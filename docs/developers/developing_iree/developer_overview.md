@@ -8,74 +8,68 @@ developers.
 
 ## Project Code Layout
 
-[iree/](https://github.com/openxla/iree/blob/main/iree/)
-
-*   Core IREE project
-
-[integrations/](https://github.com/openxla/iree/blob/main/integrations/)
-
-*   Integrations between IREE and other frameworks, such as TensorFlow
-
-[runtime/](https://github.com/openxla/iree/tree/main/runtime/)
-
-*   IREE runtime code, with no dependencies on the compiler
-
-[bindings/](https://github.com/openxla/iree/blob/main/bindings/)
-
-*   Language and platform bindings, such as Python
-*   Also see [runtime/bindings/](https://github.com/openxla/iree/tree/main/runtime/bindings)
-
-[samples/](https://github.com/openxla/iree/blob/main/samples/)
-
-*   Samples built using IREE's runtime and compiler
-*   Also see the separate https://github.com/iree-org/iree-samples repository
+* [/compiler/](https://github.com/openxla/iree/blob/main/compiler/):
+  MLIR dialects, LLVM compiler passes, module translation code, etc.
+  * [bindings/](https://github.com/openxla/iree/blob/main/compiler/bindings/):
+    Python and other language bindings
+* [/runtime/](https://github.com/openxla/iree/tree/main/runtime/):
+  Standalone runtime code including the VM and HAL drivers
+  * [bindings/](https://github.com/openxla/iree/tree/main/runtime/bindings/):
+    Python and other language bindings
+* [/integrations/](https://github.com/openxla/iree/blob/main/integrations/):
+  Integrations between IREE and other frameworks, such as TensorFlow
+* [/tests/](https://github.com/openxla/iree/blob/main/tests/):
+  Tests for full compiler->runtime workflows
+* [/tools/](https://github.com/openxla/iree/blob/main/tools/):
+  Developer tools (`iree-compile`, `iree-run-module`, etc.)
+* [/samples/](https://github.com/openxla/iree/blob/main/samples/): Also see the
+  separate https://github.com/iree-org/iree-samples repository
 
 ## IREE Compiler Code Layout
 
-[iree/compiler/](https://github.com/openxla/iree/blob/main/iree/compiler/)
-
-*   IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
+* [API/](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/API):
+  Public C API
+* [Codegen/](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Codegen):
+  Code generation for compute kernels
+* [Dialect/](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect):
+  MLIR dialects (`Flow`, `HAL`, `Stream`, `VM`, etc.)
+* [InputConversion/](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/InputConversion):
+  Conversions from input dialects and preprocessing
 
 ## IREE Runtime Code Layout
 
-[iree/base/](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/)
-
-*   Common types and utilities used throughout the runtime
-
-[iree/hal/](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/)
-
-*   **H**ardware **A**bstraction **L**ayer for IREE's runtime, with
-    implementations for hardware and software backends
-
-[iree/schemas/](https://github.com/openxla/iree/blob/main/runtime/src/iree/schemas/)
-
-*   Shared data storage format definitions, primarily using
-    [FlatBuffers](https://google.github.io/flatbuffers/)
-
-[tools/](https://github.com/openxla/iree/blob/main/tools/)
-
-*   Assorted tools used to optimize, translate, and evaluate IREE
-
-[iree/vm/](https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/)
-
-*   Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
-    IREE functions
+* [base/](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/):
+  Common types and utilities used throughout the runtime
+* [hal/](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/):
+  **H**ardware **A**bstraction **L**ayer for IREE's runtime, with
+  implementations for hardware and software backends
+* [schemas/](https://github.com/openxla/iree/blob/main/runtime/src/iree/schemas/):
+  Data storage format definitions, primarily using
+  [FlatBuffers](https://google.github.io/flatbuffers/)
+* [task/](https://github.com/openxla/iree/blob/main/runtime/src/iree/task/):
+  System for running tasks across multiple CPU threads
+* [tooling/](https://github.com/openxla/iree/blob/main/runtime/src/iree/tooling/):
+  Utilities for tests and developer tools, not suitable for use as-is in
+  downstream applications
+* [vm/](https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/):
+  Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
+  IREE functions
 
 ## Developer Tools
 
-IREE's compiler components accept programs and code fragments in several
-formats, including high level TensorFlow Python code, serialized TensorFlow
-[SavedModel](https://www.tensorflow.org/guide/saved_model) programs, and lower
-level textual MLIR files using combinations of supported dialects like `mhlo`
-and IREE's internal dialects. While input programs are ultimately compiled down
-to modules suitable for running on some combination of IREE's target deployment
-platforms, IREE's developer tools can run individual compiler passes,
-translations, and other transformations step by step.
+IREE's core compiler accepts programs in supported input MLIR dialects (e.g.
+`stablehlo`, `tosa`, `linalg`). Import tools and APIs may be used to convert
+from framework-specific formats like TensorFlow
+[SavedModel](https://www.tensorflow.org/guide/saved_model) to MLIR modules.
+While programs are ultimately compiled down to modules suitable for running on
+some combination of IREE's target deployment platforms, IREE's developer tools
+can run individual compiler passes, translations, and other transformations step
+by step.
 
 ### iree-opt
 
 `iree-opt` is a tool for testing IREE's compiler passes. It is similar to
-[mlir-opt](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-opt)
+[mlir-opt](https://github.com/llvm/llvm-project/tree/main/mlir/tools/mlir-opt)
 and runs sets of IREE's compiler passes on `.mlir` input files. See "conversion"
 in [MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#conversion)
 for more information. Transformations performed by `iree-opt` can range from
@@ -87,14 +81,14 @@ top of the file that specifies which passes should be performed and if
 `FileCheck` should be used to test the generated output.
 
 Here's an example of a small compiler pass running on a
-[test file](https://github.com/openxla/iree/blob/main/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir):
+[test file](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir):
 
 ```shell
 $ ../iree-build/tools/iree-opt \
   --split-input-file \
   --mlir-print-ir-before-all \
   --iree-drop-compiler-hints \
-  $PWD/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir
+  $PWD/compiler/src/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir
 ```
 
 For a more complex example, here's how to run IREE's complete transformation
@@ -108,10 +102,6 @@ $ ../iree-build/tools/iree-opt \
   --iree-hal-target-backends=vmvx \
   $PWD/tests/e2e/models/fullyconnected.mlir
 ```
-
-Custom passes may also be layered on top of `iree-opt`, see
-[samples/custom_modules/dialect](https://github.com/openxla/iree/blob/main/samples/custom_modules/dialect)
-for a sample.
 
 ### iree-compile
 
@@ -150,8 +140,7 @@ $ ../iree-build/tools/iree-run-module \
 The `iree-check-module` program takes an already translated IREE module as input
 and executes it as a series of
 [googletest](https://github.com/google/googletest) tests. This is the test
-runner for the IREE
-[check framework](https://github.com/openxla/iree/tree/main/docs/developing_iree/testing_guide.md#end-to-end-tests).
+runner for the IREE [check framework](./testing_guide.md#end-to-end-tests).
 
 ```shell
 $ ../iree-build/tools/iree-compile \
@@ -223,8 +212,3 @@ multiple dispatch function. When the flag is on, IREE will insert trace points
 before and after each dispatch function. The first trace op is for inputs, and
 the second trace op is for outputs. There will be two events for one dispatch
 function.
-
-### Useful Vulkan driver flags
-
-For IREE's Vulkan runtime driver, there are a few useful flags defined in
-[driver_module.cc](https://github.com/openxla/iree/blob/main/iree/hal/drivers/vulkan/registration/driver_module.cc):

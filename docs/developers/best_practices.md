@@ -66,7 +66,7 @@ TODO: sample code, profile numbers
 ### Tuning runtime settings
 
 When running on the CPU, the task system flags specified in
-[iree/task/api.c](https://github.com/openxla/iree/blob/main/iree/task/api.c)
+[iree/task/api.c](https://github.com/openxla/iree/blob/main/runtime/src/iree/task/api.c)
 give control over how worker threads will be created. For example, the
 `--task_topology_group_count=3` flag can be set to explicitly run on three
 workers rather than rely on heuristic selection that defaults to one worker
