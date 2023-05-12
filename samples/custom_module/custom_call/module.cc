@@ -183,7 +183,7 @@ Status GetFenceRefPtr(uint8_t* ptr, vm::ref<iree_hal_fence_t>& fence) {
                             iree_vm_ref_type_name(refPtr->type).data);
   }
   fence = vm::retain_ref(reinterpret_cast<iree_hal_fence_t*>(refPtr->ptr));
-  memset(refPtr, 0, sizeof(*refPtr));
+  iree_vm_ref_release(refPtr);
   return OkStatus();
 }
 
@@ -206,7 +206,7 @@ Status GetFences(const char* format, uint8_t* formattedPtr,
 Status CustomCall(CustomCallPtr fnPtr, iree_vm_function_call_t call,
                   const iree_string_view_t& formatArguments,
                   const iree_string_view_t& formatResults) {
-  auto argResFormatSize = formatArguments.size - 2;
+  auto argResFormatSize = formatArguments.size;  // - 2;
   auto argResFormatData = formatArguments.data;
   auto resFormatSize = formatResults.size;
   auto resFormatData = formatResults.data;
@@ -216,15 +216,18 @@ Status CustomCall(CustomCallPtr fnPtr, iree_vm_function_call_t call,
   IREE_ASSIGN_OR_RETURN(uint8_t * fencePtr,
                         FormattedToRaw(argResFormatData, argResFormatSize,
                                        call.arguments.data, argResList.get()));
-  vm::ref<iree_hal_fence_t> waitFence;
-  vm::ref<iree_hal_fence_t> signalFence;
-  Status status = GetFences(argResFormatData + argResFormatSize, fencePtr,
-                            waitFence, signalFence);
-  if (!status.ok()) {
-    ReleaseFormattedRef(argResFormatData, argResFormatSize,
-                        call.arguments.data);
-    return status;
-  }
+  if (!fencePtr) return iree_make_status(IREE_STATUS_UNKNOWN, "FencePtr wrong");
+  // vm::ref<iree_hal_fence_t> waitFence;
+  // vm::ref<iree_hal_fence_t> signalFence;
+  // Status status = GetFences(argResFormatData + argResFormatSize, fencePtr,
+  //                           waitFence, signalFence);
+  // if (!status.ok()) {
+  //   ReleaseFormattedRef(argResFormatData, argResFormatSize,
+  //                       call.arguments.data);
+  //   waitFence.release();
+  //   signalFence.release();
+  //   return status;
+  // }
 
   std::optional<std::string> error;
   IREE_ASSIGN_OR_RETURN(int resSize,
@@ -232,34 +235,46 @@ Status CustomCall(CustomCallPtr fnPtr, iree_vm_function_call_t call,
   uint8_t* resList = argResList.get();
   uint8_t* argList = argResList.get() + resSize;
 
-  status = iree_hal_fence_wait(waitFence.get(), iree_infinite_timeout());
-  if (!status.ok()) {
-    ReleaseFormattedRef(argResFormatData, argResFormatSize,
-                        call.arguments.data);
-    return status;
-  }
+  // status = iree_hal_fence_wait(waitFence.get(), iree_infinite_timeout());
+  // if (!status.ok()) {
+  //   ReleaseFormattedRef(argResFormatData, argResFormatSize,
+  //                       call.arguments.data);
+  //   waitFence.release();
+  //   signalFence.release();
+  //   return status;
+  // }
 
   CustomCallStatus customCallStatus;
   fnPtr((void*)resList, (void**)argList, &customCallStatus);
   if (customCallStatus.has_value()) {
     ReleaseFormattedRef(argResFormatData, argResFormatSize,
                         call.arguments.data);
+    // waitFence.release();
+    // signalFence.release();
     return iree_make_status(
         IREE_STATUS_UNKNOWN, "Custom Call returned an error: %.*s",
         (int)customCallStatus->size(), customCallStatus->data());
   }
 
-  status = CopyBetweenFormatted(resFormatData, resFormatSize,
-                                call.arguments.data, call.results.data);
+  Status status = CopyBetweenFormatted(resFormatData, resFormatSize,
+                                       call.arguments.data, call.results.data);
   ReleaseFormattedRef(argResFormatData, argResFormatSize, call.arguments.data);
   if (!status.ok()) return status;
   if (error.has_value()) {
+    // waitFence.release();
+    // signalFence.release();
     return iree_make_status(IREE_STATUS_UNKNOWN,
                             "Custom Call returned an error");
   }
-  status = iree_hal_fence_signal(signalFence.get());
-  if (!status.ok()) iree_hal_fence_fail(signalFence.get(), status.release());
+  // status = iree_hal_fence_signal(signalFence.get());
+  // if (!status.ok()) {
+  //   iree_hal_fence_fail(signalFence.get(), status.release());
+  //   waitFence.release();
+  //   signalFence.release();
+  // }
 
+  // waitFence.release();
+  // signalFence.release();
   return OkStatus();
 }
 

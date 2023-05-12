@@ -1,12 +1,11 @@
-
-// RUN: iree-compile --iree-execution-model=async-external --iree-hal-target-backends=llvm-cpu %s | \
+// RUN: iree-compile --iree-execution-model=async-internal --iree-hal-target-backends=llvm-cpu %s | \
 // RUN: iree-run-module --module=$IREE_BINARY_DIR/samples/custom_module/custom_call/module$IREE_DYLIB_EXT@create_custom_module --module=- --function=main --input="2x3xi32=[1,2,3,4,5,6]" | \
 // RUN: FileCheck %s
 
 module @example {
-  func.func private @custom_call.Double(tensor<?x?xi32>, index, index, tensor<?x?xi32>) -> tensor<?x?xi32>
+  func.func private @custom_call.Double(tensor<?x?xi32>, index, index, tensor<?x?xi32>) -> tensor<?x?xi32> attributes {iree.abi.model = "sync"}
 
-  func.func private @custom_call.Triple(tensor<?x?xi32>, index, index, tensor<?x?xi32>) -> tensor<?x?xi32>
+  func.func private @custom_call.Triple(tensor<?x?xi32>, index, index, tensor<?x?xi32>) -> tensor<?x?xi32> attributes {iree.abi.model = "sync"}
 
   // CHECK-LABEL: EXEC @main
   func.func @main(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
