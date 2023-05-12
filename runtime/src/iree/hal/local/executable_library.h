@@ -154,7 +154,7 @@ typedef const iree_hal_executable_library_header_t** (
 // a useful failure though the HAL does not mandate that all overflows are
 // caught and only that they are not harmful - clamping byte ranges and never
 // returning a failure is sufficient.
-typedef int (*iree_hal_executable_import_v0_t)(void* context, void* params,
+typedef int (*iree_hal_executable_import_v0_t)(void* params, void* context,
                                                void* reserved);
 
 // A thunk function used to call an import.
@@ -162,7 +162,7 @@ typedef int (*iree_hal_executable_import_v0_t)(void* context, void* params,
 // function pointer as the first argument followed by the arguments of the
 // import function itself.
 typedef int (*iree_hal_executable_import_thunk_v0_t)(
-    iree_hal_executable_import_v0_t fn_ptr, void* context, void* params,
+    iree_hal_executable_import_v0_t fn_ptr, void* params, void* context,
     void* reserved);
 
 // Declares imports available to the executable library at runtime.

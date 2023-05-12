@@ -30,19 +30,19 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
 #endif  // defined(IREE_UK_STANDALONE)
 
 // Plugin entry points wrapping the actual ukernels.
-static int iree_uk_plugin_mmt4d(void* context, void* params_ptr,
+static int iree_uk_plugin_mmt4d(void* params_ptr, void* context,
                                 void* reserved) {
   iree_uk_mmt4d((const iree_uk_mmt4d_params_t*)params_ptr);
   return 0;
 }
 
-static int iree_uk_plugin_pack(void* context, void* params_ptr,
+static int iree_uk_plugin_pack(void* params_ptr, void* context,
                                void* reserved) {
   iree_uk_pack((const iree_uk_pack_params_t*)params_ptr);
   return 0;
 }
 
-static int iree_uk_plugin_unpack(void* context, void* params_ptr,
+static int iree_uk_plugin_unpack(void* params_ptr, void* context,
                                  void* reserved) {
   iree_uk_unpack((const iree_uk_unpack_params_t*)params_ptr);
   return 0;
