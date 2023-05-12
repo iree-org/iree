@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE x86_64 benchmarks."""
 
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
+from benchmark_suites.iree import benchmark_tags
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups, tf_models, torch_models
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -37,9 +38,11 @@ class Linux_x86_64_Benchmarks(object):
       ])
 
   def _generate(
-      self, model_group_and_threads: List[common_definitions.Model],
+      self,
+      benchmark_configs: List[common_definitions.CpuBenchmarkConfig],
       compile_config: iree_definitions.CompileConfig,
-      device_specs: List[common_definitions.DeviceSpec]
+      device_specs: List[common_definitions.DeviceSpec],
+      tags: Sequence[str] = [],
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     gen_configs_all = []
@@ -48,14 +51,15 @@ class Linux_x86_64_Benchmarks(object):
     # We avoid the full combinatorial explosion of testing all models with all
     # thread counts and instead test each model with a number of threads
     # appropriate for its size and configurations we're interested in.
-    for model_config, thread_counts in model_group_and_threads:
+    for config in benchmark_configs:
       gen_config = iree_definitions.ModuleGenerationConfig.build(
           compile_config=compile_config,
           imported_model=iree_definitions.ImportedModel.from_model(
-              model_config))
+              config.model),
+          tags=tags)
 
       execution_configs = []
-      for thread in thread_counts:
+      for thread in config.threads:
         if thread == 0:
           execution_configs.append(
               module_execution_configs.ELF_LOCAL_SYNC_CONFIG)
@@ -66,7 +70,8 @@ class Linux_x86_64_Benchmarks(object):
       run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
           module_generation_configs=[gen_config],
           module_execution_configs=execution_configs,
-          device_specs=device_specs)
+          device_specs=device_specs,
+          tags=tags)
 
       gen_configs_all.append(gen_config)
       run_configs_all.extend(run_configs)
@@ -83,15 +88,27 @@ class Linux_x86_64_Benchmarks(object):
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
 
+    # The X86_64 tag is required to put them into the X86_64 benchmark preset.
     default_gen_configs, default_run_configs = self._generate(
-        model_groups.x86_64_MODELS_AND_THREADS, self.CASCADELAKE_COMPILE_CONFIG,
-        cascadelake_devices)
+        model_groups.X86_64_BENCHMARK_CONFIG,
+        self.CASCADELAKE_COMPILE_CONFIG,
+        cascadelake_devices,
+        tags=[benchmark_tags.X86_64])
     experimental_gen_configs, experimental_run_configs = self._generate(
-        model_groups.x86_64_MODELS_AND_THREADS_EXPERIMENTAL,
-        self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG, cascadelake_devices)
+        model_groups.X86_64_BENCHMARK_CONFIG_EXPERIMENTAL,
+        self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
+        cascadelake_devices,
+        tags=[benchmark_tags.X86_64])
 
-    return (default_gen_configs + experimental_gen_configs,
-            default_run_configs + experimental_run_configs)
+    long_running_gen_configs, long_running_run_configs = self._generate(
+        model_groups.X86_64_BENCHMARK_CONFIG_LONG,
+        self.CASCADELAKE_COMPILE_CONFIG,
+        cascadelake_devices,
+        tags=[benchmark_tags.X86_64, benchmark_tags.LONG_RUNNING])
+
+    return (default_gen_configs + experimental_gen_configs +
+            long_running_gen_configs, default_run_configs +
+            experimental_run_configs + long_running_run_configs)
 
 
 def generate() -> Tuple[List[iree_definitions.ModuleGenerationConfig],
