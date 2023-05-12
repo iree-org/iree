@@ -201,8 +201,8 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass(
+    bool tileOuterToOne) {
   return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
 }
 
