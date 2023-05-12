@@ -227,6 +227,9 @@ def OptimizeVectorTransfer :
     Option<"optionFlatten", "flatten", "bool", "false",
            "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
   ];
+  let dependentDialects = [
+      "memref::MemRefDialect"
+  ];
 }
 
 def SplitFullPartialTransfer :
