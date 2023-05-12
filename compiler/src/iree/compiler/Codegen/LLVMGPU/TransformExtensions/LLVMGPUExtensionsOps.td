@@ -558,4 +558,41 @@ def ReorderTransposeOp :
 
 }
 
+def GPUMicrokernelOp : Op<
+    Transform_Dialect, "iree.microkernel_gpu_matmul", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface]> {
+
+  let description = [{
+    Transforms the tiled `linalg.matmul` Op to the `ukernel.generic` Op.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          I64Attr:$tile_k,
+          I64Attr:$stages,
+          OptionalAttr<StrAttr>:$name
+  );
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = "$target `,` (`name` `=` $name^ `,`)? `stages` `=` $stages `,` `tile_k` `=` $tile_k attr-dict `:` functional-type($target, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+      OpBuilder<(ins "Value":$target,
+                   "int64_t":$tile_k,
+                   "int64_t":$stages,
+                   "StringAttr":$name)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
