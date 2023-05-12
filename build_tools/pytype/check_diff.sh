@@ -18,7 +18,13 @@ DIFF_TARGET="${1:-main}"
 echo "Running pycheck against '${DIFF_TARGET?}'"
 
 if [[ "${DIFF_TARGET?}" = "all" ]]; then
-  FILES=$(find -name "*\.py" -not -path "./third_party/*")
+  # Exclude third_party files and some directories that we add to .gitignore
+  FILES=$(find -name "*\.py" \
+          -not -path "./third_party/*" \
+          -not -path ".venv/*" \
+          -not -path "*.venv/*" \
+          -not -path "./build/*" \
+          -not -path "./build-*/*")
 else
   FILES=$(git diff --diff-filter=d --name-only "${DIFF_TARGET?}" | grep '.*\.py$' | grep -vP 'lit.cfg.py')
 fi
@@ -48,7 +54,7 @@ function check_files() {
   # will hard fail if the limits are exceeded.
   # See https://github.com/bazelbuild/bazel/issues/12479
   echo "${@:2}" | \
-    xargs --max-args 1000000 --max-chars 1000000 --exit \
+    xargs --max-args 1000000 --max-chars 1000000 \
       python3 -m pytype --disable=import-error,pyi-error,module-attr -j $(nproc)
   EXIT_CODE="$?"
   echo
