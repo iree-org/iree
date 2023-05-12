@@ -24,6 +24,10 @@ void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
                                        TypeConverter &typeConverter,
                                        RewritePatternSet &patterns);
+void populateUtilAssignmentToVMPatterns(MLIRContext *context,
+                                        ConversionTarget &conversionTarget,
+                                        TypeConverter &typeConverter,
+                                        RewritePatternSet &patterns);
 void populateUtilBufferToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
@@ -109,6 +113,8 @@ void populateUtilToVMPatterns(MLIRContext *context,
 
   populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
                                     patterns);
+  populateUtilAssignmentToVMPatterns(context, conversionTarget, typeConverter,
+                                     patterns);
   populateUtilBufferToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
   populateUtilGlobalToVMPatterns(context, conversionTarget, typeConverter,

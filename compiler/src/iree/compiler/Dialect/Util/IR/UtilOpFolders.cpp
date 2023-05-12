@@ -403,6 +403,37 @@ OpFoldResult SizeOfOp::fold(FoldAdaptor operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// util.switch
+//===----------------------------------------------------------------------===//
+
+OpFoldResult SwitchOp::fold(FoldAdaptor operands) {
+  APInt indexValue;
+  if (matchPattern(getIndex(), m_ConstantInt(&indexValue))) {
+    // Index is constant and we can resolve immediately.
+    int64_t index = indexValue.getSExtValue();
+    if (index < 0 || index >= getValues().size()) {
+      return getDefaultValue();
+    }
+    return getValues()[index];
+  }
+
+  bool allValuesMatch = true;
+  for (auto value : getValues()) {
+    if (value != getDefaultValue()) {
+      allValuesMatch = false;
+      break;
+    }
+  }
+  if (allValuesMatch) {
+    // All values (and the default) are the same so just return it regardless of
+    // the provided index.
+    return getDefaultValue();
+  }
+
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 

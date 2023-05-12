@@ -182,6 +182,28 @@ void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<TypedValueList>(ref($type_value), $values)
+//===----------------------------------------------------------------------===//
+
+ParseResult parseTypedValueList(
+    OpAsmParser &parser, Type type,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+    SmallVectorImpl<Type> &valueTypes) {
+  if (failed(parser.parseOperandList(values, AsmParser::Delimiter::Square))) {
+    return failure();
+  }
+  valueTypes.append(values.size(), type);
+  return success();
+}
+
+void printTypedValueList(OpAsmPrinter &p, Operation *op, Type type,
+                         OperandRange values, TypeRange valueTypes) {
+  p << "[";
+  p.printOperands(values);
+  p << "]";
+}
+
+//===----------------------------------------------------------------------===//
 // custom<RangeList>($offsets, $lengths)
 //===----------------------------------------------------------------------===//
 // [%offset for %length], [%offset for %length], ...
