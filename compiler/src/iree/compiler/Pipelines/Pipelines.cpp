@@ -46,6 +46,10 @@ void buildIREEVMTransformPassPipeline(
   // After input processing, there should only be IREE legal types in
   // signatures.
   IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Input");
+  if (hooks.pipelineExtensions) {
+    hooks.pipelineExtensions->extendInputConversionPreprocessingPassPipeline(
+        passManager, inputOptions.type);
+  }
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;

@@ -17,6 +17,7 @@ iree_compiler_cc_library(
     srcs = ["Client.cpp"],
     hdrs = ["Client.h"],
     deps = [
+        "//compiler/src/iree/compiler/Pipelines:Options",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
     ],
