@@ -31,13 +31,18 @@ CMD=(
   --max-time 1800
 )
 
+TARGET_BACKEND=""
+
 if (( ${IREE_VULKAN_DISABLE} != 1 )); then
-  CMD+=(-D FEATURES=vulkan)
-  if (( ${IREE_VMVX_TESTS_ENABLE} == 1 )); then
-    CMD+=(,vmvx)
-  fi
-elif (( ${IREE_VMVX_TESTS_ENABLE} == 1 )); then
-  CMD+=(-D FEATURES=vmvx)
+  TARGET_BACKEND="vulkan"
+fi
+
+if (( ${IREE_VMVX_TESTS_ENABLE} == 1 )); then
+  TARGET_BACKEND="vmvx,${TARGET_BACKEND}"
+fi
+
+if [[ -n ${TARGET_BACKEND} ]]; then
+  CMD+=(-D FEATURES=${TARGET_BACKEND})
 fi
 
 if (( ${IREE_LLVM_CPU_DISABLE} == 1 )); then
