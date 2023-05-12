@@ -107,6 +107,29 @@ func.func @all_reduce_maximum_optional_attrs(%input : tensor<2304xf32>) -> tenso
 
 // -----
 
+// CHECK-LABEL: @all_reduce_sum_with_groups
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<2x4xi32>)
+func.func @all_reduce_sum_with_groups(%input : tensor<2x4xi32>) -> tensor<2x4xi32> {
+  // CHECK: %[[BASE_CHANNEL:.+]] = flow.channel.default : !flow.channel
+  // CHECK: %[[BASE_RANK:.+]] = flow.channel.rank %[[BASE_CHANNEL]]
+  // CHECK: %[[SPLIT_COLOR:.+]] = util.switch index from [%c0, %c1] at %[[BASE_RANK]] else %c-1
+  // CHECK: %[[SPLIT_KEY:.+]] = util.switch index from [%c0, %c0] at %[[BASE_RANK]] else %c-1
+  // CHECK: %[[SPLIT_CHANNEL:.+]] = flow.channel.split %[[BASE_CHANNEL]], %[[SPLIT_COLOR]], %[[SPLIT_KEY]] : !flow.channel
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<2x4xi32>
+  // CHECK: %[[OP:.+]] = flow.collective.all_reduce sum, ui32, %[[EMPTY]], %[[ARG0]], %[[SPLIT_CHANNEL]] : (tensor<2x4xi32>, tensor<2x4xi32>, !flow.channel) -> %[[EMPTY]] as tensor<2x4xi32>
+  // CHECK: return %[[OP]] : tensor<2x4xi32>
+  %out = "stablehlo.all_reduce"(%input) ({
+    ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
+      %sum = stablehlo.add %arg0, %arg1 : tensor<i32>
+      stablehlo.return %sum : tensor<i32>
+    }) {channel_handle = #stablehlo.channel_handle<handle = 1, type = 1>,
+        replica_groups = dense<[[0], [1]]> : tensor<2x1xi64>,
+        use_global_device_ids} : (tensor<2x4xi32>) -> tensor<2x4xi32>
+  return %out : tensor<2x4xi32>
+}
+
+// -----
+
 // CHECK-LABEL: @all_gather_dim_0
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<512xf32>) -> tensor<1024xf32>
 func.func @all_gather_dim_0(%input : tensor<512xf32>) -> tensor<1024xf32> {
