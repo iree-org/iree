@@ -319,6 +319,8 @@ EXPORTS
   mlirIdentifierGetContext
   mlirIdentifierStr
   mlirIndexTypeGet
+  mlirInferShapedTypeOpInterfaceInferReturnTypes
+  mlirInferShapedTypeOpInterfaceTypeID
   mlirInferTypeOpInterfaceInferReturnTypes
   mlirInferTypeOpInterfaceTypeID
   mlirIntegerAttrGet

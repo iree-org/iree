@@ -327,6 +327,8 @@ extern void mlirIdentifierGet();
 extern void mlirIdentifierGetContext();
 extern void mlirIdentifierStr();
 extern void mlirIndexTypeGet();
+extern void mlirInferShapedTypeOpInterfaceInferReturnTypes();
+extern void mlirInferShapedTypeOpInterfaceTypeID();
 extern void mlirInferTypeOpInterfaceInferReturnTypes();
 extern void mlirInferTypeOpInterfaceTypeID();
 extern void mlirIntegerAttrGet();
@@ -918,6 +920,8 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirIdentifierGetContext;
   x += (uintptr_t)&mlirIdentifierStr;
   x += (uintptr_t)&mlirIndexTypeGet;
+  x += (uintptr_t)&mlirInferShapedTypeOpInterfaceInferReturnTypes;
+  x += (uintptr_t)&mlirInferShapedTypeOpInterfaceTypeID;
   x += (uintptr_t)&mlirInferTypeOpInterfaceInferReturnTypes;
   x += (uintptr_t)&mlirInferTypeOpInterfaceTypeID;
   x += (uintptr_t)&mlirIntegerAttrGet;

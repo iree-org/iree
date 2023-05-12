@@ -62,6 +62,9 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
 
 struct DecomposePackUnPackOpsPass
     : public DecomposePackUnPackOpsBase<DecomposePackUnPackOpsPass> {
+  DecomposePackUnPackOpsPass(bool tileOuterToOne) {
+    this->tileOuterToOne = tileOuterToOne;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
@@ -89,7 +92,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     }
   }
 
-  {
+  // Do not convert pack and unpack ops if outer dims are expected to always be
+  // tiled to one.
+  if (!tileOuterToOne) {
     RewritePatternSet patterns(ctx);
     patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
@@ -196,9 +201,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createDecomposePackUnPackOpsPass() {
-  return std::make_unique<DecomposePackUnPackOpsPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass(
+    bool tileOuterToOne) {
+  return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
 }
 
 }  // namespace iree_compiler

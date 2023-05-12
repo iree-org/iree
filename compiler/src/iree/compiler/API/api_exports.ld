@@ -320,6 +320,8 @@ VER_0 {
     mlirIdentifierGetContext;
     mlirIdentifierStr;
     mlirIndexTypeGet;
+    mlirInferShapedTypeOpInterfaceInferReturnTypes;
+    mlirInferShapedTypeOpInterfaceTypeID;
     mlirInferTypeOpInterfaceInferReturnTypes;
     mlirInferTypeOpInterfaceTypeID;
     mlirIntegerAttrGet;
