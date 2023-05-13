@@ -147,6 +147,12 @@ static void iree_vm_bytecode_module_destroy(void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Ensure all rodata references are unused and deinitialized.
+  for (int i = 0; i < module->rodata_ref_count; ++i) {
+    iree_vm_buffer_t* ref = &module->rodata_ref_table[i];
+    iree_vm_buffer_deinitialize(ref);
+  }
+
   module->def = NULL;
   iree_allocator_free(module->archive_allocator,
                       (void*)module->archive_contents.data);
@@ -603,8 +609,6 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
     global_ref_count =
         iree_vm_ModuleStateDef_global_ref_count(module_state_def);
   }
-  iree_host_size_t rodata_ref_count = iree_vm_RodataSegmentDef_vec_len(
-      iree_vm_BytecodeModuleDef_rodata_segments(module_def));
   iree_host_size_t import_function_count = iree_vm_ImportFunctionDef_vec_len(
       iree_vm_BytecodeModuleDef_imported_functions(module_def));
 
@@ -623,12 +627,6 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
     state->global_ref_table = (iree_vm_ref_t*)(base_ptr + offset);
   }
   offset += iree_host_align(global_ref_count * sizeof(iree_vm_ref_t), 16);
-
-  if (state) {
-    state->rodata_ref_count = rodata_ref_count;
-    state->rodata_ref_table = (iree_vm_buffer_t*)(base_ptr + offset);
-  }
-  offset += iree_host_align(rodata_ref_count * sizeof(iree_vm_buffer_t), 16);
 
   if (state) {
     state->import_count = import_function_count;
@@ -664,33 +662,6 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   // Perform layout to get the pointers into the storage for each nested table.
   iree_vm_bytecode_module_layout_state(module_def, state);
 
-  // Setup rodata segments to point directly at the FlatBuffer memory.
-  iree_vm_RodataSegmentDef_vec_t rodata_segments =
-      iree_vm_BytecodeModuleDef_rodata_segments(module_def);
-  for (int i = 0; i < state->rodata_ref_count; ++i) {
-    iree_vm_RodataSegmentDef_table_t segment =
-        iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
-    iree_byte_span_t byte_span = iree_byte_span_empty();
-    if (iree_vm_RodataSegmentDef_embedded_data_is_present(segment)) {
-      // Data is embedded in the FlatBuffer.
-      byte_span = iree_make_byte_span(
-          (uint8_t*)iree_vm_RodataSegmentDef_embedded_data(segment),
-          flatbuffers_uint8_vec_len(
-              iree_vm_RodataSegmentDef_embedded_data(segment)));
-    } else {
-      // Data is concatenated with the FlatBuffer at some relative offset.
-      // Note that we've already verified the referenced range is in bounds.
-      byte_span = iree_make_byte_span(
-          (uint8_t*)module->archive_contents.data +
-              module->archive_rodata_offset +
-              iree_vm_RodataSegmentDef_external_data_offset(segment),
-          iree_vm_RodataSegmentDef_external_data_length(segment));
-    }
-    iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
-    iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, byte_span,
-                              iree_allocator_null(), ref);
-  }
-
   *out_module_state = (iree_vm_module_state_t*)state;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -707,12 +678,6 @@ static void iree_vm_bytecode_module_free_state(
   // Release remaining global references.
   for (int i = 0; i < state->global_ref_count; ++i) {
     iree_vm_ref_release(&state->global_ref_table[i]);
-  }
-
-  // Ensure all rodata references are unused and deinitialized.
-  for (int i = 0; i < state->rodata_ref_count; ++i) {
-    iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
-    iree_vm_buffer_deinitialize(ref);
   }
 
   iree_allocator_free(state->allocator, module_state);
@@ -858,13 +823,20 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   }
 
   iree_vm_TypeDef_vec_t type_defs = iree_vm_BytecodeModuleDef_types(module_def);
-  size_t type_table_size =
-      iree_vm_TypeDef_vec_len(type_defs) * sizeof(iree_vm_type_def_t);
+  size_t type_table_size = iree_host_align(
+      iree_vm_TypeDef_vec_len(type_defs) * sizeof(iree_vm_type_def_t), 16);
+
+  iree_host_size_t rodata_ref_count = iree_vm_RodataSegmentDef_vec_len(
+      iree_vm_BytecodeModuleDef_rodata_segments(module_def));
+  size_t rodata_ref_table_size =
+      iree_host_align(rodata_ref_count * sizeof(iree_vm_buffer_t), 16);
 
   iree_vm_bytecode_module_t* module = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(allocator, sizeof(*module) + type_table_size,
-                                (void**)&module));
+      z0,
+      iree_allocator_malloc(
+          allocator, sizeof(*module) + type_table_size + rodata_ref_table_size,
+          (void**)&module));
   module->allocator = allocator;
 
   iree_vm_FunctionDescriptor_vec_t function_descriptors =
@@ -880,7 +852,6 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
 
   module->archive_contents = archive_contents;
   module->archive_allocator = archive_allocator;
-  module->archive_rodata_offset = archive_rodata_offset;
   module->def = module_def;
 
   module->type_count = iree_vm_TypeDef_vec_len(type_defs);
@@ -913,6 +884,35 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->interface.notify = iree_vm_bytecode_module_notify;
   module->interface.begin_call = iree_vm_bytecode_module_begin_call;
   module->interface.resume_call = iree_vm_bytecode_module_resume_call;
+
+  // Setup rodata segments to point directly at the FlatBuffer memory.
+  module->rodata_ref_count = rodata_ref_count;
+  module->rodata_ref_table =
+      (iree_vm_buffer_t*)((uint8_t*)module + sizeof(*module) + type_table_size);
+  iree_vm_RodataSegmentDef_vec_t rodata_segments =
+      iree_vm_BytecodeModuleDef_rodata_segments(module_def);
+  for (int i = 0; i < module->rodata_ref_count; ++i) {
+    iree_vm_RodataSegmentDef_table_t segment =
+        iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
+    iree_byte_span_t byte_span = iree_byte_span_empty();
+    if (iree_vm_RodataSegmentDef_embedded_data_is_present(segment)) {
+      // Data is embedded in the FlatBuffer.
+      byte_span = iree_make_byte_span(
+          (uint8_t*)iree_vm_RodataSegmentDef_embedded_data(segment),
+          flatbuffers_uint8_vec_len(
+              iree_vm_RodataSegmentDef_embedded_data(segment)));
+    } else {
+      // Data is concatenated with the FlatBuffer at some relative offset.
+      // Note that we've already verified the referenced range is in bounds.
+      byte_span = iree_make_byte_span(
+          (uint8_t*)module->archive_contents.data + archive_rodata_offset +
+              iree_vm_RodataSegmentDef_external_data_offset(segment),
+          iree_vm_RodataSegmentDef_external_data_length(segment));
+    }
+    iree_vm_buffer_t* ref = &module->rodata_ref_table[i];
+    iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, byte_span,
+                              iree_allocator_null(), ref);
+  }
 
   // Verify functions in the module now that we've verified the metadata that we
   // need to do so.

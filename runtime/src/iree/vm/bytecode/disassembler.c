@@ -636,8 +636,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       uint32_t rodata_ordinal = VM_ParseRodataAttr("rodata");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("value", &result_is_move);
-      iree_vm_buffer_t* buffer =
-          &module_state->rodata_ref_table[rodata_ordinal];
+      iree_vm_buffer_t* buffer = &module->rodata_ref_table[rodata_ordinal];
       EMIT_REF_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.const.ref.rodata %u  // 0x%p %" PRIhsz "b", rodata_ordinal,
