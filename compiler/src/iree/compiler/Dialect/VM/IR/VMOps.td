@@ -1926,7 +1926,7 @@ class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
@@ -1965,7 +1965,7 @@ class VM_SwitchFloatOp<F type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
