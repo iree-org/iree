@@ -1224,11 +1224,20 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
       exportOp->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
           .getValue();
-  state.addAttribute(
-      "entry_point",
+  auto entryPoint =
       SymbolRefAttr::get(builder.getContext(), executableOpSymName,
-                         {SymbolRefAttr::get(exportOp)}));
+                         {SymbolRefAttr::get(exportOp)});
+  build(builder, state, entryPoint, workload, resultTypes, resultDims, operands,
+        operandDims, tiedOperands, attributes);
+}
 
+void DispatchOp::build(OpBuilder &builder, OperationState &state,
+                       SymbolRefAttr entryPoint, ValueRange workload,
+                       TypeRange resultTypes, ValueRange resultDims,
+                       ValueRange operands, ValueRange operandDims,
+                       ArrayAttr tiedOperands,
+                       ArrayRef<NamedAttribute> attributes) {
+  state.addAttribute("entry_point", entryPoint);
   state.addOperands(workload);
   state.addTypes(resultTypes);
   state.addOperands(operands);
