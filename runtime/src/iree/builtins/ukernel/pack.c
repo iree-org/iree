@@ -247,12 +247,13 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   }
 }
 
-IREE_UK_EXPORT void iree_uk_pack(const iree_uk_pack_params_t* params) {
+IREE_UK_EXPORT int iree_uk_pack(const iree_uk_pack_params_t* params) {
   iree_uk_pack_validate(params);
 
-  if (iree_uk_pack_early(params)) return;
+  if (iree_uk_pack_early(params)) return 0;
 
   // Select a target-specific tile_func and use that with generic outer loops.
   iree_uk_pack_tile_func_t tile_func = iree_uk_pack_select_tile_func(params);
   iree_uk_pack_using_tile_func(params, tile_func);
+  return 0;
 }
