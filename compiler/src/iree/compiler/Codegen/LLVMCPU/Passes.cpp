@@ -402,16 +402,17 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTileAndFusePass(tilingConfig.getParallelCacheIdx()));
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileAndFusePass(tilingConfig.getParallelVectorIdx()));
-  nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ParallelDims));
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTilePass(tilingConfig.getReductionCacheIdx()));
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
-  nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
 
   {
     LLVMCPUVectorizationPassOptions options;

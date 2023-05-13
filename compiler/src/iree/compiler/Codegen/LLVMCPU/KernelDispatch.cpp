@@ -774,16 +774,18 @@ static LogicalResult setDefaultRootConfig(
   return success();
 }
 
-static void getDefaultMatmulCacheSizes(linalg::LinalgOp op,
-                                       SmallVectorImpl<int64_t> &sizes) {
+static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  SmallVector<int64_t> sizes;
   if (isX86(targetAttr)) {
-    sizes.append({8, 32, 16});
-    return;
+    // Tiling k dim doesn't make sense unless we interchange the loops, which
+    // would prevent fusion.
+    sizes.append({8, 32, 8});
+    return sizes;
   }
 
   sizes.append({0, 0, 0});
-  return;
+  return sizes;
 }
 
 static LogicalResult setMatmulPadRootConfig(
@@ -1068,8 +1070,8 @@ static LogicalResult setRootConfig(
       maxTileSizes[1] = 128;
     }
 
-    SmallVector<int64_t> defaultCacheTileSizes;
-    getDefaultMatmulCacheSizes(linalgOp, defaultCacheTileSizes);
+    SmallVector<int64_t> defaultCacheTileSizes =
+        getDefaultMatmulCacheSizes(linalgOp);
     cacheTileSizes.append(defaultCacheTileSizes.end() - numLoops,
                           defaultCacheTileSizes.end());
 
