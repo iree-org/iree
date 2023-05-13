@@ -780,7 +780,7 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
   if (isX86(targetAttr)) {
     // Tiling k dim doesn't make sense unless we interchange the loops, which
     // would prevent fusion.
-    sizes.append({8, 32, 8});
+    sizes.append({8, 32, 16});
     return sizes;
   }
 
