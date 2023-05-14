@@ -780,7 +780,7 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
   if (isX86(targetAttr)) {
     // Tiling k dim doesn't make sense unless we interchange the loops, which
     // would prevent fusion.
-    sizes.append({12, 64, 16});
+    sizes.append({8, 32, 16});
     return sizes;
   }
 
@@ -945,7 +945,7 @@ static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
                                            int64_t vectorSize) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
-    sizes.append({6, 64, 4});
+    sizes.append({8, 16, 1});
     return;
   }
 
