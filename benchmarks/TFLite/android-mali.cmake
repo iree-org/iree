@@ -159,7 +159,7 @@ iree_benchmark_suite(
 # Otherwise you'll get error like:
 # ```
 # INTERNAL; VK_ERROR_DEVICE_LOST; vkQueueSubmit; while invoking native function
-# hal.ex.submit_and_wait; while calling import;
+# hal.fence.await; while calling import;
 # ```
 
 # GPU, Vulkan, Mali, kernel-execution

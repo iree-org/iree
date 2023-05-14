@@ -36,7 +36,7 @@ class Android_Mali_Benchmarks(object):
   # Otherwise you'll get error like:
   # ```
   # INTERNAL; VK_ERROR_DEVICE_LOST; vkQueueSubmit; while invoking native function
-  # hal.ex.submit_and_wait; while calling import;
+  # hal.fence.await; while calling import;
   # ```
   FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.

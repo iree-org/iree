@@ -11,12 +11,6 @@ vm.module @hal {
 vm.import private @ex.shared_device() -> !vm.ref<!hal.device>
 attributes {nosideeffects}
 
-vm.import private @ex.submit_and_wait(
-  %device : !vm.ref<!hal.device>,
-  %command_buffer : !vm.ref<!hal.command_buffer>
-)
-attributes {vm.yield}
-
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
