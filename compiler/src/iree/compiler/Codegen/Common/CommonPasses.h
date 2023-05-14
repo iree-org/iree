@@ -129,6 +129,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFuseTensorPadWithConsumerPass();
 
+/// Creates a pass to distribute scf.forall ops to GPU processors.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute();
+
 /// Convert GPU shared memory copies to distributed
 /// transfer_read/transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>>

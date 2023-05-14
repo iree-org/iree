@@ -192,6 +192,7 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "ExtractAddressComputation.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
+    "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUMultiBuffering.cpp"
     "GPUPatterns.cpp"

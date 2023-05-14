@@ -21,7 +21,6 @@ iree_lit_test_suite(
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
     "create_async_groups.mlir"
-    "distribute_foreach.mlir"
     "distribute_to_thread.mlir"
     "elementwise_pipeline.mlir"
     "extract_address_computation_gpu.mlir"

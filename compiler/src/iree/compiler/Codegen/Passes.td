@@ -332,6 +332,12 @@ def MemrefCopyToLinalgPass :
       "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
 }
 
+def GPUDistribute :
+    Pass<"iree-codegen-gpu-distribute", "func::FuncOp"> {
+  let summary = "Pass to distribute scf.forall ops.";
+  let constructor = "mlir::iree_compiler::createGPUDistribute()";
+}
+
 def GPUDistributeSharedMemoryCopy :
     Pass<"iree-gpu-distribute-shared-memory-copy", "func::FuncOp"> {
   let summary = "Pass to distribute shared memory copies to threads.";
@@ -717,12 +723,6 @@ def LLVMGPUTileAndDistribute :
     Pass<"iree-llvmgpu-tile-and-distribute", "func::FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
-}
-
-def LLVMGPUDistribute :
-    Pass<"iree-llvmgpu-distribute", "func::FuncOp"> {
-  let summary = "Pass to distribute scf.forall ops.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUDistribute()";
 }
 
 def LLVMGPUPackSharedMemoryAlloc :
