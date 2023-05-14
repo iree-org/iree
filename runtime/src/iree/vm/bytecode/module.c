@@ -546,7 +546,7 @@ static iree_status_t iree_vm_bytecode_module_source_location_format(
 }
 
 static iree_status_t iree_vm_bytecode_module_resolve_source_location(
-    void* self, iree_vm_stack_frame_t* frame,
+    void* self, iree_vm_function_t function, iree_vm_source_offset_t pc,
     iree_vm_source_location_t* out_source_location) {
   // Get module debug database, if available.
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
@@ -560,11 +560,11 @@ static iree_status_t iree_vm_bytecode_module_resolve_source_location(
   // Map the (potentially) export ordinal into the internal function ordinal in
   // the function descriptor table.
   uint16_t ordinal;
-  if (frame->function.linkage == IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
-    ordinal = frame->function.ordinal;
+  if (function.linkage == IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
+    ordinal = function.ordinal;
   } else {
-    IREE_RETURN_IF_ERROR(iree_vm_bytecode_map_internal_ordinal(
-        module, frame->function, &ordinal, NULL));
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_map_internal_ordinal(module, function,
+                                                               &ordinal, NULL));
   }
 
   // Lookup the source map for the function, if available.
@@ -582,7 +582,7 @@ static iree_status_t iree_vm_bytecode_module_resolve_source_location(
   // actual lookup within the source map on demand.
   out_source_location->self = (void*)debug_database_def;
   out_source_location->data[0] = (uint64_t)source_map_def;
-  out_source_location->data[1] = (uint64_t)frame->pc;
+  out_source_location->data[1] = (uint64_t)pc;
   out_source_location->format = iree_vm_bytecode_module_source_location_format;
   return iree_ok_status();
 }
