@@ -202,25 +202,20 @@ typedef struct iree_hal_metal_command_buffer_t {
 
     // Metal APIs mandate we create argument bufffers (for descriptor sets) from compiled kernel
     // function. That means we need to bind the compute kernel first before setting descriptors and
-    // binding buffers. So we need to cache the descriptor information by ourselves and apply them
-    // in a delayed manner.
-
-    // TODO(antiagainst): Switch to use separate lists for different descriptor sets to avoid the
-    // overhead of sorting and iterating through the whole list.
-
-    // A sorted flat list of descriptors from all pushed descriptor sets.
-    iree_hal_metal_descriptor_t current_descriptors[IREE_HAL_METAL_MAX_BINDING_COUNT];
-    // The total used slot count / next unused slot index in |current_descriptors|.
-    int current_total_binding_count;
-    // The max descriptor set number we have seen thus far.
-    int current_max_set_number;
+    // binding buffers. However in IREE HAL API we see push descriptors before the dispatch command.
+    // So we need to cache the descriptor information by ourselves and record them at dispatch time.
+    struct {
+      iree_hal_metal_descriptor_t bindings[IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT];
+      // The number of binding slots (not max binding slot number) that are active.
+      uint32_t active_count;
+    } descriptor_sets[IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX];
 
     // All available push constants updated each time push_constants is called. Reset only with the
     // command buffer and otherwise will maintain its values during recording to allow for partial
     // push_constants updates.
     int32_t push_constants[IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT];
 
-    // The current pipeline layout used for push descriptors.
+    // The current pipeline layout used for push descriptors and constants.
     iree_hal_pipeline_layout_t* current_pipeline_layout;
   } state;
 } iree_hal_metal_command_buffer_t;
@@ -381,12 +376,8 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     command_buffer->state.blit_encoder = nil;
     command_buffer->state.encoder_event = [queue.device newEvent];  // +1
     command_buffer->state.next_encoder_event_value = 1;
-    memset(command_buffer->state.current_descriptors, 0,
-           IREE_HAL_METAL_MAX_BINDING_COUNT * sizeof(command_buffer->state.current_descriptors[0]));
-    command_buffer->state.current_total_binding_count = 0;
-    command_buffer->state.current_max_set_number = -1;
+    memset(command_buffer->state.descriptor_sets, 0, sizeof(command_buffer->state.descriptor_sets));
     memset(command_buffer->state.push_constants, 0, sizeof(command_buffer->state.push_constants));
-    command_buffer->state.current_pipeline_layout = NULL;
 
     *out_command_buffer = &command_buffer->base;
   }
@@ -837,7 +828,6 @@ static iree_status_t iree_hal_metal_command_buffer_push_constants(
   // "Binding a pipeline with a layout that is not compatible with the push constant layout does not
   // disturb the push constant values." So we don't need to check whether the pipeline layout
   // compatibility and invalidate existing values.
-  // See https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html
 
   if (IREE_UNLIKELY(offset + values_length >= sizeof(command_buffer->state.push_constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -849,23 +839,6 @@ static iree_status_t iree_hal_metal_command_buffer_push_constants(
   command_buffer->state.current_pipeline_layout = pipeline_layout;
 
   return iree_ok_status();
-}
-
-static int compare_descriptor(const void* a, const void* b) {
-  const iree_hal_metal_descriptor_t* buffer_a = (const iree_hal_metal_descriptor_t*)a;
-  const iree_hal_metal_descriptor_t* buffer_b = (const iree_hal_metal_descriptor_t*)b;
-  if (buffer_a->set != buffer_b->set) return buffer_a->set - buffer_b->set;
-  return buffer_a->binding - buffer_b->binding;
-}
-
-// Returns true if the given |descriptors| array contains descriptors in ascending binding slot
-// order and there is no duplicated binding slots.
-static bool iree_hal_metal_is_sorted_unique_descriptors(iree_hal_metal_descriptor_t* descriptors,
-                                                        int descriptor_count) {
-  for (int i = 1; i < descriptor_count; ++i) {
-    if (compare_descriptor(&descriptors[i - 1], &descriptors[i]) >= 0) return false;
-  }
-  return true;
 }
 
 static inline MTLResourceUsage iree_hal_metal_get_metal_resource_usage(
@@ -881,41 +854,30 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_ASSERT(set != IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX);
-  iree_hal_metal_descriptor_t* descriptors = command_buffer->state.current_descriptors;
-  IREE_ASSERT(iree_hal_metal_is_sorted_unique_descriptors(
-      descriptors, command_buffer->state.current_total_binding_count));
-
-  if (command_buffer->state.current_max_set_number >= (int)set) {
-    // We are pushing an already seen set. This would invalidate all sets with the given number and
-    // larger ones. So clear all affected bindings.
-    // TODO(antiagainst): We should actually check current pipeline's layout compatibility with
-    // previous one and decide whether we should invalidate lower numbered sets too. For now we
-    // assume the compiler side is doing proper job of guaranteeing that.
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/html/chap14.html#descriptorsets-compatibility
-    int* count = &command_buffer->state.current_total_binding_count;
-    while (*count > 0 && descriptors[*count - 1].set >= (int)set) --(*count);
-    command_buffer->state.current_max_set_number = (*count == 0) ? -1 : descriptors[*count - 1].set;
+  if (binding_count > IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "exceeded available binding slots for push descriptor set #%u; "
+                            "requested %lu vs. maximal %d",
+                            set, binding_count, IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT);
   }
 
-  // Pushing a new set with a larger number. All sets with smaller number remain active. Just sort
-  // the current one and copy over the data. This is the expected usage pattern in IREE, where the
-  // compiler sorts/deduplicates descriptor sets, and pushes them in ascending order.
-  if (binding_count + command_buffer->state.current_total_binding_count >
-      IREE_HAL_METAL_MAX_BINDING_COUNT) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "exceeded available binding slots for push descriptor sets");
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Push a descriptor set invalidate all sets with the given number and larger ones.
+  IREE_ASSERT(set < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX);
+  for (iree_host_size_t i = set + 1; i < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX; ++i) {
+    command_buffer->state.descriptor_sets[i].active_count = 0;
   }
 
   iree_hal_descriptor_set_layout_t* set_layout =
       iree_hal_metal_pipeline_layout_descriptor_set_layout(pipeline_layout, set);
+  iree_hal_metal_descriptor_t* descriptors = command_buffer->state.descriptor_sets[set].bindings;
 
-  int start_index = command_buffer->state.current_total_binding_count;
+  // Update descriptors in the current set.
+  command_buffer->state.descriptor_sets[set].active_count = binding_count;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    iree_hal_metal_descriptor_t* descriptor = &descriptors[start_index + i];
+    iree_hal_metal_descriptor_t* descriptor = &descriptors[i];
 
     descriptor->set = set;
     descriptor->binding = bindings[i].binding;
@@ -926,13 +888,6 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
         iree_hal_metal_descriptor_set_layout_binding(set_layout, descriptor->binding);
     descriptor->usage = iree_hal_metal_get_metal_resource_usage(binding_params);
   }
-  qsort(&descriptors[start_index], binding_count, sizeof(descriptors[0]), compare_descriptor);
-
-  command_buffer->state.current_max_set_number = set;
-  command_buffer->state.current_total_binding_count += binding_count;
-
-  IREE_ASSERT(iree_hal_metal_is_sorted_unique_descriptors(
-      descriptors, command_buffer->state.current_total_binding_count));
 
   // Retain all buffers bound in this descriptor set.
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
@@ -964,12 +919,15 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   iree_hal_metal_kernel_params_t kernel_params;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_kernel_library_entry_point_kernel_params(
                                             executable, entry_point, &kernel_params));
-  IREE_ASSERT(command_buffer->state.current_pipeline_layout != NULL);
 
   // Allocate the command segment and keep track of all necessary API data.
   uint8_t* storage_base = NULL;
   iree_hal_metal_command_segment_t* segment = NULL;
-  iree_host_size_t descriptor_count = command_buffer->state.current_total_binding_count;
+  iree_host_size_t descriptor_count = 0;
+  // Calculate the total number of bindings across all descriptor sets.
+  for (iree_host_size_t i = 0; i < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX; ++i) {
+    descriptor_count += command_buffer->state.descriptor_sets[i].active_count;
+  }
   iree_host_size_t descriptor_length = descriptor_count * sizeof(iree_hal_metal_descriptor_t);
   iree_host_size_t push_constant_count = iree_hal_metal_pipeline_layout_push_constant_count(
       command_buffer->state.current_pipeline_layout);
@@ -986,18 +944,23 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
 
   segment->dispatch.kernel_params = kernel_params;
 
-  // Copy descriptors to the end of the current segment for later access.
+  // Copy descriptors from all sets to the end of the current segment for later access.
   segment->dispatch.descriptor_count = descriptor_count;
   uint8_t* descriptor_ptr = storage_base + sizeof(*segment);
-  memcpy(descriptor_ptr, command_buffer->state.current_descriptors, descriptor_length);
   segment->dispatch.descriptors = (iree_hal_metal_descriptor_t*)descriptor_ptr;
+  for (iree_host_size_t i = 0; i < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX; ++i) {
+    iree_host_size_t current_size =
+        command_buffer->state.descriptor_sets[i].active_count * sizeof(iree_hal_metal_descriptor_t);
+    memcpy(descriptor_ptr, command_buffer->state.descriptor_sets[i].bindings, current_size);
+    descriptor_ptr += current_size;
+  }
 
   // Copy push constants to the end of the current segment for later access.
   segment->dispatch.push_constant_count = push_constant_count;
   uint8_t* push_constant_ptr = storage_base + sizeof(*segment) + descriptor_length;
+  segment->dispatch.push_constants = (int32_t*)push_constant_ptr;
   memcpy(push_constant_ptr, (const uint8_t*)command_buffer->state.push_constants,
          push_constant_length);
-  segment->dispatch.push_constants = (int32_t*)push_constant_ptr;
 
   *out_segment = &segment->dispatch;
   IREE_TRACE_ZONE_END(z0);

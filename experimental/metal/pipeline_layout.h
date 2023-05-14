@@ -14,22 +14,30 @@
 extern "C" {
 #endif  // __cplusplus
 
-// The max number of total binding slots across all descriptor sets by the Metal
-// HAL implementation.
+// The max number of bindings per descriptor set allowed in the Metal HAL
+// implementation.
 //
+// Note that Metal itself is more permissive:
 // - Argument buffer tier 1 binding limits:
 //   - iOS: 31 buffers (on A11 and later, 96 buffers)
 //   - macOS: 64 buffers
 // - Argument buffer tier 2 binding limits:
 //   - 500,000 buffers or textures
-#define IREE_HAL_METAL_MAX_BINDING_COUNT 64
+#define IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT 16
+
+// The max number of descriptor sets allowed in the Metal HAL implementation.
+//
+// This depends on the general descriptor set planning in IREE and should adjust
+// with it.
+#define IREE_HAL_METAL_MAX_DESCRIPTOR_SET_COUNT 4
 
 // The [[buffer(N)]] index for push constants.
 //
 // This depends on the general descriptor set planning in IREE and should adjust
 // with it. Note that it also needs to be consistent with the compiler side when
 // setting up resource location attributes during cross compiling SPIR-V to MSL.
-#define IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX 3
+#define IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX \
+  (IREE_HAL_METAL_MAX_DESCRIPTOR_SET_COUNT - 1)
 
 // The max number of push constants supported by the Metal HAL implementation.
 #define IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT 64
