@@ -717,6 +717,24 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
       reductionTileSizes[i] = 1;
   }
 
+  TileSizesListType tileSizes;
+
+  // Only the promotion pipeline has multibuffering + pipelining.
+  if (usePromotionPipeline) {
+    // Merge reductionTileSizes into workgroupTileSizes--this is needed by the
+    // pipeline passes shared between SPIR-V and LLVMGPU.
+    for (auto [i, it] : llvm::enumerate(op.getIteratorTypesArray())) {
+      if (linalg::isReductionIterator(it))
+        workgroupTileSizes[i] = reductionTileSizes[i];
+    }
+    tileSizes.push_back(workgroupTileSizes);
+
+    return setOpConfigAndEntryPointFnTranslation(
+        op->getParentOfType<func::FuncOp>(), op, tileSizes,
+        CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
+        /*subgroupSize=*/std::nullopt, pipelineDepth, storeStage);
+  }
+
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
   if (isBM) {
     threadTileSizes[bIndex] = workgroupTileSizes[bIndex] / workgroupSize[2];
@@ -724,21 +742,11 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   threadTileSizes[mIndex] = workgroupTileSizes[mIndex] / workgroupSize[1];
   threadTileSizes[nIndex] = workgroupTileSizes[nIndex] / workgroupSize[0];
 
-  TileSizesListType tileSizes;
   workgroupTileSizes.resize(lastParallelDim + 1);
   threadTileSizes.resize(lastParallelDim + 1);
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
   tileSizes.push_back(reductionTileSizes);
-
-  // Only the promotion pipeline has multibuffering + pipelining.
-  if (usePromotionPipeline) {
-    return setOpConfigAndEntryPointFnTranslation(
-        op->getParentOfType<func::FuncOp>(), op, tileSizes,
-        CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/std::nullopt, pipelineDepth, storeStage);
-  }
-
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes,
       CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
