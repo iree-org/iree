@@ -138,11 +138,11 @@ static iree_status_t IREE_API_PTR iree_vm_dynamic_module_lookup_function(
 
 static iree_status_t IREE_API_PTR
 iree_vm_dynamic_module_resolve_source_location(
-    void* self, iree_vm_stack_frame_t* frame,
+    void* self, iree_vm_function_t function, iree_vm_source_offset_t pc,
     iree_vm_source_location_t* out_source_location) {
   iree_vm_dynamic_module_t* module = (iree_vm_dynamic_module_t*)self;
   return module->user_module->resolve_source_location(
-      module->user_module->self, frame, out_source_location);
+      module->user_module->self, function, pc, out_source_location);
 }
 
 static iree_status_t IREE_API_PTR

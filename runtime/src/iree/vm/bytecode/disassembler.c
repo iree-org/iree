@@ -2172,7 +2172,7 @@ iree_status_t iree_vm_bytecode_trace_disassembly(
 #if IREE_VM_EXECUTION_TRACING_SRC_LOC_ENABLE
   iree_vm_source_location_t source_location;
   iree_status_t status = iree_vm_module_resolve_source_location(
-      frame->function.module, frame, &source_location);
+      frame->function.module, frame->function, pc, &source_location);
   if (iree_status_is_ok(status)) {
     status = iree_vm_source_location_format(
         &source_location, IREE_VM_SOURCE_LOCATION_FORMAT_FLAG_SINGLE_LINE, &b);

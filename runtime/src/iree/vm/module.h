@@ -404,10 +404,10 @@ typedef struct iree_vm_module_t {
       void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
       iree_host_size_t index, iree_string_pair_t* out_attr);
 
-  // Resolves a stack |frame| from the module to a |out_source_location|, if
-  // debug information is available.
+  // Resolves a |function| at |pc| from the module to a |out_source_location|,
+  // if debug information is available.
   iree_status_t(IREE_API_PTR* resolve_source_location)(
-      void* self, iree_vm_stack_frame_t* frame,
+      void* self, iree_vm_function_t function, iree_vm_source_offset_t pc,
       iree_vm_source_location_t* out_source_location);
 
   // Allocates module state data.
@@ -512,11 +512,11 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
     iree_host_size_t ordinal, iree_vm_function_t* out_function);
 
-// Resolves a stack |frame| from the module to a |out_source_location|, if
+// Resolves a |function| at |pc| from the module to a |out_source_location|, if
 // debug information is available.
 IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
-    const iree_vm_module_t* module, iree_vm_stack_frame_t* frame,
-    iree_vm_source_location_t* out_source_location);
+    const iree_vm_module_t* module, iree_vm_function_t function,
+    iree_vm_source_offset_t pc, iree_vm_source_location_t* out_source_location);
 
 //===----------------------------------------------------------------------===//
 // iree_vm_function_t

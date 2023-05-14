@@ -298,14 +298,14 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
-    const iree_vm_module_t* module, iree_vm_stack_frame_t* frame,
+    const iree_vm_module_t* module, iree_vm_function_t function,
+    iree_vm_source_offset_t pc,
     iree_vm_source_location_t* out_source_location) {
   IREE_ASSERT_ARGUMENT(module);
-  IREE_ASSERT_ARGUMENT(frame);
   IREE_ASSERT_ARGUMENT(out_source_location);
   memset(out_source_location, 0, sizeof(*out_source_location));
   if (module->resolve_source_location) {
-    return module->resolve_source_location(module->self, frame,
+    return module->resolve_source_location(module->self, function, pc,
                                            out_source_location);
   }
   return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
