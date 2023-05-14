@@ -242,6 +242,24 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
     bool generateContract = true, int64_t maxVectorSize = 4096);
 
+enum class GPUPromoteSharedMemPattern {
+  ContractionOpPattern = 0,
+  TransposeOpPattern = 1,
+};
+
+// Creates a pass to tile reduction dimensions and create allocations for some
+// tensor values to use GPU shared memory.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
+
+/// Tiles Linalg ops in the given `funcOp` to serial loops without distribution.
+LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction = true);
+
+// Creates a pass to tile tensor (linalg) ops within a GPU workgroup.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTile(
+    bool distributeToWarp = false);
+
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 
@@ -521,11 +539,6 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
                                                unsigned pipelineDepth);
 
-enum class GPUPromoteSharedMemPattern {
-  ContractionOpPattern = 0,
-  TransposeOpPattern = 1,
-};
-
 /// Lowering transpose using shared memory.
 void addGPUTransposePassPipeline(OpPassManager &pm);
 
@@ -557,14 +570,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
     bool distributeToWarp = false);
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
-    bool distributeToWarp = false);
-
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
-
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -allow-unregistered-dialect --split-input-file -iree-llvmgpu-alloc | FileCheck %s
+// RUN: iree-opt %s -allow-unregistered-dialect --split-input-file -iree-codegen-gpu-tensor-alloc | FileCheck %s
 
 func.func @matmul_2048x512x1024() {
   %c0 = arith.constant 0 : index
