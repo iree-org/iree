@@ -73,7 +73,6 @@ struct FoldTrailingUnitTranspose
   LogicalResult matchAndRewrite(linalg::TransposeOp op,
                                 PatternRewriter &rewriter) const override {
     auto inputTy = op.getInput().getType().cast<ShapedType>();
-    if (!inputTy.hasStaticShape()) return failure();
     int numDropDims = 0;
     ArrayRef<int64_t> perm = op.getPermutation();
     for (int idx = inputTy.getRank() - 1; idx >= 0; idx--) {

@@ -230,10 +230,14 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%0, 0]
 // CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
 // CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x16x?x1xf32>
+// CHECK:        %[[TILE:.+]] = tensor.extract_slice %expanded
+// CHECK-SAME:     : tensor<?x16x?x1xf32> to tensor<?x16x?xf32>
+// CHECK:        %[[EMPTY:.+]] = tensor.empty({{.+}}) : tensor<?x?x16xf32>
 // CHECK:        %[[TRANSP:.+]] = linalg.transpose
-// CHECK-SAME:     ins(%[[EXPANDED]] : tensor<?x16x?x1xf32>)
-// CHECK-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)
-// CHECK-SAME:   permutation = [0, 2, 1, 3]
+// CHECK-SAME:     ins(%[[TILE]] : tensor<?x16x?xf32>)
+// CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x?x16xf32>)
+// CHECK-SAME:   permutation = [0, 2, 1]
+// CHECK:        %{{.+}} = tensor.insert_slice %[[TRANSP]] into %[[OUT]]
 
 // -----
 
