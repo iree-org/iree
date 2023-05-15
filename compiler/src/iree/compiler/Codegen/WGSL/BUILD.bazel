@@ -17,6 +17,9 @@ iree_compiler_cc_library(
     srcs = [
         "WGSLReplacePushConstants.cpp",
     ],
+    hdrs = [
+        "WGSLPasses.h",
+    ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",

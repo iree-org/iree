@@ -3,12 +3,14 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//===----------------------------------------------------------------------===//
+//
+// This file includes the WGSL Passes.
+//
+//===----------------------------------------------------------------------===//
 
-#ifndef IREE_COMPILER_CODEGEN_PASSES_H_
-#define IREE_COMPILER_CODEGEN_PASSES_H_
-
-#include <memory>
-#include <string>
+#ifndef IREE_COMPILER_CODEGEN_WGSL_PASSES_H_
+#define IREE_COMPILER_CODEGEN_WGSL_PASSES_H_
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -20,23 +22,16 @@
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
-//===---------------------------------------------------------------------===//
-// Include headers per target device
-//===---------------------------------------------------------------------===//
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
-#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
-#include "iree/compiler/Codegen/WGSL/WGSLPasses.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-/// Registers all conversion passes in this directory.
-void registerCodegenPasses();
+// Removes push constants by replacing hal.interface.constant.loads with
+// hal.interface.binding.subspan + flow.dispatch.tensor.load.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWGSLReplacePushConstantsPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_PASSES_H_
+#endif  // IREE_COMPILER_CODEGEN_WGSL_PASSES_H_
