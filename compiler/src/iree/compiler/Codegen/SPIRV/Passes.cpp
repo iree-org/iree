@@ -11,14 +11,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/CommonPasses.h"
+#include "iree/compiler/Codegen/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/SPIRVPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
