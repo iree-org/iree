@@ -351,10 +351,11 @@ using namespace mlir::linalg;
 DiagnosedSilenceableFailure
 transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
                                     mlir::transform::TransformState &state) {
-  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
-  if (payloadOps.size() != 1 || !isa<ModuleOp>(payloadOps[0]))
+  auto payloadOps = state.getPayloadOps(getTarget());
+  if (!llvm::hasSingleElement(payloadOps) ||
+      !isa<ModuleOp>(*payloadOps.begin()))
     return emitSilenceableError() << "expected single module target";
-  ModuleOp moduleOp = cast<ModuleOp>(payloadOps[0]);
+  ModuleOp moduleOp = cast<ModuleOp>(*payloadOps.begin());
 
   //===------------------------------------------------------------------===//
   // BEGIN: Copied from upstream, this needs to be retired once we have a
@@ -527,7 +528,9 @@ testMatchCallbackCallback(transform_ext::MatchCallbackResult &res, Location loc,
       res.addPayloadGroup(ArrayRef<Operation *>());
       hadFailures = true;
     } else {
-      res.addPayloadGroup(state.getPayloadOps(handle));
+      SmallVector<Operation *> payloadOps =
+          llvm::to_vector(state.getPayloadOps(handle));
+      res.addPayloadGroup(payloadOps);
     }
   }
   if (hadFailures)
@@ -538,11 +541,12 @@ testMatchCallbackCallback(transform_ext::MatchCallbackResult &res, Location loc,
 static DiagnosedSilenceableFailure testRepeatedMatcherUseCallback(
     transform_ext::MatchCallbackResult &res, Location loc,
     const mlir::transform::TransformState &state, ValueRange handles) {
-  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
     return emitSilenceableFailure(loc)
            << "expected one handle to one operation";
   }
-  Operation *root = state.getPayloadOps(handles[0])[0];
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
 
   transform_ext::MatcherContext matcherContext;
   auto &operand = transform_ext::m_StructuredOp(matcherContext);
@@ -570,11 +574,12 @@ static DiagnosedSilenceableFailure
 testValueMatcherCallback(transform_ext::MatchCallbackResult &res, Location loc,
                          const mlir::transform::TransformState &state,
                          ValueRange handles) {
-  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
     return emitSilenceableFailure(loc)
            << "expected one handle to one operation";
   }
-  Operation *root = state.getPayloadOps(handles[0])[0];
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
 
   transform_ext::MatcherContext matcherContext;
   auto &operand = transform_ext::m_Value(matcherContext);
@@ -616,7 +621,8 @@ static DiagnosedSilenceableFailure
 reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
                   const mlir::transform::TransformState &state,
                   ValueRange handles) {
-  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
     return emitSilenceableFailure(loc)
            << "expected one handle to one operation";
   }
@@ -629,7 +635,7 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
-  Operation *root = state.getPayloadOps(handles[0])[0];
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
@@ -677,7 +683,8 @@ static DiagnosedSilenceableFailure
 convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
                     const mlir::transform::TransformState &state,
                     ValueRange handles) {
-  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
     return emitSilenceableFailure(loc)
            << "expected one handle to one operation";
   }
@@ -689,7 +696,7 @@ convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
-  Operation *root = state.getPayloadOps(handles[0])[0];
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
@@ -735,7 +742,8 @@ static DiagnosedSilenceableFailure
 matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
                const mlir::transform::TransformState &state,
                ValueRange handles) {
-  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
     return emitSilenceableFailure(loc)
            << "expected one handle to one operation";
   }
@@ -747,7 +755,7 @@ matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
-  Operation *root = state.getPayloadOps(handles[0])[0];
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
@@ -808,8 +816,8 @@ transform_ext::TakeFirstOp::apply(mlir::transform::TransformResults &results,
   SmallVector<Operation *> concatenated;
   bool found = false;
   for (Value handle : getInputs()) {
-    ArrayRef<Operation *> payloads = state.getPayloadOps(handle);
-    if (payloads.empty())
+    auto payloads = state.getPayloadOps(handle);
+    if (std::empty(payloads))
       continue;
     if (!found) {
       results.set(getFirst().cast<OpResult>(), payloads);

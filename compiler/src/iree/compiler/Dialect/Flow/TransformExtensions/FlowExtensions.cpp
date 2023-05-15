@@ -494,21 +494,20 @@ DiagnosedSilenceableFailure
 transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  ArrayRef<Operation *> dispatchRegion =
-      state.getPayloadOps(getDispatchRegion());
+  auto targetOps = state.getPayloadOps(getTarget());
+  auto dispatchRegion = state.getPayloadOps(getDispatchRegion());
 
-  if (targetOps.empty() && dispatchRegion.empty()) {
+  if (std::empty(targetOps) && std::empty(dispatchRegion)) {
     transformResults.set(getResult().cast<OpResult>(),
                          SmallVector<mlir::Operation *>{});
     return DiagnosedSilenceableFailure::success();
   }
 
-  if (dispatchRegion.size() != 1)
+  if (!llvm::hasSingleElement(dispatchRegion))
     return emitDefiniteFailure(
         "requires exactly one target/dispatch region handle");
 
-  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
+  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(*dispatchRegion.begin());
   if (!regionOp)
     return emitDefiniteFailure("expected 'dispatch.region' operand");
 
@@ -545,21 +544,20 @@ DiagnosedSilenceableFailure
 transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  ArrayRef<Operation *> dispatchRegion =
-      state.getPayloadOps(getDispatchRegion());
+  auto targetOps = state.getPayloadOps(getTarget());
+  auto dispatchRegion = state.getPayloadOps(getDispatchRegion());
 
-  if (targetOps.empty() && dispatchRegion.empty()) {
+  if (std::empty(targetOps) && std::empty(dispatchRegion)) {
     transformResults.set(getResult().cast<OpResult>(),
                          SmallVector<mlir::Operation *>{});
     return DiagnosedSilenceableFailure::success();
   }
 
-  if (dispatchRegion.size() != 1)
+  if (!llvm::hasSingleElement(dispatchRegion))
     return emitDefiniteFailure(
         "requires exactly one target/dispatch region handle");
 
-  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
+  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(*dispatchRegion.begin());
   if (!regionOp)
     return emitDefiniteFailure("expected 'dispatch.region' operand");
 
@@ -580,7 +578,7 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   }
 
   transformResults.set(getTransformed().cast<OpResult>(),
-                       regionOp.getOperation());
+                       {regionOp.getOperation()});
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -741,14 +739,13 @@ DiagnosedSilenceableFailure
 transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  ArrayRef<Operation *> dispatchRegion =
-      state.getPayloadOps(getDispatchRegion());
+  auto targetOps = state.getPayloadOps(getTarget());
+  auto dispatchRegion = state.getPayloadOps(getDispatchRegion());
 
-  if (dispatchRegion.size() != 1)
+  if (!llvm::hasSingleElement(dispatchRegion))
     return emitDefiniteFailure("requires exactly one dispatch region handle");
 
-  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
+  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(*dispatchRegion.begin());
   if (!regionOp)
     return emitDefiniteFailure("expected 'dispatch.region' operand");
 
@@ -782,15 +779,14 @@ DiagnosedSilenceableFailure
 transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  ArrayRef<Operation *> dispatchRegion =
-      state.getPayloadOps(getDispatchRegion());
+  auto targetOps = state.getPayloadOps(getTarget());
+  auto dispatchRegion = state.getPayloadOps(getDispatchRegion());
 
-  if (dispatchRegion.size() != 1)
+  if (!llvm::hasSingleElement(dispatchRegion))
     return emitDefiniteFailure(
         "requires exactly one target/dispatch region handle");
 
-  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
+  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(*dispatchRegion.begin());
   if (!regionOp)
     return emitDefiniteFailure("expected 'dispatch.region' operand");
 
@@ -808,7 +804,7 @@ transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
   }
 
   transformResults.set(getTransformed().cast<OpResult>(),
-                       regionOp.getOperation());
+                       {regionOp.getOperation()});
   return DiagnosedSilenceableFailure::success();
 }
 
