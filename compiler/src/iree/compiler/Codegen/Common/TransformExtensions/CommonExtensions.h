@@ -48,6 +48,7 @@ struct ApplyPatternsOpPatterns {
   bool foldReassociativeReshapes = false;
   bool foldTensorEmptyExtract = false;
   bool foldTensorSubsets = false;
+  bool foldVectorTransferTensorSlice = false;
   bool licm = false;
   bool linalgElementwiseGreedyFusion = false;
   bool lowerTransferOpPermutations = false;
