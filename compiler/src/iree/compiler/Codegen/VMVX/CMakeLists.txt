@@ -15,6 +15,7 @@ iree_cc_library(
     VMVX
   HDRS
     "EncodingInfo.h"
+    "VMVXPasses.h"
   SRCS
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"

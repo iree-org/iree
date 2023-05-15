@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"

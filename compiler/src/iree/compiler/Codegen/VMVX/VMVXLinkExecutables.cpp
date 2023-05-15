@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
-#include "iree/compiler/Codegen/VMVXPasses.h"
+#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Support/FormatVariadic.h"

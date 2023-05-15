@@ -38,6 +38,7 @@ iree_compiler_cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
+        "LLVMGPUPasses.h",
         "TilingUtils.h",
         "TransposeUtils.h",
     ],

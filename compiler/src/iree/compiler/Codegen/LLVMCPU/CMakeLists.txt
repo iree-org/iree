@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "DispatchABI.h"
     "KernelDispatch.h"
+    "LLVMCPUPasses.h"
     "TargetMLTransformInfo.h"
     "Utils.h"
   SRCS

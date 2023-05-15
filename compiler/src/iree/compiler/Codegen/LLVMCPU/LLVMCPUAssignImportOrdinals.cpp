@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPUPasses.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "llvm/ADT/MapVector.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"

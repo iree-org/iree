@@ -7,7 +7,7 @@
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
-#include "iree/compiler/Codegen/LLVMCPUPasses.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/EncodingInfo.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

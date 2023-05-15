@@ -23,11 +23,11 @@
 //===---------------------------------------------------------------------===//
 // Include headers per target device
 //===---------------------------------------------------------------------===//
-#include "iree/compiler/Codegen/CommonPasses.h"
-#include "iree/compiler/Codegen/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/SPIRVPasses.h"
-#include "iree/compiler/Codegen/VMVXPasses.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
+#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
 
 namespace mlir {
 namespace iree_compiler {

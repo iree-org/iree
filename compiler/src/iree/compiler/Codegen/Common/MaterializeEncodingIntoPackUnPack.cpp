@@ -10,8 +10,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
-#include "iree/compiler/Codegen/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"

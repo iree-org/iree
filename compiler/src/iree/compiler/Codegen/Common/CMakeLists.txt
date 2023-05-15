@@ -82,6 +82,7 @@ iree_cc_library(
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
+    "CommonPasses.h"
     "EncodingInfo.h"
     "Transforms.h"
   SRCS

@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
+    "LLVMGPUPasses.h"
     "TilingUtils.h"
     "TransposeUtils.h"
   SRCS

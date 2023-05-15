@@ -12,8 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/SPIRVPasses.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"

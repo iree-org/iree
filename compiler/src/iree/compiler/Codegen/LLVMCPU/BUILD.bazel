@@ -45,6 +45,7 @@ iree_compiler_cc_library(
     hdrs = [
         "DispatchABI.h",
         "KernelDispatch.h",
+        "LLVMCPUPasses.h",
         "TargetMLTransformInfo.h",
         "Utils.h",
     ],

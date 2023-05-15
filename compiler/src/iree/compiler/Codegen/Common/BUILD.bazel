@@ -144,6 +144,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "BufferizationAnalysis.h",
+        "CommonPasses.h",
         "EncodingInfo.h",
         "Transforms.h",
     ],

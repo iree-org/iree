@@ -33,7 +33,7 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
