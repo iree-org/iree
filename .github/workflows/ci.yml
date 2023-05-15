@@ -386,6 +386,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VMVX_DISABLE=0 \
             gcr.io/iree-oss/frontends-swiftshader@sha256:da14cc93637d3bfad469a670d4d7a49982df5d107b775331965e3bacb981d4cf \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
