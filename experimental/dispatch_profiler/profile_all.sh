@@ -9,14 +9,14 @@ set -xeuo pipefail
 TD="$(cd $(dirname $0) && pwd)"
 
 PYTHON="${PYTHON:-python3}"
-DISPATCH_PROFILER_BUILD_DIR="${1}"
+DISPATCH_PROFILER_IREE_BIN_DIR="${1:-$TD/../../tools}"
 
 VENV_DIR="$TD/dispatch-profiler.venv"
 
 echo "Setting up venv dir: $VENV_DIR"
 echo "Python: $PYTHON"
 echo "Python version: $("$PYTHON" --version)"
-echo "Dispatch Profiler build-dir: $DISPATCH_PROFILER_BUILD_DIR"
+echo "Dispatch Profiler IREE bin dir: $DISPATCH_PROFILER_IREE_BIN_DIR"
 
 function die() {
   echo "Error executing command: $*"
@@ -36,12 +36,12 @@ python "$TD/generator.py" \
   || die "Dispatch profiler failed to generate"
 python "$TD/compile.py" \
   --verbose \
-  --build-dir "${DISPATCH_PROFILER_BUILD_DIR}" \
+  --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
   --generated-dir "${TD}" \
   || die "Dispatch profiler failed to compile"
 python "$TD/profiler.py" \
   --verbose \
-  --build-dir "${DISPATCH_PROFILER_BUILD_DIR}" \
+  --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
   --generated-dir "${TD}" \
   --dispatches="matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync,matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_128x128_16x5_tensorcore_mmasync" \
   || die "Dispatch profiler failed to profile"
