@@ -825,65 +825,34 @@ struct CollectivePermuteOpConversion
     // no send/recv.
     DenseIntElementsAttr sourceTargetPairs = op.getSourceTargetPairs();
     llvm::DenseMap<int64_t, int64_t> sendMap, recvMap;
+    auto values = sourceTargetPairs.getValues<int64_t>();
+    // Find the max rank so we can size our tables.
     int64_t maxRank = 0;
-    for (auto i = sourceTargetPairs.begin(); i != sourceTargetPairs.end();
-         ++i) {
-      int64_t source = (*i).getSExtValue();
-      int64_t target = (*++i).getSExtValue();
-      if (source > std::numeric_limits<int16_t>::max() ||
-          target > std::numeric_limits<int16_t>::max()) {
+    for (auto rank : values) {
+      if (rank > std::numeric_limits<int16_t>::max()) {
         return rewriter.notifyMatchFailure(
             op, "source or target id exceeds maximum value of 16-bit integer");
       }
-      sendMap[source] = target;
-      recvMap[target] = source;
-      maxRank = std::max(std::max(maxRank, source), target);
+      maxRank = std::max(maxRank, rank);
     }
-    const int64_t numRanks = maxRank + 1;
-    SmallVector<int32_t, 8> sendTable, recvTable;
-    sendTable.reserve(numRanks + 1);
-    recvTable.reserve(numRanks + 1);
-    for (int64_t i = 0; i < numRanks; ++i) {
-      sendTable.push_back(sendMap.count(i) ? sendMap[i] : -1);
-      recvTable.push_back(recvMap.count(i) ? recvMap[i] : -1);
+    // Create tables. -1 is used to indicate no send or recv.
+    IndexSet indexSet(loc, rewriter);
+    Value noSendOrRecv = indexSet.get(-1);
+    SmallVector<Value> sendTable(maxRank + 1, noSendOrRecv);
+    SmallVector<Value> recvTable(maxRank + 1, noSendOrRecv);
+    for (auto i = values.begin(); i != values.end(); ++i) {
+      int64_t source = (*i);
+      int64_t target = (*++i);
+      sendTable[source] = indexSet.get(target);
+      recvTable[target] = indexSet.get(source);
     }
-    // For rank ids >= numRanks, we will clamp to this last entry which will
-    // return -1. This avoids control flow since the number of ranks in the
-    // channel is not statically known.
-    sendTable.push_back(-1);
-    recvTable.push_back(-1);
-
-    auto createAndIndexBuffer = [&](const SmallVector<int32_t, 8> &table,
-                                    Value index) {
-      // Create constant buffer to hold send/recv tables.
-      auto ty = RankedTensorType::get({static_cast<int64_t>(table.size())},
-                                      rewriter.getI32Type());
-      auto dataAttr = DenseIntElementsAttr::get(ty, table);
-      Value buffer = rewriter.create<IREE::Util::BufferConstantOp>(
-          loc, /*name=*/nullptr, dataAttr, /*alignment=*/IntegerAttr{},
-          /*mimeType=*/nullptr);
-
-      // Index into table.
-      Value elementTypeByteSize =
-          rewriter.create<arith::ConstantIndexOp>(loc, sizeof(int32_t));
-      Value bufferSize = rewriter.create<arith::ConstantIndexOp>(
-          loc, table.size() * sizeof(int32_t));
-      Value byteOffset =
-          rewriter.create<arith::MulIOp>(loc, elementTypeByteSize, index);
-      return rewriter.create<IREE::Util::BufferLoadOp>(
-          loc, rewriter.getI32Type(), buffer, bufferSize, byteOffset,
-          elementTypeByteSize);
-    };
-
-    // index = min(rank, numRanks)
+    // Look up the local send/recv values using rank.
     Value rank =
         rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel).getResult();
-    Value cstLastEntryIndex =
-        rewriter.create<arith::ConstantIndexOp>(loc, numRanks);
-    Value index = rewriter.create<arith::MinSIOp>(loc, rank, cstLastEntryIndex);
-    // Look up send/recv using index
-    Value send = createAndIndexBuffer(sendTable, index);
-    Value recv = createAndIndexBuffer(recvTable, index);
+    Value send = rewriter.create<IREE::Util::SwitchOp>(loc, rank, noSendOrRecv,
+                                                       sendTable);
+    Value recv = rewriter.create<IREE::Util::SwitchOp>(loc, rank, noSendOrRecv,
+                                                       recvTable);
 
     // Create an empty tensor for the result.
     ArrayRef<int64_t> inputShape = inputType.getShape();

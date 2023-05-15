@@ -1839,8 +1839,8 @@ def FLOW_CollectiveSendRecvOp : FLOW_Op<"collective.send_recv", [
     FLOW_ShapeDynamicDims:$target_dims,
     FLOW_Tensor:$source,
     FLOW_Channel:$channel,
-    I32:$send,
-    I32:$recv,
+    Index:$send,
+    Index:$recv,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs

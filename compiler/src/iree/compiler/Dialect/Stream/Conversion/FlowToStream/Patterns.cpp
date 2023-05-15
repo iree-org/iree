@@ -486,11 +486,15 @@ struct ConvertCollectiveSendRecvOp
 
     // Pack send, recv into param. The values are checked to be within the
     // 16-bit range during lowering to Flow dialect.
+    auto send = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getI32Type(), adaptor.getSend());
     auto lo = rewriter.create<arith::AndIOp>(
-        op.getLoc(), adaptor.getSend(),
+        op.getLoc(), send,
         rewriter.create<arith::ConstantIntOp>(op.getLoc(), 0xFFFF, 32));
+    auto recv = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getI32Type(), adaptor.getRecv());
     auto hi = rewriter.create<arith::ShLIOp>(
-        op.getLoc(), adaptor.getRecv(),
+        op.getLoc(), recv,
         rewriter.create<arith::ConstantIntOp>(op.getLoc(), 16, 32));
     auto param = rewriter.create<arith::OrIOp>(op.getLoc(), hi, lo);
 
