@@ -140,12 +140,12 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
 /// Creates a pass to decompose tensor.pack and tensor.unpack ops. The pass does
 /// tiling and generalization. See implementation for more details.
-std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass(
-    bool tileOuterToOne = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 
 /// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
-    bool flatten = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createOptimizeVectorTransferPass(bool flatten = false);
 
 /// Pass to lower ukernel operations into their defined function calls.
 std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass();
@@ -154,8 +154,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass();
 /// `option` details.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSplitFullPartialTransferPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createSplitFullPartialTransferPass(
-    StringRef option);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSplitFullPartialTransferPass(StringRef option);
 
 /// Tests iree-hal-preprocess-executables-with behavior.
 std::unique_ptr<OperationPass<void>> createTestExecutablePreprocessingPass();
@@ -190,8 +190,8 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUDistributeSharedMemoryCopy();
 
 /// Apply multi-buffering transformation.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUMultiBuffering(
-    unsigned numBuffers = 5);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUMultiBuffering(unsigned numBuffers = 5);
 
 /// Pipeline shared memory copy by apply software pipelining scheduling where
 /// copy to shared memory is in stage 0 and the rest of the operations are in
@@ -211,14 +211,14 @@ enum class PipeliningSchedulingStrategy {
 };
 
 /// Apply software pipelining.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    bool epiloguePeeling = true, unsigned depth = 1,
-    PipeliningSchedulingStrategy schedule =
-        PipeliningSchedulingStrategy::loadGlobalStage0);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUPipeliningPass(bool epiloguePeeling = true, unsigned depth = 1,
+                        PipeliningSchedulingStrategy schedule =
+                            PipeliningSchedulingStrategy::loadGlobalStage0);
 
 /// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
-    unsigned swizzleLogTile = 0);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 
 /// Pad dynamic alloc op to convert them into static one.
 std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
@@ -231,8 +231,9 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
     llvm::StringRef debugTransformRootTag = llvm::StringRef());
 
 /// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
-    bool generateContract = true, int64_t maxVectorSize = 4096);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUVectorizationPass(bool generateContract = true,
+                           int64_t maxVectorSize = 4096);
 
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
@@ -309,7 +310,7 @@ void populateConcretizePadResultShapePatterns(
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWGSLReplacePushConstantsPass();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_

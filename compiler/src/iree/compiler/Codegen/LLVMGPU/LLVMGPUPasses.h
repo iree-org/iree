@@ -31,10 +31,11 @@ namespace iree_compiler {
 void addGPUVectorizationPassPipeline(OpPassManager &pm);
 
 /// Lowering calling vectorization patterns.
-LogicalResult verifyGPUMatmulPipeline(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize);
+LogicalResult
+verifyGPUMatmulPipeline(Operation *op,
+                        IREE::Codegen::LoweringConfigAttr loweringConfig,
+                        IREE::Codegen::TranslationInfoAttr translationInfo,
+                        ArrayRef<int64_t> workgroupSize);
 
 /// Lowering using SIMT CUDA core operations.
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
@@ -80,17 +81,17 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUTileAndDistribute(bool distributeToWarp = false);
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
-    bool distributeToWarp = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUTileTensor(bool distributeToWarp = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
+                             GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -136,7 +137,7 @@ createLLVMGPUCheckIRBeforeLLVMConversionPass();
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
