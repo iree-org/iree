@@ -219,9 +219,22 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_function_attr(
     return module->user_interface.get_function_attr(module->self, linkage,
                                                     ordinal, index, out_attr);
   }
-  // TODO(benvanik): implement native module reflection.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "reflection not yet implemented");
+  if (linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "only exported functions can be queried");
+  } else if (ordinal >= module->descriptor->export_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "function ordinal out of range (0 < %" PRIhsz
+                            " < %" PRIhsz ")",
+                            ordinal, module->descriptor->export_count);
+  }
+  const iree_vm_native_export_descriptor_t* descriptor =
+      &module->descriptor->exports[ordinal];
+  if (index >= descriptor->attr_count) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+  *out_attr = descriptor->attrs[index];
+  return iree_ok_status();
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_lookup_function(

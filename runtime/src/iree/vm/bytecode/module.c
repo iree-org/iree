@@ -404,7 +404,7 @@ static iree_status_t iree_vm_bytecode_module_get_function_attr(
   if (ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "function ordinal out of range (0 < %zu < %zu)", ordinal,
+        "function ordinal out of range (0 < %" PRIhsz " < %zu)", ordinal,
         iree_vm_ExportFunctionDef_vec_len(exported_functions));
   }
 
