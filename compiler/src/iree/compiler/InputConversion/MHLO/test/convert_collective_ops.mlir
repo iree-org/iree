@@ -14,6 +14,53 @@ func.func @replica_id() -> tensor<ui32> {
 
 // -----
 
+module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 : i32 } {
+  // CHECK-LABEL: @replica_id_with_partitions
+  func.func @replica_id_with_partitions() -> tensor<ui32> {
+    // CHECK-DAG: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+    // CHECK-DAG: %[[RANK:.+]] = flow.channel.rank %[[CHANNEL]] : index
+    // CHECK-DAG: %[[DIV2:.+]] = arith.divui %[[RANK]], %c2 : index
+    // CHECK-DAG: %[[CAST:.+]] = arith.index_castui %[[DIV2]] : index to i32
+    // CHECK-DAG: %[[TENSOR:.+]] = tensor.from_elements %[[CAST]] : tensor<i32>
+    // CHECK-DAG: %[[BITCAST:.+]] = tensor.bitcast %[[TENSOR]] : tensor<i32> to tensor<ui32>
+    // CHECK-DAG: return %[[BITCAST]] : tensor<ui32>
+    %id = mhlo.replica_id : tensor<ui32>
+    return %id : tensor<ui32>
+  }
+}
+
+// -----
+
+// Returns 0 since num_partitions is not set.
+
+// CHECK-LABEL: @partition_id
+func.func @partition_id() -> tensor<ui32> {
+  // CHECK-DAG: %[[CST0:.+]] = arith.constant dense<0> : tensor<i32>
+  // CHECK-DAG: %[[BITCAST:.+]] = tensor.bitcast %[[CST0]] : tensor<i32> to tensor<ui32>
+  // CHECK-DAG: return %[[BITCAST]] : tensor<ui32>
+  %id = mhlo.partition_id : tensor<ui32>
+  return %id : tensor<ui32>
+}
+
+// -----
+
+module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 : i32 } {
+  // CHECK-LABEL: @partition_id_with_partitions
+  func.func @partition_id_with_partitions() -> tensor<ui32> {
+    // CHECK-DAG: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+    // CHECK-DAG: %[[RANK:.+]] = flow.channel.rank %[[CHANNEL]] : index
+    // CHECK-DAG: %[[REM2:.+]] = arith.remui %[[RANK]], %c2 : index
+    // CHECK-DAG: %[[CAST:.+]] = arith.index_castui %[[REM2]] : index to i32
+    // CHECK-DAG: %[[TENSOR:.+]] = tensor.from_elements %[[CAST]] : tensor<i32>
+    // CHECK-DAG: %[[BITCAST:.+]] = tensor.bitcast %[[TENSOR]] : tensor<i32> to tensor<ui32>
+    // CHECK-DAG: return %[[BITCAST]] : tensor<ui32>
+    %id = mhlo.partition_id : tensor<ui32>
+    return %id : tensor<ui32>
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @all_reduce_sum
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<2304xf32>)
 func.func @all_reduce_sum(%input : tensor<2304xf32>) -> tensor<2304xf32> {

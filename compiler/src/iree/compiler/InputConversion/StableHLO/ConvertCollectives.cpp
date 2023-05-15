@@ -358,22 +358,67 @@ static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
       permutationAttr);
 }
 
-/// Converts stablehlo.replica_id to flow.channel.default + flow.channel.rank.
-/// TODO(okkwon): this assumes that there is no partition so that there is a 1:1
-/// mapping between the replica ID and the process ID.
-struct ReplicaIdOpConversion final
-    : OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
-  using OpConversionPattern::OpConversionPattern;
+/// Converts stablehlo.partition_id to (flow.channel.rank % numPartitions)
+struct PartitionIdOpConversion
+    : public OpConversionPattern<mlir::stablehlo::PartitionIdOp> {
+  using OpConversionPattern<
+      mlir::stablehlo::PartitionIdOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::stablehlo::PartitionIdOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    // PartitionId = rank % numPartitions
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numPartitions = getNumPartitions(moduleOp);
+    Value value;
+    if (numPartitions <= 1) {
+      value = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    } else {
+      auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+          loc, /*group=*/StringAttr{});
+      Value rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
+      auto cst =
+          rewriter.create<arith::ConstantIndexOp>(loc,
+                                                  /*value=*/numPartitions);
+      value = rewriter.create<arith::RemUIOp>(loc, rank, cst);
+    }
+    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto elemType = resultType.getElementType();
+    // index -> ui32
+    auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, value);
+    // tensor<ui32>
+    auto rankTensor = rewriter.create<tensor::FromElementsOp>(
+        loc, resultType, rankElem.getResult());
+    rewriter.replaceOp(op, rankTensor.getResult());
+    return success();
+  }
+};
+
+/// Converts stablehlo.replica_id to floor_div(flow.channel.rank, numPartitions)
+struct ReplicaIdOpConversion
+    : public OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
+  using OpConversionPattern<mlir::stablehlo::ReplicaIdOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReplicaIdOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
+    auto loc = op.getLoc();
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
         loc, /*group=*/StringAttr{});
-    auto rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
-    auto resultType = cast<RankedTensorType>(op.getType());  // tensor<ui32>
-    Type elemType = resultType.getElementType();
+    Value rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
+
+    // ReplicaId = floor_div(rank, numPartitions)
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numPartitions = getNumPartitions(moduleOp);
+    auto cst = rewriter.create<arith::ConstantIndexOp>(loc,
+                                                       /*value=*/numPartitions);
+    if (numPartitions > 1) {
+      rank = rewriter.create<arith::DivUIOp>(loc, rank, cst);
+    }
+
+    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, rank);
     // tensor<ui32>
@@ -745,10 +790,10 @@ struct ReduceScatterOpConversion final
 void populateStableHloCollectivesConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns) {
-  patterns
-      ->add<AllGatherOpConversion, AllReduceOpConversion, AllToAllOpConversion,
-            ReduceScatterOpConversion, ReplicaIdOpConversion>(typeConverter,
-                                                              context);
+  patterns->add<AllGatherOpConversion, AllReduceOpConversion,
+                AllToAllOpConversion, PartitionIdOpConversion,
+                ReduceScatterOpConversion, ReplicaIdOpConversion>(typeConverter,
+                                                                  context);
 }
 
 }  // namespace mlir::iree_compiler::stablehlo
