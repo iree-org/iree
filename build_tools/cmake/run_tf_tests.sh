@@ -17,7 +17,7 @@ IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 
 # VMVX codegen is for reference and less optimized than other target backends.
 # Disable the tests by default to reduce the test time.
-IREE_VMVX_TESTS_ENABLE="${IREE_VMVX_TESTS_ENABLE:-0}"
+IREE_VMVX_DISABLE="${IREE_VMVX_DISABLE:-1}"
 
 source "${BUILD_DIR}/.env" && export PYTHONPATH
 source build_tools/cmake/setup_tf_python.sh
@@ -40,7 +40,7 @@ if (( ${IREE_VULKAN_DISABLE} != 1 )); then
   TARGET_BACKENDS+=(vulkan)
 fi
 
-if (( ${IREE_VMVX_TESTS_ENABLE} == 1 )); then
+if (( ${IREE_VMVX_DISABLE} != 1 )); then
   TARGET_BACKENDS+=(vmvx)
 fi
 
