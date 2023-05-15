@@ -489,14 +489,19 @@ def VerifyLinalgTransformLegality :
   let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
 }
 
-def LLVMCPUTile :
-    Pass<"iree-llvmcpu-tile", "func::FuncOp"> {
+def LLVMCPUTile : Pass<"iree-llvmcpu-tile", "func::FuncOp"> {
   let summary = "Pass to tile TilingInterface operations.";
   let constructor =
       "mlir::iree_compiler::createLLVMCPUTilePass()";
   let options = [
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
+      "Use default tiling level used to retrieve the configuration from lowering_config">,
+    ListOption<"tileSizes", "tile-sizes", "int64_t",
+               "Use list of tile sizes for tiling">
+  ];
+  let dependentDialects = [
+      "arith::ArithDialect", "affine::AffineDialect", "linalg::LinalgDialect",
+      "scf::SCFDialect"
   ];
 }
 

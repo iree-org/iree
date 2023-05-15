@@ -335,6 +335,8 @@ createVerifyLinalgTransformLegalityPass();
 /// Pass to tile TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
     int64_t tilingLevel = -1);
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
+    ArrayRef<int64_t> tileSizes);
 
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(

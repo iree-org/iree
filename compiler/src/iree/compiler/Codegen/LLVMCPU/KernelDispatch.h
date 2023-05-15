@@ -65,9 +65,16 @@ class TilingConfig {
 
   unsigned getParallelVectorIdx() { return getIdx(ParallelVectorTiles); }
 
+  unsigned getNumParallelVectorTiles() {
+    return llvm::count_if(getParallelVectorSizes(),
+                          [](int64_t tileSize) { return tileSize != 0; });
+  }
+
   SmallVector<int64_t> getParallelVectorSizes() {
     return loweringConfig.getTileSizeVals(getParallelVectorIdx());
   }
+
+
 
   unsigned getReductionCacheIdx() { return getIdx(ReductionCacheTiles); }
 

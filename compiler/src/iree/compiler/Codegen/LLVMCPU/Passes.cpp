@@ -409,10 +409,34 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+  auto parallelVectorSizes = tilingConfig.getParallelVectorSizes();
+  int numParallelTiles = tilingConfig.getNumParallelVectorTiles();
+  unsigned numTiledParallelDims = 0;
+  for (int i = 0, end = parallelVectorSizes.size();
+       (i < end) && (numTiledParallelDims < (numParallelTiles - 1)); ++i) {
+    if (parallelVectorSizes[i] != 0) {
+      SmallVector<int64_t> tileSizes(parallelVectorSizes.size(), 0);
+      tileSizes[i] = parallelVectorSizes[i];
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createLLVMCPUTilePass(tileSizes));
+      ++numTiledParallelDims;
+    }
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
+
+  int i = parallelVectorSizes.size() - 1;
+  while (i >= 0) {
+    if (parallelVectorSizes[i] != 0) {
+      SmallVector<int64_t> tileSizes(parallelVectorSizes.size(), 0);
+      tileSizes[i] = parallelVectorSizes[i];
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createLLVMCPUTilePass(tileSizes));
+      break;
+    }
+    --i;
+  }
 
   {
     LLVMCPUVectorizationPassOptions options;
