@@ -1,10 +1,5 @@
 # IREE Benchmark Suites
 
-**We are in the progress of replacing the legacy benchmark suites. Currently the
-new benchmark suites only support `x86_64`, `CUDA`, and `compilation statistics`
-benchmarks. For working with the legacy benchmark suites, see
-[IREE Benchmarks (Legacy)](/benchmarks/README.md)**.
-
 IREE Benchmarks Suites is a collection of benchmarks for IREE developers to
 track performance improvements/regressions during development.
 
