@@ -208,126 +208,71 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
   return std::make_pair(color, key);
 }
 
-static StringAttr convertToRankGroupsByFlattening(DenseIntElementsAttr groups) {
-  if (!groups) return StringAttr();
-
-  auto groupsType = groups.getType().cast<RankedTensorType>();
-  assert(groupsType.getRank() == 2);
-  int rows = groupsType.getShape()[0];
-  int cols = groupsType.getShape()[1];
-  auto values = groups.getValues<int64_t>();
-
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  bool firstGroup = true;
-  for (int i = 0; i < rows; ++i) {
-    if (!firstGroup) {
-      os << ',';
-    }
-    os << '(';
-    bool firstItem = true;
-    for (int j = 0; j < cols; ++j) {
-      const int index = i * cols + j;
-      int64_t value = values[index];
-      // -1 represents a null value in a group, where the group does not
-      // fully occupy the space in the row, e.g., [[0,1,2,3], [4,5,-1,-1]].
-      if (value != -1) {
-        // When there was a value before, put a comma.
-        if (!firstItem) {
-          os << ',';
-        }
-        os << value;
-        firstItem = false;
-      }
-    }
-    os << ')';
-    firstGroup = false;
+static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
+    DenseIntElementsAttr replicaGroups, int32_t numPartitions,
+    OpBuilder &builder) {
+  if (numPartitions < 1) {
+    // Treat as a single partition.
+    return replicaGroups;
   }
-  return StringAttr::get(groups.getContext(), str);
-}
-
-static StringAttr convertToRankGroupsByCrossReplica(
-    DenseIntElementsAttr replicaGroups, int32_t numPartitions) {
-  if (numPartitions < 1) numPartitions = 1;
 
   auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
   auto values = replicaGroups.getValues<int64_t>();
+  SmallVector<Attribute> newValues;
 
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  bool firstGroup = true;
+  // The number of groups is (rows * numPartitions).
   for (int i = 0; i < rows; ++i) {
     for (int p = 0; p < numPartitions; ++p) {
-      if (!firstGroup) {
-        os << ',';
-      }
-      os << '(';
-      bool firstItem = true;
+      // Each group starts here. The group size is the same as the column size.
       for (int j = 0; j < cols; ++j) {
         const int index = i * cols + j;
         const int64_t replicaId = values[index];
-        if (replicaId != -1) {
-          // -1 represents a null value in a group, where the group does not
-          // fully occupy the space in the row, e.g., [[0,1,2,3], [4,5,-1,-1]].
-          const int64_t value = replicaId * numPartitions + p;
-          // When there was a value before, put a comma.
-          if (!firstItem) {
-            os << ',';
-          }
-          os << value;
-          firstItem = false;
-        }
+        const int64_t value =
+            (replicaId == -1) ? -1 : replicaId * numPartitions + p;
+        newValues.push_back(builder.getI64IntegerAttr(value));
       }
-      os << ')';
-      firstGroup = false;
     }
   }
-  return StringAttr::get(replicaGroups.getContext(), str);
+
+  auto type =
+      RankedTensorType::get({rows * numPartitions, cols}, builder.getI64Type());
+  return DenseIntElementsAttr::get(type, newValues);
 }
 
-static StringAttr convertToRankGroupsByCrossReplicaAndPartition(
-    DenseIntElementsAttr replicaGroups, int32_t numPartitions) {
-  if (numPartitions < 1) numPartitions = 1;
+static DenseIntElementsAttr convertToRankGroupsByCrossReplicaAndPartition(
+    DenseIntElementsAttr replicaGroups, int32_t numPartitions,
+    OpBuilder &builder) {
+  if (numPartitions < 1) {
+    // Treat as a single partition.
+    return replicaGroups;
+  }
 
   auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
   auto values = replicaGroups.getValues<int64_t>();
+  SmallVector<Attribute> newValues;
 
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  bool firstGroup = true;
+  // The number of groups is the same as the number of rows.
   for (int i = 0; i < rows; ++i) {
-    if (!firstGroup) {
-      os << ',';
-    }
-    os << '(';
-    bool firstItem = true;
+    // Each group starts here. The group size is (numPartitions * cols).
     for (int p = 0; p < numPartitions; ++p) {
       for (int j = 0; j < cols; ++j) {
         const int index = i * cols + j;
         const int64_t replicaId = values[index];
-        if (replicaId != -1) {
-          // -1 represents a null value in a group, where the group does not
-          // fully occupy the space in the row, e.g., [[0,1,2,3], [4,5,-1,-1]].
-          const int64_t value = replicaId * numPartitions + p;
-          // When there was a value before, put a comma.
-          if (!firstItem) {
-            os << ',';
-          }
-          os << value;
-          firstItem = false;
-        }
+        const int64_t value =
+            (replicaId == -1) ? -1 : replicaId * numPartitions + p;
+        newValues.push_back(builder.getI64IntegerAttr(value));
       }
     }
-    os << ')';
-    firstGroup = false;
   }
-  return StringAttr::get(replicaGroups.getContext(), str);
+  auto type =
+      RankedTensorType::get({rows, numPartitions * cols}, builder.getI64Type());
+  return DenseIntElementsAttr::get(type, newValues);
 }
 
 /// Creates a channel matching the given |channelHandleAttr| scoped to the
@@ -356,14 +301,15 @@ static Value createChannelWithGroupInfo(
   int64_t channelId = channelHandleAttr ? channelHandleAttr.getHandle() : 0;
   if (channelId <= 0) {
     assert(!useGlobalDeviceIds);
-    rankGroups =
-        convertToRankGroupsByCrossReplica(replicaGroups, numPartitions);
+    rankGroups = convertToRankGroupsByCrossReplica(replicaGroups, numPartitions,
+                                                   builder);
   } else {
     if (useGlobalDeviceIds) {
-      rankGroups = convertToRankGroupsByFlattening(replicaGroups);
+      // already flattened.
+      rankGroups = replicaGroups;
     } else {
-      rankGroups = convertToRankGroupsByCrossReplicaAndPartition(replicaGroups,
-                                                                 numPartitions);
+      rankGroups = convertToRankGroupsByCrossReplicaAndPartition(
+          replicaGroups, numPartitions, builder);
     }
   }
 
