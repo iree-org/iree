@@ -20,7 +20,9 @@
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
-// Passes per target
+//===---------------------------------------------------------------------===//
+// Include headers per target device
+//===---------------------------------------------------------------------===//
 #include "iree/compiler/Codegen/CommonPasses.h"
 #include "iree/compiler/Codegen/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/LLVMGPUPasses.h"
