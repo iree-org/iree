@@ -62,10 +62,11 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
 };
 
 /// Folding trailing unit dims away from transpose op if they are not
-/// transposed. The decomposition stage is close to vectorization, this avoids
-/// trailing unit dims at vector types. It does not trigger issues at vector
-/// level because all the elements in a inner tiles are batch-handled. The
-/// strides of outer dims are still the same.
+/// transposed.
+/// TODO(hanchung): Remove the workaround after we materialize encoding to do 1D
+/// data tiling instead of 2D with unit dimension for AVX512 targets. This is a
+/// workaround for 1D data tiling which is represented in 2D with an unit
+/// dimension form.
 struct FoldTrailingUnitTranspose
     : public OpRewritePattern<linalg::TransposeOp> {
   using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
