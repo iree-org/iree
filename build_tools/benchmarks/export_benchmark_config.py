@@ -39,7 +39,7 @@ import dataclasses
 import json
 import textwrap
 
-from benchmark_suites.iree import benchmark_collections
+from benchmark_suites.iree import benchmark_collections, benchmark_tags
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -50,12 +50,14 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "x86_64":
         lambda config: config.target_device_spec.architecture.architecture ==
         "x86_64",
-    "cuda": (lambda config: "cuda" in config.tags and "long-running" not in
-             config.tags),
+    "cuda":
+        lambda config: (benchmark_tags.CUDA in config.tags and benchmark_tags.
+                        LONG_RUNNING not in config.tags),
     "cuda-long":
-        lambda config: "cuda" in config.tags and "long-running" in config.tags,
+        lambda config: (benchmark_tags.CUDA in config.tags and benchmark_tags.
+                        LONG_RUNNING in config.tags),
     "vulkan-nvidia":
-        lambda config: "vulkan-nvidia" in config.tags,
+        lambda config: benchmark_tags.VULKAN_NVIDIA in config.tags,
     "android-cpu":
         lambda config:
         (config.target_device_spec.architecture.type == common_definitions.
@@ -148,7 +150,7 @@ def _export_compilation_handler(_args: argparse.Namespace):
   all_gen_configs, _ = benchmark_collections.generate_benchmarks()
   compile_stats_gen_configs = [
       config for config in all_gen_configs
-      if benchmark_collections.COMPILE_STATS_TAG in config.compile_config.tags
+      if benchmark_tags.COMPILE_STATS in config.compile_config.tags
   ]
 
   distinct_module_dir_paths = _get_distinct_module_dir_paths(

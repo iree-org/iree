@@ -5,12 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates CMake rules to build IREE artifacts."""
 
-from dataclasses import dataclass
 import collections
+from dataclasses import dataclass
 from typing import Dict, List, Sequence
 import pathlib
 
-from benchmark_suites.iree import benchmark_collections
+from benchmark_suites.iree import benchmark_tags
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import iree_definitions
@@ -21,10 +21,10 @@ BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models"
 BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites"
 # Compilation statistics suites for default benchmarks.
 E2E_COMPILE_STATS_SUITES = "iree-e2e-compile-stats-suites"
-# Long-running benchmark suites with larger models.
+# Long-running benchmark suites.
 LONG_BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites-long"
 # Compilation statistics suites for long-running benchmarks.
-LONG_E2E_COMPILE_STATS_SUITES = "iree-e2e-compile-stats-suites-long"
+LONG_E2E_COMPILE_STATS_SUITES_CMAKE_TARGET = "iree-e2e-compile-stats-suites-long"
 
 
 @dataclass(frozen=True)
@@ -177,14 +177,19 @@ def generate_rules(
         module_generation_config=gen_config,
         output_file_path=module_dir_path / iree_artifacts.MODULE_FILENAME)
 
-    has_compile_stats_tag = (benchmark_collections.COMPILE_STATS_TAG
-                             in gen_config.compile_config.tags)
-    if "long-running" in gen_config.tags:
-      suite_target = (LONG_E2E_COMPILE_STATS_SUITES if has_compile_stats_tag
-                      else LONG_BENCHMARK_SUITES_CMAKE_TARGET)
+    is_compile_stats = (benchmark_tags.COMPILE_STATS
+                        in gen_config.compile_config.tags)
+    if benchmark_tags.LONG_RUNNING in gen_config.tags:
+      if is_compile_stats:
+        suite_target = LONG_E2E_COMPILE_STATS_SUITES_CMAKE_TARGET
+      else:
+        suite_target = LONG_BENCHMARK_SUITES_CMAKE_TARGET
     else:
-      suite_target = (E2E_COMPILE_STATS_SUITES if has_compile_stats_tag else
-                      BENCHMARK_SUITES_CMAKE_TARGET)
+      if is_compile_stats:
+        suite_target = E2E_COMPILE_STATS_SUITES
+      else:
+        suite_target = BENCHMARK_SUITES_CMAKE_TARGET
+
     suite_target_names[suite_target].append(module_compile_rule.target_name)
 
     cmake_rules.extend(module_compile_rule.cmake_rules)
