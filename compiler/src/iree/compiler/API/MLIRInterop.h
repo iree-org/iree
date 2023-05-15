@@ -14,12 +14,17 @@
 #define IREE_COMPILER_API_MLIR_INTEROP_H
 
 #include "iree/compiler/embedding_api.h"
+#include "mlir-c/IR.h"
 #include "mlir-c/Pass.h"
 #include "mlir-c/Support.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Registers all dialects and extensions known to the IREE compiler.
+MLIR_CAPI_EXPORTED void ireeCompilerRegisterDialects(
+    MlirDialectRegistry registry);
 
 // Gets the MlirContext that the session manages. The context is owned by the
 // session and valid until it is destroyed.

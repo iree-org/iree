@@ -30,19 +30,19 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
 #endif  // defined(IREE_UK_STANDALONE)
 
 // Plugin entry points wrapping the actual ukernels.
-static int iree_uk_plugin_mmt4d(void* context, void* params_ptr,
+static int iree_uk_plugin_mmt4d(void* params_ptr, void* context,
                                 void* reserved) {
   iree_uk_mmt4d((const iree_uk_mmt4d_params_t*)params_ptr);
   return 0;
 }
 
-static int iree_uk_plugin_pack(void* context, void* params_ptr,
+static int iree_uk_plugin_pack(void* params_ptr, void* context,
                                void* reserved) {
   iree_uk_pack((const iree_uk_pack_params_t*)params_ptr);
   return 0;
 }
 
-static int iree_uk_plugin_unpack(void* context, void* params_ptr,
+static int iree_uk_plugin_unpack(void* params_ptr, void* context,
                                  void* reserved) {
   iree_uk_unpack((const iree_uk_unpack_params_t*)params_ptr);
   return 0;
@@ -72,9 +72,9 @@ static iree_hal_executable_plugin_status_t iree_uk_plugin_resolve(
     const void* fn_ptr;
   } plugin_entry_point_t;
   static const plugin_entry_point_t entry_points[] = {
-      {"ukernel.mmt4d", iree_uk_plugin_mmt4d},
-      {"ukernel.pack", iree_uk_plugin_pack},
-      {"ukernel.unpack", iree_uk_plugin_unpack},
+      {"iree_uk_mmt4d", iree_uk_plugin_mmt4d},
+      {"iree_uk_pack", iree_uk_plugin_pack},
+      {"iree_uk_unpack", iree_uk_plugin_unpack},
   };
   *out_resolution = 0;
   bool any_required_not_found = false;

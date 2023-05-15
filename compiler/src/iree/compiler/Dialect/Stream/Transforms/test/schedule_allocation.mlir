@@ -394,12 +394,12 @@ func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %targ
 // TODO(#11249): add a test for in-place collectives (send == recv).
 
 // CHECK-LABEL: @applyAsyncCollectiveOpOutOfPlace
-// CHECK-SAME: (%[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
+// CHECK-SAME: (%[[CHANNEL:.+]]: !stream.channel,
+// CHECK-SAME:  %[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[RECV:.+]]: !stream.resource<transient>, %[[RECV_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[COUNT:[a-z0-9]+]]: index)
-func.func @applyAsyncCollectiveOpOutOfPlace(%send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
+func.func @applyAsyncCollectiveOpOutOfPlace(%channel: !stream.channel, %send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
   %c0 = arith.constant 0 : index
-  %channel = stream.channel.default : !stream.channel
   // CHECK: stream.cmd.execute
   // CHECK-SAME: with(%[[SEND]] as %[[SEND_CAPTURE:.+]]: !stream.resource<external>{%[[SEND_SIZE]]},
   // CHECK-SAME:      %[[RECV]] as %[[RECV_CAPTURE:.+]]: !stream.resource<transient>{%[[RECV_SIZE]]})

@@ -40,6 +40,11 @@ struct iree_vm_context_t {
   } list;
 };
 
+static iree_status_t iree_vm_context_resolve_function_impl(
+    const iree_vm_context_t* context, iree_string_view_t full_name,
+    const iree_vm_function_signature_t* expected_signature,
+    iree_vm_function_t* out_function);
+
 static void iree_vm_context_destroy(iree_vm_context_t* context);
 
 // Allocates a process-unique ID for a context to use.
@@ -182,8 +187,8 @@ static iree_status_t iree_vm_context_resolve_module_imports(
     // Resolve the function to the module that contains it and return the
     // information.
     iree_vm_function_t import_function;
-    iree_status_t resolve_status =
-        iree_vm_context_resolve_function(context, full_name, &import_function);
+    iree_status_t resolve_status = iree_vm_context_resolve_function_impl(
+        context, full_name, &expected_signature, &import_function);
     if (!iree_status_is_ok(resolve_status)) {
       if (iree_status_is_not_found(resolve_status) &&
           decl_function.linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL) {
@@ -560,8 +565,9 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
                                             out_module_state);
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
+static iree_status_t iree_vm_context_resolve_function_impl(
     const iree_vm_context_t* context, iree_string_view_t full_name,
+    const iree_vm_function_signature_t* expected_signature,
     iree_vm_function_t* out_function) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_function);
@@ -580,8 +586,9 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
   for (int i = (int)context->list.count - 1; i >= 0; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     if (iree_string_view_equal(module_name, iree_vm_module_name(module))) {
-      return iree_vm_module_lookup_function_by_name(
-          module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, out_function);
+      return module->lookup_function(
+          module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name,
+          expected_signature, out_function);
     }
   }
 
@@ -590,6 +597,13 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
                           "registered with the context",
                           (int)module_name.size, module_name.data,
                           (int)full_name.size, full_name.data);
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
+    const iree_vm_context_t* context, iree_string_view_t full_name,
+    iree_vm_function_t* out_function) {
+  return iree_vm_context_resolve_function_impl(
+      context, full_name, /*expected_signature=*/NULL, out_function);
 }
 
 // Calls the '__notify(i32)' function in |module|, if present.

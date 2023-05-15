@@ -419,13 +419,26 @@ void BufferViewBufferOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.channel.rank_and_count
+// hal.channel.create
 //===----------------------------------------------------------------------===//
 
 void ChannelCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel");
 }
+
+//===----------------------------------------------------------------------===//
+// hal.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "channel");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.channel.rank_and_count
+//===----------------------------------------------------------------------===//
 
 void ChannelRankAndCountOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {

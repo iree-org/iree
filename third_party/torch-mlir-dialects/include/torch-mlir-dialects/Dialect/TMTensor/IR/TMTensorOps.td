@@ -189,6 +189,56 @@ def TMTensor_ScatterOp : TMTensor_Op<"scatter",
   }];
 }
 
+def TMTensor_SortOp : TMTensor_Op<"sort",
+    [DeclareOpInterfaceMethods<ScalarLoopOpInterface,
+        ["generateScalarImplementation"]>]> {
+  let summary = "Sort operator";
+  let description = [{
+    Based on XLA operation semantics, sorts the given `operands` at the given
+    `dimension` with the given `comparator`.
+
+    See https://www.tensorflow.org/xla/operation_semantics#sort.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$dimension
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = extraTMTensorOpClassDeclaration # [{
+    Value operand(int index) {
+      return getOutputs()[index];
+    }
+    ShapedType getOperandType(int index) {
+      return operand(index).getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType(0).getRank();
+    }
+    ArrayRef<int64_t> getOperandShape() {
+      return getOperandType(0).getShape();
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
+      std::pair<unsigned, unsigned> outputsIndexAndLength =
+        getODSOperandIndexAndLength(1);
+      return std::make_pair<int64_t, int64_t>(
+          outputsIndexAndLength.first,
+          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//

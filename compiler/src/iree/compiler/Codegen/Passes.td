@@ -227,6 +227,9 @@ def OptimizeVectorTransfer :
     Option<"optionFlatten", "flatten", "bool", "false",
            "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
   ];
+  let dependentDialects = [
+      "memref::MemRefDialect"
+  ];
 }
 
 def SplitFullPartialTransfer :
@@ -303,6 +306,10 @@ def DecomposePackUnPackOps :
     Pass<"iree-codegen-decompose-pack-unpack-ops", "func::FuncOp"> {
   let summary = "Decompose pack/unpack ops into vectorizable ops";
   let constructor = "mlir::iree_compiler::createDecomposePackUnPackOpsPass()";
+  let options = [
+    Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
+           "Always apply tiling to make outer dimension be ones">
+  ];
 }
 
 def PolynomialApproximationPass :

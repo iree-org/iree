@@ -188,12 +188,13 @@ static void iree_uk_unpack_using_tile_func(
   }
 }
 
-IREE_UK_EXPORT void iree_uk_unpack(const iree_uk_unpack_params_t* params) {
+IREE_UK_EXPORT int iree_uk_unpack(const iree_uk_unpack_params_t* params) {
   iree_uk_unpack_validate(params);
 
-  if (iree_uk_unpack_early(params)) return;
+  if (iree_uk_unpack_early(params)) return 0;
 
   // Select a target-specific tile_func and use that with generic outer loops.
   iree_uk_unpack_tile_func_t func = iree_uk_unpack_select_tile_func(params);
   iree_uk_unpack_using_tile_func(params, func);
+  return 0;
 }

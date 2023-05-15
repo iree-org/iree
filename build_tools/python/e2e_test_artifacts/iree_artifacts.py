@@ -42,7 +42,7 @@ def get_imported_model_path(
   model = imported_model.model
   if model.source_type in [
       common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-      common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
+      common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
   ]:
     # Uses the MLIR model directly.
     return model_artifacts.get_model_path(model=model, root_path=root_path)

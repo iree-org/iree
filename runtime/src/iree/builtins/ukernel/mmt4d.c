@@ -120,16 +120,17 @@ static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
   return false;
 }
 
-IREE_UK_EXPORT void iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params) {
+IREE_UK_EXPORT int iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_validate(params);
 
   // Maybe handle this mmt4d "early", without needing to select a tile_func.
   // Typical cases include trivial cases (e.g. when params->K == 0) and hardware
   // targets that want to handle the entire loop nest in target-specific code.
-  if (iree_uk_mmt4d_early(params)) return;
+  if (iree_uk_mmt4d_early(params)) return 0;
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
   iree_uk_mmt4d_tile_func_t tile_func = iree_uk_mmt4d_select_tile_func(params);
   iree_uk_mmt4d_using_tile_func(params, tile_func);
+  return 0;
 }

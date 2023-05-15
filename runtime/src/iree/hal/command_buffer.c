@@ -402,6 +402,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
     const void* pattern, iree_host_size_t pattern_length) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(target_buffer);
+  if (length == 0) {
+    // No-op fill. All other validation is skipped.
+    return iree_ok_status();
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -423,6 +427,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_update_buffer(
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(source_buffer);
   IREE_ASSERT_ARGUMENT(target_buffer);
+  if (length == 0) {
+    // No-op update. All other validation is skipped.
+    return iree_ok_status();
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -442,6 +450,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
   IREE_ASSERT_ARGUMENT(command_buffer);
+  if (length == 0) {
+    // No-op copy. All other validation is skipped.
+    return iree_ok_status();
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -535,6 +547,14 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(executable);
+  if ((workgroup_x | workgroup_y | workgroup_z) == 0) {
+    // No-op dispatch. All implementations are expected to do this but we ensure
+    // it happens here to avoid the overhead of going all the way down into the
+    // device layer for something we know should have no (intentional)
+    // side-effects. Note that this does mean that validation is skipped and
+    // the executable/etc could be bogus but that's fine.
+    return iree_ok_status();
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(

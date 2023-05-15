@@ -765,13 +765,31 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
-      "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayAttr":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
     OpBuilder<(ins
-      "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
+      "SymbolRefAttr":$entryPoint, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayAttr":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+    OpBuilder<(ins
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayRef<int64_t>":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+      [{
+        build($_builder, $_state, exportOp, workload,
+              resultTypes, resultDims, arguments, argumentDims,
+              $_builder.getIndexArrayAttr(tiedOperands),
+              attributes);
+      }]>,
+    OpBuilder<(ins
+      "SymbolRefAttr":$entryPoint, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayRef<int64_t>":$tiedOperands,
@@ -1032,7 +1050,6 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
 
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   FLOW_StreamableOp,
-  AllElementTypesMatch<["source", "result"]>,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedResult",
@@ -1504,14 +1521,14 @@ def FLOW_DispatchWorkgroupCountFromSliceOp :
     workgroup count. It does so by using a program slice of the values
     within the dispatch that represent the number of workgroups when available
     within the dispatch.
-    Currently the arguments of index types captured by the 
+    Currently the arguments of index types captured by the
     `flow.dispatch.workgroups` is treated as the workload for the operation.
     It is a requirement that the slice of the program that computes the
     number of workgroups will need to have its leaves be these captured values.
 
     TODO: This could be generalized in future to allow the slices to encompass
     arbitrary computation. The computation of the workgroup count can then be
-    done on the device itself, if this is data dependent. In such cases the 
+    done on the device itself, if this is data dependent. In such cases the
     workload could be more than just values of index types.
   }];
 }
@@ -1573,6 +1590,35 @@ def FLOW_ChannelDefaultOp : FLOW_Op<"channel.default", [
   let assemblyFormat = [{
     ($group^)?
     `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def FLOW_ChannelSplitOp : FLOW_Op<"channel.split", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{splits a collective communication channel}];
+  let description = [{
+    Partitions the group associated with the given channel into disjoint
+    subgroups for each unique value of color. Each new subgroup contains all
+    participants of the same color and within each subgroup the key argument
+    is used to define the rank order. When multiple participants in a group
+    use the same key the tie will be broken using their rank in the parent
+    group.
+  }];
+
+  let arguments = (ins
+    FLOW_Channel:$channel,
+    Index:$color,
+    Index:$key
+  );
+  let results = (outs
+    FLOW_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `,` $color `,` $key
+    `:` type($channel) `->` type($result)
     attr-dict-with-keyword
   }];
 }

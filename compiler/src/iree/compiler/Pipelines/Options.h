@@ -43,7 +43,10 @@ struct InputDialectOptions {
     // cleanup activities.
     xla,
     // Legalizes input defined over StableHLO ops.
-    stablehlo_experimental,
+    stablehlo,
+    // Special case of 'stablehlo' legalization which also performs some XLA
+    // preprocessing, e.g., flattening of tuples.
+    stablehlo_xla,
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
     // Legalizes input defined over TMTensor ops.

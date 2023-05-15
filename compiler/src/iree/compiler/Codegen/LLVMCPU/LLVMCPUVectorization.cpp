@@ -234,16 +234,33 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   }
 
   IRRewriter rewriter(context);
-  SmallVector<linalg::LinalgOp> candidates;
-  funcOp.walk(
-      [&](linalg::LinalgOp linalgOp) { candidates.push_back(linalgOp); });
-  for (auto linalgOp : candidates) {
+  SmallVector<Operation *> candidates;
+  funcOp.walk([&](Operation *op) {
+    if (isa<linalg::LinalgOp>(op)) candidates.push_back(op);
+    if (vectorizePadding && isa<tensor::PadOp>(op)) candidates.push_back(op);
+  });
+  for (auto op : candidates) {
     SmallVector<int64_t> vectorSizes;
-    if (enableVectorMasking) {
-      vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      if (enableVectorMasking) {
+        vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
+      }
+      (void)linalg::vectorize(rewriter, linalgOp, vectorSizes,
+                              vectorizeGatherAccesses);
+    } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
+      if (!enableVectorMasking) continue;
+      auto ty = padOp.getResultType();
+      // TODO(hanchung): Infer the vector sizes for pad op after
+      // maskedVectorize method allows dynamic result shapes.
+      if (!ty.hasStaticShape()) continue;
+      SmallVector<int64_t> vectorSizes(ty.getShape().begin(),
+                                       ty.getShape().end());
+      FailureOr<vector::TransferWriteOp> maybeWriteOp =
+          linalg::maskedVectorize(rewriter, padOp, vectorSizes);
+      if (failed(maybeWriteOp)) {
+        continue;
+      }
     }
-    (void)linalg::vectorize(rewriter, linalgOp, vectorSizes,
-                            vectorizeGatherAccesses);
   };
 
   // TODO: Move this down the pipeline once we have the ODM-based masking

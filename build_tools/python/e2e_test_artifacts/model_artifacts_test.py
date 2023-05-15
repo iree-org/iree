@@ -37,7 +37,7 @@ class ModelArtifactsTest(unittest.TestCase):
         id="5678",
         name="tf_m",
         tags=[],
-        source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
+        source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
         source_url="https://example.com/xyz_mlir",
         entry_function="predict",
         input_types=["2xf32"])

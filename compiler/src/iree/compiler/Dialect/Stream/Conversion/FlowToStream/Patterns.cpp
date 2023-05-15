@@ -278,21 +278,24 @@ struct ConvertChannelDefaultOp
   LogicalResult matchAndRewrite(
       IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Stream::AffinityAttr affinityAttr;
-    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelDefaultOp>(
-        op, adaptor.getGroupAttr(), affinityAttr);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCreateOp>(
+        op, /*id=*/Value{},
+        /*group=*/adaptor.getGroupAttr(),
+        /*rank=*/Value{},
+        /*count=*/Value{}, affinityAttr);
     return success();
   }
 };
 
-struct ConvertChannelCountOp
-    : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
+struct ConvertChannelSplitOp
+    : public OpConversionPattern<IREE::Flow::ChannelSplitOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+      IREE::Flow::ChannelSplitOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
-        op, adaptor.getOperands());
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelSplitOp>(
+        op, adaptor.getChannel(), adaptor.getColor(), adaptor.getKey());
     return success();
   }
 };
@@ -304,6 +307,18 @@ struct ConvertChannelRankOp
       IREE::Flow::ChannelRankOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Stream::ChannelRankOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
+struct ConvertChannelCountOp
+    : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
         op, adaptor.getOperands());
     return success();
   }
@@ -790,8 +805,9 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
               ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
               ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter,
                                                           context);
-  patterns.insert<ConvertChannelCountOp, ConvertChannelDefaultOp,
-                  ConvertChannelRankOp>(typeConverter, context);
+  patterns.insert<ConvertChannelDefaultOp, ConvertChannelSplitOp,
+                  ConvertChannelRankOp, ConvertChannelCountOp>(typeConverter,
+                                                               context);
   patterns.insert<ConvertAllGatherOp, ConvertAllReduceOp,
                   ConvertReduceScatterOp, ConvertAllToAllOp>(typeConverter,
                                                              context);

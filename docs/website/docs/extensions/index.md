@@ -243,7 +243,7 @@ samples.
 
 The runtime portion requires that the code be exported to the VM system by way
 of an `iree_vm_module_t` interface. A low-level native interface exists with
-minimal overhead and is used for example [by the IREE HAL itself](https://github.com/openxla/iree/tree/main/iree/modules/hal).
+minimal overhead and is used for example [by the IREE HAL itself](https://github.com/openxla/iree/tree/main/runtime/src/iree/modules/hal).
 There is also a C++ wrapper that is significantly easier to work with however it
 needs some performance improvements.
 

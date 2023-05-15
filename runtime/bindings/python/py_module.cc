@@ -105,10 +105,10 @@ class PyModuleInterface {
     return iree_make_status(IREE_STATUS_NOT_FOUND);
   }
 
-  static iree_status_t ModuleLookupFunction(void* vself,
-                                            iree_vm_function_linkage_t linkage,
-                                            iree_string_view_t name,
-                                            iree_vm_function_t* out_function) {
+  static iree_status_t ModuleLookupFunction(
+      void* vself, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+      const iree_vm_function_signature_t* expected_signature,
+      iree_vm_function_t* out_function) {
     auto self = AsSelf(vself);
     std::string_view name_cpp(name.data, name.size);
     if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {

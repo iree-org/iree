@@ -118,7 +118,7 @@ class Manifest:
       self.dispatch_names = [x for x in args.dispatches.split(',') if x != '']
 
     # Paths to the generated directory (e.g. `./generated/linalg`).
-    self.generated_path = Path(self.args.build_dir, 'generated',
+    self.generated_path = Path(self.args.generated_dir, 'generated',
                                self.args.mlir_dialect)
 
     # Create the directories in self.generated_path, if it does not exist.

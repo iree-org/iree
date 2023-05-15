@@ -29,6 +29,7 @@ EXPORTS
   ireeCompilerOutputOpenFile
   ireeCompilerOutputOpenMembuffer
   ireeCompilerOutputWrite
+  ireeCompilerRegisterDialects
   ireeCompilerRunLldMain
   ireeCompilerRunMain
   ireeCompilerSessionCreate
@@ -318,6 +319,8 @@ EXPORTS
   mlirIdentifierGetContext
   mlirIdentifierStr
   mlirIndexTypeGet
+  mlirInferShapedTypeOpInterfaceInferReturnTypes
+  mlirInferShapedTypeOpInterfaceTypeID
   mlirInferTypeOpInterfaceInferReturnTypes
   mlirInferTypeOpInterfaceTypeID
   mlirIntegerAttrGet
@@ -583,6 +586,7 @@ EXPORTS
   mlirValueIsABlockArgument
   mlirValueIsAOpResult
   mlirValuePrint
+  mlirValuePrintAsOperand
   mlirValueReplaceAllUsesOfWith
   mlirVectorTypeGet
   mlirVectorTypeGetChecked

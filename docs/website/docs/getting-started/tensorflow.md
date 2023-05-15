@@ -17,7 +17,7 @@ python -m pip install tf-nightly
 ```
 
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/python-bindings-and-importers.md):
+[building from source](../building-from-source/getting-started/#python-bindings):
 
 ```shell
 python -m pip install \

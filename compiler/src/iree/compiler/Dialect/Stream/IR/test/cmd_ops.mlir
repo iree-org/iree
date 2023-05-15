@@ -45,49 +45,49 @@ func.func @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !str
 // -----
 
 // CHECK-LABEL: @cmdCollective
-func.func @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index) -> !stream.timepoint {
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
-  %channel = stream.channel.default : !stream.channel
-
+// CHECK-SAME: %[[CHANNEL:[a-z0-9]+]]: !stream.channel
+func.func @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index, %channel: !stream.channel) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: stream.cmd.execute
-  %0 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<transient>{%arg3}) {
+  // CHECK-SAME: %arg0 as %[[ARG0_CAPTURE:[a-z0-9]+]]: !stream.resource
+  // CHECK-SAME: %arg2 as %[[ARG2_CAPTURE:[a-z0-9]+]]: !stream.resource
+  %0 = stream.cmd.execute with(%arg0 as %arg0_capture: !stream.resource<transient>{%arg1}, %arg2 as %arg2_capture: !stream.resource<transient>{%arg3}) {
 
     // Out-of-place all-reduce:
     // CHECK-NEXT: stream.cmd.collective<all_reduce with sum : f32>[%c128] channel(%[[CHANNEL]]) {
-    // CHECK-NEXT:   ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
-    // CHECK-NEXT:   wo %arg5[%c0 for %c128] : !stream.resource<transient>{%arg3}
+    // CHECK-NEXT:   ro %[[ARG0_CAPTURE]][%c0 for %c128] : !stream.resource<transient>{%arg1},
+    // CHECK-NEXT:   wo %[[ARG2_CAPTURE]][%c0 for %c128] : !stream.resource<transient>{%arg3}
     // CHECK-NEXT: }
     stream.cmd.collective<all_reduce with sum : f32>[%c128] channel(%channel) {
-      ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
-      wo %arg5[%c0 for %c128] : !stream.resource<transient>{%arg3}
+      ro %arg0_capture[%c0 for %c128] : !stream.resource<transient>{%arg1},
+      wo %arg2_capture[%c0 for %c128] : !stream.resource<transient>{%arg3}
     }
 
     // In-place all-reduce:
     // CHECK-NEXT: stream.cmd.collective<all_reduce with average : f32>[%c128] channel(%[[CHANNEL]]) {
-    // CHECK-NEXT:   ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
-    // CHECK-NEXT:   wo %arg4[%c0 for %c128] : !stream.resource<transient>{%arg3}
+    // CHECK-NEXT:   ro %[[ARG0_CAPTURE]][%c0 for %c128] : !stream.resource<transient>{%arg1},
+    // CHECK-NEXT:   wo %[[ARG0_CAPTURE]][%c0 for %c128] : !stream.resource<transient>{%arg3}
     // CHECK-NEXT: }
     stream.cmd.collective<all_reduce with average : f32>[%c128] channel(%channel) {
-      ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
-      wo %arg4[%c0 for %c128] : !stream.resource<transient>{%arg3}
+      ro %arg0_capture[%c0 for %c128] : !stream.resource<transient>{%arg1},
+      wo %arg0_capture[%c0 for %c128] : !stream.resource<transient>{%arg3}
     }
 
     // Send:
     // CHECK-NEXT: stream.cmd.collective<send : f32>[%c128] channel(%[[CHANNEL]]) {
-    // CHECK-NEXT:   ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1}
+    // CHECK-NEXT:   ro %[[ARG0_CAPTURE]][%c0 for %c128] : !stream.resource<transient>{%arg1}
     // CHECK-NEXT: }
     stream.cmd.collective<send : f32>[%c128] channel(%channel) {
-      ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1}
+      ro %arg0_capture[%c0 for %c128] : !stream.resource<transient>{%arg1}
     }
 
     // Recv:
     // CHECK-NEXT: stream.cmd.collective<recv : f32>[%c128] channel(%[[CHANNEL]]) {
-    // CHECK-NEXT:   wo %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1}
+    // CHECK-NEXT:   wo %[[ARG0_CAPTURE]][%c0 for %c128] : !stream.resource<transient>{%arg1}
     // CHECK-NEXT: }
     stream.cmd.collective<recv : f32>[%c128] channel(%channel) {
-      wo %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1}
+      wo %arg0_capture[%c0 for %c128] : !stream.resource<transient>{%arg1}
     }
 
   } => !stream.timepoint

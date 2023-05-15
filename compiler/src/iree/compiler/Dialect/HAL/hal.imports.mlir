@@ -11,12 +11,6 @@ vm.module @hal {
 vm.import private @ex.shared_device() -> !vm.ref<!hal.device>
 attributes {nosideeffects}
 
-vm.import private @ex.submit_and_wait(
-  %device : !vm.ref<!hal.device>,
-  %command_buffer : !vm.ref<!hal.command_buffer>
-)
-attributes {vm.yield}
-
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
@@ -175,6 +169,15 @@ vm.import private @channel.create(
   %group : !vm.buffer,
   %rank : i32,
   %count : i32
+) -> !vm.ref<!hal.channel>
+attributes {nosideeffects}
+
+// Splits a collective communication channel.
+vm.import private @channel.split(
+  %channel : !vm.ref<!hal.channel>,
+  %color : i32,
+  %key : i32,
+  %flags : i32
 ) -> !vm.ref<!hal.channel>
 attributes {nosideeffects}
 

@@ -71,9 +71,10 @@ class Linux_CUDA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
-    gen_configs, run_configs = self._generate_configs(model_groups.CUDA_MODELS,
-                                                      self.SM_80_COMPILE_CONFIG)
     # The `cuda` tag is required to put them into the CUDA benchmark preset.
+    gen_configs, run_configs = self._generate_configs(model_groups.CUDA_MODELS,
+                                                      self.SM_80_COMPILE_CONFIG,
+                                                      run_tags=["cuda"])
     ubench_gen_configs, ubench_run_configs = self._generate_configs(
         model_groups.MICRO_MATMUL,
         self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,

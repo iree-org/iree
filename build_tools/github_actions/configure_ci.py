@@ -42,7 +42,7 @@ from typing import Iterable, List, Mapping, Sequence, Tuple
 
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
-BENCHMARK_PRESET_KEY = "benchmarks"
+BENCHMARK_EXTRA_KEY = "benchmark-extra"
 # Trailer to prevent benchmarks from always running on LLVM integration PRs.
 SKIP_LLVM_INTEGRATE_BENCHMARK_KEY = "skip-llvm-integrate-benchmark"
 
@@ -77,11 +77,12 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-DEFAULT_BENCHMARK_PRESETS = ["cuda", "x86_64", "vulkan-nvidia", "comp-stats"]
-BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESETS + [
-    "experimental-android-cpu",
-    "experimental-android-gpu",
+DEFAULT_BENCHMARK_PRESETS = [
+    "cuda", "x86_64", "android-cpu", "android-gpu", "vulkan-nvidia",
+    "comp-stats"
 ]
+# All available benchmark preset options including experimental presets.
+BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESETS
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
 
@@ -278,9 +279,7 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
           f"description has '{SKIP_LLVM_INTEGRATE_BENCHMARK_KEY}' trailer.")
 
   if not is_pr:
-    # TODO(#9855): Only enable android benchmarks in postsubmit before the
-    # migration is finished.
-    preset_options = {"all", "experimental-android-cpu"}
+    preset_options = {"all"}
     print(f"Using benchmark presets '{preset_options}' for non-PR run")
   elif is_llvm_integrate_pr and not skip_llvm_integrate_benchmark:
     # Run all benchmark presets for LLVM integration PRs.
@@ -290,8 +289,8 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
     preset_options = set(
         label.split(":", maxsplit=1)[1]
         for label in labels
-        if label.startswith(BENCHMARK_PRESET_KEY + ":"))
-    trailer = trailers.get(BENCHMARK_PRESET_KEY)
+        if label.startswith(BENCHMARK_EXTRA_KEY + ":"))
+    trailer = trailers.get(BENCHMARK_EXTRA_KEY)
     if trailer is not None:
       preset_options = preset_options.union(
           option.strip() for option in trailer.split(","))

@@ -105,6 +105,8 @@ elif [[ "$OSTYPE" =~ ^darwin ]]; then
     "iree/compiler/bindings/c/loader_test"
     #TODO(#12496): Remove after fixing the test on macOS
     "iree/compiler/bindings/python/test/transforms/ireec/compile_sample_module"
+    #TODO(#13501): Fix failing sample on macOS
+    "iree/samples/custom_module/async/test/example.mlir"
   )
 fi
 

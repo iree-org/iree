@@ -19,6 +19,10 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+//===----------------------------------------------------------------------===//
+// util.align
+//===----------------------------------------------------------------------===//
+
 template <typename CONST_OP, typename SUB_OP, typename ADD_OP, typename NOT_OP,
           typename AND_OP>
 void insertAlignOps(IREE::Util::AlignOp srcOp,

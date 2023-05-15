@@ -726,6 +726,40 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   }];
 }
 
+def HAL_ChannelSplitOp : HAL_PureOp<"channel.split", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{splits a collective communication channel}];
+  let description = [{
+    Partitions the group associated with the given channel into disjoint
+    subgroups for each unique value of color. Each new subgroup contains all
+    participants of the same color and within each subgroup the key argument
+    is used to define the rank order. When multiple participants in a group
+    use the same key the tie will be broken using their rank in the parent
+    group. A color of -1 indicates that the rank does not participate in any
+    subgroup and will return a null channel.
+  }];
+
+  let arguments = (ins
+    HAL_Channel:$channel,
+    I32:$color,
+    I32:$key,
+    I32Attr:$flags
+  );
+  let results = (outs
+    HAL_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $channel `:` type($channel) `>`
+    `color` `(` $color `)`
+    `key` `(` $key `)`
+    `flags` `(` $flags `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
 def HAL_ChannelRankAndCountOp : HAL_PureOp<"channel.rank_and_count", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {

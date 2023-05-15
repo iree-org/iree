@@ -31,18 +31,6 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       "requires-gpu-nvidia"
       "driver=cuda"
   )
-
-  # The test fails on CUDA with `Mismatched elements: 1 / 100352 (0.000996%)`,
-  # so mark as WILL_FAIL if the test was defined.
-  # TODO(#13007): Plumb WILL_FAIL through the test rule instead of custom logic.
-  iree_package_path(PKG_PATH)
-  set(CUDA_TEST_NAME ${PKG_PATH}/mnist_train_test_cuda)
-  get_directory_property(TESTS_LIST TESTS)
-  if(${CUDA_TEST_NAME} IN_LIST TESTS_LIST)
-    set_tests_properties(
-      ${CUDA_TEST_NAME}
-      PROPERTIES WILL_FAIL TRUE)
-  endif()
 endif()
 
 if(IREE_TARGET_BACKEND_VULKAN_SPIRV AND IREE_HAL_DRIVER_VULKAN)

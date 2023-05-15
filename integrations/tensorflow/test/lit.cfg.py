@@ -58,7 +58,6 @@ llvm_config.with_environment("PYTHONPATH", [
     test_src_dir,
     os.path.join(python_projects_dir, "iree_tf"),
     os.path.join(python_projects_dir, "iree_tflite"),
-    os.path.join(python_projects_dir, "iree_xla"),
 ],
                              append_path=True)
 

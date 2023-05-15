@@ -54,7 +54,8 @@ void registerStableHLOConversionPassPipeline() {
 }
 
 // Prepare HLO for use as an input to the Flow dialect.
-void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
+void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
+                                                   bool detuple) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createLegalizeControlFlow());
@@ -63,7 +64,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
   passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
-  // TODO(#12678): Port StableHLO detuple pass.
+  if (detuple) passManager.addPass(createFlattenTuplesInCFG());
 
   passManager.addNestedPass<func::FuncOp>(
       createStableHLOToStableHLOPreprocessing());
@@ -118,7 +119,11 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
 }  // namespace
 
 void buildStableHLOInputConversionPassPipeline(OpPassManager &passManager) {
-  buildStableHLOInputConversionPassPipelineImpl(passManager);
+  buildStableHLOInputConversionPassPipelineImpl(passManager, /*detuple=*/false);
+}
+
+void buildStableHLOXLAInputConversionPassPipeline(OpPassManager &passManager) {
+  buildStableHLOInputConversionPassPipelineImpl(passManager, /*detuple=*/true);
 }
 
 void registerStableHLOConversionPasses() {

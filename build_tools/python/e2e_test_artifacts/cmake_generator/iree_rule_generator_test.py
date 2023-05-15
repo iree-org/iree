@@ -127,10 +127,10 @@ class IreeGeneratorTest(unittest.TestCase):
         input_types=["1xf32"])
     model_b = common_definitions.Model(
         id="5678",
-        name="mhlo_m",
+        name="stablehlo_m",
         tags=[],
-        source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
-        source_url="https://example.com/xyz_mhlo.mlir",
+        source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
+        source_url="https://example.com/xyz_stablehlo.mlir",
         entry_function="predict",
         input_types=["2xf32"])
     imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
@@ -170,7 +170,7 @@ class IreeGeneratorTest(unittest.TestCase):
         model_b.id:
             model_rule_generator.ModelRule(
                 target_name=f"model-y",
-                file_path=pathlib.PurePath("root/model_5678_mhlo_m.mlir"),
+                file_path=pathlib.PurePath("root/model_5678_stablehlo_m.mlir"),
                 cmake_rules=["efg"]),
     }
 

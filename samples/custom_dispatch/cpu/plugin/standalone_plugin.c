@@ -43,7 +43,7 @@
 //
 // Expects a return of 0 on success and any other value indicates failure.
 // Try not to fail!
-static int simple_mul_workgroup(void* context, void* params_ptr,
+static int simple_mul_workgroup(void* params_ptr, void* context,
                                 void* reserved) {
   typedef struct {
     const float* restrict binding0;

@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
@@ -59,7 +58,6 @@ using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::maxDivisorOfValueBelowLimit;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
-using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
@@ -290,7 +288,7 @@ void mlir::iree_compiler::gpu::
 /// the variant op.
 std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
-    const AbstractReductionStrategy &strategy) {
+    ArrayRef<int64_t> numThreadsInBlock) {
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
 
   // Step N-5. Fold tensor.empty to avoid large allocations.
@@ -315,7 +313,7 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH, strategy.getNumThreadsInBlock());
+  funcH = buildMapToBlockAndThreads(b, funcH, numThreadsInBlock);
 
   // Step N. Perform a final pass of canonicalization + enabling before
   // returning.
@@ -330,17 +328,6 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 
 /// Key function for vtable.
 AbstractGemmLikeStrategy::~AbstractGemmLikeStrategy() {}
-
-/// Build the transform IR to pad a matmul op `matmulOpH`.
-Value mlir::iree_compiler::gpu::buildPadMatmul(
-    ImplicitLocOpBuilder &b, Value matmulOpH,
-    const AbstractGemmLikeStrategy &strategy) {
-  // TODO: Better upstream builder.
-  return b.create<transform::PadOp>(
-      matmulOpH.getType(), matmulOpH, b.getF32ArrayAttr(strategy.paddingValues),
-      b.getI64ArrayAttr(strategy.paddingDimensions),
-      b.getI64ArrayAttr(strategy.packingDimensions), ArrayAttr());
-}
 
 /// Build transform IR to hoist the padded output operand of a padded matmul.
 /// Additionally, this attempts to fold the padding into the producing fill, if
@@ -776,13 +763,11 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     ReductionConfig reductionConfig = getReductionConfig(captures, gpuModel);
     if (reductionConfig.strategy == ReductionStrategy::Small) {
-      auto strategy = SmallReductionStrategy::create(op->getContext(), captures,
-                                                     reductionConfig);
+      SmallReductionStrategy strategy(captures, reductionConfig);
       return buildSmallReductionStrategy(b, variant, strategy);
     } else if (reductionConfig.strategy == ReductionStrategy::Staged) {
       // Otherwise, always fallback to the staged strategy.
-      auto strategy = StagedReductionStrategy::create(
-          op->getContext(), captures, reductionConfig);
+      StagedReductionStrategy strategy(captures, reductionConfig);
       return buildStagedReductionStrategy(b, variant, strategy);
     } else {
       return llvm_unreachable("Unknown strategy");
@@ -823,22 +808,16 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   //   - f32 only atm.
   //   - Mandatory fill op.
   //   - No trailing op.
-  //   - If the matmul is "too aligned" then use the default IREE strategy.
+  //   - If the matmul is "too aligned", then use the default IREE strategy.
+  //   - If the matmul is "too small", then use the default IREE strategy.
   //   - Otherwise, we take it.
   if (!fill->getCaptured() || trailing->getCaptured()) {
     LDBG("--Matmul strategy fill / trailing preconditions failed\n");
     return failure();
   }
 
-  // TODO: Capture in the matcher.
-  captures.lhsType =
-      getElementTypeOrSelf(op.getDpsInputOperand(0)->get().getType());
-  captures.rhsType =
-      getElementTypeOrSelf(op.getDpsInputOperand(1)->get().getType());
-  captures.outputType =
-      getElementTypeOrSelf(op.getDpsInitOperand(0)->get().getType());
-  if (!captures.lhsType.isF32() || !captures.rhsType.isF32() ||
-      !captures.outputType.isF32()) {
+  if (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
+      !captures.outputElementType.isF32()) {
     LDBG("--Matmul strategy elemental type check failed\n");
     return failure();
   }
@@ -864,6 +843,20 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
   if (!supportedUnalignedCases) {
     LDBG("--Matmul strategy alignment check failed\n");
+    return failure();
+  }
+
+  // Currently the unaligned transform strategy does not properly handle
+  // degenerate dimensions that should have been rank-reduced (e.g. `1`).
+  // Also, it is unprofitable to force small matmuls through a high latency
+  // tensorcore path, we are better off with a simple simt strategy.
+  // TODO: profitability details can be ironed out in the future when we have a
+  // heuristic to better select strategy parameters.
+  bool unsupportedSmallCases = (matmulSize[0] > 0 && matmulSize[0] < 8) ||
+                               (matmulSize[1] > 0 && matmulSize[1] < 8) ||
+                               (matmulSize[2] > 0 && matmulSize[2] < 8);
+  if (unsupportedSmallCases) {
+    LDBG("--Matmul strategy small size check failed\n");
     return failure();
   }
 

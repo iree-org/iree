@@ -105,6 +105,22 @@ struct DynamicReshapeOpCanon final
   }
 };
 
+struct GetTupleElementOpCanon final
+    : OpRewritePattern<mlir::stablehlo::GetTupleElementOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::GetTupleElementOp op,
+                                PatternRewriter &rewriter) const override {
+    auto constructor =
+        op.getOperand().getDefiningOp<mlir::stablehlo::TupleOp>();
+    if (!constructor) return failure();
+
+    Value result = constructor.getOperand(op.getIndex());
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
 struct RealOpCanon final : OpRewritePattern<mlir::stablehlo::RealOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -223,7 +239,8 @@ void populateCanonicalizationPatterns(MLIRContext *context,
                                       RewritePatternSet *patterns,
                                       PatternBenefit benefit) {
   patterns->add<ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon,
-                RealOpCanon, ImagOpCanon, GetDimensionSizeOpCanon,
-                ReshapeOpCanon, TransposeOpCanon>(context, benefit);
+                GetTupleElementOpCanon, RealOpCanon, ImagOpCanon,
+                GetDimensionSizeOpCanon, ReshapeOpCanon, TransposeOpCanon>(
+      context, benefit);
 }
 }  // namespace mlir::iree_compiler::stablehlo

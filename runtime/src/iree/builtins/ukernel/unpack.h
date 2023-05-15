@@ -30,7 +30,7 @@ typedef struct iree_uk_unpack_params_t {
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_unpack_params_t;
 
-IREE_UK_EXPORT void iree_uk_unpack(const iree_uk_unpack_params_t* params);
+IREE_UK_EXPORT int iree_uk_unpack(const iree_uk_unpack_params_t* params);
 
 #ifdef __cplusplus
 }  // extern "C"
