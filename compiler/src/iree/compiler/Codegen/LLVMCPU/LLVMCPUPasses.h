@@ -36,12 +36,12 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
 
 /// Pass to tile TilingInterface ops with given tilingLevel.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUTilePass(int64_t tilingLevel = -1);
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
+    int64_t tilingLevel = -1);
 
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
+    int64_t tilingLevel = -1);
 
 /// Pass to pad operations on tensors in top-down order.
 enum class LLVMCPUTensorPadOption { ParallelDims, ReductionDims };
@@ -52,8 +52,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
 
 /// Pass to perform SplitReduction transformations of `LinalgOp`s.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
+    bool enableReassociateFpReductions = false);
 
 struct LLVMCPUVectorizationPassOptions {
   bool enableVectorMasking = false;
@@ -61,8 +61,8 @@ struct LLVMCPUVectorizationPassOptions {
   bool vectorizeGatherAccesses = false;
 };
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options);
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
+    const LLVMCPUVectorizationPassOptions &options);
 
 // Pass to lower Vector ops before conversion to LLVM.
 struct LLVMCPUVectorLoweringPassOptions {
@@ -74,8 +74,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options);
 
 /// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>>
-createConvertToLLVMPass(bool reassociateFpReordering = false);
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
+    bool reassociateFpReordering = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUEmitVectorizationRemarksPass();
@@ -214,7 +214,7 @@ createLLVMCPUAssignImportOrdinalsPass();
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
 
-} // namespace iree_compiler
-} // namespace mlir
+}  // namespace iree_compiler
+}  // namespace mlir
 
-#endif // IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
+#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
