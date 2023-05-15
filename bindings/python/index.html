@@ -841,7 +841,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
@@ -856,14 +856,14 @@
         
           <li class="md-nav__item">
   <a href="#prebuilt-packages" class="md-nav__link">
-    Prebuilt packages
+     Prebuilt packages
   </a>
   
 </li>
         
           <li class="md-nav__item">
   <a href="#building-from-source" class="md-nav__link">
-    Building from source
+     Building from source
   </a>
   
 </li>
@@ -1208,7 +1208,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
@@ -1223,14 +1223,14 @@
         
           <li class="md-nav__item">
   <a href="#prebuilt-packages" class="md-nav__link">
-    Prebuilt packages
+     Prebuilt packages
   </a>
   
 </li>
         
           <li class="md-nav__item">
   <a href="#building-from-source" class="md-nav__link">
-    Building from source
+     Building from source
   </a>
   
 </li>
@@ -1310,9 +1310,9 @@ towards various targets, and executing compiled code on IREE's backends.</p>
 <p class="admonition-title">Caution - Operating system support</p>
 <p>Packages are currently only available on Linux and macOS. They are not
 available on Windows yet (see
-<a href="https://github.com/openxla/iree/issues/6417">this issue</a>).</p>
+<a href="https://github.com/openxla/iree/issues/13484">this issue</a>).</p>
 </div>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>To use IREE's Python bindings, you will first need to install
 <a href="https://www.python.org/downloads/">Python 3</a> and
 <a href="https://pip.pypa.io/en/stable/installing/">pip</a>, as needed.</p>
@@ -1344,38 +1344,30 @@ through <code>venv</code>
 <p>When done, run <code>deactivate</code>.</p>
 </details>
 <h2 id="installing-iree-packages">Installing IREE packages<a class="headerlink" href="#installing-iree-packages" title="Permanent link">link</a></h2>
-<h3 id="prebuilt-packages">Prebuilt packages<a class="headerlink" href="#prebuilt-packages" title="Permanent link">link</a></h3>
-<p>Stable release packages are published to
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Minimal</label><label for="__tabbed_2_2">All packages</label></div>
+<h3 id="prebuilt-packages"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Prebuilt packages<a class="headerlink" href="#prebuilt-packages" title="Permanent link">link</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Stable releases</label><label for="__tabbed_2_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>To install just the core IREE packages:</p>
+<p>Stable release packages are
+<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-runtime
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<p>To install IREE packages with tools for all frontends:</p>
+<p>Nightly releases are published on
+<a href="https://github.com/openxla/iree/releases">GitHub releases</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>https://openxla.github.io/iree/pip-release-links.html<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--upgrade<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-runtime<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-tools-tf<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-tools-tflite
+<span class="w">  </span>iree-runtime
 </code></pre></div>
 </div>
 </div>
 </div>
-<div class="admonition tip">
-<p class="admonition-title">Tip - Nightly releases</p>
-<p>Unstable packages are also published nightly on
-<a href="https://github.com/openxla/iree/releases">GitHub releases</a>. To use these,
-run <code>pip install</code> with this option:</p>
-<div class="highlight"><pre><span></span><code>--find-links https://openxla.github.io/iree/pip-release-links.html
-</code></pre></div>
-</div>
-<h3 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">link</a></h3>
+<h3 id="building-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">link</a></h3>
 <p>See <a href="../../building-from-source/getting-started/#python-bindings">Building Python bindings</a>
 page for instructions for building from source.</p>
 <h2 id="using-the-python-bindings">Using the Python bindings<a class="headerlink" href="#using-the-python-bindings" title="Permanent link">link</a></h2>
