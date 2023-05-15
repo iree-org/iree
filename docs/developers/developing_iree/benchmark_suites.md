@@ -10,10 +10,9 @@ track performance improvements/regressions during development.
 
 The benchmark suites are run for each commit on the main branch and the results
 are uploaded to https://perf.iree.dev for regression analysis (for the current
-supported targets). On pull requests, users can write `benchmarks:
-x86_64,cuda,comp-stats` (or a subset) at the bottom of the PR descriptions and
-re-run the CI workflow to trigger the benchmark runs. The results will be
-compared with https://perf.iree.dev and post in the comments.
+supported targets). On pull requests, users can add labels `benchmarks:*` to
+trigger the benchmark runs. The results will be compared with
+https://perf.iree.dev and post in the comments.
 
 Information about the definitions of the benchmark suites can be found in the
 [IREE Benchmark Suites Configurations](/build_tools/python/benchmark_suites/iree/README.md).
