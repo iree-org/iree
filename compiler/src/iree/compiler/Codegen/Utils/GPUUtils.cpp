@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
