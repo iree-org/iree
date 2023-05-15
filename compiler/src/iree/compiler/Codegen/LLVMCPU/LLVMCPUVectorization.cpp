@@ -16,6 +16,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -278,6 +279,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                                                       funcOp.getContext());
   vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                        funcOp.getContext());
+  vector::populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the
