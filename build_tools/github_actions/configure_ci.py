@@ -83,6 +83,7 @@ DEFAULT_BENCHMARK_PRESETS = [
 ]
 # All available benchmark preset options including experimental presets.
 BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESETS
+BENCHMARK_LABEL_PREFIX = "benchmarks"
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
 
@@ -289,7 +290,7 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
     preset_options = set(
         label.split(":", maxsplit=1)[1]
         for label in labels
-        if label.startswith(BENCHMARK_EXTRA_KEY + ":"))
+        if label.startswith(BENCHMARK_LABEL_PREFIX + ":"))
     trailer = trailers.get(BENCHMARK_EXTRA_KEY)
     if trailer is not None:
       preset_options = preset_options.union(
