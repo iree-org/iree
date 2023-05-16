@@ -7,7 +7,6 @@
 #ifndef IREE_DIALECT_LINALGEXT_TRANSFORMOPS
 #define IREE_DIALECT_LINALGEXT_TRANSFORMOPS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -19,10 +18,10 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuses the producers for the operands to fuse.}];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$operands_to_fuse);
-  let results = (outs PDL_Operation:$transformed,
-                      Variadic<PDL_Operation>:$fused_ops);
+  let results = (outs TransformHandleTypeInterface:$transformed,
+                      Variadic<TransformHandleTypeInterface>:$fused_ops);
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
@@ -45,16 +44,17 @@ def RewriteForallToAsyncOp :
     This transform is currently only implemented for 1-D scf.forall that
     have been bufferized and definitely fail for the rest.
 
-    If all the operations referred to by the `target` PDLOperation lower
+    If all the operations referred to by the `target` handle lower
     properly, the transform succeeds. Otherwise the transform silently fails.
 
     The returned handle points to only the subset of successfully produced
     async operations, which can all be empty.
   }];
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = 
+      "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let extraClassDeclaration = [{
@@ -81,16 +81,17 @@ def RewriteForallToScfForOp :
     This transform is currently only implemented for 1-D scf.forall that
     have been bufferized and definitely fail for the rest.
 
-    If all the operations referred to by the `target` PDLOperation lower
+    If all the operations referred to by the `target` handle lower
     properly, the transform succeeds. Otherwise the transform silently fails.
 
     The returned handle points to only the subset of successfully produced
     scf.for operations, which can all be empty.
   }];
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = 
+      "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let extraClassDeclaration = [{
@@ -111,10 +112,8 @@ def TileAndDecomposeAttentionOp : Op<Transform_Dialect, "tile_and_decompose_atte
     This transform consumes the target handle and produces a result handle.
   }];
 
-  let arguments = (
-      ins PDL_Operation:$target
-  );
-  let results = (outs Variadic<PDL_Operation>:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
   let assemblyFormat = "attr-dict $target";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";

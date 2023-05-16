@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 #define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Dialect/Transform/IR/TransformTypes.td"
@@ -46,7 +45,7 @@ def MapNestedForallToGpuThreadsOp :
     fails.
 
     If all the scf.forall operations contained within the FuncOp
-    referred to by the `target` PDLOperation lower to GPU properly, the
+    referred to by the `target` handle lower to GPU properly, the
     transform succeeds. Otherwise the transform definitely fails.
 
     The returned handle points to the same FuncOp operand, consuming it and
@@ -135,7 +134,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
     =============
     This operation ignores non-scf::IfOp ops and drops them in the return.
 
-    If all the operations referred to by the `target` PDLOperation are properly
+    If all the operations referred to by the `target` handle are properly
     properly, the transform succeeds. Otherwise the transform silently fails.
 
     If the transform is anchored at a top-level that is not isolated from above,
@@ -196,11 +195,12 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
     ```
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<I64Attr, "{}">:$warp_size);
-  let results = (outs PDL_Operation:$result);
+  let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat =
+      "$target attr-dict `:` functional-type($target, $result)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
@@ -380,9 +380,9 @@ def PromoteOperandsOp :
     fails.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$indices);
-  let results = (outs Variadic<PDL_Operation>:$result);
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
   let assemblyFormat = [{ $target $indices attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -495,8 +495,8 @@ def LayoutAnalysisAndDistributionOp :
 
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs Variadic<PDL_Operation>:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
   let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -539,8 +539,8 @@ def ReorderTransposeOp :
       %0 = arith.subf %transposed_a, %transposed_b : vector<8x16xf16>
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs Variadic<PDL_Operation>:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
   let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

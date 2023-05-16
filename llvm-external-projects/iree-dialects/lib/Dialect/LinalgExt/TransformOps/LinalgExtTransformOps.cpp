@@ -114,11 +114,26 @@ ParseResult LinalgExt::FuseProducersOp::parse(OpAsmParser &parser,
                             llvm::formatv("`{0}` attribute must be an array",
                                           operandsToFuseAttrName));
   }
-  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
-  size_t numProducers = operandsToFuseArrayAttr.size();
-  result.addTypes(SmallVector<Type>(numProducers + 1, pdlOpType));
-  if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
+  FunctionType trailingType;
+  if (parser.parseColonType(trailingType))
     return failure();
+
+  size_t numProducers = operandsToFuseArrayAttr.size();
+  if (trailingType.getNumResults() != numProducers + 1) {
+    return parser.emitError(opLoc)
+           << "expected " << (numProducers + 1) << " result types, got "
+           << trailingType.getNumResults();
+  }
+  result.addTypes(trailingType.getResults());
+
+  if (trailingType.getNumInputs() != 1) {
+    return parser.emitError(opLoc)
+           << "expected on input type, got " << trailingType.getNumInputs();
+  }
+  if (parser.resolveOperand(targetOperand, trailingType.getInput(0),
+                            result.operands)) {
+    return failure();
+  }
   return success();
 }
 
@@ -126,6 +141,8 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
   p << ' ';
   p << getTarget();
   p.printOptionalAttrDict((*this)->getAttrs());
+  p << " : ";
+  p.printFunctionalType(getOperation());
 }
 
 DiagnosedSilenceableFailure LinalgExt::RewriteForallToAsyncOp::applyToOne(

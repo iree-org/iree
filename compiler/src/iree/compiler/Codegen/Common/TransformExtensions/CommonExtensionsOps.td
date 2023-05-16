@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformAttrs.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
@@ -479,7 +478,7 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
     to different workgroups.
   }];
 
-  let arguments = (ins PDL_Operation:$for_all_op);
+  let arguments = (ins TransformHandleTypeInterface:$for_all_op);
   let results = (outs);
   let assemblyFormat = [{
     attr-dict $for_all_op `:` functional-type($for_all_op, results)
