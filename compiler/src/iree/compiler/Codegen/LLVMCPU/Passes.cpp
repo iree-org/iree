@@ -587,16 +587,23 @@ void addCPUDataTilingPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
 
-  LLVMCPUVectorizationPassOptions options;
-  options.vectorizePadding = true;
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUVectorizationPass(options));
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  {
+    LLVMCPUVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSplitFullPartialTransferPass("linalg-copy"));
+
+  {
+    LLVMCPUVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
+  }
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
