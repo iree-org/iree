@@ -160,3 +160,21 @@ func.func @reduce_innermost_dim_contraction(%a: tensor<4x12xf32>, %b: tensor<4xf
 // CHECK-COUNT-12: arith.subf {{.+}} : vector<4xf32>
 // CHECK-COUNT-12: vector.fma {{.+}} : vector<4xf32>
 //          CHECK: vector.transfer_write %{{.+}}, %[[INIT]]{{.+}} : vector<4xf32>, tensor<4xf32>
+
+// -----
+
+func.func @reduce_vector3(%input: tensor<4x3xf32>, %init: tensor<3xf32>) -> tensor<3xf32> {
+  %f0 = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>],
+    iterator_types = ["parallel", "reduction"]
+  } ins(%input : tensor<4x3xf32>) outs(%init : tensor<3xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %add = arith.addf %arg0, %arg1 : f32
+    linalg.yield %add : f32
+  } -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
+
+// CHECK-LABEL: func @reduce_vector3
+// CHECK-COUNT-4: arith.addf {{.+}} : vector<3xf32>
