@@ -1120,5 +1120,6 @@ jobs:
         if: failure()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nocontext: true
           description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
           url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
