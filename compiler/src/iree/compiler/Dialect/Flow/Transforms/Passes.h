@@ -9,6 +9,7 @@
 
 #include <functional>
 
+#include "iree/compiler/Codegen/Common/TransformDialectInterpreterPass.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -172,15 +173,6 @@ createCloneProducersIntoDispatchRegionsPass();
 // loop nest.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchWorkgroupsPass(bool generateWorkloadRegion = true);
-
-// Pass to perform dispatch of Linalg on tensor ops by using the transform
-// dialect. Dispatch regions are created as specified by the transform module
-// that is parsed from `transformFileName`.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchWithTransformDialect(
-    llvm::StringRef transformFileName = llvm::StringRef(),
-    llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
-    llvm::StringRef debugTransformRootTag = llvm::StringRef());
 
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();

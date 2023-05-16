@@ -231,13 +231,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
 /// Pad dynamic alloc op to convert them into static one.
 std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 
-/// Create an IREE-specific Transform dialect interpreter pass with all
-/// registrations necessary for IREE.
-std::unique_ptr<Pass> createTransformDialectInterpreterPass(
-    llvm::StringRef transformFileName = llvm::StringRef(),
-    llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
-    llvm::StringRef debugTransformRootTag = llvm::StringRef());
-
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
     bool generateContract = true, int64_t maxVectorSize = 4096);

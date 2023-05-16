@@ -49,15 +49,27 @@ using namespace mlir;
 
 namespace {
 
+template <typename T>
+class PassWrapperStub : public PassWrapper<T, Pass> {};
+
 /// Pass declaration.
 /// Interpreter pass that applies transform dialect ops for codegen.
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreterPass
     : public mlir::transform::TransformInterpreterPassBase<
-          TransformDialectInterpreterPass,
-          iree_compiler::TransformDialectInterpreterBase> {
+          TransformDialectInterpreterPass, PassWrapperStub> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformDialectInterpreterPass)
+
+  bool canScheduleOn(RegisteredOperationName name) const override {
+    return true;
+  }
+
+  StringRef getArgument() const override {
+    return "iree-transform-dialect-interpreter";
+  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     // TODO: this is only necessary to make registry subset happy when running
     // the lowering to LLVM. The lowering should be changed to stop using the
@@ -67,7 +79,7 @@ class TransformDialectInterpreterPass
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                     mlir::iree_compiler::IREE::Flow::FlowDialect,
                     arith::ArithDialect,
-                   affine::AffineDialect,
+                    affine::AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
                     gpu::GPUDialect,
@@ -80,7 +92,7 @@ class TransformDialectInterpreterPass
                     tensor::TensorDialect,
                     transform::TransformDialect,
                     vector::VectorDialect
-        // clang-format on
+    // clang-format on
         >();
 
     // TODO: these should be registered by the extension instead, but there is
@@ -117,8 +129,39 @@ class TransformDialectInterpreterPass
     this->debugPayloadRootTag = debugPayloadRootTag.str();
     this->debugTransformRootTag = debugTransformRootTag.str();
   }
-  TransformDialectInterpreterPass(const TransformDialectInterpreterPass &pass) =
-      default;
+
+  TransformDialectInterpreterPass(const TransformDialectInterpreterPass &pass)
+      : TransformInterpreterPassBase(pass) {
+    transformFileName = pass.transformFileName;
+    debugPayloadRootTag = pass.debugPayloadRootTag;
+    debugTransformRootTag = pass.debugTransformRootTag;
+    transformLibraryFileName = pass.transformLibraryFileName;
+  }
+
+  Pass::Option<std::string> transformFileName{
+      *this, "transform-file-name",
+      ::llvm::cl::desc(
+          "Optional filename containing a transform dialect specification to "
+          "apply. If left empty, the IR is assumed to contain one top-level "
+          "transform dialect operation somewhere in the module."),
+      ::llvm::cl::init("")};
+  Pass::Option<std::string> debugPayloadRootTag{
+      *this, "debug-payload-root-tag",
+      ::llvm::cl::desc("Select the operation with 'transform.target_tag' "
+                       "attribute having the given value as payload IR root."),
+      ::llvm::cl::init("")};
+  Pass::Option<std::string> debugTransformRootTag{
+      *this, "debug-transform-root-tag",
+      ::llvm::cl::desc(
+          "Select the operation with 'transform.target_tag' attribute having "
+          "the given value as container IR for top-level transform ops."),
+      ::llvm::cl::init("")};
+  Pass::Option<std::string> transformLibraryFileName{
+      *this, "transform-library-file-name",
+      llvm::cl::desc(
+          "Optional name of the file containing transform dialect symbol "
+          "definitions to be injected into the transform module."),
+      llvm::cl::init("")};
 };
 }  // namespace
 
@@ -131,5 +174,8 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
   return std::make_unique<TransformDialectInterpreterPass>(
       transformFileName, debugPayloadRootTag, debugTransformRootTag);
 }
+
+static PassRegistration<TransformDialectInterpreterPass> pass;
+
 }  // namespace iree_compiler
 }  // namespace mlir

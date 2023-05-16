@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -260,7 +261,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),
                          [&]() {
-                           return createDispatchWithTransformDialect(
+                           return createTransformDialectInterpreterPass(
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let

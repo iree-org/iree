@@ -100,44 +100,6 @@ def CollapseDimensions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimensionsPass()";  
 }
 
-def DispatchWithTransformDialect :
-    InterfacePass<"iree-flow-dispatch-with-transform-dialect", "mlir::FunctionOpInterface"> {
-  let summary = "Dispatch Linalg operations on tensors by using the transform dialect interpreter";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchWithTransformDialect()";
-
-  let options = [
-    Option<"transformFileName", "transform-file-name", "std::string",
-            /*default=*/"\"\"",
-            "Optional filename containing a transform dialect specification to "
-            "apply. If left empty, the IR is assumed to contain one top-level "
-            "transform dialect operation somewhere in the module.">,
-    Option<"transformLibraryFileName",
-           "transform-library-file-name",
-           "std::string",
-           /*default=*/"\"\"",
-           "If non-empty, the name of the file containing definitions of "
-           "external symbols referenced in the transform script. "
-           "These definitions will be used to replace declarations.">,
-    Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
-            /*default=*/"\"\"",
-            "Select the operation with 'transform.target_tag' attribute having "
-            "the given value as payload IR root. This allows user control on "
-            "what operation to transform in debug mode, without requiring "
-            "intimate knowledge of the IREE nested pass pipeline.\\n"
-            "If empty (normal operation mode), select the pass anchor "
-            "operation in the IREE pipeline, as the payload IR root.">,
-    Option<"debugTransformRootTag", "debug-transform-root-tag", "std::string",
-            /*default=*/"\"\"",
-            "Select the operation with 'transform.target_tag' attribute having "
-            "the given value as container IR for top-level transform ops. This "
-            "allows user control on what transformation to apply in debug "
-            "mode, without requiring intimate knowledge of the IREE nested "
-            "pass pipeline.\\n"
-            "If empty (normal operation mode), select the container of the "
-            "top-level transform op.">
-  ];
-}
-
 def EraseUnusedLinalgOperands :
     Pass<"iree-flow-erase-unused-linalg-operands", "mlir::ModuleOp"> {
   let summary = "Erase unused linalg operand and remove dead code.";

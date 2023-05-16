@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 
+#include "iree/compiler/Codegen/Common/TransformDialectInterpreterPass.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "mlir/Pass/PassManager.h"
