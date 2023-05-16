@@ -1065,6 +1065,7 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
+          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
       - name: Show useful artifact links
         if: always()
         env:
