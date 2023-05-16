@@ -1067,9 +1067,6 @@ jobs:
             echo "The following jobs failed: ${FAILED_JOBS}"
             exit 1
           fi
-      - name: Echo link
-        if: failure()
-        run: echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
       - name: Show useful artifact links
         if: always()
         env:
