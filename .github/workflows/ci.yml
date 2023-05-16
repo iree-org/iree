@@ -1059,12 +1059,6 @@ jobs:
             echo "The following jobs failed: ${FAILED_JOBS}"
             exit 1
           fi
-      - name: Posting to Discord
-        uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
-        if: failure() && github.ref_name == 'main'
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
       - name: Show useful artifact links
         if: always()
         env:
@@ -1113,3 +1107,10 @@ jobs:
           To run benchmarks locally with the CI-built e2e test artifacts, see [IREE Benchmark Suites](
           https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/developers/developing_iree/benchmark_suites.md#3-fetch-the-benchmark-artifacts).
           EOF
+      - name: Posting to Discord
+        uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
+        if: failure() && github.ref_name == 'main'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
+          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
