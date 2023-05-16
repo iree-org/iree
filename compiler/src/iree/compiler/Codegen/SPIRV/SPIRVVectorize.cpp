@@ -50,8 +50,10 @@ namespace iree_compiler {
 namespace {
 
 int getComputeVectorSize(int64_t size) {
-  // Try to use 4 first, and then 2, and then 1.
-  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
+  for (int i : {4, 3, 2}) {
+    if (size % i == 0) return i;
+  }
+  return 1;
 }
 
 int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
