@@ -163,6 +163,13 @@ jobs:
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
+  test_job_please_ignore:
+    needs: setup
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Fail
+        run: exit 1
+
   build_test_all_macos_x86_64:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
@@ -1000,6 +1007,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - setup
+      - test_job_please_ignore
 
       # Basic
       - build_all
