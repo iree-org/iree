@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Utils/ConversionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -22,6 +23,7 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -101,6 +103,54 @@ struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
   }
 };
 
+// Tries to completely convert a generic Operation.
+// This will process attributes, result types, and nested regions.
+struct GenericTypeConversionPattern : public ConversionPattern {
+  GenericTypeConversionPattern(TypeConverter &typeConverter,
+                               MLIRContext *context)
+      : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // Convert attributes only if this is a constant-like op.
+    // This is because some ops use typed attributes for structural information
+    // - like linalg ops using i64 for dimension indices - and if we converted
+    // them all the ops would become invalid. This may still be too broad,
+    // though, if some constant ops include attributes with both the type we
+    // want to convert and structural information in the same type.
+    llvm::SmallVector<NamedAttribute> newAttrs;
+    if (op->hasTrait<OpTrait::ConstantLike>() ||
+        isa<IREE::Util::GlobalOpInterface>(op)) {
+      for (auto attr : op->getAttrs()) {
+        auto newAttr = convertAttribute(op->getLoc(), attr.getValue(),
+                                        *getTypeConverter());
+        newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
+      }
+    } else {
+      newAttrs.append(op->getAttrs().begin(), op->getAttrs().end());
+    }
+
+    llvm::SmallVector<Type, 4> newResults;
+    (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
+
+    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
+                         newResults, newAttrs, op->getSuccessors());
+
+    for (Region &r : op->getRegions()) {
+      Region *newRegion = state.addRegion();
+      rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
+      TypeConverter::SignatureConversion result(newRegion->getNumArguments());
+      (void)getTypeConverter()->convertSignatureArgs(
+          newRegion->getArgumentTypes(), result);
+      rewriter.applySignatureConversion(newRegion, result);
+    }
+
+    Operation *newOp = rewriter.create(state);
+    rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+};
+
 struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -151,17 +201,17 @@ std::optional<Value> materializeArithBitcast(OpBuilder &builder, Type resultTy,
 
 static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
                                               TypeConverter &typeConverter) {
-  patterns.add<ConvertHalInterfaceBindingSubspan, ConvertMemRefAlloc,
-               ConvertMemRefLoad, ConvertMemRefStore>(typeConverter,
-                                                      patterns.getContext());
+  patterns.add<GenericTypeConversionPattern, ConvertHalInterfaceBindingSubspan,
+               ConvertMemRefAlloc, ConvertMemRefLoad, ConvertMemRefStore>(
+      typeConverter, patterns.getContext());
 }
 
 //===----------------------------------------------------------------------===//
 // Main pass
 //===----------------------------------------------------------------------===//
 
-struct SPIRVEmulateBf16Pass final
-    : public SPIRVEmulateBf16Base<SPIRVEmulateBf16Pass> {
+struct ConvertBf16ToUInt16BuffersPass final
+    : public ConvertBf16ToUInt16BuffersBase<ConvertBf16ToUInt16BuffersPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -185,7 +235,7 @@ struct SPIRVEmulateBf16Pass final
       });
       target.addDynamicallyLegalDialect<
           arith::ArithDialect, func::FuncDialect, IREE::HAL::HALDialect,
-          memref::MemRefDialect, vector::VectorDialect>(
+          memref::MemRefDialect, scf::SCFDialect, vector::VectorDialect>(
           [&typeConverter](Operation *op) {
             bool legal = typeConverter.isLegal(op);
             LLVM_DEBUG(if (!legal) llvm::dbgs()
@@ -209,8 +259,9 @@ struct SPIRVEmulateBf16Pass final
 // Public interface
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateBf16Pass() {
-  return std::make_unique<SPIRVEmulateBf16Pass>();
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertBf16ToUInt16BuffersPass() {
+  return std::make_unique<ConvertBf16ToUInt16BuffersPass>();
 }
 
 }  // namespace iree_compiler
