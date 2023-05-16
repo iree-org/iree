@@ -517,6 +517,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
   pm.addPass(createConvertBf16ToUInt16BuffersPass());
 
+  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
+
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
