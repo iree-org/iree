@@ -9,18 +9,18 @@ module {
   }
 
   transform.with_pdl_patterns {
-  ^bb0(%arg0: !pdl.operation):
+  ^bb0(%arg0: !transform.any_op):
     pdl.pattern @some_operation : benefit(1) {
       %0 = operation "some.operation"
       rewrite %0 with "transform.dialect"
     }
 
-    transform.sequence %arg0: !pdl.operation failures(propagate) {
-    ^bb1(%arg1: !pdl.operation):
-      %0 = pdl_match @some_operation in %arg1 : (!pdl.operation) -> !pdl.operation
+    transform.sequence %arg0: !transform.any_op failures(propagate) {
+    ^bb1(%arg1: !transform.any_op):
+      %0 = pdl_match @some_operation in %arg1 : (!transform.any_op) -> !transform.any_op
       // Make sure we don't crash on wrong operation type.
       // expected-error@below {{failed to outline}}
-      transform.loop.outline %0 {func_name = "outlined"} : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      transform.loop.outline %0 {func_name = "outlined"} : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     }
   }
 }

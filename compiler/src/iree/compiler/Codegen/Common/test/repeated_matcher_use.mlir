@@ -2,15 +2,15 @@
 
 module {
   transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
+  ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
 
     %first, %second =
       transform.iree.match_callback failures(propagate) "_test_repeated_matcher_use_callback"(%arg0)
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    transform.iree.emit_remark "first" at %first : !pdl.operation
-    transform.iree.emit_remark "second" at %second : !pdl.operation
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
   }
 
   module {
@@ -55,16 +55,16 @@ module {
 // expected-error @below {{transform dialect interpreter failed}}
 module {
   transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
+  ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
 
     // expected-error @+2 {{failed to match}}
     %first, %second =
       transform.iree.match_callback failures(propagate) "_test_repeated_matcher_use_callback"(%arg0)
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    transform.iree.emit_remark "first" at %first : !pdl.operation
-    transform.iree.emit_remark "second" at %second : !pdl.operation
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
   }
 
   module {
@@ -110,16 +110,16 @@ module {
 // expected-error @below {{transform dialect interpreter failed}}
 module {
   transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
+  ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
 
     // expected-error @+2 {{failed to match}}
     %first, %second =
       transform.iree.match_callback failures(propagate) "_test_repeated_matcher_use_callback"(%arg0)
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    transform.iree.emit_remark "first" at %first : !pdl.operation
-    transform.iree.emit_remark "second" at %second : !pdl.operation
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
   }
 
   module {
@@ -162,15 +162,15 @@ module {
 
 module {
   transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
+  ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
 
     %first, %second =
       transform.iree.match_callback failures(propagate) "_test_value_matcher_callback"(%arg0)
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    transform.iree.emit_remark "first" at %first : !pdl.operation
-    transform.iree.emit_remark "second" at %second : !pdl.operation
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
   }
 
   module {

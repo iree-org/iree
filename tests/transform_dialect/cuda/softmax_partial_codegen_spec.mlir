@@ -2,29 +2,29 @@
 
 // Codegen
 transform.sequence failures(propagate) {
-^bb1(%variant_op: !pdl.operation):
+^bb1(%variant_op: !transform.any_op):
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
   %root = transform.structured.match interface{LinalgOp}
-    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!transform.any_op) -> !transform.any_op
+  %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %red = transform.structured.match interface{LinalgOp}
-    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %not_root = merge_handles %fill, %red : !pdl.operation
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!transform.any_op) -> !transform.any_op
+  %not_root = merge_handles %fill, %red : !transform.any_op
   %forall, %tiled_generic =
     transform.structured.tile_to_forall_op %root tile_sizes [1, 4]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
-  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!pdl.operation) -> ()
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!transform.any_op) -> ()
   transform.structured.fuse_into_containing_op %not_root into %forall
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================
-  %fill_linalg = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+  %fill_linalg = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %reduction_linalg = transform.structured.match ops{["linalg.generic"]}
-    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %parallel_linalg = transform.structured.match ops{["linalg.generic"]}
-    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %forall_reduction, %tiled_reduction_generic =
     transform.structured.tile_to_forall_op %reduction_linalg tile_sizes [1, 1]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
@@ -54,29 +54,29 @@ transform.sequence failures(propagate) {
 
   // Step 3. Rank-reduce and vectorize.
   // ==================================
-  %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
+  %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
   transform.structured.vectorize %func
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
   %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
-  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // =========================================================
-  %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
+  %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
   %func_3 = transform.iree.forall_to_workgroup %func_2
   transform.iree.map_nested_forall_to_gpu_threads %func_3
     { workgroup_size = [32, 4, 1] }
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===================================================================
-  %end_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!pdl.operation) -> ()
-  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
+  %end_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!transform.any_op) -> ()
+  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   transform.iree.vector.warp_distribute %end_func
 }

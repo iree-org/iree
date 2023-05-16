@@ -14,9 +14,9 @@ func.func @single_op(%arg0: tensor<?x?xf32>, %s1: index, %s2: index) -> tensor<?
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -42,11 +42,11 @@ func.func @clone_preceding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: 
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!pdl.operation) -> !pdl.operation
-  %1 = transform.structured.match ops{["test.dummy"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
+  %1 = transform.structured.match ops{["test.dummy"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -72,11 +72,11 @@ func.func @move_preceding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: i
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!pdl.operation) -> !pdl.operation
-  %1 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.move_preceding_op_into_dispatch_region %1 into %dispatch_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
+  %1 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.move_preceding_op_into_dispatch_region %1 into %dispatch_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -96,10 +96,10 @@ func.func @create_region_and_convert_to_workgroups(
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %region_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!pdl.operation) -> !pdl.operation
-  transform.iree.region_to_workgroups %region_op : (!pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %region_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
+  transform.iree.region_to_workgroups %region_op : (!transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -128,11 +128,11 @@ func.func @clone_multiple_preceding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf3
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!pdl.operation) -> !pdl.operation
-  %1 = transform.structured.match attributes{"__tagged__"} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
+  %1 = transform.structured.match attributes{"__tagged__"} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -158,11 +158,11 @@ func.func @move_succeeding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: 
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!pdl.operation) -> !pdl.operation
-  %1 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.move_succeeding_op_into_dispatch_region %1 into %dispatch_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
+  %1 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.move_succeeding_op_into_dispatch_region %1 into %dispatch_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -191,11 +191,11 @@ func.func @move_multiple_succeeding(%arg0: tensor<50x90xf32>, %arg1: tensor<600x
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["test.dummy_op"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %dispatch_op = transform.iree.wrap_in_dispatch_region %0  {generateWorkload=false} : (!pdl.operation) -> !pdl.operation
-  %1 = transform.structured.match attributes{"__tagged__"} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.move_succeeding_op_into_dispatch_region %1 into %dispatch_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["test.dummy_op"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %dispatch_op = transform.iree.wrap_in_dispatch_region %0  {generateWorkload=false} : (!transform.any_op) -> !transform.any_op
+  %1 = transform.structured.match attributes{"__tagged__"} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.move_succeeding_op_into_dispatch_region %1 into %dispatch_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -218,11 +218,11 @@ func.func @clone_succeeding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1:
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %dispatch_op = transform.iree.wrap_in_dispatch_region %0  {generateWorkload=false} : (!pdl.operation) -> !pdl.operation
-  %1 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.clone_succeeding_op_into_dispatch_region %1 into %dispatch_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %dispatch_op = transform.iree.wrap_in_dispatch_region %0  {generateWorkload=false} : (!transform.any_op) -> !transform.any_op
+  %1 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.clone_succeeding_op_into_dispatch_region %1 into %dispatch_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
 }
 
 // -----
@@ -251,7 +251,7 @@ func.func @reify_result_dims_regression(%s1: index, %s2: index) -> (tensor<4x?xf
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!pdl.operation) -> !pdl.operation
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %dispatch_op = transform.iree.wrap_in_dispatch_region %0 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
 }

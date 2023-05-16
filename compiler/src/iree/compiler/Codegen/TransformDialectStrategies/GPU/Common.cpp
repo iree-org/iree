@@ -229,9 +229,9 @@ void mlir::iree_compiler::gpu::
 
   // Split, tile and map the most minor dimension to `mappingAttr`.
   if (splitPoint > 0) {
-    auto pdlOperation = pdl::OperationType::get(b.getContext());
+    auto anyOpType = transform::AnyOpType::get(b.getContext());
     auto split = b.create<transform::SplitOp>(
-        pdlOperation, pdlOperation, opH, b.getI64IntegerAttr(mostMinorDim),
+        anyOpType, anyOpType, opH, b.getI64IntegerAttr(mostMinorDim),
         Value(), b.getI64IntegerAttr(splitPoint));
     opH = split.getFirst();
     if (vectorSize > 1) {
@@ -525,7 +525,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   }
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
-      pdl::OperationType::get(b.getContext()), funcH);
+      transform::AnyOpType::get(b.getContext()), funcH);
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
   b.create<ApplyBufferOptimizationsOp>(funcH);
@@ -569,7 +569,7 @@ Value mlir::iree_compiler::gpu::buildConvertToAsyncCopies(
   // Atm, vectors need to be lowered to 1-D for cp.async mapping to connect.
   // TODO: not a functional style op to avoid invalidating artificially.
   auto transferToScfOp = b.create<transform::TransferToScfOp>(
-      pdl::OperationType::get(b.getContext()), funcH);
+      transform::AnyOpType::get(b.getContext()), funcH);
   // TODO: proper builder instead of a setting post-hoc.
   transferToScfOp.setMaxTransferRank(1);
   transferToScfOp.setFullUnroll(true);
@@ -600,11 +600,11 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
   }
   // TODO: Better builder.
   Value forOpH = b.create<transform::GetParentForOp>(
-      pdl::OperationType::get(b.getContext()), computeOpH);
+      transform::AnyOpType::get(b.getContext()), computeOpH);
   // TODO: Better builder instead of setting post-hoc.
   auto pipelineOp = b.create<
       iree_compiler::IREE::transform_dialect::PipelineSharedMemoryCopiesOp>(
-      pdl::OperationType::get(b.getContext()), forOpH);
+      transform::AnyOpType::get(b.getContext()), forOpH);
   // TODO: depth from strategy, or directly from individual buffers.
   pipelineOp.setDepth(strategy.pipelineDepth);
 }

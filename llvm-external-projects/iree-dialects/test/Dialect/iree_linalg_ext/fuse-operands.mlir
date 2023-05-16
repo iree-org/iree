@@ -52,7 +52,7 @@ module {
   }
 
   transform.with_pdl_patterns {
-  ^bb0(%arg0: !pdl.operation):
+  ^bb0(%arg0: !transform.any_op):
     pdl.pattern @match_elemwise : benefit(1) {
       %0 = operands
       %1 = types
@@ -66,8 +66,8 @@ module {
       rewrite %2 with "transform.dialect"
     }
     transform.sequence %arg0 failures(propagate) {
-    ^bb1(%arg1: !pdl.operation):
-      %0 = pdl_match @match_elemwise in %arg1 : (!pdl.operation) -> !pdl.operation
+    ^bb1(%arg1: !transform.any_op):
+      %0 = pdl_match @match_elemwise in %arg1 : (!transform.any_op) -> !transform.any_op
       %1, %fusedOps:2 = fuse_producers %0 {operands_to_fuse=[0, 1]}
     }
   }
@@ -118,7 +118,7 @@ module {
   }
 
   transform.with_pdl_patterns {
-  ^bb0(%arg0: !pdl.operation):
+  ^bb0(%arg0: !transform.any_op):
     pdl.pattern @match_elemwise : benefit(1) {
       %0 = operands
       %1 = types
@@ -132,8 +132,8 @@ module {
       rewrite %2 with "transform.dialect"
     }
     transform.sequence %arg0 failures(propagate) {
-    ^bb1(%arg1: !pdl.operation):
-      %0 = pdl_match @match_elemwise in %arg1 : (!pdl.operation) -> !pdl.operation
+    ^bb1(%arg1: !transform.any_op):
+      %0 = pdl_match @match_elemwise in %arg1 : (!transform.any_op) -> !transform.any_op
       %1, %fusedOps = fuse_producers %0 {operands_to_fuse=[0]}
     }
   }

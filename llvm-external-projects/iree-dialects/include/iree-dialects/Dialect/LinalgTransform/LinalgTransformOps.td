@@ -21,7 +21,7 @@ def Linalg_Transform_Dialect : Dialect {
 }
 
 // Operations with this trait must provide the following methods:
-//   - `Value target()` - returns the operation handle (value of !pdl.operation
+//   - `Value target()` - returns the operation handle (value of !transform.any_op
 //     type) targeted by this transformation, if available;
 //   - `Optional<SymbolRefAttr> matcher()` - returns the name of the PDL matcher
 //     that selects the ops targeted by this transformation, if provided.
