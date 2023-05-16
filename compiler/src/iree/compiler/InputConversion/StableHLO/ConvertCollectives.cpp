@@ -139,8 +139,6 @@ static LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
       return rewriter.notifyMatchFailure(
           op, "must not set use_global_device_ids when channel_id <= 0");
     }
-  } else if (!op.getUseGlobalDeviceIds()) {
-    return rewriter.notifyMatchFailure(op, "must set use_global_device_ids");
   }
 
   return success();
@@ -204,44 +202,144 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
   return std::make_pair(color, key);
 }
 
+static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
+    DenseIntElementsAttr replicaGroups, int32_t numPartitions,
+    OpBuilder &builder) {
+  if (numPartitions < 1) {
+    // Treat as a single partition.
+    return replicaGroups;
+  }
+
+  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  assert(groupsType.getRank() == 2);
+  int rows = groupsType.getShape()[0];
+  int cols = groupsType.getShape()[1];
+  auto values = replicaGroups.getValues<int64_t>();
+  SmallVector<Attribute> newValues;
+
+  // The number of groups is (rows * numPartitions).
+  for (int i = 0; i < rows; ++i) {
+    for (int p = 0; p < numPartitions; ++p) {
+      // Each group starts here. The group size is the same as the column size.
+      for (int j = 0; j < cols; ++j) {
+        const int index = i * cols + j;
+        const int64_t replicaId = values[index];
+        const int64_t value =
+            (replicaId == -1) ? -1 : replicaId * numPartitions + p;
+        newValues.push_back(builder.getI64IntegerAttr(value));
+      }
+    }
+  }
+
+  auto type =
+      RankedTensorType::get({rows * numPartitions, cols}, builder.getI64Type());
+  return DenseIntElementsAttr::get(type, newValues);
+}
+
+static DenseIntElementsAttr convertToRankGroupsByCrossReplicaAndPartition(
+    DenseIntElementsAttr replicaGroups, int32_t numPartitions,
+    OpBuilder &builder) {
+  if (numPartitions < 1) {
+    // Treat as a single partition.
+    return replicaGroups;
+  }
+
+  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  assert(groupsType.getRank() == 2);
+  int rows = groupsType.getShape()[0];
+  int cols = groupsType.getShape()[1];
+  auto values = replicaGroups.getValues<int64_t>();
+  SmallVector<Attribute> newValues;
+
+  // The number of groups is the same as the number of rows.
+  for (int i = 0; i < rows; ++i) {
+    // Each group starts here. The group size is (numPartitions * cols).
+    for (int p = 0; p < numPartitions; ++p) {
+      for (int j = 0; j < cols; ++j) {
+        const int index = i * cols + j;
+        const int64_t replicaId = values[index];
+        const int64_t value =
+            (replicaId == -1) ? -1 : replicaId * numPartitions + p;
+        newValues.push_back(builder.getI64IntegerAttr(value));
+      }
+    }
+  }
+  auto type =
+      RankedTensorType::get({rows, numPartitions * cols}, builder.getI64Type());
+  return DenseIntElementsAttr::get(type, newValues);
+}
+
 /// Creates a channel matching the given |channelHandleAttr| scoped to the
 /// requested group.
 static Value createChannelWithGroupInfo(
     Location loc, mlir::stablehlo::ChannelHandleAttr channelHandleAttr,
+    int32_t numReplicas, int32_t numPartitions,
     DenseIntElementsAttr replicaGroups, bool useGlobalDeviceIds,
     OpBuilder &builder) {
+  // Set numPartitions to 1 if not set by the user.
+  if (numPartitions == -1) numPartitions = 1;
+
   // Base channel that may be split by the group info.
   Value baseChannel =
       builder.create<IREE::Flow::ChannelDefaultOp>(loc, /*group=*/StringAttr{});
 
-  // TODO(okkwon): Convert replica_groups into flattened IDs.
-  //
-  // Once stablehlo exposes `num_replicas` and `num_partitions`,
-  // use the channel ID to determine the collective operation mode, such as
-  // cross_replica, cross_partition, cross_replic_and_partition, and
-  // flattend_ids. Currently, we only supports the flanttend_ids mode.
-  //
-  // int64_t channelId = 0;
-  // if (channelHandleAttr) {
-  //   channelId = channelHandleAttr.getHandle();
-  // }
-
   // No need to split if there is a single group.
   ShapedType replicaGroupType = replicaGroups.getType();
   assert(replicaGroupType.getRank() == 2);
-  if (replicaGroupType.getDimSize(0) == 1) {
+  if (numPartitions == 1 && replicaGroupType.getDimSize(0) == 1) {
     return baseChannel;
+  }
+
+  // Convert replica_groups into flattened IDs.
+  DenseIntElementsAttr rankGroups;
+  int64_t channelId = channelHandleAttr ? channelHandleAttr.getHandle() : 0;
+  if (channelId <= 0) {
+    assert(!useGlobalDeviceIds);
+    rankGroups = convertToRankGroupsByCrossReplica(replicaGroups, numPartitions,
+                                                   builder);
+  } else {
+    if (useGlobalDeviceIds) {
+      // already flattened.
+      rankGroups = replicaGroups;
+    } else {
+      rankGroups = convertToRankGroupsByCrossReplicaAndPartition(
+          replicaGroups, numPartitions, builder);
+    }
   }
 
   // Construct lookups for color and key split parameters.
   // Note that `replica_groups` can be interpreted in multiple ways based on the
   // other attributes.
   auto [color, key] =
-      makeSplitColorAndKey(loc, baseChannel, replicaGroups, builder);
+      makeSplitColorAndKey(loc, baseChannel, rankGroups, builder);
 
   // Split the channel. Note that this is an expensive operation.
   return builder.create<IREE::Flow::ChannelSplitOp>(loc, baseChannel, color,
                                                     key);
+}
+
+static int32_t getNumReplicas(ModuleOp moduleOp) {
+  if (!moduleOp) {
+    return -1;
+  }
+  if (auto numReplicasAttr =
+          moduleOp->getAttrOfType<IntegerAttr>("mhlo.num_replicas")) {
+    return numReplicasAttr.getInt();
+  } else {
+    return -1;
+  }
+}
+
+static int32_t getNumPartitions(ModuleOp moduleOp) {
+  if (!moduleOp) {
+    return -1;
+  }
+  if (auto numPartitionsAttr =
+          moduleOp->getAttrOfType<IntegerAttr>("mhlo.num_partitions")) {
+    return numPartitionsAttr.getInt();
+  } else {
+    return -1;
+  }
 }
 
 static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
@@ -260,22 +358,67 @@ static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
       permutationAttr);
 }
 
-/// Converts stablehlo.replica_id to flow.channel.default + flow.channel.rank.
-/// TODO(okkwon): this assumes that there is no partition so that there is a 1:1
-/// mapping between the replica ID and the process ID.
-struct ReplicaIdOpConversion final
-    : OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
-  using OpConversionPattern::OpConversionPattern;
+/// Converts stablehlo.partition_id to (flow.channel.rank % numPartitions)
+struct PartitionIdOpConversion
+    : public OpConversionPattern<mlir::stablehlo::PartitionIdOp> {
+  using OpConversionPattern<
+      mlir::stablehlo::PartitionIdOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::stablehlo::PartitionIdOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    // PartitionId = rank % numPartitions
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numPartitions = getNumPartitions(moduleOp);
+    Value value;
+    if (numPartitions <= 1) {
+      value = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    } else {
+      auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+          loc, /*group=*/StringAttr{});
+      Value rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
+      auto cst =
+          rewriter.create<arith::ConstantIndexOp>(loc,
+                                                  /*value=*/numPartitions);
+      value = rewriter.create<arith::RemUIOp>(loc, rank, cst);
+    }
+    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto elemType = resultType.getElementType();
+    // index -> ui32
+    auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, value);
+    // tensor<ui32>
+    auto rankTensor = rewriter.create<tensor::FromElementsOp>(
+        loc, resultType, rankElem.getResult());
+    rewriter.replaceOp(op, rankTensor.getResult());
+    return success();
+  }
+};
+
+/// Converts stablehlo.replica_id to floor_div(flow.channel.rank, numPartitions)
+struct ReplicaIdOpConversion
+    : public OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
+  using OpConversionPattern<mlir::stablehlo::ReplicaIdOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReplicaIdOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
+    auto loc = op.getLoc();
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
         loc, /*group=*/StringAttr{});
-    auto rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
-    auto resultType = cast<RankedTensorType>(op.getType());  // tensor<ui32>
-    Type elemType = resultType.getElementType();
+    Value rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
+
+    // ReplicaId = floor_div(rank, numPartitions)
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numPartitions = getNumPartitions(moduleOp);
+    auto cst = rewriter.create<arith::ConstantIndexOp>(loc,
+                                                       /*value=*/numPartitions);
+    if (numPartitions > 1) {
+      rank = rewriter.create<arith::DivUIOp>(loc, rank, cst);
+    }
+
+    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, rank);
     // tensor<ui32>
@@ -299,10 +442,14 @@ struct AllGatherOpConversion final
 
     Location loc = op.getLoc();
 
-    // Get the channel used for communication.
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Create a channel.
     Value channel = createChannelWithGroupInfo(
-        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
-        op.getUseGlobalDeviceIds(), rewriter);
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult().getType());
@@ -385,10 +532,14 @@ struct AllReduceOpConversion final
 
     Location loc = op.getLoc();
 
-    // Get the channel used for communication.
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Create a channel.
     Value channel = createChannelWithGroupInfo(
-        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
-        op.getUseGlobalDeviceIds(), rewriter);
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Convert stablehlo reduction op into flow reduction op.
     auto reductionOpAttr =
@@ -575,10 +726,14 @@ struct ReduceScatterOpConversion final
 
     Location loc = op.getLoc();
 
-    // Get the channel used for communication.
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Create a channel.
     Value channel = createChannelWithGroupInfo(
-        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
-        op.getUseGlobalDeviceIds(), rewriter);
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult().getType());
@@ -635,10 +790,10 @@ struct ReduceScatterOpConversion final
 void populateStableHloCollectivesConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns) {
-  patterns
-      ->add<AllGatherOpConversion, AllReduceOpConversion, AllToAllOpConversion,
-            ReduceScatterOpConversion, ReplicaIdOpConversion>(typeConverter,
-                                                              context);
+  patterns->add<AllGatherOpConversion, AllReduceOpConversion,
+                AllToAllOpConversion, PartitionIdOpConversion,
+                ReduceScatterOpConversion, ReplicaIdOpConversion>(typeConverter,
+                                                                  context);
 }
 
 }  // namespace mlir::iree_compiler::stablehlo
