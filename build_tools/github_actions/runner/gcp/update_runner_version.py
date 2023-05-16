@@ -81,8 +81,7 @@ if __name__ == "__main__":
   archive = RUNNER_ARCHIVE_TEMPLATE.substitute(version=version)
   asset_url = ASSET_URL_TEMPLATE.substitute(version=version, archive=archive)
 
-  # file_digest not until 3.11 :-(
-
+  # With Python 3.11 we could use hashlib.file_digest
   hash = hashlib.sha256()
   with urllib.request.urlopen(asset_url) as f:
     hash.update(f.read())
