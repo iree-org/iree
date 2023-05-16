@@ -41,6 +41,7 @@ transform.sequence failures(propagate) {
     %forall_grid, %tiled_attention =
     transform.structured.tile_to_forall_op %attention tile_sizes [1, 128]
       ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
     // Tile and decompose attention
     // ==========================================
@@ -53,7 +54,7 @@ transform.sequence failures(propagate) {
     // ==========================================
     %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-    %func_3 = transform.structured.vectorize %func
+    %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
 
     // Bufferization
     // ==========================================
