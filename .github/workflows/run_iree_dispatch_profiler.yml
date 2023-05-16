@@ -8,8 +8,8 @@
 # IREE Dispatch Profiler validates functional correctness on matmul, conv, and other ops, and performs
 # micro-benchmarking on IREE CUDA and other back-ends.
 #
-# The workflow runs currently only profiles on CUDA and uploads results to 
-# `dispatch-profiler-artifacts` GC bucket.
+# The workflow currently profiles on CUDA and uploads results to
+# the `dispatch-profiler-artifacts` GC bucket.
 
 name: dispatch_profiler
 
