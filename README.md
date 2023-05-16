@@ -39,8 +39,42 @@ JAX_PLATFORMS=iree_cuda python test/test_simple.py
 
 ### Option 2: Set up for a full at-head dev rig
 
-TODO: Document how to symlink existing repos and manually sync
+```
+mkdir openxla
+cd openxla
+python -m venv .env
+source .env/bin/activate || die "Could not activate venv"
 
+pip install git+https://github.com/openxla/openxla-devtools.git
+openxla-workspace init
+openxla-workspace checkout --sync openxla-pjrt-plugin
+
+cd jax
+pip install numpy wheel
+python build/build.py \
+    --bazel_options=--override_repository=xla=$PWD/../xla \
+      --enable_tpu && pip3 install dist/*.whl --force-reinstall
+pip install -e .
+
+cd ../iree
+cmake -GNinja -B ../iree-build/ -S . \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DIREE_ENABLE_ASSERTIONS=ON \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DIREE_ENABLE_LLD=ON -DIREE_ENABLE_CCACHE=ON
+cd ../iree-build
+ninja libIREECompiler.so
+export DYLIB_PATH=$PWD
+
+cd ../openxla-pjrt-plugin
+python ./configure.py --cc=clang --cxx=clang++ --iree-compiler-dylib=$DYLIB_PATH/lib/libIREECompiler.so
+source .env.sh
+bazel build iree/integrations/pjrt/cpu/...
+
+# Do simple smoke test.
+JAX_PLATFORMS=iree_cpu python test/test_simple.py
+```
 
 ## Building Jax from Source
 
