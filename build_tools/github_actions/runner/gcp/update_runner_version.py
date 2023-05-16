@@ -62,12 +62,8 @@ if __name__ == "__main__":
   version = release["tag_name"][1:]
   digest = None
 
-  sha_pattern = re.compile(DIGEST_SEARCH_PATTERN)
-
-  matches = [
-      m for m in (sha_pattern.fullmatch(l)
-                  for l in release["body"].splitlines()) if m
-  ]
+  sha_pattern = re.compile(f"^{DIGEST_SEARCH_PATTERN}$", flags=re.MULTILINE)
+  matches = sha_pattern.findall(release["body"])
 
   if not matches:
     error(
@@ -76,7 +72,7 @@ if __name__ == "__main__":
   if len(matches) > 1:
     error(f"ERROR: Multiple lines match digest search regex:", matches)
 
-  digest = matches[0].group(1)
+  digest = matches[0]
 
   archive = RUNNER_ARCHIVE_TEMPLATE.substitute(version=version)
   asset_url = ASSET_URL_TEMPLATE.substitute(version=version, archive=archive)
