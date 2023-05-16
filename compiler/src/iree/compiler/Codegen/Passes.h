@@ -560,6 +560,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
 
+/// Cast address space to generic in CallOp and FuncOp
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMGPUCastAddressSpaceFunction();
+
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(

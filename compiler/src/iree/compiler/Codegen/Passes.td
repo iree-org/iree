@@ -688,6 +688,12 @@ def LLVMGPULowerExecutableTarget :
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
 
+def LLVMGPUCastAddressSpaceFunction :
+    Pass<"iree-llvmgpu-cast-address-space-function", "ModuleOp"> {
+  let summary = "Pass to cast";
+  let constructor = "mlir::iree_compiler::createLLVMGPUCastAddressSpaceFunction()";
+}
+
 def LLVMGPUTileAndDistribute :
     Pass<"iree-llvmgpu-tile-and-distribute", "func::FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
