@@ -65,7 +65,8 @@ jobs:
           --gpus all \
             gcr.io/iree-oss/nvidia-bleeding-edge@sha256:e020d5c748f293674ab5f63533d6bf2a6a83b4c3045da10f76aa2ef2236f008b \
             ./experimental/dispatch_profiler/profile_all.sh "${BUILD_DIR}/install/bin"
-      # - name: "Uploading results"
-      #   run: |
-      #     export GCS_DIR_NAME="$(date +'%Y-%m-%d').$(date +'%s')"
-      #     gcloud storage cp "${RESULTS_DIR}/latest/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_UPLOAD_DIR_NAME}/"
+      - name: "Uploading results"
+        run: |
+          # export GCS_DIR_NAME="$(date +'%Y-%m-%d').$(date +'%s')"
+          echo "${GCS_UPLOAD_PARENT_DIR}/${GCS_UPLOAD_DIR_NAME}/"
+          # gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_UPLOAD_DIR_NAME}/"
