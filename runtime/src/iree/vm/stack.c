@@ -671,7 +671,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
 
     iree_vm_source_location_t source_location;
     iree_status_t status = iree_vm_module_resolve_source_location(
-        module, &frame->frame, &source_location);
+        module, frame->frame.function, frame->frame.pc, &source_location);
     if (iree_status_is_ok(status)) {
       status = iree_vm_source_location_format(
           &source_location, IREE_VM_SOURCE_LOCATION_FORMAT_FLAG_NONE, builder);

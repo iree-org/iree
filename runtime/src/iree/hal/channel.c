@@ -13,6 +13,10 @@
 #include "iree/hal/device.h"
 #include "iree/hal/resource.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_channel_t
+//===----------------------------------------------------------------------===//
+
 #define _VTABLE_DISPATCH(channel, method_name) \
   IREE_HAL_VTABLE_DISPATCH(channel, iree_hal_channel, method_name)
 
@@ -28,6 +32,22 @@ IREE_API_EXPORT iree_status_t iree_hal_channel_create(
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_channel)(
           device, queue_affinity, params, out_channel);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_channel_split(
+    iree_hal_channel_t* base_channel, int32_t color, int32_t key,
+    iree_hal_channel_flags_t flags, iree_hal_channel_t** out_split_channel) {
+  IREE_ASSERT_ARGUMENT(base_channel);
+  IREE_ASSERT_ARGUMENT(out_split_channel);
+  *out_split_channel = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, color);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, key);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, flags);
+  iree_status_t status = _VTABLE_DISPATCH(base_channel, split)(
+      base_channel, color, key, flags, out_split_channel);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

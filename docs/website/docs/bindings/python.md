@@ -16,24 +16,23 @@ components:
 | `iree-runtime`      | IREE's runtime, including CPU and GPU backends                              |
 | `iree-tools-tf`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
 | `iree-tools-tflite` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
-| `iree-tools-xla`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
 | `iree-jax`          | Tools for importing from [JAX](https://github.com/google/jax)               |
 
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-!!! Caution
-    The TensorFlow, TensorFlow Lite, and XLA packages are currently only
-    available on Linux and macOS. They are not available on Windows yet (see
-    [this issue](https://github.com/openxla/iree/issues/6417)).
+!!! Caution "Caution - Operating system support"
+    Packages are currently only available on Linux and macOS. They are not
+    available on Windows yet (see
+    [this issue](https://github.com/openxla/iree/issues/13484)).
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 To use IREE's Python bindings, you will first need to install
 [Python 3](https://www.python.org/downloads/) and
 [pip](https://pip.pypa.io/en/stable/installing/), as needed.
 
-???+ tip
+???+ Tip "Tip - Virtual environments"
     We recommend using virtual environments to manage python packages, such as
     through `venv`
     ([about](https://docs.python.org/3/library/venv.html),
@@ -62,25 +61,14 @@ To use IREE's Python bindings, you will first need to install
 
     When done, run `deactivate`.
 
-<!-- TODO(??): use setup.py install_requires for any dependencies IREE needs -->
-
-Next, install packages:
-
-``` shell
-python -m pip install --upgrade pip
-python -m pip install numpy absl-py
-```
-
 ## Installing IREE packages
 
-### Prebuilt packages
+### :octicons-package-16: Prebuilt packages
 
-Stable release packages are published to
-[PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
+=== "Stable releases"
 
-=== "Minimal"
-
-    To install just the core IREE packages:
+    Stable release packages are
+    [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
 
     ``` shell
     python -m pip install \
@@ -88,32 +76,22 @@ Stable release packages are published to
       iree-runtime
     ```
 
-=== "All packages"
+=== ":material-alert: Nightly releases"
 
-    To install IREE packages with tools for all frontends:
+    Nightly releases are published on
+    [GitHub releases](https://github.com/openxla/iree/releases).
 
     ``` shell
     python -m pip install \
+      --find-links https://openxla.github.io/iree/pip-release-links.html \
+      --upgrade \
       iree-compiler \
-      iree-runtime \
-      iree-tools-tf \
-      iree-tools-tflite \
-      iree-tools-xla
+      iree-runtime
     ```
 
-!!! Tip
+### :material-hammer-wrench: Building from source
 
-    Nightly packages are also published on
-    [GitHub releases](https://github.com/openxla/iree/releases). To use these,
-    run `pip install` with this extra option:
-
-    ```
-    --find-links https://openxla.github.io/iree/pip-release-links.html
-    ```
-
-### Building from source
-
-See [Building Python bindings](../../building-from-source/python-bindings-and-importers/#building-python-bindings)
+See [Building Python bindings](../../building-from-source/getting-started/#python-bindings)
 page for instructions for building from source.
 
 ## Using the Python bindings

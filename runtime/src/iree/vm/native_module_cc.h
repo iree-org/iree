@@ -190,10 +190,10 @@ class NativeModule {
     return iree_ok_status();
   }
 
-  static iree_status_t ModuleLookupFunction(void* self,
-                                            iree_vm_function_linkage_t linkage,
-                                            iree_string_view_t name,
-                                            iree_vm_function_t* out_function) {
+  static iree_status_t ModuleLookupFunction(
+      void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+      const iree_vm_function_signature_t* expected_signature,
+      iree_vm_function_t* out_function) {
     IREE_ASSERT_ARGUMENT(out_function);
     std::memset(out_function, 0, sizeof(*out_function));
     if (IREE_UNLIKELY(!name.data || !name.size)) {
@@ -210,6 +210,7 @@ class NativeModule {
         return iree_ok_status();
       }
     }
+
     return iree_make_status(IREE_STATUS_NOT_FOUND, "function %.*s not exported",
                             (int)name.size, name.data);
   }

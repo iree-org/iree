@@ -10,8 +10,9 @@
 
 static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
-  const iree_uk_uint32_t allflags =
-      IREE_UK_FLAG_MMT4D_TYPE_MASK | IREE_UK_FLAG_MMT4D_ACCUMULATE;
+  const iree_uk_uint32_t allflags = IREE_UK_FLAG_MMT4D_TYPE_MASK |
+                                    IREE_UK_FLAG_MMT4D_ACCUMULATE |
+                                    IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
   IREE_UK_ASSERT(mmt4d_type != iree_uk_mmt4d_type_none);
@@ -57,14 +58,19 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
       (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
   const char* lhs_panel = (const char*)params->lhs_buffer +
                           (params->lhs_offset << lhs_elem_size_log2);
+  const char* rhs_panel_start = (const char*)params->rhs_buffer +
+                                (params->rhs_offset << rhs_elem_size_log2);
   iree_uk_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
   iree_uk_ssize_t lhs_panel_stride = params->lhs_stride0 << lhs_elem_size_log2;
   iree_uk_ssize_t rhs_panel_stride = params->rhs_stride0 << rhs_elem_size_log2;
   iree_uk_ssize_t out_stride = params->out_stride0 << out_elem_size_log2;
   for (iree_uk_int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;
-    const char* rhs_panel = (const char*)params->rhs_buffer +
-                            (params->rhs_offset << rhs_elem_size_log2);
+    const char* rhs_panel = rhs_panel_start;
+    // Prefetches needed on ARM Cortex-X2, Issue #13332.
+    IREE_UK_PREFETCH_RW(out_tile_row, IREE_UK_PREFETCH_LOCALITY_L3);
+    IREE_UK_PREFETCH_RO(lhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
+    IREE_UK_PREFETCH_RO(rhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
     for (iree_uk_int32_t j = 0; j < N; ++j) {
       tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
       out_tile += out_tile_size;
@@ -114,16 +120,17 @@ static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
   return false;
 }
 
-IREE_UK_EXPORT void iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params) {
+IREE_UK_EXPORT int iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_validate(params);
 
   // Maybe handle this mmt4d "early", without needing to select a tile_func.
   // Typical cases include trivial cases (e.g. when params->K == 0) and hardware
   // targets that want to handle the entire loop nest in target-specific code.
-  if (iree_uk_mmt4d_early(params)) return;
+  if (iree_uk_mmt4d_early(params)) return 0;
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
   iree_uk_mmt4d_tile_func_t tile_func = iree_uk_mmt4d_select_tile_func(params);
   iree_uk_mmt4d_using_tile_func(params, tile_func);
+  return 0;
 }

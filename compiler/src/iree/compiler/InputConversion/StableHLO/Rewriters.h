@@ -11,11 +11,45 @@
 
 namespace mlir::iree_compiler::stablehlo {
 
+//===----------------------------------------------------------------------===//
+// General StableHLO/CHLO lowering patterns.
+//===----------------------------------------------------------------------===//
+
 /// Populates the patterns that convert from StableHLO to Linalg on tensors.
 void populateStableHloToLinalgConversionPatterns(MLIRContext *context,
                                                  TypeConverter &typeConverter,
                                                  RewritePatternSet *patterns,
                                                  bool enablePrimitiveOps);
+
+/// Collection of rewrite patterns for lowering of StableHLO ops to SCF control
+/// flow ops.
+void populateLegalizeControlFlowPatterns(MLIRContext *context,
+                                         RewritePatternSet *patterns);
+
+/// Collection of rewrite patterns for lowering of StableHLO dim operations.
+void populateLegalizeShapeComputationPatterns(MLIRContext *context,
+                                              RewritePatternSet *patterns);
+
+//===----------------------------------------------------------------------===//
+// IREE-specific patterns.
+//===----------------------------------------------------------------------===//
+
+/// Populates the patterns that convert from StableHLO to LinalgExt.
+void populateStableHloToLinalgExtConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
+
+/// Populates the patterns that convert from StableHLO to Linalg on tensors.
+/// Extends the general linalg lowering patterns with IREE-specific ones.
+void populateStableHloToLinalgOnTensorsConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
+
+/// Populates the patterns that convert from StableHLO collective ops to Flow
+/// ops.
+void populateStableHloCollectivesConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
 
 //===----------------------------------------------------------------------===//
 // Fine-grained patterns used by the implementation.

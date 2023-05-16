@@ -97,7 +97,7 @@ iree_cc_library(
     iree::modules::hal
     iree::modules::hal::inline
     iree::modules::hal::loader
-    iree::modules::vmvx
+    iree::tooling::modules
     iree::vm
     iree::vm::bytecode::module
     iree::vm::dynamic::module
@@ -119,6 +119,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers
     iree::hal::utils::allocators
+    iree::hal::utils::mpi_channel_provider
   PUBLIC
 )
 
@@ -168,6 +169,29 @@ iree_cc_test(
     iree::tooling::testdata::npy
   LABELS
     "requires-filesystem"
+)
+
+iree_cc_library(
+  NAME
+    run_module
+  HDRS
+    "run_module.h"
+  SRCS
+    "run_module.c"
+  DEPS
+    ::comparison
+    ::context_util
+    ::device_util
+    ::instrument_util
+    ::vm_util
+    iree::base
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal::types
+    iree::vm
+    iree::vm::bytecode::module
+  PUBLIC
 )
 
 iree_cc_library(

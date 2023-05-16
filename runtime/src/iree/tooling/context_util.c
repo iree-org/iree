@@ -20,12 +20,9 @@
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
+#include "iree/tooling/modules/resolver.h"
 #include "iree/vm/bytecode/module.h"
 #include "iree/vm/dynamic/module.h"
-
-#if defined(IREE_HAVE_VMVX_MODULE)
-#include "iree/modules/vmvx/module.h"
-#endif  // IREE_HAVE_VMVX_MODULE
 
 //===----------------------------------------------------------------------===//
 // Module loading
@@ -383,7 +380,7 @@ typedef struct {
   iree_hal_device_t* device;
   iree_hal_allocator_t* device_allocator;
 } iree_tooling_resolve_state_t;
-static iree_status_t iree_tooling_resolve_module_dependency(
+static iree_status_t iree_tooling_resolve_module_dependency_callback(
     void* user_data_ptr, const iree_vm_module_dependency_t* dependency) {
   iree_tooling_resolve_state_t* state =
       (iree_tooling_resolve_state_t*)user_data_ptr;
@@ -393,9 +390,8 @@ static iree_status_t iree_tooling_resolve_module_dependency(
     return iree_ok_status();
   }
 
-  // Register one of the known modules. If we had a factory mechanism for
-  // resolving the modules we'd call out to that. Note that today this is not
-  // recursive but it could be in the future.
+  // Register one of the known modules. Note that today this is not recursive
+  // but it could be in the future.
   iree_vm_module_t* module = NULL;
   if (iree_string_view_equal(dependency->name, IREE_SV("hal"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_async_module(
@@ -408,20 +404,12 @@ static iree_status_t iree_tooling_resolve_module_dependency(
   } else if (iree_string_view_equal(dependency->name, IREE_SV("hal_loader"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_loader_module(
         state->instance, state->host_allocator, &module));
-  } else if (iree_string_view_equal(dependency->name, IREE_SV("vmvx"))) {
-    IREE_RETURN_IF_ERROR(iree_vmvx_module_create(
-        state->instance, state->host_allocator, &module));
-  } else if (iree_all_bits_set(dependency->flags,
-                               IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED)) {
-    // Required but not found; fail.
-    return iree_make_status(
-        IREE_STATUS_NOT_FOUND,
-        "required module '%.*s' not registered on the context",
-        (int)dependency->name.size, dependency->name.data);
   } else {
-    // Optional and not found; skip.
-    return iree_ok_status();
+    // Defer to the generic module resolver registry.
+    IREE_RETURN_IF_ERROR(iree_tooling_resolve_module_dependency(
+        state->instance, dependency, state->host_allocator, &module));
   }
+  if (!module) return iree_ok_status();
 
   iree_status_t status =
       iree_tooling_module_list_push_back(state->resolved_list, module);
@@ -463,7 +451,8 @@ iree_status_t iree_tooling_resolve_modules(
   for (iree_host_size_t i = 0; i < user_module_count; ++i) {
     iree_vm_module_t* user_module = user_modules[i];
     status = iree_vm_module_enumerate_dependencies(
-        user_module, iree_tooling_resolve_module_dependency, &resolve_state);
+        user_module, iree_tooling_resolve_module_dependency_callback,
+        &resolve_state);
     if (!iree_status_is_ok(status)) {
       iree_string_view_t module_name = iree_vm_module_name(user_module);
       (void)module_name;
@@ -553,6 +542,9 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
   // HACK: to load modules we need the types registered even though we don't
   // know if the types are used.
   iree_status_t status = iree_hal_module_register_all_types(instance);
+  if (iree_status_is_ok(status)) {
+    status = iree_tooling_register_all_module_types(instance);
+  }
 
   if (iree_status_is_ok(status)) {
     *out_instance = instance;

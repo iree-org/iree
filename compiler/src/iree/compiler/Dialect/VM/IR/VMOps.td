@@ -1926,7 +1926,7 @@ class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
@@ -1965,7 +1965,7 @@ class VM_SwitchFloatOp<F type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
@@ -2457,6 +2457,18 @@ def VM_RoundF64Op :
     VM_TotalUnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64,
                               [VM_ExtF64]> {
   let summary = [{rounds the value to the nearest integer away from zero}];
+}
+
+def VM_RoundF32EvenOp :
+    VM_TotalUnaryArithmeticOp<F32, "round.f32.even", VM_OPC_RoundF32Even,
+                              [VM_ExtF32]> {
+  let summary = [{rounds the value to the nearest even integer}];
+}
+
+def VM_RoundF64EvenOp :
+    VM_TotalUnaryArithmeticOp<F64, "round.f64.even", VM_OPC_RoundF64Even,
+                              [VM_ExtF64]> {
+  let summary = [{rounds the value to the nearest even integer}];
 }
 
 def VM_MinF32Op :
@@ -3797,6 +3809,11 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
       return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
     }
   }];
 }

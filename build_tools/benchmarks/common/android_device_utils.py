@@ -10,13 +10,13 @@ import json
 import re
 
 from typing import Sequence
-from .benchmark_definition import (execute_cmd_and_get_output, DeviceInfo,
+from .benchmark_definition import (execute_cmd_and_get_stdout, DeviceInfo,
                                    PlatformType)
 
 
 def get_android_device_model(verbose: bool = False) -> str:
   """Returns the Android device model."""
-  model = execute_cmd_and_get_output(
+  model = execute_cmd_and_get_stdout(
       ["adb", "shell", "getprop", "ro.product.model"], verbose=verbose)
   model = re.sub(r"\W+", "-", model)
   return model
@@ -24,13 +24,13 @@ def get_android_device_model(verbose: bool = False) -> str:
 
 def get_android_cpu_abi(verbose: bool = False) -> str:
   """Returns the CPU ABI for the Android device."""
-  return execute_cmd_and_get_output(
+  return execute_cmd_and_get_stdout(
       ["adb", "shell", "getprop", "ro.product.cpu.abi"], verbose=verbose)
 
 
 def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
   """Returns the CPU features for the Android device."""
-  cpuinfo = execute_cmd_and_get_output(["adb", "shell", "cat", "/proc/cpuinfo"],
+  cpuinfo = execute_cmd_and_get_stdout(["adb", "shell", "cat", "/proc/cpuinfo"],
                                        verbose=verbose)
   features = []
   for line in cpuinfo.splitlines():
@@ -42,7 +42,7 @@ def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
 
 def get_android_gpu_name(verbose: bool = False) -> str:
   """Returns the GPU name for the Android device."""
-  vkjson = execute_cmd_and_get_output(["adb", "shell", "cmd", "gpu", "vkjson"],
+  vkjson = execute_cmd_and_get_stdout(["adb", "shell", "cmd", "gpu", "vkjson"],
                                       verbose=verbose)
   vkjson = json.loads(vkjson)
   name = vkjson["devices"][0]["properties"]["deviceName"]
@@ -52,7 +52,7 @@ def get_android_gpu_name(verbose: bool = False) -> str:
   # - Adreno GPUs have raw names like "Adreno (TM) 650".
   name = name.replace("(TM)", "")
 
-  # Replace all consecutive non-word characters with a single hypen.
+  # Replace all consecutive non-word characters with a single hyphen.
   name = re.sub(r"\W+", "-", name)
 
   return name

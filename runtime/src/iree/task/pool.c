@@ -85,23 +85,17 @@ static iree_status_t iree_task_pool_grow(iree_task_pool_t* pool,
   // zero-fill-on-demand trickery going on the pages are all wired here vs.
   // when the tasks are first acquired from the list where it'd be harder to
   // track.
-  uintptr_t p = ((uintptr_t)allocation + aligned_block_size) - pool->task_size;
-  iree_task_t* head = (iree_task_t*)p;
-  iree_task_t* tail = head;
-  head->next_task = NULL;
-  head->pool = pool;
+  char* p = (char*)allocation + aligned_block_size - pool->task_size;
+  iree_task_t* tail = (iree_task_t*)p;
+  iree_task_t* head = NULL;
+  iree_task_t task = {0};
 
-  // Work around a loop vectorizer bug that causes memory corruption in this
-  // loop. Only Android NDK r25 is known to be affected. See
-  // https://github.com/openxla/iree/issues/9953 for details.
-#if defined(__NDK_MAJOR__) && __NDK_MAJOR__ == 25
-#pragma clang loop unroll(disable) vectorize(disable)
-#endif
-  for (iree_host_size_t i = 0; i < actual_capacity; ++i, p -= pool->task_size) {
-    iree_task_t* task = (iree_task_t*)p;
-    task->next_task = head;
-    task->pool = pool;
-    head = task;
+  for (iree_host_size_t i = 0; i < actual_capacity; ++i) {
+    task.next_task = head;
+    task.pool = pool;
+    memcpy(p, &task, sizeof(task));
+    head = (iree_task_t*)p;
+    p -= pool->task_size;
   }
 
   // If the caller needs a task we can slice off the head to return prior to

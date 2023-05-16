@@ -38,7 +38,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createPromoteArithBF16ToF32Pass();
 
-// Test passes.
+// Debug/test passes.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateOpOrdinalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTestConversionPass();
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 

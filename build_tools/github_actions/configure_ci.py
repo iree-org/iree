@@ -42,7 +42,7 @@ from typing import Iterable, List, Mapping, Sequence, Tuple
 
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
-BENCHMARK_PRESET_KEY = "benchmarks"
+BENCHMARK_EXTRA_KEY = "benchmark-extra"
 # Trailer to prevent benchmarks from always running on LLVM integration PRs.
 SKIP_LLVM_INTEGRATE_BENCHMARK_KEY = "skip-llvm-integrate-benchmark"
 
@@ -77,7 +77,13 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
+DEFAULT_BENCHMARK_PRESETS = [
+    "cuda", "x86_64", "android-cpu", "android-gpu", "vulkan-nvidia",
+    "comp-stats"
+]
+# All available benchmark preset options including experimental presets.
+BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESETS
+BENCHMARK_LABEL_PREFIX = "benchmarks"
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
 
@@ -274,32 +280,34 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
           f"description has '{SKIP_LLVM_INTEGRATE_BENCHMARK_KEY}' trailer.")
 
   if not is_pr:
-    preset_options = ["all"]
-    print(f"Using benchmark preset 'all' for non-PR run")
+    preset_options = {"all"}
+    print(f"Using benchmark presets '{preset_options}' for non-PR run")
   elif is_llvm_integrate_pr and not skip_llvm_integrate_benchmark:
     # Run all benchmark presets for LLVM integration PRs.
-    preset_options = ["all"]
-    print("Using benchmark preset 'all' for LLVM integration PR")
+    preset_options = {"all"}
+    print(f"Using benchmark preset '{preset_options}' for LLVM integration PR")
   else:
     preset_options = set(
         label.split(":", maxsplit=1)[1]
         for label in labels
-        if label.startswith(BENCHMARK_PRESET_KEY + ":"))
-    trailer = trailers.get(BENCHMARK_PRESET_KEY)
+        if label.startswith(BENCHMARK_LABEL_PREFIX + ":"))
+    trailer = trailers.get(BENCHMARK_EXTRA_KEY)
     if trailer is not None:
       preset_options = preset_options.union(
           option.strip() for option in trailer.split(","))
-    preset_options = sorted(preset_options)
     print(f"Using benchmark preset '{preset_options}' from trailers and labels")
 
+  # TODO(#13392): "all" should be called as "defaults". Keep it as it is and we
+  # will drop it when removing "benchmarks" trailer (with announcement).
+  if "all" in preset_options:
+    preset_options.remove("all")
+    preset_options.update(DEFAULT_BENCHMARK_PRESETS)
+
+  preset_options = sorted(preset_options)
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
       raise ValueError(f"Unknown benchmark preset option: '{preset_option}'.\n"
                        f"Available options: '{BENCHMARK_PRESET_OPTIONS}'.")
-
-  if "all" in preset_options:
-    preset_options = list(
-        option for option in BENCHMARK_PRESET_OPTIONS if option != "all")
 
   return ",".join(preset_options)
 

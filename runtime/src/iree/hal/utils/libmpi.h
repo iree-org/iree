@@ -13,6 +13,44 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// Data types and enumerations
+//===----------------------------------------------------------------------===//
+
+// OpenMPI uses pointers for common data types instead of `int` like most other
+// implementations. This is unfortunate as when dynamically importing we can't
+// easily switch between the two calling conventions. Today we assume OpenMPI
+// everywhere but Windows where we use MSMPI which follows the MPICH values.
+//
+// TODO: make the values dynamic and query them consistently from the dynamic
+// libraries, snoop the library version to populate values from a table, or
+// some other trick.
+#if !defined(IREE_PLATFORM_WINDOWS)
+#define IREE_MPI_TYPES_ARE_POINTERS 1
+#endif  // !IREE_PLATFORM_WINDOWS
+
+#if IREE_MPI_TYPES_ARE_POINTERS
+
+typedef void* IREE_MPI_Datatype;
+#define IREE_MPI_BYTE(syms) (IREE_MPI_Datatype)((syms)->ompi_mpi_byte)
+
+typedef void* IREE_MPI_Comm;
+#define IREE_MPI_COMM_WORLD(syms) (IREE_MPI_Comm)((syms)->ompi_mpi_comm_world)
+
+#else
+
+typedef int IREE_MPI_Datatype;
+#define IREE_MPI_BYTE(syms) ((IREE_MPI_Datatype)0x4C00010D)
+
+typedef int IREE_MPI_Comm;
+#define IREE_MPI_COMM_WORLD(syms) ((IREE_MPI_Comm)0x44000000)
+
+#endif  // IREE_MPI_TYPES_ARE_POINTERS
+
+//===----------------------------------------------------------------------===//
+// Dynamic symbol table
+//===----------------------------------------------------------------------===//
+
 // A collection of known MPI symbols (functions and handles)
 //
 // To support additional functions, define the function or handles
@@ -23,14 +61,26 @@ typedef struct iree_hal_mpi_dynamic_symbols_t {
 #undef MPI_PFN_DECL
 } iree_hal_mpi_dynamic_symbols_t;
 
-// Converts a mpi result to an iree_status_t.
+// Dynamically loads the MPI library and sets up the symbol table.
+// |out_library| must be released by the caller with
+// iree_dynamic_library_release. |out_syms| is only valid as long as the
+// library is live.
+iree_status_t iree_hal_mpi_library_load(
+    iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
+    iree_hal_mpi_dynamic_symbols_t* out_syms);
+
+//===----------------------------------------------------------------------===//
+// Error handling utilities
+//===----------------------------------------------------------------------===//
+
+// Converts an MPI_Status result to an iree_status_t.
 //
 // Usage:
 //   iree_status_t status = MPI_RESULT_TO_STATUS(mpiDoThing(...));
 #define MPI_RESULT_TO_STATUS(syms, expr, ...) \
   iree_hal_mpi_result_to_status((syms), ((syms)->expr), __FILE__, __LINE__)
 
-// Converts a mpi result to a Status object.
+// Converts an MPI_Status result to an iree_status_t.
 iree_status_t iree_hal_mpi_result_to_status(
     iree_hal_mpi_dynamic_symbols_t* syms, int result, const char* file,
     uint32_t line);
@@ -53,22 +103,6 @@ iree_status_t iree_hal_mpi_result_to_status(
 #define MPI_IGNORE_ERROR(syms, expr)                                      \
   IREE_IGNORE_ERROR(iree_hal_mpi_result_to_status((syms), ((syms)->expr), \
                                                   __FILE__, __LINE__))
-
-// Dynamically loads the OpenMPI library and sets up the symbol table.
-//
-// |out_library| - must be release by the caller with
-// `iree_dynamic_library_release`.
-// |out_syms| - only valid as long as the library is live. Must be released
-// by the caller with `iree_allocator_free`.
-//
-// Returns: IREE_STATUS_SUCCESS if it found the library, and fills in the
-// pointers to our_library and out_symbols
-//
-// Why only OpenMPI? Because we rely on internal symbols to access handles
-// to operators and data types. See libmpi_dynamic_symbols.h
-iree_status_t iree_hal_mpi_library_load(
-    iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
-    iree_hal_mpi_dynamic_symbols_t** out_syms);
 
 #ifdef __cplusplus
 }  // extern "C"

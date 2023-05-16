@@ -1,19 +1,24 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
-// CHECK-LABEL: @channel_default
-func.func @channel_default() {
-  // CHECK: %channel = stream.channel.default on(#hal.affinity.queue<[0, 1]>) : !stream.channel
-  %channel = stream.channel.default on(#hal.affinity.queue<[0, 1]>) : !stream.channel
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @channel_create
 //  CHECK-SAME: (%[[RANK:.+]]: index, %[[COUNT:.+]]: index)
 func.func @channel_create(%rank: index, %count: index) {
   // CHECK: %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) rank(%[[RANK]]) count(%[[COUNT]]) : !stream.channel
   %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) rank(%rank) count(%count) : !stream.channel
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @channel_split
+//  CHECK-SAME: (%[[BASE_CHANNEL:.+]]: !stream.channel)
+func.func @channel_split(%base_channel: !stream.channel) {
+  // CHECK-DAG: %[[COLOR:.+]] = arith.constant 100 : index
+  %color = arith.constant 100 : index
+  // CHECK-DAG: %[[KEY:.+]] = arith.constant 101 : index
+  %key = arith.constant 101 : index
+  // CHECK: %channel = stream.channel.split %[[BASE_CHANNEL]], %[[COLOR]], %[[KEY]] : !stream.channel -> !stream.channel
+  %split_channel = stream.channel.split %base_channel, %color, %key : !stream.channel -> !stream.channel
   return
 }
 

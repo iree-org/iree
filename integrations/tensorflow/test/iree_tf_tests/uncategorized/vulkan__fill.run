@@ -1,3 +1,0 @@
-# REQUIRES: bugfix
-# FIXME(https://github.com/openxla/iree/issues/11277): Re-enable this test after resolving the issue.
-# RUN: %PYTHON -m iree_tf_tests.uncategorized.fill_test --target_backends=iree_vulkan --artifacts_dir=%t

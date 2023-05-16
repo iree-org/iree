@@ -77,12 +77,8 @@ static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  // TODO(#12933): Because of regressions in CUDA backend, there is an
-  // option to keep a legacy mode of not representing the offset in the
-  // type. Remove once the bug is fixed.
-  addIREEComprehensiveBufferizePasses(
-      passManager, allocationFn, deallocationFn, memcpyFn,
-      /*embedSubspanOffsetIntoMemRefType=*/false);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
@@ -424,7 +420,7 @@ void addGPUPackUnPackPasses(OpPassManager &pm) {
 
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createDecomposePackUnPackOpsPass());
+      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
@@ -518,13 +514,16 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
-  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(
+      arith::createArithExpandOpsPass({/*include-bf16=*/true}));
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createLowerAffinePass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
+  // Cast address spaces of all function arguments to generic
+  if (!useROCM) pm.addPass(createLLVMGPUCastAddressSpaceFunction());
   if (useROCM) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());
@@ -554,9 +553,7 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
-  addCommonTargetExecutablePreprocessingPasses(
-      pm.nest<ModuleOp>(),
-      /*embedSubspanOffsetIntoMemRefType=*/false);
+  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(

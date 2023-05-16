@@ -1305,6 +1305,24 @@ struct ChannelCreateOpPattern
   }
 };
 
+struct ChannelSplitOpPattern
+    : public StreamConversionPattern<IREE::Stream::ChannelSplitOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::ChannelSplitOp splitOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Value color = rewriter.create<arith::IndexCastOp>(
+        splitOp.getLoc(), rewriter.getI32Type(), adaptor.getColor());
+    Value key = rewriter.create<arith::IndexCastOp>(
+        splitOp.getLoc(), rewriter.getI32Type(), adaptor.getKey());
+    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelSplitOp>(
+        splitOp, rewriter.getType<IREE::HAL::ChannelType>(),
+        adaptor.getChannel(), color, key,
+        /*flags=*/rewriter.getI32IntegerAttr(0));
+    return success();
+  }
+};
+
 struct ChannelRankOpPattern
     : public StreamConversionPattern<IREE::Stream::ChannelRankOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1414,8 +1432,9 @@ void populateStreamToHALPatterns(MLIRContext *context,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
-  patterns.insert<ChannelCreateOpPattern, ChannelRankOpPattern,
-                  ChannelCountOpPattern>(mapping, typeConverter, context);
+  patterns.insert<ChannelCreateOpPattern, ChannelSplitOpPattern,
+                  ChannelRankOpPattern, ChannelCountOpPattern>(
+      mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }
 

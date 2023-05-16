@@ -9,6 +9,7 @@
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/EncodingInfo.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -34,12 +35,10 @@ namespace Codegen {
 
 /// Helper method to generate a function declaration at a module scope,
 /// and a call to that function
-static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
-                                                  Operation *op,
-                                                  StringRef fnName,
-                                                  TypeRange callArgumentTypes,
-                                                  TypeRange callReturnTypes,
-                                                  ValueRange callOperands) {
+static FailureOr<func::CallOp> createFunctionCall(
+    RewriterBase &rewriter, Operation *op, StringRef fnName,
+    TypeRange callArgumentTypes, TypeRange callReturnTypes,
+    ValueRange callOperands, ArrayRef<NamedAttribute> fnDefAttrs) {
   FunctionType functionType =
       rewriter.getFunctionType(callArgumentTypes, callReturnTypes);
 
@@ -54,12 +53,9 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
     rewriter.setInsertionPointToStart(&moduleOp->getRegion(0).front());
     fnDecl = rewriter.create<func::FuncOp>(loc, fnName, functionType);
     SymbolTable::setSymbolVisibility(fnDecl, SymbolTable::Visibility::Private);
-    // TODO(#12327): Based on description in the issue, add an attribute
-    // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
-    // backend (obviously), but is enough to unblock while the proper fix lands.
-    // For now there are a bunch of attributes set on the function, but this
-    // should be made more controllable based on the backend.
-    fnDecl->setAttr("vm.import.module", rewriter.getStringAttr("vmvx"));
+    for (auto attr : fnDefAttrs) {
+      fnDecl->setAttr(attr.getName(), attr.getValue());
+    }
     fnDecl->setAttr("llvm.bareptr", rewriter.getBoolAttr(true));
   } else if (fnDecl.getFunctionType() != functionType) {
     return rewriter.notifyMatchFailure(
@@ -138,8 +134,8 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
 }
 
 static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
-    RewriterBase &rewriter, Operation *op, StringRef fnName,
-    IntegerAttr stridedOuterDimsAttr) {
+    RewriterBase &rewriter, IREE::Codegen::UKernelGenericOp op,
+    StringRef fnName, IntegerAttr stridedOuterDimsAttr) {
   // Create the function type based on the operands and results.
   SmallVector<Type> callArgumentTypes;
   for (auto microKernelOpOperandType : op->getOperandTypes()) {
@@ -172,8 +168,12 @@ static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
           op, "failed to lower operands to function call operands");
     }
   }
+  ArrayRef<NamedAttribute> fnDefAttrs = {};
+  if (auto specifiedfnDefAttrs = op.getFnDefAttrs()) {
+    fnDefAttrs = specifiedfnDefAttrs->getValue();
+  }
   return createFunctionCall(rewriter, op, fnName, callArgumentTypes,
-                            callResultTypes, callOperands);
+                            callResultTypes, callOperands, fnDefAttrs);
 }
 
 std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
@@ -183,8 +183,8 @@ std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
 
 FailureOr<func::CallOp> UKernelGenericOp::lowerToFunctionCall(
     RewriterBase &rewriter) {
-  return lowerUKernelGenericToFunctionCall(
-      rewriter, getOperation(), getUKernelFnName(), getStridedOuterDimsAttr());
+  return lowerUKernelGenericToFunctionCall(rewriter, *this, getUKernelFnName(),
+                                           getStridedOuterDimsAttr());
 }
 
 }  // namespace Codegen

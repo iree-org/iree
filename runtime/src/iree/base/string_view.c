@@ -210,14 +210,14 @@ IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
                                                 char split_char,
                                                 iree_string_view_t* out_lhs,
                                                 iree_string_view_t* out_rhs) {
-  *out_lhs = iree_string_view_empty();
-  *out_rhs = iree_string_view_empty();
+  if (out_lhs) *out_lhs = iree_string_view_empty();
+  if (out_rhs) *out_rhs = iree_string_view_empty();
   if (!value.data || !value.size) {
     return -1;
   }
   const void* first_ptr = memchr(value.data, split_char, value.size);
   if (!first_ptr) {
-    *out_lhs = value;
+    if (out_lhs) *out_lhs = value;
     return -1;
   }
   intptr_t offset = (intptr_t)((const char*)(first_ptr)-value.data);

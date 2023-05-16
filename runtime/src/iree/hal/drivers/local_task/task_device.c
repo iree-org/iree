@@ -39,6 +39,9 @@ typedef struct iree_hal_task_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Optional provider used for creating/configuring collective channels.
+  iree_hal_channel_provider_t* channel_provider;
+
   iree_host_size_t queue_count;
   iree_hal_task_queue_t queues[];
 } iree_hal_task_device_t;
@@ -151,12 +154,17 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
   for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
     iree_hal_task_queue_deinitialize(&device->queues[i]);
   }
+
   for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
     iree_hal_executable_loader_release(device->loaders[i]);
   }
+
   iree_hal_allocator_release(device->device_allocator);
+  iree_hal_channel_provider_release(device->channel_provider);
+
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_arena_block_pool_deinitialize(&device->small_block_pool);
+
   iree_allocator_free(host_allocator, device);
 
   IREE_TRACE_ZONE_END(z0);
@@ -186,6 +194,14 @@ static void iree_hal_task_replace_device_allocator(
   iree_hal_allocator_retain(new_allocator);
   iree_hal_allocator_release(device->device_allocator);
   device->device_allocator = new_allocator;
+}
+
+static void iree_hal_task_replace_channel_provider(
+    iree_hal_device_t* base_device, iree_hal_channel_provider_t* new_provider) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_hal_channel_provider_retain(new_provider);
+  iree_hal_channel_provider_release(device->channel_provider);
+  device->channel_provider = new_provider;
 }
 
 static iree_status_t iree_hal_task_device_trim(iree_hal_device_t* base_device) {
@@ -433,6 +449,7 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .host_allocator = iree_hal_task_device_host_allocator,
     .device_allocator = iree_hal_task_device_allocator,
     .replace_device_allocator = iree_hal_task_replace_device_allocator,
+    .replace_channel_provider = iree_hal_task_replace_channel_provider,
     .trim = iree_hal_task_device_trim,
     .query_i64 = iree_hal_task_device_query_i64,
     .create_channel = iree_hal_task_device_create_channel,

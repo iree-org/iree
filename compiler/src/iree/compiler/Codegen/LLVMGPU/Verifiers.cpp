@@ -143,9 +143,6 @@ LogicalResult verifyGPUMatmulPipeline(
     rhsShape = rhsShape.drop_front();
   }
 
-  // Number of software pipeline stages/depth.
-  int64_t softwarePipelineDepth = translationInfo.getSoftwarePipelineDepth();
-
   //
   // Begin verification for CUDA and Tensor Core pipelines.
   //
@@ -206,18 +203,6 @@ LogicalResult verifyGPUMatmulPipeline(
                                  lhsType.cast<ShapedType>().getElementType(),
                                  instructionShape))) {
     return failure();
-  }
-
-  // Verify the matmul problem shape K has a multiple of thread block K tiles.
-  if (softwarePipelineDepth > 1 && threadBlockShape[kK] == matmulShape[kK]) {
-    return op->emitError("Matmul problem shape K ")
-           << matmulShape[kK]
-           << " is not in the multiple of thread block K tiles needed for "
-              "software pipelining ("
-           << threadBlockShape[kK] << ")"
-           << " * "
-           << "(" << softwarePipelineDepth << ")"
-           << " with compilation pipeline " << pipelineName;
   }
 
   // Verify that matmul problem shape can be tiled with the thread block shape.

@@ -120,6 +120,19 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "mpi_channel_provider",
+    srcs = ["mpi_channel_provider.c"],
+    hdrs = ["mpi_channel_provider.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":libmpi",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "resource_set",
     srcs = ["resource_set.c"],
     hdrs = ["resource_set.h"],

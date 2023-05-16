@@ -79,6 +79,13 @@ IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_retain(
 IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
     iree_vm_list_t* list, iree_host_size_t i, iree_hal_buffer_view_t* value);
 
+IREE_API_EXPORT iree_hal_fence_t* iree_vm_list_get_fence_assign(
+    const iree_vm_list_t* list, iree_host_size_t i);
+IREE_API_EXPORT iree_hal_fence_t* iree_vm_list_get_fence_retain(
+    const iree_vm_list_t* list, iree_host_size_t i);
+IREE_API_EXPORT iree_status_t iree_vm_list_set_fence_retain(
+    iree_vm_list_t* list, iree_host_size_t i, iree_hal_fence_t* value);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -174,12 +174,6 @@ def BufferizeCopyOnlyDispatches :
   let summary =
       "Bufferize dispatches that copy to/from interfaces to convert to a linalg.copy op";
   let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
-  let options = [
-    Option<"embedSubspanOffsetIntoMemRefType",
-           "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
-           "Embeds the offset information on subspan ops into the type."
-           "Is a work-around for #12933">,
-  ];
 }
 
 def EliminateEmptyTensors :
@@ -205,10 +199,6 @@ def IREEComprehensiveBufferize :
     Option<"printConflicts", "print-conflicts", "bool",
             /*default=*/"false",
            "Annotates IR with RaW conflicts. Requires test-analysis-only.">,
-    Option<"embedSubspanOffsetIntoMemRefType",
-           "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
-           "Embeds the offset information on subspan ops into the type."
-           "Is a work-around for #12933">,
   ];
 }
 
@@ -236,6 +226,9 @@ def OptimizeVectorTransfer :
   let options = [
     Option<"optionFlatten", "flatten", "bool", "false",
            "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
+  ];
+  let dependentDialects = [
+      "memref::MemRefDialect"
   ];
 }
 
@@ -313,6 +306,10 @@ def DecomposePackUnPackOps :
     Pass<"iree-codegen-decompose-pack-unpack-ops", "func::FuncOp"> {
   let summary = "Decompose pack/unpack ops into vectorizable ops";
   let constructor = "mlir::iree_compiler::createDecomposePackUnPackOpsPass()";
+  let options = [
+    Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
+           "Always apply tiling to make outer dimension be ones">
+  ];
 }
 
 def PolynomialApproximationPass :
@@ -396,9 +393,16 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
+    Option<"transformLibraryFileName",
+           "transform-library-file-name",
+           "std::string",
+           /*default=*/"\"\"",
+           "If non-empty, the name of the file containing definitions of "
+           "external symbols referenced in the transform script. "
+           "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
             /*default=*/"\"\"",
-            "Select the operation with 'transform.iree_tag' attribute having "
+            "Select the operation with 'transform.target_tag' attribute having "
             "the given value as payload IR root. This allows user control on "
             "what operation to transform in debug mode, without requiring "
             "intimate knowledge of the IREE nested pass pipeline.\\n"
@@ -406,7 +410,7 @@ def TransformDialectInterpreter :
             "operation in the IREE pipeline, as the payload IR root.">,
     Option<"debugTransformRootTag", "debug-transform-root-tag", "std::string",
             /*default=*/"\"\"",
-            "Select the operation with 'transform.iree_tag' attribute having "
+            "Select the operation with 'transform.target_tag' attribute having "
             "the given value as container IR for top-level transform ops. This "
             "allows user control on what transformation to apply in debug "
             "mode, without requiring intimate knowledge of the IREE nested "
@@ -547,7 +551,7 @@ def LLVMCPUVectorization :
 }
 
 def LLVMCPUVectorLowering :
-    Pass<"iree-llvmcpu-lower-vectors", "func::FuncOp"> {
+    Pass<"iree-llvmcpu-vector-lowering", "func::FuncOp"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
   let options = [
     Option<"splitVectorTransfersTo", "split-transfers", "std::string",
@@ -682,6 +686,12 @@ def LLVMGPULowerExecutableTarget :
     Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
+}
+
+def LLVMGPUCastAddressSpaceFunction :
+    Pass<"iree-llvmgpu-cast-address-space-function", "ModuleOp"> {
+  let summary = "Pass to cast";
+  let constructor = "mlir::iree_compiler::createLLVMGPUCastAddressSpaceFunction()";
 }
 
 def LLVMGPUTileAndDistribute :
@@ -846,8 +856,14 @@ def SPIRVCreateFastSlowPath :
 
 def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
-  let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
+  let summary = "Emulate 64-bit integer ops with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
+def SPIRVEmulateBf16 :
+    Pass<"iree-spirv-emulate-bf16", "ModuleOp"> {
+  let summary = "Emulate bfloat 16 ops with 32-bit float ops";
+  let constructor = "mlir::iree_compiler::createSPIRVEmulateBf16Pass()";
 }
 
 def SPIRVEraseStorageBufferStaticShape :

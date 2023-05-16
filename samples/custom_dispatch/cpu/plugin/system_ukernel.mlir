@@ -1,3 +1,9 @@
+// This example demonstrates calling dynamically imported functions in the
+// runtime through the use of ukernels. This is calling the same function
+// as `system_example.mlir`, but using the `iree_codegen.ukernel.generic`.
+// This is an example of how ukernels can be called from code generated
+// by IREE.
+
 // RUN: iree-compile --iree-hal-target-backends=llvm-cpu %s | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
@@ -46,10 +52,17 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
     %3 = tensor.extract_slice %dest[%offset] [%size] [1] : tensor<?xf32> to tensor<?xf32>
 
     // Invoke the ukernel.
-    %4 = iree_codegen.ukernel.generic "simple_mul_workgroup_ukernel"
+    %4 = iree_codegen.ukernel.generic "simple_mul_workgroup"
       ins(%1, %2 : tensor<?xf32>, tensor<?xf32>)
       outs(%3 : tensor<?xf32>)
-      (%size, %id : index, index) strided_outer_dims(0) -> tensor<?xf32>
+      (%size, %id : index, index)
+      // We can include some additional fields on the parameters struct as
+      // needed. Here we request which processor is executing the call and
+      // its data fields as defined by runtime/src/iree/schemas/cpu_data.h.
+      fn_def_attrs {hal.import.fields = ["processor_id", "processor_data"]}
+      // Set the operation to not incorporate any strides. The implementation
+      // expects no stride arguments.
+      strided_outer_dims(0) -> tensor<?xf32>
 
     // Insert the result back into the result at the right position.
     %5 = tensor.insert_slice %4 into %dest[%offset] [%size] [1] : tensor<?xf32> into tensor<?xf32>

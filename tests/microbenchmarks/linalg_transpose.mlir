@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-link-embedded=true --iree-llvmcpu-target-cpu-features='host' --iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
+// RUN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu --Xcompiler,iree-llvmcpu-target-cpu-features=host --Xcompiler,iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
 
 //===----------------------------------------------------------------------===//
 // Transpose ops.

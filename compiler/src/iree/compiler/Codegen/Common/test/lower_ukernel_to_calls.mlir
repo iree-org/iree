@@ -20,6 +20,7 @@ func.func @ukernel_generic_memref_1D(%arg0 : memref<?xf32, strided<[1], offset: 
   return
 }
 //      CHECK: func.func private @test1d(memref<f32>, index, index)
+// CHECK-SAME:     llvm.bareptr = true
 //      CHECK: func.func @ukernel_generic_memref_1D
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: memref<?xf32, strided<[1], offset: ?>>
 //      CHECK:   %[[BASE:.+]], %[[OFFSET:.+]], %[[SIZE:.+]], %[[STRIDES:.+]] = memref.extract_strided_metadata %[[ARG0]]
@@ -165,3 +166,14 @@ func.func @ukernel_mmt4d_i8i8i32(%lhs : memref<?x?x?x?xi8>, %rhs : memref<?x?x?x
 //  CHECK-SAME:       %[[BASE2]], %[[OFFSET2]], %[[STRIDES2]]#0
 //  CHECK-SAME:       %[[M]], %[[N]], %[[K]],
 //  CHECK-SAME:       %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]])
+
+// -----
+
+func.func @ukernel_generic_test_fndef_attrs(%arg0 : memref<?xf32, strided<[1], offset: ?>>) {
+  iree_codegen.ukernel.generic "test1d" outs(%arg0 : memref<?xf32, strided<[1], offset: ?>>)
+      fn_def_attrs{hal.import.fields = ["processor_id", "processor_data"]}
+  return
+}
+//      CHECK: func.func private @test1d(memref<f32>, index, index)
+// CHECK-SAME:     hal.import.fields = ["processor_id", "processor_data"]
+

@@ -278,21 +278,24 @@ struct ConvertChannelDefaultOp
   LogicalResult matchAndRewrite(
       IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Stream::AffinityAttr affinityAttr;
-    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelDefaultOp>(
-        op, adaptor.getGroupAttr(), affinityAttr);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCreateOp>(
+        op, /*id=*/Value{},
+        /*group=*/adaptor.getGroupAttr(),
+        /*rank=*/Value{},
+        /*count=*/Value{}, affinityAttr);
     return success();
   }
 };
 
-struct ConvertChannelCountOp
-    : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
+struct ConvertChannelSplitOp
+    : public OpConversionPattern<IREE::Flow::ChannelSplitOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+      IREE::Flow::ChannelSplitOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
-        op, adaptor.getOperands());
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelSplitOp>(
+        op, adaptor.getChannel(), adaptor.getColor(), adaptor.getKey());
     return success();
   }
 };
@@ -304,6 +307,18 @@ struct ConvertChannelRankOp
       IREE::Flow::ChannelRankOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Stream::ChannelRankOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
+struct ConvertChannelCountOp
+    : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
         op, adaptor.getOperands());
     return success();
   }
@@ -354,6 +369,41 @@ struct ConvertAllReduceOp
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllReduce,
         static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
+        static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
+
+    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
+        op.getLoc(), shape.getNumElements());
+    auto newTargetCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
+    auto newSourceCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
+        op, collectiveAttr, adaptor.getTarget(),
+        /*target_size=*/newTargetCast.resourceSize,
+        /*target_offset=*/zeroOffset,
+        /*target_end=*/newTargetCast.resourceSize,
+        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*source_size=*/newSourceCast.resourceSize,
+        /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
+        /*source_length=*/newSourceCast.resourceSize, elementCount,
+        adaptor.getChannel(),
+        /*param=*/mlir::Value(), getAffinityFor(op));
+    return success();
+  }
+};
+
+struct ConvertAllToAllOp
+    : public OpConversionPattern<IREE::Flow::CollectiveAllToAllOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::CollectiveAllToAllOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto shape = op.getSource().getType().cast<ShapedType>();
+    auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
+        op.getContext(), IREE::Stream::CollectiveKind::AllToAll,
+        /*reduction=*/std::nullopt,
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
@@ -755,11 +805,12 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
               ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
               ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter,
                                                           context);
-  patterns.insert<ConvertChannelCountOp, ConvertChannelDefaultOp,
-                  ConvertChannelRankOp>(typeConverter, context);
-  patterns
-      .insert<ConvertAllGatherOp, ConvertAllReduceOp, ConvertReduceScatterOp>(
-          typeConverter, context);
+  patterns.insert<ConvertChannelDefaultOp, ConvertChannelSplitOp,
+                  ConvertChannelRankOp, ConvertChannelCountOp>(typeConverter,
+                                                               context);
+  patterns.insert<ConvertAllGatherOp, ConvertAllReduceOp,
+                  ConvertReduceScatterOp, ConvertAllToAllOp>(typeConverter,
+                                                             context);
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertFuncOp, ConvertCallOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);

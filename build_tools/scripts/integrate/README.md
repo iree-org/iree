@@ -176,130 +176,6 @@ details.
 
 Good luck!
 
-#### Strategy 2: Sync everything to a Google/TensorFlow commit
-
-TODO: Add a script for this.
-
-```
-cd ~/src
-git clone --branch master https://github.com/iree-org/iree-tf-fork.git
-git clone --branch master https://github.com/iree-org/iree-mhlo-fork.git
-```
-
-Get MHLO's published version:
-
-We use this one because it is the easiest to get at and most of the
-activity is LLVM integrates.
-
-```
-cat mlir-hlo/build_tools/llvm_version.txt
-```
-
-Or `git log` to find a commit like:
-
-```
-commit f9f696890acbe198b6164a7ca43523e2bddd630a (HEAD -> master, origin/master, origin/HEAD)
-Author: Stephan Herhut <herhut@google.com>
-Date:   Wed Jan 12 08:00:24 2022 -0800
-
-    Integrate LLVM at llvm/llvm-project@c490f8feb71e
-
-    Updates LLVM usage to match
-    [c490f8feb71e](https://github.com/llvm/llvm-project/commit/c490f8feb71e)
-
-    PiperOrigin-RevId: 421298939
-```
-
-You can correlate this with a tensorflow commit by searching TensorFlow commits
-for the `PiperOrigin-RevId`, which is shared between them. While not strictly
-necessary to keep all of this in sync, if doing so, it will yield fewer
-surprises.
-
-An example of a corresponding commit in the tensorflow repo:
-
-```
-commit a20bfc24dfbc34ef4de644e6bf46b41e6e57b878
-Author: Stephan Herhut <herhut@google.com>
-Date:   Wed Jan 12 08:00:24 2022 -0800
-
-    Integrate LLVM at llvm/llvm-project@c490f8feb71e
-
-    Updates LLVM usage to match
-    [c490f8feb71e](https://github.com/llvm/llvm-project/commit/c490f8feb71e)
-
-    PiperOrigin-RevId: 421298939
-    Change-Id: I7e6c1c25d42f6936f626550930957f5ee522b645
-```
-
-From this example:
-
-```
-LLVM_COMMIT="c490f8feb71e"
-MHLO_COMMIT="f9f696890acbe198b6164a7ca43523e2bddd630a"
-TF_COMMIT="a20bfc24dfbc34ef4de644e6bf46b41e6e57b878"
-```
-
-Apply:
-
-```
-cd ~/src/iree
-git fetch
-(cd third_party/llvm-project && git checkout $LLVM_COMMIT)
-(cd third_party/mlir-hlo && git checkout $MHLO_COMMIT)
-sed -i "s/^TENSORFLOW_COMMIT = .*$/TENSORFLOW_COMMIT = \"$TF_COMMIT\"/" integrations/tensorflow/WORKSPACE
-
-# git status should show:
-#        modified:   integrations/tensorflow/WORKSPACE
-#        modified:   third_party/llvm-project (new commits)
-#        modified:   third_party/mlir-hlo (new commits)
-```
-
-Make a patch:
-
-```
-git add -A
-git commit
-# Message like:
-#    Integrate llvm-project and bump dependencies.
-#
-#    * llvm-project: c490f8feb71e
-#    * mlir-hlo: f9f696890acbe198b6164a7ca43523e2bddd630a
-#    * tensorflow: a20bfc24dfbc34ef4de644e6bf46b41e6e57b878
-```
-
-Either Yolo and send a PR to have the CI run it or do a local build. I will
-typically only build integrations/tensorflow if the CI indicates there is an
-issue.
-
-```
-# Push to the main repo so that we can better collaboratively apply fixes.
-# If there are failures, feel free to call people in who know areas for help.
-git push origin HEAD:llvm-bump
-```
-
-Either fix any issues or get people to do so and land patches until the
-PR is green.
-
-A script from [iree-samples](https://github.com/iree-org/iree-samples/blob/main/scripts/integrate/bump_llvm.py)
-repository can help with bumping the LLVM version and creating a PR.
-To use the script the steps are
-
-```
-cd ~/src/iree
-$SCRIPTS/bump_llvm.py --llvm-commit $LLVM_COMMIT
-```
-
-This creates a new in IREE repository (named bump-llvm-yyyymmdd). A PR can
-be created from that. Following that MHLO and TF can be bumped the same way
-
-```
-(cd third_party/mlir-hlo && git checkout $MHLO_COMMIT)
-sed -i "s/^TENSORFLOW_COMMIT = .*$/TENSORFLOW_COMMIT = \"$TF_COMMIT\"/" integrations/tensorflow/WORKSPACE
-git add -A
-git commit ...
-git push UPSTREAM_AUTOMATION bump-llvm-...
-```
-
 ### Update C-API exported
 
 If a new symbol needs to be export in the C-API run this [script](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/API/generate_exports.py)
@@ -370,8 +246,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:da14cc93637d3bfad469a670d4d7a49982df5d107b775331965e3bacb981d4cf build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:da14cc93637d3bfad469a670d4d7a49982df5d107b775331965e3bacb981d4cf' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -379,7 +255,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:da14cc93637d3bfad469a670d4d7a49982df5d107b775331965e3bacb981d4cf
 ```
 
 To repro failures in `iree/e2e/`:

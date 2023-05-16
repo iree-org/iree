@@ -869,12 +869,12 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, ConstRefRodata, {
       uint32_t rodata_ordinal = VM_DecRodataAttr("rodata");
-      IREE_ASSERT(rodata_ordinal < module_state->rodata_ref_count);
+      IREE_ASSERT(rodata_ordinal < module->rodata_ref_count);
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
-      IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_retain(
-          &module_state->rodata_ref_table[rodata_ordinal],
-          iree_vm_buffer_type(), result));
+      IREE_RETURN_IF_ERROR(
+          iree_vm_ref_wrap_retain(&module->rodata_ref_table[rodata_ordinal],
+                                  iree_vm_buffer_type(), result));
     });
 
     //===------------------------------------------------------------------===//
@@ -1374,7 +1374,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, SwitchI32, {
       int32_t index = VM_DecOperandRegI32("index");
-      int32_t default_value = VM_DecIntAttr32("default_value");
+      int32_t default_value = VM_DecOperandRegI32("default_value");
       const iree_vm_register_list_t* value_reg_list =
           VM_DecVariadicOperands("values");
       int32_t* result = VM_DecResultRegI32("result");
@@ -1387,7 +1387,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, SwitchI64, {
       int32_t index = VM_DecOperandRegI32("index");
-      int64_t default_value = VM_DecIntAttr64("default_value");
+      int64_t default_value = VM_DecOperandRegI64("default_value");
       const iree_vm_register_list_t* value_reg_list =
           VM_DecVariadicOperands("values");
       int64_t* result = VM_DecResultRegI64("result");
@@ -1926,7 +1926,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
       DISPATCH_OP(EXT_F32, SwitchF32, {
         int32_t index = VM_DecOperandRegI32("index");
-        float default_value = VM_DecFloatAttr32("default_value");
+        float default_value = VM_DecOperandRegF32("default_value");
         const iree_vm_register_list_t* value_reg_list =
             VM_DecVariadicOperands("values");
         float* result = VM_DecResultRegF32("result");
@@ -1952,6 +1952,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32Even, vm_round_f32_even);
       DISPATCH_OP_EXT_F32_BINARY_F32(MinF32, vm_min_f32);
       DISPATCH_OP_EXT_F32_BINARY_F32(MaxF32, vm_max_f32);
 

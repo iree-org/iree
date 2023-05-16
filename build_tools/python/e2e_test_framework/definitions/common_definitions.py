@@ -26,13 +26,6 @@ class _ArchitectureInfo(object):
   microarchitecture: str = ""
   vendor: str = ""
 
-  def __str__(self):
-    parts = [
-        part for part in (self.vendor, self.architecture,
-                          self.microarchitecture) if len(part) != 0
-    ]
-    return "-".join(parts)
-
 
 class DeviceArchitecture(_ArchitectureInfo, Enum):
   """Predefined architecture/microarchitecture."""
@@ -51,13 +44,23 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   RV64_GENERIC = (ArchitectureType.CPU, "riscv_64", "generic")
   RV32_GENERIC = (ArchitectureType.CPU, "riscv_32", "generic")
 
-  # Mobile GPUs
+  # Vulkan GPUs
   QUALCOMM_ADRENO = (ArchitectureType.GPU, "adreno", "", "qualcomm")
   ARM_VALHALL = (ArchitectureType.GPU, "valhall", "", "arm")
+  NVIDIA_AMPERE = (ArchitectureType.GPU, "ampere", "", "nvidia")
+  NVIDIA_PASCAL = (ArchitectureType.GPU, "pascal", "", "nvidia")
 
   # CUDA GPUs
   CUDA_SM70 = (ArchitectureType.GPU, "cuda", "sm_70")
   CUDA_SM80 = (ArchitectureType.GPU, "cuda", "sm_80")
+
+  # Starting from 3.11, enum members are defined before the subclasses (don't
+  # follow MRO, see https://docs.python.org/3/whatsnew/3.11.html#enum).
+  # Therefore __str__ is defined here instead of in _ArchitectureInfo to
+  # override the default one.
+  def __str__(self):
+    parts = [self.vendor, self.architecture, self.microarchitecture]
+    return "-".join(part for part in parts if part != "")
 
 
 @dataclass(frozen=True)
@@ -93,11 +96,10 @@ class ModelSourceType(Enum):
   """Type of model source."""
   # Exported Linalg MLIR file.
   EXPORTED_LINALG_MLIR = "exported_linalg_mlir"
+  # Exported Stable HLO file.
+  EXPORTED_STABLEHLO_MLIR = "exported_stablehlo_mlir"
   # Exported TFLite model file.
   EXPORTED_TFLITE = "exported_tflite"
-  # Exported SavedModel from Tensorflow.
-  EXPORTED_TF_V1 = "exported_tf_v1"
-  EXPORTED_TF_V2 = "exported_tf_v2"
 
 
 class InputDataFormat(Enum):

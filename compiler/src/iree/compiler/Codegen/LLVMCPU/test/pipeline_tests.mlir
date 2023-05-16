@@ -78,15 +78,15 @@ hal.executable private @check_no_cse {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-hal.executable private @preset_config_matmul  {
+hal.executable private @preset_pad_config_matmul  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
-    hal.executable.export @preset_config_matmul layout(#pipeline_layout) {
+    hal.executable.export @preset_pad_config_matmul layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @preset_config_matmul() {
+      func.func @preset_pad_config_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x49xf32>>
@@ -105,8 +105,130 @@ hal.executable private @preset_config_matmul  {
     }
   }
 }
-// CHECK-LABEL: func.func @preset_config_matmul
-//       CHECK:   vector.outerproduct
+// CHECK-LABEL: func.func @preset_pad_config_matmul
+//       CHECK:     vector.outerproduct
+
+// -----
+
+// Checks that the ops are padded and vectorized. The test sets tiling sizes to
+// be non-divisible by problem sizes. If padding and vectorizing are kicked in,
+// vector ops will be generated.
+#compilation = #iree_codegen.compilation_info<
+    lowering_config = <tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16]]>,
+    translation_info  = <CPUDoubleTilingPadExpert>,
+    workgroup_size = []>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @preset_pad_config_dynamic_matmul  {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+    hal.executable.export @preset_pad_config_dynamic_matmul layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @preset_pad_config_dynamic_matmul() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = arith.index_castui %0 : i32 to index
+        %5 = arith.index_castui %1 : i32 to index
+        %6 = arith.index_castui %2 : i32 to index
+        %7 = arith.index_castui %3 : i32 to index
+        %8 = flow.dispatch.workload.ordinal %4, 0 : index
+        %9 = flow.dispatch.workload.ordinal %5, 1 : index
+        %10 = flow.dispatch.workload.ordinal %6, 2 : index
+        %11 = flow.dispatch.workload.ordinal %7, 3 : index
+        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%10, %8}
+        %13 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%9, %11}
+        %14 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%10, %11}
+        %15 = flow.dispatch.tensor.load %12, offsets = [0, 0], sizes = [%10, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%10, %8} -> tensor<?x?xf32>
+        %16 = flow.dispatch.tensor.load %13, offsets = [0, 0], sizes = [%9, %11], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%9, %11} -> tensor<?x?xf32>
+        %17 = tensor.empty(%10, %11) : tensor<?x?xf32>
+        %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %19 = linalg.matmul {compilation_info = #compilation} ins(%15, %16 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%18 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %19, %14, offsets = [0, 0], sizes = [%10, %11], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%10, %11}
+        return
+      }
+    }
+  }
+}
+// Checks that the bounded stack allocation are created.
+// CHECK-LABEL: func.func @preset_pad_config_dynamic_matmul
+//   CHECK-DAG:   memref.alloca() {{.+}} memref<8x16xf32>
+//   CHECK-DAG:   memref.alloca() {{.+}} memref<16x32xf32>
+//   CHECK-DAG:   memref.alloca() {{.+}} memref<8x32xf32>
+//       CHECK:     vector.outerproduct
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+  cpu_features = "",
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 64 : index,
+  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#pipeline_layout5 = #hal.pipeline.layout<push_constants = 2, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>]
+  >]>
+hal.executable private @pad_partially_unaligned_matmul {
+  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.export public @pad_partially_unaligned_matmul ordinal(0) layout(#pipeline_layout5) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @pad_partially_unaligned_matmul() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = arith.index_castui %0 {stream.alignment = 128 : index, stream.values = [0 : index, 131712 : index]} : i32 to index
+        %5 = arith.index_castui %1 {stream.alignment = 64 : index, stream.values = [576704 : index, 1763072 : index]} : i32 to index
+        %6 = arith.index_castui %2 {stream.alignment = 64 : index, stream.values = [908480 : index, 2094848 : index]} : i32 to index
+        %7 = arith.index_castui %3 {stream.alignment = 128 : index, stream.values = [2304 : index, 134016 : index]} : i32 to index
+        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%4) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x576xf32>>
+        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<576x144xf32>>
+        %10 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%6) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x144xf32>>
+        %11 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%7) : !flow.dispatch.tensor<writeonly:tensor<1x144xf32>>
+        %12 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [1, 576], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x576xf32>> -> tensor<1x576xf32>
+        %13 = flow.dispatch.tensor.load %9, offsets = [0, 0], sizes = [576, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<576x144xf32>> -> tensor<576x144xf32>
+        %14 = flow.dispatch.tensor.load %10, offsets = [0, 0], sizes = [1, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x144xf32>> -> tensor<1x144xf32>
+        %15 = tensor.empty() : tensor<1x144xf32>
+        %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1x144xf32>) -> tensor<1x144xf32>
+        %17 = linalg.matmul ins(%12, %13 : tensor<1x576xf32>, tensor<576x144xf32>) outs(%16 : tensor<1x144xf32>) -> tensor<1x144xf32>
+        %18 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%17, %14 : tensor<1x144xf32>, tensor<1x144xf32>) outs(%15 : tensor<1x144xf32>) {
+        ^bb0(%in: f32, %in_0: f32, %out: f32):
+          %19 = arith.addf %in, %in_0 : f32
+          %20 = arith.maxf %19, %cst : f32
+          linalg.yield %20 : f32
+        } -> tensor<1x144xf32>
+        flow.dispatch.tensor.store %18, %11, offsets = [0, 0], sizes = [1, 144], strides = [1, 1] : tensor<1x144xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x144xf32>>
+        return
+      }
+    }
+  }
+}
+// Checks that the bounded stack allocation are created.
+// CHECK-LABEL: func.func @pad_partially_unaligned_matmul
+//   CHECK-DAG:   memref.alloca() {{.+}} memref<1x32xf32>
+//   CHECK-DAG:   memref.alloca() {{.+}} memref<1x32xf32>
+//   CHECK-NOT:   memref.alloca
+//       CHECK:     vector.outerproduct
+//       CHECK:     arith.addf {{.*}} : vector<
+//       CHECK:     arith.maxf {{.*}} : vector<
 
 // -----
 
@@ -380,7 +502,7 @@ hal.executable private @quant_matmul_fusion {
 //          CHECK:     scf.for
 //          CHECK:       scf.for
 //          CHECK:         vector.outerproduct
-//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) {double_round = true} : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
+//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) <{double_round = true}> : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
 
 // -----
 
@@ -412,7 +534,11 @@ hal.executable private @mmt4d_ukernel {
   }
 }
 // CHECK-LABEL: func @ukernel_dispatch()
-//       CHECK:   iree_codegen.ukernel.generic "vmvx.mmt4d"
+// Checks scf.for for distribution loops.
+//       CHECK:   scf.for
+//       CHECK:     scf.for
+//   CHECK-NOT:       scf.for
+//       CHECK:   iree_codegen.ukernel.generic "iree_uk_mmt4d"
 
 // -----
 

@@ -362,7 +362,7 @@ hal.executable private @pack  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 64]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 64], [1, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
 //      CHECK: hal.executable.export public @pack
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -407,7 +407,7 @@ hal.executable private @unpack_outer_dynamic  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [32, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
 //      CHECK: hal.executable.export public @unpack_outer_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

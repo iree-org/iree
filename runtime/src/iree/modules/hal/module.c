@@ -564,6 +564,23 @@ IREE_VM_ABI_EXPORT(iree_hal_module_channel_create,  //
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_channel_split,  //
+                   iree_hal_module_state_t,        //
+                   riii, r) {
+  iree_hal_channel_t* base_channel = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_channel_check_deref(args->r0, &base_channel));
+  int32_t color = args->i1;
+  int32_t key = args->i2;
+  int32_t flags = args->i3;
+
+  iree_hal_channel_t* split_channel = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_channel_split(base_channel, color, key, flags, &split_channel));
+
+  rets->r0 = iree_hal_channel_move_ref(split_channel);
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_channel_rank_and_count,  //
                    iree_hal_module_state_t,                 //
                    r, ii) {
@@ -740,6 +757,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_check_deref_or_null(args->r7, &recv_binding.buffer));
   iree_device_size_t element_count = iree_hal_cast_device_size(args->i10);
+
   return iree_hal_command_buffer_collective(command_buffer, channel, op, param,
                                             send_binding, recv_binding,
                                             element_count);
@@ -809,6 +827,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
   uint32_t workgroup_x = (uint32_t)args->i3;
   uint32_t workgroup_y = (uint32_t)args->i4;
   uint32_t workgroup_z = (uint32_t)args->i5;
+
   return iree_hal_command_buffer_dispatch(command_buffer, executable,
                                           entry_point, workgroup_x, workgroup_y,
                                           workgroup_z);
@@ -827,6 +846,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_check_deref(args->r3, &workgroups_buffer));
   iree_device_size_t workgroups_offset = iree_hal_cast_device_size(args->i4);
+
   return iree_hal_command_buffer_dispatch_indirect(
       command_buffer, executable, entry_point, workgroups_buffer,
       workgroups_offset);

@@ -39,8 +39,13 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
 IREE_API_EXPORT void iree_hal_device_replace_allocator(
     iree_hal_device_t* device, iree_hal_allocator_t* new_allocator) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(new_allocator);
   _VTABLE_DISPATCH(device, replace_device_allocator)(device, new_allocator);
+}
+
+IREE_API_EXPORT void iree_hal_device_replace_channel_provider(
+    iree_hal_device_t* device, iree_hal_channel_provider_t* new_provider) {
+  IREE_ASSERT_ARGUMENT(device);
+  _VTABLE_DISPATCH(device, replace_channel_provider)(device, new_provider);
 }
 
 IREE_API_EXPORT

@@ -12,7 +12,7 @@ from e2e_test_framework.definitions import iree_definitions
 from benchmark_suites.iree import (riscv_benchmarks, x86_64_benchmarks,
                                    adreno_benchmarks, armv8_a_benchmarks,
                                    cuda_benchmarks, mali_benchmarks,
-                                   vmvx_benchmarks)
+                                   vulkan_nvidia_benchmarks, vmvx_benchmarks)
 
 COMPILE_STATS_ID_SUFFIX = "-compile-stats"
 # Tag that indicates this compile config is generated for collecting compilation
@@ -31,6 +31,7 @@ def generate_benchmarks(
       armv8_a_benchmarks.Android_ARMv8_A_Benchmarks(),
       adreno_benchmarks.Android_Adreno_Benchmarks(),
       mali_benchmarks.Android_Mali_Benchmarks(),
+      vulkan_nvidia_benchmarks.Linux_Vulkan_NVIDIA_Benchmarks(),
       vmvx_benchmarks.Android_VMVX_Benchmarks()
   ]
   all_gen_configs: List[iree_definitions.ModuleGenerationConfig] = []

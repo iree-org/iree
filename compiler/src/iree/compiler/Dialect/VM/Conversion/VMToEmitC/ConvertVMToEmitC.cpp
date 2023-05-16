@@ -3215,7 +3215,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       auto messageSizeIntOp = rewriter.create<emitc::CastOp>(
           /*location=*/loc,
-          /*type=*/rewriter.getIntegerType(32),
+          /*type=*/emitc::OpaqueType::get(ctx, "int"),
           /*operand=*/messageSizeOp);
 
       auto messageDataOp = emitc_builders::structMember(
@@ -4480,6 +4480,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
       typeConverter, context, "vm_floor_f32");
   patterns.add<GenericOpConversion<IREE::VM::RoundF32Op>>(
       typeConverter, context, "vm_round_f32");
+  patterns.add<GenericOpConversion<IREE::VM::RoundF32EvenOp>>(
+      typeConverter, context, "vm_round_f32_even");
   patterns.add<GenericOpConversion<IREE::VM::MinF32Op>>(typeConverter, context,
                                                         "vm_min_f32");
   patterns.add<GenericOpConversion<IREE::VM::MaxF32Op>>(typeConverter, context,

@@ -75,8 +75,7 @@ static MemRefType getMemrefTypeForTensor(
 // option to keep a legacy mode of not representing the offset in the
 // type. Remove once the bug is fixed.
 static Value findOrCreateSubspanBuffer(
-    RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp,
-    bool embedSubspanOffsetIntoMemRefType) {
+    RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
   // Ensure that this a tensor subspan op.
   auto shapedType = subspanOp.getResult()
                         .getType()
@@ -85,8 +84,7 @@ static Value findOrCreateSubspanBuffer(
 
   Value byteOffset = subspanOp.getByteOffset();
   MemRefLayoutAttrInterface layoutAttr = {};
-  if (embedSubspanOffsetIntoMemRefType && byteOffset &&
-      !matchPattern(byteOffset, m_Zero())) {
+  if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
     OpFoldResult elementOffset = convertByteOffsetToElementOffset(
         rewriter, subspanOp->getLoc(), subspanOp.getByteOffset(),
         shapedType.getBoundElementType());
@@ -176,11 +174,7 @@ struct DispatchTensorLoadOpInterface
         loadOp.getSource()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that source is a SubspanOp");
-    auto ireeOptions =
-        static_cast<const IREEOneShotBufferizationOptions *>(&options);
-    Value source = findOrCreateSubspanBuffer(
-        rewriter, tensorSubspanOp,
-        ireeOptions->embedSubspanOffsetIntoMemRefType);
+    Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
     if (equalTensorShape(
             loadOp.getType(), loadOp.sizes(),
@@ -230,11 +224,7 @@ struct DispatchTensorStoreOpInterface
         storeOp.getTarget()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that target is a SubspanOp");
-    auto ireeOptions =
-        static_cast<const IREEOneShotBufferizationOptions *>(&options);
-    Value target = findOrCreateSubspanBuffer(
-        rewriter, tensorSubspanOp,
-        ireeOptions->embedSubspanOffsetIntoMemRefType);
+    Value target = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
     if (!equalTensorShape(storeOp.getValue().getType().cast<RankedTensorType>(),
                           storeOp.getSizes(),

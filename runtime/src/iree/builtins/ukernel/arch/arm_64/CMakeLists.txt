@@ -21,13 +21,6 @@ configure_file(config.h.in config.h)
 
 iree_cc_library(
   NAME
-    assembly
-  HDRS
-    "assembly.h"
-)
-
-iree_cc_library(
-  NAME
     common_arm_neon
   HDRS
     "common_arm_neon.h"
@@ -40,12 +33,11 @@ if(IREE_UK_BUILD_ARM_64_DOTPROD)
     NAME
       arm_64_dotprod
     SRCS
-      "mmt4d_arm_64_dotprod.S"
+      "mmt4d_arm_64_dotprod.c"
     COPTS
       "${IREE_UK_COPTS_ARM_64_DOTPROD}"
     DEPS
-      ::assembly
-      iree::builtins::ukernel::exported_bits
+      iree::builtins::ukernel::internal_headers
   )
   list(APPEND IREE_UK_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::arm_64_dotprod")
 endif()
@@ -55,12 +47,11 @@ if(IREE_UK_BUILD_ARM_64_I8MM)
     NAME
       arm_64_i8mm
     SRCS
-      "mmt4d_arm_64_i8mm.S"
+      "mmt4d_arm_64_i8mm.c"
     COPTS
-      "-march=armv8.2-a+i8mm"
+      "${IREE_UK_COPTS_ARM_64_I8MM}"
     DEPS
-      ::assembly
-      iree::builtins::ukernel::exported_bits
+      iree::builtins::ukernel::internal_headers
   )
   list(APPEND IREE_UK_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::arm_64_i8mm")
 endif()
@@ -75,7 +66,6 @@ iree_cc_library(
     "unpack_arm_64.h"
   SRCS
     "mmt4d_arm_64.c"
-    "mmt4d_arm_64.S"
     "pack_arm_64.c"
     "query_tile_sizes_arm_64.c"
     "unpack_arm_64.c"

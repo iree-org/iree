@@ -69,10 +69,9 @@ endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 # compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/internal/EmbeddedLinkerTool.cpp
 if(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF)
 
-# This only builds for x86-64/aarch64 because that's all we have coded in here.
-if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64|amd64)" AND
-   NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)")
-  message(STATUS "IREE custom_dispatch/cpu/plugin standalone example ignored -- only builds for x86_64/aarch64 (today)")
+# This only builds for x86-64/arm_64 because that's all we have coded in here.
+if(NOT IREE_ARCH STREQUAL "arm_64" AND NOT IREE_ARCH STREQUAL "x86_64")
+  message(STATUS "IREE custom_dispatch/cpu/plugin standalone example ignored -- only builds for x86_64/arm_64 (today)")
   return()
 endif()
 
@@ -84,6 +83,11 @@ endif()
 
 function(standalone_plugin_library _ARCH)
   set(_NAME iree_samples_custom_dispatch_cpu_standalone_plugin_${_ARCH})
+  if (_ARCH STREQUAL "arm_64")
+    set(LLVM_ARCH "aarch64")
+  else()
+    set(LLVM_ARCH "${_ARCH}")
+  endif()
   add_custom_command(
     OUTPUT
       standalone_plugin_${_ARCH}.o
@@ -91,7 +95,7 @@ function(standalone_plugin_library _ARCH)
       standalone_plugin.c
       ${IREE_CLANG_TARGET}
     COMMAND ${IREE_CLANG_TARGET}
-      -target ${_ARCH}-unknown-unknown-eabi-elf
+      -target ${LLVM_ARCH}-unknown-unknown-eabi-elf
       -isystem ${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include
       -std=c17
       -fPIC
@@ -142,18 +146,18 @@ function(standalone_plugin_library _ARCH)
 endfunction()
 
 # Build the standalone_plugin_*.so files for each architecture we target.
-standalone_plugin_library(aarch64)
+standalone_plugin_library(arm_64)
 standalone_plugin_library(x86_64)
 
 add_custom_command(
   OUTPUT
     standalone_plugin.sos
   DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_aarch64.so
+    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_arm_64.so
     ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
     iree-fatelf
   COMMAND iree-fatelf join
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_aarch64.so
+    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_arm_64.so
     ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
     > ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin.sos
   VERBATIM

@@ -14,7 +14,7 @@ iree_cc_library(
   NAME
     TransformDialectStrategies
   HDRS
-    "AbstractReductionStrategy.h"
+    "AbstractGemmLikeStrategy.h"
     "Common.h"
     "MatmulTensorCoreStrategy.h"
     "SmallReductionStrategy.h"

@@ -57,16 +57,17 @@ iree_status_t iree_hal_rocm_native_executable_create(
   iree_hal_rocm_native_executable_t* executable = NULL;
 
   // TODO: Verify the flat buffer.
-  iree_ROCMExecutableDef_table_t executable_def =
-      iree_ROCMExecutableDef_as_root(executable_params->executable_data.data);
+  iree_hal_rocm_ExecutableDef_table_t executable_def =
+      iree_hal_rocm_ExecutableDef_as_root(
+          executable_params->executable_data.data);
 
   // Create the kernel module.
   flatbuffers_string_t hsaco_image =
-      iree_ROCMExecutableDef_hsaco_image_get(executable_def);
+      iree_hal_rocm_ExecutableDef_hsaco_image_get(executable_def);
   flatbuffers_string_vec_t entry_points_vec =
-      iree_ROCMExecutableDef_entry_points_get(executable_def);
-  iree_ROCMBlockSizeDef_vec_t block_sizes_vec =
-      iree_ROCMExecutableDef_block_sizes_get(executable_def);
+      iree_hal_rocm_ExecutableDef_entry_points_get(executable_def);
+  iree_hal_rocm_BlockSizeDef_vec_t block_sizes_vec =
+      iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
   iree_host_size_t entry_count = flatbuffers_string_vec_len(entry_points_vec);
   iree_host_size_t total_size =
       sizeof(*executable) +

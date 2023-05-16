@@ -1,0 +1,22 @@
+// Copyright 2023 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/tooling/modules/resolver.h"
+
+${_RESOLVER_EXTERNAL_DECLS}
+
+iree_status_t iree_tooling_register_external_module_types(
+    iree_vm_instance_t* instance) {
+  ${_RESOLVER_EXTERNAL_REGISTER_TYPES}
+  return iree_ok_status();
+}
+
+iree_status_t iree_tooling_try_resolve_external_module_dependency(
+    iree_vm_instance_t* instance, const iree_vm_module_dependency_t* dependency,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
+  ${_RESOLVER_EXTERNAL_TRY_CREATES}
+  return iree_ok_status();
+}

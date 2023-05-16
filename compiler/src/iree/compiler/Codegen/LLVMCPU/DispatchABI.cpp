@@ -986,8 +986,8 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
                                    ValueRange{
                                        /*thunk_func_ptr=*/thunkPtrValue,
                                        /*import_func_ptr=*/importFunc.first,
-                                       /*context=*/importFunc.second,
                                        /*params=*/params,
+                                       /*context=*/importFunc.second,
                                        /*reserved=*/nullPtrValue,
                                    });
   return callOp.getResult();

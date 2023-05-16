@@ -126,6 +126,20 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
 #-------------------------------------------------------------------------------
+# IREE command-line tooling configuration
+#-------------------------------------------------------------------------------
+
+# External user modules linked into IREE tooling (iree-run-module/etc).
+# These are only available in the internal IREE tools and here for testing
+# custom modules in standard workflows. This is not a deployment mechanism and
+# users integrating IREE into their libraries or applications will need to
+# manage the building and registering/resolving the modules themselves.
+#
+# See runtime/src/iree/tooling/modules/CMakeLists.txt for more information on
+# how to declare external modules.
+set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
+
+#-------------------------------------------------------------------------------
 # Compiler plugins
 # IREE compiler plugins can be statically built into the compiler by adding
 # directories to IREE_COMPILER_PLUGIN_PATHS. If directories are relative, they
@@ -161,7 +175,7 @@ endif()
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_VMVX_MMT4D "Enables MMT4D methods in the VMVX module." OFF)
+option(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS "Build experimental plugins making builtin ukernels available to llvm-cpu modules compiled with --iree-llvmcpu-enable-microkernels" OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
@@ -951,6 +965,10 @@ endif()
 
 if(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES)
   add_subdirectory(experimental/web)
+endif()
+
+if(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS)
+  add_subdirectory(experimental/cpu_ukernel)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

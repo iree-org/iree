@@ -498,21 +498,12 @@ std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
 }
 
 SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
-  Block *body = &funcOp.getFunctionBody().front();
-  auto forOps = body->getOps<scf::ForOp>();
-  while (!forOps.empty()) {
-    assert(llvm::hasSingleElement(forOps) &&
-           "expected dispatch function with single block");
-    scf::ForOp forOp = *(forOps.begin());
-    body = forOp.getBody();
-    forOps = body->getOps<scf::ForOp>();
-  }
   SmallVector<Operation *> computeOps;
-  for (Operation &op : *body) {
-    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(&op)) {
-      computeOps.push_back(&op);
+  funcOp.walk([&](Operation *op) {
+    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op)) {
+      computeOps.push_back(op);
     }
-  }
+  });
   return computeOps;
 }
 

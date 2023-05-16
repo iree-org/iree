@@ -9,7 +9,7 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.device_specs import device_parameters
 
-DEVICE_NAME = "Pixel-6-Pro"
+DEVICE_NAME = "pixel-6-pro"
 
 BIG_CORES = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_6_PRO + "-big-core",

@@ -9,57 +9,83 @@
 #include <iostream>
 
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace utils {
+namespace {
 
-TEST(libmpi, DynamicLoadLibraryAndSymbols) {
-  iree_dynamic_library_t *library;
-  iree_hal_mpi_dynamic_symbols_t *symbols;
+using ::iree::StatusCode;
+using ::iree::testing::status::StatusIs;
 
-  iree_status_t status =
-      iree_hal_mpi_library_load(iree_allocator_system(), &library, &symbols);
+const int MPI_SUCCESS = 0;
 
-  if (!iree_status_is_ok(status)) {
-    iree_status_fprint(stderr, status);
-    iree_status_ignore(status);
-    std::cerr << "Symbols cannot be loaded, skipping test.";
-    GTEST_SKIP();
+class LibmpiTest : public ::testing::Test {
+ protected:
+  static void SetUpTestSuite() {
+    iree_status_t status =
+        iree_hal_mpi_library_load(iree_allocator_system(), &library, &symbols);
+
+    if (!iree_status_is_ok(status)) {
+      iree_status_fprint(stderr, status);
+      iree_status_ignore(status);
+    } else {
+      EXPECT_EQ(symbols.MPI_Init(NULL, NULL), MPI_SUCCESS);
+    }
   }
 
-  // an MPI hello_world program
-  int rank;
-  int world_size;
+  void SetUp() override {
+    if (!library) GTEST_SKIP() << "No MPI library available. Skipping suite.";
 
-  status = MPI_RESULT_TO_STATUS(symbols, MPI_Init(NULL, NULL), "MPI_Init");
-  EXPECT_TRUE(iree_status_is_ok(status));
+    IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+        &symbols, MPI_Comm_size(IREE_MPI_COMM_WORLD(&symbols), &world_size),
+        "MPI_Comm_size"));
 
-  status = MPI_RESULT_TO_STATUS(
-      symbols, MPI_Comm_size((void *)symbols->ompi_mpi_comm_world, &world_size),
-      "MPI_Comm_size");
-  EXPECT_TRUE(iree_status_is_ok(status));
+    IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+        &symbols, MPI_Comm_rank(IREE_MPI_COMM_WORLD(&symbols), &rank),
+        "MPI_Comm_rank"));
 
-  status = MPI_RESULT_TO_STATUS(
-      symbols, MPI_Comm_rank((void *)symbols->ompi_mpi_comm_world, &rank),
-      "MPI_Comm_rank");
-  EXPECT_TRUE(iree_status_is_ok(status));
+    EXPECT_LT(rank, world_size);
+  }
 
-  EXPECT_TRUE(rank < world_size);
+  void TearDown() override {}
 
+  static void TearDownTestSuite() {
+    if (!library) return;
+
+    IREE_EXPECT_OK(
+        MPI_RESULT_TO_STATUS(&symbols, MPI_Finalize(), "MPI_Finalize"));
+
+    memset(&symbols, 0, sizeof(symbols));
+    if (library) iree_dynamic_library_release(library);
+  }
+
+ protected:
+  static iree_dynamic_library_t* library;
+  static iree_hal_mpi_dynamic_symbols_t symbols;
+  int rank = 0;
+  int world_size = 0;
+};
+
+iree_dynamic_library_t* LibmpiTest::library = NULL;
+iree_hal_mpi_dynamic_symbols_t LibmpiTest::symbols = {0};
+
+// An MPI "hello world" program to test library loading.
+TEST_F(LibmpiTest, HelloWorld) {
   std::cout << "Hello world! "
             << "I'm " << rank << " of " << world_size << std::endl;
-
-  status = MPI_RESULT_TO_STATUS(symbols, MPI_Finalize(), "MPI_Finalize");
-  EXPECT_TRUE(iree_status_is_ok(status));
-
-  iree_dynamic_library_release(library);
-  if (symbols) {
-    memset(symbols, 0, sizeof(*symbols));
-    symbols = NULL;
-  }
 }
 
-}  // namespace utils
-}  // namespace hal
-}  // namespace iree
+TEST_F(LibmpiTest, MPIErrorToIREEStatus) {
+  IREE_EXPECT_OK(iree_hal_mpi_result_to_status(NULL, 0, __FILE__, __LINE__));
+
+  const int MPI_ERR_UNKNOWN = 14;
+  EXPECT_THAT(
+      iree_hal_mpi_result_to_status(NULL, MPI_ERR_UNKNOWN, __FILE__, __LINE__),
+      StatusIs(StatusCode::kInternal));
+
+  const int MPI_ERR_ACCESS = 20;
+  EXPECT_THAT(iree_hal_mpi_result_to_status(&symbols, MPI_ERR_ACCESS, __FILE__,
+                                            __LINE__),
+              StatusIs(StatusCode::kInternal));
+}
+
+}  // namespace

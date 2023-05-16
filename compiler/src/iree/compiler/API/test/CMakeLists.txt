@@ -17,7 +17,6 @@ iree_cc_test(
     "api-test-main.c"
   DEPS
     IREELLVMIncludeSetup
-    iree::base
     iree::compiler::API::Impl
     iree::compiler::API::MLIRInteropHeaders
     iree::compiler::bindings::c::headers

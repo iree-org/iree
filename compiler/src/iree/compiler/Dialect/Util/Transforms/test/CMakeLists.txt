@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_op_ordinals.mlir"
     "block_patterns.mlir"
     "combine_initializers.mlir"
     "demote_f32_to_f16.mlir"

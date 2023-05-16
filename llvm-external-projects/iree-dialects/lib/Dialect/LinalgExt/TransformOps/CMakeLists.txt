@@ -6,6 +6,7 @@ add_mlir_library(IREELinalgExtTransformOps
 
   LINK_LIBS PUBLIC
   IREEDialectsTransforms
+  MLIRAsyncDialect
   MLIRRewrite
   MLIRTransformDialect
   IREELinalgExtDialect

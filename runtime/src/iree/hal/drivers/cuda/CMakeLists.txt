@@ -56,7 +56,6 @@ iree_cc_library(
     iree::hal::utils::buffer_transfer
     iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer
-    iree::hal::utils::libmpi
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
@@ -81,7 +80,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::tracing
-    iree::hal::utils::libmpi
     iree_cuda::headers
     nccl::headers
   PUBLIC

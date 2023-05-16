@@ -29,6 +29,7 @@ iree_cc_library(
     "SPIRVBreakDownLargeVector.cpp"
     "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
+    "SPIRVEmulateBf16.cpp"
     "SPIRVEmulateI64.cpp"
     "SPIRVEraseStorageBufferStaticShape.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
@@ -109,6 +110,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
   PUBLIC
 )
 

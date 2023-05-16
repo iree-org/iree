@@ -207,23 +207,23 @@ class WebGPUTargetBackend : public TargetBackend {
 
     // Pack the WGSL and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
-    iree_WGSLExecutableDef_start_as_root(builder);
+    iree_hal_wgsl_ExecutableDef_start_as_root(builder);
 
-    iree_WGSLShaderModuleDef_start(builder);
+    iree_hal_wgsl_ShaderModuleDef_start(builder);
     auto wgslRef = builder.createString(wgsl.value());
-    iree_WGSLShaderModuleDef_code_add(builder, wgslRef);
+    iree_hal_wgsl_ShaderModuleDef_code_add(builder, wgslRef);
     // TODO(scotttodd): populate source map
-    auto shaderModuleRef = iree_WGSLShaderModuleDef_end(builder);
+    auto shaderModuleRef = iree_hal_wgsl_ShaderModuleDef_end(builder);
 
-    auto shaderModulesVec = iree_WGSLShaderModuleDef_vec_create(
+    auto shaderModulesVec = iree_hal_wgsl_ShaderModuleDef_vec_create(
         builder, &shaderModuleRef, /*len=*/1);
-    iree_WGSLExecutableDef_shader_modules_add(builder, shaderModulesVec);
+    iree_hal_wgsl_ExecutableDef_shader_modules_add(builder, shaderModulesVec);
 
     auto entryPointsRef = flatbuffers_uint32_vec_create(
         builder, entryPointOrdinals.data(), entryPointOrdinals.size());
-    iree_WGSLExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_wgsl_ExecutableDef_entry_points_add(builder, entryPointsRef);
 
-    iree_WGSLExecutableDef_end_as_root(builder);
+    iree_hal_wgsl_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(

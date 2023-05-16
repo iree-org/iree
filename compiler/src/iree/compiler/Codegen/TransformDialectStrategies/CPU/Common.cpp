@@ -42,7 +42,7 @@ using transform::LowerShapeCastOp;
 using transform::LowerTransferOp;
 using transform::LowerTransposeOp;
 using transform::MatchOp;
-using transform::SplitHandlesOp;
+using transform::SplitHandleOp;
 using transform::SplitTransferFullPartialOp;
 using transform::TransferToScfOp;
 using transform_ext::AllDims;
@@ -163,8 +163,7 @@ LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     ReductionConfig reductionConfig = getReductionConfig(captures, cpuModel);
-    auto strategy =
-        ReductionStrategy::create(op->getContext(), captures, reductionConfig);
+    ReductionStrategy strategy(captures, reductionConfig);
     return buildReductionStrategy(b, variant, strategy);
   };
 

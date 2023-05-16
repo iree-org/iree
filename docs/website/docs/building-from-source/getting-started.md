@@ -1,6 +1,6 @@
 # Getting started
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 IREE can be built from source using [CMake](https://cmake.org/). We also
 recommend the [Ninja](https://ninja-build.org/) CMake generator and the
@@ -56,7 +56,7 @@ recommend the [Ninja](https://ninja-build.org/) CMake generator and the
 
 <!-- TODO(#12921): add notes about Docker and/or dev containers  -->
 
-## Quickstart: clone and build
+## :octicons-rocket-16: Quickstart: clone and build
 
 Use [Git](https://git-scm.com/) to clone the IREE repository and initialize its
 submodules:
@@ -85,7 +85,7 @@ cmake --build ../iree-build/
     Use case permitting, disabling the compiler build with
     `-DIREE_BUILD_COMPILER=OFF` will drastically simplify the build.
 
-## Configuration settings
+## :octicons-sliders-16: Configuration settings
 
 The configure step should be customized for your build environment. These
 settings can improve compile and link times substantially.
@@ -148,7 +148,7 @@ settings can improve compile and link times substantially.
 
     See also our [developer documentation for ccache](https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/ccache.md).
 
-### Optional components
+### :octicons-gear-16: Optional components
 
 By default, the CMake build includes:
 
@@ -166,7 +166,7 @@ The default build does _not_ include:
 These can be changed via the `IREE_` CMake options listed in the root
 [`CMakeLists.txt`](https://github.com/openxla/iree/blob/main/CMakeLists.txt).
 
-### Extensions and project integrations
+### Extensions and integrations
 
 When using IREE within other projects, you can register compiler plugins and
 runtime HAL drivers. You can also bring your own copy of LLVM and some other
@@ -174,7 +174,7 @@ tools. See the root
 [`CMakeLists.txt`](https://github.com/openxla/iree/blob/main/CMakeLists.txt)
 for details.
 
-## Tests and samples
+## :octicons-code-16: Tests and samples
 
 ### Running tests
 
@@ -244,4 +244,146 @@ cmake --build ../iree-build/
 ls ../iree-build/tools/
 ../iree-build/tools/iree-compile --help
 ../iree-build/tools/iree-run-module --help
+```
+
+## :simple-python: Python bindings
+
+Python packages can either be built from source or installed from our releases.
+See the [Python bindings](../bindings/python.md) page for details about the
+bindings themselves.
+
+### Dependencies
+
+You will need a recent Python installation >=3.8 (we aim to support
+[non-eol Python versions](https://endoflife.date/python)).
+
+???+ Tip "Tip - Managing Python versions"
+    Make sure your 'python' is what you expect:
+
+    === "Linux"
+
+        Note that on multi-python systems, this may have a version suffix, and on
+        many Linuxes where python2 and python3 can co-exist, you may also want to
+        use `python3`.
+
+        ``` shell
+        which python
+        python --version
+        ```
+
+    === "macOS"
+
+        Note that on multi-python systems, this may have a version suffix, and on
+        macOS where python2 and python3 can co-exist, you may also want to use `python3`.
+
+        ``` shell
+        which python
+        python --version
+        ```
+
+    === "Windows"
+        The
+        [Python launcher for Windows](https://docs.python.org/3/using/windows.html#python-launcher-for-windows) (`py`) can help manage versions.
+
+        ``` powershell
+        which python
+        python --version
+        py --list-paths
+        ```
+
+???+ Tip "Tip - Virtual environments"
+    We recommend using virtual environments to manage python packages, such as
+    through `venv`
+    ([about](https://docs.python.org/3/library/venv.html),
+    [tutorial](https://docs.python.org/3/tutorial/venv.html)):
+
+    === "Linux"
+
+        ``` shell
+        python -m venv .venv
+        source .venv/bin/activate
+        ```
+
+    === "macOS"
+
+        ``` shell
+        python -m venv .venv
+        source .venv/bin/activate
+        ```
+
+    === "Windows"
+
+        ``` powershell
+        python -m venv .venv
+        .venv\Scripts\activate.bat
+        ```
+
+    When done, run `deactivate`.
+
+``` shell
+# Upgrade PIP before installing other requirements
+python -m pip install --upgrade pip
+
+# Install IREE build requirements
+python -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+```
+
+### Building with CMake
+
+To build the Python bindings, configure CMake with the
+`IREE_BUILD_PYTHON_BINDINGS` option. We also recommend explicitly setting which
+Python executable to use with `Python3_EXECUTABLE`:
+
+``` shell
+# Configure (including other options as discussed above)
+cmake -G Ninja -B ../iree-build/ \
+  -DIREE_BUILD_PYTHON_BINDINGS=ON  \
+  -DPython3_EXECUTABLE="$(which python)" \
+  .
+
+# Build
+cmake --build ../iree-build/
+```
+
+### Using the Python bindings
+
+Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
+
+=== "Linux"
+
+    ``` shell
+    source ../iree-build/.env && export PYTHONPATH
+    python -c "import iree.compiler"
+    python -c "import iree.runtime"
+    ```
+
+=== "macOS"
+
+    ``` shell
+    source ../iree-build/.env && export PYTHONPATH
+    python -c "import iree.compiler"
+    python -c "import iree.runtime"
+    ```
+
+=== "Windows"
+
+    ``` powershell
+    ../iree-build/.env.bat
+    python -c "import iree.compiler"
+    python -c "import iree.runtime"
+    ```
+
+Using IREE's ML framework importers requires a few extra steps:
+
+``` shell
+# Install test requirements
+python -m pip install -r integrations/tensorflow/test/requirements.txt
+
+# Install pure Python packages (no build required)
+python -m pip install integrations/tensorflow/python_projects/iree_tf
+python -m pip install integrations/tensorflow/python_projects/iree_tflite
+
+# Then test the tools:
+iree-import-tf --help
+iree-import-tflite --help
 ```

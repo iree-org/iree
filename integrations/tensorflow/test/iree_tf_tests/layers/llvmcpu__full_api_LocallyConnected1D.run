@@ -1,3 +1,0 @@
-# XFAIL: *
-# REQUIRES: llvmcpu
-# RUN: %PYTHON -m iree_tf_tests.layers.layers_test --target_backends=iree_llvmcpu --dynamic_dims=false --training=false --test_default_kwargs_only=false --layer=LocallyConnected1D --artifacts_dir=%t

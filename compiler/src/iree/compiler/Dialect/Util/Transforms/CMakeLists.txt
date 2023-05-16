@@ -18,6 +18,7 @@ iree_cc_library(
     "Passes.h.inc"
     "Patterns.h"
   SRCS
+    "AnnotateOpOrdinals.cpp"
     "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
     "ConvertPrimitiveType.cpp"
