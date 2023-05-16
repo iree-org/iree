@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterPassBase.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -18,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
@@ -30,8 +30,8 @@ namespace Flow {
 /// Interpreter pass that applies transform dialect ops for dispatch region
 /// formation. This needs to be its own pass because the registration mechanism
 /// and ops available are different than for other interpreters.
-struct DispatchWithTransformDialect
-    : public transform::iree_dialects::TransformInterpreterPassBase<
+class DispatchWithTransformDialect
+    : public mlir::transform::TransformInterpreterPassBase<
           DispatchWithTransformDialect, DispatchWithTransformDialectBase> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -49,6 +49,7 @@ struct DispatchWithTransformDialect
     // clang-format on
   }
 
+ public:
   DispatchWithTransformDialect(StringRef transformFileName,
                                StringRef debugPayloadRootTag = StringRef(),
                                StringRef debugTransformRootTag = StringRef()) {

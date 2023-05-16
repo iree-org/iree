@@ -1,6 +1,5 @@
 // RUN: iree-dialects-opt --transform-dialect-interpreter --split-input-file --verify-diagnostics --allow-unregistered-dialect %s
 
-// expected-error @below {{transform dialect interpreter failed}}
 module {
   func.func public @no_outlining() {
     // expected-note @below {{target op}}
