@@ -324,10 +324,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   // Check if the C matrix will be promoted for computing shared memory usage.
-  auto matmulResult = cast<linalg::LinalgOp>(op).getDpsInitOperand(0)->get();
-  bool promoteC =
-      !matmulResult.hasOneUse() ||
-      !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
+  bool promoteC = needToPrmoteCForCooperativeMatrix(cast<linalg::LinalgOp>(op));
 
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
   unsigned tilingSharedMemSizeBytes = getTileBytes(

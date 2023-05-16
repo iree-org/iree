@@ -641,6 +641,68 @@ hal.executable public @matmul_tensor {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
+    lowering_config  = <tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>,
+    translation_info = <SPIRVCooperativeMatrixVectorize>,
+    workgroup_size = [128, 2, 1], subgroup_size = 64>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
+hal.executable public @matmul_tensor {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+    spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 12800,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64>
+       >}> {
+    hal.executable.export public @matmul_tensor layout(#pipeline_layout)
+    builtin.module {
+      func.func @matmul_tensor() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x64xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x4096xf16>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512xf16>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<512x4096xf16>>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x64xf16>> -> tensor<512x64xf16>
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [64, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x4096xf16>> -> tensor<64x4096xf16>
+        %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [512], strides = [1] : !flow.dispatch.tensor<readonly:tensor<512xf16>> -> tensor<512xf16>
+        %7 = tensor.empty() : tensor<512x4096xf16>
+        %8 = linalg.fill ins(%cst : f16) outs(%7 : tensor<512x4096xf16>) -> tensor<512x4096xf16>
+        // This does not need to promote C matrix, so we only need 15360 bytes.
+        // expected-error @+1 {{op expected shared memory usage <= 12800, got 15360}}
+        %9 = linalg.matmul {compilation_info = #compilation}
+            ins(%4, %5 : tensor<512x64xf16>, tensor<64x4096xf16>) outs(%8 : tensor<512x4096xf16>) -> tensor<512x4096xf16>
+        %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+            ins(%9, %6 : tensor<512x4096xf16>, tensor<512xf16>) outs(%7 : tensor<512x4096xf16>) {
+        ^bb0(%in: f16, %in_0: f16, %out: f16):
+          %11 = arith.addf %in, %in_0 : f16
+          linalg.yield %11 : f16
+        } -> tensor<512x4096xf16>
+        flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [512, 4096], strides = [1, 1] : tensor<512x4096xf16> -> !flow.dispatch.tensor<writeonly:tensor<512x4096xf16>>
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>,
     translation_info = <SPIRVBaseVectorize>,
     workgroup_size = [8, 2, 2]>
