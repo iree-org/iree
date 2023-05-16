@@ -66,7 +66,6 @@ builtin.module {
 // Check that we reject constructs that try to apply create_async_groups
 // on non-func op.
 
-// expected-error@below {{transform dialect interpreter failed}}
 builtin.module {
   func.func @copies_to_asyncs_invalid_op_input(%a: memref<1024x1024xf32>) {
     // expected-note@below {{when applied to this op}}

@@ -52,7 +52,6 @@ module {
 
 // -----
 
-// expected-error @below {{transform dialect interpreter failed}}
 module {
   transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
@@ -107,7 +106,6 @@ module {
 
 // -----
 
-// expected-error @below {{transform dialect interpreter failed}}
 module {
   transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
