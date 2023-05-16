@@ -210,7 +210,8 @@ static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
 // Main pass
 //===----------------------------------------------------------------------===//
 
-struct ConvertBf16ToUInt16BuffersPass final : public ConvertBf16ToUInt16BuffersBase<ConvertBf16ToUInt16BuffersPass> {
+struct ConvertBf16ToUInt16BuffersPass final
+    : public ConvertBf16ToUInt16BuffersBase<ConvertBf16ToUInt16BuffersPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -258,7 +259,8 @@ struct ConvertBf16ToUInt16BuffersPass final : public ConvertBf16ToUInt16BuffersB
 // Public interface
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertBf16ToUInt16BuffersPass() {
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertBf16ToUInt16BuffersPass() {
   return std::make_unique<ConvertBf16ToUInt16BuffersPass>();
 }
 
