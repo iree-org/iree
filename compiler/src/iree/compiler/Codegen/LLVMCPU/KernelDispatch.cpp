@@ -778,9 +778,15 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   SmallVector<int64_t> sizes;
   if (isX86(targetAttr)) {
-    // Tiling k dim doesn't make sense unless we interchange the loops, which
-    // would prevent fusion.
-    sizes.append({12, 32, 4});
+    // 'I' should be equal to the number of accumulators. Increasing it further
+    // wouldn't contribute to spacial locality. 'K' should be at least the
+    // number of elements in a cache line so that we maximize spatial locality
+    // in broadcasts. Increasing it beyond that may result in too many cache
+    // lines from column-wise accesses. Increasing 'J' should be good in general
+    // if there are enough elements in that dimension modulo cache conflicts.
+    // Current configuration is ~12.5KB. That should hopefully leave enough room
+    // for fused consumers assuming a 32KB cache.
+    sizes.append({8, 128, 16});
     return sizes;
   }
 
@@ -945,7 +951,8 @@ static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
                                            int64_t vectorSize) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
-    sizes.append({6, 16, 4});
+    // 16 accumulators, 32 broadcasts, 8 vector loads.
+    sizes.append({8, 32, 4});
     return;
   }
 
