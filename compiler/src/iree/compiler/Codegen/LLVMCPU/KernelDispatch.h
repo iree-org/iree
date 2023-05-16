@@ -74,8 +74,6 @@ class TilingConfig {
     return loweringConfig.getTileSizeVals(getParallelVectorIdx());
   }
 
-
-
   unsigned getReductionCacheIdx() { return getIdx(ReductionCacheTiles); }
 
   unsigned getReductionVectorIdx() { return getIdx(ReductionVectorTiles); }

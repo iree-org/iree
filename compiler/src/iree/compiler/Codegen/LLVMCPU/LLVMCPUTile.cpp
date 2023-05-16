@@ -28,7 +28,7 @@ namespace {
 /// scf::tileUsingSCFForOp expects the num of tile sizes = num of loops. This
 /// method returns a proper tile sizes vector for each op during tiling.
 SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
-                                              ArrayRef<int64_t> tileSizes) {
+                                       ArrayRef<int64_t> tileSizes) {
   auto tilingOp = cast<TilingInterface>(op);
 
   SmallVector<int64_t> newTileSizes(tileSizes);
@@ -45,9 +45,7 @@ SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
 /// be specified. It picks the `tilingLevel`-th list as tiling sizes from
 /// lowering_config.
 struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
-  LLVMCPUTilePass(int64_t tilingLevel = -1) {
-    this->tilingLevel = tilingLevel;
-  }
+  LLVMCPUTilePass(int64_t tilingLevel = -1) { this->tilingLevel = tilingLevel; }
   LLVMCPUTilePass(ArrayRef<int64_t> sizes) {
     this->tilingLevel = -1;
     this->tileSizes = sizes;

@@ -271,8 +271,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                                                       funcOp.getContext());
   vector::MaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                               funcOp.getContext());
-  (void)applyPatternsAndFoldGreedily(funcOp,
-                                     std::move(maskCanonPatterns));
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(maskCanonPatterns));
 
   // TODO: Move this down the pipeline once we have the ODM-based masking
   // representation.
