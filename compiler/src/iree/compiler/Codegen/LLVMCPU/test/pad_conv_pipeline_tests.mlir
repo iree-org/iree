@@ -59,5 +59,5 @@ module {
 // Check that the stack buffer is bounded by tiling sizes.
 //
 // CHECK:          memref.alloca() {alignment = 64 : i64} : memref<1x8x1x8xf32>
-// CHECK:          vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
+// CHECK:          vector.fma
 

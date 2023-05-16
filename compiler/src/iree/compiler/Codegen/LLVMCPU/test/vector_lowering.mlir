@@ -63,7 +63,7 @@ func.func @matmul_391x384x384_f32() {
 // CHECK:               scf.yield %{{.*}}
 // CHECK:             }
 // CHECK:             scf.for
-// CHECK:               vector.outerproduct
+// CHECK:               vector.fma
 // CHECK:           %{{.*}} = scf.if
 // CHECK:           scf.if %{{.*}} {
 // CHECK:             memref.copy
