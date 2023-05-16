@@ -1117,7 +1117,7 @@ jobs:
           EOF
       - name: Posting to Discord
         uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
-        if: failure() && github.ref_name == 'main'
+        if: failure()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
