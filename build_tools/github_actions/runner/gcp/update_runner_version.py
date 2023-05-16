@@ -24,7 +24,7 @@ import urllib
 
 import requests
 
-# This is using the old printf-style strong formatting because we're creating
+# This is using the old printf-style string formatting because we're creating
 # lines that have Bash substitutions using braces
 VERSION_LINE_FORMAT_STRING = 'GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-%s}"'
 DIGEST_LINE_FORMAT_STRING = 'GITHUB_RUNNER_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARCHIVE_DIGEST:-%s}"'
