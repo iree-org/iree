@@ -1,5 +1,7 @@
 #!/bin/bash
-# Sets up a venv suitable for running IREE Dispatch Profiler.
+# Sets up a venv suitable for running IREE Dispatch Profiler and executes a 
+# suite of runs. This is invoked by a Github workflow and can be invoked locally.
+# 
 # Recommend getting default 'python' to be python 3. For example on Debian:
 #   sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 # Or launch with python=/some/path
@@ -10,6 +12,7 @@ TD="$(cd $(dirname $0) && pwd)"
 
 PYTHON="${PYTHON:-python3}"
 DISPATCH_PROFILER_IREE_BIN_DIR="${1:-$TD/../../tools}"
+DISPATCH_PROFILER_OUTPUT_DIR="dispatch_profiler_output"
 
 VENV_DIR="$TD/dispatch-profiler.venv"
 
@@ -44,4 +47,5 @@ python "$TD/profiler.py" \
   --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
   --generated-dir "${TD}" \
   --dispatches="matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync,matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_128x128_16x5_tensorcore_mmasync" \
+  --output "$DISPATCH_PROFILER_OUTPUT_DIR/matmul_perf_tensor_core_a100.csv" \
   || die "Dispatch profiler failed to profile"
