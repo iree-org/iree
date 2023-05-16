@@ -342,6 +342,25 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // High dimension contraction can appear after vectorizing ops like 1-D
+    // convolution. Those 1-D convolution ops typically have a leading unit
+    // batch dimension. Try to drop that to map to matmul dimensions better.
+    SmallVector<vector::ContractionOp> contractOps;
+    funcOp.walk([&](vector::ContractionOp op) {
+      if (op.getIteratorTypes().size() > 3) contractOps.push_back(op);
+    });
+    for (vector::ContractionOp op : contractOps) {
+      OpBuilder builder(op);
+      IRRewriter rewriter(builder);
+      (void)vector::castAwayContractionLeadingOneDim(op, rewriter);
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After trimming contract leading unit dims ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // Fold tensor.extract_slice/insert_slice ops into transfer ops. This helps
     // to remove those tensor slice ops so that we can enable further vector op
     // transformations.
