@@ -135,6 +135,22 @@ func.func @transferResolution(%arg0: !stream.resource<constant>, %size: index) -
 
 // -----
 
+// Tests that multiple transfers are elided during transfer materialization.
+
+// CHECK-LABEL: @transferElision
+// CHECK-SAME: (%[[SIZE:.+]]: index) -> !stream.resource<external>
+func.func @transferElision(%size: index) -> !stream.resource<external> {
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca
+  %alloca = stream.async.alloca : !stream.resource<constant>{%size}
+  %transfer_any = stream.async.transfer %alloca : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[TRANSFER_EXTERNAL:.+]] = stream.async.transfer %[[ALLOCA]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  %transfer_external = stream.async.transfer %transfer_any : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
+  // CHECK: return %[[TRANSFER_EXTERNAL]]
+  return %transfer_external : !stream.resource<external>
+}
+
+// -----
+
 // Tests that global usage propagates through loads/stores.
 
 util.global private mutable @variable : !stream.resource<variable>

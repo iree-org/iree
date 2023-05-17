@@ -108,6 +108,12 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   ];
 }
 
+def ConvertBf16ToUInt16Buffers :
+    Pass<"iree-convert-bf16-to-uint16-buffers", "ModuleOp"> {
+  let summary = "Convert bf16 buffers to uint16 equivalents";
+  let constructor = "mlir::iree_compiler::createConvertBf16ToUInt16BuffersPass()";
+}
+
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
   let summary = "Extract address computations from memory accesses";
   let description = [{
@@ -393,9 +399,16 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
+    Option<"transformLibraryFileName",
+           "transform-library-file-name",
+           "std::string",
+           /*default=*/"\"\"",
+           "If non-empty, the name of the file containing definitions of "
+           "external symbols referenced in the transform script. "
+           "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
             /*default=*/"\"\"",
-            "Select the operation with 'transform.iree_tag' attribute having "
+            "Select the operation with 'transform.target_tag' attribute having "
             "the given value as payload IR root. This allows user control on "
             "what operation to transform in debug mode, without requiring "
             "intimate knowledge of the IREE nested pass pipeline.\\n"
@@ -403,7 +416,7 @@ def TransformDialectInterpreter :
             "operation in the IREE pipeline, as the payload IR root.">,
     Option<"debugTransformRootTag", "debug-transform-root-tag", "std::string",
             /*default=*/"\"\"",
-            "Select the operation with 'transform.iree_tag' attribute having "
+            "Select the operation with 'transform.target_tag' attribute having "
             "the given value as container IR for top-level transform ops. This "
             "allows user control on what transformation to apply in debug "
             "mode, without requiring intimate knowledge of the IREE nested "
@@ -694,6 +707,12 @@ def LLVMGPULowerExecutableTarget :
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
 
+def LLVMGPUCastAddressSpaceFunction :
+    Pass<"iree-llvmgpu-cast-address-space-function", "ModuleOp"> {
+  let summary = "Pass to cast";
+  let constructor = "mlir::iree_compiler::createLLVMGPUCastAddressSpaceFunction()";
+}
+
 def LLVMGPUTileAndDistribute :
     Pass<"iree-llvmgpu-tile-and-distribute", "func::FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
@@ -846,12 +865,6 @@ def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
   let summary = "Emulate 64-bit integer ops with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
-}
-
-def SPIRVEmulateBf16 :
-    Pass<"iree-spirv-emulate-bf16", "ModuleOp"> {
-  let summary = "Emulate bfloat 16 ops with 32-bit float ops";
-  let constructor = "mlir::iree_compiler::createSPIRVEmulateBf16Pass()";
 }
 
 def SPIRVEraseStorageBufferStaticShape :

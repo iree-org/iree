@@ -8,8 +8,8 @@
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 

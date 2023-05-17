@@ -26,7 +26,6 @@ iree_compiler_cc_library(
     hdrs = ["MetalSPIRVTarget.h"],
     deps = [
         ":SPIRVToMSL",
-        "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/SPIRV",

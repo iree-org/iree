@@ -8,7 +8,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterPassBase.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
@@ -25,6 +24,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Pass/Pass.h"
@@ -43,7 +43,7 @@ class PassWrapperStub : public PassWrapper<T, Pass> {};
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreter
-    : public transform::iree_dialects::TransformInterpreterPassBase<
+    : public mlir::transform::TransformInterpreterPassBase<
           TransformDialectInterpreter, PassWrapperStub> {
 public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformDialectInterpreter)
@@ -112,15 +112,21 @@ public:
       ::llvm::cl::init("")};
   Pass::Option<std::string> debugPayloadRootTag{
       *this, "debug-payload-root-tag",
-      ::llvm::cl::desc("Select the operation with 'transform.iree_tag' "
+      ::llvm::cl::desc("Select the operation with 'transform.target_tag' "
                        "attribute having the given value as payload IR root."),
       ::llvm::cl::init("")};
   Pass::Option<std::string> debugTransformRootTag{
       *this, "debug-transform-root-tag",
       ::llvm::cl::desc(
-          "Select the operation with 'transform.iree_tag' attribute having the "
-          "given value as container IR for top-level transform ops."),
+          "Select the operation with 'transform.target_tag' attribute having "
+          "the given value as container IR for top-level transform ops."),
       ::llvm::cl::init("")};
+  Pass::Option<std::string> transformLibraryFileName{
+      *this, "transform-library-file-name",
+      llvm::cl::desc(
+          "Optional name of the file containing transform dialect symbol "
+          "definitions to be injected into the transform module."),
+      llvm::cl::init("")};
 };
 
 struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {

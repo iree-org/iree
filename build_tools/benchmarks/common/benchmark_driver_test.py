@@ -79,7 +79,8 @@ class BenchmarkDriverTest(unittest.TestCase):
             traced_benchmark_tool_dir=self.tmp_dir,
             trace_capture_tool=self.tmp_dir / "capture_tool",
             capture_tarball=self.tmp_dir / "captures.tar",
-            capture_tmp_dir=self.captures_dir))
+            capture_tmp_dir=self.captures_dir),
+        use_compatible_filter=True)
 
     self.device_info = DeviceInfo(platform_type=PlatformType.LINUX,
                                   model="Unknown",
@@ -151,8 +152,41 @@ class BenchmarkDriverTest(unittest.TestCase):
                                benchmark_case_dir=pathlib.Path("case2"),
                                benchmark_tool_name="tool",
                                run_config=run_config_b)
+
+    compile_target_rv64 = iree_definitions.CompileTarget(
+        target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+        target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+        target_abi=iree_definitions.TargetABI.LINUX_GNU)
+    gen_config_rv64 = iree_definitions.ModuleGenerationConfig.build(
+        imported_model=iree_definitions.ImportedModel.from_model(model_tflite),
+        compile_config=iree_definitions.CompileConfig.build(
+            id="comp_rv64", tags=[], compile_targets=[compile_target_rv64]))
+    device_spec_rv64 = common_definitions.DeviceSpec.build(
+        id="rv64_dev",
+        device_name="rv64_dev",
+        architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+        device_parameters=[],
+        tags=[])
+    run_config_incompatible = iree_definitions.E2EModelRunConfig.build(
+        module_generation_config=gen_config_rv64,
+        module_execution_config=exec_config_b,
+        target_device_spec=device_spec_rv64,
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
+    self.incompatible_case = BenchmarkCase(
+        model_name="model_tflite",
+        model_tags=[],
+        bench_mode=["task"],
+        target_arch="riscv_64-generic",
+        driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
+        benchmark_case_dir=pathlib.Path("incompatible_case"),
+        benchmark_tool_name="tool",
+        run_config=run_config_incompatible)
     self.benchmark_suite = BenchmarkSuite({
-        pathlib.Path("suite/TFLite"): [self.case1, self.case2],
+        pathlib.Path("suite/TFLite"): [
+            self.case1, self.case2, self.incompatible_case
+        ],
     })
 
   def tearDown(self) -> None:
@@ -178,6 +212,15 @@ class BenchmarkDriverTest(unittest.TestCase):
         self.captures_dir / f"{self.case2.run_config}.tracy"
     ])
     self.assertEqual(driver.get_benchmark_errors(), [])
+
+  def test_run_disable_compatible_filter(self):
+    self.config.use_compatible_filter = False
+    driver = FakeBenchmarkDriver(self.device_info, self.config,
+                                 self.benchmark_suite)
+
+    driver.run()
+
+    self.assertEqual(len(driver.get_benchmark_results().benchmarks), 3)
 
   def test_run_with_no_capture(self):
     self.config.trace_capture_config = None

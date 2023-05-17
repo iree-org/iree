@@ -68,20 +68,22 @@ class BenchmarkDriver(object):
 
     use_legacy_name = self.benchmark_suite.legacy_suite
 
-    target_architectures = []
     cpu_target_arch = self.device_info.get_iree_cpu_arch_name(use_legacy_name)
-    if cpu_target_arch is None:
-      print("WARNING: Detected unsupported CPU architecture in "
-            f'"{self.device_info}", CPU benchmarking is disabled.')
-    else:
-      target_architectures.append(cpu_target_arch)
-
     gpu_target_arch = self.device_info.get_iree_gpu_arch_name(use_legacy_name)
-    if gpu_target_arch is None:
-      print("WARNING: Detected unsupported GPU architecture in "
-            f'"{self.device_info}", GPU benchmarking is disabled.')
+    detected_architectures = [
+        arch for arch in [cpu_target_arch, gpu_target_arch] if arch is not None
+    ]
+    if self.config.use_compatible_filter:
+      if cpu_target_arch is None:
+        print("INFO: Detected unsupported CPU architecture in"
+              f' "{self.device_info}", CPU benchmarking is disabled.')
+      if gpu_target_arch is None:
+        print("INFO: Detected unsupported GPU architecture in"
+              f' "{self.device_info}", GPU benchmarking is disabled.')
+      compatible_arch_filter = detected_architectures
     else:
-      target_architectures.append(gpu_target_arch)
+      # No compatible filter on the target architectures.
+      compatible_arch_filter = None
 
     drivers, loaders = self.__get_available_drivers_and_loaders()
 
@@ -90,7 +92,7 @@ class BenchmarkDriver(object):
           category=category,
           available_drivers=drivers,
           available_loaders=loaders,
-          target_architectures=target_architectures,
+          target_architectures=compatible_arch_filter,
           driver_filter=self.config.driver_filter,
           mode_filter=self.config.mode_filter,
           model_name_filter=self.config.model_name_filter)
@@ -99,6 +101,12 @@ class BenchmarkDriver(object):
         benchmark_info = self.__get_benchmark_info_from_case(
             category=category, benchmark_case=benchmark_case)
         benchmark_name = str(benchmark_info)
+
+        if benchmark_case.target_arch not in detected_architectures:
+          print(f"WARNING: Benchmark '{benchmark_name}' may be incompatible"
+                f" with the detected architectures '{detected_architectures}'"
+                f" on the device. Pass --compatible-only to skip incompatible"
+                f" benchmarks.")
 
         # Sanity check for the uniqueness of benchmark names.
         if benchmark_name in self._seen_benchmark_names:

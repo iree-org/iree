@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
@@ -324,10 +324,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   // Check if the C matrix will be promoted for computing shared memory usage.
-  auto matmulResult = cast<linalg::LinalgOp>(op).getDpsInitOperand(0)->get();
-  bool promoteC =
-      !matmulResult.hasOneUse() ||
-      !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
+  bool promoteC = needToPrmoteCForCooperativeMatrix(cast<linalg::LinalgOp>(op));
 
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
   unsigned tilingSharedMemSizeBytes = getTileBytes(

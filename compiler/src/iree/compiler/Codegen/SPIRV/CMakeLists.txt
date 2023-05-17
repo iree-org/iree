@@ -15,6 +15,7 @@ iree_cc_library(
     SPIRV
   HDRS
     "KernelConfig.h"
+    "SPIRVPasses.h"
     "Utils.h"
   SRCS
     "AMDConfig.cpp"
@@ -29,7 +30,6 @@ iree_cc_library(
     "SPIRVBreakDownLargeVector.cpp"
     "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
-    "SPIRVEmulateBf16.cpp"
     "SPIRVEmulateI64.cpp"
     "SPIRVEraseStorageBufferStaticShape.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
@@ -102,6 +102,7 @@ iree_cc_library(
     MLIRVectorToSPIRV
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms

@@ -62,6 +62,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTransformDialect
+    MLIRTransformDialectTransforms
     MLIRVectorDialect
     MLIRVectorTransformOps
     MLIRVectorTransforms
@@ -81,6 +82,7 @@ iree_cc_library(
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
+    "CommonPasses.h"
     "EncodingInfo.h"
     "Transforms.h"
   SRCS
@@ -89,6 +91,7 @@ iree_cc_library(
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
     "ConcretizePadResultShape.cpp"
+    "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposePackUnPackOps.cpp"
@@ -151,6 +154,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTensorUtils
     MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransforms

@@ -1,0 +1,2 @@
+# REQUIRES: vmvx
+# RUN: %PYTHON -m iree_tfl_tests.mobilebert_tf2_quant_test --target_backend=vmvx --artifacts_dir=%t

@@ -11,13 +11,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -229,7 +229,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addNestedPass<func::FuncOp>(createSPIRVMapMemRefStorageClassPass());
   pm.addPass(createSPIRVEmulateI64Pass());
   pm.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
-  pm.addPass(createSPIRVEmulateBf16Pass());
+  pm.addPass(createConvertBf16ToUInt16BuffersPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

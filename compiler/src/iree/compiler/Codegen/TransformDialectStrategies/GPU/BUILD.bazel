@@ -63,7 +63,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
         # Other Stuff
-        "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:DialectUtils",

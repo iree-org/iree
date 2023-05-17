@@ -41,13 +41,12 @@ typedef struct iree_vm_bytecode_module_t {
   iree_const_byte_span_t archive_contents;
   iree_allocator_t archive_allocator;
 
-  // Offset into the archive data where external read-only data begins.
-  // This is added to any relative rodata reference in the FlatBuffer to get the
-  // aligned physical offset where content is located.
-  iree_host_size_t archive_rodata_offset;
-
   // Loaded FlatBuffer module pointing into the archive contents.
   iree_vm_BytecodeModuleDef_table_t def;
+
+  // Initialized references to rodata segments.
+  iree_host_size_t rodata_ref_count;
+  iree_vm_buffer_t* rodata_ref_table;
 
   // Type table mapping module type IDs to registered VM types.
   iree_host_size_t type_count;
@@ -88,13 +87,6 @@ typedef struct iree_vm_bytecode_module_state_t {
   // Global ref values, indexed by global ordinal.
   iree_host_size_t global_ref_count;
   iree_vm_ref_t* global_ref_table;
-
-  // TODO(benvanik): move to iree_vm_bytecode_module_t if always static.
-  // Initialized references to rodata segments.
-  // Right now these don't do much, however we can perform lazy caching and
-  // on-the-fly decompression using this information.
-  iree_host_size_t rodata_ref_count;
-  iree_vm_buffer_t* rodata_ref_table;
 
   // Resolved function imports.
   iree_host_size_t import_count;

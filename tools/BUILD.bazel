@@ -111,7 +111,9 @@ iree_runtime_cc_binary(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal/flatcc:debugging",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "//runtime/src/iree/vm/bytecode:module",
     ],

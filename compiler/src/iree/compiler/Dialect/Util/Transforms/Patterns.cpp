@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/EquivalenceClasses.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
@@ -32,7 +33,7 @@ static void eraseOperands(MutableOperandRange &operands,
 }
 
 // Folds block arguments that are always known to have the same value at all
-// branch source sites. This is like CSE applied to blocks.
+// branch source sites. This is like CSE applied to block arguments.
 //
 // Example:
 //   br ^bb1(%0, %0 : index, index)
@@ -56,12 +57,11 @@ struct FoldBlockArgumentsPattern
       mutable BranchOpInterface branchOp;
       // Which successor this source represents.
       unsigned successorIndex;
-      // Successor operand index -> index mapping for duplicates.
-      // Base/non-duplicated values will be identity.
-      // Example: (%a, %b, %a, %b) -> (0, 1, 0, 1)
-      SmallVector<int> dupeIndexMap;
+      // Equivalence classes for all arguments indicating which have the same
+      // value at the source. Base/non-duplicated values will be identity.
+      // Example: (%a, %b, %a, %b, %c) -> (0, 2), (1, 3), (4)
+      llvm::EquivalenceClasses<unsigned> duplicates;
     };
-    static const int kUnassigned = -1;
     DenseMap<Block *, SmallVector<BlockSource>> blockSourceMap;
     bool hasAnyDupes = false;
     for (auto branchOp : region.getOps<BranchOpInterface>()) {
@@ -72,18 +72,17 @@ struct FoldBlockArgumentsPattern
         BlockSource blockSource;
         blockSource.branchOp = branchOp;
         blockSource.successorIndex = successorIndex;
-        blockSource.dupeIndexMap.resize(operands.size(), kUnassigned);
         for (int i = 0; i < operands.size(); ++i) {
-          blockSource.dupeIndexMap[i] = i;
+          blockSource.duplicates.insert(i);
           for (int j = 0; j < i; ++j) {
             if (operands[j] == operands[i]) {
-              blockSource.dupeIndexMap[i] = j;
+              blockSource.duplicates.unionSets(i, j);
               hasAnyDupes |= true;
               break;
             }
           }
         }
-        blockSourceMap[block].push_back(blockSource);
+        blockSourceMap[block].push_back(std::move(blockSource));
       }
     }
     if (!hasAnyDupes) {
@@ -109,9 +108,10 @@ struct FoldBlockArgumentsPattern
       llvm::BitVector elidedArgs(numArgs);
 
       // See if each block argument is foldable across all block sources.
-      // In order to fold we need each source to have the same index in its
-      // duplication map refering back to the given block argument.
-      llvm::BitVector sameValues(numArgs);
+      // In order to fold we need each source to share some duplicates but note
+      // that the sources may not have identical sets.
+      llvm::BitVector sameValues(numArgs);    // reused
+      llvm::BitVector sourceValues(numArgs);  // reused
       for (unsigned argIndex = 0; argIndex < numArgs; ++argIndex) {
         // Each bit represents an argument that duplicates the arg at argIndex.
         // We walk all the sources and AND their masks together to get the safe
@@ -120,17 +120,25 @@ struct FoldBlockArgumentsPattern
         // Example for %1: (%a, %b, %a) -> b000
         sameValues.set();  // note reused
         for (auto &blockSource : blockSources) {
-          for (unsigned i = 0; i < numArgs; ++i) {
-            if (i == argIndex || blockSource.dupeIndexMap[i] != argIndex) {
-              sameValues.reset(i);
-            }
+          sourceValues.reset();
+          for (auto mit = blockSource.duplicates.findLeader(argIndex);
+               mit != blockSource.duplicates.member_end(); ++mit) {
+            sourceValues.set(*mit);
           }
+          sameValues &= sourceValues;
         }
-        if (sameValues.none()) continue;
+        if (sameValues.none()) {
+          continue;  // arg unused/not duplicated
+        }
+
+        // Remove the base argument from the set so we don't erase it and can
+        // point all duplicate args at it.
+        int baseArgIndex = sameValues.find_first();
+        sameValues.reset(baseArgIndex);
         elidedArgs |= sameValues;
 
         // Replace all of the subsequent duplicate arguments with the first.
-        auto baseArg = block.getArgument(argIndex);
+        auto baseArg = block.getArgument(baseArgIndex);
         for (unsigned dupeIndex : sameValues.set_bits()) {
           rewriter.replaceAllUsesWith(block.getArgument(dupeIndex), baseArg);
         }

@@ -68,6 +68,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFUtils",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformDialectTransforms",
         "@llvm-project//mlir:VectorDialect",
         # IR
         "@llvm-project//mlir:Analysis",
@@ -113,6 +114,7 @@ iree_compiler_cc_library(
         "BufferizeCopyOnlyDispatchesPass.cpp",
         "CleanupBufferAllocViewPass.cpp",
         "ConcretizePadResultShape.cpp",
+        "ConvertBf16ToUInt16Buffers.cpp",
         "ConvertToDestinationPassingStylePass.cpp",
         "DecomposeAffineOpsPass.cpp",
         "DecomposePackUnPackOps.cpp",
@@ -142,6 +144,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "BufferizationAnalysis.h",
+        "CommonPasses.h",
         "EncodingInfo.h",
         "Transforms.h",
     ],
@@ -197,6 +200,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
+        "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:Transforms",
