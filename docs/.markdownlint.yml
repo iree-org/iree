@@ -56,9 +56,6 @@ no-duplicate-heading:
 # Allow images w/o alt-text
 no-alt-text: false
 
-# Allow bare URLs
-no-bare-urls: false
-
 # Allow first line to be something other than a heading
 # (we use this for date/author in blog posts)
 first-line-heading: false
