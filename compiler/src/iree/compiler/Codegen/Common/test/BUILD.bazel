@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "fold_affine_min_of_block_id.mlir",
             "fold_tensor_extract_op.mlir",
             "forop_canonicalization.mlir",
+            "gpu_distribute.mlir",
             "gpu_pipeline.mlir",
             "gpu_tensor_alloc.mlir",
             "gpu_tensor_tile.mlir",

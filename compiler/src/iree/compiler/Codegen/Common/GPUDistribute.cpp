@@ -4,32 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "llvm/ADT/None.h"
-#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/MathExtras.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-llvmgpu-distribute"
+#define DEBUG_TYPE "iree-codegen-gpu-distribute"
 
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMGPUDistributePass
-    : public LLVMGPUDistributeBase<LLVMGPUDistributePass> {
+struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect>();
   }
@@ -52,8 +41,8 @@ struct LLVMGPUDistributePass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute() {
-  return std::make_unique<LLVMGPUDistributePass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute() {
+  return std::make_unique<GPUDistributePass>();
 }
 
 }  // namespace iree_compiler
