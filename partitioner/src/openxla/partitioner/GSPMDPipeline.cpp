@@ -136,8 +136,6 @@ void GSPMDOptions::bindOptions(support::OptionsBinder &binder) {
                   llvm::cl::cat(category));
 }
 
-namespace {
-
 class RunGSPMDPartitionerPass
     : public PassWrapper<RunGSPMDPartitionerPass, OperationPass<ModuleOp>> {
  public:
@@ -197,8 +195,6 @@ class RunGSPMDPartitionerPass
 
   GSPMDOptions options;
 };
-
-}  // namespace
 
 // Builds a pipeline which runs the GSPMD partitioner.
 void buildGSPMDPipeline(mlir::PassManager &passManager,
