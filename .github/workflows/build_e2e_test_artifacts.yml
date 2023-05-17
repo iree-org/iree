@@ -115,7 +115,6 @@ jobs:
             --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
             --compilation_benchmark_config="${COMPILATION_BENCHMARK_CONFIG}" \
             > "${BENCHMARK_FLAG_DUMP}"
-          echo "benchmark-flag-dump=${BENCHMARK_FLAG_DUMP}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading e2e test artifacts"
         id: upload
         env:
@@ -123,17 +122,13 @@ jobs:
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
           E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
           E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/e2e-test-artifacts/ninja_log
-          BENCHMARK_FLAG_DUMP: ${{ steps.export.outputs.benchmark-flag-dump }}
         run: |
           # Uploads all IREE artifacts and MLIR files (including the imported
           # MLIR files and MLIR source models).
           # Not archiving the directory to allow fetching each file as needed
           # separately.
-          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
-            -name "iree_*" -o -name "model_*.mlir" -o -name "model_*.mlirbc" -o -name "*.json" | \
-            gcloud storage cp --read-paths-from-stdin -r \
-              "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
-          gcloud storage cp "${BENCHMARK_FLAG_DUMP}" \
+          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 ! -name "*.tflite" \
+            | gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
               "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
