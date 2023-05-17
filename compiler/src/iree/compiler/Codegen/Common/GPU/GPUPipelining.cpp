@@ -4,8 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -18,7 +17,8 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#define DEBUG_TYPE "iree-gpu-pipelining"
+
+#define DEBUG_TYPE "iree-codegen-gpu-pipelining"
 
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.

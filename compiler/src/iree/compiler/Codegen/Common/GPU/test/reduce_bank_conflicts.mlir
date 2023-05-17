@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file --iree-gpu-reduce-bank-conflicts  | FileCheck %s
+// RUN: iree-opt %s --split-input-file --iree-codegen-gpu-reduce-bank-conflicts  | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0 * 2048 + d1 * 64 + d2)>
 

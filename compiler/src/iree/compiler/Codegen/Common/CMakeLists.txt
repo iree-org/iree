@@ -100,7 +100,6 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
-    "GPUPipelining.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
@@ -133,7 +132,6 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
@@ -144,7 +142,6 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRNVGPUDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow
@@ -184,7 +181,6 @@ iree_cc_library(
     Common
   HDRS
     "ExtractAddressComputation.h"
-    "GPUPatterns.h"
     "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
@@ -192,22 +188,11 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "ExtractAddressComputation.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
-    "GPUDistribute.cpp"
-    "GPUDistributeSharedMemoryCopy.cpp"
-    "GPUMultiBuffering.cpp"
-    "GPUPatterns.cpp"
-    "GPUReduceBankConflicts.cpp"
-    "GPUTensorAlloc.cpp"
-    "GPUTensorTile.cpp"
-    "GPUTileReduction.cpp"
-    "GPUVectorization.cpp"
     "LinalgOpInfo.cpp"
     "MemrefCopyToLinalg.cpp"
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"
     "UserConfig.cpp"
-    "VectorReductionToGPU.cpp"
-    "WorkGroupSwizzle.cpp"
   DEPS
     ::CommonPasses
     ::TransformDialectInterpreterPass
@@ -225,9 +210,6 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUOps
-    MLIRGPUTransformOps
-    MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
@@ -237,7 +219,6 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRNVGPUDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow

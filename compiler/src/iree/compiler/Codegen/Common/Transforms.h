@@ -42,10 +42,6 @@ FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     RewriterBase &rewriter, TilingInterface op,
     linalg::LinalgTilingOptions tilingOptions);
 
-FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
-    RewriterBase &rewriter, scf::ForOp forOp,
-    PipeliningSchedulingStrategy startegy, bool peelEpilogue, int64_t depth);
-
 /// Populate patterns related to clean up the IR after tile and distribute to
 /// workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
