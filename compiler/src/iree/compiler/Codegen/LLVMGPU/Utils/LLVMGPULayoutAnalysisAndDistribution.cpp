@@ -234,8 +234,25 @@ static MMAType getMMAType(ArrayRef<int64_t> aShape, ArrayRef<int64_t> bShape,
   return MMAType::NONE;
 }
 
+// The value needs to have the target layout before op, so
+// we create a layout conflict op that resolves the layout differences
+// before the op.
+static void createLayoutConflictOp(Value value, Layout targetLayout,
+                                   DenseMap<Value, Layout> &layoutMap,
+                                   Operation *op, IRRewriter &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(op);
+  vector::ShapeCastOp conflictOp = rewriter.create<vector::ShapeCastOp>(
+      op->getLoc(), value.getType(), value);
+  Value resolvedValue = conflictOp.getResult();
+  layoutMap.try_emplace(resolvedValue, targetLayout);
+  layoutMap.at(resolvedValue).debugPrint("layout conflict resolved");
+  rewriter.replaceAllUsesExcept(value, resolvedValue, conflictOp);
+}
+
 static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
-                         Value dMatrix, DenseMap<Value, Layout> &layoutMap) {
+                         Value dMatrix, DenseMap<Value, Layout> &layoutMap,
+                         Operation *op, IRRewriter &rewriter) {
   // First determine which variant of MMA this op is most suitable for
   auto aType = aMatrix.getType().cast<ShapedType>();
   auto bType = aMatrix.getType().cast<ShapedType>();
@@ -257,8 +274,12 @@ static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
     Layout layout(dimOrder, canonicalShape);
     ArrayRef<int64_t> shape = matrix.getType().cast<ShapedType>().getShape();
     layout.updateBatchDims(shape[0], shape[1]);
-    layoutMap.try_emplace(matrix, layout);
-    layout.debugPrint(name);
+    if (layoutMap.count(matrix) && (layout != layoutMap.at(matrix))) {
+      createLayoutConflictOp(matrix, layout, layoutMap, op, rewriter);
+    } else {
+      layoutMap.try_emplace(matrix, layout);
+      layout.debugPrint(name);
+    }
   };
   setLayout(aMatrix, MMAMatrixType::AMatrix, "aMatrix");
   setLayout(bMatrix, MMAMatrixType::BMatrix, "bMatrix");
@@ -679,6 +700,10 @@ static void distributeTransferWrites(vector::TransferWriteOp writeOp,
   ops.insert(writeOp);
 }
 
+static bool isBatchId(int dimType) {
+  return ((dimType == DimType::Batch0) || (dimType == DimType::Batch1));
+}
+
 static bool isLaneId(int dimType) {
   return ((dimType == DimType::LaneIdX) || (dimType == DimType::LaneIdY) ||
           (dimType == DimType::LaneIdZ));
@@ -1016,6 +1041,146 @@ static void distributeElementwise(Operation *op,
   ops.insert(op);
 }
 
+static Value resolveBatchConflict(SmallVectorImpl<int> &mismatchedDims,
+                                  Value vector, const Layout &targetLayout,
+                                  const Layout &currentLayout,
+                                  IRRewriter &rewriter, Location loc) {
+  assert(mismatchedDims.size() == 1);
+  int batchDim = mismatchedDims[0];
+  VectorType vectorType = vector.getType().cast<VectorType>();
+  ArrayRef<int64_t> vectorShape = vectorType.getShape();
+  SmallVector<int64_t> offsets(vectorShape.size(), 0);
+  SmallVector<int64_t> strides(vectorShape.size(), 1);
+  SmallVector<int64_t> shape(vectorShape);
+  shape[batchDim] = targetLayout.shape[batchDim];
+
+  Value newVector;
+  // If target layout shape is less than current, then extract a slice,
+  // otherwise broadcast
+  if (currentLayout.shape[batchDim] > targetLayout.shape[batchDim]) {
+    newVector = rewriter.create<vector::ExtractStridedSliceOp>(
+        loc, vector, offsets, shape, strides);
+  } else {
+    Value transposedVector = vector;
+    if (batchDim == DimType::Batch1) {
+      transposedVector = rewriter.create<vector::TransposeOp>(
+          loc, transposedVector, ArrayRef<int64_t>{1, 0, 2, 3});
+      std::swap(shape[DimType::Batch0], shape[DimType::Batch1]);
+    }
+    transposedVector = rewriter.create<vector::ExtractOp>(loc, transposedVector,
+                                                          ArrayRef<int64_t>{0});
+    Type elementType = vectorType.getElementType();
+    newVector = rewriter.create<vector::BroadcastOp>(
+        loc, VectorType::get(shape, elementType), transposedVector);
+    if (batchDim == DimType::Batch1) {
+      newVector = rewriter.create<vector::TransposeOp>(
+          loc, newVector, ArrayRef<int64_t>{1, 0, 2, 3});
+    }
+  }
+  return newVector;
+}
+
+static Value resolveBatchVectorConflict(SmallVectorImpl<int> &mismatchedDims,
+                                        Value vector,
+                                        const Layout &targetLayout,
+                                        const Layout &currentLayout,
+                                        IRRewriter &rewriter, Location loc) {
+  int numMismatchedVecDims{0};
+  int vecDim, batchDim;
+  for (auto dimType : mismatchedDims) {
+    if (isVectorId(dimType)) {
+      numMismatchedVecDims++;
+      vecDim = dimType;
+    }
+    if (isBatchId(dimType)) batchDim = dimType;
+  }
+  // Only support single vector mismatched dim
+  if (numMismatchedVecDims > 1) return Value{};
+  // Assumes target layout vector dim > current layout vector dim
+  int ratio = ((float)targetLayout.shape[vecDim] / currentLayout.shape[vecDim]);
+
+  // Check that the batch can be used to compensate for vector layout
+  // differences
+  if (currentLayout.shape[batchDim] != targetLayout.shape[batchDim] * ratio)
+    return Value{};
+
+  SmallVector<int64_t> vecShape{
+      targetLayout.shape[DimType::Batch0], targetLayout.shape[DimType::Batch1],
+      targetLayout.shape[DimType::VecIdZ] * targetLayout.shape[DimType::VecIdY],
+      targetLayout.shape[DimType::VecIdX]};
+  Type elementType = vector.getType().cast<VectorType>().getElementType();
+  auto vecType = VectorType::get(vecShape, elementType);
+  Value newVector = rewriter.create<arith::ConstantOp>(
+      loc, vecType, rewriter.getZeroAttr(vecType));
+  for (int i = 0; i < currentLayout.shape[DimType::Batch0]; i++) {
+    for (int j = 0, offset = 0; j < currentLayout.shape[DimType::Batch1]; j++) {
+      Value slice = rewriter.create<vector::ExtractOp>(
+          loc, vector, SmallVector<int64_t>{i, j});
+      int newI = batchDim == DimType::Batch0 ? i / ratio : i;
+      int newJ = batchDim == DimType::Batch0 ? j : j / ratio;
+      int newK = vecDim == DimType::VecIdX ? 0 : ratio * offset;
+      int newL = vecDim == DimType::VecIdX ? ratio * offset : 0;
+      SmallVector<int64_t> offsets{newI, newJ, newK, newL};
+      SmallVector<int64_t> strides{1, 1};
+      newVector = rewriter.create<vector::InsertStridedSliceOp>(
+          loc, slice, newVector, offsets, strides);
+      offset = (offset + 1) % ratio;
+    }
+  }
+  return newVector;
+}
+
+static void distributeLayoutConflicts(vector::ShapeCastOp op,
+                                      DenseMap<Value, Layout> &layoutMap,
+                                      DenseMap<Value, Value> &simdToSimtMap,
+                                      IRRewriter &rewriter,
+                                      llvm::SetVector<Operation *> &ops) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(op);
+  Value source = op.getSource();
+  if (!layoutMap.count(source) || !simdToSimtMap.count(source)) return;
+  Layout currentLayout = layoutMap.at(source);
+  Value result = op.getResult();
+  if (!layoutMap.count(result)) return;
+  Layout targetLayout = layoutMap.at(result);
+
+  Value resolvedResult = simdToSimtMap.at(source);
+  // For row and col of the vector, resolve layout differences
+  for (int i = 0; i < currentLayout.order.size(); i++) {
+    if (!resolvedResult) return;
+    // Check which dimension(s) are mismatched.
+    SmallVector<int> mismatchedDims;
+    for (auto dimType : currentLayout.order[i]) {
+      if (currentLayout.shape[dimType] != targetLayout.shape[dimType]) {
+        mismatchedDims.push_back(dimType);
+      }
+    }
+    if (mismatchedDims.empty()) continue;
+    // If any of the mismatched dims are laneId, this layout conflict cannot be
+    // resolved.
+    if (llvm::any_of(mismatchedDims,
+                     [](int dimType) { return isLaneId(dimType); }))
+      return;
+    // Pure vector conflicts can be resolved, but not supported yet
+    if (llvm::all_of(mismatchedDims,
+                     [](int dimType) { return isVectorId(dimType); }))
+      return;
+    if (llvm::all_of(mismatchedDims,
+                     [](int dimType) { return isBatchId(dimType); })) {
+      resolvedResult =
+          resolveBatchConflict(mismatchedDims, resolvedResult, targetLayout,
+                               currentLayout, rewriter, op->getLoc());
+      continue;
+    }
+    resolvedResult =
+        resolveBatchVectorConflict(mismatchedDims, resolvedResult, targetLayout,
+                                   currentLayout, rewriter, op->getLoc());
+  }
+
+  simdToSimtMap.try_emplace(result, resolvedResult);
+  ops.insert(op);
+}
+
 static void eraseOps(llvm::SetVector<Operation *> &opsToErase,
                      IRRewriter &rewriter) {
   for (int i = opsToErase.size() - 1; i >= 0; i--) {
@@ -1064,7 +1229,7 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
       Value rhs = contractOp.getRhs();
       Value acc = contractOp.getAcc();
       Value result = contractOp.getResult();
-      setMMALayout(lhs, rhs, acc, result, layoutMap);
+      setMMALayout(lhs, rhs, acc, result, layoutMap, op, rewriter);
     }
     return WalkResult::advance();
   });
@@ -1112,6 +1277,10 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
     if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
       distributeConstants(constantOp, layoutMap, simdToSimtMap, rewriter,
                           opsToErase);
+    }
+    if (auto conflictOp = dyn_cast<vector::ShapeCastOp>(op)) {
+      distributeLayoutConflicts(conflictOp, layoutMap, simdToSimtMap, rewriter,
+                                opsToErase);
     }
     distributeElementwise(op, layoutMap, simdToSimtMap, rewriter, opsToErase);
   }
