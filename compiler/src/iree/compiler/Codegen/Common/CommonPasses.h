@@ -305,6 +305,9 @@ void populateConcretizePadResultShapePatterns(
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
+/// Convert BF16 buffer ops and conversions to simulated behavior with uint16.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertBf16ToUInt16BuffersPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -125,6 +125,10 @@ createLLVMGPUPackSharedMemoryAlloc();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUCheckIRBeforeLLVMConversionPass();
 
+/// Cast address space to generic in CallOp and FuncOp
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMGPUCastAddressSpaceFunction();
+
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------
