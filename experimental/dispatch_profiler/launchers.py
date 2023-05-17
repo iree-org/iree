@@ -42,7 +42,8 @@ class IreeToolsLauncher:
     self.iree_compile_path = Path(args.iree_bin_dir, 'iree-compile')
 
     # path to iree-benchmark-module tool. (for performance benchmarking and profiling)
-    self.iree_benchmark_module_path = Path(args.iree_bin_dir, 'iree-benchmark-module')
+    self.iree_benchmark_module_path = Path(args.iree_bin_dir,
+                                           'iree-benchmark-module')
 
     # path to iree-run-module tool. (for verification)
     self.iree_run_module_path = Path(args.iree_bin_dir, 'iree-run-module')
@@ -113,8 +114,7 @@ class IreeToolsLauncher:
           'iree_compile_cmd_stdout.mlir')
 
       with open(iree_compile_stdout_filepath, "w") as fp:
-        subprocess.run(cmd, 
-                       stderr=fp)
+        subprocess.run(cmd, stderr=fp)
 
     elif self.args.verbose:
       print(
@@ -152,8 +152,7 @@ class IreeToolsLauncher:
       print(f"[Verification] {' '.join(cmd)}")
 
     # Launch verification.
-    cmd_output = subprocess.check_output(cmd, 
-                                         text=True)
+    cmd_output = subprocess.check_output(cmd, text=True)
 
     # Save the verification command and the output, only if requested
     # (file writing could slow down the verification).
