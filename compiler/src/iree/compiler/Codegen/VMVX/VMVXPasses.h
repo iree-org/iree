@@ -28,25 +28,25 @@ namespace iree_compiler {
 // VMVX passes
 //------------------------------------------------------------------------------
 
+// Lowers high level library calls from named ops and generics. This operates
+// at the bufferized linalg level.
+std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
+
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are VMVX specific.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createVMVXMaterializeEncodingPass();
 
-// Lowers high level library calls from named ops and generics. This operates
-// at the bufferized linalg level.
-std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
-
 //----------------------------------------------------------------------------//
 // VMVX Linking Passes and Pipelines
 //----------------------------------------------------------------------------//
 
-/// Links VMVX HAL executables within the top-level program module.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
-
 /// Assigns executable constant ordinals across all VMVX variants.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createVMVXAssignConstantOrdinalsPass();
+
+/// Links VMVX HAL executables within the top-level program module.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
 
 /// Populates passes needed to link HAL executables across VMVX targets.
 void buildVMVXLinkingPassPipeline(OpPassManager &passManager);

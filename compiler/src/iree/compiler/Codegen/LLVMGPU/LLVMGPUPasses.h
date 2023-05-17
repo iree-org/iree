@@ -18,47 +18,36 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Lowering calling vectorization patterns. Expects pass manager to be a
-/// module-level pass manager.
-void addGPUVectorizationPassPipeline(OpPassManager &pm);
-
-/// Lowering calling vectorization patterns.
-LogicalResult verifyGPUMatmulPipeline(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize);
-
 /// Lowering using SIMT CUDA core operations.
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
-
-/// Lowering using wmma Tensor Core operations.
-void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
-                                        unsigned pipelineDepth);
 
 /// Lowering using mma.sync Tensor Core operations.
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
                                                unsigned pipelineDepth);
 
-enum class GPUPromoteSharedMemPattern {
-  ContractionOpPattern = 0,
-  TransposeOpPattern = 1,
-};
+/// Lowering using wmma Tensor Core operations.
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
+                                        unsigned pipelineDepth);
 
-/// Lowering transpose using shared memory.
-void addGPUTransposePassPipeline(OpPassManager &pm);
-
-/// Lowering reductions to warp reductions.
-void addGPUWarpReductionPassPipeline(OpPassManager &pm);
-
-/// Transform dialect-based path.
-void addGPUTransformDialectPasses(OpPassManager &pm);
+void addGPUPackUnPackPasses(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a
 /// module-level pass manager.
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm);
 
-void addGPUPackUnPackPasses(OpPassManager &pm);
+/// Transform dialect-based path.
+void addGPUTransformDialectPasses(OpPassManager &pm);
+
+/// Lowering transpose using shared memory.
+void addGPUTransposePassPipeline(OpPassManager &pm);
+
+/// Lowering calling vectorization patterns. Expects pass manager to be a
+/// module-level pass manager.
+void addGPUVectorizationPassPipeline(OpPassManager &pm);
+
+/// Lowering reductions to warp reductions.
+void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via
 /// the structured ops path. The pass manager `pm` in here should operate on
@@ -71,22 +60,32 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 /// Performs the final conversion to ROCDL+LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
-/// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false);
+/// Cast address space to generic in CallOp and FuncOp
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMGPUCastAddressSpaceFunction();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
-    bool distributeToWarp = false);
+/// Checks GPU backend specific IR constraints such as shared memory limits.
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMGPUCheckIRBeforeLLVMConversionPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
-
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
+
+// Pass to pack shared memory allocations in order to reduce shared memory
+// usage.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUPackSharedMemoryAlloc();
+
+enum class GPUPromoteSharedMemPattern {
+  ContractionOpPattern = 0,
+  TransposeOpPattern = 1,
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 enum class GPUTensorCoreType {
   WMMA = 0,
@@ -98,6 +97,16 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUTensorCoreVectorizationPass(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
+//. Pass to pad out tensors up to static dimensions.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
+
+/// Perform tiling and distribution to threads.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
+    bool distributeToWarp = false);
+
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
+    bool distributeToWarp = false);
+
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
 
@@ -105,21 +114,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
-//. Pass to pad out tensors up to static dimensions.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
-
-// Pass to pack shared memory allocations in order to reduce shared memory
-// usage.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUPackSharedMemoryAlloc();
-
-/// Checks GPU backend specific IR constraints such as shared memory limits.
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMGPUCheckIRBeforeLLVMConversionPass();
-
-/// Cast address space to generic in CallOp and FuncOp
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMGPUCastAddressSpaceFunction();
+/// Lowering calling vectorization patterns.
+LogicalResult verifyGPUMatmulPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize);
 
 //------------------------------------------------------------------------------
 // Test passes
