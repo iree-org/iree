@@ -38,4 +38,3 @@ iree_lit_test_suite(
         "@llvm-project//llvm:FileCheck",
     ],
 )
-
