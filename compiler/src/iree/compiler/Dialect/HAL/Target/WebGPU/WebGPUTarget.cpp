@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/HAL/Target/WebGPU/WebGPUTarget.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/WGSL/WGSLPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Target/WebGPU/SPIRVToWGSL.h"
