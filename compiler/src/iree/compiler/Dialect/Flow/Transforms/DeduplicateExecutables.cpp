@@ -216,7 +216,7 @@ class DeduplicateExecutablesPass
     totalExecutables = 0;
     for (auto op : moduleOp.getOps<ExecutableOp>()) {
       int count = 0;
-      llvm::hash_code hash;
+      llvm::hash_code hash(1);
       op.walk([&](Operation *it) {
         hash = llvm::hash_combine(hash, it->getName());
         return (++count >= 5) ? WalkResult::interrupt() : WalkResult::advance();
