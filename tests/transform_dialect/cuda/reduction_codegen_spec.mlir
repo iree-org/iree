@@ -10,15 +10,17 @@ transform.sequence failures(propagate) {
   %init_or_alloc_op, %more_parallel_fill_op, %more_parallel_op, %combiner_op =
     transform.structured.split_reduction %0
       { split_factor = 2, insert_split_dimension = 1 }
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
 
   // Step 2. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
   %forall_grid, %grid_combiner_op =
     transform.structured.tile_to_forall_op %combiner_op tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
+       : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
   %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op : !pdl.operation
-  transform.structured.fuse_into_containing_op %not_combiner into %forall_grid
+  transform.structured.fuse_into_containing_op %not_combiner into %forall_grid : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Step 3. Second level of tiling + fusion parallelizes to threads.
   // ===========================================================================
@@ -27,7 +29,8 @@ transform.sequence failures(propagate) {
   %forall_block_combiner_op, %block_combiner_op =
     transform.structured.tile_to_forall_op %grid_combiner_op tile_sizes [1] 
     ( mapping = [#gpu.thread<z>] )
-  transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+  transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -41,14 +44,15 @@ transform.sequence failures(propagate) {
   %forall_block_more_parallel_op, %block_more_parallel_op =
     transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
-  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op 
     : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-  %func_3 = transform.structured.vectorize %func
+  %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================

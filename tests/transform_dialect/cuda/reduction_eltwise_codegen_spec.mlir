@@ -14,6 +14,7 @@ transform.sequence failures(propagate) {
   %init_or_alloc_op, %more_parallel_fill_op, %more_parallel_op, %combiner_op =
     transform.structured.split_reduction %reduction
       { split_factor = 2, insert_split_dimension = 1 }
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -24,10 +25,11 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %grid_loop, %eltwise_grid_op = transform.structured.tile_to_forall_op %eltwise
     tile_sizes [1] (mapping = [#gpu.block<x>])
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %grid_loop : (!pdl.operation) -> ()
   %not_eltwise = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op, %combiner_op
     : !pdl.operation
-  transform.structured.fuse_into_containing_op %not_eltwise into %grid_loop
+  transform.structured.fuse_into_containing_op %not_eltwise into %grid_loop : (!pdl.operation, !pdl.operation) -> (!pdl.operation)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -40,11 +42,12 @@ transform.sequence failures(propagate) {
   %eltwise_block_loop, %eltwise_block_op =
     transform.structured.tile_to_forall_op %eltwise_grid_op tile_sizes [1]
     ( mapping = [#gpu.thread<z>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   %block_combiner_op = transform.structured.match ops{["linalg.generic"]}
     attributes {iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
       : (!pdl.operation) -> !pdl.operation
   %combined_and_fill = transform.merge_handles %fill_1d, %block_combiner_op : !pdl.operation
-  transform.structured.fuse_into_containing_op %combined_and_fill into %eltwise_block_loop
+  transform.structured.fuse_into_containing_op %combined_and_fill into %eltwise_block_loop : (!pdl.operation, !pdl.operation) -> (!pdl.operation)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -58,7 +61,8 @@ transform.sequence failures(propagate) {
   %forall_block_more_parallel_op, %block_more_parallel_op =
     transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
-  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!pdl.operation, !pdl.operation) -> (!pdl.operation)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -68,7 +72,7 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-  %func_3 = transform.structured.vectorize %func
+  %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
