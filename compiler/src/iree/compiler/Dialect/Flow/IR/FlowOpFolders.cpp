@@ -1237,6 +1237,15 @@ void TensorUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ReplaceOpIfTensorUpdateOperandZeroElements>(context);
 }
 
+//===----------------------------------------------------------------------===//
+// flow.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

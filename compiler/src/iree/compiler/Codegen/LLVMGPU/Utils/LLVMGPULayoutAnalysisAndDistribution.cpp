@@ -125,7 +125,7 @@ static std::array<Dimension, 3> getMMADimensions(MMAType mmaType,
                    {DimType::LaneIdX, 4},
                    {DimType::VecIdZ, 1}}};
       }
-      break;
+      return {};
     default:
       return {};
   }
@@ -143,7 +143,7 @@ static std::array<int, 2> getMMACanonicalShape(MMAType mmaType,
         case MMAMatrixType::CMatrix:
           return {16, 8};
       }
-      break;
+      return {};
     default:
       return {};
   }
