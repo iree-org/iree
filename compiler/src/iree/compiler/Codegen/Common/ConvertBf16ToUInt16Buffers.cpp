@@ -140,8 +140,13 @@ struct GenericTypeConversionPattern : public ConversionPattern {
       Region *newRegion = state.addRegion();
       rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
       TypeConverter::SignatureConversion result(newRegion->getNumArguments());
-      (void)getTypeConverter()->convertSignatureArgs(
-          newRegion->getArgumentTypes(), result);
+
+      if (failed(getTypeConverter()->convertSignatureArgs(
+              newRegion->getArgumentTypes(), result))) {
+        return rewriter.notifyMatchFailure(op,
+                                           "argument type conversion failed");
+      }
+
       rewriter.applySignatureConversion(newRegion, result);
     }
 
@@ -221,13 +226,13 @@ struct ConvertBf16ToUInt16BuffersPass final
     MLIRContext *ctx = &getContext();
 
     Bf16EmulationConverter typeConverter;
+    typeConverter.addArgumentMaterialization(materializeArithBitcast);
     typeConverter.addTargetMaterialization(materializeArithBitcast);
     typeConverter.addSourceMaterialization(materializeArithBitcast);
 
     // Run the main emulation pass.
     {
       ConversionTarget target(*ctx);
-      target.addLegalOp<arith::BitcastOp>();
       target.addLegalOp<func::ReturnOp>();
       target.addDynamicallyLegalOp<func::FuncOp>([&typeConverter](
                                                      Operation *op) {
