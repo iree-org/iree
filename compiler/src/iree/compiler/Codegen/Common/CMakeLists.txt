@@ -132,6 +132,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
+    MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
@@ -181,14 +182,12 @@ iree_cc_library(
     Common
   HDRS
     "ExtractAddressComputation.h"
-    "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "ExtractAddressComputation.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
-    "LinalgOpInfo.cpp"
     "MemrefCopyToLinalg.cpp"
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"

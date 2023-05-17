@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRVectorToGPU
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::CommonPasses
+    iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::LLVMGPU::Utils
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR

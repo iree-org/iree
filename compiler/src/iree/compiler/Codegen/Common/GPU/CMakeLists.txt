@@ -49,10 +49,12 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRNVGPUDialect
+    MLIRPass
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSCFUtils
     MLIRSideEffectInterfaces
+    MLIRSupport
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
