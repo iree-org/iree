@@ -50,6 +50,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
               IREE_SVL("reduce_scatter"),
           [IREE_HAL_COLLECTIVE_KIND_SEND] = IREE_SVL("send"),
           [IREE_HAL_COLLECTIVE_KIND_RECV] = IREE_SVL("recv"),
+          [IREE_HAL_COLLECTIVE_KIND_SEND_RECV] = IREE_SVL("send_recv"),
       };
   static const iree_string_view_t
       reduction_names[IREE_HAL_COLLECTIVE_REDUCTION_MAX_VALUE + 1] = {

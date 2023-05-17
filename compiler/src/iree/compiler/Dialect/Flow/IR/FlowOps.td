@@ -1819,4 +1819,48 @@ def FLOW_CollectiveReduceScatterOp : FLOW_Op<"collective.reduce_scatter", [
   ];
 }
 
+def FLOW_CollectiveSendRecvOp : FLOW_Op<"collective.send_recv", [
+  AllTypesMatch<["source", "target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{performs a grouped send and receive operation}];
+  let description = [{The operation sends data to the rank specificied by send
+    and receives data from the rank specified by recv. If send is -1, this rank
+    will not send any data. If recv is -1, this rank will not receive any data
+    and the output will be all zeros.}];
+
+  let arguments = (ins
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
+    FLOW_Tensor:$source,
+    FLOW_Channel:$channel,
+    Index:$send,
+    Index:$recv,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+  let assemblyFormat = [{
+    $element_type `,` $target `,` $source `,` $channel `,` $send `,` $recv `:`
+    `(` type($target) `,` type($source) `,` type($channel) `,` type($send) `,` type($recv) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel,
+      "Value":$send,
+      "Value":$recv)>,
+  ];
+}
+
 #endif  // IREE_DIALECT_FLOW_OPS

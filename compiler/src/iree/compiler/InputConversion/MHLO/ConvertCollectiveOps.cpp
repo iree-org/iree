@@ -798,6 +798,76 @@ struct ReduceScatterOpConversion
   }
 };
 
+struct CollectivePermuteOpConversion
+    : public OpConversionPattern<mhlo::CollectivePermuteOp> {
+  using OpConversionPattern<mhlo::CollectivePermuteOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::CollectivePermuteOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+
+    // Create a default channel.
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+        loc, /*group=*/StringAttr{});
+
+    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
+
+    // Get the collective element type attribute.
+    IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
+        getCollectiveElementTypeAttr(op.getContext(), inputType);
+    if (!elementTypeAttr) {
+      return rewriter.notifyMatchFailure(op, "unsupported input type");
+    }
+
+    // Convert source target pairs into a constant table that can be indexed by
+    // rank to find which ids that rank should send to and recv from, or -1 for
+    // no send/recv.
+    DenseIntElementsAttr sourceTargetPairs = op.getSourceTargetPairs();
+    llvm::DenseMap<int64_t, int64_t> sendMap, recvMap;
+    auto values = sourceTargetPairs.getValues<int64_t>();
+    // Find the max rank so we can size our tables.
+    int64_t maxRank = 0;
+    for (auto rank : values) {
+      if (rank > std::numeric_limits<int16_t>::max()) {
+        return rewriter.notifyMatchFailure(
+            op, "source or target id exceeds maximum value of 16-bit integer");
+      }
+      maxRank = std::max(maxRank, rank);
+    }
+    // Create tables. -1 is used to indicate no send or recv.
+    IndexSet indexSet(loc, rewriter);
+    Value noSendOrRecv = indexSet.get(-1);
+    SmallVector<Value> sendTable(maxRank + 1, noSendOrRecv);
+    SmallVector<Value> recvTable(maxRank + 1, noSendOrRecv);
+    for (auto i = values.begin(); i != values.end(); ++i) {
+      int64_t source = (*i);
+      int64_t target = (*++i);
+      sendTable[source] = indexSet.get(target);
+      recvTable[target] = indexSet.get(source);
+    }
+    // Look up the local send/recv values using rank.
+    Value rank =
+        rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel).getResult();
+    Value send = rewriter.create<IREE::Util::SwitchOp>(loc, rank, noSendOrRecv,
+                                                       sendTable);
+    Value recv = rewriter.create<IREE::Util::SwitchOp>(loc, rank, noSendOrRecv,
+                                                       recvTable);
+
+    // Create an empty tensor for the result.
+    ArrayRef<int64_t> inputShape = inputType.getShape();
+    Value target = rewriter.create<tensor::EmptyOp>(loc, inputShape,
+                                                    inputType.getElementType());
+    auto collectiveSendRecvOp =
+        rewriter.create<IREE::Flow::CollectiveSendRecvOp>(
+            op.getLoc(), elementTypeAttr, target, op.getOperand(), channel,
+            send, recv);
+
+    rewriter.replaceOp(op, collectiveSendRecvOp.getResult());
+    return success();
+  }
+};
+
 void populateMHLOCollectiveOpsConversionPatterns(MLIRContext *context,
                                                  TypeConverter &typeConverter,
                                                  RewritePatternSet &patterns) {
@@ -806,6 +876,7 @@ void populateMHLOCollectiveOpsConversionPatterns(MLIRContext *context,
   patterns.insert<AllToAllOpConversion>(typeConverter, context);
   patterns.insert<PartitionIdOpConversion>(typeConverter, context);
   patterns.insert<ReduceScatterOpConversion>(typeConverter, context);
+  patterns.insert<CollectivePermuteOpConversion>(typeConverter, context);
   patterns.insert<ReplicaIdOpConversion>(typeConverter, context);
 }
 

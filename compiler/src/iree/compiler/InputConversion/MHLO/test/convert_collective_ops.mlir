@@ -470,3 +470,21 @@ module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 
     return %out : tensor<2304xf32>
   }
 }
+
+// -----
+
+// CHECK-LABEL: @collective_permute
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<8xf32>) -> tensor<8xf32>
+func.func @collective_permute(%input : tensor<8xf32>) -> tensor<8xf32> {
+  // CHECK: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+  // CHECK: %[[RANK:.+]] = flow.channel.rank %[[CHANNEL]] : index
+  // CHECK: %[[SEND:.+]] = util.switch index from [%c1, %c2, %c3, %c0] at %[[RANK]] else %c-1
+  // CHECK: %[[RECV:.+]] = util.switch index from [%c3, %c0, %c1, %c2] at %[[RANK]] else %c-1
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<8xf32>
+  // CHECK: %[[OP:.+]] = flow.collective.send_recv f32, %[[EMPTY]], %[[ARG0]], %[[CHANNEL]], %[[SEND]], %[[RECV]] : (tensor<8xf32>, tensor<8xf32>, !flow.channel, index, index) -> %[[EMPTY]] as tensor<8xf32>
+  // CHECK: return %[[OP]] : tensor<8xf32>
+  %out = "mhlo.collective_permute"(%input) {
+        source_target_pairs = dense<[[0, 1], [1, 2], [2, 3], [3, 0]]> : tensor<4x2xi64>,
+        channel_handle = #mhlo.channel_handle<handle = 1, type = 1>} : (tensor<8xf32>) -> tensor<8xf32>
+  return %out : tensor<8xf32>
+}
