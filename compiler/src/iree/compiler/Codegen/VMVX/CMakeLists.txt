@@ -29,6 +29,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRArithDialect
     MLIRBufferizationDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect
