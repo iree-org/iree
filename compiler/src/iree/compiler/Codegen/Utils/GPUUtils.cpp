@@ -761,5 +761,23 @@ bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
          addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }
 
+//===----------------------------------------------------------------------===//
+// GPU CodeGen op filter
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem.
+bool sharedMemTransposeFilter(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

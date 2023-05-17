@@ -8,8 +8,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -26,7 +26,7 @@
 
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
-#define DEBUG_TYPE "iree-llvmgpu-tile-tensor"
+#define DEBUG_TYPE "iree-codegen-gpu-tensor-tile"
 
 namespace mlir {
 namespace iree_compiler {
@@ -199,14 +199,13 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
 }
 
 namespace {
-struct LLVMGPUTileTensorPass
-    : public LLVMGPUTileTensorBase<LLVMGPUTileTensorPass> {
+struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
  private:
   // Distribute the workloads to warp if true otherwise distribute to threads.
   bool distributeToWarp = false;
 
  public:
-  LLVMGPUTileTensorPass(bool distributeToWarp)
+  GPUTensorTilePass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
@@ -254,9 +253,9 @@ struct LLVMGPUTileTensorPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTile(
     bool distributeToWarp) {
-  return std::make_unique<LLVMGPUTileTensorPass>(distributeToWarp);
+  return std::make_unique<GPUTensorTilePass>(distributeToWarp);
 }
 
 }  // namespace iree_compiler

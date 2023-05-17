@@ -166,6 +166,24 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
+enum class GPUPromoteSharedMemPattern {
+  ContractionOpPattern = 0,
+  TransposeOpPattern = 1,
+};
+
+// Creates a pass to tile reduction dimensions and create allocations for some
+// tensor values to use GPU shared memory.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
+
+/// Tiles Linalg ops in the given `funcOp` to serial loops without distribution.
+LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction = true);
+
+// Creates a pass to tile tensor (linalg) ops within a GPU workgroup.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTile(
+    bool distributeToWarp = false);
+
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 

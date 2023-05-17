@@ -196,6 +196,8 @@ iree_cc_library(
     "GPUMultiBuffering.cpp"
     "GPUPatterns.cpp"
     "GPUReduceBankConflicts.cpp"
+    "GPUTensorAlloc.cpp"
+    "GPUTensorTile.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
     "LinalgOpInfo.cpp"

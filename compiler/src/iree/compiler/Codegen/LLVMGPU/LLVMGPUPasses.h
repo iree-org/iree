@@ -79,14 +79,6 @@ createLLVMGPULowerExecutableTargetPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUPackSharedMemoryAlloc();
 
-enum class GPUPromoteSharedMemPattern {
-  ContractionOpPattern = 0,
-  TransposeOpPattern = 1,
-};
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
-
 enum class GPUTensorCoreType {
   WMMA = 0,
   MMA_SYNC = 1,
@@ -102,9 +94,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
 
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false);
-
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
 
 /// Lower vector ops before convertion to LLVM.

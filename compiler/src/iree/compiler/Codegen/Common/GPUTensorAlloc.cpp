@@ -4,17 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/LLVMGPU/TilingUtils.h"
-#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-llvmgpu-alloc"
+#define DEBUG_TYPE "iree-codegen-gpu-tensor-alloc"
 
 namespace mlir {
 namespace iree_compiler {
@@ -90,14 +89,13 @@ static bool isSharedMemTranspose(AffineMap indexMap) {
 }
 
 namespace {
-struct LLVMGPUTensorAllocPass
-    : public LLVMGPUTensorAllocBase<LLVMGPUTensorAllocPass> {
+struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
  private:
   GPUPromoteSharedMemPattern promoteSharedMemPattern =
       GPUPromoteSharedMemPattern::ContractionOpPattern;
 
  public:
-  LLVMGPUTensorAllocPass(GPUPromoteSharedMemPattern promoteSharedMemPattern)
+  GPUTensorAllocPass(GPUPromoteSharedMemPattern promoteSharedMemPattern)
       : promoteSharedMemPattern(promoteSharedMemPattern) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<bufferization::BufferizationDialect, scf::SCFDialect>();
@@ -158,9 +156,9 @@ struct LLVMGPUTensorAllocPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorAlloc(
     GPUPromoteSharedMemPattern promoteSharedMemPattern) {
-  return std::make_unique<LLVMGPUTensorAllocPass>(promoteSharedMemPattern);
+  return std::make_unique<GPUTensorAllocPass>(promoteSharedMemPattern);
 }
 
 }  // namespace iree_compiler

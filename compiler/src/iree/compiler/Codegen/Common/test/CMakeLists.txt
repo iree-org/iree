@@ -35,6 +35,8 @@ iree_lit_test_suite(
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
     "gpu_pipeline.mlir"
+    "gpu_tensor_alloc.mlir"
+    "gpu_tensor_tile.mlir"
     "gpu_vectorization.mlir"
     "hoist_statically_bound_allocations.mlir"
     "iree_comprehensive_bufferize.mlir"

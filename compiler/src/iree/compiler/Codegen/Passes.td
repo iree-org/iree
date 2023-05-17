@@ -440,6 +440,19 @@ def GPUVectorization :
   ];
 }
 
+def GPUTensorAlloc :
+    Pass<"iree-codegen-gpu-tensor-alloc", "func::FuncOp"> {
+  let summary = "Pass to tile reduction dimensions and create allocations for "
+                "some tensor values to use GPU shared memory";
+  let constructor = "mlir::iree_compiler::createGPUTensorAlloc()";
+}
+
+def GPUTensorTile :
+    Pass<"iree-codegen-gpu-tensor-tile", "func::FuncOp"> {
+  let summary = "Pass to tile tensor (linalg) ops within a GPU workgroup";
+  let constructor = "mlir::iree_compiler::createGPUTensorTile()";
+}
+
 def GPUTileReduction :
     Pass<"iree-codegen-gpu-tile-reduction", "func::FuncOp"> {
   let summary = "Pass to tile linalg reduction dimensions.";
@@ -706,22 +719,10 @@ def LLVMGPUTileAndDistribute :
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
 }
 
-def LLVMGPUTileTensor :
-    Pass<"iree-llvmgpu-tile-tensor", "func::FuncOp"> {
-  let summary = "Pass to tile linalg on tensor ops within a workgroup.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUTileTensor()";
-}
-
 def LLVMGPUDistribute :
     Pass<"iree-llvmgpu-distribute", "func::FuncOp"> {
   let summary = "Pass to distribute scf.forall ops.";
   let constructor = "mlir::iree_compiler::createLLVMGPUDistribute()";
-}
-
-def LLVMGPUTensorAlloc :
-    Pass<"iree-llvmgpu-alloc", "func::FuncOp"> {
-  let summary = "Pass to create allocation for some values.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUTensorAlloc()";
 }
 
 def LLVMGPUPackSharedMemoryAlloc :
