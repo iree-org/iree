@@ -884,6 +884,12 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
   }
 
   LogicalResult handle2DTile(OpInfo &info, PatternRewriter &rewriter) const {
+    Type scalarType = info.scalar.getType();
+    if (!scalarType.isIntOrFloat() ||
+        scalarType.getIntOrFloatBitWidth() != 32) {
+      return rewriter.notifyMatchFailure(info.op,
+                                         "handling only 32-bit scalar types");
+    }
     auto loc = info.op.getLoc();
     StridedBufferDescriptor &outDesc = info.outAnal.getDesc(rewriter);
     Value m = outDesc.sizes[0];
