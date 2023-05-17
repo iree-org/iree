@@ -35,6 +35,9 @@ bazel build iree/integrations/pjrt/...
 # Run a sample.
 JAX_PLATFORMS=iree_cpu python test/test_simple.py
 JAX_PLATFORMS=iree_cuda python test/test_simple.py
+# When multiple CUDA devices are installed, pick one by setting CUDA_VISIBLE_DEVICES=<n>.
+CUDA_VISIBLE_DEVICES=0 JAX_PLATFORMS=iree_cuda python test/test_simple.py
+
 ```
 
 ### Option 2: Set up for a full at-head dev rig
