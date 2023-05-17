@@ -15,6 +15,7 @@ iree_cc_library(
     VMVX
   HDRS
     "EncodingInfo.h"
+    "VMVXPasses.h"
   SRCS
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
@@ -28,6 +29,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRArithDialect
     MLIRBufferizationDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect

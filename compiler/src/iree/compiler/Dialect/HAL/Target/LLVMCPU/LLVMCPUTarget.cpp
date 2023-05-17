@@ -11,7 +11,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMIRPasses.h"

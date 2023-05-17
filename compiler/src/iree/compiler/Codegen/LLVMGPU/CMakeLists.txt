@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
+    "LLVMGPUPasses.h"
     "TilingUtils.h"
     "TransposeUtils.h"
   SRCS
@@ -96,6 +97,7 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::LLVMGPU::Utils

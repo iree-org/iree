@@ -13,10 +13,13 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     WGSL
+  HDRS
+    "WGSLPasses.h"
   SRCS
     "WGSLReplacePushConstants.cpp"
   DEPS
     MLIRArithDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRPass
     MLIRTensorDialect

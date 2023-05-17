@@ -4,11 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Pass/PassManager.h"
+//===---------------------------------------------------------------------===//
+// Include pass headers per target device
+//===---------------------------------------------------------------------===//
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
+#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
+#include "iree/compiler/Codegen/WGSL/WGSLPasses.h"
 
 namespace mlir {
 namespace iree_compiler {
