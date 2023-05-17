@@ -53,39 +53,39 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.tile %{{.*}}[0, 0, 16]
 // CHECK: transform.structured.pad %{{.*}} {pack_paddings = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: transform.structured.hoist_pad %{{.}} by 1 loops
-// CHECK: transform.structured.insert_slice_to_copy %{{.*}} : (!pdl.operation) -> !pdl.operation
+// CHECK: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
-// CHECK:   transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!pdl.operation) -> ()
+// CHECK:   transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
-// CHECK: transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!pdl.operation) -> ()
+// CHECK: transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [4, 4]
 // CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [4, 4]
 // CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [32, 4]
-// CHECK: transform.vector.lower_masked_transfers %{{.*}} : (!pdl.operation) -> !pdl.operation
+// CHECK: transform.vector.lower_masked_transfers %{{.*}}
 // CHECK: transform.structured.vectorize %{{.*}}
 // CHECK: transform.iree.eliminate_empty_tensors %{{.*}}
 // CHECK: transform.iree.bufferize {target_gpu} %{{.*}} : (!pdl.operation) -> !pdl.operation
-// CHECK: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}} : (!pdl.operation) -> ()
-// CHECK: transform.iree.forall_to_workgroup %{{.*}} : (!pdl.operation) -> ()
-// CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1] : (!pdl.operation) -> ()
-// CHECK: transform.iree.hoist_static_alloc %{{.*}} : (!pdl.operation) -> ()
-// CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases} : (!pdl.operation) -> ()
-// CHECK: transform.iree.apply_patterns %{{.*}} {extract_address_computations} : (!pdl.operation) -> ()
-// CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_wmma} : (!pdl.operation) -> ()
-// CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}} : (!pdl.operation) -> !pdl.operation
+// CHECK: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}}
+// CHECK: transform.iree.forall_to_workgroup %{{.*}}
+// CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
+// CHECK: transform.iree.hoist_static_alloc %{{.*}}
+// CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
+// CHECK: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
+// CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_wmma}
+// CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // CHECK: transform.iree.apply_buffer_optimizations %{{.*}} : (!pdl.operation) -> ()
 // CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_wmma} : (!pdl.operation) -> ()
-// CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases} : (!pdl.operation) -> ()
+// CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
 // CHECK: transform.memref.multibuffer %{{.*}} {factor = 3 : i64, skip_analysis} : (!transform.op<"memref.alloc">) -> !pdl.operation
 // CHECK: transform.vector.transfer_to_scf %{{.*}}   max_transfer_rank = 1 full_unroll = true : (!pdl.operation) -> !pdl.operation
 // CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync = false} : (!pdl.operation) -> ()
 // CHECK: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 3 : i64} : (!pdl.operation) -> !pdl.operation
 // CHECK: transform.vector.lower_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
 // CHECK: transform.vector.materialize_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
-// CHECK: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization} : (!pdl.operation) -> ()
+// CHECK: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization}
 
 
 // WITH_OPTIONS-LABEL: func @matmul
@@ -100,37 +100,37 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.structured.tile %{{.*}}[0, 0, 8]
 // WITH_OPTIONS: transform.structured.pad %{{.*}} {pack_paddings = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // WITH_OPTIONS: transform.structured.hoist_pad %{{.}} by 1 loops
-// WITH_OPTIONS: transform.structured.insert_slice_to_copy %{{.*}} : (!pdl.operation) -> !pdl.operation
+// WITH_OPTIONS: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [64, 2] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
-// WITH_OPTIONS:   transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!pdl.operation) -> ()
+// WITH_OPTIONS:   transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
-// WITH_OPTIONS: transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 4] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 4] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [4, 4]
 // WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [1, 4]
 // WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [32, 4]
-// WITH_OPTIONS: transform.vector.lower_masked_transfers %{{.*}} : (!pdl.operation) -> !pdl.operation
+// WITH_OPTIONS: transform.vector.lower_masked_transfers %{{.*}}
 // WITH_OPTIONS: transform.structured.vectorize %{{.*}}
 // WITH_OPTIONS: transform.iree.eliminate_empty_tensors %{{.*}}
 // WITH_OPTIONS: transform.iree.bufferize {target_gpu} %{{.*}} : (!pdl.operation) -> !pdl.operation
-// WITH_OPTIONS: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}} : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.iree.forall_to_workgroup %{{.*}} : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}}
+// WITH_OPTIONS: transform.iree.forall_to_workgroup %{{.*}}
 // The workgroup dimensions are controled by td-matmul-strategy-num-threads-XX.
 // The warp dimensions are controled by td-matmul-strategy-num-warps-XX.
-// WITH_OPTIONS: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [32, 4, 1] warp_dims = [1, 4, 1] : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.iree.hoist_static_alloc %{{.*}} : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases} : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {extract_address_computations} : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [32, 4, 1] warp_dims = [1, 4, 1]
+// WITH_OPTIONS: transform.iree.hoist_static_alloc %{{.*}}
+// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
+// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
 // The unroll attribute should match td-matmul-use-mma-sync, for true: mma_sync,
 // for false:_wmma.
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_mma_sync} : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.structured.hoist_redundant_vector_transfers %{{.*}} : (!pdl.operation) -> !pdl.operation
+// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_mma_sync}
+// WITH_OPTIONS: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // WITH_OPTIONS: transform.iree.apply_buffer_optimizations %{{.*}} : (!pdl.operation) -> ()
 // The attribute should match td-matmul-use-mma-sync.
 // WITH_OPTIONS: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync} : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases} : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
 // The multibuffer pass is only run when we set use-async-copies.
 // The factor should match td-matmul-strategy-pipeline-depth: 5.
 // WITH_OPTIONS: transform.memref.multibuffer %{{.*}} {factor = 5 : i64, skip_analysis} : (!transform.op<"memref.alloc">) -> !pdl.operation
@@ -141,7 +141,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 5 : i64} : (!pdl.operation) -> !pdl.operation
 // WITH_OPTIONS: transform.vector.lower_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
 // WITH_OPTIONS: transform.vector.materialize_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization} : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization}
 
 // -----
 

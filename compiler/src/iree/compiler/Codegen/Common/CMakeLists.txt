@@ -42,7 +42,7 @@ iree_cc_library(
     MLIRBufferizationTransformOps
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUTransformOps
     MLIRIR
     MLIRLLVMDialect
@@ -132,7 +132,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
@@ -221,7 +221,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion

@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     ::SPIRVToMSL
     MLIRAffineDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRLinalgDialect
     MLIRSPIRVDialect
     MLIRSPIRVSerialization

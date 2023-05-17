@@ -1003,10 +1003,10 @@ struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
 
 DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
-  ArrayRef<Operation *> payload = state.getPayloadOps(getTarget());
-  if (payload.size() != 1 ||
+  auto payload = state.getPayloadOps(getTarget());
+  if (!llvm::hasSingleElement(payload) ||
       !isa<ModuleOp, HAL::ExecutableOp, HAL::ExecutableVariantOp>(
-          payload.front())) {
+          *payload.begin())) {
     return mlir::emitDefiniteFailure(
         state.getTopLevel(),
         "requires exactly a single HAL::ExecutableOp or "
@@ -1031,7 +1031,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
-  Operation *target = payload.front();
+  Operation *target = *payload.begin();
   Location loc = target->getLoc();
   ErrorCheckingTrackingListener listener(state, *this);
   //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
@@ -1073,7 +1073,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
   // Early exit if test_analysis_only is set.
   if (getTestAnalysisOnly()) {
-    results.set(getOperation()->getOpResult(0), payload.front());
+    results.set(getOperation()->getOpResult(0), {*payload.begin()});
     return listener.check(loc);
   }
 
@@ -1093,7 +1093,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   if (res.wasInterrupted())
     return listener.check(loc, emitDefaultDefiniteFailure(target));
 
-  results.set(getOperation()->getOpResult(0), payload.front());
+  results.set(getOperation()->getOpResult(0), {*payload.begin()});
   return listener.check(loc);
 }
 
