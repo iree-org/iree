@@ -1,0 +1,66 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI Test
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  test_no_benchmarks:
+    uses: ./.github/workflows/ci.yml
+    with:
+      should-run: "true"
+      is-pr: "true"
+      runner-group: "presubmit"
+      runner-env: "prod"
+      write-caches: "0"
+      benchmark-presets: ""
+      gcs-suffix: "-test-no-benchmarks"
+
+  test_comp-stats_benchmarks:
+    uses: ./.github/workflows/ci.yml
+    with:
+      should-run: "true"
+      is-pr: "true"
+      runner-group: "presubmit"
+      runner-env: "prod"
+      write-caches: "0"
+      benchmark-presets: "comp-stats"
+      gcs-suffix: "-test-comp-stats-benchmarks"
+
+  test_x86_64_benchmarks:
+    uses: ./.github/workflows/ci.yml
+    with:
+      should-run: "true"
+      is-pr: "true"
+      runner-group: "presubmit"
+      runner-env: "prod"
+      write-caches: "0"
+      benchmark-presets: "x86_64"
+      gcs-suffix: "-test-x86_64-benchmarks"
+
+  test_default_benchmarks:
+    uses: ./.github/workflows/ci.yml
+    with:
+      should-run: "true"
+      is-pr: "true"
+      runner-group: "presubmit"
+      runner-env: "prod"
+      write-caches: "0"
+      benchmark-presets: "comp-stats,x86_64,cuda,android-cpu,android-gpu,vulkan-nvidia"
+      gcs-suffix: "-test-default-benchmarks"
+
+  test_long_benchmarks:
+    uses: ./.github/workflows/ci.yml
+    with:
+      should-run: "true"
+      is-pr: "true"
+      runner-group: "presubmit"
+      runner-env: "prod"
+      write-caches: "0"
+      benchmark-presets: "cuda-long"
+      gcs-suffix: "-test-long-benchmarks"
