@@ -300,6 +300,11 @@ void populateVectorizePadPatterns(RewritePatternSet &patterns,
 void populateConcretizePadResultShapePatterns(
     RewritePatternSet &patterns, ArrayRef<int64_t> numWorkgroups = {});
 
+/// Apply transformation to reduce the number of bank conflicts when accessing
+/// shared memory by padding fastest moving dimension with the specified size.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -28,7 +28,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::VMVX
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::VM::Conversion

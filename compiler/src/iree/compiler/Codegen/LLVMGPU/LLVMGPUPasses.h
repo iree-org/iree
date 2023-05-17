@@ -109,11 +109,6 @@ createLLVMGPUTensorCoreVectorizationPass(
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
 
-/// Apply transformation to reduce the number of bank conflicts when accessing
-/// shared memory by padding fastest moving dimension with the specified size.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
-
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);

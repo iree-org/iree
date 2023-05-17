@@ -63,7 +63,6 @@ iree_cc_library(
     MLIRVectorTransformOps
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::TransformDialectStrategies::Common::TransformDialectStrategies
   PUBLIC
 )

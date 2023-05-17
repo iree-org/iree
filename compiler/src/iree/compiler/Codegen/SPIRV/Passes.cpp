@@ -15,7 +15,6 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"

@@ -54,7 +54,6 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::Flow::IR
   PUBLIC
 )

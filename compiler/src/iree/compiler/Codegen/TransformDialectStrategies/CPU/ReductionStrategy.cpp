@@ -10,7 +10,6 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
