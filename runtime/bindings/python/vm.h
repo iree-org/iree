@@ -129,6 +129,10 @@ class VmInstance : public ApiRefCounted<VmInstance, iree_vm_instance_t> {
 
 class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
  public:
+  static VmModule ResolveModuleDependency(VmInstance* instance,
+                                          const std::string& name,
+                                          uint32_t minimum_version);
+
   static VmModule FromFlatbufferBlob(VmInstance* instance,
                                      py::object flatbuffer_blob_object);
 
