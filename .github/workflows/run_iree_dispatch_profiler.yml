@@ -17,7 +17,7 @@ name: dispatch_profiler
 
 on:
   schedule:
-    - cron: '0 13 * * *'
+    - cron: "0 13 * * *"
   workflow_dispatch:
   pull_request:
 
@@ -38,7 +38,7 @@ jobs:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
