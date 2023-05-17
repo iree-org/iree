@@ -1,9 +1,9 @@
 # CPU Deployment
 
-IREE supports efficient program execution on CPU devices by using [LLVM][llvm]
-to compile all dense computations in each program into highly optimized CPU
-native instruction streams, which are embedded in one of IREE's deployable
-formats.
+IREE supports efficient program execution on CPU devices by using
+[LLVM](https://llvm.org/) to compile all dense computations in each program into
+highly optimized CPU native instruction streams, which are embedded in one of
+IREE's deployable formats.
 
 To compile a program for CPU execution, pick one of IREE's supported executable
 formats:
@@ -34,8 +34,9 @@ At runtime, CPU executables can be loaded using one of IREE's CPU HAL drivers:
 #### Download as Python package
 
 Python packages for various IREE functionalities are regularly published
-to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
-details. The core `iree-compiler` package includes the LLVM-based CPU compiler:
+to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../bindings/python.md) page for more details. The core
+`iree-compiler` package includes the LLVM-based CPU compiler:
 
 ``` shell
 python -m pip install iree-compiler
@@ -53,11 +54,13 @@ python -m pip install iree-compiler
 
 #### Build compiler from source
 
-Please make sure you have followed the [Getting started][get-started] page
-to build IREE for your host platform and the
-[Android cross-compilation][android-cc] or [iOS cross-compilation][ios-cc] page
-if you are cross compiling for a mobile device. The LLVM (CPU) compiler backend
-is compiled in by default on all platforms.
+Please make sure you have followed the
+[Getting started](../building-from-source/getting-started.md) page to build IREE
+for your host platform and the
+[Android cross-compilation](../building-from-source/android.md) or
+[iOS cross-compilation](../building-from-source/ios.md) page if you are cross
+compiling for a mobile device. The LLVM (CPU) compiler backend is compiled in by
+default on all platforms.
 
 Ensure that the `IREE_TARGET_BACKEND_LLVM_CPU` CMake option is `ON` when
 configuring for the host.
@@ -76,11 +79,13 @@ model and run it.
 The IREE compiler transforms a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
-[MLIR][mlir]) expected by the IREE compiler first.
+[MLIR](https://mlir.llvm.org/)) expected by the IREE compiler first.
 
 Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
-[TensorFlow importer][tf-import]. Then,
+weights from
+[TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
+and convert it using IREE's
+[TensorFlow importer](../getting-started/tensorflow.md). Then,
 
 #### Compile using the command-line
 
@@ -100,8 +105,8 @@ where `iree_input.mlir` is the imported program.
 
     The `--iree-llvmcpu-target-triple=` flag tells the compiler to generate code
     for a specific type of CPU. You can see the list of supported targets with
-    `iree-compile --iree-llvmcpu-list-targets`, or omit the flag to let LLVM infer
-    the triple from your host machine (e.g. `x86_64-linux-gnu`).
+    `iree-compile --iree-llvmcpu-list-targets`, or omit the flag to let LLVM
+    infer the triple from your host machine (e.g. `x86_64-linux-gnu`).
 
 ### Get IREE runtime with local CPU HAL driver
 
@@ -110,10 +115,12 @@ along with the appropriate executable loaders for your application.
 
 #### Build runtime from source
 
-Please make sure you have followed the [Getting started][get-started] page
-to build IREE for your host platform and the
-[Android cross-compilation][android-cc] page if you are cross compiling for
-Android. The local CPU HAL drivers are compiled in by default on all platforms.
+Please make sure you have followed the
+[Getting started](../building-from-source/getting-started.md) page to build IREE
+for your host platform and the
+[Android cross-compilation](../building-from-source/android.md) page if you are
+cross compiling for Android. The local CPU HAL drivers are compiled in by
+default on all platforms.
 
 <!-- TODO(??): a way to verify the driver is compiled in and supported -->
 
@@ -145,13 +152,3 @@ concrete values.
 <!-- TODO(??): measuring performance -->
 
 <!-- TODO(??): troubleshooting -->
-
-[android-cc]: ../building-from-source/android.md
-[ios-cc]: ../building-from-source/ios.md
-[get-started]: ../building-from-source/getting-started.md
-[llvm]: https://llvm.org/
-[mlir]: https://mlir.llvm.org/
-[pypi]: https://pypi.org/user/google-iree-pypi-deploy/
-[python-bindings]: ../bindings/python.md
-[tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: ../getting-started/tensorflow.md
