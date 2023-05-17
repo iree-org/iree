@@ -5,6 +5,7 @@ transform.sequence failures(propagate) {
   // Tile only one dimension, skip the other one.
   %forall_grid, %_ = transform.structured.tile_to_forall_op %generics 
                   tile_sizes [0, 3] ( mapping = [#gpu.block<z>])
+                   : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
 
 

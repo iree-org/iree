@@ -12,6 +12,7 @@ transform.sequence failures(propagate) {
   %init_or_alloc_op, %more_parallel_fill_op, %more_parallel_op, %combiner_op =
     transform.structured.split_reduction %reduction
       { split_factor = 2, insert_split_dimension = 1 }
+       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
 
   // Step 2. First level of tiling + fusion parallelizes to blocks. Tile the
   // trailing elementwise the same way we want to tile the reduction.
@@ -19,6 +20,7 @@ transform.sequence failures(propagate) {
   %grid_loop, %trailing_eltwise_grid_op =
     transform.structured.tile_to_forall_op %trailing_eltwise tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
   // Step 2.1: Cannot fuse across the "expand_shape" produced by reduction
   // splitting above, so we need to bubble that up via patterns and rematch
@@ -38,7 +40,7 @@ transform.sequence failures(propagate) {
   %forall_grid_2 = transform.structured.match ops{["scf.forall"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %not_trailing = transform.merge_handles %fill_2, %more_parallel_fill_2,
     %more_parallel_2, %expanded_eltwise, %combiner_2 : !pdl.operation
-  transform.structured.fuse_into_containing_op %not_trailing into %forall_grid_2
+  transform.structured.fuse_into_containing_op %not_trailing into %forall_grid_2 : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Step 3. Second level of tiling + fusion parallelizes to threads. Also
   // fuse in the leading and trailing elementwise.
@@ -47,10 +49,11 @@ transform.sequence failures(propagate) {
   %forall_trailing_eltwise_op, %block_trailing_eltwise_op =
     transform.structured.tile_to_forall_op %trailing_eltwise_2 tile_sizes [1]
     ( mapping = [#gpu.thread<z>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   %block_combiner_op = transform.structured.match ops{["linalg.generic"]}
     attributes {iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %fill_and_reduction = transform.merge_handles %fill_1d, %block_combiner_op : !pdl.operation
-  transform.structured.fuse_into_containing_op %fill_and_reduction into %forall_trailing_eltwise_op
+  transform.structured.fuse_into_containing_op %fill_and_reduction into %forall_trailing_eltwise_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
@@ -60,14 +63,15 @@ transform.sequence failures(propagate) {
   %forall_block_more_parallel_op, %block_more_parallel_op =
     transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
-  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op
-  transform.structured.fuse_into_containing_op %grid_eltwise_op into %forall_block_more_parallel_op
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
+  transform.structured.fuse_into_containing_op %grid_eltwise_op into %forall_block_more_parallel_op : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func_1 = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func_1 {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-  %func_2 = transform.structured.vectorize %func_1
+  %func_2 = transform.structured.vectorize %func_1 : (!pdl.operation) -> !pdl.operation
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================

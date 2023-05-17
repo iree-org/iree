@@ -18,13 +18,14 @@ transform.sequence failures(propagate) {
   %forall, %_ =
   transform.structured.tile_to_forall_op %div tile_sizes [1, 4]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+     : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!pdl.operation) -> ()
 
   // TODO: Merging and fusing merged handles does not work properly atm.
-  transform.structured.fuse_into_containing_op %exp_and_exps_sum into %forall
-  transform.structured.fuse_into_containing_op %exps_sum_fill into %forall
-  transform.structured.fuse_into_containing_op %input_max into %forall
-  transform.structured.fuse_into_containing_op %input_max_fill into %forall
+  transform.structured.fuse_into_containing_op %exp_and_exps_sum into %forall : (!pdl.operation, !pdl.operation) -> !pdl.operation
+  transform.structured.fuse_into_containing_op %exps_sum_fill into %forall : (!pdl.operation, !pdl.operation) -> !pdl.operation
+  transform.structured.fuse_into_containing_op %input_max into %forall : (!pdl.operation, !pdl.operation) -> !pdl.operation
+  transform.structured.fuse_into_containing_op %input_max_fill into %forall : (!pdl.operation, !pdl.operation) -> !pdl.operation
   // By default, fusion into scf.forall does not promote captured values
   // to shared as this involves a cross-thread dependence analysis.
   // Instead, we activate it explicitly post-hoc to promote all the extract_slice
@@ -58,6 +59,7 @@ transform.sequence failures(propagate) {
     : !pdl.operation
   transform.structured.tile_to_forall_op %reduction_linalg_ops tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   // Fully parallel ops are tiled and mapped.
   %parallel_linalg_ops = transform.merge_handles %tiled_input_max_fill,
                                                  %tiled_exps_sum_fill,
@@ -65,6 +67,7 @@ transform.sequence failures(propagate) {
     : !pdl.operation
   transform.structured.tile_to_forall_op %parallel_linalg_ops num_threads [1, 4, 32]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -74,7 +77,7 @@ transform.sequence failures(propagate) {
   // ==================================
   %funcx_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %funcx_2 {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-  transform.structured.vectorize %funcx_2
+  transform.structured.vectorize %funcx_2 : (!pdl.operation) -> !pdl.operation
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
