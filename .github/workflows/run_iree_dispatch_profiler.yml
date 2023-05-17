@@ -4,13 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
-# Workflow for running IREE Dispatch Profiler 
+# Workflow for running IREE Dispatch Profiler
 # (https://github.com/openxla/iree/tree/main/experimental/dispatch_profiler).
-# 
-# IREE Dispatch Profiler validates functional correctness and performs profiling 
+#
+# IREE Dispatch Profiler validates functional correctness and performs profiling
 # on matmul, conv, and other ops on IREE CUDA and other back-ends.
 #
-# It uploads results to this a publicly accessible GCS bucket: 
+# It uploads results to this a publicly accessible GCS bucket:
 # https://storage.googleapis.com/dispatch-profiler-artifacts
 
 name: dispatch_profiler
@@ -68,5 +68,5 @@ jobs:
             "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |
-          export GCS_ARTIFACT_DIR="$(date +'%Y-%m-%d').sha_${IREE_SHA}.timestamp_$(date +'%s')"          
+          export GCS_ARTIFACT_DIR="$(date +'%Y-%m-%d').sha_${IREE_SHA}.timestamp_$(date +'%s')"
           gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_ARTIFACT_DIR}/"
