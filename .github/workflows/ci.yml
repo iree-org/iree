@@ -1092,11 +1092,6 @@ jobs:
           <summary>Click to show common usages</summary>
 
           \`\`\`sh
-          # Get compile and run flags of benchmarks
-          gcloud storage cp -r "\${E2E_TEST_ARTIFACTS_DIR_URL?}/benchmark-flag-dump.txt" /tmp/
-          \`\`\`
-
-          \`\`\`sh
           # Download all artifacts
           mkdir /tmp/iree_e2e_test_artifacts
           gcloud storage cp -r "\${E2E_TEST_ARTIFACTS_DIR_URL?}/*" /tmp/iree_e2e_test_artifacts
