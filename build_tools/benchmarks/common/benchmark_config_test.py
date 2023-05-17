@@ -41,7 +41,7 @@ class BenchmarkConfigTest(unittest.TestCase):
         f"--trace_capture_tool={self.trace_capture_tool.name}",
         f"--capture_tarball=capture.tar", f"--driver_filter_regex=a",
         f"--model_name_regex=b", f"--mode_regex=c", f"--keep_going",
-        f"--benchmark_min_time=10",
+        f"--benchmark_min_time=10", f"--compatible_only",
         str(self.build_dir)
     ])
 
@@ -64,7 +64,8 @@ class BenchmarkConfigTest(unittest.TestCase):
         model_name_filter="b",
         mode_filter="c",
         keep_going=True,
-        benchmark_min_time=10)
+        benchmark_min_time=10,
+        use_compatible_filter=True)
     self.assertEqual(config, expected_config)
 
   def test_build_from_args_benchmark_only(self):

@@ -72,7 +72,6 @@ elif [[ "${TARGET_DEVICE_NAME}" =~ ^(pixel-4|pixel-6-pro|moto-edge-x30)$ ]]; the
     --pin-cpu-freq \
     --pin-gpu-freq \
     --verbose
-    # TODO(#13198): Disable compatible filter
 else
   echo "${TARGET_DEVICE_NAME} is not supported yet."
   exit 1
