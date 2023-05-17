@@ -1,6 +1,7 @@
 #!/bin/bash
-# Sets up a venv suitable for running IREE Dispatch Profiler and executes a 
-# suite of runs. This is invoked by a Github workflow and can be invoked locally.
+# Sets up a venv suitable for running IREE Dispatch Profiler and executes
+# a suite of runs. This is invoked by a Github workflow and can be invoked
+# locally.
 # 
 # Recommend getting default 'python' to be python 3. For example on Debian:
 #   sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1

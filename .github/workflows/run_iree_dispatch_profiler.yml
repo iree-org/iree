@@ -8,7 +8,7 @@
 # (https://github.com/openxla/iree/tree/main/experimental/dispatch_profiler).
 # 
 # IREE Dispatch Profiler validates functional correctness and performs profiling 
-# on matmul, conv, and other ops, and perform on IREE CUDA and other back-ends.
+# on matmul, conv, and other ops on IREE CUDA and other back-ends.
 #
 # It uploads results to this a publicly accessible GCS bucket: 
 # https://storage.googleapis.com/dispatch-profiler-artifacts
