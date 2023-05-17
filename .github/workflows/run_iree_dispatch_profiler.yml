@@ -4,12 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
-# Workflow for running IREE Dispatch Profiler (https://github.com/openxla/iree/tree/main/experimental/dispatch_profiler).
-# IREE Dispatch Profiler validates functional correctness on matmul, conv, and other ops, and performs
-# micro-benchmarking on IREE CUDA and other back-ends.
+# Workflow for running IREE Dispatch Profiler 
+# (https://github.com/openxla/iree/tree/main/experimental/dispatch_profiler).
+# 
+# IREE Dispatch Profiler validates functional correctness and performs profiling 
+# on matmul, conv, and other ops, and perform on IREE CUDA and other back-ends.
 #
-# The workflow currently profiles on CUDA and uploads results to
-# the `dispatch-profiler-artifacts` GC bucket.
+# It uploads results to this a publicly accessible GCS bucket: 
+# https://storage.googleapis.com/dispatch-profiler-artifacts
 
 name: dispatch_profiler
 
@@ -18,9 +20,6 @@ on:
     - cron: '0 13 * * *'
   workflow_dispatch:
   pull_request:
-
-env:
-  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 jobs:
   setup:

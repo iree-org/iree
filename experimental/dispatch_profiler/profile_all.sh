@@ -6,8 +6,6 @@
 #   sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 # Or launch with python=/some/path
 
-set -xeuo pipefail
-
 TD="$(cd $(dirname $0) && pwd)"
 
 PYTHON="${PYTHON:-python3}"
@@ -39,12 +37,10 @@ python "${TD}/generator.py" \
   --generated-dir "${TD}" \
   || die "Dispatch profiler failed to generate"
 python "${TD}/compile.py" \
-  --verbose \
   --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
   --generated-dir "${TD}" \
   || die "Dispatch profiler failed to compile"
 python "${TD}/profiler.py" \
-  --verbose \
   --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
   --generated-dir "${TD}" \
   --dispatches="matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync,matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_128x128_16x5_tensorcore_mmasync" \
