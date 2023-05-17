@@ -209,6 +209,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
+    MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
