@@ -57,7 +57,6 @@ iree_cc_library(
     MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::TransformDialectStrategies::Common::TransformDialectStrategies
     iree::compiler::Dialect::Flow::IR

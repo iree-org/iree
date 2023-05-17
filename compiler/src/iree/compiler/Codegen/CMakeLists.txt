@@ -50,6 +50,7 @@ iree_cc_library(
     IREELinalgExtPasses
     MLIRPass
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::LLVMGPU
