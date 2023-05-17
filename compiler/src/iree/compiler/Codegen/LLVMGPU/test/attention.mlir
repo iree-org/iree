@@ -41,6 +41,7 @@ transform.sequence failures(propagate) {
     %forall_grid, %tiled_attention =
     transform.structured.tile_to_forall_op %attention tile_sizes [1, 128]
       ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
     // Tile and decompose attention
     // ==========================================
@@ -53,7 +54,7 @@ transform.sequence failures(propagate) {
     // ==========================================
     %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-    %func_3 = transform.structured.vectorize %func
+    %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
 
     // Bufferization
     // ==========================================
@@ -108,13 +109,13 @@ transform.sequence failures(propagate) {
 // CHECK-DAG:      %[[D4:.+]] = affine.apply #[[MAP]]()[%[[WORKGROUP_ID_Y]]]
 // CHECK:        %[[SUBVIEW:.+]] = memref.subview %[[D3]][%[[WORKGROUP_ID_X]], %[[D4]], 0] [1, 128, 64] [1, 1, 1]
 // CHECK-SAME:     : memref<192x1024x64xf32> to memref<1x128x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:        %[[D7:.+]] = vector.transfer_read %[[D0]][%[[WORKGROUP_ID_X]], %[[D4]], %[[C0]]], %[[CST_2]]
+// CHECK-SAME:     {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
 // CHECK:        %[[D5:.+]] = vector.transfer_read %[[SUBVIEW]][%[[C0]], %[[C0]], %[[C0]]], %[[CST_2]] {in_bounds
 // CHECK-SAME:     = [true, true]} : memref<1x128x64xf32, strided<[65536, 64, 1], offset: ?>>, vector<128x64xf32>
 // CHECK:        %[[D6:.+]]:3 = scf.for %[[ARG0:.+]] = %[[C0]] to %[[C1024]] step %[[C128]]
 // CHECK-SAME:     iter_args(%[[ARG1:.+]] = %[[CST]], %[[ARG2:.+]] = %[[CST_0]], %[[ARG3:.+]] = %[[D5]]) -> (vector<128xf32>,
 // CHECK-SAME:     vector<128xf32>, vector<128x64xf32>) {
-// CHECK:          %[[D7:.+]] = vector.transfer_read %[[D0]][%[[WORKGROUP_ID_X]], %[[D4]], %[[C0]]], %[[CST_2]]
-// CHECK-SAME:       {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
 // CHECK:          %[[D8:.+]] = vector.transfer_read %[[D1]][%[[WORKGROUP_ID_X]], %[[ARG0]], %[[C0]]], %[[CST_2]]
 // CHECK-SAME:       {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
 // CHECK:          %[[D9:.+]] = vector.contract {indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iterator_types

@@ -55,6 +55,7 @@ transform.sequence failures(propagate) {
   %forall, %matmul =
     transform.structured.tile_to_forall_op %original_matmul num_threads [32]
       ( mapping = [#gpu.block<x>] )
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
   // Late canonicalizations to cleanup and pass the checks.
   // Needs to occur on the whole variant to perform cse on the workgroup_count region
@@ -112,7 +113,7 @@ hal.executable private @matmul_static_dispatch_0 {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %1 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [1, 1, 1](mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>])
+  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [1, 1, 1](mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>]): (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_op : (!pdl.operation) -> ()
 }
 
@@ -162,6 +163,6 @@ hal.executable private @matmul_static_dispatch_0 {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %1 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [5, 3](mapping = [#gpu.block<z>, #gpu.block<x>])
+  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [5, 3](mapping = [#gpu.block<z>, #gpu.block<x>]) : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_op : (!pdl.operation) -> ()
 }

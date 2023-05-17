@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAsmParser
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRSPIRVDialect
     MLIRSPIRVModuleCombiner
