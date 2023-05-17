@@ -807,3 +807,223 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1280_BertLargefp16PTBatch1280.mlir"
   UNPACK
 )
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1_BERT_LARGE_JAX_384XI32_BATCH1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch16"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_16/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch16_BERT_LARGE_JAX_384XI32_BATCH16.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch24"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_24/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch24_BERT_LARGE_JAX_384XI32_BATCH24.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch32"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_32/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch32_BERT_LARGE_JAX_384XI32_BATCH32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch48"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_48/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch48_BERT_LARGE_JAX_384XI32_BATCH48.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch64"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_64/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch64_BERT_LARGE_JAX_384XI32_BATCH64.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch512"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_512/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch512_BERT_LARGE_JAX_384XI32_BATCH512.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1024/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024_BertLargeJAXBatch1024.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1280/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280_BertLargeJAXBatch1280.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_1/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch1_RESNET50_FP32_JAX_3X224X224XF32_BATCH1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch8"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_8/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch8_RESNET50_FP32_JAX_3X224X224XF32_BATCH8.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch64"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_64/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch64_RESNET50_FP32_JAX_3X224X224XF32_BATCH64.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch128"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_128/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch128_RESNET50_FP32_JAX_3X224X224XF32_BATCH128.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch256"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_256/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch256_RESNET50_FP32_JAX_3X224X224XF32_BATCH256.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch2048"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_2048/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32-batch2048_RESNET50_FP32_JAX_3X224X224XF32_BATCH2048.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_1/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch1_T5_LARGE_FP32_JAX_512XI32_BATCH1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch16"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_16/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch16_T5_LARGE_FP32_JAX_512XI32_BATCH16.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch24"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_24/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch24_T5_LARGE_FP32_JAX_512XI32_BATCH24.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch32"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_32/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch32_T5_LARGE_FP32_JAX_512XI32_BATCH32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch48"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_48/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch48_T5_LARGE_FP32_JAX_512XI32_BATCH48.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch64"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_64/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch64_T5_LARGE_FP32_JAX_512XI32_BATCH64.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch512"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_512/stablehlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32-batch512_T5_LARGE_FP32_JAX_512XI32_BATCH512.mlirbc"
+  UNPACK
+)
