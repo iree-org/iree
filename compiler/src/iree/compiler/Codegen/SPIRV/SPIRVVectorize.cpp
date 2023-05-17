@@ -217,6 +217,13 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
   return nativeSize;
 }
 
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::GatherOp op) {
+  VectorType vectorType = op.getVectorType();
+  SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
+  nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
+  return nativeSize;
+}
+
 std::optional<SmallVector<int64_t>> getNativeVectorShape(
     Operation *op, bool targetSupportsDotProd) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
@@ -229,7 +236,7 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(
 
   return TypeSwitch<Operation *, std::optional<SmallVector<int64_t>>>(op)
       .Case<VectorTransferOpInterface, vector::MultiDimReductionOp,
-            vector::ReductionOp, vector::TransposeOp>(
+            vector::ReductionOp, vector::TransposeOp, vector::GatherOp>(
           [](auto typedOp) { return getNativeVectorShapeImpl(typedOp); })
       .Case<vector::ContractionOp>([=](auto contract) {
         return getNativeVectorShapeImpl(contract, targetSupportsDotProd);
@@ -410,22 +417,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // Similarly for vector.gather ops, whose lowering patterns unroll
-    // internally.
-    {
-      RewritePatternSet patterns(context);
-      vector::populateVectorGatherLoweringPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering gather ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
     // Prepare for SPIR-V integer dot product lowering.
     if (emitIntegerDotProdOps) {
       RewritePatternSet patterns(context);
@@ -602,6 +593,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
+      vector::populateVectorGatherLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -622,6 +614,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
       vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
+      scf::IfOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
