@@ -17,6 +17,7 @@ iree_cc_library(
     "CommonGPUPasses.h"
     "GPUPatterns.h"
   SRCS
+    "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUMultiBuffering.cpp"

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "gpu_check_resource_usage.mlir"
     "gpu_distribute.mlir"
     "gpu_distribute_shared_memory.mlir"
     "gpu_pipeline.mlir"

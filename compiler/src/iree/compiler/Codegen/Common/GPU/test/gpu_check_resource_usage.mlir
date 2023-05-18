@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmgpu-check-ir-before-llvm-conversion %s --verify-diagnostics -split-input-file
+// RUN: iree-opt --iree-codegen-gpu-check-resource-usage %s --verify-diagnostics -split-input-file
 
 module {
   // expected-error @+1 {{'func.func' op exceeded GPU memory limit of 166912 bytes for function. Got 274432 bytes}}

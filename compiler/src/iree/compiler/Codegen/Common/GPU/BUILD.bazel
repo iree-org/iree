@@ -15,6 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "CommonGPUPasses",
     srcs = [
+        "GPUCheckResourceUsage.cpp",
         "GPUDistribute.cpp",
         "GPUDistributeSharedMemoryCopy.cpp",
         "GPUMultiBuffering.cpp",

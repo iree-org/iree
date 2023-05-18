@@ -332,6 +332,12 @@ def MemrefCopyToLinalgPass :
       "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
 }
 
+def GPUCheckResourceUsage :
+    Pass<"iree-codegen-gpu-check-resource-usage", "ModuleOp"> {
+  let summary = "Checks GPU specific resource usage constraints like shared memory limits";
+  let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
+}
+
 def GPUDistribute :
     Pass<"iree-codegen-gpu-distribute", "func::FuncOp"> {
   let summary = "Pass to distribute scf.forall ops.";
@@ -753,12 +759,6 @@ def LLVMGPUTensorPad :
     Pass<"iree-llvmgpu-tensor-pad", "func::FuncOp"> {
   let summary = "Pass to pad out tensors up to static dimensions.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorPadPass()";
-}
-
-def LLVMGPUCheckIRBeforeLLVMConversion :
-    Pass<"iree-llvmgpu-check-ir-before-llvm-conversion", "ModuleOp"> {
-  let summary = "Checks GPU backend specific IR constraints such as shared memory limits";
-  let constructor = "mlir::iree_compiler::createLLVMGPUCheckIRBeforeLLVMConversionPass()";
 }
 
 //------------------------------------------------------------------------------
