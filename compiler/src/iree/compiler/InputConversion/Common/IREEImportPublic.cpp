@@ -99,7 +99,8 @@ class BufferViewToTensorPattern
       // specified and we reify them here with the specific builder that does
       // the work.
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
-          srcOp, resultType, adaptor.getSource(), /*name=*/nullptr);
+          srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
+          /*name=*/nullptr);
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).
@@ -126,7 +127,8 @@ class TensorToBufferViewPattern
       // specified and we reify them here with the specific builder that does
       // the work.
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
-          srcOp, resultType, adaptor.getSource(), /*name=*/nullptr);
+          srcOp, resultType, adaptor.getSource(),
+          TypeAttr::get(adaptor.getSource().getType()), /*name=*/nullptr);
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).

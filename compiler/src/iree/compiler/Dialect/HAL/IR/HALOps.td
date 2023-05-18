@@ -100,11 +100,13 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
+      "TypeAttr":$targetEncoding,
       "StringAttr":$name
     )>,
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
+      "TypeAttr":$targetEncoding,
       "Value":$waitFence,
       "StringAttr":$name
     )>,
@@ -150,7 +152,7 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     AnyTensor:$source,
     TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims,
-    Optional<HAL_Buffer>:$target_storage,
+    Optional<AnyTypeOf<[HAL_Buffer, HAL_BufferView]>>:$target_storage,
     OptionalAttr<StrAttr>:$name
   );
   let results = (outs
@@ -160,7 +162,7 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   let assemblyFormat = [{
     $source
     ($name^)?
-    (`into` $target_storage^)?
+    (`into` `(` $target_storage^ `:` type($target_storage) `)`)?
     `:`
     custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
     `->`
@@ -172,6 +174,7 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
+      "TypeAttr":$sourceEncoding,
       "StringAttr":$name
     )>,
   ];

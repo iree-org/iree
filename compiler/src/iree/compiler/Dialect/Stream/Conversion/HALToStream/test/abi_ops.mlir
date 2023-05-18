@@ -80,7 +80,7 @@ func.func @exportBufferViewInPlace(%tensor: tensor<?x?x4xf32>, %dim0: index, %di
   // CHECK-NEXT: %[[STORAGE_RESULT:.+]] = stream.tensor.export %[[STORAGE_UPDATE]] :
   // CHECK-SAME:     tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[STORAGE_LENGTH]]}
   // CHECK-SAME:     -> !hal.buffer_view
-  %0 = hal.tensor.export %tensor into %storage : tensor<?x?x4xf32>{%dim0, %dim1} -> !hal.buffer_view
+  %0 = hal.tensor.export %tensor into(%storage : !hal.buffer) : tensor<?x?x4xf32>{%dim0, %dim1} -> !hal.buffer_view
   // CHECK: return %[[STORAGE_RESULT]]
   return %0 : !hal.buffer_view
 }
