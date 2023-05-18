@@ -20,7 +20,6 @@ on:
     # Run daily at 2:00 PM (14:00) every weekday (Monday to Friday)
     - cron: "0 14 * * 1-5"
   workflow_dispatch:
-  pull_request:
 
 jobs:
   setup:
