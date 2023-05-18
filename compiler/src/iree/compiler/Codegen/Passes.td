@@ -339,24 +339,24 @@ def GPUDistribute :
 }
 
 def GPUDistributeSharedMemoryCopy :
-    Pass<"iree-gpu-distribute-shared-memory-copy", "func::FuncOp"> {
+    Pass<"iree-codegen-gpu-distribute-shared-memory-copy", "func::FuncOp"> {
   let summary = "Pass to distribute shared memory copies to threads.";
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
 def GPUReduceBankConflicts :
-    Pass<"iree-gpu-reduce-bank-conflicts", "func::FuncOp"> {
+    Pass<"iree-codegen-gpu-reduce-bank-conflicts", "func::FuncOp"> {
   let summary = "Pass to try to reduce the number of bank conflicts.";
   let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
 }
 
 def GPUMultiBuffering :
-    Pass<"iree-gpu-multi-buffering", "func::FuncOp"> {
+    Pass<"iree-codegen-gpu-multi-buffering", "func::FuncOp"> {
   let summary = "Pass to do multi buffering.";
   let constructor = "mlir::iree_compiler::createGPUMultiBuffering()";
 }
 
-def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
+def GPUPipelining : Pass<"iree-codegen-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
   let options = [

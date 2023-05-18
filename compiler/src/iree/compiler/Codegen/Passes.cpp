@@ -13,6 +13,7 @@
 // Include pass headers per target device
 //===---------------------------------------------------------------------===//
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
