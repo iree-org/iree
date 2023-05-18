@@ -1046,6 +1046,8 @@ jobs:
       - execution_benchmarks
       - process_benchmark_results
     steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Getting failed jobs
         id: failed_jobs
         run: |
@@ -1062,51 +1064,14 @@ jobs:
       - name: Show useful artifact links
         if: always()
         env:
-          BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-          E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
-          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
-          EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
-          COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
-        # If the job of an artifact is skipped or failed, we show "Not present".
+          # If the job of an artifact is skipped or failed, we show "NOT_PRESENT".
+          BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact || 'NOT_PRESENT' }}
+          E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir || 'NOT_PRESENT' }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir || 'NOT_PRESENT' }}
+          EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir || 'NOT_PRESENT' }}
+          COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact || 'NOT_PRESENT' }}
         run: |
-          cat <<EOF >> "${GITHUB_STEP_SUMMARY}"
-          ### :link: Artifact Links
-
-          \`\`\`sh
-          # Compiler and host tools archive:
-          export BUILD_DIR_URL="${BUILD_DIR_GCS_ARTIFACT:-Not present}"
-          # Directory of e2e test artifacts:
-          export E2E_TEST_ARTIFACTS_DIR_URL="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR:-Not present}"
-          # Directory of benchmark tool binaries:
-          export BENCHMARK_TOOLS_DIR_URL="${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR:-Not present}"
-          # Directory of execution benchmark results and traces:
-          export EXECUTION_BENCHMARK_RESULTS_DIR_URL="${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR:-Not present}"
-          # Compilation benchmark results:
-          export COMPILATION_BENCHMARK_RESULTS_URL="${COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT:-Not present}"
-          \`\`\`
-
-          You can list \`gs://\` directories and download files with [gcloud cli](
-          https://cloud.google.com/sdk/gcloud/reference/storage).
-
-          <details>
-          <summary>Click to show common usages</summary>
-
-          \`\`\`sh
-          # Download all artifacts
-          mkdir /tmp/iree_e2e_test_artifacts
-          gcloud storage cp -r "\${E2E_TEST_ARTIFACTS_DIR_URL?}/*" /tmp/iree_e2e_test_artifacts
-          \`\`\`
-
-          \`\`\`sh
-          # Download execution benchmark results and traces
-          mkdir /tmp/iree_benchmark_results
-          gcloud storage cp -r "\${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/*" /tmp/iree_benchmark_results
-          \`\`\`
-          </details>
-
-          To run benchmarks locally with the CI-built e2e test artifacts, see [IREE Benchmark Suites](
-          https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/developers/developing_iree/benchmark_suites.md#3-fetch-the-benchmark-artifacts).
-          EOF
+          envsubst < ./.github/workflows/ARTIFACT_SUMMARY_TEMPLATE.md >> "${GITHUB_STEP_SUMMARY}"
       - name: Posting to Discord
         uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
         if: failure() && github.ref_name == 'main'
