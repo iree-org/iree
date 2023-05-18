@@ -231,8 +231,8 @@ iree_status_t iree_hal_webgpu_command_buffer_create(
 
 bool iree_hal_webgpu_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_webgpu_command_buffer_vtable);
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_webgpu_command_buffer_vtable);
 }
 
 static void* iree_hal_webgpu_command_buffer_dyn_cast(
@@ -287,8 +287,7 @@ static void iree_hal_webgpu_command_buffer_destroy(
 iree_status_t iree_hal_webgpu_command_buffer_issue(
     iree_hal_command_buffer_t* base_command_buffer, WGPUQueue queue) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
-      iree_hal_command_buffer_dyn_cast(base_command_buffer,
-                                       &iree_hal_webgpu_command_buffer_vtable);
+      iree_hal_webgpu_command_buffer_cast(base_command_buffer);
   IREE_ASSERT(command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -927,7 +926,6 @@ static iree_status_t iree_hal_webgpu_command_buffer_execute_commands(
 
 const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .destroy = iree_hal_webgpu_command_buffer_destroy,
-    .dyn_cast = iree_hal_webgpu_command_buffer_dyn_cast,
     .begin = iree_hal_webgpu_command_buffer_begin,
     .end = iree_hal_webgpu_command_buffer_end,
     .begin_debug_group = iree_hal_webgpu_command_buffer_begin_debug_group,
