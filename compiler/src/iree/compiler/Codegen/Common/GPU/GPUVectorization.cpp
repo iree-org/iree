@@ -57,6 +57,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
   });
 
   IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
+  vectorizationOptions.setVectorizeGatherAccesses(true);
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
                         linalg::Conv1DNwcWcfOp, linalg::Conv1DNcwFcwOp,
                         linalg::TransposeOp>::insert(patterns,
