@@ -72,7 +72,7 @@ const LibraryIreeWaitHandlePromise = {
       promiseWrapper.reject();
       promiseWrapper.isSettled = true;
     }
-    delete IreeWaitHandlePromise._promiseWrappers[promiseHandle];
+    delete IreeWaitHandlePromise._promiseWrappers[promise_handle];
   },
 
   iree_wait_primitive_promise_set: function(promise_handle) {

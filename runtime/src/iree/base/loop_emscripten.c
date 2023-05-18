@@ -14,6 +14,14 @@
 #include "iree/base/internal/wait_handle.h"
 #include "iree/base/wait_source.h"
 
+// General implementation notes:
+//
+// Several loop commands use 'deadline_ns' to implement timeouts. We convert
+// those int64 deadlines to int32 timeouts since
+//   * int64 support across C <-> JS requires BigInt
+//   * we _might_ get microsecond precision on the web, never nanosecond
+//   * this will be passed to setTimeout, which takes milliseconds
+
 //===----------------------------------------------------------------------===//
 // externs from loop_emscripten.js
 //===----------------------------------------------------------------------===//
@@ -26,11 +34,20 @@ extern void iree_loop_free_scope(iree_loop_emscripten_scope_t scope);
 extern iree_status_t iree_loop_command_call(iree_loop_emscripten_scope_t scope,
                                             iree_loop_callback_fn_t callback,
                                             void* user_data, iree_loop_t loop);
-
+extern iree_status_t iree_loop_command_wait_until(
+    iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
+    void* user_data, uint32_t timeout_ms, iree_loop_t loop);
 extern iree_status_t iree_loop_command_wait_one(
     iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
-    void* user_data, uint32_t timeout_ms, int wait_primitive_promise_handle,
-    iree_loop_t loop);
+    void* user_data, uint32_t timeout_ms, int promise_handle, iree_loop_t loop);
+extern iree_status_t iree_loop_command_wait_any(
+    iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
+    void* user_data, uint32_t timeout_ms, int promise_handles_count,
+    int* promise_handles, iree_loop_t loop);
+extern iree_status_t iree_loop_command_wait_all(
+    iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
+    void* user_data, uint32_t timeout_ms, int promise_handles_count,
+    int* promise_handles, iree_loop_t loop);
 
 //===----------------------------------------------------------------------===//
 // iree_loop_emscripten_t
@@ -66,16 +83,24 @@ IREE_API_EXPORT void iree_loop_emscripten_free(iree_loop_emscripten_t* loop) {
 static iree_status_t iree_loop_emscripten_run_call(
     iree_loop_emscripten_t* loop_emscripten, iree_loop_call_params_t* params) {
   iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
+  // Note: ignoring params->priority.
   return iree_loop_command_call(loop_emscripten->scope, params->callback.fn,
                                 params->callback.user_data, loop);
 }
 
-static iree_status_t iree_loop_emscripten_run_wait_one(
+static iree_status_t iree_loop_emscripten_run_wait_until(
     iree_loop_emscripten_t* loop_emscripten,
-    iree_loop_wait_one_params_t* params) {
+    iree_loop_wait_until_params_t* params) {
   iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
+  uint32_t timeout_ms =
+      iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
+  return iree_loop_command_wait_until(
+      loop_emscripten->scope, params->callback.fn, params->callback.user_data,
+      timeout_ms, loop);
+}
 
-  iree_wait_source_t wait_source = params->wait_source;
+static iree_status_t iree_loop_emscripten_get_promise_handle(
+    iree_wait_source_t wait_source, int* out_handle) {
   if (iree_wait_source_is_immediate(wait_source)) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "wait immediate not implemented");
@@ -97,17 +122,80 @@ static iree_status_t iree_loop_emscripten_run_wait_one(
                             "only Promise wait primitives are supported");
   }
 
-  // Convert the int64 deadline to an int32 timeout.
-  // * int64 support across C <-> JS requires BigInt
-  // * we _might_ get microsecond precision on the web, never nanosecond
-  // * this will be passed to setTimeout, which takes milliseconds
-  // https://emscripten.org/docs/getting_started/FAQ.html#how-do-i-pass-int64-t-and-uint64-t-values-from-js-into-wasm-functions
+  *out_handle = wait_handle.value.promise.handle;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_loop_emscripten_run_wait_one(
+    iree_loop_emscripten_t* loop_emscripten,
+    iree_loop_wait_one_params_t* params) {
+  int promise_handle = 0;
+  IREE_RETURN_IF_ERROR(iree_loop_emscripten_get_promise_handle(
+      params->wait_source, &promise_handle));
+  iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
   uint32_t timeout_ms =
       iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
-
   return iree_loop_command_wait_one(loop_emscripten->scope, params->callback.fn,
                                     params->callback.user_data, timeout_ms,
-                                    wait_handle.value.promise.handle, loop);
+                                    promise_handle, loop);
+}
+
+static iree_status_t iree_loop_emscripten_run_wait_any(
+    iree_loop_emscripten_t* loop_emscripten,
+    iree_loop_wait_multi_params_t* params) {
+  int* promise_handles = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(loop_emscripten->allocator,
+                                             sizeof(int) * params->count,
+                                             (void**)&promise_handles));
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < params->count; ++i) {
+    if (iree_status_is_ok(status)) {
+      status = iree_loop_emscripten_get_promise_handle(params->wait_sources[i],
+                                                       &promise_handles[i]);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
+    uint32_t timeout_ms =
+        iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
+    status = iree_loop_command_wait_any(
+        loop_emscripten->scope, params->callback.fn, params->callback.user_data,
+        timeout_ms, params->count, promise_handles, loop);
+  }
+
+  iree_allocator_free(loop_emscripten->allocator, promise_handles);
+  return status;
+}
+
+static iree_status_t iree_loop_emscripten_run_wait_all(
+    iree_loop_emscripten_t* loop_emscripten,
+    iree_loop_wait_multi_params_t* params) {
+  int* promise_handles = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(loop_emscripten->allocator,
+                                             sizeof(int) * params->count,
+                                             (void**)&promise_handles));
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < params->count; ++i) {
+    if (iree_status_is_ok(status)) {
+      status = iree_loop_emscripten_get_promise_handle(params->wait_sources[i],
+                                                       &promise_handles[i]);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
+    uint32_t timeout_ms =
+        iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
+    status = iree_loop_command_wait_all(
+        loop_emscripten->scope, params->callback.fn, params->callback.user_data,
+        timeout_ms, params->count, promise_handles, loop);
+  }
+
+  iree_allocator_free(loop_emscripten->allocator, promise_handles);
+  return status;
 }
 
 // Control function for the Emscripten loop.
@@ -126,18 +214,18 @@ iree_loop_emscripten_ctl(void* self, iree_loop_command_t command,
     case IREE_LOOP_COMMAND_DISPATCH:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "IREE_LOOP_COMMAND_DISPATCH not implemented");
+    case IREE_LOOP_COMMAND_WAIT_UNTIL:
+      return iree_loop_emscripten_run_wait_until(
+          loop_emscripten, (iree_loop_wait_until_params_t*)params);
     case IREE_LOOP_COMMAND_WAIT_ONE:
       return iree_loop_emscripten_run_wait_one(
           loop_emscripten, (iree_loop_wait_one_params_t*)params);
-    case IREE_LOOP_COMMAND_WAIT_UNTIL:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "IREE_LOOP_COMMAND_WAIT_UNTIL not implemented");
-    case IREE_LOOP_COMMAND_WAIT_ALL:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "IREE_LOOP_COMMAND_WAIT_ALL not implemented");
     case IREE_LOOP_COMMAND_WAIT_ANY:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "IREE_LOOP_COMMAND_WAIT_ANY not implemented");
+      return iree_loop_emscripten_run_wait_any(
+          loop_emscripten, (iree_loop_wait_multi_params_t*)params);
+    case IREE_LOOP_COMMAND_WAIT_ALL:
+      return iree_loop_emscripten_run_wait_all(
+          loop_emscripten, (iree_loop_wait_multi_params_t*)params);
     case IREE_LOOP_COMMAND_DRAIN:
       return iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED,
                               "unsupported loop command");
