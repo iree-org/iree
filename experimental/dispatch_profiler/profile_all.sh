@@ -19,15 +19,19 @@ set -euo pipefail
 TD="$(cd $(dirname $0) && pwd)"
 
 PYTHON="${PYTHON:-python3}"
-DISPATCH_PROFILER_IREE_BIN_DIR="${1:-$TD/../../tools}"
-DISPATCH_PROFILER_OUTPUT_DIR="${2:-$TD/dispatch_profiler_output}"
 
-VENV_DIR="${TD}/dispatch-profiler.venv"
+DISPATCH_PROFILER_OUTPUT_DIR="${2:-"dispatch_profiler_output"}"
+DISPATCH_PROFILER_IREE_BIN_DIR_FLAG=""
+if [ -n $1 ]; then
+  DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="--iree-bin-dir=${1}"
+fi
+
+VENV_DIR="dispatch-profiler.venv"
 
 echo "Setting up venv dir: ${VENV_DIR}"
 echo "Python: ${PYTHON}"
 echo "Python version: $("${PYTHON}" --version)"
-echo "Dispatch Profiler IREE bin dir: ${DISPATCH_PROFILER_IREE_BIN_DIR}"
+echo "Dispatch Profiler IREE bin dir flag: ${DISPATCH_PROFILER_IREE_BIN_DIR}"
 echo "Dispatch Profiler output dir: ${DISPATCH_PROFILER_OUTPUT_DIR}"
 
 ${PYTHON} -m venv "${VENV_DIR}"
@@ -41,7 +45,7 @@ python -m pip install --upgrade -r "${TD}/requirements.txt"
 python "${TD}/generator.py" \
   --generated-dir "${TD}"
 python "${TD}/compile.py" \
-  --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
+  ${DISPATCH_PROFILER_IREE_BIN_DIR_FLAG} \
   --generated-dir "${TD}"
 python "${TD}/profiler.py" \
   --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
