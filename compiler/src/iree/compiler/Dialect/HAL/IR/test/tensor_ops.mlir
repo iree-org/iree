@@ -38,8 +38,8 @@ func.func @tensorExportDynamic(%arg0: tensor<?x3xi32>, %arg1: index) -> !hal.buf
 
 // CHECK-LABEL: @tensorExportInPlace
 func.func @tensorExportInPlace(%arg0: tensor<?x3xi32>, %arg1: index, %arg2: !hal.buffer) -> !hal.buffer_view {
-  // CHECK: hal.tensor.export %arg0 into %arg2 : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
-  %0 = hal.tensor.export %arg0 into %arg2 : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
+  // CHECK: hal.tensor.export %arg0 into(%arg2 : !hal.buffer) : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
+  %0 = hal.tensor.export %arg0 into(%arg2 : !hal.buffer) : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
   return %0 : !hal.buffer_view
 }
 
