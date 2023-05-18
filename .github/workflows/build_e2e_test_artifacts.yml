@@ -123,8 +123,11 @@ jobs:
           E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
           E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/e2e-test-artifacts/ninja_log
         run: |
-          # Uploads all IREE artifacts and MLIR files (including the imported
-          # MLIR files and MLIR source models).
+          # TODO(#13677): MLIRs of the versioned MLIR source models are fetched
+          # from GCS and they won't change. We can upload links instead of files
+          # to save space.
+          # Uploads all artifacts except for the `*.tflite`, which are the
+          # source models we imported into MLIR.
           # Not archiving the directory to allow fetching each file as needed
           # separately. `find` depth is limited at 1 to exclude the directory
           # itself and list all files and subdirectories at the first level. Let
