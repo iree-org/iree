@@ -724,9 +724,11 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
-def HAL_ChannelSplitOp : HAL_PureOp<"channel.split", [
+def HAL_ChannelSplitOp : HAL_Op<"channel.split", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{splits a collective communication channel}];
@@ -758,6 +760,8 @@ def HAL_ChannelSplitOp : HAL_PureOp<"channel.split", [
     `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_ChannelRankAndCountOp : HAL_PureOp<"channel.rank_and_count", [

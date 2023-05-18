@@ -105,6 +105,10 @@ def Stream_Dialect : Dialect {
     breaking execution correctness.
   }];
 
+  let dependentDialects = [
+    "IREE::Util::UtilDialect",
+  ];
+
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
 }

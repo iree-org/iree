@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -93,6 +94,8 @@ struct StripResourceConversionCastPattern
 
 StreamDialect::StreamDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<StreamDialect>()) {
+  context->loadDialect<IREE::Util::UtilDialect>();
+
   registerAttributes();
   registerTypes();
 
