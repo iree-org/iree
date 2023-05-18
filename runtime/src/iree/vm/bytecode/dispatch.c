@@ -1493,6 +1493,16 @@ static iree_status_t iree_vm_bytecode_dispatch(
       *result = vm_ext_i32i64u(operand);
     });
 
+    DISPATCH_OP(CORE, CastAnyRef, {
+      bool operand_is_move;
+      iree_vm_ref_t* operand = VM_DecOperandRegRef("operand", &operand_is_move);
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("result");
+      bool result_is_move;
+      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
+      IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+          operand_is_move, operand, iree_vm_type_def_as_ref(type_def), result));
+    });
+
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//

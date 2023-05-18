@@ -371,6 +371,10 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     for (auto &op : block.getOperations()) {
       auto serializableOp = dyn_cast<IREE::VM::VMSerializableOp>(op);
       if (!serializableOp) {
+        if (op.hasTrait<OpTrait::IREE::VM::AssignmentOp>()) {
+          // Assignment ops are ok to not be serializable.
+          continue;
+        }
         op.emitOpError() << "is not serializable";
         return std::nullopt;
       }

@@ -2992,6 +2992,62 @@ def VM_BitcastF64I64Op :
   let summary = [{bitcast from a 64-bit float-point value to a 64-bit integer}];
 }
 
+def VM_CastAnyRefOp :
+    VM_PureOp<"cast.any.ref", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{casts from any ref to a specific ref type}];
+  let description = [{
+    Performs a runtime cast of an opaque `!vm.ref<?>` to a specific `!vm.ref<T>`
+    and raises an error if the operand does not match the expected type.
+    Null refs can always be cast between types.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$operand
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CastAnyRef>,
+    VM_EncOperand<"operand", 0>,
+    VM_EncTypeOf<"result">,
+    VM_EncResult<"result">,
+  ];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def VM_CastRefAnyOp :
+    VM_PureOp<"cast.ref.any", [VM_AssignmentOp]> {
+  let summary = [{casts from a specific ref to any ref type}];
+  let description = [{
+    Performs a compile-time widening cast of a specific `!vm.ref<T>` to an
+    opaque `!vm.ref<?>`.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$operand
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Native reduction (horizontal) arithmetic
 //===----------------------------------------------------------------------===//

@@ -28,6 +28,41 @@ namespace IREE {
 namespace Util {
 
 //===----------------------------------------------------------------------===//
+// util.cast
+//===----------------------------------------------------------------------===//
+
+OpFoldResult CastOp::fold(FoldAdaptor operands) {
+  if (auto castOp = dyn_cast_or_null<CastOp>(getOperand().getDefiningOp())) {
+    if (castOp.getOperand().getType() == getResult().getType()) {
+      return castOp.getOperand();
+    }
+  }
+  return {};
+}
+
+namespace {
+
+/// Folds cast ops into the result of other ops.
+/// Only safe to apply to ops that don't care about their types.
+struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
+  using OpRewritePattern<CastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    auto nullOp = dyn_cast_or_null<NullOp>(castOp.getOperand().getDefiningOp());
+    if (!nullOp) return failure();
+    rewriter.replaceOpWithNewOp<NullOp>(castOp, castOp.getResult().getType());
+    return success();
+  }
+};
+
+}  // namespace
+
+void CastOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                         MLIRContext *context) {
+  results.add<FoldCastIntoNullOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // util.cmp.eq
 //===----------------------------------------------------------------------===//
 

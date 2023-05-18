@@ -139,3 +139,69 @@ vm.module @ext_folds_i64 {
     vm.return %0 : i64
   }
 }
+
+// -----
+
+// CHECK-LABEL: @cast_any_ref_folds
+vm.module @cast_any_ref_folds {
+  // CHECK-LABEL: @cast_any_ref_nop
+  vm.func @cast_any_ref_nop(%arg0: !vm.buffer) -> !vm.buffer {
+    // CHECK-NOT: vm.cast.any.ref
+    %0 = vm.cast.any.ref %arg0 : !vm.buffer -> !vm.buffer
+    // CHECK: vm.return %arg0
+    vm.return %0 : !vm.buffer
+  }
+
+  // CHECK-LABEL: @cast_ref_any_ref
+  vm.func @cast_ref_any_ref(%arg0: !vm.buffer) -> !vm.buffer {
+    // CHECK-NOT: vm.cast.ref.any
+    %0 = vm.cast.ref.any %arg0 : !vm.buffer -> !vm.ref<?>
+    // CHECK-NOT: vm.cast.any.ref
+    %1 = vm.cast.any.ref %0 : !vm.ref<?> -> !vm.buffer
+    // CHECK: vm.return %arg0
+    vm.return %1 : !vm.buffer
+  }
+
+  // CHECK-LABEL: @cast_any_ref_null
+  vm.func @cast_any_ref_null() -> !vm.buffer {
+    // CHECK: %[[NULL:.+]] = vm.const.ref.zero : !vm.buffer
+    %0 = vm.const.ref.zero : !vm.ref<?>
+    // CHECK-NOT: vm.cast.any.ref
+    %1 = vm.cast.any.ref %0 : !vm.ref<?> -> !vm.buffer
+    // CHECK: vm.return %[[NULL]]
+    vm.return %1 : !vm.buffer
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_ref_any_folds
+vm.module @cast_ref_any_folds {
+  // CHECK-LABEL: @cast_ref_any_nop
+  vm.func @cast_ref_any_nop(%arg0: !vm.ref<?>) -> !vm.ref<?> {
+    // CHECK-NOT: vm.cast.ref.any
+    %0 = vm.cast.ref.any %arg0 : !vm.ref<?> -> !vm.ref<?>
+    // CHECK: vm.return %arg0
+    vm.return %0 : !vm.ref<?>
+  }
+
+  // CHECK-LABEL: @cast_any_ref_any
+  vm.func @cast_any_ref_any(%arg0: !vm.ref<?>) -> !vm.ref<?> {
+    // CHECK-NOT: vm.cast.any.ref
+    %0 = vm.cast.any.ref %arg0 : !vm.ref<?> -> !vm.buffer
+    // CHECK-NOT: vm.cast.ref.any
+    %1 = vm.cast.ref.any %0 : !vm.buffer -> !vm.ref<?>
+    // CHECK: vm.return %arg0
+    vm.return %1 : !vm.ref<?>
+  }
+
+  // CHECK-LABEL: @cast_ref_any_null
+  vm.func @cast_ref_any_null() -> !vm.ref<?> {
+    // CHECK: %[[NULL:.+]] = vm.const.ref.zero : !vm.ref<?>
+    %0 = vm.const.ref.zero : !vm.buffer
+    // CHECK-NOT: vm.cast.ref.any
+    %1 = vm.cast.ref.any %0 : !vm.buffer -> !vm.ref<?>
+    // CHECK: vm.return %[[NULL]]
+    vm.return %1 : !vm.ref<?>
+  }
+}

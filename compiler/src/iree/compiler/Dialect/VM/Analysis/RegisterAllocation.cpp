@@ -258,6 +258,14 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
     }
 
     for (auto &op : block->getOperations()) {
+      if (op.hasTrait<OpTrait::IREE::VM::AssignmentOp>()) {
+        // Assignment ops reuse operand registers for result registers.
+        for (int i = 0; i < op.getNumOperands(); ++i) {
+          map_[op.getResult(i)] = map_[op.getOpOperand(i).get()];
+        }
+        continue;
+      }
+
       for (auto &operand : op.getOpOperands()) {
         if (liveness_.isLastValueUse(operand.get(), &op,
                                      operand.getOperandNumber())) {
