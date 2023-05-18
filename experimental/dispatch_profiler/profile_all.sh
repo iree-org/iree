@@ -48,7 +48,7 @@ python "${TD}/compile.py" \
   ${DISPATCH_PROFILER_IREE_BIN_DIR_FLAG} \
   --generated-dir "${TD}"
 python "${TD}/profiler.py" \
-  --iree-bin-dir "${DISPATCH_PROFILER_IREE_BIN_DIR}" \
+  ${DISPATCH_PROFILER_IREE_BIN_DIR_FLAG} \
   --generated-dir "${TD}" \
   --dispatches="matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync,matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_128x128_16x5_tensorcore_mmasync" \
   --output "${DISPATCH_PROFILER_OUTPUT_DIR}/matmul_perf_tensor_core_a100.csv"
