@@ -1396,10 +1396,10 @@
 
 
 <h1 id="cpu-deployment">CPU Deployment<a class="headerlink" href="#cpu-deployment" title="Permanent link">link</a></h1>
-<p>IREE supports efficient program execution on CPU devices by using <a href="https://llvm.org/">LLVM</a>
-to compile all dense computations in each program into highly optimized CPU
-native instruction streams, which are embedded in one of IREE's deployable
-formats.</p>
+<p>IREE supports efficient program execution on CPU devices by using
+<a href="https://llvm.org/">LLVM</a> to compile all dense computations in each program into
+highly optimized CPU native instruction streams, which are embedded in one of
+IREE's deployable formats.</p>
 <p>To compile a program for CPU execution, pick one of IREE's supported executable
 formats:</p>
 <table>
@@ -1441,8 +1441,9 @@ architectures are well optimized; etc.</p>
 <h3 id="get-compiler-for-cpu-native-instructions">Get compiler for CPU native instructions<a class="headerlink" href="#get-compiler-for-cpu-native-instructions" title="Permanent link">link</a></h3>
 <h4 id="download-as-python-package">Download as Python package<a class="headerlink" href="#download-as-python-package" title="Permanent link">link</a></h4>
 <p>Python packages for various IREE functionalities are regularly published
-to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the <a href="../../bindings/python/">Python Bindings</a> page for more
-details. The core <code>iree-compiler</code> package includes the LLVM-based CPU compiler:</p>
+to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
+<a href="../../bindings/python/">Python Bindings</a> page for more details. The core
+<code>iree-compiler</code> package includes the LLVM-based CPU compiler:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
 </code></pre></div>
 <div class="admonition tip">
@@ -1455,11 +1456,13 @@ system's <code>PATH</code> environment variable:</p>
 </code></pre></div>
 </div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for your host platform and the
-<a href="../../building-from-source/android/">Android cross-compilation</a> or <a href="../../building-from-source/ios/">iOS cross-compilation</a> page
-if you are cross compiling for a mobile device. The LLVM (CPU) compiler backend
-is compiled in by default on all platforms.</p>
+<p>Please make sure you have followed the
+<a href="../../building-from-source/getting-started/">Getting started</a> page to build IREE
+for your host platform and the
+<a href="../../building-from-source/android/">Android cross-compilation</a> or
+<a href="../../building-from-source/ios/">iOS cross-compilation</a> page if you are cross
+compiling for a mobile device. The LLVM (CPU) compiler backend is compiled in by
+default on all platforms.</p>
 <p>Ensure that the <code>IREE_TARGET_BACKEND_LLVM_CPU</code> CMake option is <code>ON</code> when
 configuring for the host.</p>
 <div class="admonition tip">
@@ -1476,7 +1479,9 @@ sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
 <a href="https://mlir.llvm.org/">MLIR</a>) expected by the IREE compiler first.</p>
 <p>Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a> and convert it using IREE's
+weights from
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a>
+and convert it using IREE's
 <a href="../../getting-started/tensorflow/">TensorFlow importer</a>. Then,</p>
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">link</a></h4>
 <p>Run the following command (passing <code>--iree-input-type=</code> as needed for your
@@ -1491,17 +1496,19 @@ import tool):</p>
 <p class="admonition-title">Tip</p>
 <p>The <code>--iree-llvmcpu-target-triple=</code> flag tells the compiler to generate code
 for a specific type of CPU. You can see the list of supported targets with
-<code>iree-compile --iree-llvmcpu-list-targets</code>, or omit the flag to let LLVM infer
-the triple from your host machine (e.g. <code>x86_64-linux-gnu</code>).</p>
+<code>iree-compile --iree-llvmcpu-list-targets</code>, or omit the flag to let LLVM
+infer the triple from your host machine (e.g. <code>x86_64-linux-gnu</code>).</p>
 </div>
 <h3 id="get-iree-runtime-with-local-cpu-hal-driver">Get IREE runtime with local CPU HAL driver<a class="headerlink" href="#get-iree-runtime-with-local-cpu-hal-driver" title="Permanent link">link</a></h3>
 <p>You will need to get an IREE runtime that supports the local CPU HAL driver,
 along with the appropriate executable loaders for your application.</p>
 <h4 id="build-runtime-from-source">Build runtime from source<a class="headerlink" href="#build-runtime-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for your host platform and the
-<a href="../../building-from-source/android/">Android cross-compilation</a> page if you are cross compiling for
-Android. The local CPU HAL drivers are compiled in by default on all platforms.</p>
+<p>Please make sure you have followed the
+<a href="../../building-from-source/getting-started/">Getting started</a> page to build IREE
+for your host platform and the
+<a href="../../building-from-source/android/">Android cross-compilation</a> page if you are
+cross compiling for Android. The local CPU HAL drivers are compiled in by
+default on all platforms.</p>
 <!-- TODO(??): a way to verify the driver is compiled in and supported -->
 
 <p>Ensure that the <code>IREE_HAL_DRIVER_LOCAL_TASK</code> and

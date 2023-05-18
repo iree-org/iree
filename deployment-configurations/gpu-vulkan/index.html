@@ -1424,11 +1424,11 @@
 
 
 <h1 id="vulkan-gpu-hal-driver">Vulkan GPU HAL Driver<a class="headerlink" href="#vulkan-gpu-hal-driver" title="Permanent link">link</a></h1>
-<p>IREE can accelerate model execution on GPUs via <a href="https://www.khronos.org/vulkan/">Vulkan</a>, a low-overhead
-graphics and compute API. Vulkan is cross-platform: it is available on many
-operating systems, including Android, Linux, and Windows. Vulkan is also
-cross-vendor: it is supported by most GPU vendors, including AMD, ARM, Intel,
-NVIDIA, and Qualcomm.</p>
+<p>IREE can accelerate model execution on GPUs via
+<a href="https://www.khronos.org/vulkan/">Vulkan</a>, a low-overhead graphics and compute
+API. Vulkan is cross-platform: it is available on many operating systems,
+including Android, Linux, and Windows. Vulkan is also cross-vendor: it is
+supported by most GPU vendors, including AMD, ARM, Intel, NVIDIA, and Qualcomm.</p>
 <!-- TODO(??): when to use CPU vs GPU -->
 
 <h2 id="support-matrix">Support matrix<a class="headerlink" href="#support-matrix" title="Permanent link">link</a></h2>
@@ -1487,9 +1487,9 @@ make sure the device's Android version is 10 or higher.</p>
 <div class="highlight"><pre><span></span><code>vulkaninfo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apiVersion
 </code></pre></div>
 <p>If <code>vulkaninfo</code> does not exist, you will need to <a href="https://vulkan.lunarg.com/sdk/home/">install the latest Vulkan
-SDK</a>. For Ubuntu 18.04/20.04, installing via LunarG's package
-repository is recommended, as it places Vulkan libraries and tools under
-system paths so it's easy to discover.</p>
+SDK</a>. For Ubuntu 18.04/20.04,
+installing via LunarG's package repository is recommended, as it places
+Vulkan libraries and tools under system paths so it's easy to discover.</p>
 <p>If the showed version is lower than Vulkan 1.2, you will need to update the
 driver for your GPU.</p>
 </div>
@@ -1511,22 +1511,25 @@ so it can execute the model on GPU via Vulkan.</p>
 <!-- TODO(??): vcpkg -->
 
 <h4 id="build-runtime-from-source">Build runtime from source<a class="headerlink" href="#build-runtime-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows and the <a href="../../building-from-source/android/">Android cross-compilation</a>
-page for Android. The Vulkan HAL driver is compiled in by default on non-Apple
-platforms.</p>
+<p>Please make sure you have followed the
+<a href="../../building-from-source/getting-started/">Getting started</a> page to build IREE
+for Linux/Windows and the
+<a href="../../building-from-source/android/">Android cross-compilation</a> page for
+Android. The Vulkan HAL driver is compiled in by default on non-Apple platforms.</p>
 <!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
 
 <p>Ensure that the <code>IREE_HAL_DRIVER_VULKAN</code> CMake option is <code>ON</code> when configuring
 for the target.</p>
 <h3 id="get-compiler-for-spir-v-exchange-format">Get compiler for SPIR-V exchange format<a class="headerlink" href="#get-compiler-for-spir-v-exchange-format" title="Permanent link">link</a></h3>
-<p>Vulkan expects the program running on GPU to be expressed by the <a href="https://www.khronos.org/registry/spir-v/">SPIR-V</a>
-binary exchange format, which the model must be compiled into.</p>
+<p>Vulkan expects the program running on GPU to be expressed by the
+<a href="https://www.khronos.org/registry/spir-v/">SPIR-V</a> binary exchange format, which
+the model must be compiled into.</p>
 <!-- TODO(??): vcpkg -->
 
 <h4 id="download-as-python-package">Download as Python package<a class="headerlink" href="#download-as-python-package" title="Permanent link">link</a></h4>
 <p>Python packages for various IREE functionalities are regularly published
-to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the <a href="../../bindings/python/">Python Bindings</a> page for more
+to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
+<a href="../../bindings/python/">Python Bindings</a> page for more
 details. The core <code>iree-compiler</code> package includes the SPIR-V compiler:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
 </code></pre></div>
@@ -1540,10 +1543,11 @@ system's <code>PATH</code> environment variable.</p>
 </code></pre></div>
 </div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows and the <a href="../../building-from-source/android/">Android cross-compilation</a>
-page for Android. The SPIR-V compiler backend is compiled in by default on all
-platforms.</p>
+<p>Please make sure you have followed the
+<a href="../../building-from-source/getting-started/">Getting started</a> page to build IREE
+for Linux/Windows and the
+<a href="../../building-from-source/android/">Android cross-compilation</a> page for
+Android. The SPIR-V compiler backend is compiled in by default on all platforms.</p>
 <p>Ensure that the <code>IREE_TARGET_BACKEND_VULKAN_SPIRV</code> CMake option is <code>ON</code> when
 configuring for the host.</p>
 <h2 id="compile-and-run-the-model">Compile and run the model<a class="headerlink" href="#compile-and-run-the-model" title="Permanent link">link</a></h2>
@@ -1555,7 +1559,9 @@ sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
 <a href="https://mlir.llvm.org/">MLIR</a>) expected by main IREE compilers first.</p>
 <p>Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a> and convert it using IREE's
+weights from
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a>
+and convert it using IREE's
 <a href="../../getting-started/tensorflow/">TensorFlow importer</a>. Then,</p>
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">link</a></h4>
 <p>Run the following command (passing <code>--iree-input-type=</code> as needed for your
@@ -1568,9 +1574,9 @@ import tool):</p>
 </code></pre></div>
 <p>where <code>iree_input.mlir</code> is the imported program.</p>
 <p>Note that a target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
-to compile towards each GPU architecture. If no triple is specified then a safe but
-more limited default will be used.
-We don't support the full spectrum here<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>; the following table summarizes the
+to compile towards each GPU architecture. If no triple is specified then a safe
+but more limited default will be used. We don't support the full spectrum
+here<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>; the following table summarizes the
 currently recognized ones:</p>
 <table>
 <thead>
