@@ -17,7 +17,8 @@ name: dispatch_profiler
 
 on:
   schedule:
-    - cron: "0 13 * * *"
+    # Run daily at 2:00 PM (14:00) every weekday (Monday to Friday)
+    - cron: "0 14 * * 1-5"
   workflow_dispatch:
   pull_request:
 
@@ -41,8 +42,7 @@ jobs:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
-      - os-family=Linux
+      - machine-type=a2-highgpu-1g
     env:
       RESULTS_DIR: dispatch-profiler-results-cuda
       GCS_UPLOAD_PARENT_DIR: "gs://dispatch-profiler-artifacts/cuda"
@@ -62,7 +62,7 @@ jobs:
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-          --gpus all \
+            --gpus all \
             gcr.io/iree-oss/nvidia-bleeding-edge@sha256:e020d5c748f293674ab5f63533d6bf2a6a83b4c3045da10f76aa2ef2236f008b \
             ./experimental/dispatch_profiler/profile_all.sh "${BUILD_DIR}/install/bin" \
             "${RESULTS_DIR}"
