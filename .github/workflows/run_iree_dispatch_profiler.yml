@@ -68,5 +68,5 @@ jobs:
             "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |
-          export GCS_ARTIFACT_DIR="$(date +'%Y-%m-%d').sha_${IREE_SHA}.timestamp_$(date +'%s')"
+          GCS_ARTIFACT_DIR="$(date +'%Y-%m-%d').sha_${IREE_SHA}.timestamp_$(date +'%s')"
           gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_ARTIFACT_DIR}/"
