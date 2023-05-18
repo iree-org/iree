@@ -184,6 +184,14 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
 
   pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
 
+  // Check to make sure we are not exceeding shared memory usage limit.
+  auto getSharedMemoryLimit = [](func::FuncOp func) {
+    auto moduleOp = func->getParentOfType<ModuleOp>();
+    spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
+    return target.getResourceLimits().getMaxComputeSharedMemorySize();
+  };
+  pm.addPass(createGPUCheckResourceUsagePass(getSharedMemoryLimit));
+
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
