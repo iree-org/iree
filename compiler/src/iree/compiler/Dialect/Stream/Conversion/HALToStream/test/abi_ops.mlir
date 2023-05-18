@@ -84,3 +84,18 @@ func.func @exportBufferViewInPlace(%tensor: tensor<?x?x4xf32>, %dim0: index, %di
   // CHECK: return %[[STORAGE_RESULT]]
   return %0 : !hal.buffer_view
 }
+
+// -----
+
+// As with @exportBufferViewInPlace above but using !hal.buffer_view storage.
+
+// CHECK-LABEL: @exportBufferViewInPlaceToView
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[STORAGE:.+]]: !hal.buffer_view)
+func.func @exportBufferViewInPlaceToView(%tensor: tensor<?x?x4xf32>, %dim0: index, %dim1: index, %storage: !hal.buffer_view) -> !hal.buffer_view {
+  //      CHECK: %[[STORAGE_BUFFER:.+]] = hal.buffer_view.buffer<%[[STORAGE]]
+  //      CHECK: %[[STORAGE_LENGTH:.+]] = hal.buffer.length<%[[STORAGE_BUFFER]]
+  // CHECK-NEXT: %[[STORAGE_IMPORT:.+]] = stream.tensor.import %[[STORAGE]]
+  // CHECK-SAME:   : !hal.buffer_view -> tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[STORAGE_LENGTH]]}
+  %0 = hal.tensor.export %tensor into(%storage : !hal.buffer_view) : tensor<?x?x4xf32>{%dim0, %dim1} -> !hal.buffer_view
+  return %0 : !hal.buffer_view
+}
