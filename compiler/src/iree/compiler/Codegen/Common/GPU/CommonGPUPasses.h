@@ -52,6 +52,9 @@ LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction = true);
 // Passes
 //===----------------------------------------------------------------------===//
 
+/// Checks GPU specific resource usage constraints like shared memory limits.
+std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass();
+
 /// Creates a pass to distribute scf.forall ops to GPU processors.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute();
 

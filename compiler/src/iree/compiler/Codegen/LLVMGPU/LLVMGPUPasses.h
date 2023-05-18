@@ -68,10 +68,6 @@ std::unique_ptr<Pass> createExtractAddressComputationGPUPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUCastAddressSpaceFunction();
 
-/// Checks GPU backend specific IR constraints such as shared memory limits.
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMGPUCheckIRBeforeLLVMConversionPass();
-
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.

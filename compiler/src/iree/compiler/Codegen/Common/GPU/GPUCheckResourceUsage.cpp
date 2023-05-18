@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/CommandLine.h"
@@ -20,9 +20,8 @@ static llvm::cl::opt<int> clMaxGPUSharedMemSize(
     llvm::cl::init(163 * 1024));
 
 namespace {
-struct LLVMGPUCheckIRBeforeLLVMConversionPass
-    : LLVMGPUCheckIRBeforeLLVMConversionBase<
-          LLVMGPUCheckIRBeforeLLVMConversionPass> {
+struct GPUCheckResourceUsagePass
+    : GPUCheckResourceUsageBase<GPUCheckResourceUsagePass> {
   void runOnOperation() override;
 };
 }  // namespace
@@ -78,7 +77,7 @@ static LogicalResult checkGPUAllocationSize(func::FuncOp funcOp) {
   return success();
 }
 
-void LLVMGPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
+void GPUCheckResourceUsagePass::runOnOperation() {
   auto moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     if (failed(checkGPUAllocationSize(funcOp))) {
@@ -87,9 +86,8 @@ void LLVMGPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMGPUCheckIRBeforeLLVMConversionPass() {
-  return std::make_unique<LLVMGPUCheckIRBeforeLLVMConversionPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass() {
+  return std::make_unique<GPUCheckResourceUsagePass>();
 }
 
 }  // namespace iree_compiler
