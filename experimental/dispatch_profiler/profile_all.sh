@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2022 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -13,6 +13,11 @@
 # Recommend getting default 'python' to be python 3. For example on Debian:
 #   sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 # Or launch with python=/some/path
+#
+# Arg 1: The directory where iree-compile, iree-benchmark-module, etc. are
+#        located. If unset, uses IREE Dispatch Profiler defaults.
+# Arg 2: The directory where output is written. If unset, uses
+#        `dispatch_profiler_output` in current working directory.
 
 set -euo pipefail
 
@@ -22,10 +27,9 @@ PYTHON="${PYTHON:-python3}"
 
 DISPATCH_PROFILER_IREE_BIN_DIR=${1:-""}
 if [[ -z "${DISPATCH_PROFILER_IREE_BIN_DIR}" ]]; then
-  DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="" 
+  DISPATCH_PROFILER_IREE_BIN_DIR_FLAG=""
 else
   DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="--iree-bin-dir=${DISPATCH_PROFILER_IREE_BIN_DIR}"
- 
 fi
 
 DISPATCH_PROFILER_OUTPUT_DIR="${2:-"dispatch_profiler_output"}"
