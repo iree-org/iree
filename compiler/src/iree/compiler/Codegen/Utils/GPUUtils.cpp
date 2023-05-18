@@ -589,8 +589,7 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       // TODO: The condition for unrolling elementwise should be restricted
       // only to operations that need unrolling (connected to the contract).
-      if (vecType.getRank() < 2)
-        return std::nullopt;
+      if (vecType.getRank() < 2) return std::nullopt;
 
       // First check whether there is a slice to infer the shape from. This is
       // required for cases where the accumulator type differs from the input
