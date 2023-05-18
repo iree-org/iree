@@ -31,7 +31,7 @@ VENV_DIR="dispatch-profiler.venv"
 echo "Setting up venv dir: ${VENV_DIR}"
 echo "Python: ${PYTHON}"
 echo "Python version: $("${PYTHON}" --version)"
-echo "Dispatch Profiler IREE bin dir flag: ${DISPATCH_PROFILER_IREE_BIN_DIR}"
+echo "Dispatch Profiler IREE bin dir flag: ${DISPATCH_PROFILER_IREE_BIN_DIR_FLAG}"
 echo "Dispatch Profiler output dir: ${DISPATCH_PROFILER_OUTPUT_DIR}"
 
 ${PYTHON} -m venv "${VENV_DIR}"
