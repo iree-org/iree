@@ -59,7 +59,7 @@ jobs:
         run: tar -vxf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Running IREE Dispatch Profiler on CUDA"
         run: |
-          mkdir ${RESULTS_DIR}
+          mkdir "${RESULTS_DIR}"
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
             gcr.io/iree-oss/nvidia-bleeding-edge@sha256:e020d5c748f293674ab5f63533d6bf2a6a83b4c3045da10f76aa2ef2236f008b \

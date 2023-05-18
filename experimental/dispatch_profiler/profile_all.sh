@@ -21,7 +21,7 @@ TD="$(cd $(dirname $0) && pwd)"
 PYTHON="${PYTHON:-python3}"
 
 DISPATCH_PROFILER_IREE_BIN_DIR=${1:-""}
-if [ -z ${DISPATCH_PROFILER_IREE_BIN_DIR} ]; then
+if [[ -z "${DISPATCH_PROFILER_IREE_BIN_DIR}" ]]; then
   DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="" 
 else
   DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="--iree-bin-dir=${DISPATCH_PROFILER_IREE_BIN_DIR}"
@@ -47,7 +47,7 @@ source "${VENV_DIR}/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install --upgrade -r "${TD}/requirements.txt"
 
-mkdir -p ${DISPATCH_PROFILER_OUTPUT_DIR}
+mkdir -p "${DISPATCH_PROFILER_OUTPUT_DIR}"
 
 python "${TD}/generator.py" \
   --generated-dir "${DISPATCH_PROFILER_GENERATED_DIR}"
