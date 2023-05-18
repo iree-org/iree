@@ -6,7 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -57,6 +57,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
   });
 
   IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
+  vectorizationOptions.setVectorizeGatherAccesses(true);
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
                         linalg::Conv1DNwcWcfOp, linalg::Conv1DNcwFcwOp,
                         linalg::TransposeOp>::insert(patterns,

@@ -78,7 +78,8 @@ static IREE::Util::GlobalOp createBufferLikeGlobalOp(
       loc, tensorType, zeroOp, /*result_dims=*/ValueRange{});
   // hal.tensor.export
   auto bufferExportOp = initializerBuilder.create<IREE::HAL::TensorExportOp>(
-      loc, globalOp.getType(), splatOp.getResult(), /*name=*/nullptr);
+      loc, globalOp.getType(), splatOp.getResult(),
+      TypeAttr::get(splatOp.getType()), /*name=*/nullptr);
   // util.optimization_barrier (try to prevent optimizations across the export)
   auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
       loc, bufferExportOp.getTarget());
@@ -133,7 +134,7 @@ static IREE::Util::GlobalOp createImportBufferViewGlobalOp(
 // op.
 //
 // Example:
-//  %1 = hal.tensor.export %0 into %storage : tensor<4xi32> -> !hal.buffer_view
+//  %1 = hal.tensor.export %0 into(%storage) : tensor<4xi32> -> !hal.buffer_view
 // ->
 //  util.global @some_fn_arg0 : !hal.buffer
 //  util.initializer { ... }

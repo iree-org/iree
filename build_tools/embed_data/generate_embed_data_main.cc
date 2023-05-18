@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <iomanip>

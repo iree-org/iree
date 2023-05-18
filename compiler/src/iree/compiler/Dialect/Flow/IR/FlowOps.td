@@ -1572,7 +1572,7 @@ def FLOW_DispatchWorkloadOrdinalOp :
 // Collective communication ops
 //===----------------------------------------------------------------------===//
 
-def FLOW_ChannelDefaultOp : FLOW_Op<"channel.default", [
+def FLOW_ChannelDefaultOp : FLOW_PureOp<"channel.default", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
 ]> {
   let summary = [{returns a default collective communication channel}];
@@ -1621,9 +1621,11 @@ def FLOW_ChannelSplitOp : FLOW_Op<"channel.split", [
     `:` type($channel) `->` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
-def FLOW_ChannelRankOp : FLOW_Op<"channel.rank", [
+def FLOW_ChannelRankOp : FLOW_PureOp<"channel.rank", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{returns the rank of the local participant in the group}];
@@ -1645,7 +1647,7 @@ def FLOW_ChannelRankOp : FLOW_Op<"channel.rank", [
   }];
 }
 
-def FLOW_ChannelCountOp : FLOW_Op<"channel.count", [
+def FLOW_ChannelCountOp : FLOW_PureOp<"channel.count", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{returns the total number of participants in the group}];

@@ -160,12 +160,15 @@ LogicalResult ReturnOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, StringAttr name) {
-  build(builder, result, resultType, source, /*waitFence=*/Value{}, name);
+                           Type resultType, Value source,
+                           TypeAttr targetEncoding, StringAttr name) {
+  build(builder, result, resultType, source, targetEncoding,
+        /*waitFence=*/Value{}, name);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, Value waitFence,
+                           Type resultType, Value source,
+                           TypeAttr targetEncoding, Value waitFence,
                            StringAttr name) {
   auto shapedType = resultType.cast<ShapedType>();
   assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
@@ -179,8 +182,8 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         result.location, builder.getIndexType(), source,
         builder.getIndexAttr(i)));
   }
-  build(builder, result, resultType, source, TypeAttr::get(shapedType),
-        dynamicDims, waitFence, name);
+  build(builder, result, resultType, source, targetEncoding, dynamicDims,
+        waitFence, name);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
@@ -253,11 +256,12 @@ LogicalResult TensorImportOp::verify() {
 }
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, StringAttr name) {
+                           Type resultType, Value source,
+                           TypeAttr sourceEncoding, StringAttr name) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
-  build(builder, result, resultType, source, TypeAttr::get(source.getType()),
-        dynamicDims, /*target_storage=*/nullptr, name);
+  build(builder, result, resultType, source, sourceEncoding, dynamicDims,
+        /*target_storage=*/nullptr, name);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {

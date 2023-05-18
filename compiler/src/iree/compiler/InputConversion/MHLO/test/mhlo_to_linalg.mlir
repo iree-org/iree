@@ -19,12 +19,11 @@ func.func @concatenate(%arg0: tensor<2x2xi32>, %arg1: tensor<2x4xi32>) -> tensor
 
 // CHECK: ml_program.global private mutable @variable(dense<0> : tensor<2xi32>) : tensor<2xi32>
 ml_program.global private mutable @variable(dense<0> : tensor<2xui32>) : tensor<2xui32>
-// CHECK: func.func @global_types() -> tensor<2xui32>
+// CHECK: func.func @global_types() -> (tensor<2xi32> {iree.abi.encoding = tensor<2xui32>})
 func.func @global_types() -> tensor<2xui32> {
   // CHECK-NEXT: %[[VALUE:.+]] = ml_program.global_load @variable : tensor<2xi32>
   %0 = ml_program.global_load @variable : tensor<2xui32>
-  // CHECK-NEXT: %[[CAST:.*]] = tensor.bitcast %[[VALUE]] : tensor<2xi32> to tensor<2xui32>
-  // CHECK: return %[[CAST]] : tensor<2xui32>
+  // CHECK: return %[[VALUE]] : tensor<2xi32>
   return %0 : tensor<2xui32>
 }
 
@@ -41,19 +40,25 @@ func.func @optimization_barrier(%arg0: tensor<3x4xf32>, %arg1: tensor<4xi32>) ->
 
 // -----
 
-// CHECK: @unsigned_integer_input_output(%[[ARG0:.*]]: tensor<2x2xui32>, %[[ARG1:.*]]: tensor<2x2xui32>) -> tensor<2x2xui32>
+// CHECK: @unsigned_integer_input_output(%[[ARG0:.*]]: tensor<2x2xi32> {iree.abi.encoding = tensor<2x2xui32>}, %[[ARG1:.*]]: tensor<2x2xi32> {iree.abi.encoding = tensor<2x2xui32>}) -> (tensor<2x2xi32> {iree.abi.encoding = tensor<2x2xui32>})
 func.func @unsigned_integer_input_output(%arg0: tensor<2x2xui32>, %arg1: tensor<2x2xui32>) -> tensor<2x2xui32> {
-  // CHECK: %[[CAST0:.*]] = tensor.bitcast %[[ARG0]] : tensor<2x2xui32> to tensor<2x2xi32>
-  // CHECK: %[[CAST1:.*]] = tensor.bitcast %[[ARG1]] : tensor<2x2xui32> to tensor<2x2xi32>
-  // CHECK: %[[INIT:.*]] = tensor.empty() : tensor<2x2xi32> 
-  // CHECK: %[[LINALG:.*]] = linalg.generic
-  //  CHECK-SAME:       ins(%[[CAST0]], %[[CAST1]] : tensor<2x2xi32>, tensor<2x2xi32>
+  // CHECK: %[[INIT:.*]] = tensor.empty() : tensor<2x2xi32>
+  // CHECK: %[[RESULT:.*]] = linalg.generic
+  //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] : tensor<2x2xi32>, tensor<2x2xi32>
   //  CHECK-SAME:       outs(%[[INIT]] : tensor<2x2xi32>)
-  // CHECK: ^bb0(%[[IN0:.*]]: i32, %[[IN1:.*]]: i32, %out: i32): 
+  // CHECK: ^bb0(%[[IN0:.*]]: i32, %[[IN1:.*]]: i32, %out: i32):
   // CHECK: %[[ADD:.*]] = arith.addi %[[IN0]], %[[IN1]] : i32
-  // CHECK: linalg.yield %[[ADD:.*]] : i32 
+  // CHECK: linalg.yield %[[ADD:.*]] : i32
   %0 = "mhlo.add"(%arg0, %arg1) : (tensor<2x2xui32>, tensor<2x2xui32>) -> tensor<2x2xui32>
-  // CHECK: %[[CAST_RESULT:.*]] = tensor.bitcast %[[LINALG]] : tensor<2x2xi32> to tensor<2x2xui32>
-  // CHECK: return %[[CAST_RESULT]]
+  // CHECK: return %[[RESULT]] : tensor<2x2xi32>
   return %0 : tensor<2x2xui32>
+}
+
+// -----
+
+// CHECK: func.func @aliasing_output
+// CHECK-SAME:    %[[ARG0:[^:]+]]: tensor<3x4xf32> {iree.abi.output = 1 : index}
+// CHECK-SAME:    %[[ARG1:[^:]+]]: tensor<4xi32> {iree.abi.encoding = tensor<4xui32>}
+func.func @aliasing_output(%arg0: tensor<3x4xf32> {tf.aliasing_output = 1 : i32}, %arg1: tensor<4xui32>) -> (tensor<4xui32>, tensor<3x4xf32>) {
+  return %arg1, %arg0 : tensor<4xui32>, tensor<3x4xf32>
 }

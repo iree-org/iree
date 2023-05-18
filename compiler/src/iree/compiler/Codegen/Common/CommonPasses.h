@@ -68,14 +68,6 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertToDestinationPassingStylePass(
     bool useWARForCooperativeMatrixCodegen = false);
 
-// Distributes vector ops to all threads/warps in a GPU workgroup.
-// `getWarpSize` is for deciding the warp size to use; it takes the
-// current function containing those vector ops as the argument.
-// If nullptr, warp size 32 will be used.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertVectorReductionToGPUPass(
-    std::function<int(func::FuncOp)> getWarpSize = nullptr);
-
 // Decompose affine.apply operations into sub affine.apply that can be
 // hoisted in different loops.
 std::unique_ptr<Pass> createDecomposeAffineOpsPass();
@@ -98,10 +90,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass();
-
-// Extract address computations (including the ones with GPU instructions) into
-// their own separate instructions.
-std::unique_ptr<Pass> createExtractAddressComputationGPUPass();
 
 // Extract address computations into their own separate instructions.
 std::unique_ptr<Pass> createExtractAddressComputationPass();
@@ -128,71 +116,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 /// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFuseTensorPadWithConsumerPass();
-
-/// Creates a pass to distribute scf.forall ops to GPU processors.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute();
-
-/// Convert GPU shared memory copies to distributed
-/// transfer_read/transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createGPUDistributeSharedMemoryCopy();
-
-/// Apply multi-buffering transformation.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUMultiBuffering(
-    unsigned numBuffers = 5);
-
-/// Pipeline shared memory copy by apply software pipelining scheduling where
-/// copy to shared memory is in stage 0 and the rest of the operations are in
-/// stage `depth - 1`.
-enum class PipeliningSchedulingStrategy {
-  // Schedule the load from global memory into stage 0 and the associated store
-  // will be in stage depth - 1.
-  loadGlobalStage0 = 0,
-  // Schedule both the load from global and the store to shared memory in stage
-  // 0. The compute operations will be in stage depth-1. This means there won't
-  // be vector registers carried between stages.
-  loadStoreStage0 = 1,
-  // Schedule optimized when using nvidia tensorcore with async copies. It will
-  // set all the copies in stage 0 then it will prefecth part of loads in `depth
-  // - 2` stage and keep the rest of the load and compute into `depth - 1`.
-  nvidiaTensorCore = 2,
-};
-
-/// Apply software pipelining.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    bool epiloguePeeling = true, unsigned depth = 1,
-    PipeliningSchedulingStrategy schedule =
-        PipeliningSchedulingStrategy::loadGlobalStage0);
-
-/// Apply transformation to reduce the number of bank conflicts when accessing
-/// shared memory by padding fastest moving dimension with the specified size.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
-
-enum class GPUPromoteSharedMemPattern {
-  ContractionOpPattern = 0,
-  TransposeOpPattern = 1,
-};
-
-// Creates a pass to tile reduction dimensions and create allocations for some
-// tensor values to use GPU shared memory.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorAlloc(
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
-
-/// Tiles Linalg ops in the given `funcOp` to serial loops without distribution.
-LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction = true);
-
-// Creates a pass to tile tensor (linalg) ops within a GPU workgroup.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTile(
-    bool distributeToWarp = false);
-
-/// Tile reductions and generate serial loops around reductions.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
-
-/// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
-    bool generateContract = true, int64_t maxVectorSize = 4096);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
@@ -277,10 +200,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
-
-/// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
-    unsigned swizzleLogTile = 0);
 
 /// Pass to specialize workgroup distribution loops
 std::unique_ptr<OperationPass<func::FuncOp>>

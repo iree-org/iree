@@ -56,13 +56,28 @@ no-duplicate-heading:
 # Allow images w/o alt-text
 no-alt-text: false
 
-# Allow bare URLs
-no-bare-urls: false
-
 # Allow first line to be something other than a heading
 # (we use this for date/author in blog posts)
 first-line-heading: false
 
-# markdownlint does not recognize link references in content tabs, so it
-# reports false positive errors for "unused" link references
-link-image-reference-definitions: false
+# Link style:
+#   Markdown links can normally provide link destinations elsewhere and
+#   simply reference those destinations by a label, e.g.
+#
+#     <!-- Middle of file -->
+#     [text][label]
+#
+#     <!-- Bottom of file -->
+#     [label]: https://example.com/label
+#
+#   The 'reference-links-images' and 'link-image-reference-definitions' rules
+#   can (respectively) help ensure that all referenced labels exist and that no
+#   labels are orphaned. However, markdownlint does not recognize link
+#   references in content tabs so it reports false positive errors for "unused"
+#   link references. Because we can't reliably lint such references, we
+#   recommend _not using that style of linking at all_.
+#
+#   There is no rule (yet?) to enforce inline links over reference links, but
+#   https://github.com/DavidAnson/markdownlint/issues/40 may add one.
+#
+# TLDR: Add your links inline, as in [text](www.example.com).

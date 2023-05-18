@@ -48,6 +48,7 @@ static llvm::cl::opt<std::string> clTraceDispatch(
                    "deduplication (@function_name:<index>) and tracing all "
                    "occurrences of the dispatch symbol."),
     llvm::cl::init(""));
+
 static llvm::cl::opt<bool> clDemoteI64ToI32(
     "iree-flow-demote-i64-to-i32",
     llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
@@ -74,57 +75,63 @@ static llvm::cl::opt<bool> clDemoteF64ToF32(
                    "unconditionally before main flow conversions."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clDetensoring(
+    "iree-flow-enable-detensoring",
+    llvm::cl::desc(
+        "Enable changing of tensor operations into scalar operations."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnablePadHandling(
     "iree-flow-enable-pad-handling",
-    llvm::cl::desc("Enable native handling of tensor.pad operations"),
+    llvm::cl::desc("Enable native handling of tensor.pad operations."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     "iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     "iree-flow-enable-fuse-padding-into-linalg-producer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFuseMultiUse(
-    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops"),
+    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
-    llvm::cl::desc("Generate the workload region"), llvm::cl::init(true));
+    llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clEnableDataTiling(
-    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
+    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
-    llvm::cl::desc("Enable normalizing input indexing map to identity"),
+    llvm::cl::desc("Enable normalizing input indexing map to identity."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDumpDispatchGraph(
     "iree-flow-dump-dispatch-graph",
-    llvm::cl::desc("Dump a dot graph for dispatches"), llvm::cl::init(false));
+    llvm::cl::desc("Dump a dot graph for dispatches."), llvm::cl::init(false));
 
 static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
     "iree-flow-dump-dispatch-graph-output-file",
-    llvm::cl::desc("Output file name for a dispatch graph dump"),
+    llvm::cl::desc("Output file name for a dispatch graph dump."),
     llvm::cl::init("dispatch.dot"));
 
 static llvm::cl::opt<std::string> clDispatchTransformFileName(
     "iree-flow-dispatch-use-transform-dialect",
-    llvm::cl::desc("mlir file containing a top-level module that specifies "
+    llvm::cl::desc("MLIR file containing a top-level module that specifies "
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
 
 static llvm::cl::opt<bool> clZeroFillEmptyTensors(
     "iree-flow-zero-fill-empty-tensors",
     llvm::cl::desc(
-        "Zero fill empty tensors instead of leaving them uninitialized"),
+        "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
 namespace mlir {
@@ -240,7 +247,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // Elementwise fusion.
       .addPass(
           []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
-      .addPass(mlir::createLinalgDetensorizePass)
+      .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       .addPass(createCollapseDimsPass)

@@ -2957,6 +2957,48 @@ void TimepointAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ElideUnusedOp<TimepointAwaitOp>>(context);
 }
 
+//===----------------------------------------------------------------------===//
+// stream.channel.create
+//===----------------------------------------------------------------------===//
+
+void ChannelCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelCreateOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.rank
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ChannelRankOp::fold(FoldAdaptor operands) {
+  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+          getChannel().getDefiningOp())) {
+    return createOp.getRank();
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.count
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ChannelCountOp::fold(FoldAdaptor operands) {
+  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+          getChannel().getDefiningOp())) {
+    return createOp.getCount();
+  }
+  return {};
+}
+
 }  // namespace Stream
 }  // namespace IREE
 }  // namespace iree_compiler

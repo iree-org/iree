@@ -24,7 +24,7 @@ CUDA or ROCm environment. It can be verified by the following steps:
     ```
 
     If `nvidia-smi` does not exist, you will need to
-    [install the latest CUDA Toolkit SDK][cuda-toolkit].
+    [install the latest CUDA Toolkit SDK](https://developer.nvidia.com/cuda-downloads).
 
 === "AMD/ROCm"
 
@@ -35,7 +35,7 @@ CUDA or ROCm environment. It can be verified by the following steps:
     ```
 
     If `rocm-smi` does not exist, you will need to
-    [install the latest ROCm Toolkit SDK][rocm-toolkit].
+    [install the latest ROCm Toolkit SDK](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html)).
 
 ## Get runtime and compiler
 
@@ -46,8 +46,9 @@ hardware) or ROCm (for AMD hardware) HAL driver.
 
 #### Build runtime from source
 
-Please make sure you have followed the [Getting started][get-started] page
-to build IREE from source, then enable the CUDA HAL driver with the
+Please make sure you have followed the
+[Getting started](../building-from-source/getting-started.md) page to build
+IREE from source, then enable the CUDA HAL driver with the
 `IREE_HAL_DRIVER_CUDA` option or the experimental ROCm HAL driver with the
 `IREE_EXTERNAL_HAL_DRIVERS=rocm` option.
 
@@ -56,7 +57,7 @@ to build IREE from source, then enable the CUDA HAL driver with the
 === "Nvidia/CUDA"
 
     Python packages for various IREE functionalities are regularly published
-    to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
+    to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the [Python Bindings][../bindings/python.md] page for more
     details. The core `iree-compiler` package includes the CUDA compiler:
 
     ``` shell
@@ -78,8 +79,9 @@ to build IREE from source, then enable the CUDA HAL driver with the
 
 #### Build compiler from source
 
-Please make sure you have followed the [Getting started][get-started] page
-to build the IREE compiler, then enable the CUDA compiler target with the
+Please make sure you have followed the
+[Getting started](../building-from-source/getting-started.md) page to build the
+IREE compiler, then enable the CUDA compiler target with the
 `IREE_TARGET_BACKEND_CUDA` option or the ROCm compiler target with the
 `IREE_TARGET_BACKEND_ROCM` option.
 
@@ -93,11 +95,13 @@ the GPU.
 IREE compilers transform a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
-[MLIR][mlir]) expected by main IREE compilers first.
+[MLIR](https://mlir.llvm.org/)) expected by main IREE compilers first.
 
 Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
-[TensorFlow importer][tf-import]. Then,
+weights from
+[TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
+and convert it using IREE's
+[TensorFlow importer](../getting-started/tensorflow.md). Then,
 
 #### Compile using the command-line
 
@@ -190,12 +194,3 @@ The above assumes the exported function in the model is named as `predict` and
 it expects one 224x224 RGB image. We are feeding in an image with all 0 values
 here for brevity, see `iree-run-module --help` for the format to specify
 concrete values.
-
-[get-started]: ../building-from-source/getting-started.md
-[mlir]: https://mlir.llvm.org/
-[python-bindings]: ../bindings/python.md
-[tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: ../getting-started/tensorflow.md
-[tflite-import]: ../getting-started/tensorflow-lite.md
-[cuda-toolkit]: https://developer.nvidia.com/cuda-downloads
-[rocm-toolkit]: https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html
