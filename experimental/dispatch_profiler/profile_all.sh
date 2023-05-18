@@ -29,6 +29,7 @@ else
 fi
 
 DISPATCH_PROFILER_OUTPUT_DIR="${2:-"dispatch_profiler_output"}"
+DISPATCH_PROFILER_GENERATED_DIR="."
 VENV_DIR="dispatch-profiler.venv"
 
 echo "Setting up venv dir: ${VENV_DIR}"
@@ -36,6 +37,7 @@ echo "Python: ${PYTHON}"
 echo "Python version: $("${PYTHON}" --version)"
 echo "Dispatch Profiler IREE bin dir flag: ${DISPATCH_PROFILER_IREE_BIN_DIR_FLAG}"
 echo "Dispatch Profiler output dir: ${DISPATCH_PROFILER_OUTPUT_DIR}"
+echo "Dispatch profiler generated dir: ${DISPATCH_PROFILER_GENERATED_DIR}"
 
 ${PYTHON} -m venv "${VENV_DIR}"
 source "${VENV_DIR}/bin/activate"
@@ -45,13 +47,15 @@ source "${VENV_DIR}/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install --upgrade -r "${TD}/requirements.txt"
 
+mkdir -p ${DISPATCH_PROFILER_OUTPUT_DIR}
+
 python "${TD}/generator.py" \
-  --generated-dir "${TD}"
+  --generated-dir "${DISPATCH_PROFILER_GENERATED_DIR}"
 python "${TD}/compile.py" \
   ${DISPATCH_PROFILER_IREE_BIN_DIR_FLAG} \
-  --generated-dir "${TD}"
+  --generated-dir "${DISPATCH_PROFILER_GENERATED_DIR}"
 python "${TD}/profiler.py" \
   ${DISPATCH_PROFILER_IREE_BIN_DIR_FLAG} \
-  --generated-dir "${TD}" \
+  --generated-dir "${DISPATCH_PROFILER_GENERATED_DIR}" \
   --dispatches="matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync,matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_128x128_16x5_tensorcore_mmasync" \
   --output "${DISPATCH_PROFILER_OUTPUT_DIR}/matmul_perf_tensor_core_a100.csv"
