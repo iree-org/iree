@@ -374,7 +374,8 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   LLVM_DEBUG({
     llvm::dbgs() << "isSafeToElideCloneOp:\n";
     llvm::dbgs() << "  ";
-    cloneOp.print(llvm::dbgs(), OpPrintingFlags().elideLargeElementsAttrs());
+    cloneOp.print(llvm::dbgs(),
+                  OpPrintingFlags().elideLargeElementsAttrs().assumeVerified());
     llvm::dbgs() << "\n";
   });
 
