@@ -20,12 +20,15 @@ TD="$(cd $(dirname $0) && pwd)"
 
 PYTHON="${PYTHON:-python3}"
 
-DISPATCH_PROFILER_OUTPUT_DIR="${2:-"dispatch_profiler_output"}"
-DISPATCH_PROFILER_IREE_BIN_DIR_FLAG=""
-if [ -n $1 ]; then
-  DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="--iree-bin-dir=${1}"
+DISPATCH_PROFILER_IREE_BIN_DIR=${1:-""}
+if [ -z ${DISPATCH_PROFILER_IREE_BIN_DIR} ]; then
+  DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="" 
+else
+  DISPATCH_PROFILER_IREE_BIN_DIR_FLAG="--iree-bin-dir=${DISPATCH_PROFILER_IREE_BIN_DIR}"
+ 
 fi
 
+DISPATCH_PROFILER_OUTPUT_DIR="${2:-"dispatch_profiler_output"}"
 VENV_DIR="dispatch-profiler.venv"
 
 echo "Setting up venv dir: ${VENV_DIR}"
