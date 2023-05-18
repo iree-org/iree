@@ -15,13 +15,22 @@ most powerful).
 
 The below presumes that you have a compatible Jax/Jaxlib installed. Since
 PJRT plugin support is moving fast, it is rare that released versions are
-appropriate. See ["Building Jax from Source"](#building-jax-from-source) below.
+appropriate. **See ["Building Jax from Source"](#building-jax-from-source)
+below.**
+
+If you are building without CUDA, you may still need to install IREE's CUDA deps
+for the `bazel` build below:
+
+```shell
+export IREE_CUDA_DEPS_DIR=${HOME?}/.iree_cuda_deps
+../iree/build_tools/docker/context/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR?}
+```
 
 ### Option 1: Synchronize to a nightly IREE release
 
-```
+```shell
 python ./sync_deps.py
-pip install -U -r requirements.txt
+python -m pip install -U -r requirements.txt
 python ./configure.py --cc=clang --cxx=clang++ --cuda-sdk-dir=$CUDA_SDK_DIR
 
 # Source environment variables to run interactively.
@@ -29,7 +38,6 @@ python ./configure.py --cc=clang --cxx=clang++ --cuda-sdk-dir=$CUDA_SDK_DIR
 source .env.sh
 
 # Build.
-
 bazel build iree/integrations/pjrt/...
 
 # Run a sample.
@@ -83,20 +91,26 @@ JAX_PLATFORMS=iree_cpu python test/test_simple.py
 
 Install Jax with Python sources:
 
-```
-pip install -e external/jax
+```shell
+# Starting in the openxla-pjrt-plugin repo, download JAX and sync to a
+# compatible commit.
+python ./sync_deps.py
+python -m pip install -e ../jax
 ```
 
 Build a compatible jaxlib:
 
-```
+```shell
 # Currently pluggable PJRT is commingled with TPU support... folks are
 # working on it :/
-cd external/jax
+cd ../jax
+# NOTE: Try running `bazel clean --expunge` if you run into undeclared inclusion
+# error(s).
 python build/build.py \
   --bazel_options=--override_repository=xla=$PWD/../xla \
   --enable_tpu
-pip install dist/*.whl --force-reinstall
+# Install the version of jaxlib you just built.
+python -m pip install dist/*.whl --force-reinstall
 ```
 
 ## Generating runtime traces
@@ -174,4 +188,3 @@ compilation artifacts, reproducers, etc.
 
 OpenXLA PJRT plugin is licensed under the terms of the Apache 2.0 License with
 LLVM Exceptions. See [LICENSE](LICENSE) for more information.
-
