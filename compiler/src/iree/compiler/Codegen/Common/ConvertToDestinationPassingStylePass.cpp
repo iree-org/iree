@@ -309,8 +309,8 @@ static bool canUseInOperandAsInitOperand(
   }
 
   if (auto producerOp = inOperand->get().getDefiningOp<linalg::LinalgOp>()) {
-    if (succeeded(linalg::vectorizeLinalgOpPrecondition(linalgOp)) &&
-        succeeded(linalg::vectorizeLinalgOpPrecondition(producerOp))) {
+    if (succeeded(linalg::vectorizeOpPrecondition(linalgOp)) &&
+        succeeded(linalg::vectorizeOpPrecondition(producerOp))) {
       return false;
     }
   }
