@@ -85,7 +85,6 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
         patterns, vectorTransformOptions,
         /*benefit=*/1,
         /*disableOuterProductLowering=*/true);
-    vector::populateVectorShapeCastLoweringPatterns(patterns);
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
     vector::populateVectorMultiReductionLoweringPatterns(
         patterns, vectorMultiReductionLowering);
@@ -156,6 +155,16 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
+
+  // 'vector.shape_cast' are very expensive operations that are even generated
+  // by some of the lowerings above (e.g., transpose lowering). There are
+  // chances to cancel them out if they are not lowered too early so we lower
+  // them at the very end of the pass.
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorShapeCastLoweringPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 }
 }  // namespace
 
