@@ -24,7 +24,6 @@ iree_cc_library(
     "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
-    "LLVMGPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"

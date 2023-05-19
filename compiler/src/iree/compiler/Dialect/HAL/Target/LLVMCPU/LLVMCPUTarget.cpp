@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/UKernel.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LinkerTool.h"
@@ -123,6 +124,22 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
   std::memcpy(baseFile.data() + baseFileSize + debugFileSize, &footer,
               sizeof(footer));
   return success();
+}
+
+/// Helper method to check if the variant op has a `ukernel` attribute
+/// in its `hal.executable.target`. If so, load the ukernel library
+/// for that target and link.
+// Note: This is duplicate of a similar function in Codegen/. For
+// now duplicating this to avoid false linking issues. Eventually
+// presence of this attribute in the `hal.executable.target` should
+// drive everything.
+static bool hasMicrokernel(IREE::HAL::ExecutableVariantOp variantOp) {
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (!targetAttr) return false;
+  auto config = targetAttr.getConfiguration();
+  if (!config) return false;
+  auto attr = config.getAs<BoolAttr>("ukernels");
+  return attr && attr.getValue();
 }
 
 class LLVMCPUTargetBackend final : public TargetBackend {
@@ -415,6 +432,26 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       return mlir::emitError(variantOp.getLoc())
              << "failed linking in builtin library for target triple '"
              << targetTriple.str() << "'";
+    }
+
+    // Link in ukernel file.
+    if (hasMicrokernel(variantOp)) {
+      auto setAlwaysInline = [&](llvm::Module &module) {
+        for (auto &func : module.getFunctionList()) {
+          func.addFnAttr(llvm::Attribute::AlwaysInline);
+        }
+      };
+      if (std::optional<std::unique_ptr<llvm::Module>> libUKernel =
+              loadUKernelBitcode(targetMachine.get(), context)) {
+        if (failed(linkBitcodeModule(
+                variantOp.getLoc(), moduleLinker, llvm::Linker::LinkOnlyNeeded,
+                *targetMachine, "libukernel", std::move(libUKernel.value()),
+                setAlwaysInline))) {
+          return mlir::emitError(variantOp.getLoc())
+                 << "failed linking in ukernel library for target triple '"
+                 << targetTriple.str() << "'";
+        }
+      }
     }
 
     // Strip any compiler identifiers that may have snuck in. We let the linker

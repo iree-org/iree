@@ -1,0 +1,71 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Workflow for running IREE Dispatch Profiler
+# (https://github.com/openxla/iree/tree/main/experimental/dispatch_profiler).
+#
+# IREE Dispatch Profiler validates functional correctness and performs profiling
+# on matmul, conv, and other ops on IREE CUDA and other back-ends.
+#
+# It uploads results to this a publicly accessible GCS bucket:
+# https://storage.googleapis.com/dispatch-profiler-artifacts
+
+name: dispatch_profiler
+
+on:
+  schedule:
+    # Run daily at 2:00 PM (14:00) every weekday (Monday to Friday)
+    - cron: "0 14 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
+  build_all:
+    needs: setup
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/build_all.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+
+  profile_cuda:
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - machine-type=a2-highgpu-1g
+    env:
+      RESULTS_DIR: dispatch-profiler-results-cuda
+      GCS_UPLOAD_PARENT_DIR: "gs://dispatch-profiler-artifacts/cuda"
+      GCS_UPLOAD_DIR_NAME: ${{ needs.setup.outputs.artifact-upload-dir }}
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      IREE_SHA: ${{ github.sha }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -vxf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Running IREE Dispatch Profiler on CUDA"
+        run: |
+          mkdir "${RESULTS_DIR}"
+          ./build_tools/github_actions/docker_run.sh \
+            --gpus all \
+            gcr.io/iree-oss/nvidia-bleeding-edge@sha256:e020d5c748f293674ab5f63533d6bf2a6a83b4c3045da10f76aa2ef2236f008b \
+            ./experimental/dispatch_profiler/profile_all.sh "${BUILD_DIR}/install/bin" \
+            "${RESULTS_DIR}"
+      - name: "Uploading results"
+        run: |
+          GCS_ARTIFACT_DIR="$(date +'%Y-%m-%d').sha_${IREE_SHA}.timestamp_$(date +'%s')"
+          gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_ARTIFACT_DIR}/"

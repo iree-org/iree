@@ -43,3 +43,39 @@ func.func @foldSwitchI32ConstantIndex() -> (i32, i32, i32, i32) {
   // CHECK: return %[[C100]], %[[C200]], %[[C300]], %[[C400]] : i32, i32, i32, i32
   return %0, %1, %2, %3 : i32, i32, i32, i32
 }
+
+// -----
+
+// CHECK-LABEL: @foldCastSameType
+// CHECK-SAME: (%[[SOURCE:.+]]: !util.buffer)
+func.func @foldCastSameType(%source: !util.buffer) -> !util.buffer {
+  // CHECK-NOT: util.cast
+  %0 = util.cast %source : !util.buffer to !util.buffer
+  // CHECK: return %[[SOURCE]]
+  return %0 : !util.buffer
+}
+
+// -----
+
+// CHECK-LABEL: @foldChainedCast
+// CHECK-SAME: (%[[SOURCE:.+]]: !util.buffer)
+func.func @foldChainedCast(%source: !util.buffer) -> !util.buffer {
+  // CHECK-NOT: util.cast
+  %0 = util.cast %source : !util.buffer to !util.object
+  // CHECK-NOT: util.cast
+  %1 = util.cast %0 : !util.object to !util.buffer
+  // CHECK: return %[[SOURCE]]
+  return %1 : !util.buffer
+}
+
+// -----
+
+// CHECK-LABEL: @foldCastIntoNullOp
+func.func @foldCastIntoNullOp() -> !util.buffer {
+  // CHECK: %[[NULL:.+]] = util.null : !util.buffer
+  %0 = util.null : !util.object
+  // CHECK-NOT: util.cast
+  %1 = util.cast %0 : !util.object to !util.buffer
+  // CHECK: return %[[NULL]]
+  return %1 : !util.buffer
+}

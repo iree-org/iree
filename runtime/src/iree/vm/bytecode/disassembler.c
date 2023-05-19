@@ -1399,6 +1399,23 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       break;
     }
 
+    DISASM_OP(CORE, CastAnyRef) {
+      bool operand_is_move;
+      uint16_t operand_reg = VM_ParseOperandRegRef("operand", &operand_is_move);
+      const iree_vm_type_def_t type_def = VM_ParseTypeOf("result");
+      bool result_is_move;
+      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
+      EMIT_REF_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.any.ref "));
+      EMIT_REF_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " : !vm.ref<?> -> "));
+      EMIT_TYPE_NAME(type_def);
+      break;
+    }
+
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//

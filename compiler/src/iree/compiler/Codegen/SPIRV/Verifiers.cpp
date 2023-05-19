@@ -55,7 +55,6 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   auto funcOp = op->getParentOfType<func::FuncOp>();
   const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
-  const int maxSharedMemory = limits.getMaxComputeSharedMemorySize();
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
   const auto maxWorkGroupSize = llvm::to_vector<3>(llvm::map_range(
       limits.getMaxComputeWorkgroupSize().getAsValueRange<IntegerAttr>(),
@@ -98,7 +97,6 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
       op->getOperand(0).getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> rhsShape =
       op->getOperand(1).getType().cast<ShapedType>().getShape();
-  Type inputType = op->getOperand(0).getType();
 
   SmallVector<int64_t> workgroupTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
@@ -142,19 +140,6 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   auto pipelineDepth = translationInfo.getSoftwarePipelineDepth();
   pipelineDepth = pipelineDepth ? pipelineDepth : 1;
 
-  // Verify shared memory usage of operands after tiling <= maxSharedMemory.
-  unsigned tilingSharedMemSizeBytes = getTileBytes(
-      workgroupTileSizes[0], workgroupTileSizes[1], reductionTileSizes[2],
-      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth(),
-      false);
-  unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
-      tilingSharedMemSizeBytes, pipelineDepth,
-      translationInfo.getSoftwarePipelineStoreStage());
-
-  if (totalSharedMemSizeBytes > maxSharedMemory) {
-    return op->emitOpError("expected shared memory usage <= ")
-           << maxSharedMemory << ", got " << totalSharedMemSizeBytes;
-  }
   return success();
 }
 
@@ -190,7 +175,6 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   auto funcOp = op->getParentOfType<func::FuncOp>();
   const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
-  const int maxSharedMemory = limits.getMaxComputeSharedMemorySize();
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
   const auto maxWorkGroupSize = llvm::to_vector<3>(llvm::map_range(
       limits.getMaxComputeWorkgroupSize().getAsValueRange<IntegerAttr>(),
@@ -323,21 +307,6 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
         "subgroup_tile_m)");
   }
 
-  // Check if the C matrix will be promoted for computing shared memory usage.
-  bool promoteC = needToPrmoteCForCooperativeMatrix(cast<linalg::LinalgOp>(op));
-
-  // Verify shared memory usage of operands after tiling <= maxSharedMemory.
-  unsigned tilingSharedMemSizeBytes = getTileBytes(
-      workgroupTileSizes[0], workgroupTileSizes[1], reductionTileSizes[2],
-      lhsType.getIntOrFloatBitWidth(), promoteC);
-  unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
-      tilingSharedMemSizeBytes, translationInfo.getSoftwarePipelineDepth(),
-      translationInfo.getSoftwarePipelineStoreStage());
-
-  if (totalSharedMemSizeBytes > maxSharedMemory) {
-    return op->emitOpError("expected shared memory usage <= ")
-           << maxSharedMemory << ", got " << totalSharedMemSizeBytes;
-  }
   return success();
 }
 

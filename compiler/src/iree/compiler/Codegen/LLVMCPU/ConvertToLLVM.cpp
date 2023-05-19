@@ -666,6 +666,137 @@ struct ConvertHALInstrumentMemoryStoreOp
   }
 };
 
+/// Helper method to get information about extra operands that need to be
+/// appended to a function defn/call operation.
+static SmallVector<StringRef> getExtraFields(Operation *forOp) {
+  SmallVector<StringRef> extraFields;
+  if (auto extraFieldsAttr =
+          forOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
+    extraFields = llvm::to_vector(llvm::map_range(
+        extraFieldsAttr.getValue(),
+        [](Attribute attr) { return attr.cast<StringAttr>().getValue(); }));
+  }
+  return extraFields;
+}
+
+/// Return calling convention to use for the operation.
+static IREE::HAL::CallingConvention getCallingConvention(Operation *forOp) {
+  auto cConv = IREE::HAL::CallingConvention::Default;
+  if (auto cConvAttr = forOp->getAttrOfType<IREE::HAL::CallingConventionAttr>(
+          "hal.import.cconv")) {
+    cConv = cConvAttr.getValue();
+  }
+  return cConv;
+}
+
+/// Lower func ops with specified ABI. Currently this pattern is triggered
+/// only for operations with the `hal.import.bitcode` attribute set.
+///
+/// Note: this is an LLVM::CallOp -> LLVM::CallOp rewrite that is introduced
+/// after all conversions are done. Importantly, this is not a conversion
+/// pattern.
+struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
+  RewriteFuncOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
+      : OpRewritePattern(&typeConverter.getContext()),
+        abi(abi),
+        typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(LLVM::LLVMFuncOp funcOp,
+                                PatternRewriter &rewriter) const override {
+    if (!funcOp.isExternal()) {
+      return rewriter.notifyMatchFailure(funcOp, "skipping non-external calls");
+    }
+    if (!funcOp->hasAttr("hal.import.bitcode")) {
+      return rewriter.notifyMatchFailure(
+          funcOp, "callee is not imported using bitcode linkage; skipping");
+    }
+    IREE::HAL::CallingConvention cConv = getCallingConvention(funcOp);
+
+    SmallVector<StringRef> extraFields = getExtraFields(funcOp);
+    auto funcType = funcOp.getFunctionType();
+    FailureOr<LLVM::LLVMFunctionType> expectedType =
+        abi.getABIFunctionType(funcOp, cConv, funcType.getReturnTypes(),
+                               funcType.getParams(), extraFields);
+    if (failed(expectedType)) {
+      return rewriter.notifyMatchFailure(
+          funcOp,
+          "unable to get function type to match the calling convention");
+    }
+    if (abi.hasCompatibleFunctionSignature(
+            rewriter.getContext(), expectedType.value(),
+            funcType.getReturnTypes(), funcType.getParams())) {
+      return failure();
+    }
+    auto attrs = getPrunedAttributeList(
+        funcOp, llvm::to_vector(LLVM::LLVMFuncOp::getAttributeNames()));
+    SmallVector<DictionaryAttr> argAttrs;
+    if (auto currArgAttrs = funcOp.getArgAttrsAttr()) {
+      argAttrs =
+          llvm::to_vector(llvm::map_range(currArgAttrs, [](Attribute attr) {
+            return attr.cast<DictionaryAttr>();
+          }));
+    }
+    rewriter.create<LLVM::LLVMFuncOp>(
+        funcOp.getLoc(), funcOp.getName(), expectedType.value(),
+        funcOp.getLinkage(), funcOp.getDsoLocal(), funcOp.getCConv(), attrs,
+        argAttrs, funcOp.getFunctionEntryCount());
+    rewriter.eraseOp(funcOp);
+    return success();
+  }
+
+ private:
+  HALDispatchABI &abi;
+  LLVMTypeConverter &typeConverter;
+};
+
+/// Lower call ops with specified ABI. The ABI to use is looked up from the
+/// callee. Currently this pattern is triggered only for operations where the
+/// callee has the `hal.import.bitcode` attribute set.
+///
+/// Note: this is an LLVM::CallOp -> LLVM::CallOp rewrite that is introduced
+/// after all conversions are done. Importantly, this is not a conversion
+/// pattern.
+struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
+  RewriteCallOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
+      : OpRewritePattern(&typeConverter.getContext()),
+        abi(abi),
+        typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(LLVM::CallOp callOp,
+                                PatternRewriter &rewriter) const override {
+    auto symbol = callOp.getCallableForCallee().dyn_cast<SymbolRefAttr>();
+    auto flatSymbol = symbol.dyn_cast_or_null<FlatSymbolRefAttr>();
+    if (!flatSymbol) return failure();
+
+    // Ensure the target function is extern.
+    // To support conversion inserting calls in local patterns that can't add
+    // global function symbols we assume any missing callee is extern.
+    auto calleeOp =
+        SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(callOp, symbol);
+    if (!calleeOp || !calleeOp->hasAttr("hal.import.bitcode") ||
+        !calleeOp.isExternal()) {
+      return rewriter.notifyMatchFailure(
+          callOp, "callee is not imported using bitcode linakge; skipping");
+    }
+
+    IREE::HAL::CallingConvention cConv = getCallingConvention(calleeOp);
+    SmallVector<StringRef> extraFields = getExtraFields(calleeOp);
+
+    FailureOr<SmallVector<Value>> results = abi.materializeABI(
+        callOp, calleeOp.getSymName(), cConv, callOp->getResultTypes(),
+        callOp->getOperands(), extraFields, rewriter);
+    if (failed(results)) {
+      return failure();
+    }
+    rewriter.replaceOp(callOp, *results);
+    return success();
+  }
+
+ private:
+  HALDispatchABI &abi;
+  LLVMTypeConverter &typeConverter;
+};
+
 /// Rewrites calls to extern functions to dynamic library import calls.
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 ///
@@ -702,10 +833,20 @@ struct RewriteExternCallOpToDynamicImportCallOp
     // let it fall through to the linker stage where it can be picked up either
     // from the runtime build (in the case of us producing static libraries) or
     // the user-specified object files (when producing dynamic libraries).
-    if (calleeOp->hasAttr("hal.import.static")) {
+    if (calleeOp->hasAttr("hal.import.static") ||
+        calleeOp->hasAttr("hal.import.bitcode")) {
       return rewriter.notifyMatchFailure(callOp,
                                          "external function is marked static "
                                          "and does not need an import wrapper");
+    }
+
+    // The call may need some additional internal fields appended.
+    SmallVector<StringRef> extraFields;
+    if (auto extraFieldsAttr =
+            calleeOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
+      for (auto extraFieldAttr : extraFieldsAttr) {
+        extraFields.push_back(extraFieldAttr.cast<StringAttr>().getValue());
+      }
     }
 
     // Allow multiple imports to alias by having their name explicitly
@@ -718,15 +859,6 @@ struct RewriteExternCallOpToDynamicImportCallOp
 
     // TODO(benvanik): way to determine if weak (maybe via linkage?).
     bool weak = false;
-
-    // The call may need some additional internal fields appended.
-    SmallVector<StringRef> extraFields;
-    if (auto extraFieldsAttr =
-            calleeOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
-      for (auto extraFieldAttr : extraFieldsAttr) {
-        extraFields.push_back(extraFieldAttr.cast<StringAttr>().getValue());
-      }
-    }
 
     // Rewrite the call to a dynamic import call.
     SmallVector<Value> results = abi.wrapAndCallImport(
@@ -955,8 +1087,8 @@ void ConvertToLLVMPass::runOnOperation() {
   // Rewrite any extern calls emitted to dynamic library imports.
   {
     RewritePatternSet patterns(&getContext());
-    patterns.insert<RewriteExternCallOpToDynamicImportCallOp>(abi,
-                                                              typeConverter);
+    patterns.insert<RewriteExternCallOpToDynamicImportCallOp, RewriteCallOpABI,
+                    RewriteFuncOpABI>(abi, typeConverter);
     if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns))))
       return signalPassFailure();
   }

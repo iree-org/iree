@@ -1443,6 +1443,12 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyResultRegI64(result);
     });
 
+    VERIFY_OP(CORE, CastAnyRef, {
+      VM_VerifyOperandRegRef(operand);
+      VM_VerifyTypeOf(result);
+      VM_VerifyResultRegRef(result);
+    });
+
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//

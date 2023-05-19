@@ -160,6 +160,31 @@ py_binary(
     "f32",
 ]]
 
+# Test x86_64+ukernel, mmt4d, with target CPU features variants relevant to each
+# lhs_rhs_type.
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_mmt4d_%s_small_ukernel_x86" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-llvmcpu-enable-microkernels",
+        "--iree-flow-enable-data-tiling",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=small",
+    ],
+    tags = [
+        "hostonly",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for lhs_rhs_type in [
+    "i8",
+    "f32",
+]]
+
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_%s" % compilation_info,
     generator = ":generate_e2e_matmul_tests",

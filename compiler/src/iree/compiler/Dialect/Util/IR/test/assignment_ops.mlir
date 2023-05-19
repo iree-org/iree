@@ -15,3 +15,13 @@ func.func @switch(%index: index) -> i32 {
   %0 = util.switch i32 from [%c100, %c200, %c300] at %index else %default : i32
   return %0 : i32
 }
+
+// -----
+
+// CHECK-LABEL: @cast
+// CHECK-SAME: (%[[SOURCE:.+]]: !util.buffer)
+func.func @cast(%source: !util.buffer) -> !util.object {
+  // CHECK: = util.cast %[[SOURCE]] : !util.buffer to !util.object
+  %0 = util.cast %source : !util.buffer to !util.object
+  return %0 : !util.object
+}
