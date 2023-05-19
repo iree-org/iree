@@ -498,8 +498,16 @@ static void BindApi(PJRT_Api* api) {
   api->PJRT_Client_Create = +[](PJRT_Client_Create_Args* args) -> PJRT_Error* {
     auto platform = std::make_unique<PlatformTy>();
 
-    // TODO: Once a client can be created with config, use it to populate
-    // platform->config_vars().
+    // Populate config_vars() from the client create_options.
+    for (size_t i = 0; i < args->num_options; ++i) {
+      PJRT_NamedValue* nv = args->create_options + i;
+      // For now, we only support string types.
+      if (nv->type != PJRT_NamedValue_kString) continue;
+      std::string name(nv->name, nv->name_size);
+      std::string value(nv->string_value, nv->value_size);
+      platform->config_vars().Set(name, std::move(value));
+    }
+
     auto status = platform->Initialize();
     if (!iree_status_is_ok(status)) {
       return MakeError(status);

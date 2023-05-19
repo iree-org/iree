@@ -44,10 +44,10 @@ this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root="$(cd "${this_dir}" && git rev-parse --show-toplevel)"
 manylinux_docker_image="${manylinux_docker_image:-}"
-python_versions="${override_python_versions:-cp38-cp38}"
+python_versions="${override_python_versions:-cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${repo_root}/bindist}"
 plugins="${plugins:-iree/integrations/pjrt/cpu/pjrt_plugin_iree_cpu.so iree/integrations/pjrt/cuda/pjrt_plugin_iree_cuda.so}"
-packages="${packages:-plugins}"
+packages="${packages:-plugins python-cpu-wheel}"
 package_suffix="${package_suffix:-}"
 
 function run_on_host() {
@@ -123,6 +123,11 @@ function run_in_docker() {
         plugins_instrumented)
           build_plugins_instrumented
           ;;
+
+        python-cpu-wheel)
+          build_python_cpu_wheel
+          ;;
+
         *)
           echo "Unrecognized package '${package}'"
           exit 1
@@ -153,8 +158,21 @@ function build_plugins_instrumented() {
   done
 }
 
+function build_python_cpu_wheel() {
+  # Note that these wheels are Python version independent. We build them
+  # with each listed Python version to make sure that the setup machinery
+  # works, but the most recent one persists.
+  bazel build -c opt iree/integrations/pjrt/cpu/pjrt_plugin_iree_cpu.so
+  clean_wheels "openxla_pjrt_plugin_cpu${package_suffix}" "py3-none"
+  build_wheel python_packages/openxla_cpu_plugin
+  run_audit_wheel "openxla_pjrt_plugin_cpu${package_suffix}" "py3-none"
+}
+
 function build_wheel() {
-  python -m pip wheel --disable-pip-version-check -v -w "${output_dir}" "${repo_root}/$@"
+  python -m pip wheel --disable-pip-version-check \
+    -f https://openxla.github.io/iree/pip-release-links.html \
+    -f https://storage.googleapis.com/jax-releases/jaxlib_nightly_releases.html \
+    -v -w "${output_dir}" "${repo_root}/$@"
 }
 
 function run_audit_wheel() {

@@ -35,6 +35,9 @@ struct ConfigVars {
   // is valid at least until the next mutation.
   std::optional<std::string> Lookup(const std::string& key);
 
+  // Sets a variable.
+  void Set(const std::string& key, std::string value);
+
  private:
   std::unordered_map<std::string, std::string> kv_entries_;
   std::optional<std::string> env_fallback_prefix_;

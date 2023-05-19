@@ -38,6 +38,10 @@ std::optional<std::string> ConfigVars::Lookup(const std::string& key) {
   return {};
 }
 
+void ConfigVars::Set(const std::string& key, std::string value) {
+  kv_entries_[key] = std::move(value);
+}
+
 //===----------------------------------------------------------------------===//
 // Platform
 //===----------------------------------------------------------------------===//
