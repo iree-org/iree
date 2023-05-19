@@ -134,26 +134,27 @@ struct AbstractGemmLikeStrategy {
 
   // wmma preconditions that we want to lift out in an actionnable top-level
   // error message instead of failing late in the transformation schedule.
-  // TODO: These are now hardcoded for f32 but are element-type dependent.
-  // Precondition: the pipeline transformation for wmma requires at least 2
-  // k-groups.
+  // TODO: These are now hardcoded for f16 and f32 but are element-type
+  // dependent. Precondition: the pipeline transformation for wmma requires at
+  // least 2 k-groups.
   constexpr static int64_t kMinWmmaMinM = 16;
   constexpr static int64_t kMinWmmaMinN = 16;
-  constexpr static int64_t kMinWmmaMinK = 8;
+  int64_t kMinWmmaMinK() const { return lhsElementalBitWidth == 32 ? 8 : 16; }
 
   // mma.sync preconditions that we want to lift out in an actionnable top-level
   // error message instead of failing late in the transformation schedule.
-  // TODO: These are now hardcoded for f32 but are element-type dependent.
-  // Precondition: the pipeline transformation for mma.sync requires at least 2
-  // k-groups.
+  // TODO: These are now hardcoded for f16 and f32 but are element-type
+  // dependent. Precondition: the pipeline transformation for mma.sync requires
+  // at least 2 k-groups.
   constexpr static int64_t kMinMmaSyncGroups = 2;
   // Precondition: the pipeline transformation for mma.sync requires at least a
   // pipeline depth of 3.
   constexpr static int64_t kMinMmaSyncPipelineDepth = 3;
-  // Precondition: if mma.sync is used, the tile sizes must be at least 8x8x4.
+  // Precondition: if mma.sync is used, the tile sizes must be at least 8x8x4
+  // for f32 and 8x8x8 for f16.
   constexpr static int64_t kMinMmaSyncMinM = 8;
   constexpr static int64_t kMinMmaSyncMinN = 8;
-  constexpr static int64_t kMinMmaSyncMinK = 4;
+  int64_t kMinMmaSyncMinK() const { return lhsElementalBitWidth == 32 ? 4 : 8; }
 };
 
 }  // namespace gpu

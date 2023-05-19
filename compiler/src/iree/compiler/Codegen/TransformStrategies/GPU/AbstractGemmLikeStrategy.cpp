@@ -89,6 +89,10 @@ void AbstractGemmLikeStrategy::initDefaultValues() {
       pipelineDepth != clPipelineDepth.getDefault().getValue()) {
     cliOptionsSpecified = true;
   }
+
+  // Adjust default reduction tile size for f16.
+  if (reductionTileSize == clReductionTileSize.getDefault().getValue())
+    reductionTileSize = lhsElementalBitWidth == 32 ? 16 : 32;
 }
 
 ArrayAttr AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(
@@ -162,8 +166,8 @@ LogicalResult AbstractGemmLikeStrategy::validate(
                    << " block tile size in N";
       return failure();
     }
-    if (reductionTileSize < kMinMmaSyncMinK) {
-      llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinK
+    if (reductionTileSize < kMinMmaSyncMinK()) {
+      llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinK()
                    << " block tile size in K";
       return failure();
     }
@@ -188,8 +192,8 @@ LogicalResult AbstractGemmLikeStrategy::validate(
                    << " block tile size in N";
       return failure();
     }
-    if (reductionTileSize < kMinWmmaMinK) {
-      llvm::errs() << "wmma requires at least " << kMinWmmaMinK
+    if (reductionTileSize < kMinWmmaMinK()) {
+      llvm::errs() << "wmma requires at least " << kMinWmmaMinK()
                    << " block tile size in K";
       return failure();
     }

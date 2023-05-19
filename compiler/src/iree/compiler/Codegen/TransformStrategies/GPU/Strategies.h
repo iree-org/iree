@@ -18,6 +18,18 @@ class Value;
 namespace iree_compiler {
 namespace gpu {
 
+/// Placeholder for representing supported WMMA/Cooperative Matrix
+/// configurations. This is a reflection of
+/// SPIRV_CooperativeMatrixPropertiesNVArrayAttr.
+struct MMAConfig {
+  int64_t m;
+  int64_t n;
+  int64_t k;
+  Type aType;
+  Type bType;
+  Type cType;
+};
+
 /// Placeholder for some hardware model proxy that contains relevant information
 /// to configure the reduction strategy. In the future, this will need to be
 /// driven by some contract with the runtime.
@@ -27,6 +39,7 @@ struct GPUModel {
   bool hasWarpShuffle = false;
   bool hasTF32TensorCore = false;
   bool hasMmaSync = false;
+  SmallVector<MMAConfig> supportedWMMAConfigs = {};
 };
 
 //===--------------------------------------------------------------------===//

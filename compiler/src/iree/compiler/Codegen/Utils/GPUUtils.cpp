@@ -748,7 +748,23 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         // and writes are moved below the mainloop. Thus, mma.sync read/write
         // accumulator inplace.
         SmallVector<int64_t> readShape;
-        readShape.append({16, 16});
+        int outer, inner;
+        // If the read is already transposed we can unroll to the full tiled
+        // block of 16x16. Otherwise we need to match the unrolling of the
+        // contract to ensure conversion to mma.sync won't be blocked by
+        // extract slice ops.
+        if (!readOp.getPermutationMap().getMinorSubMap(2).isIdentity()) {
+          outer = 16;
+          inner = 16;
+        } else if (*operandId == 0) {
+          outer = mmaShapeM;
+          inner = 16;
+        } else {
+          outer = 16;
+          inner = mmaShapeN;
+        }
+
+        readShape.append({outer, inner});
         LLVM_DEBUG({
           llvm::interleaveComma(readShape,
                                 DBGS() << "shape for vector.xfer_read: ");
