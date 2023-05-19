@@ -15,6 +15,7 @@ include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -33,7 +34,7 @@ class Util_PureOp<string mnemonic, list<Trait> traits = []> :
     Util_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
-// Byte buffers and host data
+// Type manipulation
 //===----------------------------------------------------------------------===//
 
 def Util_NullOp : Util_PureOp<"null"> {
@@ -50,6 +51,36 @@ def Util_NullOp : Util_PureOp<"null"> {
   let assemblyFormat = [{
     attr-dict `:` type($result)
   }];
+}
+
+def Util_CastOp : Util_PureOp<"cast", [
+  DeclareOpInterfaceMethods<CastOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperand",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{casts one util type to another ala static_cast/dynamic_cast}];
+  let description = [{
+    Performs a type cast between object types known to the util dialect.
+  }];
+
+  let arguments = (ins
+    AnyType:$operand
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `to` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 def Util_CmpEQOp : Util_PureOp<"cmp.eq", [

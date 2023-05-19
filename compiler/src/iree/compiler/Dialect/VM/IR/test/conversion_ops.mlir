@@ -63,3 +63,25 @@ vm.module @my_module {
     vm.return %5 : i64
   }
 }
+
+// -----
+
+// CHECK-LABEL: @cast_any_ref
+vm.module @my_module {
+  vm.func @cast_any_ref(%arg0: !vm.ref<?>) -> !vm.buffer {
+    // CHECK-NEXT: = vm.cast.any.ref %arg0 : !vm.ref<?> -> !vm.buffer
+    %0 = vm.cast.any.ref %arg0 : !vm.ref<?> -> !vm.buffer
+    vm.return %0 : !vm.buffer
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_ref_any
+vm.module @my_module {
+  vm.func @cast_ref_any(%arg0: !vm.buffer) -> !vm.ref<?> {
+    // CHECK-NEXT: = vm.cast.ref.any %arg0 : !vm.buffer -> !vm.ref<?>
+    %0 = vm.cast.ref.any %arg0 : !vm.buffer -> !vm.ref<?>
+    vm.return %0 : !vm.ref<?>
+  }
+}

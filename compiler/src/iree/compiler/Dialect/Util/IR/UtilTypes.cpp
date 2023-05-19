@@ -86,6 +86,12 @@ bool ListType::isCompatible(Type type) { return true; }
 bool ListType::canImplicitlyCast(Type from, Type to) {
   if (from.isa<VariantType>() || to.isa<VariantType>()) {
     return true;
+  } else if (from.isa<ObjectType>() &&
+             IREE::Util::ObjectType::isCompatible(to)) {
+    return true;
+  } else if (IREE::Util::ObjectType::isCompatible(from) &&
+             to.isa<ObjectType>()) {
+    return true;
   } else if (from.isa<TensorType>() && to.isa<TensorType>()) {
     return true;
   }
@@ -115,6 +121,23 @@ LogicalResult PtrType::verify(function_ref<InFlightDiagnostic()> emitError,
     return emitError() << "invalid target type for a pointer: " << targetType;
   }
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// !util.ptr<T>
+//===----------------------------------------------------------------------===//
+
+// static
+bool ObjectType::isCompatible(Type type) {
+  if (type.isa<ObjectType>()) {
+    // Already an object.
+    return true;
+  } else if (type.isIntOrIndexOrFloat() || type.isa<ComplexType>()) {
+    // Ignore known primitive types.
+    return false;
+  }
+  // Assume all other types (user types, buffers, etc) can be objects.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
