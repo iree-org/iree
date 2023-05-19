@@ -306,6 +306,18 @@ def HAL_CollectiveElementTypeAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_CallingConvention_Default : I32EnumAttrCase<"Default", 0>;
+def HAL_CallingConvention_ParameterStruct : I32EnumAttrCase<"ParameterStruct", 1>;
+def HAL_CallingConventionAttr :
+    I32EnumAttr<
+        "CallingConvention",
+        "Calling conversions for linked functions",[
+          HAL_CallingConvention_Default,
+          HAL_CallingConvention_ParameterStruct,
+        ]>{
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 //===----------------------------------------------------------------------===//
 // HAL types
 //===----------------------------------------------------------------------===//

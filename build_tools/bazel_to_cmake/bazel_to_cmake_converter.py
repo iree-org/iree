@@ -515,6 +515,20 @@ class BuildFileFunctions(object):
                              f"{testonly_block}"
                              f"  PUBLIC\n)\n\n")
 
+  def iree_link_bitcode(self, name, bitcode_files, data=None, testonly=None):
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    bitcode_files_block = self._convert_srcs_block(
+        [f.replace(":", "/") for f in bitcode_files])
+    data_block = self._convert_target_list_block("DATA", data)
+    testonly_block = self._convert_option_block("TESTONLY", testonly)
+
+    self._converter.body += (f"iree_link_bitcode(\n"
+                             f"{name_block}"
+                             f"{bitcode_files_block}"
+                             f"{data_block}"
+                             f"{testonly_block}"
+                             f"  PUBLIC\n)\n\n")
+
   def iree_bytecode_module(self,
                            name,
                            src,

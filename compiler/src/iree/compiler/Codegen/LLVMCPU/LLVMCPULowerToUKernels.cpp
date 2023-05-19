@@ -63,6 +63,13 @@ static FnNameAndDefAttrs getFnNameAndDefAttrs(
     result.defAttrs.emplace_back(
         rewriter.getStringAttr("hal.import.fields"),
         rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
+    result.defAttrs.emplace_back(rewriter.getStringAttr("hal.import.bitcode"),
+                                 rewriter.getBoolAttr(true));
+    result.defAttrs.emplace_back(
+        rewriter.getStringAttr("hal.import.cconv"),
+        IREE::HAL::CallingConventionAttr::get(
+            rewriter.getContext(),
+            IREE::HAL::CallingConvention::ParameterStruct));
   }
   return result;
 }

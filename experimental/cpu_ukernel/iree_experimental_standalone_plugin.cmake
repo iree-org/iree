@@ -168,6 +168,11 @@ endfunction()
 #           `FILE_COPTS_VAR_NAME`.
 #           Example:  "x86_64:some_file_for_x86_64_using_avx512_instructions.c:NAME_OF_VARIABLE_CONTAINING_COPTS_FOR_X86_64_AVX512".
 function(iree_experimental_standalone_plugin)
+  # Early return if we don't have our own build of Clang and LLD available.
+  if (NOT (IREE_CLANG_TARGET AND IREE_LLD_TARGET))
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""

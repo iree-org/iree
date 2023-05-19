@@ -267,9 +267,11 @@ class HALDispatchABI {
   // Loads the processor ID the code is (most likely) being run on.
   // Equivalent to:
   //   uint32_t processor_id = state->processor_id;
+  Type getProcessorIDType();
   Value loadProcessorID(Operation *forOp, OpBuilder &builder);
 
   // Loads a pointer to the processor information data fields.
+  Type getProcessorDataType();
   Value loadProcessorData(Operation *forOp, OpBuilder &builder);
 
   // Loads a processor information data field at the given index.
@@ -322,6 +324,39 @@ class HALDispatchABI {
                                        ArrayRef<StringRef> extraFields,
                                        OpBuilder &builder);
 
+  //===--------------------------------------------------------------------==//
+  // External/bitcode function ABI handling methods.
+  //===--------------------------------------------------------------------==//
+  // Methods required for handling ABI for functions whose definitions are
+  // external.
+
+  /// Check if the `funcType` is equivalent to a function with return being
+  /// of type `resultTypes` and operands of type `paramTypes`.
+  static bool hasCompatibleFunctionSignature(MLIRContext *context,
+                                             LLVM::LLVMFunctionType funcType,
+                                             TypeRange resultTypes,
+                                             TypeRange paramTypes);
+
+  /// Given a calling convention `cConv`, and callee with return of
+  /// `resultTypes` and operands with type `argTypes`, along with extra fields
+  /// to append to argument list specified in `extraFields`; return the function
+  /// type of use for the function that implements the specified calling
+  /// convention.
+  FailureOr<LLVM::LLVMFunctionType> getABIFunctionType(
+      Operation *forOp, IREE::HAL::CallingConvention cConv,
+      TypeRange resultTypes, TypeRange argTypes,
+      ArrayRef<StringRef> extraFields);
+
+  /// Given a calling convention `cConv`, and callee with return of
+  /// `resultTypes` and operands with type `argTypes`, along with extra fields
+  /// to append to argument list specified in `extraFields`; modify the `callOp`
+  /// to implement the specified ABI. The calleee signature is expected to have
+  /// been/to be modified separately, i.e. it isnt done within this method.
+  FailureOr<SmallVector<Value>> materializeABI(
+      Operation *callOp, StringRef symbolName,
+      IREE::HAL::CallingConvention cConv, TypeRange resultTypes,
+      ValueRange args, ArrayRef<StringRef> extraFields, RewriterBase &builder);
+
  private:
   Value getIndexValue(Location loc, int64_t value, OpBuilder &builder);
 
@@ -334,11 +369,37 @@ class HALDispatchABI {
                        OpBuilder &builder);
   Value loadFieldValue(Operation *forOp, DispatchStateField field,
                        OpBuilder &builder);
+  Type getFieldType(WorkgroupStateField field);
   Value loadFieldValue(Operation *forOp, WorkgroupStateField field,
                        OpBuilder &builder);
 
+  Type getExtraFieldType(StringRef extraField);
   Value getExtraField(Operation *forOp, StringRef extraField,
                       OpBuilder &builder);
+
+  // Update the processor data based on the `cpu_features` present in
+  // `executable.target` attribute.
+  Value updateProcessorDataFromTargetAttr(Operation *forOp,
+                                          Value processorDataPtrValue,
+                                          OpBuilder &builder);
+
+  // Return LLVM Struct type that represents a container for arguments
+  // and return types. The struct type are ordered [results..., args...]
+  std::optional<Type> getParameterStructType(TypeRange resultTypes,
+                                             ValueRange args,
+                                             TypeRange extraFieldsTypes);
+  // For a given call operation, generate the struct that is the container
+  // for passing the arguments.
+  //
+  // The provided |resultTypes| and |args| are packed in a struct and transit
+  // through memory so that we can expose a single void* argument. Optionally
+  // |extraFields| can be specified with an ordered list of field names to be
+  // appended to the end of the struct.
+  std::tuple<Type, Value> packIntoParameterStruct(Operation *forOp,
+                                                  TypeRange resultTypes,
+                                                  ValueRange args,
+                                                  ValueRange extraFields,
+                                                  OpBuilder &builder);
 
   mlir::MLIRContext *context;
   LLVMTypeConverter *typeConverter;
