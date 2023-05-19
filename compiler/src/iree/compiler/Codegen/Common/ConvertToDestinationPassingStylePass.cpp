@@ -544,7 +544,7 @@ struct RemoveCstOutsDependency
 ///    flow.dispatch.tensor.store %true, %target
 ///  } else {
 ///    ...
-///    flow.dispatch.tensor.store %true, %target
+///    flow.dispatch.tensor.store %false, %target
 ///  }
 /// ```
 /// This is a workaround for #11273 while a proper fix lands.
