@@ -660,6 +660,7 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
   // TODO: depth from strategy, or directly from individual buffers.
   pipelineOp.setDepth(strategy.pipelineDepth);
   pipelineOp.setUseMmaSync(strategy.useMmaSync);
+  pipelineOp.setPeelEpilogue(strategy.peelPipelineEpilogue);
 }
 
 Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,

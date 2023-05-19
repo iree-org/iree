@@ -511,3 +511,49 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS_2-LABEL: func @f16_matmul
 
 // WITH_OPTIONS_3-LABEL: func @f16_matmul
+
+
+// -----
+
+hal.executable @int8_matmul {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @int8_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @int8_matmul() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0 : i8
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4x2556xi8>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2556x2052xi8>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x2052xi8>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 2556], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x2556xi8>> -> tensor<4x2556xi8>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2556, 2052], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2556x2052xi8>> -> tensor<2556x2052xi8>
+      %5 = tensor.empty() : tensor<4x2052xi8>
+      %6 = linalg.fill ins(%cst : i8) outs(%5 : tensor<4x2052xi8>) -> tensor<4x2052xi8>
+      %7 = linalg.matmul ins(%3, %4 : tensor<4x2556xi8>, tensor<2556x2052xi8>) outs(%6 : tensor<4x2052xi8>) -> tensor<4x2052xi8>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [4, 2052], strides = [1, 1] : tensor<4x2052xi8> -> !flow.dispatch.tensor<writeonly:tensor<4x2052xi8>>
+      return
+    }
+  }
+}
+}
+
+// SMALL-LABEL: func @int8_matmul
+// SMALL: transform.sequence
+// SMALL-NOT: mma
+// SMALL-NOT: wmma
+
+// CHECK-LABEL: func @int8_matmul
+// CHECK-NOT: transform.sequence
+
+// WITH_OPTIONS-LABEL: func @int8_matmul
+// WITH_OPTIONS-NOT: transform.sequence
+
+// WITH_OPTIONS_2-LABEL: func @int8_matmul
+// WITH_OPTIONS_2-NOT: transform.sequence
+
+// WITH_OPTIONS_3-LABEL: func @int8_matmul
+// WITH_OPTIONS_3-NOT: transform.sequence
