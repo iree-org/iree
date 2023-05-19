@@ -82,6 +82,10 @@ bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+v");
 }
 
+bool hasZve16xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+zve64x");
+}
+
 bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+zve32x");
 }

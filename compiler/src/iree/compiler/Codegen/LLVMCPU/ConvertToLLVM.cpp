@@ -916,6 +916,37 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
   }
 };
 
+class ExpandFMaxfExtended : public OpRewritePattern<arith::FMaxfOp> {
+  public:
+    using OpRewritePattern<arith::FMaxfOp>::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(arith::FMaxfOp op, 
+                                  PatternRewriter &rewriter) const override{
+    Type resultType = op.getOperand(0).getType();
+    if (getElementTypeOrSelf(resultType).getIntOrFloatBitWidth() != 16) {
+      return failure();
+      }
+
+      Location loc = op.getLoc();
+
+      Type wideType = rewriter.getFloatType(32);
+
+      if(auto vectTy = resultType.dyn_cast<VectorType>()) {
+        wideType = VectorType::get(vecTy.getShape(), wideType);
+      }
+
+      Value lhsExt = rewriter.create<arith::ExtFOp>(loc, wideType, op.getLhs());
+      Value rhsExt = rewriter.create<arith::ExtFOp>(loc, wideType, op.getRhs());
+      Value maxExt = 
+          rewriter.create<arith::FMaxfOp>(loc, wideType, lhsExt, rhsExt);
+      Value result = rewriter.create<arith::TruncFOp>(loc, resultType, maxExt);
+
+
+      rewriter.replaceOp(op, {result});
+      return success();
+    }
+};
+
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
   ConvertToLLVMPass(bool reassociateFpReductions) {
@@ -1026,14 +1057,16 @@ void ConvertToLLVMPass::runOnOperation() {
     // TODO(#9440) Simplify logic when 'cpu_features' is simplified.
     use32BitImpl =
         (hasZve32xFeature(targetAttr) || hasZve32fFeature(targetAttr)) &&
-        !hasVFeature(targetAttr) && !hasZve64xFeature(targetAttr);
+        !hasVFeature(targetAttr) && (!hasZve64xFeature(targetAttr) || !hasZve16xFeature(targetAttr));
   }
   tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
 
   // Make sure we expand any `arith.mulsi_extended` before going to the LLVM
   // dialect.
   if (use32BitImpl) {
+    std::cout<<"Using 32 bit Max";
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
+    patterns.add<ExpandMaxfExtended>(patterns.getContext(), /benefit=/1024);
   }
 
   populateAffineToStdConversionPatterns(patterns);
