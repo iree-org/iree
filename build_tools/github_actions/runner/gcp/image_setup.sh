@@ -315,7 +315,7 @@ EOF
     }
 
     check_docker gcr.io/iree-oss/nvidia@sha256:e7a1daba40815d1e94c901ce7de4bead54e725302ba320eda6745857977528a7
-    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:00d8c8882643030a93f25e8c20e4349331a8f735ba02a1b0cfc93312fd403bc8
+    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:d2bea95804c5f75dc64446f2839d17af5f245d3cc939c161482e213890c8213b
 
     # Remove the docker images we've fetched. We might want to pre-fetch Docker
     # images into the VM image, but that should be a separate decision.

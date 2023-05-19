@@ -90,7 +90,7 @@ jobs:
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-            gcr.io/iree-oss/frontends@sha256:c123d9e54e5179ef49345271e5535bcd618ce8d5f20c1353741b81715c3bee33 \
+            gcr.io/iree-oss/frontends@sha256:da48ff70cc3b956ba22465a3bef285711b66dfcd605ccba605db2278b96dbc5c \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
