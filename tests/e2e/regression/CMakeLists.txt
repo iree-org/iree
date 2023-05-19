@@ -33,9 +33,22 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_llvm-cpu
+    check_fp_reassoc_regression_llvm-cpu
   SRCS
     "associative_reordering.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-llvmcpu-reassociate-fp-reductions=false"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_llvm-cpu
+  SRCS
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
     "dynamic_dot.mlir"

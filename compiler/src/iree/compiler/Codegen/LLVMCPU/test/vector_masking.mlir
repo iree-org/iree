@@ -124,9 +124,8 @@ hal.executable private @preset_config_reduction  {
 }
 
 //   CHECK-LABEL: func.func @mask_dynamic_reduction
-// CHECK-COUNT-5:   vector.maskedload
-// CHECK-COUNT-4:   vector.mask %{{.*}} { vector.reduction <add>
-//         CHECK:   vector.maskedstore
+//         CHECK:   vector.maskedload
+//         CHECK:   vector.mask %{{.*}} { vector.reduction <add>
 
 // -----
 
