@@ -415,8 +415,11 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_OnDeviceSizeInBytes =
       +[](PJRT_Buffer_OnDeviceSizeInBytes_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE0("PJRT_Buffer_OnDeviceSizeInBytes");
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Buffer_OnDeviceSizeInBytes"));
+    BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+    iree_device_size_t size =
+        iree_hal_buffer_view_byte_length(buffer->buffer_view());
+    args->on_device_size_in_bytes = size;
+    return nullptr;
   };
   api->PJRT_Buffer_Delete = +[](PJRT_Buffer_Delete_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE0("PJRT_Buffer_Delete");
