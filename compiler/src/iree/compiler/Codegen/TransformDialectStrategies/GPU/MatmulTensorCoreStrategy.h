@@ -38,7 +38,7 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   MLIRContext *ctx;
   transform_ext::MatchedMatmulCaptures captures;
 
-  void initDefaultValues();
+  void initDefaultValues() override;
 
   LogicalResult verify() const;
 

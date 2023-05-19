@@ -20,6 +20,7 @@ iree_cc_library(
     "SmallReductionStrategy.h"
     "StagedReductionStrategy.h"
   SRCS
+    "AbstractGemmLikeStrategy.cpp"
     "Common.cpp"
     "MatmulTensorCoreStrategy.cpp"
     "SmallReductionStrategy.cpp"

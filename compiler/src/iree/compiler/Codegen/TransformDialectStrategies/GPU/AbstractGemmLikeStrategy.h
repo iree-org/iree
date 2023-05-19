@@ -15,6 +15,9 @@ class raw_ostream;
 }
 
 namespace mlir {
+
+class OpBuilder;
+
 namespace iree_compiler {
 namespace gpu {
 
@@ -24,6 +27,8 @@ struct AbstractGemmLikeStrategy {
   AbstractGemmLikeStrategy() {}
 
   virtual ~AbstractGemmLikeStrategy();
+
+  virtual void initDefaultValues();
 
   /// Tile sizes for the workgroup / determines grid size for all known
   /// reduction strategies. The initial values are set by initDefaultValues();
@@ -87,8 +92,8 @@ struct AbstractGemmLikeStrategy {
   virtual MappingInfo resCopyMapping() const = 0;
   virtual MappingInfo computeMapping() const = 0;
 
-  virtual void print(llvm::raw_ostream &os) const = 0;
-  virtual LLVM_DUMP_METHOD void dump() const = 0;
+  virtual void print(llvm::raw_ostream &os) const;
+  virtual LLVM_DUMP_METHOD void dump() const;
 };
 
 }  // namespace gpu

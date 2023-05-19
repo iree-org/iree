@@ -15,6 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "TransformDialectStrategies",
     srcs = [
+        "AbstractGemmLikeStrategy.cpp",
         "Common.cpp",
         "MatmulTensorCoreStrategy.cpp",
         "SmallReductionStrategy.cpp",

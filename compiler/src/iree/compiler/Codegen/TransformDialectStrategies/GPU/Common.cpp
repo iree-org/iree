@@ -333,9 +333,6 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 // Subset of mid-level builders currently used for GEMM-like problems.
 //===----------------------------------------------------------------------===//
 
-/// Key function for vtable.
-AbstractGemmLikeStrategy::~AbstractGemmLikeStrategy() {}
-
 /// Build transform IR to hoist the padded output operand of a padded matmul.
 /// Additionally, this attempts to fold the padding into the producing fill, if
 /// available.
