@@ -248,57 +248,64 @@ builtin.module {
 // CHECK:        %[[D59:.+]] = nvgpu.mma.sync(%[[D57]], %[[D58]], %[[D56]]) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>,
 // CHECK-SAME:     vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
 // CHECK:        %[[D60:.+]] = vector.insert %[[D59]], %[[CST]] [0, 0] : vector<2x2xf16> into vector<1x1x2x2xf16>
-// CHECK:        %[[D61:.+]] = vector.extract %[[D60]][0, 0, 0] : vector<1x1x2x2xf16>
-// CHECK:        %[[D62:.+]] = vector.bitcast %[[D61]] : vector<2xf16> to vector<1xi32>
-// CHECK:        %[[D63:.+]] = vector.extract %[[D62]][0] : vector<1xi32>
+// CHECK:        %[[D61:.+]] = vector.extract %[[CST_0]][0, 0, 0, 0] : vector<1x1x2x2xf16>
+// CHECK-DAG:    %[[CST_2:.+]] = arith.constant dense<0.000000e+00> : vector<2xf16>
+// CHECK:        %[[D62:.+]] = vector.extract %[[D60]][0, 0, 0, 0] : vector<1x1x2x2xf16>
+// CHECK:        %[[D63:.+]] = vector.insert %[[D62]], %[[CST_2]] [0] : f16 into vector<2xf16>
+// CHECK:        %[[D64:.+]] = vector.extract %[[D60]][0, 0, 0, 1] : vector<1x1x2x2xf16>
+// CHECK:        %[[D65:.+]] = vector.insert %[[D64]], %[[D63]] [1] : f16 into vector<2xf16>
+// CHECK:        %[[D66:.+]] = vector.bitcast %[[D65]] : vector<2xf16> to vector<1xi32>
+// CHECK:        %[[D67:.+]] = vector.extract %[[D66]][0] : vector<1xi32>
 // CHECK-DAG:    %[[C1_I32:.+]] = arith.constant 1 : i32
 // CHECK-DAG:    %[[C32_I32:.+]] = arith.constant 32 : i32
-// CHECK:        %[[SHUFFLERESULT:.+]], %[[VALID:.+]] = gpu.shuffle  xor %[[D63]], %[[C1_I32]], %[[C32_I32]] : i32
-// CHECK:        %[[D64:.+]] = vector.broadcast %[[SHUFFLERESULT]] : i32 to vector<1xi32>
-// CHECK:        %[[D65:.+]] = vector.bitcast %[[D64]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D66:.+]] = arith.maxf %[[D65]], %[[D61]] : vector<2xf16>
-// CHECK:        %[[D67:.+]] = vector.bitcast %[[D66]] : vector<2xf16> to vector<1xi32>
-// CHECK:        %[[D68:.+]] = vector.extract %[[D67]][0] : vector<1xi32>
+// CHECK:        %[[SHUFFLERESULT:.+]], %[[VALID:.+]] = gpu.shuffle  xor %[[D67]], %[[C1_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D68:.+]] = vector.broadcast %[[SHUFFLERESULT]] : i32 to vector<1xi32>
+// CHECK:        %[[D69:.+]] = vector.bitcast %[[D68]] : vector<1xi32> to vector<2xf16>
+// CHECK:        %[[D70:.+]] = arith.maxf %[[D69]], %[[D65]] : vector<2xf16>
+// CHECK:        %[[D71:.+]] = vector.bitcast %[[D70]] : vector<2xf16> to vector<1xi32>
+// CHECK:        %[[D72:.+]] = vector.extract %[[D71]][0] : vector<1xi32>
 // CHECK-DAG:    %[[C2_I32:.+]] = arith.constant 2 : i32
-// CHECK:        %[[SHUFFLERESULT_2:.+]], %[[VALID_3:.+]] = gpu.shuffle  xor %[[D68]], %[[C2_I32]], %[[C32_I32]] : i32
-// CHECK:        %[[D69:.+]] = vector.broadcast %[[SHUFFLERESULT_2]] : i32 to vector<1xi32>
-// CHECK:        %[[D70:.+]] = vector.bitcast %[[D69]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D71:.+]] = arith.maxf %[[D70]], %[[D66]] : vector<2xf16>
-// CHECK:        %[[D72:.+]] = vector.extract %[[CST_0]][0, 0, 0, 0] : vector<1x1x2x2xf16>
-// CHECK:        %[[D73:.+]] = vector.extract %[[D71]][0] : vector<2xf16>
-// CHECK:        %[[D74:.+]] = arith.maxf %[[D72]], %[[D73]] : f16
-// CHECK:        %[[D75:.+]] = vector.extract %[[D71]][1] : vector<2xf16>
-// CHECK:        %[[D76:.+]] = arith.maxf %[[D74]], %[[D75]] : f16
-// CHECK:        %[[D77:.+]] = vector.insert %[[D76]], %[[CST]] [0, 0, 0, 0] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D78:.+]] = vector.insert %[[D76]], %[[D77]] [0, 0, 0, 1] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D79:.+]] = vector.extract %[[D60]][0, 0, 1] : vector<1x1x2x2xf16>
-// CHECK:        %[[D80:.+]] = vector.bitcast %[[D79]] : vector<2xf16> to vector<1xi32>
-// CHECK:        %[[D81:.+]] = vector.extract %[[D80]][0] : vector<1xi32>
-// CHECK:        %[[SHUFFLERESULT_4:.+]], %[[VALID_5:.+]] = gpu.shuffle  xor %[[D81]], %[[C1_I32]], %[[C32_I32]] : i32
-// CHECK:        %[[D82:.+]] = vector.broadcast %[[SHUFFLERESULT_4]] : i32 to vector<1xi32>
-// CHECK:        %[[D83:.+]] = vector.bitcast %[[D82]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D84:.+]] = arith.maxf %[[D83]], %[[D79]] : vector<2xf16>
-// CHECK:        %[[D85:.+]] = vector.bitcast %[[D84]] : vector<2xf16> to vector<1xi32>
-// CHECK:        %[[D86:.+]] = vector.extract %[[D85]][0] : vector<1xi32>
-// CHECK:        %[[SHUFFLERESULT_6:.+]], %[[VALID_7:.+]] = gpu.shuffle  xor %[[D86]], %[[C2_I32]], %[[C32_I32]] : i32
-// CHECK:        %[[D87:.+]] = vector.broadcast %[[SHUFFLERESULT_6]] : i32 to vector<1xi32>
-// CHECK:        %[[D88:.+]] = vector.bitcast %[[D87]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D89:.+]] = arith.maxf %[[D88]], %[[D84]] : vector<2xf16>
-// CHECK:        %[[D90:.+]] = vector.extract %[[CST_0]][0, 0, 1, 0] : vector<1x1x2x2xf16>
-// CHECK:        %[[D91:.+]] = vector.extract %[[D89]][0] : vector<2xf16>
-// CHECK:        %[[D92:.+]] = arith.maxf %[[D90]], %[[D91]] : f16
-// CHECK:        %[[D93:.+]] = vector.extract %[[D89]][1] : vector<2xf16>
-// CHECK:        %[[D94:.+]] = arith.maxf %[[D92]], %[[D93]] : f16
-// CHECK:        %[[D95:.+]] = vector.insert %[[D94]], %[[D78]] [0, 0, 1, 0] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D96:.+]] = vector.insert %[[D94]], %[[D95]] [0, 0, 1, 1] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D97:.+]] = vector.extract %[[D96]][0, 0, 0, 0] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D97]], %[[D2]][%[[D8]], %[[D9]]] : memref<16x8xf16>
-// CHECK:        %[[D98:.+]] = vector.extract %[[D96]][0, 0, 0, 1] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D98]], %[[D2]][%[[D8]], %[[D14]]] : memref<16x8xf16>
-// CHECK:        %[[D99:.+]] = vector.extract %[[D96]][0, 0, 1, 0] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D99]], %[[D2]][%[[D29]], %[[D9]]] : memref<16x8xf16>
-// CHECK:        %[[D100:.+]] = vector.extract %[[D96]][0, 0, 1, 1] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D100]], %[[D2]][%[[D29]], %[[D14]]] : memref<16x8xf16>
+// CHECK:        %[[SHUFFLERESULT_3:.+]], %[[VALID_4:.+]] = gpu.shuffle  xor %[[D72]], %[[C2_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D73:.+]] = vector.broadcast %[[SHUFFLERESULT_3]] : i32 to vector<1xi32>
+// CHECK:        %[[D74:.+]] = vector.bitcast %[[D73]] : vector<1xi32> to vector<2xf16>
+// CHECK:        %[[D75:.+]] = arith.maxf %[[D74]], %[[D70]] : vector<2xf16>
+// CHECK:        %[[D76:.+]] = vector.extract %[[D75]][0] : vector<2xf16>
+// CHECK:        %[[D77:.+]] = vector.extract %[[D75]][1] : vector<2xf16>
+// CHECK:        %[[D78:.+]] = arith.maxf %[[D76]], %[[D77]] : f16
+// CHECK:        %[[D79:.+]] = arith.maxf %[[D78]], %[[D61]] : f16
+// CHECK:        %[[D80:.+]] = vector.insert %[[D79]], %[[CST]] [0, 0, 0, 0] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D81:.+]] = vector.insert %[[D79]], %[[D80]] [0, 0, 0, 1] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D82:.+]] = vector.extract %[[CST_0]][0, 0, 1, 0] : vector<1x1x2x2xf16>
+// CHECK:        %[[D83:.+]] = vector.extract %[[D60]][0, 0, 1, 0] : vector<1x1x2x2xf16>
+// CHECK:        %[[D84:.+]] = vector.insert %[[D83]], %[[CST_2]] [0] : f16 into vector<2xf16>
+// CHECK:        %[[D85:.+]] = vector.extract %[[D60]][0, 0, 1, 1] : vector<1x1x2x2xf16>
+// CHECK:        %[[D86:.+]] = vector.insert %[[D85]], %[[D84]] [1] : f16 into vector<2xf16>
+// CHECK:        %[[D87:.+]] = vector.bitcast %[[D86]] : vector<2xf16> to vector<1xi32>
+// CHECK:        %[[D88:.+]] = vector.extract %[[D87]][0] : vector<1xi32>
+// CHECK:        %[[SHUFFLERESULT_5:.+]], %[[VALID_6:.+]] = gpu.shuffle  xor %[[D88]], %[[C1_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D89:.+]] = vector.broadcast %[[SHUFFLERESULT_5]] : i32 to vector<1xi32>
+// CHECK:        %[[D90:.+]] = vector.bitcast %[[D89]] : vector<1xi32> to vector<2xf16>
+// CHECK:        %[[D91:.+]] = arith.maxf %[[D90]], %[[D86]] : vector<2xf16>
+// CHECK:        %[[D92:.+]] = vector.bitcast %[[D91]] : vector<2xf16> to vector<1xi32>
+// CHECK:        %[[D93:.+]] = vector.extract %[[D92]][0] : vector<1xi32>
+// CHECK:        %[[SHUFFLERESULT_7:.+]], %[[VALID_8:.+]] = gpu.shuffle  xor %[[D93]], %[[C2_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D94:.+]] = vector.broadcast %[[SHUFFLERESULT_7]] : i32 to vector<1xi32>
+// CHECK:        %[[D95:.+]] = vector.bitcast %[[D94]] : vector<1xi32> to vector<2xf16>
+// CHECK:        %[[D96:.+]] = arith.maxf %[[D95]], %[[D91]] : vector<2xf16>
+// CHECK:        %[[D97:.+]] = vector.extract %[[D96]][0] : vector<2xf16>
+// CHECK:        %[[D98:.+]] = vector.extract %[[D96]][1] : vector<2xf16>
+// CHECK:        %[[D99:.+]] = arith.maxf %[[D97]], %[[D98]] : f16
+// CHECK:        %[[D100:.+]] = arith.maxf %[[D99]], %[[D82]] : f16
+// CHECK:        %[[D101:.+]] = vector.insert %[[D100]], %[[D81]] [0, 0, 1, 0] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D102:.+]] = vector.insert %[[D100]], %[[D101]] [0, 0, 1, 1] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D103:.+]] = vector.extract %[[D102]][0, 0, 0, 0] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D103]], %[[D2]][%[[D8]], %[[D9]]] : memref<16x8xf16>
+// CHECK:        %[[D104:.+]] = vector.extract %[[D102]][0, 0, 0, 1] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D104]], %[[D2]][%[[D8]], %[[D14]]] : memref<16x8xf16>
+// CHECK:        %[[D105:.+]] = vector.extract %[[D102]][0, 0, 1, 0] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D105]], %[[D2]][%[[D29]], %[[D9]]] : memref<16x8xf16>
+// CHECK:        %[[D106:.+]] = vector.extract %[[D102]][0, 0, 1, 1] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D106]], %[[D2]][%[[D29]], %[[D14]]] : memref<16x8xf16>
 // CHECK:        return
 // CHECK:      }
 

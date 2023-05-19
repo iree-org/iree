@@ -736,6 +736,16 @@ static void iterate(int dimType, ArrayRef<int> order,
   }
 }
 
+static SmallVector<int64_t> getIndicesFromState(
+    std::array<int, DimType::NumDims> &state, Layout &layout) {
+  SmallVector<int64_t> indices{
+      state[DimType::Batch0], state[DimType::Batch1],
+      state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
+          state[DimType::VecIdZ],
+      state[DimType::VecIdX]};
+  return indices;
+}
+
 static void distributeReductionBroadcastTranspose(
     vector::MultiDimReductionOp reductionOp, vector::BroadcastOp broadcastOp,
     vector::TransposeOp transposeOp, DenseMap<Value, Layout> &layoutMap,
@@ -748,6 +758,7 @@ static void distributeReductionBroadcastTranspose(
   if (!layoutMap.count(source)) return;
   if (!simdToSimtMap.count(source)) return;
   if (!broadcastOp) return;
+  if (!transposeOp) return;
   Location loc = reductionOp.getLoc();
   Layout layout = layoutMap.at(source);
   auto reductionDims = llvm::to_vector<4>(
@@ -785,86 +796,87 @@ static void distributeReductionBroadcastTranspose(
   }
 
   bodyType loopBody = [&](std::array<int, DimType::NumDims> &state) {
+    Value vector = simdToSimtMap.at(source);
+    VectorType vectorType = vector.getType().cast<VectorType>();
+    Type elementType = vectorType.getElementType();
+    int bitWidth = elementType.getIntOrFloatBitWidth();
+    bool isFP32 = bitWidth == 32;
+    uint32_t size{32};
+    Value mask;
+
+    Value accValue = rewriter.create<vector::ExtractOp>(
+        loc, simdToSimtMap.at(acc), getIndicesFromState(state, layout));
+
+    int index{0};
+    auto zero =
+        rewriter.getZeroAttr(VectorType::get({isFP32 ? 1 : 2}, elementType));
+    Value tmp = rewriter.create<arith::ConstantOp>(loc, zero);
     Value result;
 
-    auto reduce = [&](std::array<int, DimType::NumDims> &state) {
-      Value vector = simdToSimtMap.at(source);
-      int vectorOffset =
-          state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
-          state[DimType::VecIdZ];
-      if (std::find(reductionOrder.begin(), reductionOrder.end(),
-                    DimType::VecIdX) == reductionOrder.end()) {
-        vector = rewriter.create<vector::TransposeOp>(
-            loc, vector, ArrayRef<int64_t>{0, 1, 3, 2});
-        vectorOffset = state[DimType::VecIdX];
+    // Returns vector<1xf32> or vector<2xf16>
+    auto reduceLocal = [&](std::array<int, DimType::NumDims> &state) {
+      Value current = rewriter.create<vector::ExtractOp>(
+          loc, vector, getIndicesFromState(state, layout));
+      tmp = rewriter.create<vector::InsertOp>(loc, current, tmp,
+                                              SmallVector<int64_t>{index});
+      if (!isFP32) {
+        index = !index;
+        if (index) return;
       }
+      result = !result ? tmp
+                       : makeArithReduction(rewriter, loc, combiningKind,
+                                            result, tmp, mask);
+    };
+    iterate(0, reductionOrder, state, layout, reduceLocal);
 
-      vector = rewriter.create<vector::ExtractOp>(
-          loc, vector,
-          SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
-                               vectorOffset});
-      ArrayRef<int64_t> vShape = vector.getType().cast<VectorType>().getShape();
-      assert(vShape.size() == 1);
-
-      uint32_t size{32};
-      Value mask;
+    auto reduceGlobal = [&]() {
       for (uint64_t i = offset; i < offset * layout.shape[dimType]; i <<= 1) {
-        Value packed = packVectorToSupportedWidth(loc, rewriter, vector);
+        Value packed = packVectorToSupportedWidth(loc, rewriter, result);
         auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
                                                          gpu::ShuffleMode::XOR);
         Value unpacked =
             unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
-                           vector.getType().cast<VectorType>());
-        vector = makeArithReduction(rewriter, loc, combiningKind, unpacked,
-                                    vector, mask);
+                           result.getType().cast<VectorType>());
+        result = makeArithReduction(rewriter, loc, combiningKind, unpacked,
+                                    result, mask);
       }
 
-      // Since this is a broadcasted tensor, we only need to extract the 0th
-      // element
-      if (!result)
-        result = rewriter.create<vector::ExtractOp>(
-            loc, simdToSimtMap.at(acc),
-            SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
-                                 vectorOffset, 0});
-
-      for (int i = 0; i < vShape[0]; i++) {
-        Value v = rewriter.create<vector::ExtractOp>(loc, vector,
-                                                     SmallVector<int64_t>{i});
-        result =
-            makeArithReduction(rewriter, loc, combiningKind, result, v, mask);
+      // Convert to f16 or f32
+      Value v0 = rewriter.create<vector::ExtractOp>(loc, result,
+                                                    SmallVector<int64_t>{0});
+      if (isFP32) {
+        result = makeArithReduction(rewriter, loc, combiningKind, v0, accValue,
+                                    mask);
+      } else {
+        Value v1 = rewriter.create<vector::ExtractOp>(loc, result,
+                                                      SmallVector<int64_t>{1});
+        result = makeArithReduction(rewriter, loc, combiningKind, v0, v1, mask);
+        result = makeArithReduction(rewriter, loc, combiningKind, result,
+                                    accValue, mask);
       }
     };
-
-    // Iterate only over batch dimension
-    std::array<int, 1> batchDim = {{reductionOrder.back()}};
-    iterate(0, batchDim, state, layout, reduce);
+    reduceGlobal();
 
     auto broadcastResult = [&](std::array<int, DimType::NumDims> &state) {
       output = rewriter.create<vector::InsertOp>(
-          loc, result, output,
-          SmallVector<int64_t>{
-              state[DimType::Batch0], state[DimType::Batch1],
-              state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
-                  state[DimType::VecIdZ],
-              state[DimType::VecIdX]});
+          loc, result, output, getIndicesFromState(state, layout));
     };
-
     // Broadcast result to same shape as original
     iterate(0, reductionOrder, state, layout, broadcastResult);
+
+    // Reset reduction state
+    for (int type : reductionOrder) state[type] = 0;
   };
 
   std::array<int, DimType::NumDims> state;
   state.fill(0);
   iterate(0, parallelOrder, state, layout, loopBody);
 
-  if (transposeOp)
-    simdToSimtMap.try_emplace(transposeOp.getResult(), output);
-  else
-    simdToSimtMap.try_emplace(broadcastOp.getResult(), output);
+  simdToSimtMap.try_emplace(transposeOp.getResult(), output);
 
   ops.insert(reductionOp);
   ops.insert(broadcastOp);
-  if (transposeOp) ops.insert(transposeOp);
+  ops.insert(transposeOp);
 }
 
 static void replaceForOpWithNewSignature(RewriterBase &rewriter,
