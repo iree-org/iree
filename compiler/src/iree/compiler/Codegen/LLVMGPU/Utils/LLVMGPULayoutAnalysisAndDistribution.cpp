@@ -21,6 +21,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+static constexpr int warpSize = 32;
 static constexpr int maxTensorDims = 2;
 namespace DimType {
 static constexpr int Batch0 = 0;  // Batch dimension for tensor dim 0
@@ -736,6 +737,15 @@ static void iterate(int dimType, ArrayRef<int> order,
   }
 }
 
+/// Computes the 4D SIMT vector index using the current value
+/// of the induction variables of the loops being iterated
+/// (state) [b0, b1, lz, ly, lx, vz, vy, vx]
+/// and the layout shape.
+/// Dim 0 of the SIMT vector maps to b0
+/// Dim 1 of the SIMT vector maps to b1
+/// Dim 2 of the SIMT vector maps to vy * VZ + vz
+/// Dim 3 of the SIMT vector maps to vx
+/// where VZ is the shape of the VectorZ dimension of the layout.
 static SmallVector<int64_t> getIndicesFromState(
     std::array<int, DimType::NumDims> &state, Layout &layout) {
   SmallVector<int64_t> indices{
@@ -799,9 +809,7 @@ static void distributeReductionBroadcastTranspose(
     Value vector = simdToSimtMap.at(source);
     VectorType vectorType = vector.getType().cast<VectorType>();
     Type elementType = vectorType.getElementType();
-    int bitWidth = elementType.getIntOrFloatBitWidth();
-    bool isFP32 = bitWidth == 32;
-    uint32_t size{32};
+    bool isFP32 = elementType.isF32();
     Value mask;
 
     Value accValue = rewriter.create<vector::ExtractOp>(
@@ -832,8 +840,8 @@ static void distributeReductionBroadcastTranspose(
     auto reduceGlobal = [&]() {
       for (uint64_t i = offset; i < offset * layout.shape[dimType]; i <<= 1) {
         Value packed = packVectorToSupportedWidth(loc, rewriter, result);
-        auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
-                                                         gpu::ShuffleMode::XOR);
+        auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
+            loc, packed, i, warpSize, gpu::ShuffleMode::XOR);
         Value unpacked =
             unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
                            result.getType().cast<VectorType>());
