@@ -36,6 +36,10 @@ BITCODE_COPTS = [
     "-fno-ident",
     "-fdiscard-value-names",
 
+    # Set the size of wchar_t to 4 bytes (instead of 2 bytes).
+    # This must match what the runtime is built with.
+    "-fno-short-wchar",
+
     # Object file only in bitcode format:
     "-c",
     "-emit-llvm",

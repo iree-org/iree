@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+iree_add_all_subdirs()
+
 # Our inline assembly is of the GCC/Clang flavor. Enable it by default when it
 # is expected to compile.
 iree_select_compiler_opts(IREE_UK_ENABLE_INLINE_ASM_DEFAULT
@@ -23,13 +25,11 @@ option(IREE_UK_ENABLE_INTRINSICS_EVEN_WHEN_INLINE_ASM_AVAILABLE
 
 if (IREE_ARCH STREQUAL "arm_64")
   set(IREE_UK_ARCH_ARM_64 TRUE)
-  add_subdirectory(arm_64)
   list(APPEND IREE_UK_ARCH_DEPS
     "iree::builtins::ukernel::arch::arm_64"
   )
 elseif (IREE_ARCH STREQUAL "x86_64")
   set(IREE_UK_ARCH_X86_64 TRUE)
-  add_subdirectory(x86_64)
   list(APPEND IREE_UK_ARCH_DEPS
     "iree::builtins::ukernel::arch::x86_64"
   )

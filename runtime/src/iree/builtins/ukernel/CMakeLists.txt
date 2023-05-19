@@ -126,6 +126,7 @@ iree_bitcode_library(
     "-DNDEBUG"
     "-fno-ident"
     "-fdiscard-value-names"
+    "-fno-short-wchar"
     "-c"
     "-emit-llvm"
     "-DIREE_UK_STANDALONE=1"
