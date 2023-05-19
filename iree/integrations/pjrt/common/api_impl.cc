@@ -18,10 +18,12 @@ using iree::vm::retain_ref;
 
 namespace iree::pjrt {
 
-// Chopped down utilities from various TPU support libraries. Basically all for
-// populating Trimmed device shapes. Since that is supposed to go away at
-// some point, just copy-pasta here.
-namespace ApiConverter {
+// Some general conversion functions for managing around some API layering
+// that is in flight. It is expected that most of this goes away over time.
+namespace PJRTApiConverter {
+namespace {
+// C API adapters copied from pjrt_c_api_wrapper_impl.cc as a stopgap.
+
 // Helper functions for copying data to possibly-inlined C arrays.
 
 // 'Src' and 'Dst' are allowed to be different types to make this usable with
@@ -30,7 +32,7 @@ namespace ApiConverter {
 template <typename Src, typename Dst, typename DstList>
 static void CreateVectorBase(const absl::Span<Src> src, DstList* dst) {
   dst->size = src.size();
-  if (dst->size > TPU_C_API_MAX_INLINED) {
+  if (dst->size > PJRT_C_API_MAX_INLINED) {
     dst->heap = new Dst[dst->size];
     std::copy(src.begin(), src.end(), dst->heap);
   } else {
@@ -38,32 +40,30 @@ static void CreateVectorBase(const absl::Span<Src> src, DstList* dst) {
   }
 }
 
-void CreateVector(const absl::Span<const int64_t> src, Int64List* dst) {
-  return CreateVectorBase<const int64_t, int64_t, Int64List>(src, dst);
+void CreateVector(const absl::Span<const int64_t> src, PJRT_Int64List* dst) {
+  return CreateVectorBase<const int64_t, int64_t, PJRT_Int64List>(src, dst);
 }
-
-void CreateVector(const absl::Span<const bool> src, BoolList* dst) {
-  return CreateVectorBase<const bool, bool, BoolList>(src, dst);
+void CreateVector(const absl::Span<const bool> src, PJRT_BoolList* dst) {
+  return CreateVectorBase<const bool, bool, PJRT_BoolList>(src, dst);
 }
-
-static void CreateVector(const absl::Span<const bool> src, IntList* dst) {
-  CreateVectorBase<const bool, int, IntList>(src, dst);
-}
-
 static void CreateVector(const absl::Span<const xla::DimLevelType> src,
-                         IntList* dst) {
-  CreateVectorBase<const xla::DimLevelType, int, IntList>(src, dst);
+                         PJRT_IntList* dst) {
+  CreateVectorBase<const xla::DimLevelType, int, PJRT_IntList>(src, dst);
+}
+void CreateVector(const absl::Span<const bool> src, PJRT_IntList* dst) {
+  CreateVectorBase<const bool, int, PJRT_IntList>(src, dst);
 }
 
-void ToC(const xla::Tile& tile, XLA_Tile* c_tile) {
+void ToC(const xla::Tile& tile, PJRT_XLA_Tile* c_tile) {
   CreateVector(tile.dimensions(), &c_tile->dimensions);
 }
 
-static void CreateVector(const absl::Span<const xla::Tile> src, TileList* dst) {
+void CreateVector(const absl::Span<const xla::Tile> src,
+                  PJRT_XLA_TileList* dst) {
   dst->size = src.size();
-  XLA_Tile* c_tiles;
-  if (dst->size > TPU_C_API_MAX_INLINED) {
-    dst->heap = new XLA_Tile[dst->size];
+  PJRT_XLA_Tile* c_tiles;
+  if (dst->size > PJRT_C_API_MAX_INLINED) {
+    dst->heap = new PJRT_XLA_Tile[dst->size];
     c_tiles = dst->heap;
   } else {
     c_tiles = dst->inlined;
@@ -73,21 +73,21 @@ static void CreateVector(const absl::Span<const xla::Tile> src, TileList* dst) {
   }
 }
 
-void ToC(const xla::Layout& layout, XLA_Layout* c_layout) {
+void ToC(const xla::Layout& layout, PJRT_XLA_Layout* c_layout) {
   CreateVector(layout.minor_to_major(), &c_layout->minor_to_major);
   CreateVector(layout.dim_level_types(), &c_layout->dim_level_types);
   CreateVector(layout.dim_unique(), &c_layout->dim_unique);
   CreateVector(layout.dim_ordered(), &c_layout->dim_ordered);
   c_layout->index_primitive_type = layout.index_primitive_type();
   c_layout->pointer_primitive_type = layout.pointer_primitive_type();
+  c_layout->element_size_in_bits = layout.element_size_in_bits();
   c_layout->memory_space = layout.memory_space();
+  c_layout->dynamic_shape_metadata_prefix_bytes =
+      layout.dynamic_shape_metadata_prefix_bytes();
   CreateVector(layout.tiles(), &c_layout->tiles);
 }
 
-}  // namespace ApiConverter
-
-namespace {
-
+// Enum converter functions
 iree_status_t MapElementTypeToXlaElementType(
     iree_hal_element_type_t element_type, xla::PrimitiveType* xla_primitive) {
   // TODO: Cascade on bit-field sub-types to avoid large linear scan.
@@ -215,6 +215,7 @@ iree_status_t MapBufferTypeToElementType(
 }
 
 }  // namespace
+}  // namespace PJRTApiConverter
 
 //===----------------------------------------------------------------------===//
 // Error
@@ -334,8 +335,8 @@ iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
   iree_hal_element_type_t hal_element_type =
       iree_hal_buffer_view_element_type(buffer_view());
   xla::PrimitiveType xla_element_type;
-  IREE_RETURN_IF_ERROR(
-      MapElementTypeToXlaElementType(hal_element_type, &xla_element_type));
+  IREE_RETURN_IF_ERROR(PJRTApiConverter::MapElementTypeToXlaElementType(
+      hal_element_type, &xla_element_type));
 
   size_t rank = iree_hal_buffer_view_shape_rank(buffer_view());
   const iree_hal_dim_t* dims = iree_hal_buffer_view_shape_dims(buffer_view());
@@ -383,13 +384,13 @@ void BufferInstance::BindApi(PJRT_Api* api) {
       IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
 
       args->element_type = shape->element_type();
-      ApiConverter::CreateVector(shape->dimensions(), &args->dimensions);
-      ApiConverter::CreateVector(shape->dynamic_dimensions(),
-                                 &args->dynamic_dimensions);
+      PJRTApiConverter::CreateVector(shape->dimensions(), &args->dimensions);
+      PJRTApiConverter::CreateVector(shape->dynamic_dimensions(),
+                                     &args->dynamic_dimensions);
 
       if (shape->has_layout()) {
         args->has_layout = true;
-        ApiConverter::ToC(shape->layout(), &args->layout);
+        PJRTApiConverter::ToC(shape->layout(), &args->layout);
       } else {
         args->has_layout = false;
       }
@@ -683,7 +684,8 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   // Map element type.
   iree_hal_element_type_t element_type;
-  IREE_RETURN_IF_ERROR(MapBufferTypeToElementType(type, &element_type));
+  IREE_RETURN_IF_ERROR(
+      PJRTApiConverter::MapBufferTypeToElementType(type, &element_type));
   // TODO: Do something sensible with sub-byte aligned types.
   if (IREE_UNLIKELY(iree_hal_element_bit_count(element_type) == 0) ||
       IREE_UNLIKELY(!iree_hal_element_is_byte_aligned(element_type))) {
