@@ -66,12 +66,6 @@ add_dependencies(iree-e2e-test-artifacts
   iree-benchmark-suites-comp-stats-large
 )
 
-# Map the legacy, intuitive target to default benchmark preset.
-add_custom_target(iree-benchmark-suites)
-add_dependencies(iree-benchmark-suites
-  iree-benchmark-suites-default
-)
-
 # iree-benchmark-import-models* imports benchmark models from their source
 # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
 
@@ -84,3 +78,63 @@ add_custom_target(iree-benchmark-import-models-large)
 include(generated_e2e_test_fetch_models.cmake)
 
 include(generated_e2e_test_iree_artifacts.cmake)
+
+################################################################################
+# Defines which targets to build in the target iree-benchmark-suites based on  #
+# IREE_BENCHMARK_SUITE_PRESETS                                                 #
+################################################################################
+
+set(_COMPILATION_BENCHMARK_CONFIG
+  "${ROOT_ARTIFACTS_DIR}/compilation-benchmark-config.json"
+)
+add_custom_command(
+  OUTPUT "${_COMPILATION_BENCHMARK_CONFIG}"
+  COMMAND
+    "${Python3_EXECUTABLE}"
+    "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+    compilation
+    --output="${_COMPILATION_BENCHMARK_CONFIG}"
+  DEPENDS
+    "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+)
+set(_COMPILATION_BENCHMARK_CONFIG_TARGET
+  "${PACKAGE_NAME}_compilation-benchmark-config"
+)
+add_custom_target("${_COMPILATION_BENCHMARK_CONFIG_TARGET}"
+  DEPENDS "${_COMPILATION_BENCHMARK_CONFIG}"
+)
+
+set(_EXECUTION_BENCHMARK_CONFIG
+  "${ROOT_ARTIFACTS_DIR}/execution-benchmark-config.json"
+)
+add_custom_command(
+  OUTPUT "${_EXECUTION_BENCHMARK_CONFIG}"
+  COMMAND
+    "${Python3_EXECUTABLE}"
+    "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+    execution
+    --presets="${IREE_BENCHMARK_SUITE_PRESETS}"
+    --output="${_EXECUTION_BENCHMARK_CONFIG}"
+  DEPENDS
+    "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+)
+set(_EXECUTION_BENCHMARK_CONFIG_TARGET
+  "${PACKAGE_NAME}_execution-benchmark-config"
+)
+add_custom_target("${_EXECUTION_BENCHMARK_CONFIG_TARGET}"
+  DEPENDS "${_EXECUTION_BENCHMARK_CONFIG}"
+)
+
+add_custom_target(iree-benchmark-suites)
+
+string(REPLACE "," ";" _BENCHMARK_PRESET_LIST "${IREE_BENCHMARK_SUITE_PRESETS}")
+foreach(_BENCHMARK_PRESET ${_BENCHMARK_PRESET_LIST})
+  add_dependencies(iree-benchmark-suites
+    "iree-benchmark-suites-${_BENCHMARK_PRESET}"
+  )
+endforeach()
+
+add_dependencies(iree-benchmark-suites
+  "${_COMPILATION_BENCHMARK_CONFIG_TARGET}"
+  "${_EXECUTION_BENCHMARK_CONFIG_TARGET}"
+)
