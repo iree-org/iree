@@ -792,15 +792,15 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
   let methods = [
     InterfaceMethod<
       [{Returns dynamic dimensions for the given shaped operand index.}],
-      "ValueRange", "getOperandDynamicDims", (ins "unsigned":$idx)
+      "mlir::ValueRange", "getOperandDynamicDims", (ins "unsigned":$idx)
     >,
     InterfaceMethod<
       [{Returns dynamic dimensions for the given shaped result index.}],
-      "ValueRange", "getResultDynamicDims", (ins "unsigned":$idx)
+      "mlir::ValueRange", "getResultDynamicDims", (ins "unsigned":$idx)
     >,
     InterfaceMethod<
       [{Returns dynamic dimensions for the given shaped result value.}],
-      "ValueRange", "getResultDynamicDimsFromValue", (ins "Value":$value),
+      "mlir::ValueRange", "getResultDynamicDimsFromValue", (ins "Value":$value),
       /*defaultImplementation=*/[{
         for (unsigned i = 0; i < $_self->getNumResults(); ++i) {
           if ($_self->getResult(i) == value) {
