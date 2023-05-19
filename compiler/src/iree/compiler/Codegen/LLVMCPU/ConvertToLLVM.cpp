@@ -916,11 +916,11 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
   }
 };
 
-class ExpandFMaxfExtended : public OpRewritePattern<arith::FMaxfOp> {
+class ExpandMaxFExtended : public OpRewritePattern<arith::MaxFOp> {
   public:
-    using OpRewritePattern<arith::FMaxfOp>::OpRewritePattern;
+    using OpRewritePattern<arith::MaxfOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(arith::FMaxfOp op, 
+    LogicalResult matchAndRewrite(arith::MaxFOp op, 
                                   PatternRewriter &rewriter) const override{
     Type resultType = op.getOperand(0).getType();
     if (getElementTypeOrSelf(resultType).getIntOrFloatBitWidth() != 16) {
@@ -938,7 +938,7 @@ class ExpandFMaxfExtended : public OpRewritePattern<arith::FMaxfOp> {
       Value lhsExt = rewriter.create<arith::ExtFOp>(loc, wideType, op.getLhs());
       Value rhsExt = rewriter.create<arith::ExtFOp>(loc, wideType, op.getRhs());
       Value maxExt = 
-          rewriter.create<arith::FMaxfOp>(loc, wideType, lhsExt, rhsExt);
+          rewriter.create<arith::MaxFOp>(loc, wideType, lhsExt, rhsExt);
       Value result = rewriter.create<arith::TruncFOp>(loc, resultType, maxExt);
 
 
