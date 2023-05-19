@@ -469,6 +469,35 @@ module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 
 
 // -----
 
+// cross_partition: channel_id > 0
+module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 : i32 } {
+  // CHECK-LABEL: @cross_partition
+  func.func @cross_partition(%input : tensor<2304xf32>) -> tensor<2304xf32> {
+    // Cross partition should form groups (0,1),(2,3),(4,5),(6,7) where each number represents a cell below.
+    // +---+---+
+    // | 0   1 |
+    // +---+---+
+    // | 2   3 |
+    // +---+---+
+    // | 4   5 |
+    // +---+---+
+    // | 6   7 |
+    // +---+---+
+    //                          rank:   0    1    2    3    4    5    6    7
+    // CHECK: util.switch index from [%c0, %c0, %c1, %c1, %c2, %c2, %c3, %c3] at %channel_rank else %c-1 : index
+    // CHECK: util.switch index from [%c0, %c1, %c0, %c1, %c0, %c1, %c0, %c1] at %channel_rank else %c-1 : index
+    %out = "mhlo.all_to_all"(%input) {
+      split_dimension = 0 : i64,
+      concat_dimension = 0 : i64,
+      split_count = 2 : i64,
+      channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<2304xf32>) -> tensor<2304xf32>
+    return %out : tensor<2304xf32>
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @collective_permute
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<8xf32>) -> tensor<8xf32>
 func.func @collective_permute(%input : tensor<8xf32>) -> tensor<8xf32> {
@@ -483,4 +512,56 @@ func.func @collective_permute(%input : tensor<8xf32>) -> tensor<8xf32> {
         source_target_pairs = dense<[[0, 1], [1, 2], [2, 3], [3, 0]]> : tensor<4x2xi64>,
         channel_handle = #mhlo.channel_handle<handle = 1, type = 1>} : (tensor<8xf32>) -> tensor<8xf32>
   return %out : tensor<8xf32>
+}
+
+// -----
+
+// collective_permute cross_replica: channel_id <= 0
+module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 : i32 } {
+  // CHECK-LABEL: @collective_permute_cross_replica
+  func.func @collective_permute_cross_replica(%input : tensor<8xf32>) -> tensor<8xf32> {
+    // Cross replica should form groups (0,2,4,6),(1,3,5,7) where each number represents a cell below.
+    // +---+---+
+    // | 0 | 1 |
+    // |   |   |
+    // | 2 | 3 |
+    // |   |   |
+    // | 4 | 5 |
+    // |   |   |
+    // | 6 | 7 |
+    // +---+---+
+    //                          rank:   0    1    2    3    4    5    6    7
+    // CHECK: util.switch index from [%c0, %c1, %c0, %c1, %c0, %c1, %c0, %c1] at %channel_rank else %c-1 : index
+    // CHECK: util.switch index from [%c0, %c0, %c1, %c1, %c2, %c2, %c3, %c3] at %channel_rank else %c-1 : index
+    %out = "mhlo.collective_permute"(%input) {
+          source_target_pairs = dense<[[0, 1], [1, 2], [2, 3], [3, 0]]> : tensor<4x2xi64>,
+          channel_handle = #mhlo.channel_handle<handle = 0, type = 1>} : (tensor<8xf32>) -> tensor<8xf32>
+    return %out : tensor<8xf32>
+  }
+}
+
+// -----
+
+// collective_permute cross_partition: channel_id > 0
+module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 : i32 } {
+  // CHECK-LABEL: @collective_permute_cross_partition
+  func.func @collective_permute_cross_partition(%input : tensor<8xf32>) -> tensor<8xf32> {
+    // Cross partition should form groups (0,1),(2,3),(4,5),(6,7) where each number represents a cell below.
+    // +---+---+
+    // | 0   1 |
+    // +---+---+
+    // | 2   3 |
+    // |---+---|
+    // | 4   5 |
+    // +---+---+
+    // | 6   7 |
+    // +---+---+
+    //                          rank:   0    1    2    3    4    5    6    7
+    // CHECK: util.switch index from [%c0, %c0, %c1, %c1, %c2, %c2, %c3, %c3] at %channel_rank else %c-1 : index
+    // CHECK: util.switch index from [%c0, %c1, %c0, %c1, %c0, %c1, %c0, %c1] at %channel_rank else %c-1 : index
+    %out = "mhlo.collective_permute"(%input) {
+          source_target_pairs = dense<[[0, 1]]> : tensor<1x2xi64>,
+          channel_handle = #mhlo.channel_handle<handle = 1, type = 1>} : (tensor<8xf32>) -> tensor<8xf32>
+    return %out : tensor<8xf32>
+  }
 }

@@ -211,7 +211,7 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
 static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
     DenseIntElementsAttr replicaGroups, int32_t numPartitions,
     OpBuilder &builder) {
-  if (numPartitions < 1) {
+  if (numPartitions <= 1) {
     // Treat as a single partition.
     return replicaGroups;
   }
@@ -242,10 +242,48 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
   return DenseIntElementsAttr::get(type, newValues);
 }
 
+static DenseIntElementsAttr convertToRankGroupsByCrossPartition(
+    DenseIntElementsAttr partitionGroups, int32_t numReplicas,
+    OpBuilder &builder) {
+  if (numReplicas <= 1) {
+    // Treat as a single replica.
+    return partitionGroups;
+  }
+
+  auto groupsType = partitionGroups.getType().cast<RankedTensorType>();
+  assert(groupsType.getRank() == 2);
+  int rows = groupsType.getShape()[0];
+  int cols = groupsType.getShape()[1];
+  auto values = partitionGroups.getValues<int64_t>();
+  SmallVector<Attribute> newValues;
+  // partitionGroups must have unique elements and cover all partition_ids, so
+  // numPartitions == values.size().
+  int64_t numPartitions = values.size();
+
+  // The number of groups is (rows * numReplicas).
+  for (int i = 0; i < rows; ++i) {
+    for (int r = 0; r < numReplicas; ++r) {
+      // Each group starts here. The group size is the same as the column size.
+      for (int j = 0; j < cols; ++j) {
+        const int index = i * cols + j;
+        const int64_t partitionId = values[index];
+        const int64_t value =
+            (partitionId == -1) ? -1 : r * numPartitions + partitionId;
+
+        newValues.push_back(builder.getI64IntegerAttr(value));
+      }
+    }
+  }
+
+  auto type =
+      RankedTensorType::get({rows * numReplicas, cols}, builder.getI64Type());
+  return DenseIntElementsAttr::get(type, newValues);
+}
+
 static DenseIntElementsAttr convertToRankGroupsByCrossReplicaAndPartition(
     DenseIntElementsAttr replicaGroups, int32_t numPartitions,
     OpBuilder &builder) {
-  if (numPartitions < 1) {
+  if (numPartitions <= 1) {
     // Treat as a single partition.
     return replicaGroups;
   }
@@ -275,15 +313,69 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplicaAndPartition(
   return DenseIntElementsAttr::get(type, newValues);
 }
 
+// The collective group mode determines how the StableHLO process grid is split
+// into independent process groups.
+enum class CollectiveOpGroupMode {
+  // Only cross-replica communications happen within each process group.
+  CrossReplica,
+  // Only cross-partition communications happen within each process group.
+  CrossPartition,
+  // Both cross-replica and cross-partition communications may happen within
+  // each process group.
+  CrossReplicaAndPartition,
+  // A list of flattened process ids is used to specify the process groups.
+  FlattenedIds,
+};
+
+// clang-format off
+// +--------------------+-----------+--------------------+--------------------------+
+// | Collective         | channelId | useGlobalDeviceIds | Collective Group Mode    |
+// +--------------------+-----------+--------------------+--------------------------+
+// | all_gather         |   <= 0    | false              | CrossReplica             |
+// |                    |    > 0    | false              | CrossReplicaAndPartition |
+// |                    |    > 0    | true               | FlattenedIds             |
+// +--------------------+-----------+--------------------+--------------------------+
+// | all_reduce         |   <= 0    | false              | CrossReplica             |
+// |                    |    > 0    | false              | CrossReplicaAndPartition |
+// |                    |    > 0    | true               | FlattenedIds             |
+// +--------------------+-----------+--------------------+--------------------------+
+// | all_to_all         |   <= 0    |                    | CrossReplica             |
+// |                    |    > 0    |                    | CrossPartition           |
+// +--------------------+-----------+--------------------+--------------------------+
+// | collective_permute |   <= 0    |                    | CrossReplica             |
+// |                    |    > 0    |                    | CrossPartition           |
+// +--------------------+-----------+--------------------+--------------------------+
+// | reduce_scatter     |   <= 0    | false              | CrossReplica             |
+// |                    |    > 0    | false              | CrossReplicaAndPartition |
+// |                    |    > 0    | true               | FlattenedIds             |
+// +--------------------+-----------+--------------------+--------------------------+
+// clang-format on
+static CollectiveOpGroupMode getCollectiveOpGroupMode(
+    int64_t channelId, std::optional<bool> useGlobalDeviceIds) {
+  if (channelId <= 0) {
+    assert(!useGlobalDeviceIds.has_value() || !*useGlobalDeviceIds);
+    return CollectiveOpGroupMode::CrossReplica;
+  } else {
+    if (!useGlobalDeviceIds.has_value()) {
+      return CollectiveOpGroupMode::CrossPartition;
+    } else if (!*useGlobalDeviceIds) {
+      return CollectiveOpGroupMode::CrossReplicaAndPartition;
+    } else {
+      return CollectiveOpGroupMode::FlattenedIds;
+    }
+  }
+}
+
 /// Creates a channel matching the given |channelHandleAttr| scoped to the
 /// requested group.
 static Value createChannelWithGroupInfo(
     Location loc, mhlo::ChannelHandleAttr channelHandleAttr,
     int32_t numReplicas, int32_t numPartitions,
-    DenseIntElementsAttr replicaGroups, bool useGlobalDeviceIds,
+    DenseIntElementsAttr replicaGroups, std::optional<bool> useGlobalDeviceIds,
     OpBuilder &builder) {
-  // Set numPartitions to 1 if not set by the user.
+  // Set numPartitions, numReplicas to 1 if not set by the user.
   if (numPartitions == -1) numPartitions = 1;
+  if (numReplicas == -1) numReplicas = 1;
 
   // Base channel that may be split by the group info.
   Value baseChannel =
@@ -296,21 +388,23 @@ static Value createChannelWithGroupInfo(
     return baseChannel;
   }
 
-  // Convert replica_groups into flattened IDs.
+  // Convert replica_groups into flattened IDs depending on group mode.
   DenseIntElementsAttr rankGroups;
   int64_t channelId = channelHandleAttr ? channelHandleAttr.getHandle() : 0;
-  if (channelId <= 0) {
-    assert(!useGlobalDeviceIds);
+  CollectiveOpGroupMode mode =
+      getCollectiveOpGroupMode(channelId, useGlobalDeviceIds);
+  if (mode == CollectiveOpGroupMode::CrossReplica) {
     rankGroups = convertToRankGroupsByCrossReplica(replicaGroups, numPartitions,
                                                    builder);
-  } else {
-    if (useGlobalDeviceIds) {
-      // already flattened.
-      rankGroups = replicaGroups;
-    } else {
-      rankGroups = convertToRankGroupsByCrossReplicaAndPartition(
-          replicaGroups, numPartitions, builder);
-    }
+  } else if (mode == CollectiveOpGroupMode::CrossPartition) {
+    rankGroups = convertToRankGroupsByCrossPartition(replicaGroups, numReplicas,
+                                                     builder);
+  } else if (mode == CollectiveOpGroupMode::CrossReplicaAndPartition) {
+    rankGroups = convertToRankGroupsByCrossReplicaAndPartition(
+        replicaGroups, numPartitions, builder);
+  } else if (mode == CollectiveOpGroupMode::FlattenedIds) {
+    // already flattened.
+    rankGroups = replicaGroups;
   }
 
   // Construct lookups for color and key split parameters.
@@ -628,10 +722,14 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
-    // Get the channel used for communication.
-    // TODO: update to use createChannelWithGroupInfo.
-    Value channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Create a channel.
+    Value channel = createChannelWithGroupInfo(
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        op.getReplicaGroups(), /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
     // Get the collective element type attribute.
     auto resultType = op.getResult(0).getType().cast<RankedTensorType>();
@@ -807,9 +905,33 @@ struct CollectivePermuteOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
-    // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Replica group consists of all partitions or all replicas depending on the
+    // mode. If numPartitions is not set, a single group will result in the base
+    // channel being used.
+    int64_t channelId =
+        op.getChannelHandleAttr() ? op.getChannelHandleAttr().getHandle() : 0;
+    auto mode = getCollectiveOpGroupMode(channelId,
+                                         /*useGlobalDeviceIds=*/std::nullopt);
+    int64_t numParticipants = mode == CollectiveOpGroupMode::CrossReplica
+                                  ? numReplicas
+                                  : numPartitions;
+    if (numParticipants == -1) numParticipants = 1;
+    SmallVector<Attribute> replicaGroups;
+    for (int64_t i = 0; i < numParticipants; ++i) {
+      replicaGroups.push_back(rewriter.getI64IntegerAttr(i));
+    }
+    auto type =
+        RankedTensorType::get({1, numParticipants}, rewriter.getI64Type());
+    auto replicaGroupsAttr = DenseIntElementsAttr::get(type, replicaGroups);
+
+    // Create a channel.
+    Value channel = createChannelWithGroupInfo(
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        replicaGroupsAttr, /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
     auto inputType = op.getOperand().getType().cast<RankedTensorType>();
 
