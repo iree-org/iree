@@ -19,7 +19,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
+if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU AND (NOT WIN32))
 """,
     inline = True,
 )
@@ -144,7 +144,7 @@ iree_bitcode_library(
 
 iree_cmake_extra_content(
     content = """
-endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU
+endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU AND (NOT WIN32)
 """,
     inline = True,
 )
