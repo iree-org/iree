@@ -90,7 +90,6 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.vectorize %{{.*}}
 // CHECK: transform.iree.eliminate_empty_tensors %{{.*}}
 // CHECK: transform.iree.bufferize {target_gpu} %{{.*}}
-// CHECK: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}}
 // CHECK: transform.iree.forall_to_workgroup %{{.*}}
 // CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
 // CHECK: transform.iree.hoist_static_alloc %{{.*}}
@@ -153,7 +152,6 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.structured.vectorize %{{.*}}
 // WITH_OPTIONS: transform.iree.eliminate_empty_tensors %{{.*}}
 // WITH_OPTIONS: transform.iree.bufferize {target_gpu} %{{.*}}
-// WITH_OPTIONS: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}}
 // WITH_OPTIONS: transform.iree.forall_to_workgroup %{{.*}}
 // The workgroup dimensions are controled by td-matmul-strategy-num-threads-XX.
 // The warp dimensions are controled by td-matmul-strategy-num-warps-XX.

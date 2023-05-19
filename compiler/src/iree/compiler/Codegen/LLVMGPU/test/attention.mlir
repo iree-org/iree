@@ -125,8 +125,6 @@ transform.sequence failures(propagate) {
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   transform.apply_patterns to %func_3 { transform.apply_patterns.linalg.erase_unnecessary_inputs } : !transform.any_op
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)
-  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-  transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!transform.any_op) -> ()
 
   // Step 5. Pre-process the contract and transfer ops to put it in the right form.
   // ===========================================================================
@@ -149,14 +147,13 @@ transform.sequence failures(propagate) {
      transform.apply_patterns.canonicalization
   } : !transform.any_op
   transform.iree.apply_cse %func_7 : !transform.any_op
-  %func_8 = transform.structured.hoist_redundant_vector_transfers %memref_func
+  %func_8 = transform.structured.hoist_redundant_vector_transfers %func_7
   : (!transform.any_op) -> !transform.any_op
   transform.apply_patterns to %func_8 {
     transform.apply_patterns.canonicalization
   } : !transform.any_op
   transform.iree.apply_cse %func_8 : !transform.any_op
   transform.iree.apply_buffer_optimizations %func_8 : (!transform.any_op) -> ()
-
 }
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 128)>
@@ -178,29 +175,29 @@ transform.sequence failures(propagate) {
 // CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK-DAG:    %[[CST_5:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
-// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<192x1024x64xf16>
-// CHECK:        memref.assume_alignment %[[D0]], 64 : memref<192x1024x64xf16>
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK:        memref.assume_alignment %[[D0]], 64 : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
-// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<192x1024x64xf16>
-// CHECK:        memref.assume_alignment %[[D1]], 64 : memref<192x1024x64xf16>
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK:        memref.assume_alignment %[[D1]], 64 : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
-// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<192x1024x64xf16>
-// CHECK:        memref.assume_alignment %[[D2]], 64 : memref<192x1024x64xf16>
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK:        memref.assume_alignment %[[D2]], 64 : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK:        %[[D3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64)
-// CHECK-SAME:     offset(%[[C0]]) : memref<192x1024x64xf16>
-// CHECK:        memref.assume_alignment %[[D3]], 64 : memref<192x1024x64xf16>
+// CHECK-SAME:     offset(%[[C0]]) : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK:        memref.assume_alignment %[[D3]], 64 : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
 // CHECK:        %[[WORKGROUP_ID_Y:.+]] = hal.interface.workgroup.id[1] : index
 // CHECK-DAG:    %[[D4:.+]] = affine.apply #[[MAP]]()[%[[WORKGROUP_ID_Y]]]
 // CHECK:        %[[SUBVIEW:.+]] = memref.subview %[[D0]][%[[WORKGROUP_ID_X]], %[[D4]], 0] [1, 128, 64] [1, 1, 1] :
-// CHECK-SAME:     memref<192x1024x64xf16> to memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>>
+// CHECK-SAME:     memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>> to memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 // CHECK:        %[[SUBVIEW_6:.+]] = memref.subview %[[D3]][%[[WORKGROUP_ID_X]], %[[D4]], 0] [1, 128, 64] [1, 1, 1] :
-// CHECK-SAME:     memref<192x1024x64xf16> to memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>>
+// CHECK-SAME:     memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>> to memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 // CHECK:        %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<1x128x64xf16,
 // CHECK-SAME:     #[[GPU:.+]].address_space<workgroup>>
 // CHECK:        gpu.barrier
 // CHECK:        linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]]], iterator_types = ["parallel", "parallel",
-// CHECK-SAME:     "parallel"]} ins(%[[SUBVIEW]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>>)
+// CHECK-SAME:     "parallel"]} ins(%[[SUBVIEW]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
 // CHECK-SAME:     outs(%[[ALLOC]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>) {
 // CHECK:        ^bb0(%[[IN:.+]]: f16, %[[OUT:.+]]: f16):
 // CHECK:          linalg.yield %[[IN]] : f16
@@ -210,7 +207,7 @@ transform.sequence failures(propagate) {
 // CHECK-SAME:     #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
 // CHECK:        linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]]], iterator_types = ["parallel", "parallel",
-// CHECK-SAME:     "parallel"]} ins(%[[SUBVIEW_6]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>>)
+// CHECK-SAME:     "parallel"]} ins(%[[SUBVIEW_6]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
 // CHECK-SAME:     outs(%[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>) {
 // CHECK:        ^bb0(%[[IN:.+]]: f16, %[[OUT:.+]]: f16):
 // CHECK:          linalg.yield %[[IN]] : f16
@@ -230,14 +227,14 @@ transform.sequence failures(propagate) {
 // CHECK-SAME:     iter_args(%[[ARG1:[a-zA-Z0-9_]+]] = %[[CST_0]], %[[ARG2:[a-zA-Z0-9_]+]] = %[[CST_1]],
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]] = %[[CST]]) -> (vector<32xf32>, vector<32xf32>, vector<32x64xf32>) {
 // CHECK:          %[[SUBVIEW_8:.+]] = memref.subview %[[D1]][%[[WORKGROUP_ID_X]], %[[ARG0]], 0] [1, 128, 64] [1, 1, 1]
-// CHECK-SAME:       : memref<192x1024x64xf16> to memref<128x64xf16, strided<[64, 1], offset: ?>>
+// CHECK-SAME:       : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>> to memref<128x64xf16, strided<[64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 // CHECK:          %[[SUBVIEW_9:.+]] = memref.subview %[[D2]][%[[WORKGROUP_ID_X]], %[[ARG0]], 0] [1, 128, 64] [1, 1, 1]
-// CHECK-SAME:       : memref<192x1024x64xf16> to memref<128x64xf16, strided<[64, 1], offset: ?>>
+// CHECK-SAME:       : memref<192x1024x64xf16, #hal.descriptor_type<storage_buffer>> to memref<128x64xf16, strided<[64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 // CHECK:          %[[ALLOC_10:.+]] = memref.alloc() {alignment = 64 : i64} : memref<128x64xf16,
 // CHECK-SAME:       #[[GPU]].address_space<workgroup>>
 // CHECK:          gpu.barrier
 // CHECK:          linalg.generic {indexing_maps = [#[[MAP3]], #[[MAP3]]], iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME:       ins(%[[SUBVIEW_8]] : memref<128x64xf16, strided<[64, 1], offset: ?>>) outs(%[[ALLOC_10]] :
+// CHECK-SAME:       ins(%[[SUBVIEW_8]] : memref<128x64xf16, strided<[64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) outs(%[[ALLOC_10]] :
 // CHECK-SAME:       memref<128x64xf16, #[[GPU]].address_space<workgroup>>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f16, %[[OUT:.+]]: f16):
 // CHECK:            linalg.yield %[[IN]] : f16
@@ -247,7 +244,7 @@ transform.sequence failures(propagate) {
 // CHECK-SAME:       #[[GPU]].address_space<workgroup>>
 // CHECK:          gpu.barrier
 // CHECK:          linalg.generic {indexing_maps = [#[[MAP3]], #[[MAP3]]], iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME:       ins(%[[SUBVIEW_9]] : memref<128x64xf16, strided<[64, 1], offset: ?>>) outs(%[[ALLOC_11]] :
+// CHECK-SAME:       ins(%[[SUBVIEW_9]] : memref<128x64xf16, strided<[64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) outs(%[[ALLOC_11]] :
 // CHECK-SAME:       memref<128x64xf16, #[[GPU]].address_space<workgroup>>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f16, %[[OUT:.+]]: f16):
 // CHECK:            linalg.yield %[[IN]] : f16
@@ -300,7 +297,7 @@ transform.sequence failures(propagate) {
 // CHECK:        gpu.barrier
 // CHECK:        linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]]], iterator_types = ["parallel", "parallel",
 // CHECK-SAME:     "parallel"]} ins(%[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>)
-// CHECK-SAME:     outs(%[[SUBVIEW_6]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>>) {
+// CHECK-SAME:     outs(%[[SUBVIEW_6]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) {
 // CHECK:        ^bb0(%[[IN:.+]]: f16, %[[OUT:.+]]: f16):
 // CHECK:          linalg.yield %[[IN]] : f16
 // CHECK:        }

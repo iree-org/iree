@@ -59,7 +59,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
 //         CHECK:    %[[TID4:.+]] = affine.apply #[[$MAP]]()[%[[TID]]]
 //         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[TID4]] to %[[C10240]] step %[[C1024]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<1xf32>) {
-//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32>, vector<4xf32>
+//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      %[[E:.+]] = vector.extract %[[A0]][0] : vector<1xf32>
 //         CHECK:      %[[RL:.+]] = vector.reduction <add>, %[[V]], %[[E]] : vector<4xf32> into f32
 //         CHECK:      %[[B:.+]] = vector.broadcast %[[RL:.*]] : f32 to vector<1xf32>
@@ -97,7 +97,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    %[[R13:.+]] = vector.broadcast %[[R12]] : f32 to vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
-//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32>
+//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
 //         CHECK:    }
 
 // -----
@@ -154,7 +154,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @warp_reduction_broadcast_dispatch
 //         CHECK:    scf.for {{.*}} -> (vector<1xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32>, vector<4xf32>
+//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      vector.reduction <add>, {{.*}} : vector<4xf32> into f32
 //         CHECK:      scf.yield
 //         CHECK:    gpu.shuffle  xor
@@ -187,7 +187,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.divf {{.*}} : vector<4x1xf32>
-//         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32>
+//         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>
 //         CHECK:    }
 //         CHECK:    return
 
@@ -250,7 +250,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @softmax
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32>, vector<4xf32>
+//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      arith.maxf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
 //         CHECK:    vector.reduction <maxf>, %{{.*}} : vector<4xf32> into f32

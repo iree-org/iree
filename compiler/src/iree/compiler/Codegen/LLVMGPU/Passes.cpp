@@ -85,10 +85,6 @@ static void addBufferizePasses(OpPassManager &passManager) {
                                       memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  passManager.addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
 }
 
 static void
@@ -491,6 +487,10 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
+  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
+  // memory space through the stack.
+  pm.addNestedPass<func::FuncOp>(createEraseHALDescriptorTypeFromMemRefPass());
+
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -586,10 +586,6 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//

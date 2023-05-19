@@ -78,8 +78,8 @@ hal.executable private @aligned_unpack_generic {
   }
 }
 // CHECK:         func.func @aligned_unpack_generic
-// CHECK:           %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32>
-// CHECK:             %[[SUBVIEW:.+]] = memref.subview %{{.*}} memref<24x32x16x16xf32> to memref<
+// CHECK:           %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
+// CHECK:             %[[SUBVIEW:.+]] = memref.subview %{{.*}} memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>> to memref<
 // CHECK-COUNT-15:      vector.load %[[SUBVIEW]]
 // CHECK:               %[[LAST_LOAD:.+]] = vector.load %[[SUBVIEW]]
 // CHECK-NEXT:          %[[IN_1:.+]] = vector.insert %[[LAST_LOAD]], %{{.*}}

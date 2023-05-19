@@ -939,35 +939,5 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
-//===---------------------------------------------------------------------===//
-// EraseHALDescriptorTypeFromMemRef
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
-    transform::TransformRewriter &rewriter, ::mlir::Operation *target,
-    ::mlir::transform::ApplyToEachResultList &results,
-    ::mlir::transform::TransformState &state) {
-  if (!isa<func::FuncOp>(target)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "expects a func::FuncOp as the target op");
-  }
-  auto funcOp = cast<func::FuncOp>(target);
-
-  if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "failed to erase #hal.descriptor_type as MemRef memory space");
-  }
-
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
-}
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"

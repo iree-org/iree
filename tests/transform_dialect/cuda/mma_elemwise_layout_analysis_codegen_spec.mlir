@@ -46,7 +46,6 @@ transform.sequence failures(propagate) {
   } : !transform.any_op
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-  transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!transform.any_op) -> ()
 
   // Step 6. Post-bufferization vector distribution
   // ===========================================================================
