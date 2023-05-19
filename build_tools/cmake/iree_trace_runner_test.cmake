@@ -51,6 +51,10 @@ function(iree_trace_runner_test)
     return()
   endif()
 
+  if(WIN32 AND "nowindows" IN_LIST _RULE_LABELS)
+    return()
+  endif()
+
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
@@ -154,6 +158,10 @@ function(iree_single_backend_generated_trace_runner_test)
   )
 
   if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+    return()
+  endif()
+
+  if(WIN32 AND "nowindows" IN_LIST _RULE_LABELS)
     return()
   endif()
 
@@ -302,6 +310,10 @@ function(iree_generated_trace_runner_test)
   )
 
   if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+    return()
+  endif()
+
+  if(WIN32 AND "nowindows" IN_LIST _RULE_LABELS)
     return()
   endif()
 
