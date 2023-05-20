@@ -32,7 +32,7 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import Callable, Dict, Iterable, List, Optional, Set
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Sequence
 import argparse
 import collections
 import dataclasses
@@ -45,8 +45,8 @@ from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.definitions import iree_definitions
 
-PresetMatcher = Callable[[iree_definitions.E2EModelRunConfig], bool]
-BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
+PresetMatcher = Callable[[Any], bool]
+EXECUTION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "x86_64":
         lambda config: config.target_device_spec.architecture.architecture ==
         "x86_64",
@@ -70,14 +70,23 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
          platform == "android"),
     # Not a preset for execution benchmarks.
     "comp-stats":
-        lambda _config: False,
+        lambda _: False,
+    "comp-stats-long":
+        lambda _: False,
+}
+
+COMPILATION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
+    "comp-stats":
+        lambda gen_config: benchmark_tags.LONG_RUNNING not in gen_config.tags,
+    "comp-stats-long":
+        lambda gen_config: benchmark_tags.LONG_RUNNING in gen_config.tags,
 }
 
 
 def filter_and_group_run_configs(
     run_configs: List[iree_definitions.E2EModelRunConfig],
     target_device_names: Optional[Set[str]] = None,
-    preset_matchers: Optional[List[PresetMatcher]] = None
+    preset_matchers: Optional[Sequence[PresetMatcher]] = None
 ) -> Dict[str, List[iree_definitions.E2EModelRunConfig]]:
   """Filters run configs and groups by target device name.
   
@@ -115,14 +124,17 @@ def _get_distinct_module_dir_paths(
   return sorted(set(module_dir_paths))
 
 
-def _export_execution_handler(args: argparse.Namespace):
+def _export_execution_handler(
+    benchmark_presets: Optional[Sequence[PresetMatcher]] = None,
+    target_device_names: Optional[Sequence[str]] = None,
+    **_unused_args):
   _, all_run_configs = benchmark_collections.generate_benchmarks()
-  target_device_names = (set(args.target_device_names)
-                         if args.target_device_names is not None else None)
+  target_device_name_set = (None if target_device_names is None else
+                            set(target_device_names))
   grouped_run_config_map = filter_and_group_run_configs(
       all_run_configs,
-      target_device_names=target_device_names,
-      preset_matchers=args.benchmark_presets)
+      target_device_names=target_device_name_set,
+      preset_matchers=benchmark_presets)
 
   output_map = {}
   for device_name, run_configs in grouped_run_config_map.items():
@@ -146,12 +158,22 @@ def _export_execution_handler(args: argparse.Namespace):
   return output_map
 
 
-def _export_compilation_handler(_args: argparse.Namespace):
+def _export_compilation_handler(
+    benchmark_presets: Optional[Sequence[PresetMatcher]] = None,
+    **_unused_args):
   all_gen_configs, _ = benchmark_collections.generate_benchmarks()
   compile_stats_gen_configs = [
       config for config in all_gen_configs
       if benchmark_tags.COMPILE_STATS in config.compile_config.tags
   ]
+
+  if benchmark_presets is not None:
+    match_predicate = lambda gen_config: any(
+        matcher(gen_config) for matcher in benchmark_presets)
+    compile_stats_gen_configs = [
+        gen_config for gen_config in compile_stats_gen_configs
+        if match_predicate(gen_config)
+    ]
 
   distinct_module_dir_paths = _get_distinct_module_dir_paths(
       compile_stats_gen_configs)
@@ -164,14 +186,15 @@ def _export_compilation_handler(_args: argparse.Namespace):
   }
 
 
-def _parse_and_strip_list_argument(arg) -> List[str]:
-  return [part.strip() for part in arg.split(",")]
+def _parse_and_strip_list_argument(arg: str) -> List[str]:
+  return [part.strip() for part in arg.split(",") if part != ""]
 
 
-def _parse_benchmark_presets(arg) -> List[PresetMatcher]:
+def _parse_benchmark_presets(
+    arg: str, matcher_map: Dict[str, PresetMatcher]) -> List[PresetMatcher]:
   matchers = []
   for preset in _parse_and_strip_list_argument(arg):
-    matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
+    matcher = matcher_map.get(preset)
     if matcher is None:
       raise argparse.ArgumentTypeError(
           f"Unrecognized benchmark preset: '{preset}'.")
@@ -225,10 +248,11 @@ def _parse_arguments():
             "including all devices."))
   execution_parser.add_argument(
       "--benchmark_presets",
-      type=_parse_benchmark_presets,
+      type=lambda arg: _parse_benchmark_presets(
+          arg, EXECUTION_BENCHMARK_PRESET_MATCHERS),
       help=("Presets that select a bundle of benchmarks, separated by comma, "
             "multiple presets will be union. Available options: "
-            f"{','.join(BENCHMARK_PRESET_MATCHERS.keys())}"))
+            f"{','.join(EXECUTION_BENCHMARK_PRESET_MATCHERS.keys())}"))
 
   compilation_parser = subparser.add_parser(
       "compilation",
@@ -236,12 +260,20 @@ def _parse_arguments():
       help=("Export serialized list of module generation configs defined for "
             "compilation statistics."))
   compilation_parser.set_defaults(handler=_export_compilation_handler)
+  compilation_parser.add_argument(
+      "--benchmark_presets",
+      type=lambda arg: _parse_benchmark_presets(
+          arg, COMPILATION_BENCHMARK_PRESET_MATCHERS),
+      help=("Presets `comp-stats*` that select a bundle of compilation"
+            " benchmarks, separated by comma, multiple presets will be union."
+            " Available options: "
+            f"{','.join(COMPILATION_BENCHMARK_PRESET_MATCHERS.keys())}"))
 
   return parser.parse_args()
 
 
 def main(args: argparse.Namespace):
-  output_obj = args.handler(args)
+  output_obj = args.handler(**vars(args))
   json_data = json.dumps(output_obj, indent=2)
   if args.output is None:
     print(json_data)
