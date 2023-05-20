@@ -88,6 +88,12 @@ def FormDispatchWorkgroups :
   ];
 }
 
+def FormScalarDispatches :
+    InterfacePass<"iree-flow-form-scalar-dispatches", "mlir::FunctionOpInterface"> {
+  let summary = "Form Dispatch Regions for scalar computations.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFormScalarDispatchesPass()";
+}
+
 def CloneProducersIntoDispatchRegions :
     InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Clone producers into dispatch regions to be isolated above";

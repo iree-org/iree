@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
@@ -505,7 +506,9 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
       return true;
     }
   }
-  if (llvm::all_of(op->getOperands(),
+  if (op->getDialect() ==
+          op->getContext()->getLoadedDialect<arith::ArithDialect>() &&
+      llvm::all_of(op->getOperands(),
                    [&](Value v) { return v.getType().isIntOrFloat(); }) &&
       llvm::all_of(op->getResults(),
                    [&](Value v) { return v.getType().isIntOrFloat(); })) {
