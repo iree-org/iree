@@ -1452,7 +1452,7 @@ static void printCollectiveParam(OpAsmPrinter &p, Operation *op,
     assert(keyword && "collective op must have a param keyword");
     p << keyword << "(";
     p.printOperand(paramValue);
-    p << ")";
+    p << ") ";
   }
 }
 
