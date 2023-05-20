@@ -49,7 +49,8 @@ BITCODE_COPTS = [
     "-DIREE_UK_STANDALONE=1",
 
     # Force configure for X86_64 with own Clang
-    "-march=x86-64",
+    "-target",
+    "x86_64-unknown-unknown-eabi-elf",
     "-DIREE_UK_ARCH_X86_64",
     "-DIREE_UK_POINTER_SIZE=8",
     "-DIREE_UK_BUILD_X86_64_AVX2_FMA",
