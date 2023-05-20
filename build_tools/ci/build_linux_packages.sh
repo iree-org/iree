@@ -47,7 +47,7 @@ manylinux_docker_image="${manylinux_docker_image:-}"
 python_versions="${override_python_versions:-cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${repo_root}/bindist}"
 plugins="${plugins:-iree/integrations/pjrt/cpu/pjrt_plugin_iree_cpu.so iree/integrations/pjrt/cuda/pjrt_plugin_iree_cuda.so}"
-packages="${packages:-plugins python-cpu-wheel}"
+packages="${packages:-plugins python-cpu-wheel python-cuda-wheel}"
 package_suffix="${package_suffix:-}"
 
 function run_on_host() {
@@ -128,6 +128,10 @@ function run_in_docker() {
           build_python_cpu_wheel
           ;;
 
+        python-cuda-wheel)
+          build_python_cuda_wheel
+          ;;
+
         *)
           echo "Unrecognized package '${package}'"
           exit 1
@@ -166,6 +170,16 @@ function build_python_cpu_wheel() {
   clean_wheels "openxla_pjrt_plugin_cpu${package_suffix}" "py3-none"
   build_wheel python_packages/openxla_cpu_plugin
   run_audit_wheel "openxla_pjrt_plugin_cpu${package_suffix}" "py3-none"
+}
+
+function build_python_cuda_wheel() {
+  # Note that these wheels are Python version independent. We build them
+  # with each listed Python version to make sure that the setup machinery
+  # works, but the most recent one persists.
+  bazel build -c opt iree/integrations/pjrt/cuda/pjrt_plugin_iree_cuda.so
+  clean_wheels "openxla_pjrt_plugin_cuda${package_suffix}" "py3-none"
+  build_wheel python_packages/openxla_cuda_plugin
+  run_audit_wheel "openxla_pjrt_plugin_cuda${package_suffix}" "py3-none"
 }
 
 function build_wheel() {
