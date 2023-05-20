@@ -305,6 +305,10 @@ function(iree_generated_trace_runner_test)
     return()
   endif()
 
+  if((NOT (IREE_ARCH STREQUAL "x86_64")) AND ("x86_64_only" IN_LIST _RULE_LABELS))
+    return()
+  endif()
+
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
     set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
     set(_RULE_DRIVERS "local-task" "vulkan" "local-task")
