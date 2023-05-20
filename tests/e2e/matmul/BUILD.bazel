@@ -175,6 +175,7 @@ py_binary(
     ],
     tags = [
         "hostonly",
+        "x86_64_only",
     ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
