@@ -130,6 +130,7 @@ iree_bitcode_library(
     "-c"
     "-emit-llvm"
     "-DIREE_UK_STANDALONE=1"
+    "-march=x86-64"
     "-DIREE_UK_ARCH_X86_64"
     "-DIREE_UK_POINTER_SIZE=8"
     "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
