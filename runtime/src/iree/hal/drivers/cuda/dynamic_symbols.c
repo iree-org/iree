@@ -134,8 +134,8 @@ static iree_status_t iree_hal_cuda_nccl_check_version(
   }
   patch = nccl_version % 100;
   if (major != NCCL_MAJOR || minor != NCCL_MINOR || patch != NCCL_PATCH) {
-    printf("NCCL version is %d.%d.%d, but %d.%d.%d is required", major, minor,
-           patch, NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
+    fprintf(stderr, "NCCL version is %d.%d.%d, but %d.%d.%d is required\n",
+            major, minor, patch, NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
 
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
