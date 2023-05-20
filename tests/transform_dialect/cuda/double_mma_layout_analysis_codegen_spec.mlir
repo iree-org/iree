@@ -24,7 +24,7 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
-  %func_3 = transform.structured.vectorize %func
+  %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize
   // ===========================================================================
