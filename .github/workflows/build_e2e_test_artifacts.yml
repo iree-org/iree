@@ -29,8 +29,16 @@ on:
         required: true
         type: string
       benchmark-presets:
+        description: |
+          A comma-separated string of benchmark presets to build.
         required: true
         type: string
+      build-default-benchmark-suites:
+        description: |
+          Build default benchmark suites for sanity check and e2e model testing
+          if set to 1.
+        default: 1
+        type: number
     outputs:
       e2e-test-artifacts-dir:
         description: |
@@ -86,35 +94,19 @@ jobs:
       - name: "Building e2e test artifacts"
         id: build
         env:
+          IREE_BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
+          IREE_BUILD_DEFAULT_BENCHMARK_SUITES: ${{ inputs.build-default-benchmark-suites }}
           BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            --env "IREE_BENCHMARK_PRESETS=${IREE_BENCHMARK_PRESETS}" \
+            --env "IREE_BUILD_DEFAULT_BENCHMARK_SUITES=${IREE_BUILD_DEFAULT_BENCHMARK_SUITES}" \
             gcr.io/iree-oss/frontends@sha256:da48ff70cc3b956ba22465a3bef285711b66dfcd605ccba605db2278b96dbc5c \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
-      - name: "Exporting benchmark configs"
-        id: export
-        if: inputs.benchmark-presets != ''
-        env:
-          COMPILATION_BENCHMARK_CONFIG: ${{ steps.build.outputs.e2e-test-artifacts-dir }}/compilation-benchmark-config.json
-          EXECUTION_BENCHMARK_CONFIG: ${{ steps.build.outputs.e2e-test-artifacts-dir }}/execution-benchmark-config.json
-          BENCHMARK_FLAG_DUMP: ${{ steps.build.outputs.e2e-test-artifacts-dir }}/benchmark-flag-dump.txt
-          BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
-        run: |
-          ./build_tools/benchmarks/export_benchmark_config.py \
-            compilation \
-            --output="${COMPILATION_BENCHMARK_CONFIG}"
-          ./build_tools/benchmarks/export_benchmark_config.py \
-            execution \
-            --benchmark_presets="${BENCHMARK_PRESETS}" \
-            --output="${EXECUTION_BENCHMARK_CONFIG}"
-          ./build_tools/benchmarks/benchmark_helper.py dump-cmds \
-            --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
-            --compilation_benchmark_config="${COMPILATION_BENCHMARK_CONFIG}" \
-            > "${BENCHMARK_FLAG_DUMP}"
       - name: "Uploading e2e test artifacts"
         id: upload
         env:

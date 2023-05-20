@@ -68,11 +68,6 @@ EXECUTION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
         (config.target_device_spec.architecture.type == common_definitions.
          ArchitectureType.GPU and config.target_device_spec.host_environment.
          platform == "android"),
-    # Not a preset for execution benchmarks.
-    "comp-stats":
-        lambda _: False,
-    "comp-stats-long":
-        lambda _: False,
 }
 
 COMPILATION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
