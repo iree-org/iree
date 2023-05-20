@@ -64,7 +64,7 @@ cd jax
 pip install numpy wheel
 python build/build.py \
     --bazel_options=--override_repository=xla=$PWD/../xla \
-      --enable_tpu && pip3 install dist/*.whl --force-reinstall
+     && pip3 install dist/*.whl --force-reinstall
 pip install -e .
 
 cd ../iree
@@ -101,14 +101,11 @@ python -m pip install -e ../jax
 Build a compatible jaxlib:
 
 ```shell
-# Currently pluggable PJRT is commingled with TPU support... folks are
-# working on it :/
 cd ../jax
 # NOTE: Try running `bazel clean --expunge` if you run into undeclared inclusion
 # error(s).
 python build/build.py \
-  --bazel_options=--override_repository=xla=$PWD/../xla \
-  --enable_tpu
+  --bazel_options=--override_repository=xla=$PWD/../xla
 # Install the version of jaxlib you just built.
 python -m pip install dist/*.whl --force-reinstall
 ```

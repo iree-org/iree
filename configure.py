@@ -102,7 +102,6 @@ def write_configuration(args):
 
     add_env("IREE_PJRT_COMPILER_LIB_PATH", args.iree_compiler_dylib)
     add_env("PJRT_NAMES_AND_LIBRARY_PATHS", ','.join(plugin_paths))
-    add_env("JAX_USE_PJRT_C_API_ON_TPU", "1")  # TODO: Remove when ready
     if args.cuda_sdk_dir:
       print(f"Enabling CUDA SDK: {args.cuda_sdk_dir}")
       add_env("IREE_CUDA_DEPS_DIR", args.cuda_sdk_dir)
