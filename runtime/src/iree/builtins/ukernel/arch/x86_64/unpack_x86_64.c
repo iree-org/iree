@@ -4,16 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/arch/x86_64/unpack_x86_64.h"
-
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
+#include "iree/builtins/ukernel/unpack_internal.h"
 
 IREE_UK_UNPACK_TILE_FUNC_DECL(
     iree_uk_unpack_tile_8x8_x32_x86_64_avx2_fma_direct)
 IREE_UK_UNPACK_TILE_FUNC_DECL(
     iree_uk_unpack_tile_16x16_x32_x86_64_avx512_base_direct)
 
-iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_x86_64(
+iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arch(
     const iree_uk_unpack_params_t* params) {
   iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
   int esize = iree_uk_type_size(iree_uk_unpack_out_type(unpack_type));

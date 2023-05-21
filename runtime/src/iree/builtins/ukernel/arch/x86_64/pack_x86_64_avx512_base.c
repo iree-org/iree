@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
-#include "iree/builtins/ukernel/arch/x86_64/unpack_x86_64.h"
+#include "iree/builtins/ukernel/pack_internal.h"
 
 void iree_uk_pack_tile_16x16_x32_x86_64_avx512_base_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,

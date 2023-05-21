@@ -72,11 +72,7 @@ UKERNEL_HDRS = [
     "//runtime/src/iree/builtins/ukernel:pack_internal.h",
     "//runtime/src/iree/builtins/ukernel:elementwise.h",
     "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h",
     "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h",
     "//runtime/src/iree/schemas:cpu_data.h",
     "//runtime/src/iree/schemas:cpu_feature_bits.inl",
 ]

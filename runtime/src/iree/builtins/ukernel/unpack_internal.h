@@ -56,4 +56,8 @@ typedef void (*iree_uk_unpack_tile_func_t)(
 iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func(
     const iree_uk_unpack_params_t* params);
 
+// Architecture-specific implementation.
+iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arch(
+    const iree_uk_unpack_params_t* params);
+
 #endif  // IREE_BUILTINS_UKERNEL_UNPACK_INTERNAL_H_
