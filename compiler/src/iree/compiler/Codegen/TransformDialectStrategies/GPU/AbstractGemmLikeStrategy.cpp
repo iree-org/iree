@@ -78,13 +78,9 @@ static llvm::cl::opt<int64_t> clNumWarpsZ(
 
 static llvm::cl::opt<bool> clUseAsyncCopies(
     "td-matmul-strategy-use-async-copies",
-    llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
+    llvm::cl::desc(
+        "use async copies for the transform dialect matmul strategy"),
     llvm::cl::init(true));
-
-static llvm::cl::opt<bool> clUseMmaSync(
-    "td-matmul-strategy-use-mma-sync",
-    llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<int64_t> clPipelineDepth(
     "td-matmul-strategy-pipeline-depth",
@@ -96,14 +92,64 @@ using iree_compiler::gpu::AbstractGemmLikeStrategy;
 /// Key function for vtable.
 AbstractGemmLikeStrategy::~AbstractGemmLikeStrategy() {}
 
-void AbstractGemmLikeStrategy::initDefaultValues() {
+void AbstractGemmLikeStrategy::initDefaultValues(bool optUseMmaSync) {
   blockTileSizes = {clBlockTileSizeX, clBlockTileSizeY, clBlockTileSizeZ};
   reductionTileSize = clReductionTileSize;
   numThreads = {clNumThreadsX, clNumThreadsY, clNumThreadsZ};
   numWarps = {clNumWarpsX, clNumThreadsY, clNumThreadsZ};
   useAsyncCopies = clUseAsyncCopies;
-  useMmaSync = clUseMmaSync;
+  useMmaSync = optUseMmaSync;
   pipelineDepth = clPipelineDepth;
+}
+
+ArrayAttr AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(
+    OpBuilder &b) const {
+  SmallVector<Attribute> paddingValues;
+  for (Type t : paddingValueTypes) paddingValues.push_back(b.getZeroAttr(t));
+  return b.getArrayAttr(paddingValues);
+}
+
+/// Prefer 128 bit copies.
+constexpr int64_t targetCopyNumBits = 128;
+
+/// Get the largest valid copy vector size up to a vector of size
+/// targetCopyNumBits. This assumes the existence of a vector size that can use
+/// all of the available threads.
+/// TODO: Proper handling of fewer elements than threads.
+static int64_t getCopyVectorSize(int64_t innerExtent, int64_t outerCopyExtent,
+                                 int64_t innerCopyExtent,
+                                 int64_t totalNumThreads, int64_t bitWidth) {
+  assert(targetCopyNumBits % bitWidth == 0 &&
+         "require bit width that divides target copy num bits");
+  int64_t numel = targetCopyNumBits / bitWidth;
+  // First adjust for vector alignment on the problem shape.
+  while (innerExtent % numel != 0) numel /= 2;
+
+  // Next, adjust for vector alignment on the tile.
+  while (innerCopyExtent % numel != 0) numel /= 2;
+
+  // Finally, ensure that the remaining threads will divide the outer dim of the
+  // tile.
+  int64_t minResidualElements = totalNumThreads / innerCopyExtent;
+  assert(outerCopyExtent % minResidualElements == 0 &&
+         "fewer elements to copy than total number of threads");
+  int64_t maxCopiedElementsPerVector = outerCopyExtent / minResidualElements;
+  while (maxCopiedElementsPerVector % numel != 0) numel /= 2;
+  return numel;
+}
+
+/// Copy vector sizes based on inner most K/N dims.
+int64_t AbstractGemmLikeStrategy::lhsCopyVectorSize() const {
+  return getCopyVectorSize(k(), blockTileM(), blockTileK(), totalNumThreads(),
+                           lhsElementalBitWidth);
+}
+int64_t AbstractGemmLikeStrategy::rhsCopyVectorSize() const {
+  return getCopyVectorSize(n(), blockTileK(), blockTileN(), totalNumThreads(),
+                           rhsElementalBitWidth);
+}
+int64_t AbstractGemmLikeStrategy::resCopyVectorSize() const {
+  return getCopyVectorSize(n(), blockTileM(), blockTileN(), totalNumThreads(),
+                           resElementalBitWidth);
 }
 
 LLVM_DUMP_METHOD void AbstractGemmLikeStrategy::dump() const {

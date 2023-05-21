@@ -49,15 +49,19 @@ using iree_compiler::IREE::transform_dialect::
 using transform::MatchOp;
 using transform_ext::RegisterMatchCallbacksOp;
 
-void MatmulStrategy::initDefaultValues() {
+void MatmulStrategy::initDefaultValues(bool optUseMmaSync) {
   // Pull in tile configs from flags.
-  AbstractGemmLikeStrategy::initDefaultValues();
+  AbstractGemmLikeStrategy::initDefaultValues(optUseMmaSync);
 
-  // TODO: Capture input/output element types properly for configuring the
-  // padding values.
-  paddingValues = {0.0f, 0.0f, 0.0f};
+  // Set the configuration for padding the matmul.
+  paddingValueTypes = {captures.lhsElementType, captures.rhsElementType,
+                       captures.outputElementType};
   paddingDimensions = {0, 1, 2};
   packingDimensions = {1, 1, 1};
+
+  lhsElementalBitWidth = captures.lhsElementType.getIntOrFloatBitWidth();
+  rhsElementalBitWidth = captures.rhsElementType.getIntOrFloatBitWidth();
+  resElementalBitWidth = captures.outputElementType.getIntOrFloatBitWidth();
 }
 
 LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
@@ -116,10 +120,9 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
       /*canonicalize=*/!strategy.alignedRes());
 
   // Step 2. Pad the matmul op.
-  // TODO: use captured type information to configure the padding values.
   auto paddedMatmulOpH =
       buildPad(b, tileReductionResult.tiledOpH,
-               b.getF32ArrayAttr(strategy.paddingValues).getValue(),
+               strategy.getZeroPadAttrFromElementalTypes(b).getValue(),
                strategy.paddingDimensions, strategy.packingDimensions);
 
   // Step 3. Hoist the padding of the output operand above the reduction loop.

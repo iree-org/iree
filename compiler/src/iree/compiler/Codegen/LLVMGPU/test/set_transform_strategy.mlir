@@ -285,6 +285,45 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      transform.vector.materialize_masks
 
 // -----
+hal.executable @f16_matmul {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @f16_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @f16_matmul() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f16
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2056x2560xf16>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2560x2056xf16>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2056x2056xf16>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2056, 2560], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2056x2560xf16>> -> tensor<2056x2560xf16>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2560, 2056], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2560x2056xf16>> -> tensor<2560x2056xf16>
+      %5 = tensor.empty() : tensor<2056x2056xf16>
+      %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2056x2056xf16>) -> tensor<2056x2056xf16>
+      %7 = linalg.matmul ins(%3, %4 : tensor<2056x2560xf16>, tensor<2560x2056xf16>) outs(%6 : tensor<2056x2056xf16>) -> tensor<2056x2056xf16>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2056, 2056], strides = [1, 1] : tensor<2056x2056xf16> -> !flow.dispatch.tensor<writeonly:tensor<2056x2056xf16>>
+      return
+    }
+  }
+}
+}
+
+// CHECK-LABEL: func @f16_matmul
+
+// Check 128 bit vector sizes.
+// CHECK:      transform.structured.masked_vectorize {{.*}} vector_sizes [2, 8]
+// CHECK:      transform.structured.masked_vectorize {{.*}} vector_sizes [2, 8]
+// CHECK:      transform.structured.masked_vectorize {{.*}} vector_sizes [16, 8]
+
+// Check for mma.sync we don't enable f16.
+// WITH_OPTIONS-LABEL: func @f16_matmul
+
+// WITH_OPTIONS-NOT: transform.sequence  failures(propagate) {
+
+// -----
 hal.executable @aligned_matmul {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @aligned_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
@@ -383,26 +422,26 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // -----
 
-hal.executable @f16_matmul {
+hal.executable @int8_matmul {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
-  hal.executable.export public @f16_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  hal.executable.export public @int8_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
-    func.func @f16_matmul() {
+    func.func @int8_matmul() {
       %c0 = arith.constant 0 : index
-      %cst = arith.constant 0.000000e+00 : f16
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2052x2556xf16>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2556x2052xf16>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2052x2052xf16>>
-      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2052, 2556], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2052x2556xf16>> -> tensor<2052x2556xf16>
-      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2556, 2052], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2556x2052xf16>> -> tensor<2556x2052xf16>
-      %5 = tensor.empty() : tensor<2052x2052xf16>
-      %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2052x2052xf16>) -> tensor<2052x2052xf16>
-      %7 = linalg.matmul ins(%3, %4 : tensor<2052x2556xf16>, tensor<2556x2052xf16>) outs(%6 : tensor<2052x2052xf16>) -> tensor<2052x2052xf16>
-      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2052, 2052], strides = [1, 1] : tensor<2052x2052xf16> -> !flow.dispatch.tensor<writeonly:tensor<2052x2052xf16>>
+      %cst = arith.constant 0 : i8
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2052x2556xi8>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2556x2052xi8>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2052x2052xi8>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2052, 2556], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2052x2556xi8>> -> tensor<2052x2556xi8>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2556, 2052], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2556x2052xi8>> -> tensor<2556x2052xi8>
+      %5 = tensor.empty() : tensor<2052x2052xi8>
+      %6 = linalg.fill ins(%cst : i8) outs(%5 : tensor<2052x2052xi8>) -> tensor<2052x2052xi8>
+      %7 = linalg.matmul ins(%3, %4 : tensor<2052x2556xi8>, tensor<2556x2052xi8>) outs(%6 : tensor<2052x2052xi8>) -> tensor<2052x2052xi8>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2052, 2052], strides = [1, 1] : tensor<2052x2052xi8> -> !flow.dispatch.tensor<writeonly:tensor<2052x2052xi8>>
       return
     }
   }
@@ -410,5 +449,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 // CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
-// CHECK-LABEL: func @f16_matmul
+// CHECK-LABEL: func @int8_matmul
+
+// Currently WMMA unrolling does not properly unroll for non-f16 and f32 types (such as int8) so disable for now.
 // CHECK-NOT: transform.sequence

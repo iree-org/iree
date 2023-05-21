@@ -50,6 +50,11 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectAlignedMatmul(
         "activate the matmul tensorcore strategy for tile aligned shapes"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clGPUTransformDialectUseMmaSync(
+    "td-matmul-strategy-use-mma-sync",
+    llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
+    llvm::cl::init(false));
+
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
@@ -820,10 +825,6 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     LDBG("--Matmul strategy flag turned off\n");
     return failure();
   }
-  if (!gpuModel.hasTF32TensorCore) {
-    LDBG("--Matmul strategy no TF32 tensor core\n");
-    return failure();
-  }
 
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *fill;
@@ -838,7 +839,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   }
 
   // We are very peculiar about the dispatches we want to match for now:
-  //   - f32 only atm.
+  //   - f32 or f16 only atm.
   //   - Mandatory fill op.
   //   - No trailing op.
   //   - If the matmul is "too aligned", then guard on the alignment flag.
@@ -849,17 +850,58 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
-  if (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
-      !captures.outputElementType.isF32()) {
-    LDBG("--Matmul strategy elemental type check failed\n");
-    return failure();
-  }
-
   // TODO: Generalize to a good mix of sizes, alignments and element types.
   const auto &matmulSize = captures.matmulOpSizes;
   if (matmulSize.size() != 3) {
     LDBG("--Matmul strategy size capture failed\n");
     return failure();
+  }
+
+  Type lhsElementType = captures.lhsElementType;
+  Type rhsElementType = captures.rhsElementType;
+  Type resElementType = captures.outputElementType;
+
+  if (lhsElementType != rhsElementType) {
+    LDBG("--Matmul strategy mixed input types\n");
+    return failure();
+  }
+
+  // Currently this is restricted by the supported vector unroll types/shapes
+  // for WMMA.
+  // TODO: Remove this once proper support for unrolling is in place.
+  if (!lhsElementType.isF32() && !lhsElementType.isF16()) {
+    LDBG("--Matmul strategy failed elemental type check\n");
+    return failure();
+  }
+
+  if (clGPUTransformDialectUseMmaSync) {
+    if (!gpuModel.hasMmaSync) {
+      LDBG("--Matmul strategy target does not support MMA.SYNC operations\n");
+      return failure();
+    }
+    // For unaligned f16 inputs conversion to subgroup_mma ops is failing and
+    // thus blowing up the generated code. Turn off f16 for mma sync for now.
+    if (!captures.lhsElementType.isF32() || !gpuModel.hasTF32TensorCore) {
+      LDBG("--Matmul strategy no TF32 tensor core\n");
+      return failure();
+    }
+  } else {
+    // Verify WMMA.
+    // Hard coded to reflect current WMMA unrolling support.
+    int reqM = 16;
+    int reqN = 16;
+    int reqK = lhsElementType.isF32() ? 8 : 16;
+    if (llvm::all_of(gpuModel.supportedWMMAConfigs,
+                     [&](iree_compiler::gpu::MMAConfig config) {
+                       return config.m != reqM || config.n != reqN ||
+                              config.k != reqK ||
+                              config.aType != lhsElementType ||
+                              config.bType != rhsElementType ||
+                              config.cType != resElementType;
+                     })) {
+      LDBG("--Matmul strategy failed wmma type check\n");
+      return failure();
+    }
   }
 
   // Currently the fully aligned case still lags behind the current default
@@ -892,7 +934,8 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    iree_compiler::gpu::MatmulStrategy strategy(op->getContext(), captures);
+    iree_compiler::gpu::MatmulStrategy strategy(
+        op->getContext(), captures, clGPUTransformDialectUseMmaSync);
     return buildMatmulTensorCoreStrategy(b, variant, strategy);
   };
 
