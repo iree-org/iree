@@ -10,14 +10,8 @@ import unittest
 
 import configure_ci
 
-SORTED_DEFAULT_BENCHMARK_PRESETS = ",".join([
-    "android-cpu",
-    "android-gpu",
-    "comp-stats",
-    "cuda",
-    "vulkan-nvidia",
-    "x86_64",
-])
+SORTED_DEFAULT_BENCHMARK_PRESETS = ",".join(
+    sorted(configure_ci.DEFAULT_BENCHMARK_PRESET_GROUP))
 
 
 class GetBenchmarkPresetsTest(unittest.TestCase):
