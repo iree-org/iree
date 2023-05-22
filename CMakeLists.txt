@@ -975,15 +975,11 @@ set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
     CACHE INTERNAL "IREE: Include Directories" FORCE)
 
 #-------------------------------------------------------------------------------
-# IREE benchmark tools
+# IREE build tools
 #-------------------------------------------------------------------------------
 
 add_subdirectory(build_tools/benchmarks)
-
-#-------------------------------------------------------------------------------
-# IREE build tools python modules
-#-------------------------------------------------------------------------------
-
+add_subdirectory(build_tools/github_actions)
 add_subdirectory(build_tools/python)
 
 #-------------------------------------------------------------------------------
