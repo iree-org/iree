@@ -45,7 +45,7 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
 
   def test_get_benchmark_presets_from_default_group(self):
     presets_str = configure_ci.get_benchmark_presets(
-        trailers={"benchmark-extra": "defaults"},
+        trailers={"benchmark-extra": "default"},
         labels=[],
         is_pr=True,
         is_llvm_integrate_pr=False)

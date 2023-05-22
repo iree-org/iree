@@ -81,7 +81,7 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
     "cuda", "x86_64", "android-cpu", "android-gpu", "vulkan-nvidia",
     "comp-stats"
 ]
-DEFAULT_BENCHMARK_PRESET = "defaults"
+DEFAULT_BENCHMARK_PRESET = "default"
 # All available benchmark preset options including experimental presets.
 BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESET_GROUP
 BENCHMARK_LABEL_PREFIX = "benchmarks"
