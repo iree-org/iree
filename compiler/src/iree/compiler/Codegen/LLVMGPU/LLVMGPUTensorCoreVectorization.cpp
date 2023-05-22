@@ -45,15 +45,16 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
 }
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
+                                         SmallVector<int64_t, 3> &nativeShape,
                                          bool useMmaSyncShape) {
   auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
     return gpuMmaUnrollOrder(contract);
   };
-  auto getNativeShape = [useMmaSyncShape](Operation *op) {
+  auto getNativeShape = [&nativeShape, useMmaSyncShape](Operation *op) {
     if (useMmaSyncShape) return getMmaNativeVectorSize(op);
-    return getWmmaNativeVectorSize(op);
+    return getWmmaNativeVectorSize(op, nativeShape);
   };
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
@@ -107,9 +108,18 @@ struct LLVMGPUTensorCoreVectorizationPass
         }
       }
       bool useMmaSyncShape = tensorCoreType == GPUTensorCoreType::MMA_SYNC;
+
+      SmallVector<int64_t, 3> nativeShape;
+      if (!useMmaSyncShape) {
+        if (failed(
+                getWmmaNativeVectorShapeFromContractOps(funcOp, nativeShape)))
+          return signalPassFailure();
+      }
+
       // Step 4. Break and unroll warp tile size to native math and load sizes.
       RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns, useMmaSyncShape);
+      populateVectorUnrollPatterns(vectorUnrollPatterns, nativeShape,
+                                   useMmaSyncShape);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(vectorUnrollPatterns)))) {
         return signalPassFailure();

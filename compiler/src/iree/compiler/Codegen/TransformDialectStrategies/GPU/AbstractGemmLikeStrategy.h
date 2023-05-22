@@ -22,9 +22,15 @@ namespace iree_compiler {
 namespace gpu {
 
 struct GPUModel;
+struct MMAShape {
+  int64_t m;
+  int64_t n;
+  int64_t k;
+};
 
 struct AbstractGemmLikeStrategy {
   AbstractGemmLikeStrategy() {}
+  AbstractGemmLikeStrategy(MMAShape mmaShape) : targetWmmaShape(mmaShape) {}
 
   virtual ~AbstractGemmLikeStrategy();
 
@@ -44,6 +50,8 @@ struct AbstractGemmLikeStrategy {
   SmallVector<Type> paddingValueTypes;
   SmallVector<int64_t> paddingDimensions;
   SmallVector<int64_t> packingDimensions;
+
+  MMAShape targetWmmaShape;
 
   ArrayAttr getZeroPadAttrFromElementalTypes(OpBuilder &b) const;
 

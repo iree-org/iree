@@ -82,9 +82,13 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
                             const int warpSize);
 
+/// Helper to infer the correct unroll shape from contract ops.
+LogicalResult getWmmaNativeVectorShapeFromContractOps(
+    Operation *containerOp, SmallVector<int64_t, 3> &nativeShape);
+
 /// Return the native size of an operation used in contraction calculation.
-// TODO: Make this take HW specific sizes.
-std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
+std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(
+    Operation *op, const SmallVector<int64_t, 3> &nativeShape);
 
 /// Helper function to return native size for MMA.SYNC-based operations.
 std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);

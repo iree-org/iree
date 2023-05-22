@@ -50,7 +50,7 @@ func.func @matmul() {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma } : (!pdl.operation) -> ()
+  transform.iree.unroll_vectors_gpu_wmma %func [16, 16, 8] : (!pdl.operation) -> ()
   transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!pdl.operation) -> ()
 
   // Apply canonicalization post-hoc to trigger DCE and pass the test 
@@ -127,7 +127,7 @@ func.func @gathered_matmul() {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma } : (!pdl.operation) -> ()
+  transform.iree.unroll_vectors_gpu_wmma %func [16, 16, 8] : (!pdl.operation) -> ()
   transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!pdl.operation) -> ()
   transform.iree.apply_patterns %func { canonicalization } : (!pdl.operation) -> ()
 }

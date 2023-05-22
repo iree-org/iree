@@ -91,6 +91,7 @@ using iree_compiler::IREE::transform_dialect::
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
+using iree_compiler::IREE::transform_dialect::UnrollVectorsGpuWmmaOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
 using transform::RewriteInDestinationPassingStyleOp;
@@ -554,12 +555,15 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
   {
-    ApplyPatternsOpPatterns config;
-    if (strategy.useMmaSync)
+    if (strategy.useMmaSync) {
+      ApplyPatternsOpPatterns config;
       config.unrollVectorsGpuMmaSync = true;
-    else
-      config.unrollVectorsGpuWmma = true;
-    b.create<ApplyPatternsOp>(funcH, config);
+      b.create<ApplyPatternsOp>(funcH, config);
+    } else {
+      b.create<UnrollVectorsGpuWmmaOp>(funcH, strategy.targetWmmaShape.m,
+                                       strategy.targetWmmaShape.n,
+                                       strategy.targetWmmaShape.k);
+    }
   }
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
@@ -874,6 +878,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
+  iree_compiler::gpu::MMAShape targetWmmaShape;
   if (clGPUTransformDialectUseMmaSync) {
     if (!gpuModel.hasMmaSync) {
       LDBG("--Matmul strategy target does not support MMA.SYNC operations\n");
@@ -888,16 +893,17 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   } else {
     // Verify WMMA.
     // Hard coded to reflect current WMMA unrolling support.
-    int reqM = 16;
-    int reqN = 16;
-    int reqK = lhsElementType.isF32() ? 8 : 16;
     if (llvm::all_of(gpuModel.supportedWMMAConfigs,
                      [&](iree_compiler::gpu::MMAConfig config) {
-                       return config.m != reqM || config.n != reqN ||
-                              config.k != reqK ||
-                              config.aType != lhsElementType ||
-                              config.bType != rhsElementType ||
-                              config.cType != resElementType;
+                       if (config.aType != lhsElementType ||
+                           config.bType != rhsElementType ||
+                           config.cType != resElementType) {
+                         return true;
+                       }
+                       targetWmmaShape.m = config.m;
+                       targetWmmaShape.n = config.n;
+                       targetWmmaShape.k = config.k;
+                       return false;
                      })) {
       LDBG("--Matmul strategy failed wmma type check\n");
       return failure();
@@ -934,8 +940,9 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    iree_compiler::gpu::MatmulStrategy strategy(
-        op->getContext(), captures, clGPUTransformDialectUseMmaSync);
+    iree_compiler::gpu::MatmulStrategy strategy(op->getContext(), captures,
+                                                clGPUTransformDialectUseMmaSync,
+                                                targetWmmaShape);
     return buildMatmulTensorCoreStrategy(b, variant, strategy);
   };
 

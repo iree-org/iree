@@ -493,4 +493,60 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
   }];
 }
 
+def UnrollVectorsGpuWmmaOp : Op<Transform_Dialect, "iree.unroll_vectors_gpu_wmma",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Greedily unrolls vector operations to the specified native vector size.
+
+    Must be applied to an op with trait IsolatedFromAbove since the
+    GreedyPatternRewriter asserts those. Internally, uses the tracking rewriter
+    to preserve handles to payload operations nested within operations
+    associated with `target`. Fails if tracking cannot find replacement for a
+    payload operation.
+
+    Returns the IsolatedFromAbove op whose content it has modified for better
+    chaining APIs.
+
+    #### Return modes:
+
+    This operation must target an operation that is isolated from above,
+    otherwise the transform definitely fails.
+
+    If the pattern application fails, or if the underlying listener fails to
+    capture op handles, the transformation definitely fails.
+
+    Otherwise the transformation is successful.
+
+    This operation does not consume the target handle and does not produce any
+    handle.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       I64Attr:$m,
+                       I64Attr:$n,
+                       I64Attr:$k);
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $target ` ` `[` $m `,` $n `,` $k `]` attr-dict `:` functional-type($target, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target,
+                   "int64_t":$m,
+                   "int64_t":$n,
+                   "int64_t":$k)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS

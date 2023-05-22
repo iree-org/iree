@@ -74,7 +74,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.iree.hoist_static_alloc %{{.*}} : (!pdl.operation) -> ()
 // CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases} : (!pdl.operation) -> ()
 // CHECK: transform.iree.apply_patterns %{{.*}} {extract_address_computations} : (!pdl.operation) -> ()
-// CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_wmma} : (!pdl.operation) -> ()
+// CHECK: transform.iree.unroll_vectors_gpu_wmma %{{.*}} [16, 16, 8] : (!pdl.operation) -> ()
 // CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}} : (!pdl.operation) -> !pdl.operation
 // CHECK: transform.iree.apply_buffer_optimizations %{{.*}} : (!pdl.operation) -> ()
 // CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_wmma} : (!pdl.operation) -> ()
@@ -314,9 +314,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-LABEL: func @f16_matmul
 
 // Check 128 bit vector sizes.
-// CHECK:      transform.structured.masked_vectorize {{.*}} vector_sizes [2, 8]
-// CHECK:      transform.structured.masked_vectorize {{.*}} vector_sizes [2, 8]
-// CHECK:      transform.structured.masked_vectorize {{.*}} vector_sizes [16, 8]
+// CHECK: transform.structured.masked_vectorize {{.*}} vector_sizes [2, 8]
+// CHECK: transform.structured.masked_vectorize {{.*}} vector_sizes [2, 8]
+// CHECK: transform.structured.masked_vectorize {{.*}} vector_sizes [16, 8]
+// CHECK: transform.iree.unroll_vectors_gpu_wmma %{{.*}} [16, 16, 16]
 
 // Check for mma.sync we don't enable f16.
 // WITH_OPTIONS-LABEL: func @f16_matmul

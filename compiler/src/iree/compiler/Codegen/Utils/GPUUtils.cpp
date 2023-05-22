@@ -556,13 +556,32 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
-std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
+/// TODO: Drop this once all paths properly set the native vector shape
+/// directly.
+LogicalResult getWmmaNativeVectorShapeFromContractOps(
+    Operation *containerOp, SmallVector<int64_t, 3> &nativeShape) {
+  int64_t k = -1;
+  auto result = containerOp->walk([&](vector::ContractionOp contractOp) {
+    int64_t newK = contractOp.getLhsType().getElementType().isF32() ? 8 : 16;
+    if (k >= 0 && k != newK) return WalkResult::interrupt();
+    k = newK;
+    return WalkResult::advance();
+  });
+  if (result.wasInterrupted()) return failure();
+  nativeShape = {/*m=*/16, /*n=*/16, k};
+  return success();
+}
+
+std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(
+    Operation *op, const SmallVector<int64_t, 3> &nativeShape) {
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
-  int64_t m = 16;
-  int64_t n = 16;
+  assert(nativeShape.size() == 3 &&
+         "Require 3 sizes for wmma native vector shape");
+  int64_t m = nativeShape[0];
+  int64_t n = nativeShape[1];
+  int64_t k = nativeShape[2];
   if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
-    int64_t k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
     SmallVector<int64_t> nativeSize(contract.getIteratorTypes().size() - 3, 1);
     nativeSize.append({m, n, k});
     return nativeSize;

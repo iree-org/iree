@@ -23,12 +23,16 @@ namespace gpu {
 
 struct GPUModel;
 
+using iree_compiler::gpu::MMAShape;
+
 class MatmulStrategy : public AbstractGemmLikeStrategy {
  public:
   MatmulStrategy(MLIRContext *context,
                  const transform_ext::MatchedMatmulCaptures &captures,
-                 bool optUseMmaSync)
-      : AbstractGemmLikeStrategy(), ctx(context), captures(captures) {
+                 bool optUseMmaSync, MMAShape targetWmmaShape)
+      : AbstractGemmLikeStrategy(targetWmmaShape),
+        ctx(context),
+        captures(captures) {
     initDefaultValues(optUseMmaSync);
   }
 
