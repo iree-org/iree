@@ -854,6 +854,40 @@ hal.executable private @thin_depthwise_conv_static {
 
 // -----
 
+hal.executable private @pooling_nchw_max {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "cascadelake", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vnni,+adx,+clflushopt,+clwb,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+pku,+prfchw,+rdrnd,+rdseed,+sahf,+x87,+xsave,+xsavec,+xsaveopt,+xsaves", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 32 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = false}> {
+    hal.executable.export public @pooling_nchw_max ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @pooling_nchw_max() {
+        %c3846080 = arith.constant 3846080 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant -3.40282347E+38 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c3846080) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x64x114x114xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 64, 114, 114], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x64x114x114xf32>> -> tensor<1x64x114x114xf32>
+        %3 = tensor.empty() : tensor<1x64x56x56xf32>
+        %4 = tensor.empty() : tensor<3x3xf32>
+        %5 = linalg.fill ins(%cst : f32) outs(%3 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+        %6 = linalg.pooling_nchw_max {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>} ins(%2, %4 : tensor<1x64x114x114xf32>, tensor<3x3xf32>) outs(%5 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+        flow.dispatch.tensor.store %6, %1, offsets = [0, 0, 0, 0], sizes = [1, 64, 56, 56], strides = [1, 1, 1, 1] : tensor<1x64x56x56xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32, 56, 8, 0, 0], [1, 16, 1, 8, 0, 0], [0, 0, 0, 0, 1, 3]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+//      CHECK: hal.executable.export public @pooling_nchw_max
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:     linalg.pooling_nchw_max
+// CHECK-SAME:       lowering_config  = #[[CONFIG]]
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
