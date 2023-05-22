@@ -63,3 +63,7 @@ jobs:
           # TODO: We should be pinning/rolling a jaxlib nightly version.
           JAX_PLATFORMS=iree_cpu python test/test_simple.py
           JAX_PLATFORMS=iree_cpu python test/test_degenerate.py
+
+      - name: "Build partitioner"
+        run: |
+          bazel build partitioner:libOpenXLAPartitioner.so
