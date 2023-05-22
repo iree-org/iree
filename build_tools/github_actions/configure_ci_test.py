@@ -67,6 +67,15 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
 
     self.assertEqual(presets, SORTED_DEFAULT_BENCHMARK_PRESETS)
 
+  # Sample PR description:
+  # ```
+  # PR Title
+  #
+  # PR body...
+  #
+  # skip-llvm-integrate-benchmark: some good reasons
+  # ```
+  # Result: No benchmark is automatically enabled on the LLVM integrate PR.
   def test_get_benchmark_presets_skip_llvm_integrate_benchmark(self):
     presets = configure_ci.get_benchmark_presets(
         trailers={"skip-llvm-integrate-benchmark": "some good reasons"},
