@@ -44,6 +44,7 @@ using iree_compiler::gpu::buildPipelineSharedMemoryCopies;
 using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
@@ -285,6 +286,16 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   }
 
   // Step 13. Late lowerings and cleanups.
+  {
+    ApplyPatternsOpPatterns config;
+    config.foldMemrefAliases = true;
+    b.create<ApplyPatternsOp>(funcH, config);
+  }
+  {
+    ApplyPatternsOpPatterns config;
+    config.extractAddressComputations = true;
+    b.create<ApplyPatternsOp>(funcH, config);
+  }
   // TODO: not a functional style op to avoid invalidating artificially.
   funcH = b.create<transform::LowerMasksOp>(
       pdl::OperationType::get(b.getContext()), funcH);

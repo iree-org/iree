@@ -503,16 +503,6 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
   b.create<iree_compiler::IREE::transform_dialect::HoistStaticAllocOp>(funcH);
-  {
-    ApplyPatternsOpPatterns config;
-    config.foldMemrefAliases = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
-  {
-    ApplyPatternsOpPatterns config;
-    config.extractAddressComputations = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
   {
