@@ -1681,7 +1681,6 @@ static SmallVector<int64_t> getNhwcConvWorkgroupSizes(
     if (is2DDepthConvOp(op)) return {1, 1, 8, vectorSize, 1, 3};
     if (is2DPoolingOp(op)) return {1, 1, 8, vectorSize * 2, 1, 8};
     llvm_unreachable("unsupported conv");
-
   }
   if (isAArch64(targetAttr)) {
     if (is2DConvOp(op)) return {1, 1, 32, 64, 1, 1, 16};
