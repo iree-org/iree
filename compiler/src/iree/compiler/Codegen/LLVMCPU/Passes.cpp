@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "llvm/Support/raw_ostream.h"
+
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
@@ -692,6 +694,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
+  llvm::outs() << "Build LLVMCPU Codegen Pass Pipeline";
   addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createLLVMCPUMaterializeEncodingPass());

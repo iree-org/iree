@@ -3,6 +3,7 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#include "llvm/Support/raw_ostream.h"
 
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
@@ -1042,13 +1043,13 @@ void ConvertToLLVMPass::runOnOperation() {
 
   RewritePatternSet patterns(&getContext());
 
-  // Use the default 64-bit lowering for TOSA's ApplyScale operator:
-  //   This lowering widens integer types to 64-bit an performs the non-fused
-  //   operations, specifically multiply, add, and shift. Bit-widening
-  //   is used to guarantee higher-order bits are not truncated during the
-  //   multiply or add.
-  //
-  // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
+  Use the default 64-bit lowering for TOSA's ApplyScale operator:
+    This lowering widens integer types to 64-bit an performs the non-fused
+    operations, specifically multiply, add, and shift. Bit-widening
+    is used to guarantee higher-order bits are not truncated during the
+    multiply or add.
+  
+  TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
   bool use32BitImpl = false;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
   if (isRISCV(targetAttr)) {
@@ -1057,17 +1058,18 @@ void ConvertToLLVMPass::runOnOperation() {
     // TODO(#9440) Simplify logic when 'cpu_features' is simplified.
     use32BitImpl =
         (hasZve32xFeature(targetAttr) || hasZve32fFeature(targetAttr)) &&
-        !hasVFeature(targetAttr) && (!hasZve64xFeature(targetAttr) || !hasZve16xFeature(targetAttr));
+        !hasVFeature(targetAttr) && !hasZve64xFeature(targetAttr);
   }
   tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
 
   // Make sure we expand any `arith.mulsi_extended` before going to the LLVM
   // dialect.
   if (use32BitImpl) {
-    std::cout<<"Using 32 bit Max";
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
-    patterns.add<ExpandMaxfExtended>(patterns.getContext(), /benefit=/1024);
   }
+
+  llvm::outs()<<"Adding to patterns";
+  patterns.add<ExpandMaxFExtended>(patterns.getContext(), /benefit=/1024);
 
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
@@ -1143,6 +1145,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReductions) {
+      llvm::outs()<<"createConvertToLLVMPass";
   return std::make_unique<ConvertToLLVMPass>(reassociateFpReductions);
 }
 
