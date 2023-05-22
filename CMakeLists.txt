@@ -981,6 +981,12 @@ set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
 add_subdirectory(build_tools/benchmarks)
 
 #-------------------------------------------------------------------------------
+# IREE GitHub CI tools
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/github_actions)
+
+#-------------------------------------------------------------------------------
 # IREE build tools python modules
 #-------------------------------------------------------------------------------
 
