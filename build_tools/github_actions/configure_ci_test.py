@@ -22,6 +22,14 @@ SORTED_DEFAULT_BENCHMARK_PRESETS = ",".join([
 
 class GetBenchmarkPresetsTest(unittest.TestCase):
 
+  def test_get_benchmark_presets_no_preset(self):
+    presets = configure_ci.get_benchmark_presets(trailers={},
+                                                 labels=["unrelated-labels"],
+                                                 is_pr=True,
+                                                 is_llvm_integrate_pr=False)
+
+    self.assertEqual(presets, "")
+
   def test_get_benchmark_presets_from_pr_labels(self):
     presets = configure_ci.get_benchmark_presets(
         trailers={},
@@ -64,6 +72,23 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
                                                  is_llvm_integrate_pr=True)
 
     self.assertEqual(presets, SORTED_DEFAULT_BENCHMARK_PRESETS)
+
+  def test_get_benchmark_presets_skip_llvm_integrate_benchmark(self):
+    presets = configure_ci.get_benchmark_presets(
+        trailers={"skip-llvm-integrate-benchmark": "some good reasons"},
+        labels=[],
+        is_pr=True,
+        is_llvm_integrate_pr=True)
+
+    self.assertEqual(presets, "")
+
+  def test_get_benchmark_presets_unknown_preset(self):
+    self.assertRaises(
+        ValueError, lambda: configure_ci.get_benchmark_presets(
+            trailers={"benchmark-extra": "unknown"},
+            labels=[],
+            is_pr=True,
+            is_llvm_integrate_pr=False))
 
 
 if __name__ == "__main__":
