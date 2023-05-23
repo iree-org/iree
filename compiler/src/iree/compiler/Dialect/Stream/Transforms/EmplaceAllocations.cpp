@@ -35,6 +35,25 @@ namespace {
 // Emplacement
 //===----------------------------------------------------------------------===//
 
+static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
+  assert(oldValue.getType().isa<IREE::Stream::ResourceType>());
+  assert(newValue.getType().isa<IREE::Stream::ResourceType>());
+  if (oldValue.getType() == newValue.getType()) {
+    oldValue.replaceAllUsesWith(newValue);
+    return;
+  }
+  OpBuilder builder(newValue.getContext());
+  builder.setInsertionPointAfterValue(newValue);
+  Value newValueSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
+      newValue.getLoc(), newValue, builder);
+  IREE::Stream::AffinityAttr sourceAffinity;
+  IREE::Stream::AffinityAttr resultAffinity;
+  Value transferValue = builder.create<IREE::Stream::AsyncTransferOp>(
+      newValue.getLoc(), oldValue.getType(), newValue, newValueSize,
+      newValueSize, sourceAffinity, resultAffinity);
+  oldValue.replaceAllUsesWith(transferValue);
+}
+
 static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
   bool didChange = false;
   for (auto [resultIndex, result] : llvm::enumerate(dispatchOp.getResults())) {
@@ -93,7 +112,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     dispatchOp.getResultSizesMutable().assign(resultSizes);
 
     // Replace users with the result of the dispatch op.
-    targetResult.replaceAllUsesWith(result);
+    replaceUsesAndTransfer(targetResult, result);
     userOp->erase();
 
     didChange = true;

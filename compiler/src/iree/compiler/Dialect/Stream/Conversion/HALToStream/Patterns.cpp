@@ -18,18 +18,6 @@ namespace iree_compiler {
 
 namespace {
 
-// Returns the size in bytes of the buffer/buffer view |storage|.
-static Value getStorageSize(Value storage, OpBuilder &builder) {
-  if (storage.getType().isa<IREE::HAL::BufferViewType>()) {
-    storage = builder.create<IREE::HAL::BufferViewBufferOp>(
-        storage.getLoc(), builder.getType<IREE::HAL::BufferType>(), storage);
-  }
-  return builder
-      .create<IREE::HAL::BufferLengthOp>(storage.getLoc(),
-                                         builder.getIndexType(), storage)
-      .getResult();
-}
-
 // %1 = hal.tensor.import %0 : !hal.buffer_view -> tensor<4xf32>
 // ->
 // %1 = stream.tensor.import %0 : !hal.buffer_view ->
@@ -171,7 +159,10 @@ struct ConvertTensorExportOp
     if (adaptor.getTargetStorage()) {
       // Query the target storage buffer length; we will only populate up to
       // what is required for the output.
-      auto storageSize = getStorageSize(op.getTargetStorage(), rewriter);
+      auto storageSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+          op.getLoc(), rewriter.getIndexType(),
+          TypeAttr::get(op.getSource().getType()), adaptor.getSourceDims(),
+          /*affinity=*/nullptr);
 
       // Import the target storage as a resource that we can use as an update
       // target. We overwrite the contents and just cast the storage to the

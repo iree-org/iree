@@ -1777,7 +1777,7 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
     `` $op `` `[` $element_count `]`
     (`on` `(` $affinity^ `)`)?
     `channel` `(` $channel `)`
-    custom<CollectiveParam>(ref($op), $param)
+    custom<CollectiveParam>(ref($op), $param) ``
     $source `[` $source_offset `to` $source_end `for` $source_length `]` `,`
     $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
     type($source) `` `{` $source_size `}` `->`
