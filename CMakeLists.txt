@@ -662,7 +662,8 @@ endif()
 # dependencies to them.
 #-------------------------------------------------------------------------------
 
-if(IREE_BUILD_LEGACY_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
+# TODO(#11263): Remove together with IREE_BUILD_LEGACY_BENCHMARKS.
+if(IREE_BUILD_LEGACY_BENCHMARKS)
   # Add top-level custom targets to drive generating benchmark suites.
 
   # iree-benchmark-import-models imports benchmark models from their source
@@ -676,12 +677,25 @@ if(IREE_BUILD_LEGACY_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
   add_custom_target(iree-benchmark-suites)
 endif()
 
-# TODO(#11263): This conditional block should be merged with the block above
-# once we remove IREE_BUILD_LEGACY_BENCHMARKS.
 if(IREE_BUILD_E2E_TEST_ARTIFACTS)
-  # iree-e2e-compile-stats-suites compiles the benchmark models with specific
+  # iree-benchmark-import-models imports benchmark models from their source
+  # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
+  add_custom_target(iree-benchmark-import-models)
+
+  # iree-benchmark-suites* fully prepares benchmark models for benchmarking:
+  #   * importing from source formats to IREE-compatible .mlir files
+  #   * compiling from .mlir files to benchmark-ready .vmfb files
+  # Build default benchmark suites.
+  add_custom_target(iree-benchmark-suites)
+  # Build long-running benchmark suites.
+  add_custom_target(iree-benchmark-suites-long)
+
+  # iree-e2e-compile-stats-suites* compiles the benchmark models with specific
   # flags to collect the compilation statistics.
+  # Build for default benchmark suites.
   add_custom_target(iree-e2e-compile-stats-suites)
+  # Build for long-running benchmark suites.
+  add_custom_target(iree-e2e-compile-stats-suites-long)
 
   # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
   # and model tests.
@@ -689,7 +703,9 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   add_dependencies(iree-e2e-test-artifacts
     iree-benchmark-import-models
     iree-benchmark-suites
+    iree-benchmark-suites-long
     iree-e2e-compile-stats-suites
+    iree-e2e-compile-stats-suites-long
   )
 endif()
 
