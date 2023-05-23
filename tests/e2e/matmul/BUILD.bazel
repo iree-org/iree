@@ -210,6 +210,30 @@ py_binary(
     "LLVMGPUMatmulSimt",
 ]]
 
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f32_gpu_large_unaligned",
+    compiler_flags = [
+        "--iree-hal-cuda-llvm-target-arch=sm_80",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--shapes=large",
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+)
+
 # Testing Ampere + TensorCore path.
 # WMMA TensorCore(F32): wmma.161616.f32.tf32
 [iree_generated_trace_runner_test(

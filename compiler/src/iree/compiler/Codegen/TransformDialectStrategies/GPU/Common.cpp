@@ -42,7 +42,7 @@ using namespace mlir;
 llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy",
     llvm::cl::desc("activate the matmul tensorcore strategy"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
