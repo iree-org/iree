@@ -106,7 +106,7 @@ const LibraryIreeLoopEmscripten = {
 
     class LoopCommandWaitPromise extends LoopCommand {
       constructor(
-          scope, operationId, callback, userData, timeoutMs, wait_promise,
+          scope, operationId, callback, userData, timeoutMs, waitPromise,
           loop) {
         super();
 
@@ -125,13 +125,22 @@ const LibraryIreeLoopEmscripten = {
         const abortPromise = new Promise((_, reject) => {
           this.abortFn = reject;
         });
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => {
-            reject();
-          }, timeoutMs);
-        });
 
-        Promise.race([wait_promise, abortPromise, timeoutPromise])
+        let racePromise;
+        if (timeoutMs >= 0 && timeoutMs < 2147483647) {
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject();
+            }, timeoutMs);
+          });
+          racePromise =
+              Promise.race([waitPromise, abortPromise, timeoutPromise]);
+        } else {
+          // "Infinite" timeout.
+          racePromise = Promise.race([waitPromise, abortPromise]);
+        }
+
+        racePromise
             .then(() => {
               Module['dynCall'](
                   'iiii', this.callback,
