@@ -57,6 +57,8 @@ void registerStableHLOConversionPassPipeline() {
 void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
                                                    bool detuple) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createLegalizeControlFlow());
 
@@ -68,7 +70,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
 
   passManager.addNestedPass<func::FuncOp>(
       createStableHLOToStableHLOPreprocessing());
-  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
   // Various shape functions may have been materialized in the `shape.shape_of`
   // style of treating shapes as tensors. We prefer to legalize these to
@@ -77,6 +79,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(createShapeToShapeLowering());
   passManager.addPass(createConvertShapeToStandardPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
@@ -99,6 +102,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
 
   // Convert to Linalg. After this point, StableHLO will be eliminated.
@@ -113,6 +117,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
   // Note that some StableHLO ops are left by the above and must resolve via
   // canonicalization. See comments in the above pass and find a better way.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
   passManager.addPass(stablehlo::createVerifyCompilerStableHloInputLegality());
 }

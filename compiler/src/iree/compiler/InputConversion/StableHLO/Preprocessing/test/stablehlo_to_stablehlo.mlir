@@ -11,8 +11,7 @@ func.func @batch_norm_inference(
     %x: tensor<4x256xf32>, %scale: tensor<256xf32>, %offset: tensor<256xf32>,
     %mean: tensor<256xf32>, %variance: tensor<256xf32>)
     -> (tensor<4x256xf32>) {
-  // CHECK-DAG: %[[EPS:.+]] = stablehlo.constant dense<1.001000e-05> : tensor<f32>
-  // CHECK-DAG: %[[EPS_BCAST:.+]] = stablehlo.broadcast_in_dim %[[EPS]], dims = [] : (tensor<f32>) -> tensor<256xf32>
+  // CHECK-DAG: %[[EPS_BCAST:.+]] = stablehlo.constant dense<1.001000e-05> : tensor<256xf32>
   // CHECK-DAG: %[[VARIANCE_EPS:.+]] = stablehlo.add %[[VARIANCE]], %[[EPS_BCAST]] : tensor<256xf32>
   // CHECK-DAG: %[[STDDEV:.+]] = stablehlo.sqrt %[[VARIANCE_EPS]] : tensor<256xf32>
   // CHECK-DAG: %[[STDDEV_BCAST:.+]] = stablehlo.broadcast_in_dim %[[STDDEV]], dims = [1] : (tensor<256xf32>) -> tensor<4x256xf32>
