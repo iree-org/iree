@@ -386,7 +386,7 @@ def Util_GlobalStoreOpInterface : Util_GlobalAccessorOpInterface<"GlobalStoreOpI
       /*desc=*/[{
         Returns the value stored by the operation.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getStoredGlobalValue",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -411,7 +411,7 @@ def Util_GlobalLoadIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface<
       /*desc=*/[{
         Returns the global symbol accessed by the op.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getGlobal",
       /*args=*/(ins)
     >,
@@ -440,7 +440,7 @@ def Util_GlobalStoreIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface
       /*desc=*/[{
         Returns the global symbol accessed by the op.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getGlobal",
       /*args=*/(ins)
     >,
@@ -448,7 +448,7 @@ def Util_GlobalStoreIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface
       /*desc=*/[{
         Returns the value stored by the operation.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getStoredGlobalValue",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -486,7 +486,7 @@ def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
       /*desc=*/[{
         Gets the input value.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getInput",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -512,7 +512,7 @@ def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
       /*desc=*/[{
         Gets the result casted value.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getCasted",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -640,7 +640,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         defining op, and the search will not continue past branches.
         If the result is untied then the result itself is returned.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getTiedResult",
       /*args=*/(ins "unsigned":$resultIndex),
       /*methodBody=*/[{}],
@@ -653,7 +653,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         Returns the operand tied to the given result of the op or nullptr if
         none.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getTiedResultOperand",
       /*args=*/(ins "Value":$result),
       /*methodBody=*/[{}],
@@ -981,7 +981,7 @@ def Util_SubrangeType : TypeInterface<"SubrangeTypeInterface"> {
       /*desc=*/[{
         Creates an op returning an (offset, length) subrange of a resource.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"createSubrangeOp",
       /*args=*/(ins
         "Location":$loc,
@@ -1008,7 +1008,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the size-aware source resource the subrange is taken from.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeResource",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1017,7 +1017,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the total size of the source resource.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeResourceSize",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1026,7 +1026,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the offset of the taken subrange into the resource.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeOffset",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1035,7 +1035,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the length of the taken subrange.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeLength",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1045,7 +1045,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
         Returns the resulting subrange value if the op produces one.
         Will be nullptr if the op is only consuming a subrange.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeResult",
       /*args=*/(ins),
       /*methodBody=*/[{}]

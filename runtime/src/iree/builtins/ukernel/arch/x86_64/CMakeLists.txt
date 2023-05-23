@@ -49,9 +49,12 @@ iree_bitcode_library(
     "-DNDEBUG"
     "-fno-ident"
     "-fdiscard-value-names"
+    "-fno-short-wchar"
     "-c"
     "-emit-llvm"
     "-DIREE_UK_STANDALONE=1"
+    "-target"
+    "x86_64-unknown-unknown-eabi-elf"
     "-DIREE_UK_ARCH_X86_64"
     "-DIREE_UK_POINTER_SIZE=8"
     "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
@@ -96,9 +99,12 @@ iree_bitcode_library(
     "-DNDEBUG"
     "-fno-ident"
     "-fdiscard-value-names"
+    "-fno-short-wchar"
     "-c"
     "-emit-llvm"
     "-DIREE_UK_STANDALONE=1"
+    "-target"
+    "x86_64-unknown-unknown-eabi-elf"
     "-DIREE_UK_ARCH_X86_64"
     "-DIREE_UK_POINTER_SIZE=8"
     "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
@@ -145,9 +151,12 @@ iree_bitcode_library(
     "-DNDEBUG"
     "-fno-ident"
     "-fdiscard-value-names"
+    "-fno-short-wchar"
     "-c"
     "-emit-llvm"
     "-DIREE_UK_STANDALONE=1"
+    "-target"
+    "x86_64-unknown-unknown-eabi-elf"
     "-DIREE_UK_ARCH_X86_64"
     "-DIREE_UK_POINTER_SIZE=8"
     "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
@@ -195,9 +204,12 @@ iree_bitcode_library(
     "-DNDEBUG"
     "-fno-ident"
     "-fdiscard-value-names"
+    "-fno-short-wchar"
     "-c"
     "-emit-llvm"
     "-DIREE_UK_STANDALONE=1"
+    "-target"
+    "x86_64-unknown-unknown-eabi-elf"
     "-DIREE_UK_ARCH_X86_64"
     "-DIREE_UK_POINTER_SIZE=8"
     "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
@@ -215,6 +227,10 @@ iree_bitcode_library(
 endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if (NOT (IREE_ARCH STREQUAL "x86_64"))
+  return()
+endif()
 
 # Target CPUs supporting AVX2+FMA3. That includes Intel Haswell (2013) and newer
 # and AMD Excavator (2015) and newer. There is no current plan to look after

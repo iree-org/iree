@@ -58,21 +58,9 @@ iree_lit_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_fp_reassoc_regression_llvm-cpu",
-    srcs = [
-        "associative_reordering.mlir",
-    ],
-    compiler_flags = [
-        "--iree-input-type=mhlo",
-        "--iree-llvmcpu-reassociate-fp-reductions=false",
-    ],
-    driver = "local-task",
-    target_backend = "llvm-cpu",
-)
-
-iree_check_single_backend_test_suite(
     name = "check_regression_llvm-cpu",
     srcs = [
+        "associative_reordering.mlir",
         "layernorm.mlir",
         "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir",

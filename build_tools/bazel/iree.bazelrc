@@ -33,6 +33,11 @@ build --enable_runfiles
 # breadcrumb.
 # build --incompatible_default_to_explicit_init_py
 
+# Disable split PIC/non-PIC build graphs and disable heuristic to link binaries
+# dynamically by default. See: https://github.com/openxla/iree/issues/13470
+build --dynamic_mode=off
+build --force_pic
+
 ###############################################################################
 # Build settings flag aliases. See https://bazel.build/rules/config
 ###############################################################################

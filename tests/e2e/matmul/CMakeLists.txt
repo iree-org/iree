@@ -267,6 +267,7 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   LABELS
     "hostonly"
+    "x86_64_only"
 )
 
 iree_generated_trace_runner_test(
@@ -288,6 +289,7 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   LABELS
     "hostonly"
+    "x86_64_only"
 )
 
 iree_generated_trace_runner_test(

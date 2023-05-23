@@ -63,7 +63,7 @@ static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
     "iree-llvmcpu-instrument-memory-accesses",
@@ -276,8 +276,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
           .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
                 linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
                 linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp>([&](auto) {
+                linalg::PoolingNhwcMinUnsignedOp>([&](auto) {
             // Shape: N, OH, OW, OC, KH, KW, (IC)
             khSize = shape[4];
             kwSize = shape[5];

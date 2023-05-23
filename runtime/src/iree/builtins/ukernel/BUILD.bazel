@@ -96,6 +96,10 @@ BITCODE_COPTS = [
     "-fno-ident",
     "-fdiscard-value-names",
 
+    # Set the size of wchar_t to 4 bytes (instead of 2 bytes).
+    # This must match what the runtime is built with.
+    "-fno-short-wchar",
+
     # Object file only in bitcode format:
     "-c",
     "-emit-llvm",
@@ -105,6 +109,8 @@ BITCODE_COPTS = [
     "-DIREE_UK_STANDALONE=1",
 
     # Force configure for X86_64 with own Clang
+    "-target",
+    "x86_64-unknown-unknown-eabi-elf",
     "-DIREE_UK_ARCH_X86_64",
     "-DIREE_UK_POINTER_SIZE=8",
     "-DIREE_UK_BUILD_X86_64_AVX2_FMA",
