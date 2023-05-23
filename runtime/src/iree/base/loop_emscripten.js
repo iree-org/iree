@@ -16,16 +16,26 @@
 const LibraryIreeLoopEmscripten = {
   $iree_loop_emscripten_support__postset: 'iree_loop_emscripten_support();',
   $iree_loop_emscripten_support: function() {
+    // iree_status_t objects for common iree_status_code_t values.
+    // Keep in sync with status.h.
     const IREE_STATUS_OK = 0;
     const IREE_STATUS_CODE_MASK = 0x1F;
+    const IREE_STATUS_INVALID_ARGUMENT = 3 & IREE_STATUS_CODE_MASK;
     const IREE_STATUS_ABORTED = 10 & IREE_STATUS_CODE_MASK;
-    const IREE_STATUS_OUT_OF_RANGE = 11 & IREE_STATUS_CODE_MASK;
+    const IREE_STATUS_UNIMPLEMENTED = 12 & IREE_STATUS_CODE_MASK;
+
+    // iree_loop_command_e values, keep in sync with loop.h.
+    const IREE_LOOP_COMMAND_CALL = 0;
+    const IREE_LOOP_COMMAND_DISPATCH = 1;
+    const IREE_LOOP_COMMAND_WAIT_UNTIL = 2;
+    const IREE_LOOP_COMMAND_WAIT_ONE = 3;
+    const IREE_LOOP_COMMAND_WAIT_ANY = 4;
+    const IREE_LOOP_COMMAND_WAIT_ALL = 5;
 
     class LoopCommand {
       abort() {}
     }
 
-    // IREE_LOOP_COMMAND_CALL
     class LoopCommandCall extends LoopCommand {
       constructor(scope, operationId, callback, user_data, loop) {
         super();
@@ -52,7 +62,6 @@ const LibraryIreeLoopEmscripten = {
       }
     }
 
-    // IREE_LOOP_COMMAND_WAIT_UNTIL
     class LoopCommandWaitUntil extends LoopCommand {
       constructor(scope, operationId, callback, user_data, timeout_ms, loop) {
         super();
@@ -95,9 +104,6 @@ const LibraryIreeLoopEmscripten = {
       }
     }
 
-    // IREE_LOOP_COMMAND_WAIT_ONE
-    // IREE_LOOP_COMMAND_WAIT_ANY
-    // IREE_LOOP_COMMAND_WAIT_ALL
     class LoopCommandWaitPromise extends LoopCommand {
       constructor(
           scope, operationId, callback, user_data, timeout_ms, wait_promise,
@@ -166,48 +172,42 @@ const LibraryIreeLoopEmscripten = {
         }
       }
 
-      command_call(callback, user_data, loop) {
+      runCommand(command, callback, userData, timeoutMs, waitPromises, loop) {
         // TODO(scotttodd): assert not destroyed to avoid reentrant queueing?
         const operationId = this.nextOperationId++;
-        this.pendingOperations[operationId] =
-            new LoopCommandCall(this, operationId, callback, user_data, loop);
-        return IREE_STATUS_OK;
-      }
 
-      command_wait_until(callback, user_data, timeout_ms, loop) {
-        // TODO(scotttodd): assert not destroyed to avoid reentrant queueing?
-        const operationId = this.nextOperationId++;
-        this.pendingOperations[operationId] = new LoopCommandWaitUntil(
-            this, operationId, callback, user_data, timeout_ms, loop);
-        return IREE_STATUS_OK;
-      }
+        switch (command) {
+          case IREE_LOOP_COMMAND_CALL:
+            this.pendingOperations[operationId] = new LoopCommandCall(
+                this, operationId, callback, userData, loop);
+            break;
+          case IREE_LOOP_COMMAND_DISPATCH:
+            return IREE_STATUS_UNIMPLEMENTED;
+          case IREE_LOOP_COMMAND_WAIT_UNTIL:
+            this.pendingOperations[operationId] = new LoopCommandWaitUntil(
+                this, operationId, callback, userData, timeoutMs, loop);
+            break;
+          case IREE_LOOP_COMMAND_WAIT_ONE:
+            this.pendingOperations[operationId] = new LoopCommandWaitPromise(
+                this, operationId, callback, userData, timeoutMs,
+                waitPromises[0], loop);
+            break;
+          case IREE_LOOP_COMMAND_WAIT_ANY:
+            const anyPromise = Promise.any(waitPromises);
+            this.pendingOperations[operationId] = new LoopCommandWaitPromise(
+                this, operationId, callback, userData, timeoutMs, anyPromise,
+                loop);
+            break;
+          case IREE_LOOP_COMMAND_WAIT_ALL:
+            const allPromise = Promise.all(waitPromises);
+            this.pendingOperations[operationId] = new LoopCommandWaitPromise(
+                this, operationId, callback, userData, timeoutMs, allPromise,
+                loop);
+            break;
+          default:
+            return IREE_STATUS_UNIMPLEMENTED;
+        }
 
-      command_wait_one(callback, user_data, timeout_ms, wait_promise, loop) {
-        // TODO(scotttodd): assert not destroyed to avoid reentrant queueing?
-        const operationId = this.nextOperationId++;
-        this.pendingOperations[operationId] = new LoopCommandWaitPromise(
-            this, operationId, callback, user_data, timeout_ms, wait_promise,
-            loop);
-        return IREE_STATUS_OK;
-      }
-
-      command_wait_any(callback, user_data, timeout_ms, wait_promises, loop) {
-        // TODO(scotttodd): assert not destroyed to avoid reentrant queueing?
-        const operationId = this.nextOperationId++;
-        const anyPromise = Promise.any(wait_promises);
-        this.pendingOperations[operationId] = new LoopCommandWaitPromise(
-            this, operationId, callback, user_data, timeout_ms, anyPromise,
-            loop);
-        return IREE_STATUS_OK;
-      }
-
-      command_wait_all(callback, user_data, timeout_ms, wait_promises, loop) {
-        // TODO(scotttodd): assert not destroyed to avoid reentrant queueing?
-        const operationId = this.nextOperationId++;
-        const allPromise = Promise.all(wait_promises);
-        this.pendingOperations[operationId] = new LoopCommandWaitPromise(
-            this, operationId, callback, user_data, timeout_ms, allPromise,
-            loop);
         return IREE_STATUS_OK;
       }
     }
@@ -235,60 +235,21 @@ const LibraryIreeLoopEmscripten = {
         delete this.scopes[scope_handle];
       }
 
-      iree_loop_command_call(scope_handle, callback, user_data, loop) {
-        if (!(scope_handle in this.scopes)) return IREE_STATUS_OUT_OF_RANGE;
-
+      iree_loop_command(
+          scope_handle, command, callback, user_data, timeout_ms,
+          promise_handles_count, promise_handles, loop) {
+        if (!(scope_handle in this.scopes)) return IREE_STATUS_INVALID_ARGUMENT;
         const scope = this.scopes[scope_handle];
-        return scope.command_call(callback, user_data, loop);
-      }
 
-      iree_loop_command_wait_until(
-          scope_handle, callback, user_data, timeout_ms, loop) {
-        if (!(scope_handle in this.scopes)) return IREE_STATUS_OUT_OF_RANGE;
-
-        const scope = this.scopes[scope_handle];
-        return scope.command_wait_until(
-            callback, user_data, timeout_ms, wait_promise, loop);
-      }
-
-      iree_loop_command_wait_one(
-          scope_handle, callback, user_data, timeout_ms, promise_handle, loop) {
-        if (!(scope_handle in this.scopes)) return IREE_STATUS_OUT_OF_RANGE;
-
-        const scope = this.scopes[scope_handle];
-        const wait_promise = IreeWaitHandlePromise.getPromise(promise_handle);
-        return scope.command_wait_one(
-            callback, user_data, timeout_ms, wait_promise, loop);
-      }
-
-      iree_loop_command_wait_any(
-          scope_handle, callback, user_data, timeout_ms, promise_handles_count,
-          promise_handles, loop) {
-        if (!(scope_handle in this.scopes)) return IREE_STATUS_OUT_OF_RANGE;
-
-        const scope = this.scopes[scope_handle];
         const wait_promises = [];
         for (let i = 0; i < promise_handles_count; ++i) {
           const promise_handle = getValue(promise_handles + i * 4);
-          wait_promises[i] = IreeWaitHandlePromise.getPromise(promise_handle);
+          wait_promises[i] =
+              IreeWaitHandleEmscripten.getPromise(promise_handle);
         }
-        return scope.command_wait_any(
-            callback, user_data, timeout_ms, wait_promises, loop);
-      }
 
-      iree_loop_command_wait_all(
-          scope_handle, callback, user_data, timeout_ms, promise_handles_count,
-          promise_handles, loop) {
-        if (!(scope_handle in this.scopes)) return IREE_STATUS_OUT_OF_RANGE;
-
-        const scope = this.scopes[scope_handle];
-        const wait_promises = [];
-        for (let i = 0; i < promise_handles_count; ++i) {
-          const promise_handle = getValue(promise_handles + i * 4);
-          wait_promises[i] = IreeWaitHandlePromise.getPromise(promise_handle);
-        }
-        return scope.command_wait_all(
-            callback, user_data, timeout_ms, wait_promises, loop);
+        return scope.runCommand(
+            command, callback, user_data, timeout_ms, wait_promises, loop);
       }
     }
 
@@ -296,15 +257,7 @@ const LibraryIreeLoopEmscripten = {
     _iree_loop_allocate_scope =
         instance.iree_loop_allocate_scope.bind(instance);
     _iree_loop_free_scope = instance.iree_loop_free_scope.bind(instance);
-    _iree_loop_command_call = instance.iree_loop_command_call.bind(instance);
-    _iree_loop_command_wait_until =
-        instance.iree_loop_command_wait_until.bind(instance);
-    _iree_loop_command_wait_one =
-        instance.iree_loop_command_wait_one.bind(instance);
-    _iree_loop_command_wait_any =
-        instance.iree_loop_command_wait_any.bind(instance);
-    _iree_loop_command_wait_all =
-        instance.iree_loop_command_wait_all.bind(instance);
+    _iree_loop_command = instance.iree_loop_command.bind(instance);
   },
   $iree_loop_emscripten_support__deps:
       ['$dynCall', '$IreeWaitHandleEmscripten'],
@@ -313,16 +266,8 @@ const LibraryIreeLoopEmscripten = {
   iree_loop_allocate_scope__deps: ['$iree_loop_emscripten_support'],
   iree_loop_free_scope: function() {},
   iree_loop_free_scope__deps: ['$iree_loop_emscripten_support'],
-  iree_loop_command_call: function() {},
-  iree_loop_command_call__deps: ['$iree_loop_emscripten_support'],
-  iree_loop_command_wait_until: function() {},
-  iree_loop_command_wait_until__deps: ['$iree_loop_emscripten_support'],
-  iree_loop_command_wait_one: function() {},
-  iree_loop_command_wait_one__deps: ['$iree_loop_emscripten_support'],
-  iree_loop_command_wait_any: function() {},
-  iree_loop_command_wait_any__deps: ['$iree_loop_emscripten_support'],
-  iree_loop_command_wait_all: function() {},
-  iree_loop_command_wait_all__deps: ['$iree_loop_emscripten_support'],
+  iree_loop_command: function() {},
+  iree_loop_command__deps: ['$iree_loop_emscripten_support'],
 }
 
 mergeInto(LibraryManager.library, LibraryIreeLoopEmscripten);

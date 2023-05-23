@@ -31,23 +31,12 @@ typedef uint32_t iree_loop_emscripten_scope_t;  // Opaque handle.
 extern iree_loop_emscripten_scope_t iree_loop_allocate_scope();
 extern void iree_loop_free_scope(iree_loop_emscripten_scope_t scope);
 
-extern iree_status_t iree_loop_command_call(iree_loop_emscripten_scope_t scope,
-                                            iree_loop_callback_fn_t callback,
-                                            void* user_data, iree_loop_t loop);
-extern iree_status_t iree_loop_command_wait_until(
-    iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
-    void* user_data, uint32_t timeout_ms, iree_loop_t loop);
-extern iree_status_t iree_loop_command_wait_one(
-    iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
-    void* user_data, uint32_t timeout_ms, int promise_handle, iree_loop_t loop);
-extern iree_status_t iree_loop_command_wait_any(
-    iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
-    void* user_data, uint32_t timeout_ms, int promise_handles_count,
-    int* promise_handles, iree_loop_t loop);
-extern iree_status_t iree_loop_command_wait_all(
-    iree_loop_emscripten_scope_t scope, iree_loop_callback_fn_t callback,
-    void* user_data, uint32_t timeout_ms, int promise_handles_count,
-    int* promise_handles, iree_loop_t loop);
+extern iree_status_t iree_loop_command(iree_loop_emscripten_scope_t scope,
+                                       int command,
+                                       iree_loop_callback_fn_t callback,
+                                       void* user_data, uint32_t timeout_ms,
+                                       int promise_handles_count,
+                                       int* promise_handles, iree_loop_t loop);
 
 //===----------------------------------------------------------------------===//
 // iree_loop_emscripten_t
@@ -84,8 +73,10 @@ static iree_status_t iree_loop_emscripten_run_call(
     iree_loop_emscripten_t* loop_emscripten, iree_loop_call_params_t* params) {
   iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
   // Note: ignoring params->priority.
-  return iree_loop_command_call(loop_emscripten->scope, params->callback.fn,
-                                params->callback.user_data, loop);
+  return iree_loop_command(loop_emscripten->scope, IREE_LOOP_COMMAND_CALL,
+                           params->callback.fn, params->callback.user_data,
+                           /*timeout_ms=*/0, /*promise_handles_count=*/0,
+                           /*promise_handles=*/NULL, loop);
 }
 
 static iree_status_t iree_loop_emscripten_run_wait_until(
@@ -94,9 +85,10 @@ static iree_status_t iree_loop_emscripten_run_wait_until(
   iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
   uint32_t timeout_ms =
       iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
-  return iree_loop_command_wait_until(
-      loop_emscripten->scope, params->callback.fn, params->callback.user_data,
-      timeout_ms, loop);
+  return iree_loop_command(loop_emscripten->scope, IREE_LOOP_COMMAND_WAIT_UNTIL,
+                           params->callback.fn, params->callback.user_data,
+                           timeout_ms, /*promise_handles_count=*/0,
+                           /*promise_handles=*/NULL, loop);
 }
 
 static iree_status_t iree_loop_emscripten_get_promise_handle(
@@ -135,9 +127,9 @@ static iree_status_t iree_loop_emscripten_run_wait_one(
   iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
   uint32_t timeout_ms =
       iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
-  return iree_loop_command_wait_one(loop_emscripten->scope, params->callback.fn,
-                                    params->callback.user_data, timeout_ms,
-                                    promise_handle, loop);
+  return iree_loop_command(loop_emscripten->scope, IREE_LOOP_COMMAND_WAIT_ONE,
+                           params->callback.fn, params->callback.user_data,
+                           timeout_ms, 1, &promise_handle, loop);
 }
 
 static iree_status_t iree_loop_emscripten_run_wait_any(
@@ -150,19 +142,19 @@ static iree_status_t iree_loop_emscripten_run_wait_any(
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < params->count; ++i) {
-    if (iree_status_is_ok(status)) {
-      status = iree_loop_emscripten_get_promise_handle(params->wait_sources[i],
-                                                       &promise_handles[i]);
-    }
+    status = iree_loop_emscripten_get_promise_handle(params->wait_sources[i],
+                                                     &promise_handles[i]);
+    if (!iree_status_is_ok(status)) break;
   }
 
   if (iree_status_is_ok(status)) {
     iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
     uint32_t timeout_ms =
         iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
-    status = iree_loop_command_wait_any(
-        loop_emscripten->scope, params->callback.fn, params->callback.user_data,
-        timeout_ms, params->count, promise_handles, loop);
+    status =
+        iree_loop_command(loop_emscripten->scope, IREE_LOOP_COMMAND_WAIT_ANY,
+                          params->callback.fn, params->callback.user_data,
+                          timeout_ms, params->count, promise_handles, loop);
   }
 
   iree_allocator_free(loop_emscripten->allocator, promise_handles);
@@ -179,19 +171,19 @@ static iree_status_t iree_loop_emscripten_run_wait_all(
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < params->count; ++i) {
-    if (iree_status_is_ok(status)) {
-      status = iree_loop_emscripten_get_promise_handle(params->wait_sources[i],
-                                                       &promise_handles[i]);
-    }
+    status = iree_loop_emscripten_get_promise_handle(params->wait_sources[i],
+                                                     &promise_handles[i]);
+    if (!iree_status_is_ok(status)) break;
   }
 
   if (iree_status_is_ok(status)) {
     iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
     uint32_t timeout_ms =
         iree_absolute_deadline_to_timeout_ms(params->deadline_ns);
-    status = iree_loop_command_wait_all(
-        loop_emscripten->scope, params->callback.fn, params->callback.user_data,
-        timeout_ms, params->count, promise_handles, loop);
+    status =
+        iree_loop_command(loop_emscripten->scope, IREE_LOOP_COMMAND_WAIT_ALL,
+                          params->callback.fn, params->callback.user_data,
+                          timeout_ms, params->count, promise_handles, loop);
   }
 
   iree_allocator_free(loop_emscripten->allocator, promise_handles);
