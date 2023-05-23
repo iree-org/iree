@@ -250,15 +250,14 @@ const LibraryIreeLoopEmscripten = {
         if (!(scopeHandle in this.scopes)) return IREE_STATUS_INVALID_ARGUMENT;
         const scope = this.scopes[scopeHandle];
 
-        const wait_promises = [];
+        const waitPromises = [];
         for (let i = 0; i < promiseHandlesCount; ++i) {
-          const promise_handle = getValue(promiseHandles + i * 4);
-          wait_promises[i] =
-              IreeWaitHandleEmscripten.getPromise(promise_handle);
+          const promiseHandle = getValue(promiseHandles + i * 4);
+          waitPromises[i] = IreeWaitHandleEmscripten.getPromise(promiseHandle);
         }
 
         return scope.runCommand(
-            command, callback, userData, timeoutMs, wait_promises, loop);
+            command, callback, userData, timeoutMs, waitPromises, loop);
       }
     }
 
