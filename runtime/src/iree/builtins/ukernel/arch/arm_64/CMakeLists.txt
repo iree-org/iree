@@ -63,11 +63,6 @@ endif()
 iree_cc_library(
   NAME
     arm_64
-  HDRS
-    "mmt4d_arm_64.h"
-    "pack_arm_64.h"
-    "query_tile_sizes_arm_64.h"
-    "unpack_arm_64.h"
   SRCS
     "mmt4d_arm_64.c"
     "pack_arm_64.c"

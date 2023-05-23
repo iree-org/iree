@@ -6,7 +6,7 @@
 
 #include <arm_neon.h>
 
-#include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 static inline int32x4_t iree_uk_neon_zip1_s32_as_s64(int32x4_t a, int32x4_t b) {
   return vreinterpretq_s32_s64(

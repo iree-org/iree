@@ -7,7 +7,7 @@
 #include <immintrin.h>
 
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
-#include "iree/builtins/ukernel/mmt4d.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,

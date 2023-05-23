@@ -4,9 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/arch/x86_64/query_tile_sizes_x86_64.h"
-
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
+#include "iree/builtins/ukernel/query_tile_sizes_internal.h"
 
 static iree_uk_matmul_tile_sizes_t
 iree_uk_query_matmul_tile_sizes_x86_64_f32f32f32(
@@ -42,7 +41,7 @@ iree_uk_query_matmul_tile_sizes_x86_64_i8i8i32(
   return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 2, .N = 4};
 }
 
-bool iree_uk_query_matmul_tile_sizes_x86_64(
+bool iree_uk_query_matmul_tile_sizes_arch(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_matmul_tile_sizes_t* out_matmul_tile_sizes) {
   iree_uk_uint32_t op = iree_uk_query_tile_sizes_operation(params->flags);
