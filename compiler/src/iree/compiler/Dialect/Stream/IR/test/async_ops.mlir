@@ -84,13 +84,13 @@ func.func @asyncCopy(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.re
 
 // CHECK-LABEL: @asyncCollectiveAllGather
 func.func @asyncCollectiveAllGather(
+    // CHECK-SAME: %[[CHANNEL:.+]]: !stream.channel,
+    %channel: !stream.channel,
     // CHECK-SAME: %[[SEND:[a-z0-9]+]]: !stream.resource<*>, %[[SEND_SIZE:[a-z0-9]+]]: index,
     %send: !stream.resource<*>, %send_size: index,
     // CHECK-SAME: %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
     %recv_size: index, %count: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
-  %channel = stream.channel.default : !stream.channel
   // CHECK: %[[RECV:.+]] = stream.async.alloca
   %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
   // CHECK: = stream.async.collective<all_gather : f32>[%[[COUNT]]]
@@ -112,6 +112,8 @@ func.func @asyncCollectiveAllGather(
 
 // CHECK-LABEL: @asyncCollectiveBroadcast
 func.func @asyncCollectiveBroadcast(
+    // CHECK-SAME: %[[CHANNEL:.+]]: !stream.channel,
+    %channel: !stream.channel,
     // CHECK-SAME: %[[RANK:[a-z0-9]+]]: i32,
     %rank: i32,
     // CHECK-SAME: %[[SEND:[a-z0-9]+]]: !stream.resource<*>, %[[SEND_SIZE:[a-z0-9]+]]: index,
@@ -119,8 +121,6 @@ func.func @asyncCollectiveBroadcast(
     // CHECK-SAME: %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
     %recv_size: index, %count: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
-  %channel = stream.channel.default : !stream.channel
   // CHECK: %[[RECV:.+]] = stream.async.alloca
   %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
   // CHECK: = stream.async.collective<broadcast : f32>[%[[COUNT]]]

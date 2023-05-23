@@ -15,6 +15,7 @@ include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -33,7 +34,7 @@ class Util_PureOp<string mnemonic, list<Trait> traits = []> :
     Util_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
-// Byte buffers and host data
+// Type manipulation
 //===----------------------------------------------------------------------===//
 
 def Util_NullOp : Util_PureOp<"null"> {
@@ -50,6 +51,36 @@ def Util_NullOp : Util_PureOp<"null"> {
   let assemblyFormat = [{
     attr-dict `:` type($result)
   }];
+}
+
+def Util_CastOp : Util_PureOp<"cast", [
+  DeclareOpInterfaceMethods<CastOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperand",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{casts one util type to another ala static_cast/dynamic_cast}];
+  let description = [{
+    Performs a type cast between object types known to the util dialect.
+  }];
+
+  let arguments = (ins
+    AnyType:$operand
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `to` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
@@ -296,6 +327,46 @@ def Util_SizeOfOp : Util_PureOp<"sizeof"> {
 
   let assemblyFormat = [{
     $sizedType attr-dict-with-keyword
+  }];
+
+  let hasFolder = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Value utility ops
+//===----------------------------------------------------------------------===//
+
+def Util_SwitchOp : Util_PureOp<"switch", [
+  AllTypesMatch<["default_value", "result"]>,
+]> {
+  let summary = [{primitive switch operation}];
+  let description = [{
+    Returns the value with the given `index` in `values` or `default_value` if
+    the index is out of bounds.
+
+    ```mlir
+    // Switch %index to cases of %c100/%c200/%c300 if index==0, ==1, ==2.
+    // If %index is out of range (<0 or >2) then default to %c5.
+    %0 = util.switch %index[%c100, %c200, %c300] else %c5 : i32
+    ```
+  }];
+
+  let arguments = (ins
+    Index:$index,
+    Util_Primitive:$default_value,
+    Variadic<Util_Primitive>:$values
+  );
+  let results = (outs
+    Util_Primitive:$result
+  );
+
+  let assemblyFormat = [{
+    type($default_value) `from`
+    custom<TypedValueList>(ref(type($default_value)), $values, type($values))
+    `at` $index
+    `else` $default_value
+    attr-dict
+    `:` type($result)
   }];
 
   let hasFolder = 1;

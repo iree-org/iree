@@ -182,6 +182,28 @@ void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<TypedValueList>(ref($type_value), $values)
+//===----------------------------------------------------------------------===//
+
+ParseResult parseTypedValueList(
+    OpAsmParser &parser, Type type,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+    SmallVectorImpl<Type> &valueTypes) {
+  if (failed(parser.parseOperandList(values, AsmParser::Delimiter::Square))) {
+    return failure();
+  }
+  valueTypes.append(values.size(), type);
+  return success();
+}
+
+void printTypedValueList(OpAsmPrinter &p, Operation *op, Type type,
+                         OperandRange values, TypeRange valueTypes) {
+  p << "[";
+  p.printOperands(values);
+  p << "]";
+}
+
+//===----------------------------------------------------------------------===//
 // custom<RangeList>($offsets, $lengths)
 //===----------------------------------------------------------------------===//
 // [%offset for %length], [%offset for %length], ...
@@ -852,6 +874,55 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
 
   // If the value is a symbol reference, print a trailing type.
   if (getValue().isa<SymbolRefAttr>()) p << " : " << getType();
+}
+
+//===----------------------------------------------------------------------===//
+// Type manipulation
+//===----------------------------------------------------------------------===//
+
+bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
+  if (inputs.size() != 1 || outputs.size() != 1) return false;
+  Type a = inputs.front(), b = outputs.front();
+  if (a == b) {
+    // Both types are the same.
+    return true;
+  }
+  if (a.isa<IREE::Util::ObjectType>() || b.isa<IREE::Util::ObjectType>()) {
+    // Either type is an opaque object.
+    return true;
+  }
+  // Don't currently allow casting between types as we don't have runtime
+  // support for such operations (we don't generally care in the VM).
+  return false;
+}
+
+LogicalResult CastOp::verify() {
+  auto operandType = getOperand().getType();
+  if (!IREE::Util::ObjectType::isCompatible(operandType)) {
+    return this->emitOpError() << "operand type " << operandType
+                               << " is not object cast compatible";
+  }
+  auto resultType = getResult().getType();
+  if (!IREE::Util::ObjectType::isCompatible(resultType)) {
+    return this->emitOpError()
+           << "result type " << resultType << " is not object cast compatible";
+  }
+  return success();
+}
+
+Value CastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getOperand());
+}
+
+Value CastOp::getTiedResultOperand(Value result) { return getOperand(); }
+
+::std::optional<unsigned> CastOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // operand
+}
+
+SmallVector<int64_t, 4> CastOp::getTiedResultOperandIndices() {
+  return {0};  // operand
 }
 
 //===----------------------------------------------------------------------===//

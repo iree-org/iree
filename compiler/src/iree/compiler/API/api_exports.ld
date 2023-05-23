@@ -30,6 +30,7 @@ VER_0 {
     ireeCompilerOutputOpenFile;
     ireeCompilerOutputOpenMembuffer;
     ireeCompilerOutputWrite;
+    ireeCompilerRegisterDialects;
     ireeCompilerRunLldMain;
     ireeCompilerRunMain;
     ireeCompilerSessionCreate;
@@ -319,6 +320,8 @@ VER_0 {
     mlirIdentifierGetContext;
     mlirIdentifierStr;
     mlirIndexTypeGet;
+    mlirInferShapedTypeOpInterfaceInferReturnTypes;
+    mlirInferShapedTypeOpInterfaceTypeID;
     mlirInferTypeOpInterfaceInferReturnTypes;
     mlirInferTypeOpInterfaceTypeID;
     mlirIntegerAttrGet;
@@ -584,6 +587,7 @@ VER_0 {
     mlirValueIsABlockArgument;
     mlirValueIsAOpResult;
     mlirValuePrint;
+    mlirValuePrintAsOperand;
     mlirValueReplaceAllUsesOfWith;
     mlirVectorTypeGet;
     mlirVectorTypeGetChecked;

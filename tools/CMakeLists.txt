@@ -145,7 +145,9 @@ iree_cc_binary(
     flatcc::runtime
     iree::base
     iree::base::internal::file_io
+    iree::base::internal::flags
     iree::base::internal::flatcc::debugging
+    iree::base::internal::flatcc::parsing
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm::bytecode::module
 )

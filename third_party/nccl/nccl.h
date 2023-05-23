@@ -14,19 +14,21 @@
 #endif
 
 #define NCCL_MAJOR 2
-#define NCCL_MINOR 15
-#define NCCL_PATCH 5
+#define NCCL_MINOR 18
+#define NCCL_PATCH 1
 #define NCCL_SUFFIX ""
 
-#define NCCL_VERSION_CODE 21505
+#define NCCL_VERSION_CODE 21801
 #define NCCL_VERSION(X,Y,Z) (((X) <= 2 && (Y) <= 8) ? (X) * 1000 + (Y) * 100 + (Z) : (X) * 10000 + (Y) * 100 + (Z))
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <limits.h>
 /* Opaque handle to communicator */
 typedef struct ncclComm* ncclComm_t;
+#define NCCL_COMM_NULL NULL
 
 #define NCCL_UNIQUE_ID_BYTES 128
 typedef struct { char internal[NCCL_UNIQUE_ID_BYTES]; } ncclUniqueId;
@@ -42,15 +44,24 @@ typedef enum { ncclSuccess                 =  0,
                ncclInProgress              =  7,
                ncclNumResults              =  8 } ncclResult_t;
 
+#define NCCL_CONFIG_UNDEF_INT INT_MIN
+#define NCCL_CONFIG_UNDEF_PTR NULL
+#define NCCL_SPLIT_NOCOLOR -1
+
 /* Communicator configuration. Users can assign value to attributes to specify the
  * behavior of a communicator. */
-typedef struct ncclConfig_v21400 {
+typedef struct ncclConfig_v21700 {
   /* attributes that users should never touch. */
   size_t size;
   unsigned int magic;
   unsigned int version;
   /* attributes that users are able to customize. */
   int blocking;
+  int cgaClusterSize;
+  int minCTAs;
+  int maxCTAs;
+  const char *netName;
+  int splitShare;
 } ncclConfig_t;
 
 /* Config initializer must be assigned to initialize config structure when it is created.
@@ -59,7 +70,12 @@ typedef struct ncclConfig_v21400 {
   sizeof(ncclConfig_t), /* size */                                      \
   0xcafebeef,           /* magic */                                     \
   NCCL_VERSION(NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH), /* version */       \
-  1                     /* blocking */                                  \
+  NCCL_CONFIG_UNDEF_INT,                    /* blocking */              \
+  NCCL_CONFIG_UNDEF_INT,                    /* cgaClusterSize */        \
+  NCCL_CONFIG_UNDEF_INT,                    /* minCTAs */               \
+  NCCL_CONFIG_UNDEF_INT,                    /* maxCTAs */               \
+  NCCL_CONFIG_UNDEF_PTR,                    /* netName */               \
+  NCCL_CONFIG_UNDEF_INT                     /* splitShare */            \
 }
 
 /* Return the NCCL_VERSION_CODE of the NCCL library in the supplied integer.
@@ -115,6 +131,16 @@ ncclResult_t pncclCommDestroy(ncclComm_t comm);
 ncclResult_t  ncclCommAbort(ncclComm_t comm);
 ncclResult_t pncclCommAbort(ncclComm_t comm);
 
+/* Creates one or more communicators from an existing one.
+ * Ranks with the same color will end up in the same communicator.
+ * Within the new communicator, key will be used to order ranks.
+ * NCCL_SPLIT_NOCOLOR as color will indicate the rank will not be part of any group
+ * and will therefore return a NULL communicator.
+ * If config is NULL, the new communicator will inherit the original communicator's
+ * configuration*/
+ncclResult_t  ncclCommSplit(ncclComm_t comm, int color, int key, ncclComm_t *newcomm, ncclConfig_t* config);
+ncclResult_t pncclCommSplit(ncclComm_t comm, int color, int key, ncclComm_t *newcomm, ncclConfig_t* config);
+
 /* Returns a string for each error code. */
 const char*  ncclGetErrorString(ncclResult_t result);
 const char* pncclGetErrorString(ncclResult_t result);
@@ -123,7 +149,7 @@ const char* pncclGetErrorString(ncclResult_t result);
  * comm is currently unused and can be set to NULL
  */
 const char*  ncclGetLastError(ncclComm_t comm);
-const char* pncclGetError(ncclComm_t comm);
+const char* pncclGetLastError(ncclComm_t comm);
 
 /* Checks whether the comm has encountered any asynchronous errors */
 ncclResult_t  ncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError);

@@ -72,27 +72,26 @@ static LogicalResult mergeModuleInto(
   auto allOps = llvm::to_vector<8>(
       llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
 
-  for (auto &op : allOps) {
-    if (op->hasTrait<OpTrait::IsTerminator>()) continue;
-    if (auto symbolOp = dyn_cast<SymbolOpInterface>(op)) {
+  for (auto &sourceOp : allOps) {
+    if (sourceOp->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (auto symbolOp = dyn_cast<SymbolOpInterface>(sourceOp)) {
       auto symbolName = symbolOp.getName();
 
       // Resolve symbol name conflicts.
       if (auto targetOp = targetSymbolMap[symbolName]) {
+        if (OperationEquivalence::isEquivalentTo(
+                targetOp, sourceOp, OperationEquivalence::exactValueMatch,
+                /*markEquivalent=*/nullptr,
+                OperationEquivalence::Flags::IgnoreLocations)) {
+          // If the two ops are identical then we can ignore the source op and
+          // use the existing target op.
+          continue;
+        }
         if (symbolOp.getVisibility() == SymbolTable::Visibility::Private) {
-          // Private symbols can be safely folded into duplicates or renamed.
-          if (OperationEquivalence::isEquivalentTo(
-                  targetOp, op, OperationEquivalence::exactValueMatch,
-                  /*markEquivalent=*/nullptr,
-                  OperationEquivalence::Flags::IgnoreLocations)) {
-            // Optimization: skip over duplicate private symbols.
-            // We could let CSE do this later, but we may as well check here.
-            continue;
-          } else {
-            // Preserve the op but give it a unique name.
-            renameWithDisambiguatedName(op, sourceModuleOp, targetSymbolMap,
-                                        &sourceSymbolTable);
-          }
+          // Since the source symbol is private we can rename it as all uses
+          // are known to be local to the source module.
+          renameWithDisambiguatedName(sourceOp, sourceModuleOp, targetSymbolMap,
+                                      &sourceSymbolTable);
         } else {
           // The source symbol has 'nested' or 'public' visibility.
           if (SymbolTable::getSymbolVisibility(targetOp) !=
@@ -105,7 +104,7 @@ static LogicalResult mergeModuleInto(
             // conflicting symbol names. We think such conflicts will be better
             // fixed in other ways, so we'll emit an error until we find a case
             // where that isn't true.
-            return op->emitError()
+            return sourceOp->emitError()
                    << "multiple public symbols with the name: " << symbolName;
           } else {
             // Keep the original name for our new op, rename the target op.
@@ -115,13 +114,14 @@ static LogicalResult mergeModuleInto(
           }
         }
       }
-      targetSymbolMap[SymbolTable::getSymbolName(op).getValue()] = op;
+      targetSymbolMap[SymbolTable::getSymbolName(sourceOp).getValue()] =
+          sourceOp;
     }
     if (!targetBlock.empty() &&
         targetBlock.back().hasTrait<OpTrait::IsTerminator>()) {
-      op->moveBefore(&targetBlock.back());
+      sourceOp->moveBefore(&targetBlock.back());
     } else {
-      op->moveBefore(&targetBlock, targetBlock.end());
+      sourceOp->moveBefore(&targetBlock, targetBlock.end());
     }
   }
 

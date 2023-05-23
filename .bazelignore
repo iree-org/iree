@@ -15,6 +15,3 @@ third_party
 
 # Ignore the bazel directories when this directory is used as a local repository.
 bazel-*
-
-# integrations have separate WORKSPACE files
-integrations/

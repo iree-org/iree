@@ -144,8 +144,6 @@ std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass();
 // TODO(benvanik): outline streams (ala dispatch regions).
 // TODO(benvanik): deduplicate outlined streams.
 
-std::unique_ptr<OperationPass<ModuleOp>> createMemoizeChannelsPass();
-
 //===----------------------------------------------------------------------===//
 // Dispatch optimization
 //===----------------------------------------------------------------------===//

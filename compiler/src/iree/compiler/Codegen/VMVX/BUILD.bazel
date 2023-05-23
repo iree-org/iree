@@ -23,6 +23,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "EncodingInfo.h",
+        "VMVXPasses.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
@@ -43,6 +44,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:MathDialect",

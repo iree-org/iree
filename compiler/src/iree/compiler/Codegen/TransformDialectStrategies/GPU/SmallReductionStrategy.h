@@ -7,7 +7,10 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_SMALL_REDUCTION_STRATEGY_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_SMALL_REDUCTION_STRATEGY_H_
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
+#include <array>
+
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -39,15 +42,14 @@ struct GPUModel;
 // to force sizes that don't divide properly into warp shuffles.
 class SmallReductionStrategy : public AbstractReductionStrategy {
  public:
-  static SmallReductionStrategy create(
-      MLIRContext *context,
+  SmallReductionStrategy(
       const transform_ext::MatchedReductionCaptures &captures,
       const ReductionConfig &reductionConfig);
 
   SmallReductionStrategy(const SmallReductionStrategy &) = default;
   SmallReductionStrategy &operator=(const SmallReductionStrategy &) = default;
 
-  std::array<int64_t, 3> getNumThreadsInBlock() const override {
+  std::array<int64_t, 3> getNumThreadsInBlock() const {
     std::array<int64_t, 3> res{1, 1, 1};
     for (int64_t i = 0, e = workgroupTileSizes.size(); i < e; ++i)
       res[i] = workgroupTileSizes[i];
@@ -55,16 +57,6 @@ class SmallReductionStrategy : public AbstractReductionStrategy {
   }
 
  private:
-  /// `hasTrailingElementwise` is currently used to guard against pathological
-  /// cases where IREE can't bound a buffer and crashes.
-  // TODO: Fix codegen/Common/PadDynamicAlloc.cpp which calls into upstream
-  // code that tries to compose affine maps too aggressively when it could
-  // instead resolve bounding by being more eager.
-  SmallReductionStrategy(
-      MLIRContext *context,
-      const transform_ext::MatchedReductionCaptures &captures)
-      : AbstractReductionStrategy(context, captures) {}
-
   /// Compute the small strategy based on the problem size and the
   /// `maxNumThreadsToUse`.
   void configure(const ReductionConfig &reductionConfig);

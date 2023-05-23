@@ -34,14 +34,14 @@ func.func @sort_1d_ui(%arg0: tensor<128xui32>) -> (tensor<128xui32>) {
 // CHECK-LABEL: func.func @sort_1d_ui(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
-// CHECK:         %[[CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<128xui32> to tensor<128xi32>
+// CHECK:         %[[CAST:.+]] = tensor.bitcast %[[ARG0]] : tensor<128xui32> to tensor<128xi32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs(%[[CAST]] : tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi ugt, %[[ARG1]], %[[ARG2]]
 // CHECK:             iree_linalg_ext.yield %[[CMP]]
-// CHECK:         %[[RESULT:.+]] = builtin.unrealized_conversion_cast %[[SORT]] : tensor<128xi32> to tensor<128xui32>
+// CHECK:         %[[RESULT:.+]] = tensor.bitcast %[[SORT]] : tensor<128xi32> to tensor<128xui32>
 // CHECK:         return %[[RESULT]]
 
 // -----
@@ -154,7 +154,7 @@ func.func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> 
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[UI32:.+]] = mhlo.constant dense<2> : tensor<ui32>
-// CHECK:         %[[CONVERSION_CAST_CST:.+]] = builtin.unrealized_conversion_cast %[[UI32]] : tensor<ui32> to tensor<i32>
+// CHECK:         %[[CONVERSION_CAST_CST:.+]] = tensor.bitcast %[[UI32]] : tensor<ui32> to tensor<i32>
 // CHECK:         %[[EXTRACT_CST:.+]] = tensor.extract %[[CONVERSION_CAST_CST]][] : tensor<i32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(1)

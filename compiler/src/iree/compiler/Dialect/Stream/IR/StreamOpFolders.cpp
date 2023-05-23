@@ -171,7 +171,8 @@ namespace {
 // the MLIR CSE pass would deduplicate them.
 template <typename Op>
 struct ElideUnusedOp : public OpRewritePattern<Op> {
-  using OpRewritePattern<Op>::OpRewritePattern;
+  explicit ElideUnusedOp(MLIRContext *context)
+      : OpRewritePattern<Op>(context, /*benefit=*/1000) {}
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     if (!op.use_empty()) return failure();
@@ -1648,12 +1649,37 @@ struct RedundantTransferElision : public OpRewritePattern<AsyncTransferOp> {
   }
 };
 
+// Collapses chains of transfers that have no use.
+struct IntermediateTransferElision : public OpRewritePattern<AsyncTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
+                                PatternRewriter &rewriter) const override {
+    // Walk up the transfer chain to the first non-transfer op.
+    AsyncTransferOp originTransferOp = transferOp;
+    while (true) {
+      auto source = originTransferOp.getSource();
+      auto previousTransferOp =
+          dyn_cast_or_null<AsyncTransferOp>(source.getDefiningOp());
+      if (!previousTransferOp) break;
+      originTransferOp = previousTransferOp;
+    }
+    if (originTransferOp == transferOp) return failure();
+    rewriter.replaceOpWithNewOp<AsyncTransferOp>(
+        transferOp, transferOp.getResult().getType(),
+        originTransferOp.getSource(), originTransferOp.getSourceSize(),
+        transferOp.getResultSize(), originTransferOp.getSourceAffinityAttr(),
+        transferOp.getResultAffinityAttr());
+    return success();
+  }
+};
+
 }  // namespace
 
 void AsyncTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   // TODO(benvanik): staging propagation (fill of staging -> fill on device).
   results.insert<RedundantTransferElision>(context);
+  results.insert<IntermediateTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
 }
 
@@ -2929,6 +2955,48 @@ void TimepointAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<GroupAwaitsByTimepoint>(context);
   results.insert<FoldDuplicateAwaitResources>(context);
   results.insert<ElideUnusedOp<TimepointAwaitOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.create
+//===----------------------------------------------------------------------===//
+
+void ChannelCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelCreateOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.rank
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ChannelRankOp::fold(FoldAdaptor operands) {
+  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+          getChannel().getDefiningOp())) {
+    return createOp.getRank();
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.count
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ChannelCountOp::fold(FoldAdaptor operands) {
+  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+          getChannel().getDefiningOp())) {
+    return createOp.getCount();
+  }
+  return {};
 }
 
 }  // namespace Stream

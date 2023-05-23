@@ -9,6 +9,7 @@
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/EncodingInfo.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -55,12 +56,6 @@ static FailureOr<func::CallOp> createFunctionCall(
     for (auto attr : fnDefAttrs) {
       fnDecl->setAttr(attr.getName(), attr.getValue());
     }
-    // TODO(#12327): Based on description in the issue, add an attribute
-    // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
-    // backend (obviously), but is enough to unblock while the proper fix lands.
-    // For now there are a bunch of attributes set on the function, but this
-    // should be made more controllable based on the backend.
-    fnDecl->setAttr("vm.import.module", rewriter.getStringAttr("vmvx"));
     fnDecl->setAttr("llvm.bareptr", rewriter.getBoolAttr(true));
   } else if (fnDecl.getFunctionType() != functionType) {
     return rewriter.notifyMatchFailure(

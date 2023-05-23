@@ -152,6 +152,12 @@ class Parser(argparse.ArgumentParser):
         "for). In that case, no --benchmark_repetitions flag will be passed."
         " If not specified, a --benchmark_repetitions will be passed "
         "instead.")
+    self.add_argument(
+        "--compatible_only",
+        "--compatible-only",
+        action="store_true",
+        help="Only run compatible benchmarks based on the detected device "
+        "information")
     self.add_argument("--execution_benchmark_config",
                       type=_check_file_path,
                       default=None,

@@ -57,7 +57,6 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
               artifacts_dir=artifacts_dir))
 
       artifacts_to_check = [
-          'tf_input.mlir',
           'iree_input.mlir',
           compiled_path,
       ]

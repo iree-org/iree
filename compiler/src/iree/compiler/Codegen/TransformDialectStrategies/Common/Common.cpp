@@ -8,7 +8,6 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -39,7 +38,7 @@ using transform::MatchOp;
 using transform::MergeHandlesOp;
 using transform::PrintOp;
 using transform::SequenceOp;
-using transform::SplitHandlesOp;
+using transform::SplitHandleOp;
 using transform::SplitReductionOp;
 using transform::TileToForallOp;
 using transform::VectorizeOp;
@@ -53,8 +52,8 @@ template <int N, typename... MatchingArgs>
 auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
                     MatchingArgs... args) {
   Value matchedH = b.create<MatchOp>(targetH, args...);
-  auto matchOp = b.create<SplitHandlesOp>(matchedH,
-                                          /*numHandles=*/N);
+  auto matchOp = b.create<SplitHandleOp>(matchedH,
+                                         /*numHandles=*/N);
   assert(matchOp->getNumResults() == N && "Unexpected number of results");
   std::array<Value, N> a;
   for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
@@ -248,6 +247,21 @@ mlir::iree_compiler::buildTileFuseDistToForallWithNumThreads(
       b, isolatedParentOpH, rootH, opsHToFuse, numThreads, threadDimMapping);
 }
 
+/// Build the transform IR to pad an op `opH`.
+// TODO: Better upstream builder.
+Value mlir::iree_compiler::buildPad(
+    ImplicitLocOpBuilder &b, Value opH, ArrayRef<Attribute> paddingValues,
+    ArrayRef<int64_t> paddingDimensions, ArrayRef<int64_t> packingDimensions,
+    ArrayRef<SmallVector<int64_t>> transposePaddings) {
+  SmallVector<Attribute> transposeAttrs;
+  for (auto &transp : transposePaddings)
+    transposeAttrs.push_back(b.getI64ArrayAttr(transp));
+  return b.create<transform::PadOp>(
+      opH.getType(), opH, b.getArrayAttr(paddingValues),
+      b.getI64ArrayAttr(paddingDimensions),
+      b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs));
+}
+
 /// Apply patterns and vectorize.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
@@ -368,7 +382,7 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
 std::tuple<Value, Value, Value, Value, Value>
 mlir::iree_compiler::buildReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
-    const AbstractReductionStrategy &strategy) {
+    ArrayRef<int64_t> workgroupTileSizes) {
   // Step 1. Call the matcher. Note that this is the same matcher as used to
   // trigger this compilation path, so it must always apply.
   b.create<RegisterMatchCallbacksOp>();
@@ -379,7 +393,9 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
   // Step 2. Create the block/mapping tiling level and fusee.
   auto [fusionTargetH, fusionGroupH] =
       buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
-  ArrayRef<Attribute> allBlocksRef(strategy.allBlockAttrs);
+  MLIRContext *ctx = b.getContext();
+  SmallVector<Attribute> blockDimMapping{blockX(ctx), blockY(ctx), blockZ(ctx)};
+  blockDimMapping.resize(workgroupTileSizes.size());
   TileToForallAndFuseAndDistributeResult tileResult =
       buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
@@ -387,10 +403,8 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
           /*rootH=*/fusionTargetH,
           /*opsToFuseH=*/fusionGroupH,
           /*tileSizes=*/
-          getAsOpFoldResult(b.getI64ArrayAttr(strategy.workgroupTileSizes)),
-          /*threadDimMapping=*/
-          b.getArrayAttr(
-              allBlocksRef.take_front(strategy.captures.reductionRank - 1)));
+          getAsOpFoldResult(b.getI64ArrayAttr(workgroupTileSizes)),
+          /*threadDimMapping=*/b.getArrayAttr(blockDimMapping));
 
   // Handle the workgroup count region.
   b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(

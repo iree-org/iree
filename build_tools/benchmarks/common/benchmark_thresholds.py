@@ -104,9 +104,9 @@ BENCHMARK_THRESHOLDS = [
 ]
 
 COMPILATION_TIME_THRESHOLDS = [
-    # Compilation time measurement is very stable right now. Use a large
-    # threshold until we make it stable.
-    BenchmarkThreshold(re.compile(r".*"), 50, ThresholdUnit.PERCENTAGE),
+    # TODO(#11922): Compilation time measurement is very unstable right now.
+    # Use a large threshold until we make it stable.
+    BenchmarkThreshold(re.compile(r".*"), 100, ThresholdUnit.PERCENTAGE),
 ]
 
 TOTAL_DISPATCH_SIZE_THRESHOLDS = [

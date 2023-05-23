@@ -6,7 +6,7 @@ transform.sequence failures(propagate){
     in %variant_op : (!pdl.operation) -> !pdl.operation
 
   %fill0, %fill1, %matmul, %reduce, %broadcast =
-    transform.split_handles %ops in [5]
+    transform.split_handle %ops
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation,
                              !pdl.operation, !pdl.operation)
 

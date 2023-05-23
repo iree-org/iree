@@ -414,6 +414,9 @@ iree_status_t iree_hal_command_buffer_collective_validation(
               IREE_HAL_COLLECTIVE_REQUIRES_SEND_BINDING,
           [IREE_HAL_COLLECTIVE_KIND_RECV] =
               IREE_HAL_COLLECTIVE_REQUIRES_RECV_BINDING,
+          [IREE_HAL_COLLECTIVE_KIND_SEND_RECV] =
+              IREE_HAL_COLLECTIVE_REQUIRES_SEND_BINDING |
+              IREE_HAL_COLLECTIVE_REQUIRES_RECV_BINDING,
       };
   const uint32_t info_bits = info_bits_table[op.kind];
   if (!(info_bits & IREE_HAL_COLLECTIVE_IS_REDUCTION) && op.reduction != 0) {

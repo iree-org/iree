@@ -16,23 +16,19 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
-    "TilingUtils.h"
-    "TransposeUtils.h"
+    "LLVMGPUPasses.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
-    "LLVMGPUCheckIRBeforeLLVMConversion.cpp"
-    "LLVMGPUDistribute.cpp"
+    "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
-    "LLVMGPUTensorAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
-    "LLVMGPUTileTensor.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"
@@ -95,6 +91,8 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CommonPasses
+    iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::LLVMGPU::Utils
@@ -105,6 +103,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
   PUBLIC
 )
 

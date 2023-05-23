@@ -75,7 +75,6 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgExtUtils
     IREELinalgTransformDialect
-    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis
@@ -102,6 +101,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTosaDialect
     MLIRTransformDialect
+    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow

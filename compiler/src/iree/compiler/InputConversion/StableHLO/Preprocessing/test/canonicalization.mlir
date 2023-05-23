@@ -91,6 +91,24 @@ func.func @get_dimension_size(%arg0: tensor<1x2x3xf32>, %arg1: tensor<?x2xf32>)
 
 // -----
 
+// CHECK-LABEL: func.func @get_tuple_element
+// CHECK-SAME:   ([[ARG0:%.+]]: tensor<f32>, [[ARG1:%.+]]: tensor<i32>, [[ARG2:%.+]]: tuple<tensor<f32>, tensor<f16>>)
+func.func @get_tuple_element(%arg0: tensor<f32>, %arg1: tensor<i32>, %arg2: tuple<tensor<f32>, tensor<f16>>)
+          -> (tensor<f32>, tensor<i32>, tensor<f16>) {
+  %t = stablehlo.tuple %arg0, %arg1 : tuple<tensor<f32>, tensor<i32>>
+
+  %a = stablehlo.get_tuple_element %t[0] : (tuple<tensor<f32>, tensor<i32>>) -> tensor<f32>
+  %b = stablehlo.get_tuple_element %t[1] : (tuple<tensor<f32>, tensor<i32>>) -> tensor<i32>
+
+  %c = stablehlo.get_tuple_element %arg2[1] : (tuple<tensor<f32>, tensor<f16>>) -> tensor<f16>
+
+  // CHECK:      [[GTE:%.+]] = stablehlo.get_tuple_element [[ARG2]][1] : (tuple<tensor<f32>, tensor<f16>>) -> tensor<f16>
+  // CHECK-NEXT: return [[ARG0]], [[ARG1]], [[GTE]]
+  return %a, %b, %c : tensor<f32>, tensor<i32>, tensor<f16>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @reshape
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<1xf32>)
 func.func @reshape(%arg0: tensor<1xf32>)

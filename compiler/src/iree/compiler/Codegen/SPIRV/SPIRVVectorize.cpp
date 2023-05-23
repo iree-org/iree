@@ -12,8 +12,9 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -50,8 +51,10 @@ namespace iree_compiler {
 namespace {
 
 int getComputeVectorSize(int64_t size) {
-  // Try to use 4 first, and then 2, and then 1.
-  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
+  for (int i : {4, 3, 2}) {
+    if (size % i == 0) return i;
+  }
+  return 1;
 }
 
 int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
@@ -214,6 +217,13 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
   return nativeSize;
 }
 
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::GatherOp op) {
+  VectorType vectorType = op.getVectorType();
+  SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
+  nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
+  return nativeSize;
+}
+
 std::optional<SmallVector<int64_t>> getNativeVectorShape(
     Operation *op, bool targetSupportsDotProd) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
@@ -226,7 +236,7 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(
 
   return TypeSwitch<Operation *, std::optional<SmallVector<int64_t>>>(op)
       .Case<VectorTransferOpInterface, vector::MultiDimReductionOp,
-            vector::ReductionOp, vector::TransposeOp>(
+            vector::ReductionOp, vector::TransposeOp, vector::GatherOp>(
           [](auto typedOp) { return getNativeVectorShapeImpl(typedOp); })
       .Case<vector::ContractionOp>([=](auto contract) {
         return getNativeVectorShapeImpl(contract, targetSupportsDotProd);
@@ -340,6 +350,25 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // High dimension contraction can appear after vectorizing ops like 1-D
+    // convolution. Those 1-D convolution ops typically have a leading unit
+    // batch dimension. Try to drop that to map to matmul dimensions better.
+    SmallVector<vector::ContractionOp> contractOps;
+    funcOp.walk([&](vector::ContractionOp op) {
+      if (op.getIteratorTypes().size() > 3) contractOps.push_back(op);
+    });
+    for (vector::ContractionOp op : contractOps) {
+      OpBuilder builder(op);
+      IRRewriter rewriter(builder);
+      (void)vector::castAwayContractionLeadingOneDim(op, rewriter);
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After trimming contract leading unit dims ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // Fold tensor.extract_slice/insert_slice ops into transfer ops. This helps
     // to remove those tensor slice ops so that we can enable further vector op
     // transformations.
@@ -384,22 +413,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After lowering multi_reduction ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // Similarly for vector.gather ops, whose lowering patterns unroll
-    // internally.
-    {
-      RewritePatternSet patterns(context);
-      vector::populateVectorGatherLoweringPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering gather ops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
@@ -580,6 +593,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
+      vector::populateVectorGatherLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -600,6 +614,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
       vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
+      scf::IfOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }

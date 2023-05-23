@@ -45,6 +45,7 @@ EXPORT_FN("buffer_view.trace", iree_hal_module_buffer_view_trace, rCrD, v)
 
 EXPORT_FN("channel.create", iree_hal_module_channel_create, rIirrii, r)
 EXPORT_FN("channel.rank_and_count", iree_hal_module_channel_rank_and_count, r, ii)
+EXPORT_FN("channel.split", iree_hal_module_channel_split, riii, r)
 
 EXPORT_FN("command_buffer.begin_debug_group", iree_hal_module_command_buffer_begin_debug_group, rr, v)
 EXPORT_FN("command_buffer.collective", iree_hal_module_command_buffer_collective, rriirIIrIII, v)

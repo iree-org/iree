@@ -224,6 +224,19 @@ func.func @RedundantTransferElision(%arg0: !stream.resource<transient>, %arg1: i
 
 // -----
 
+// CHECK-LABEL: @IntermediateTransferElision
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+func.func @IntermediateTransferElision(%source: !stream.resource<constant>, %size: index) -> !stream.resource<external> {
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  %transfer0 = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size}
+  // CHECK-NOT: stream.async.transfer
+  %transfer1 = stream.async.transfer %transfer0 : !stream.resource<staging>{%size} -> !stream.resource<external>{%size}
+  // CHECK-NEXT: return %[[TRANSFER]]
+  return %transfer1 : !stream.resource<external>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncLoadBitcast
 func.func @FoldAsyncLoadBitcast(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
   %c0 = arith.constant 0 : index

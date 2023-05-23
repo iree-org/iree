@@ -8,9 +8,6 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_ABSTRACT_REDUCTION_STRATEGY_H_
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
-// Needed until IREE builds its own gpu::GPUBlockMappingAttr / gpu::Blocks
-// attributes that are reusable across all targets.
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -18,26 +15,12 @@ namespace iree_compiler {
 /// Structure to hold the parameters that control the reduction strategy.
 struct AbstractReductionStrategy {
   AbstractReductionStrategy(
-      MLIRContext *context,
-      const transform_ext::MatchedReductionCaptures &captures)
-      : context(context), captures(captures) {
-    // Needed until IREE builds its own gpu::GPUBlockMappingAttr / gpu::Blocks
-    // attributes that are reusable across all targets.
-    auto blockX =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimX);
-    auto blockY =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimY);
-    auto blockZ =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimZ);
-    allBlockAttrs = SmallVector<Attribute>{blockX, blockY, blockZ};
-  }
+      const transform_ext::MatchedReductionCaptures &captures,
+      ArrayRef<int64_t> workgroupTileSizes)
+      : captures(captures), workgroupTileSizes(workgroupTileSizes) {}
 
   /// Constructor quantities.
-  MLIRContext *context;
   transform_ext::MatchedReductionCaptures captures;
-
-  /// Derived quantities.
-  SmallVector<Attribute> allBlockAttrs;
 
   /// Tile sizes for the workgroup / determines grid size for all known
   /// reduction strategies.

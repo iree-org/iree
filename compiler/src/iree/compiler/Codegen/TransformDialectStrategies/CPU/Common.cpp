@@ -10,7 +10,6 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/CPU/ReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
@@ -42,7 +41,7 @@ using transform::LowerShapeCastOp;
 using transform::LowerTransferOp;
 using transform::LowerTransposeOp;
 using transform::MatchOp;
-using transform::SplitHandlesOp;
+using transform::SplitHandleOp;
 using transform::SplitTransferFullPartialOp;
 using transform::TransferToScfOp;
 using transform_ext::AllDims;
@@ -163,8 +162,7 @@ LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     ReductionConfig reductionConfig = getReductionConfig(captures, cpuModel);
-    auto strategy =
-        ReductionStrategy::create(op->getContext(), captures, reductionConfig);
+    ReductionStrategy strategy(captures, reductionConfig);
     return buildReductionStrategy(b, variant, strategy);
   };
 

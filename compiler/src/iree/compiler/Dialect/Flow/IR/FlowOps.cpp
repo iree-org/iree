@@ -1224,11 +1224,20 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
       exportOp->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
           .getValue();
-  state.addAttribute(
-      "entry_point",
+  auto entryPoint =
       SymbolRefAttr::get(builder.getContext(), executableOpSymName,
-                         {SymbolRefAttr::get(exportOp)}));
+                         {SymbolRefAttr::get(exportOp)});
+  build(builder, state, entryPoint, workload, resultTypes, resultDims, operands,
+        operandDims, tiedOperands, attributes);
+}
 
+void DispatchOp::build(OpBuilder &builder, OperationState &state,
+                       SymbolRefAttr entryPoint, ValueRange workload,
+                       TypeRange resultTypes, ValueRange resultDims,
+                       ValueRange operands, ValueRange operandDims,
+                       ArrayAttr tiedOperands,
+                       ArrayRef<NamedAttribute> attributes) {
+  state.addAttribute("entry_point", entryPoint);
   state.addOperands(workload);
   state.addTypes(resultTypes);
   state.addOperands(operands);
@@ -1435,12 +1444,21 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 
 LogicalResult TensorReshapeOp::verify() {
+  // The element types don't need to match but the bit widths need to.
+  auto sourceType = getSource().getType().cast<ShapedType>();
+  auto resultType = getResult().getType().cast<ShapedType>();
+  if (sourceType.getElementTypeBitWidth() !=
+      resultType.getElementTypeBitWidth()) {
+    return emitOpError() << "element bit widths must match";
+  }
+
   if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
                                  getSourceDims())) ||
       failed(verifyOpDynamicDims(getOperation(), {getResult()},
                                  {getResultDims()}))) {
     return failure();
   }
+
   return success();
 }
 
@@ -1690,7 +1708,16 @@ void ChannelCountOp::getAsmResultNames(
 
 void ChannelDefaultOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "channel_default");
+  setNameFn(getResult(), "default_channel");
+}
+
+//===----------------------------------------------------------------------===//
+// flow.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "channel");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1809,6 +1836,34 @@ void CollectiveReduceScatterOp::build(OpBuilder &builder, OperationState &state,
       IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
   build(builder, state, reductionOp, elementType, target, targetDims, source,
         channel, builder.getIndexArrayAttr({0}));
+}
+
+//===----------------------------------------------------------------------===//
+// flow.collective.send_recv
+//===----------------------------------------------------------------------===//
+
+Value CollectiveSendRecvOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::llvm::Optional<unsigned> CollectiveSendRecvOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> CollectiveSendRecvOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
+void CollectiveSendRecvOp::build(OpBuilder &builder, OperationState &state,
+                                 CollectiveElementTypeAttr elementType,
+                                 Value target, Value source, Value channel,
+                                 Value send, Value recv) {
+  auto targetDims =
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
+
+  build(builder, state, elementType, target, targetDims, source, channel, send,
+        recv, builder.getIndexArrayAttr({0}));
 }
 
 }  // namespace Flow

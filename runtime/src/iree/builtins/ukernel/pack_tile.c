@@ -6,12 +6,6 @@
 
 #include "iree/builtins/ukernel/pack_internal.h"
 
-#if defined(IREE_UK_ARCH_ARM_64)
-#include "iree/builtins/ukernel/arch/arm_64/pack_arm_64.h"
-#elif defined(IREE_UK_ARCH_X86_64)
-#include "iree/builtins/ukernel/arch/x86_64/pack_x86_64.h"
-#endif
-
 static void iree_uk_pack_tile_generic_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
@@ -65,16 +59,6 @@ static iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_generic(
   return (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER)
              ? iree_uk_pack_tile_generic_transpose
              : iree_uk_pack_tile_generic_direct;
-}
-
-static iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_arch(
-    const iree_uk_pack_params_t* params) {
-#if defined(IREE_UK_ARCH_ARM_64)
-  return iree_uk_pack_select_tile_func_arm_64(params);
-#elif defined(IREE_UK_ARCH_X86_64)
-  return iree_uk_pack_select_tile_func_x86_64(params);
-#endif
-  return 0;
 }
 
 iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func(

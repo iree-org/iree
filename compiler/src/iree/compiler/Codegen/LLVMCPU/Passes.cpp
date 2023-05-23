@@ -4,14 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -276,8 +278,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
           .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
                 linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
                 linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp>([&](auto) {
+                linalg::PoolingNhwcMinUnsignedOp>([&](auto) {
             // Shape: N, OH, OW, OC, KH, KW, (IC)
             khSize = shape[4];
             kwSize = shape[5];
@@ -332,8 +333,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   {
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
-    // TODO(#13036): Re-enable once debugged.
-    options.vectorizeGatherAccesses = false;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -370,8 +370,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
-    // TODO(#13036): Re-enable once debugged.
-    options.vectorizeGatherAccesses = false;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -470,8 +469,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
-    // TODO(#13036): Re-enable once debugged.
-    options.vectorizeGatherAccesses = false;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -525,8 +523,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
-    // TODO(#13036): Re-enable once debugged.
-    options.vectorizeGatherAccesses = false;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -556,14 +553,14 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(TilingLevel::ParallelTiles)));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
 
   if (enableMicrokernels) {
     nestedModulePM.addPass(createLLVMCPULowerToUKernelsPass());
   } else {
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
+        static_cast<int64_t>(TilingLevel::ParallelTiles)));
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
+        static_cast<int64_t>(TilingLevel::ReductionTiles)));
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass());
   }
@@ -589,16 +586,23 @@ void addCPUDataTilingPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
 
-  LLVMCPUVectorizationPassOptions options;
-  options.vectorizePadding = true;
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUVectorizationPass(options));
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  {
+    LLVMCPUVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSplitFullPartialTransferPass("linalg-copy"));
+
+  {
+    LLVMCPUVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
+  }
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
@@ -635,8 +639,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
     passManager.addNestedPass<func::FuncOp>(
         createLLVMCPUEmitVectorizationRemarksPass());
   }
-  passManager.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  passManager.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
+  passManager.addPass(createConvertBf16ToUInt16BuffersPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
 

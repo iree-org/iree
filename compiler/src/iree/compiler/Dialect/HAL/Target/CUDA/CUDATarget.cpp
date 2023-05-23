@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -572,9 +572,8 @@ class CUDATargetBackend final : public TargetBackend {
     }
 
     std::string gpuImage = produceGpuImage(ptxImage);
-    auto gpuImageRef = flatbuffers_uint8_vec_create(
-        builder, reinterpret_cast<const uint8_t *>(gpuImage.c_str()),
-        gpuImage.size());
+    auto gpuImageRef =
+        flatbuffers_string_create(builder, gpuImage.c_str(), gpuImage.size());
     iree_hal_cuda_BlockSizeDef_vec_start(builder);
     for (const auto &workgroupSize : workgroupSizes) {
       iree_hal_cuda_BlockSizeDef_vec_push_create(

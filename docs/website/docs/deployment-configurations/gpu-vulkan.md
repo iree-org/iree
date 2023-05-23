@@ -1,10 +1,10 @@
 # Vulkan GPU HAL Driver
 
-IREE can accelerate model execution on GPUs via [Vulkan][vulkan], a low-overhead
-graphics and compute API. Vulkan is cross-platform: it is available on many
-operating systems, including Android, Linux, and Windows. Vulkan is also
-cross-vendor: it is supported by most GPU vendors, including AMD, ARM, Intel,
-NVIDIA, and Qualcomm.
+IREE can accelerate model execution on GPUs via
+[Vulkan](https://www.khronos.org/vulkan/), a low-overhead graphics and compute
+API. Vulkan is cross-platform: it is available on many operating systems,
+including Android, Linux, and Windows. Vulkan is also cross-vendor: it is
+supported by most GPU vendors, including AMD, ARM, Intel, NVIDIA, and Qualcomm.
 
 <!-- TODO(??): when to use CPU vs GPU -->
 
@@ -42,9 +42,9 @@ verified by the following steps:
     ```
 
     If `vulkaninfo` does not exist, you will need to [install the latest Vulkan
-    SDK][vulkan-sdk]. For Ubuntu 18.04/20.04, installing via LunarG's package
-    repository is recommended, as it places Vulkan libraries and tools under
-    system paths so it's easy to discover.
+    SDK](https://vulkan.lunarg.com/sdk/home/). For Ubuntu 18.04/20.04,
+    installing via LunarG's package repository is recommended, as it places
+    Vulkan libraries and tools under system paths so it's easy to discover.
 
     If the showed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
@@ -58,7 +58,7 @@ verified by the following steps:
     ```
 
     If `vulkaninfo` does not exist, you will need to [install the latest Vulkan
-    SDK][vulkan-sdk].
+    SDK](https://vulkan.lunarg.com/sdk/home/).
 
     If the showed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
@@ -74,10 +74,11 @@ so it can execute the model on GPU via Vulkan.
 
 #### Build runtime from source
 
-Please make sure you have followed the [Getting started][get-started] page
-to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
-page for Android. The Vulkan HAL driver is compiled in by default on non-Apple
-platforms.
+Please make sure you have followed the
+[Getting started](../building-from-source/getting-started.md) page to build IREE
+for Linux/Windows and the
+[Android cross-compilation](../building-from-source/android.md) page for
+Android. The Vulkan HAL driver is compiled in by default on non-Apple platforms.
 
 <!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
 
@@ -86,15 +87,17 @@ for the target.
 
 ### Get compiler for SPIR-V exchange format
 
-Vulkan expects the program running on GPU to be expressed by the [SPIR-V][spirv]
-binary exchange format, which the model must be compiled into.
+Vulkan expects the program running on GPU to be expressed by the
+[SPIR-V](https://www.khronos.org/registry/spir-v/) binary exchange format, which
+the model must be compiled into.
 
 <!-- TODO(??): vcpkg -->
 
 #### Download as Python package
 
 Python packages for various IREE functionalities are regularly published
-to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
+to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../bindings/python.md) page for more
 details. The core `iree-compiler` package includes the SPIR-V compiler:
 
 ``` shell
@@ -113,10 +116,11 @@ python -m pip install iree-compiler
 
 #### Build compiler from source
 
-Please make sure you have followed the [Getting started][get-started] page
-to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
-page for Android. The SPIR-V compiler backend is compiled in by default on all
-platforms.
+Please make sure you have followed the
+[Getting started](../building-from-source/getting-started.md) page to build IREE
+for Linux/Windows and the
+[Android cross-compilation](../building-from-source/android.md) page for
+Android. The SPIR-V compiler backend is compiled in by default on all platforms.
 
 Ensure that the `IREE_TARGET_BACKEND_VULKAN_SPIRV` CMake option is `ON` when
 configuring for the host.
@@ -131,11 +135,13 @@ and run it on the GPU.
 IREE compilers transform a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
-[MLIR][mlir]) expected by main IREE compilers first.
+[MLIR](https://mlir.llvm.org/)) expected by main IREE compilers first.
 
 Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
-[TensorFlow importer][tf-import]. Then,
+weights from
+[TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
+and convert it using IREE's
+[TensorFlow importer](../getting-started/tensorflow.md). Then,
 
 #### Compile using the command-line
 
@@ -153,9 +159,9 @@ iree-compile \
 where `iree_input.mlir` is the imported program.
 
 Note that a target triple of the form `<vendor/arch>-<product>-<os>` is needed
-to compile towards each GPU architecture. If no triple is specified then a safe but
-more limited default will be used.
-We don't support the full spectrum here[^1]; the following table summarizes the
+to compile towards each GPU architecture. If no triple is specified then a safe
+but more limited default will be used. We don't support the full spectrum
+here[^1]; the following table summarizes the
 currently recognized ones:
 
 GPU Vendor | Target Triple
@@ -196,14 +202,3 @@ concrete values.
 [^1]: It's also impossible to capture all details of a Vulkan implementation
 with a target triple, given the allowed variances on extensions, properties,
 limits, etc. So the target triple is just an approximation for usage.
-
-[android-cc]: ../building-from-source/android.md
-[get-started]: ../building-from-source/getting-started.md
-[mlir]: https://mlir.llvm.org/
-[pypi]: https://pypi.org/user/google-iree-pypi-deploy/
-[python-bindings]: ../bindings/python.md
-[spirv]: https://www.khronos.org/registry/spir-v/
-[tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: ../getting-started/tensorflow.md
-[vulkan]: https://www.khronos.org/vulkan/
-[vulkan-sdk]: https://vulkan.lunarg.com/sdk/home/

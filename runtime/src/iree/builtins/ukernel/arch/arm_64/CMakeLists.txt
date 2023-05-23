@@ -4,6 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+if (NOT (IREE_ARCH STREQUAL "arm_64"))
+  return()
+endif()
+
 iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_DOTPROD
   CLANG_OR_GCC
     "-march=armv8.2-a+dotprod"
@@ -59,11 +63,6 @@ endif()
 iree_cc_library(
   NAME
     arm_64
-  HDRS
-    "mmt4d_arm_64.h"
-    "pack_arm_64.h"
-    "query_tile_sizes_arm_64.h"
-    "unpack_arm_64.h"
   SRCS
     "mmt4d_arm_64.c"
     "pack_arm_64.c"

@@ -26,7 +26,7 @@ typedef struct iree_uk_query_tile_sizes_2d_out_params_t {
   iree_uk_ssize_t tile_size1;
 } iree_uk_query_tile_sizes_2d_out_params_t;
 
-IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
+IREE_UK_EXPORT int iree_uk_query_tile_sizes_2d(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_query_tile_sizes_2d_out_params_t* out_params);
 

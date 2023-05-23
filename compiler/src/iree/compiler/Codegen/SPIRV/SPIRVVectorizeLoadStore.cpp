@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"

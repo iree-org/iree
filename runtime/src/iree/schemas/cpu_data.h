@@ -70,7 +70,8 @@ enum iree_cpu_data_field_0_e {
   IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name) = 1ull << bit_pos,
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT
-
 };
+
+#undef IREE_CPU_FEATURE_BIT_NAME
 
 #endif  // IREE_SCHEMAS_CPU_DATA_H_

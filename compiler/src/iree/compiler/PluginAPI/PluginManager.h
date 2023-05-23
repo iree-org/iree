@@ -91,6 +91,15 @@ class PluginManagerSession : public PipelineExtensions {
   LogicalResult activatePlugins(MLIRContext *context);
 
   // Forward pipeline extensions.
+  void extendInputConversionPreprocessingPassPipeline(
+      OpPassManager &passManager,
+      InputDialectOptions::Type inputType) override {
+    for (auto *s : initializedSessions) {
+      s->extendInputConversionPreprocessingPassPipeline(passManager, inputType);
+    }
+  }
+
+  // Forward pipeline extensions.
   void extendPreprocessingPassPipeline(OpPassManager &passManager) override {
     for (auto *s : initializedSessions) {
       s->extendPreprocessingPassPipeline(passManager);

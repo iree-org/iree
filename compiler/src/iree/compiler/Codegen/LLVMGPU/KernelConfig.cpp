@@ -9,11 +9,11 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -109,8 +109,8 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
 /// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
 static void getTensorCoreConfig(
-    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
-    int64_t N, int64_t K) {
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, Type elementType,
+    int64_t M, int64_t N, int64_t K) {
   // Based on early analysis we found that 128x256x32_3 gives acceptable
   // performance across many of the large matrix sizes for f16 and fp32. This
   // needs to be refined into a better startegy based on empircal data but this
@@ -118,7 +118,7 @@ static void getTensorCoreConfig(
   // magnitude for large square like cases.
   int64_t parallelDim = M * N;
   static constexpr int64_t kLargDimThreashold = 1536;
-  if (isFp16) {
+  if (elementType.isF16()) {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
       tileSizes.push_back(
           TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
@@ -211,13 +211,16 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
 
 /// Decides which tensorcore operations to use.
 static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
-    bool isF16) {
+    Type elementType) {
   // Currently mma.sync is on by default for fp16 only.
   IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
-      isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCoreMmaSync
-            : IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCore;
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+
+  // For F16 and F32 use mmasync by default.
+  if (elementType.isF16() || elementType.isF32()) {
+    codegenPipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUMatmulTensorCoreMmaSync;
+  }
 
   // Override the decision based on cl flags.
   assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
@@ -256,7 +259,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
         SmallVector<unsigned> partitionedLoops =
             cast<PartitionableLoopsInterface>(op.getOperation())
-                .getPartitionableLoops(kNumMaxParallelDims);
+                .getPartitionableLoops(/*maxNumPartitionedLoops=*/std::nullopt);
         llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
         partitionedLoopsSet.insert(partitionedLoops.begin(),
                                    partitionedLoops.end());
@@ -313,13 +316,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-      bool isFp16 = op.getDpsInputOperand(0)
-                        ->get()
-                        .getType()
-                        .cast<RankedTensorType>()
-                        .getElementType()
-                        .isF16();
-      getTensorCoreConfig(TCtileSizeConfig, isFp16, sizeM, sizeN, sizeK);
+      Type elementType = op.getDpsInputOperand(0)
+                             ->get()
+                             .getType()
+                             .cast<RankedTensorType>()
+                             .getElementType();
+
+      getTensorCoreConfig(TCtileSizeConfig, elementType, sizeM, sizeN, sizeK);
       // Pick the best configuration where the original shape is aligned on the
       // tile size.
       for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
@@ -327,7 +330,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
           IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
-              getTensorCorePipeline(isFp16);
+              getTensorCorePipeline(elementType);
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,

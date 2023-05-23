@@ -18,6 +18,7 @@ iree_cc_library(
     "Passes.h.inc"
     "Patterns.h"
   SRCS
+    "AnnotateOpOrdinals.cpp"
     "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
     "ConvertPrimitiveType.cpp"
@@ -52,6 +53,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSupport
     MLIRTransforms
+    MLIRVectorDialect
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant

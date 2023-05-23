@@ -82,3 +82,31 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Transforms",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "AutoInputConversionPipeline",
+    srcs = [
+        "AutoInputConversionPipeline.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+        "Utils.h",
+    ],
+    deps = [
+        ":PassHeaders",
+        ":PassesIncGen",
+        "//compiler/src/iree/compiler/InputConversion/MHLO",
+        "//compiler/src/iree/compiler/InputConversion/StableHLO",
+        "//compiler/src/iree/compiler/InputConversion/TMTensor",
+        "//compiler/src/iree/compiler/InputConversion/TOSA",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TosaDialect",
+        "@llvm-project//mlir:Transforms",
+        "@mlir-hlo//:mlir_hlo",
+        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
+    ],
+)

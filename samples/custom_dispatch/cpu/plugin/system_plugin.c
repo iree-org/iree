@@ -61,7 +61,7 @@ typedef struct {
 //
 // Expects a return of 0 on success and any other value indicates failure.
 // Try not to fail!
-static int simple_mul_workgroup(void* context, void* params_ptr,
+static int simple_mul_workgroup(void* params_ptr, void* context,
                                 void* reserved) {
   system_plugin_t* plugin = (system_plugin_t*)context;
   typedef struct {

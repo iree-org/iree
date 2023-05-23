@@ -22,6 +22,10 @@ std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter();
 
 void buildStableHLOInputConversionPassPipeline(OpPassManager &passManager);
 
+// Performs input legalization on programs that may have originated from an XLA
+// import (or made to interop with it).
+void buildStableHLOXLAInputConversionPassPipeline(OpPassManager &passManager);
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//

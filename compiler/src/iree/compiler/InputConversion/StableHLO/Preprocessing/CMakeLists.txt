@@ -56,6 +56,7 @@ iree_cc_library(
     "Canonicalization.cpp"
     "DotGeneralToDot.cpp"
     "EinsumToDotGeneral.cpp"
+    "FlattenTuplesInCFG.cpp"
     "GatherToTorchIndexSelect.cpp"
     "LowerComplex.cpp"
     "Passes.cpp"
@@ -67,6 +68,7 @@ iree_cc_library(
     ChloOps
     LLVMSupport
     MLIRArithDialect
+    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMathDialect

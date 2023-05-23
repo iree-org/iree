@@ -8,11 +8,27 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_COMMON_H_
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+// Needed until IREE builds its own gpu::GPUBlockMappingAttr / gpu::Blocks
+// attributes that are reusable across all targets.
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+//===----------------------------------------------------------------------===//
+// Base quantities generally useful for all CPU and GPU strategies.
+//===----------------------------------------------------------------------===//
+inline Attribute blockX(MLIRContext *ctx) {
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimX);
+}
+inline Attribute blockY(MLIRContext *ctx) {
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimY);
+}
+inline Attribute blockZ(MLIRContext *ctx) {
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimZ);
+}
 
 namespace IREE {
 namespace transform_dialect {
@@ -154,6 +170,25 @@ TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithNumThreads(
     ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
     ArrayAttr threadDimMapping);
 
+/// Build transform IR to split the reduction into a parallel and combiner part.
+/// Then tile the parallel part and map it to `tileSize` threads, each reducing
+/// on `vectorSize` elements.
+/// Lastly, fuse the newly created fill and elementwise operations into the
+/// resulting containing forall op.
+/// Return a triple of handles to (forall, fill, combiner)
+std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value reductionH,
+    int64_t reductionRank, int64_t tileSize, int64_t reductionVectorSize,
+    Attribute mappingAttr);
+
+/// Build the transform IR to pad an op `opH`.
+// TODO: Better upstream builder.
+Value buildPad(ImplicitLocOpBuilder &b, Value opH,
+               ArrayRef<Attribute> paddingValues,
+               ArrayRef<int64_t> paddingDimensions,
+               ArrayRef<int64_t> packingDimensions,
+               ArrayRef<SmallVector<int64_t>> transposePaddings = {});
+
 /// Build transform IR that applies rank-reduction patterns and vectorizes.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
@@ -166,17 +201,6 @@ void buildHoisting(ImplicitLocOpBuilder &b, Value funcH);
 /// Takes a handle variantOp and returns a handle to the same variant op.
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
                      bool targetGpu = false);
-
-/// Build transform IR to split the reduction into a parallel and combiner part.
-/// Then tile the parallel part and map it to `tileSize` threads, each reducing
-/// on `vectorSize` elements.
-/// Lastly, fuse the newly created fill and elementwise operations into the
-/// resulting containing forall op.
-/// Return a triple of handles to (forall, fill, combiner)
-std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value reductionH,
-    int64_t reductionRank, int64_t tileSize, int64_t reductionVectorSize,
-    Attribute mappingAttr);
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
@@ -205,9 +229,8 @@ std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
 /// Note: A future version of this op will be able to directly apply on the DAG
 /// and form the dispatch region.
 std::tuple<Value, Value, Value, Value, Value>
-buildReductionStrategyBlockDistribution(
-    ImplicitLocOpBuilder &b, Value variantH,
-    const AbstractReductionStrategy &strategy);
+buildReductionStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
+                                        ArrayRef<int64_t> workgroupTileSizes);
 
 /// Build transform IR that applies memory optimizations.
 Value buildMemoryOptimizations(ImplicitLocOpBuilder &b, Value funcH);

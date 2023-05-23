@@ -2156,6 +2156,11 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
     }
 
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
@@ -2816,6 +2821,11 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
     }
 
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
@@ -3311,33 +3321,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
 // Channels
 //===----------------------------------------------------------------------===//
 
-def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Stream_AffinityOp,
-]> {
-  let summary = [{returns a default collective communication channel}];
-  let description = [{
-    Returns a channel initialized using the runtime environment for the
-    particular affinity.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$group,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_Channel:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    (`group` `(` $group^ `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
+def Stream_ChannelCreateOp : Stream_PureOp<"channel.create", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Stream_AffinityOp,
@@ -3373,6 +3357,40 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
     `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{splits a collective communication channel}];
+  let description = [{
+    Partitions the group associated with the given channel into disjoint
+    subgroups for each unique value of color. Each new subgroup contains all
+    participants of the same color and within each subgroup the key argument
+    is used to define the rank order. When multiple participants in a group
+    use the same key the tie will be broken using their rank in the parent
+    group. A color of -1 indicates that the rank does not participate in any
+    subgroup and will return a null channel.
+  }];
+
+  let arguments = (ins
+    Stream_Channel:$channel,
+    Index:$color,
+    Index:$key
+  );
+  let results = (outs
+    Stream_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `,` $color `,` $key
+    `:` type($channel) `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
@@ -3395,6 +3413,8 @@ def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
      $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
 
 def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
@@ -3416,6 +3436,8 @@ def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
     $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//

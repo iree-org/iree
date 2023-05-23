@@ -16,6 +16,22 @@ func.func @channel_create() -> !stream.channel {
 
 // -----
 
+// CHECK-LABEL: @channel_split
+//  CHECK-SAME: (%[[BASE_CHANNEL:.+]]: !hal.channel)
+func.func @channel_split(%base_channel: !stream.channel) {
+  // CHECK-DAG: %[[COLOR_INDEX:.+]] = arith.constant 100
+  %color = arith.constant 100 : index
+  // CHECK-DAG: %[[KEY_INDEX:.+]] = arith.constant 101
+  %key = arith.constant 101 : index
+  // CHECK-DAG: %[[COLOR_I32:.+]] = arith.index_cast %[[COLOR_INDEX]] : index to i32
+  // CHECK-DAG: %[[KEY_I32:.+]] = arith.index_cast %[[KEY_INDEX]] : index to i32
+  // CHECK: %channel = hal.channel.split<%[[BASE_CHANNEL]] : !hal.channel> color(%[[COLOR_I32]]) key(%[[KEY_I32]]) flags(0) : !hal.channel
+  %split_channel = stream.channel.split %base_channel, %color, %key : !stream.channel -> !stream.channel
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @channel_rank
 //  CHECK-SAME: (%[[CHANNEL:.+]]: !hal.channel)
 func.func @channel_rank(%channel: !stream.channel) -> index {

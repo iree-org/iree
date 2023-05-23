@@ -1926,7 +1926,7 @@ class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
@@ -1965,7 +1965,7 @@ class VM_SwitchFloatOp<F type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
@@ -2457,6 +2457,18 @@ def VM_RoundF64Op :
     VM_TotalUnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64,
                               [VM_ExtF64]> {
   let summary = [{rounds the value to the nearest integer away from zero}];
+}
+
+def VM_RoundF32EvenOp :
+    VM_TotalUnaryArithmeticOp<F32, "round.f32.even", VM_OPC_RoundF32Even,
+                              [VM_ExtF32]> {
+  let summary = [{rounds the value to the nearest even integer}];
+}
+
+def VM_RoundF64EvenOp :
+    VM_TotalUnaryArithmeticOp<F64, "round.f64.even", VM_OPC_RoundF64Even,
+                              [VM_ExtF64]> {
+  let summary = [{rounds the value to the nearest even integer}];
 }
 
 def VM_MinF32Op :
@@ -2978,6 +2990,62 @@ def VM_BitcastF64I64Op :
     VM_ConversionOp<F64, I64, "bitcast.f64.i64", VM_OPC_BitcastF64I64,
                     [VM_ExtF64]> {
   let summary = [{bitcast from a 64-bit float-point value to a 64-bit integer}];
+}
+
+def VM_CastAnyRefOp :
+    VM_PureOp<"cast.any.ref", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{casts from any ref to a specific ref type}];
+  let description = [{
+    Performs a runtime cast of an opaque `!vm.ref<?>` to a specific `!vm.ref<T>`
+    and raises an error if the operand does not match the expected type.
+    Null refs can always be cast between types.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$operand
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CastAnyRef>,
+    VM_EncOperand<"operand", 0>,
+    VM_EncTypeOf<"result">,
+    VM_EncResult<"result">,
+  ];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def VM_CastRefAnyOp :
+    VM_PureOp<"cast.ref.any", [VM_AssignmentOp]> {
+  let summary = [{casts from a specific ref to any ref type}];
+  let description = [{
+    Performs a compile-time widening cast of a specific `!vm.ref<T>` to an
+    opaque `!vm.ref<?>`.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$operand
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3797,6 +3865,11 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
       return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
     }
   }];
 }

@@ -848,14 +848,8 @@ static iree_status_t iree_vm_bytecode_function_verify_arguments(
   iree_host_size_t args_ref = 0;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_count_cconv_regs(
       verify_state->cconv_arguments, &args_i32, &args_ref));
-  iree_host_size_t rets_i32 = 0;
-  iree_host_size_t rets_ref = 0;
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_count_cconv_regs(
-      verify_state->cconv_results, &rets_i32, &rets_ref));
   if (verify_state->i32_register_count < args_i32 ||
-      verify_state->i32_register_count < rets_i32 ||
-      verify_state->ref_register_count < args_ref ||
-      verify_state->ref_register_count < rets_ref) {
+      verify_state->ref_register_count < args_ref) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "insufficient register storage for function arguments/results");
@@ -1361,14 +1355,14 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(CORE, SwitchI32, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyIntAttr32(default_value);
+      VM_VerifyOperandRegI32(default_value);
       VM_VerifyVariadicOperandsI32(values);
       VM_VerifyResultRegI32(result);
     });
 
     VERIFY_OP(CORE, SwitchI64, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyIntAttr64(default_value);
+      VM_VerifyOperandRegI64(default_value);
       VM_VerifyVariadicOperandsI64(values);
       VM_VerifyResultRegI64(result);
     });
@@ -1447,6 +1441,12 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP(CORE, ExtI32I64U, {
       VM_VerifyOperandRegI32(operand);
       VM_VerifyResultRegI64(result);
+    });
+
+    VERIFY_OP(CORE, CastAnyRef, {
+      VM_VerifyOperandRegRef(operand);
+      VM_VerifyTypeOf(result);
+      VM_VerifyResultRegRef(result);
     });
 
     //===------------------------------------------------------------------===//
@@ -1738,7 +1738,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(EXT_F32, SwitchF32, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyFloatAttr32(default_value);
+      VM_VerifyOperandRegF32(default_value);
       VM_VerifyVariadicOperandsF32(values);
       VM_VerifyResultRegF32(result);
     });
@@ -1758,6 +1758,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP_EXT_F32_UNARY_F32(CeilF32);
     VERIFY_OP_EXT_F32_UNARY_F32(FloorF32);
     VERIFY_OP_EXT_F32_UNARY_F32(RoundF32);
+    VERIFY_OP_EXT_F32_UNARY_F32(RoundF32Even);
     VERIFY_OP_EXT_F32_BINARY_F32(MinF32);
     VERIFY_OP_EXT_F32_BINARY_F32(MaxF32);
 

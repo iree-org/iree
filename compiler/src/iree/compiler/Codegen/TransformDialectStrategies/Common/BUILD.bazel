@@ -59,7 +59,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:VectorTransforms",
         # Other Stuff
-        "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:DialectUtils",

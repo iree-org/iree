@@ -9,34 +9,52 @@
 
 include "mlir/Pass/PassBase.td"
 
+//===----------------------------------------------------------------------===//
+// IREE-specific passes
+//===----------------------------------------------------------------------===//
+
+def ConvertStableHloToIreeInputDialects :
+    Pass<"iree-stablehlo-to-iree-input", "ModuleOp"> {
+  let summary = "Convert StableHLO ops to IREE input dialects ops";
+  let description = [{
+    Converts StableHLO input to IREE input dialects. These include: Linalg,
+    Arith, Tensor, Complex, Shape, ML Program, Flow, and Util.
+  }];
+}
+
+def ConvertStableHloToLinalgExt :
+    Pass<"iree-stablehlo-to-linalg-ext", "func::FuncOp"> {
+  let summary =
+      "Converts from StableHLO ops to LinalgExt ops and distribute to Flow ops";
+}
+
+//===----------------------------------------------------------------------===//
+// General passes
+//===----------------------------------------------------------------------===//
+
 def ConvertStableHloToLinalg :
     Pass<"iree-stablehlo-to-linalg", "ModuleOp"> {
-  let summary = "Convert from StableHLO ops to Linalg ops on tensors";
+  let summary = "Converts from StableHLO ops to Linalg ops on";
   let options = [Option<"enablePrimitiveOps", "enable-primitive-ops", "bool",
                         /*default=*/"false",
                         "Lower to primitive Linalg ops (map, reduce and "
                         "transpose) when possible, instead of linalg.generic">];
 }
 
-def ConvertStableHloToLinalgExt :
-    Pass<"iree-stablehlo-to-linalg-ext", "func::FuncOp"> {
-  let summary =
-      "Convert from StableHLO ops to LinalgExt ops and distribute to Flow ops";
-}
-
 def LegalizeControlFlow :
     Pass<"iree-stablehlo-legalize-control-flow", "func::FuncOp"> {
-  let summary = "Legalize from StableHLO control flow to SCF control flow";
+  let summary = "Legalizes from StableHLO control flow to SCF control flow";
 }
 
 def LegalizeShapeComputations :
     Pass<"iree-stablehlo-legalize-shape-computations", "func::FuncOp"> {
-  let summary = "Legalize StableHLO shape operations to core-mlir operations";
+  let summary = "Legalizes StableHLO shape operations to core-mlir operations";
 }
 
 def VerifyCompilerStableHloInputLegality :
     Pass<"iree-stablehlo-verify-compiler-input-legality", "ModuleOp"> {
-  let summary = "Verifies that only supported IR constructs are passed to the compiler";
+  let summary =
+      "Verifies that only supported IR constructs are passed to the compiler";
 }
 
 #endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES

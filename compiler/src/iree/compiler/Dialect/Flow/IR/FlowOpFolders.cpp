@@ -808,6 +808,10 @@ void TensorTieShapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
 OpFoldResult TensorReshapeOp::fold(FoldAdaptor operands) {
   auto sourceType = getSource().getType().cast<ShapedType>();
   auto resultType = getResult().getType().cast<ShapedType>();
+  if (sourceType.getElementType() != resultType.getElementType()) {
+    // Element type mismatch, this is a bitcast.
+    return {};
+  }
   if (compareShapesEqual(sourceType, getSourceDims(), resultType,
                          getResultDims())) {
     // Shapes match and this is a no-op so just fold to the source.
@@ -1231,6 +1235,15 @@ void TensorUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
   // update:
   results.insert<ReplaceOpIfTensorUpdateOperandZeroElements>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// flow.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
 }
 
 }  // namespace Flow

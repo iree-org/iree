@@ -431,21 +431,35 @@ static iree_status_t get_matmul_sizes(
   iree_hal_dim_t result_dims[2] = {0};
   IREE_RETURN_IF_ERROR(get_matrix_shape(lhs, lhs_dims));
   IREE_RETURN_IF_ERROR(get_matrix_shape(rhs, rhs_dims));
-  IREE_RETURN_IF_ERROR(get_matrix_shape(acc, acc_dims));
   IREE_RETURN_IF_ERROR(get_matrix_shape(result, result_dims));
   *m_size = lhs_dims[0];
   *k_size = lhs_dims[1];
   *n_size = rhs_dims[1];
-  if (!(lhs_dims[0] == *m_size && lhs_dims[1] == *k_size &&
-        rhs_dims[0] == *k_size && rhs_dims[1] == *n_size &&
-        acc_dims[0] == *m_size && acc_dims[1] == *n_size &&
-        result_dims[0] == *m_size && result_dims[1] == *n_size)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "mismatched matrix shapes in matmul: %" PRIdim "x%" PRIdim " * %" PRIdim
-        "x%" PRIdim " + %" PRIdim "x%" PRIdim " -> %" PRIdim "x%" PRIdim,
-        lhs_dims[0], lhs_dims[1], rhs_dims[0], rhs_dims[1], acc_dims[0],
-        acc_dims[1], result_dims[0], result_dims[1]);
+  if (acc) {
+    IREE_RETURN_IF_ERROR(get_matrix_shape(acc, acc_dims));
+    if (!(lhs_dims[0] == *m_size && lhs_dims[1] == *k_size &&
+          rhs_dims[0] == *k_size && rhs_dims[1] == *n_size &&
+          acc_dims[0] == *m_size && acc_dims[1] == *n_size &&
+          result_dims[0] == *m_size && result_dims[1] == *n_size)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "mismatched matrix shapes in matmul: %" PRIdim "x%" PRIdim
+          " * %" PRIdim "x%" PRIdim " + %" PRIdim "x%" PRIdim " -> %" PRIdim
+          "x%" PRIdim,
+          lhs_dims[0], lhs_dims[1], rhs_dims[0], rhs_dims[1], acc_dims[0],
+          acc_dims[1], result_dims[0], result_dims[1]);
+    }
+  } else {
+    if (!(lhs_dims[0] == *m_size && lhs_dims[1] == *k_size &&
+          rhs_dims[0] == *k_size && rhs_dims[1] == *n_size &&
+          result_dims[0] == *m_size && result_dims[1] == *n_size)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "mismatched matrix shapes in matmul: %" PRIdim
+                              "x%" PRIdim " * %" PRIdim "x%" PRIdim
+                              " -> %" PRIdim "x%" PRIdim,
+                              lhs_dims[0], lhs_dims[1], rhs_dims[0],
+                              rhs_dims[1], result_dims[0], result_dims[1]);
+    }
   }
   return iree_ok_status();
 }
@@ -457,7 +471,7 @@ static iree_status_t get_matmul_sizes(
       iree_hal_element_type_t acc_type, LHSTYPE* lhs_data, RHSTYPE* rhs_data,  \
       ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,               \
       iree_hal_dim_t n) {                                                      \
-    ACCTYPE acc = acc_data[n + m * n_size];                                    \
+    ACCTYPE acc = acc_data ? acc_data[n + m * n_size] : 0;                     \
     for (iree_hal_dim_t k = 0; k < k_size; ++k) {                              \
       LHSTYPE lhs_value = lhs_data[k + m * k_size];                            \
       RHSTYPE rhs_value = rhs_data[n + k * n_size];                            \
@@ -484,7 +498,7 @@ static void reference_matmul_f16_f16_f16_f16(
     iree_hal_element_type_t acc_type, uint16_t* lhs_data, uint16_t* rhs_data,
     uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
     iree_hal_dim_t n) {
-  float acc = iree_math_f16_to_f32(acc_data[n + m * n_size]);
+  float acc = acc_data ? iree_math_f16_to_f32(acc_data[n + m * n_size]) : 0;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
     acc = iree_math_round_to_nearest_f16(
         iree_math_round_to_nearest_f16(
@@ -536,8 +550,9 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
   iree_hal_buffer_view_t* acc = NULL;
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 0, &lhs));
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 1, &rhs));
-  IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
-
+  if (iree_vm_list_size(input_list) == 3) {
+    IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
+  }
   iree_hal_dim_t m_size, k_size, n_size;
   IREE_RETURN_IF_ERROR(
       get_matmul_sizes(lhs, rhs, acc, result, &m_size, &k_size, &n_size));
@@ -549,24 +564,29 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
       lhs, IREE_HAL_MEMORY_ACCESS_READ, &lhs_mapping));
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
       rhs, IREE_HAL_MEMORY_ACCESS_READ, &rhs_mapping));
-  IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      acc, IREE_HAL_MEMORY_ACCESS_READ, &acc_mapping));
+  if (acc) {
+    IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
+        acc, IREE_HAL_MEMORY_ACCESS_READ, &acc_mapping));
+  }
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
       result, IREE_HAL_MEMORY_ACCESS_WRITE, &result_mapping));
   iree_hal_element_type_t lhs_type = iree_hal_buffer_view_element_type(lhs);
   iree_hal_element_type_t rhs_type = iree_hal_buffer_view_element_type(rhs);
-  iree_hal_element_type_t acc_type = iree_hal_buffer_view_element_type(acc);
+  iree_hal_element_type_t acc_type = iree_hal_buffer_view_element_type(result);
   for (iree_hal_dim_t m = 0; m < m_size; ++m) {
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
-      reference_matmul_element(
-          m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
-          lhs_mapping.contents.data, rhs_mapping.contents.data,
-          acc_mapping.contents.data, result_mapping.contents.data, m, n);
+      reference_matmul_element(m_size, k_size, n_size, lhs_type, rhs_type,
+                               acc_type, lhs_mapping.contents.data,
+                               rhs_mapping.contents.data,
+                               acc ? acc_mapping.contents.data : NULL,
+                               result_mapping.contents.data, m, n);
     }
   }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&lhs_mapping));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&rhs_mapping));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&acc_mapping));
+  if (acc) {
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&acc_mapping));
+  }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&result_mapping));
   return iree_ok_status();
 }
@@ -813,9 +833,11 @@ static iree_status_t check_matmul_failure(
   print_matrix(file, "right-hand side", PRECISION_LOW, k_start, k_end, n_start,
                n_end, rhs, NULL, NULL);
   fprintf(file, "\n");
-  print_matrix(file, "input accumulator", PRECISION_LOW, m_start, m_end,
-               n_start, n_end, acc, NULL, NULL);
-  fprintf(file, "\n");
+  if (acc) {
+    print_matrix(file, "input accumulator", PRECISION_LOW, m_start, m_end,
+                 n_start, n_end, acc, NULL, NULL);
+    fprintf(file, "\n");
+  }
   print_matrix(file, "expected result", PRECISION_LOW, m_start, m_end, n_start,
                n_end, expected_result, actual_result, emoji(true));
   fprintf(file, "\n");
@@ -874,7 +896,9 @@ static iree_status_t check_matmul_results(
   iree_hal_buffer_view_t* acc = NULL;
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 0, &lhs));
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 1, &rhs));
-  IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
+  if (iree_vm_list_size(input_list) == 3) {
+    IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
+  }
 
   iree_hal_dim_t m_size, k_size, n_size;
   IREE_RETURN_IF_ERROR(get_matmul_sizes(lhs, rhs, acc, actual_result, &m_size,
@@ -895,23 +919,9 @@ static iree_status_t check_matmul_results(
  * helpers for it.
  *
  * |replay_event_call_matmul| calls |do_matmul_and_check_results| to actually
- * perform a matmul. In normal cases, each |replay_event_call_matmul| performs
- * one call to |do_matmul_and_check_results|, but when that generates an error,
- * it will make additional calls to |do_matmul_and_check_results| to evaluate
- * variants of the failed testcase to generate a more helpful log.
- *
- * The |matrix_mask_t| stuff is only used to generate these variants of failed
- * testcases.
+ * perform a matmul.
  *
  *****************************************************************************/
-
-// Enumerates ways that we may mask matrices in list of matrix inputs to matmul
-// testcases.
-typedef enum {
-  MATRIX_MASK_NONE,      // no-op: leave the existing matrix unchanged.
-  MATRIX_MASK_ZERO,      // overwrite the matrix with zeros.
-  MATRIX_MASK_IDENTITY,  // overwrite with (general rectangular) identity matrix
-} matrix_mask_t;
 
 static iree_status_t make_identity_matrix_callback(
     iree_hal_buffer_mapping_t* mapping, void* user_data) {
@@ -936,53 +946,10 @@ static iree_status_t make_identity_matrix_callback(
   return iree_ok_status();
 }
 
-// Allocates device-local |dst| and initializes it as an identity-matrix shaped
-// like |src|.
-static iree_status_t make_device_identity_matrix_like(
+// Deep-copies device-local list of buffer_views |src| into |dst|.
+static iree_status_t copy_device_buffer_views_to_device(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
-  return iree_hal_buffer_view_generate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_rank(src),
-      iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_element_type(src),
-      iree_hal_buffer_view_encoding_type(src),
-      (iree_hal_buffer_params_t){
-          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
-      },
-      make_identity_matrix_callback, src, dst);
-}
-
-// Allocates device-local |dst| shaped like |src|, and:
-// - If |mask| is MATRIX_MASK_NONE, copies device-local |src| into |dst|.
-// - If |mask| is MATRIX_MASK_ZERO, leaves |dst| zero-filled.
-// - If |mask| is MATRIX_MASK_IDENTITY, makes |dst| an identity-matrix
-static iree_status_t mask_and_copy_device_buffer_view_to_device(
-    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_hal_buffer_view_t* src, matrix_mask_t mask,
-    iree_hal_buffer_view_t** dst) {
-  if (mask == MATRIX_MASK_NONE) {
-    IREE_RETURN_IF_ERROR(
-        copy_device_buffer_view_to_device(device, hal_allocator, src, dst));
-  } else if (mask == MATRIX_MASK_ZERO) {
-    IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
-        hal_allocator, src, iree_const_byte_span_empty(), dst));
-  } else if (mask == MATRIX_MASK_IDENTITY) {
-    IREE_RETURN_IF_ERROR(
-        make_device_identity_matrix_like(device, hal_allocator, src, dst));
-  } else {
-    iree_status_abort(iree_make_status(IREE_STATUS_INTERNAL, "bad mask enum"));
-  }
-  return iree_ok_status();
-}
-
-// Deep-copies device-local list of buffer_views |src| into |dst|, applying
-// mask[i] to the i-th list element as in
-// |mask_and_copy_device_buffer_view_to_device|.
-// Requirement: |mask| must point to an array of the same length as |src|.
-static iree_status_t mask_and_copy_device_buffer_views_to_device(
-    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_vm_list_t* src_list, matrix_mask_t* mask, iree_vm_list_t** dst_list) {
+    iree_vm_list_t* src_list, iree_vm_list_t** dst_list) {
   iree_vm_type_def_t elem_type = iree_vm_list_element_type(src_list);
   iree_host_size_t size = iree_vm_list_size(src_list);
   iree_allocator_t allocator = iree_hal_allocator_host_allocator(hal_allocator);
@@ -993,8 +960,8 @@ static iree_status_t mask_and_copy_device_buffer_views_to_device(
     iree_hal_buffer_view_t* src = NULL;
     IREE_RETURN_IF_ERROR(get_item_as_buffer_view(src_list, i, &src));
     iree_hal_buffer_view_t* dst = NULL;
-    IREE_RETURN_IF_ERROR(mask_and_copy_device_buffer_view_to_device(
-        device, hal_allocator, src, mask[i], &dst));
+    IREE_RETURN_IF_ERROR(
+        copy_device_buffer_view_to_device(device, hal_allocator, src, &dst));
     iree_vm_ref_t dst_ref = {0};
     IREE_RETURN_IF_ERROR(
         iree_vm_ref_wrap_assign(dst, iree_hal_buffer_view_type(), &dst_ref));
@@ -1004,16 +971,13 @@ static iree_status_t mask_and_copy_device_buffer_views_to_device(
 }
 
 // Performs one matmul test, on the device-local input matrices given in
-// |original_device_inputs|, applying the masks given in |mask| as in
-// |mask_and_copy_device_buffer_view_to_device|.
-// Both |input_list| and |mask| should have length 3. The 3 input matrices are
-// LHS, RHS, Accumulator, in that order.
+// |original_device_inputs|.
 //
 // The contents of |original_device_inputs| are preserved, even if the
 // |function| would overwrite input-output arguments (e.g. the accumulator).
 static iree_status_t do_matmul_and_check_results(
     FILE* file, iree_trace_replay_t* replay, iree_vm_function_t function,
-    matrix_mask_t* mask, iree_vm_list_t* original_device_inputs) {
+    iree_vm_list_t* original_device_inputs) {
   iree_hal_allocator_t* device_allocator =
       iree_hal_device_allocator(replay->device);
 
@@ -1023,8 +987,8 @@ static iree_status_t do_matmul_and_check_results(
   // linalg.matmul. We need to preserve the original test inputs to perform
   // reruns on variants in the failure case (see |replay_event_call_matmul|).
   iree_vm_list_t* device_inputs = NULL;
-  IREE_CHECK_OK(mask_and_copy_device_buffer_views_to_device(
-      replay->device, device_allocator, original_device_inputs, mask,
+  IREE_CHECK_OK(copy_device_buffer_views_to_device(
+      replay->device, device_allocator, original_device_inputs,
       &device_inputs));
 
   // Perform a deep copy of the device-local inputs into host-local buffers.
@@ -1074,19 +1038,6 @@ static iree_status_t do_matmul_and_check_results(
   return status;
 }
 
-const char* matrix_form(matrix_mask_t mask) {
-  switch (mask) {
-    case MATRIX_MASK_NONE:
-      return "GENERAL";
-    case MATRIX_MASK_ZERO:
-      return "ZERO";
-    case MATRIX_MASK_IDENTITY:
-      return "IDENTITY";
-  }
-  assert(false);
-  return NULL;
-}
-
 // Prints to |file| a message about the matmul shape. Useful as testcases
 // otherwise only print the function name, and in the dynamic-shapes cases, that
 // doesn't tell the actual shape.
@@ -1106,8 +1057,6 @@ static iree_status_t print_matmul_shape(FILE* file,
 }
 
 // Special handler for function calls in a e2e matmul test trace.
-// Assumes that all calls are to functions that take 3 inputs (lhs, rhs, acc)
-// and return the result of a matmul (lhs*rhs+acc).
 static iree_status_t replay_event_call_matmul(iree_trace_replay_t* replay,
                                               yaml_document_t* document,
                                               yaml_node_t* event_node) {
@@ -1126,69 +1075,8 @@ static iree_status_t replay_event_call_matmul(iree_trace_replay_t* replay,
 
   IREE_CHECK_OK(print_matmul_shape(stderr, device_inputs));
 
-  // Perform the matmul test. So far we are using pseudorandom matrices (as
-  // specified in the YAML trace and interpreted above in
-  // |iree_trace_replay_event_call_prepare|). So this is a test on general
-  // random matrices: great for test coverage (if this succeeds, any variant on
-  // more special matrices would also succeed) but bad for debugging (if this
-  // fails, having to debug that would involve staring at arrays of random
-  // numbers). So for now we pass NULL as the |file| param, keeping errors
-  // silent for now.
-  matrix_mask_t none_masks[3] = {MATRIX_MASK_NONE, MATRIX_MASK_NONE,
-                                 MATRIX_MASK_NONE};
-  iree_status_t status = do_matmul_and_check_results(NULL, replay, function,
-                                                     none_masks, device_inputs);
-  if (!iree_status_is_ok(status)) {
-    // The matmul test failed. So whatever we do now is only for the sake of
-    // generating the most undertandable possible error log. We are going to
-    // retry the matmul but on more special, easy-to-understand matrices,
-    // gradually increasing generality, and we will abort and log details on
-    // the first error that we encounter.
-    iree_string_builder_t sb;
-    iree_string_builder_initialize(replay->host_allocator, &sb);
-    matrix_mask_t all_debug_masks[6][3] = {
-        // Try Zero * Zero + Zero. Expected result: Zero.
-        {MATRIX_MASK_ZERO, MATRIX_MASK_ZERO, MATRIX_MASK_ZERO},
-        // Try Identity * Identity + Zero. Expected result: Identity.
-        {MATRIX_MASK_IDENTITY, MATRIX_MASK_IDENTITY, MATRIX_MASK_ZERO},
-        // Try RandomLHS * Identity + Zero. Expected result: RandomLHS.
-        {MATRIX_MASK_NONE, MATRIX_MASK_IDENTITY, MATRIX_MASK_ZERO},
-        // Try Identity * RandomRHS + Zero. Expected result: RandomRHS.
-        {MATRIX_MASK_IDENTITY, MATRIX_MASK_NONE, MATRIX_MASK_ZERO},
-        // Try Identity * Identity + RandomAccum.
-        // Expected result: Identity + RandomAccum.
-        {MATRIX_MASK_IDENTITY, MATRIX_MASK_IDENTITY, MATRIX_MASK_NONE},
-        // Finally run the general case again. If none of the above special
-        // cases
-        // failed, then that at least must fail, since we already ran that and
-        // it
-        // had failed.
-        {MATRIX_MASK_NONE, MATRIX_MASK_NONE, MATRIX_MASK_NONE}};
-    bool reproduced_failure = false;
-    for (int i = 0; i < IREE_ARRAYSIZE(all_debug_masks); ++i) {
-      matrix_mask_t* masks = all_debug_masks[i];
-      iree_status_code_t rerun_status =
-          iree_status_consume_code(do_matmul_and_check_results(
-              stderr, replay, function, masks, device_inputs));
-      bool good = iree_status_is_ok(rerun_status);
-      reproduced_failure |= !good;
-      iree_string_builder_append_format(
-          &sb, "%s LHS:%-10s * RHS:%-10s + ACCUMULATOR:%-10s\n", emoji(good),
-          matrix_form(masks[0]), matrix_form(masks[1]), matrix_form(masks[2]));
-      if (!good) break;
-    }
-    if (!reproduced_failure) {
-      iree_status_abort(iree_make_status(
-          IREE_STATUS_INTERNAL,
-          "Internal error: a matmul test failed, but subsequent reruns for "
-          "logging purposes were not able to reproduce the failure."));
-    }
-    fprintf(stderr,
-            "Summary of reruns, pinpointing how general matrices need to be to "
-            "reproduce this failure:\n%s\n",
-            iree_string_builder_buffer(&sb));
-    iree_string_builder_deinitialize(&sb);
-  }
+  iree_status_t status =
+      do_matmul_and_check_results(stderr, replay, function, device_inputs);
 
   // Clean up.
   iree_vm_list_release(device_inputs);

@@ -8,17 +8,17 @@ func.func @foldBrArguments(%cond: i1, %arg1: index) -> index {
 ^bb1:
   // CHECK: %[[OP1:.+]] = "some.op1"
   %0 = "some.op1"() : () -> index
-  // CHECK: cf.br ^bb3(%[[OP1]], %[[ARG1]] : index, index)
-  cf.br ^bb3(%0, %arg1, %0 : index, index, index)
+  // CHECK: cf.br ^bb3(%[[OP1]], %[[OP1]], %[[ARG1]] : index, index, index)
+  cf.br ^bb3(%0, %0, %arg1, %0 : index, index, index, index)
 ^bb2:
   // CHECK: %[[OP2:.+]] = "some.op2"
   %1 = "some.op2"() : () -> index
-  // CHECK: cf.br ^bb3(%[[OP2]], %[[OP2]] : index, index)
-  cf.br ^bb3(%1, %1, %1 : index, index, index)
-// CHECK: ^bb3(%[[BB3_ARG0:.+]]: index, %[[BB3_ARG1:.+]]: index):
-^bb3(%bb3_0: index, %bb3_1: index, %bb3_2: index):
-  // CHECK: %[[OP3:.+]] = "some.op3"(%[[BB3_ARG0]], %[[BB3_ARG1]], %[[BB3_ARG0]])
-  %2 = "some.op3"(%bb3_0, %bb3_1, %bb3_2) : (index, index, index) -> index
+  // CHECK: cf.br ^bb3(%[[ARG1]], %[[OP2]], %[[OP2]] : index, index, index)
+  cf.br ^bb3(%arg1, %1, %1, %1 : index, index, index, index)
+// CHECK: ^bb3(%[[BB3_ARG0:.+]]: index, %[[BB3_ARG1:.+]]: index, %[[BB3_ARG2:.+]]: index):
+^bb3(%bb3_0: index, %bb3_1: index, %bb3_2: index, %bb3_3: index):
+  // CHECK: %[[OP3:.+]] = "some.op3"(%[[BB3_ARG0]], %[[BB3_ARG1]], %[[BB3_ARG2]], %[[BB3_ARG1]])
+  %2 = "some.op3"(%bb3_0, %bb3_1, %bb3_2, %bb3_3) : (index, index, index, index) -> index
   // CHECK: return %[[OP3]]
   return %2 : index
 }

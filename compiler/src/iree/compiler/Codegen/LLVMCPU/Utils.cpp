@@ -74,6 +74,10 @@ bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+avx2");
 }
 
+bool hasAVX512fFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+avx512f");
+}
+
 bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+v");
 }

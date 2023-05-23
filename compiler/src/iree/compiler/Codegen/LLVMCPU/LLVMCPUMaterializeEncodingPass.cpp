@@ -53,7 +53,7 @@ static MatmulTileParams chooseMatmulTileParamsX86_64(
     MatmulType type, ExecutableTargetAttr target) {
   switch (type) {
     case MatmulType::F32F32F32:
-      if (hasFeature(target, "+avx512f")) return {16, 1, 16};
+      if (hasAVX512fFeature(target)) return {16, 1, 16};
       if (hasFeature(target, "+avx")) {
         // Note: for good performance, most +avx users will also want to add
         // +fma, but that's a local instruction selection detail and the tile

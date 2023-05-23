@@ -36,6 +36,22 @@ IREE_API_EXPORT iree_status_t iree_hal_channel_create(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_channel_split(
+    iree_hal_channel_t* base_channel, int32_t color, int32_t key,
+    iree_hal_channel_flags_t flags, iree_hal_channel_t** out_split_channel) {
+  IREE_ASSERT_ARGUMENT(base_channel);
+  IREE_ASSERT_ARGUMENT(out_split_channel);
+  *out_split_channel = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, color);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, key);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, flags);
+  iree_status_t status = _VTABLE_DISPATCH(base_channel, split)(
+      base_channel, color, key, flags, out_split_channel);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT void iree_hal_channel_query_rank_and_count(
     const iree_hal_channel_t* channel, int32_t* out_rank, int32_t* out_count) {
   IREE_ASSERT_ARGUMENT(channel);

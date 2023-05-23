@@ -296,6 +296,14 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
+        .Case([&](IREE::Stream::AsyncAllocaOp op) {
+          // NOTE: allocas imply non-constant/immutable.
+          removeAssumedBits(NOT_MUTATED);
+          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
+        })
         .Case([&](IREE::Stream::AsyncConstantOp op) {
           removeAssumedBits(NOT_CONSTANT | NOT_TRANSFER_WRITE);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(

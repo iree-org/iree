@@ -47,7 +47,7 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
   string opcodeEnumTag = enumTag;
 }
 
-// Next available opcode: 0x82
+// Next available opcode: 0x83
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -161,6 +161,7 @@ def VM_OPC_ExtI16I32S            : VM_OPC<0x45, "ExtI16I32S">;
 def VM_OPC_ExtI16I32U            : VM_OPC<0x46, "ExtI16I32U">;
 def VM_OPC_ExtI32I64S            : VM_OPC<0x47, "ExtI32I64S">;
 def VM_OPC_ExtI32I64U            : VM_OPC<0x48, "ExtI32I64U">;
+def VM_OPC_CastAnyRef            : VM_OPC<0x82, "CastAnyRef">;
 
 // Reduction arithmetic:
 
@@ -328,6 +329,7 @@ def VM_CoreOpcodeAttr :
     VM_OPC_ExtI16I32U,
     VM_OPC_ExtI32I64S,
     VM_OPC_ExtI32I64U,
+    VM_OPC_CastAnyRef,
 
     VM_OPC_CmpEQI32,
     VM_OPC_CmpNEI32,

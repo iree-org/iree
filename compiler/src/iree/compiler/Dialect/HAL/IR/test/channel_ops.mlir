@@ -23,6 +23,22 @@ func.func @channel_create(%device: !hal.device, %affinity: i64, %id: !util.buffe
 
 // -----
 
+// CHECK-LABEL: @channel_split
+//  CHECK-SAME: (%[[BASE_CHANNEL:.+]]: !hal.channel, %[[COLOR:.+]]: i32, %[[KEY:.+]]: i32)
+func.func @channel_split(%base_channel: !hal.channel, %color: i32, %key: i32) {
+  //      CHECK: %channel = hal.channel.split<%[[BASE_CHANNEL]] : !hal.channel>
+  // CHECK-SAME:   color(%[[COLOR]])
+  // CHECK-SAME:   key(%[[KEY]])
+  // CHECK-SAME:   flags(0) : !hal.channel
+  %channel = hal.channel.split<%base_channel : !hal.channel>
+                              color(%color)
+                                key(%key)
+                              flags(0) : !hal.channel
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @channel_rank_and_count
 // CHECK-SAME: (%[[CHANNEL:.+]]: !hal.channel)
 func.func @channel_rank_and_count(%channel: !hal.channel) -> (i32, i32) {
