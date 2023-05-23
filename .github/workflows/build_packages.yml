@@ -25,6 +25,15 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
 
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        if: github.event_name != 'pull_request'
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: true
+
       - name: "Setting up Python"
         uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
         with:
@@ -36,7 +45,15 @@ jobs:
           python ./sync_deps.py --depth 1 --submodules-depth 1 --exclude-submodule "iree:third_party/(llvm|mlir-hlo)"
 
       - name: Build Packages (Linux)
+        env:
+          # Note if gcp-auth didn't run, this will be empty because GitHub
+          # Actions generally just fails silently. Useful, in this case.
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.gcp-auth.outputs.credentials_file_path }}
+          # GitHub Actions horrible excuse for a ternary
+          write_caches: ${{ github.event_name != 'pull_request' && 1 || 0 }}
         run: |
+          set -euo pipefail
+          echo "${write_caches}"
           ./build_tools/ci/build_linux_packages.sh
 
       - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
