@@ -1587,22 +1587,22 @@ static bool is2DPoolingOp(Operation *op) {
 }
 
 /// Helper enum to represent conv2d input traversal order.
-enum class Conv2DOpOrder {
+enum class Conv2DDimOrder {
   // Corresponds to operation that traverses the input in (n, c, h, w) order.
   Nchw,
   // Corresponds to operation that traverses the input in (n, h, w, c) order.
   Nhwc
 };
 
-static Conv2DOpOrder getConv2DOpOrder(Operation *op) {
+static Conv2DDimOrder getConv2DDimOrder(Operation *op) {
   if (isa<linalg::Conv2DNchwFchwOp, linalg::PoolingNchwSumOp,
           linalg::PoolingNchwMaxOp>(op))
-    return Conv2DOpOrder::Nchw;
+    return Conv2DDimOrder::Nchw;
   if (isa<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
           linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
           linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
           linalg::DepthwiseConv2DNhwcHwcOp>(op))
-    return Conv2DOpOrder::Nhwc;
+    return Conv2DDimOrder::Nhwc;
   llvm::llvm_unreachable_internal("unsupported conv op");
 }
 
@@ -1704,11 +1704,13 @@ static LogicalResult setConvInterfaceRootConfig(
   SmallVector<int64_t> targetTileSizes =
       getNhwcConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
 
-  Conv2DOpOrder order = getConv2DOpOrder(convOp);
+  // The tiling sizes are for NHWC layout. We need to apply a permutation if
+  // they are in other layout format.
+  Conv2DDimOrder order = getConv2DDimOrder(convOp);
   switch (order) {
-    case Conv2DOpOrder::Nhwc:
+    case Conv2DDimOrder::Nhwc:
       break;
-    case Conv2DOpOrder::Nchw:
+    case Conv2DDimOrder::Nchw:
       SmallVector<int64_t> perm;
       if (is2DConvOp(convOp)) {
         // D.n, D.oh, D.ow,  D.f, D.kh, D.kw, D.c ->
