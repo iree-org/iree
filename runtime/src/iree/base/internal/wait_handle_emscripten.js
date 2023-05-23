@@ -60,35 +60,34 @@ const LibraryIreeWaitHandleEmscripten = {
     },
   },
 
-  iree_wait_primitive_promise_create: function(initial_state) {
+  iree_wait_primitive_promise_create: function(initialState) {
     const promiseHandle = IreeWaitHandleEmscripten._nextPromiseHandle++;
-    IreeWaitHandleEmscripten._createPromiseWrapper(
-        promiseHandle, initial_state);
+    IreeWaitHandleEmscripten._createPromiseWrapper(promiseHandle, initialState);
     return promiseHandle;
   },
 
-  iree_wait_primitive_promise_delete: function(promise_handle) {
+  iree_wait_primitive_promise_delete: function(promiseHandle) {
     const promiseWrapper =
-        IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
+        IreeWaitHandleEmscripten._promiseWrappers[promiseHandle];
     if (!promiseWrapper.isSettled && promiseWrapper.reject !== undefined) {
       promiseWrapper.reject();
       promiseWrapper.isSettled = true;
     }
-    delete IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
+    delete IreeWaitHandleEmscripten._promiseWrappers[promiseHandle];
   },
 
-  iree_wait_primitive_promise_set: function(promise_handle) {
+  iree_wait_primitive_promise_set: function(promiseHandle) {
     const promiseWrapper =
-        IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
+        IreeWaitHandleEmscripten._promiseWrappers[promiseHandle];
     if (promiseWrapper.resolve !== undefined) {
       promiseWrapper.resolve();
       promiseWrapper.isSettled = true;
     }
   },
 
-  iree_wait_primitive_promise_reset: function(promise_handle) {
+  iree_wait_primitive_promise_reset: function(promiseHandle) {
     const promiseWrapper =
-        IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
+        IreeWaitHandleEmscripten._promiseWrappers[promiseHandle];
 
     // No-op if already unsignaled.
     if (!promiseWrapper.isSettled) return;
@@ -98,7 +97,7 @@ const LibraryIreeWaitHandleEmscripten = {
     // Since the previous Promise was resolved or rejected already, listeners
     // should have already been notified and we aren't leaving any orphaned.
     // (?) This synchronizes on the browser event loop, so there are no races.
-    IreeWaitHandleEmscripten._createPromiseWrapper(promise_handle, false);
+    IreeWaitHandleEmscripten._createPromiseWrapper(promiseHandle, false);
   },
 }
 

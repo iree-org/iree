@@ -37,17 +37,17 @@ const LibraryIreeLoopEmscripten = {
     }
 
     class LoopCommandCall extends LoopCommand {
-      constructor(scope, operationId, callback, user_data, loop) {
+      constructor(scope, operationId, callback, userData, loop) {
         super();
 
         this.callback = callback;
-        this.user_data = user_data;
+        this.userData = userData;
         this.loop = loop;
 
         this.timeoutId = setTimeout(() => {
           Module['dynCall'](
               'iiii', this.callback,
-              [this.user_data, this.loop, IREE_STATUS_OK]);
+              [this.userData, this.loop, IREE_STATUS_OK]);
           // TODO(scotttodd): handle the returned status (sticky failure state?)
           //     at least free the status so it doesn't leak
           delete scope.pendingOperations[operationId];
@@ -58,16 +58,16 @@ const LibraryIreeLoopEmscripten = {
         clearTimeout(this.timeoutId);
         Module['dynCall'](
             'iiii', this.callback,
-            [this.user_data, this.loop, IREE_STATUS_ABORTED]);
+            [this.userData, this.loop, IREE_STATUS_ABORTED]);
       }
     }
 
     class LoopCommandWaitUntil extends LoopCommand {
-      constructor(scope, operationId, callback, user_data, timeout_ms, loop) {
+      constructor(scope, operationId, callback, userData, timeoutMs, loop) {
         super();
 
         this.callback = callback;
-        this.user_data = user_data;
+        this.userData = userData;
         this.loop = loop;
         this.abortFn = undefined;
 
@@ -77,14 +77,14 @@ const LibraryIreeLoopEmscripten = {
         const timeoutPromise = new Promise((resolve, _) => {
           setTimeout(() => {
             resolve();
-          }, timeout_ms);
+          }, timeoutMs);
         });
 
         Promise.race([abortPromise, timeoutPromise])
             .then(() => {
               Module['dynCall'](
                   'iiii', this.callback,
-                  [this.user_data, this.loop, IREE_STATUS_OK]);
+                  [this.userData, this.loop, IREE_STATUS_OK]);
               // TODO(scotttodd): handle the returned status (sticky failure
               //     state?) at least free the status so it doesn't leak
               delete scope.pendingOperations[operationId];
@@ -92,7 +92,7 @@ const LibraryIreeLoopEmscripten = {
             .catch(() => {
               Module['dynCall'](
                   'iiii', this.callback,
-                  [this.user_data, this.loop, IREE_STATUS_ABORTED]);
+                  [this.userData, this.loop, IREE_STATUS_ABORTED]);
             })
             .finally(() => {
               delete scope.pendingOperations[operationId];
@@ -106,12 +106,12 @@ const LibraryIreeLoopEmscripten = {
 
     class LoopCommandWaitPromise extends LoopCommand {
       constructor(
-          scope, operationId, callback, user_data, timeout_ms, wait_promise,
+          scope, operationId, callback, userData, timeoutMs, wait_promise,
           loop) {
         super();
 
         this.callback = callback;
-        this.user_data = user_data;
+        this.userData = userData;
         this.loop = loop;
         this.abortFn = undefined;
 
@@ -128,14 +128,14 @@ const LibraryIreeLoopEmscripten = {
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
             reject();
-          }, timeout_ms);
+          }, timeoutMs);
         });
 
         Promise.race([wait_promise, abortPromise, timeoutPromise])
             .then(() => {
               Module['dynCall'](
                   'iiii', this.callback,
-                  [this.user_data, this.loop, IREE_STATUS_OK]);
+                  [this.userData, this.loop, IREE_STATUS_OK]);
               // TODO(scotttodd): handle the returned status (sticky failure
               //     state?) at least free the status so it doesn't leak
               delete scope.pendingOperations[operationId];
@@ -143,7 +143,7 @@ const LibraryIreeLoopEmscripten = {
             .catch(() => {
               Module['dynCall'](
                   'iiii', this.callback,
-                  [this.user_data, this.loop, IREE_STATUS_ABORTED]);
+                  [this.userData, this.loop, IREE_STATUS_ABORTED]);
             })
             .finally(() => {
               delete scope.pendingOperations[operationId];
@@ -227,29 +227,29 @@ const LibraryIreeLoopEmscripten = {
         return scopeHandle;
       }
 
-      iree_loop_free_scope(scope_handle) {
-        if (!(scope_handle in this.scopes)) return;
+      iree_loop_free_scope(scopeHandle) {
+        if (!(scopeHandle in this.scopes)) return;
 
-        const scope = this.scopes[scope_handle];
+        const scope = this.scopes[scopeHandle];
         scope.destroy();
-        delete this.scopes[scope_handle];
+        delete this.scopes[scopeHandle];
       }
 
       iree_loop_command(
-          scope_handle, command, callback, user_data, timeout_ms,
-          promise_handles_count, promise_handles, loop) {
-        if (!(scope_handle in this.scopes)) return IREE_STATUS_INVALID_ARGUMENT;
-        const scope = this.scopes[scope_handle];
+          scopeHandle, command, callback, userData, timeoutMs,
+          promiseHandlesCount, promiseHandles, loop) {
+        if (!(scopeHandle in this.scopes)) return IREE_STATUS_INVALID_ARGUMENT;
+        const scope = this.scopes[scopeHandle];
 
         const wait_promises = [];
-        for (let i = 0; i < promise_handles_count; ++i) {
-          const promise_handle = getValue(promise_handles + i * 4);
+        for (let i = 0; i < promiseHandlesCount; ++i) {
+          const promise_handle = getValue(promiseHandles + i * 4);
           wait_promises[i] =
               IreeWaitHandleEmscripten.getPromise(promise_handle);
         }
 
         return scope.runCommand(
-            command, callback, user_data, timeout_ms, wait_promises, loop);
+            command, callback, userData, timeoutMs, wait_promises, loop);
       }
     }
 

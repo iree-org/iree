@@ -29,14 +29,12 @@
 typedef uint32_t iree_loop_emscripten_scope_t;  // Opaque handle.
 
 extern iree_loop_emscripten_scope_t iree_loop_allocate_scope();
-extern void iree_loop_free_scope(iree_loop_emscripten_scope_t scope);
+extern void iree_loop_free_scope(iree_loop_emscripten_scope_t scope_handle);
 
-extern iree_status_t iree_loop_command(iree_loop_emscripten_scope_t scope,
-                                       int command,
-                                       iree_loop_callback_fn_t callback,
-                                       void* user_data, uint32_t timeout_ms,
-                                       int promise_handles_count,
-                                       int* promise_handles, iree_loop_t loop);
+extern iree_status_t iree_loop_command(
+    iree_loop_emscripten_scope_t scope_handle, int command,
+    iree_loop_callback_fn_t callback, void* user_data, uint32_t timeout_ms,
+    int promise_handles_count, int* promise_handles, iree_loop_t loop);
 
 //===----------------------------------------------------------------------===//
 // iree_loop_emscripten_t
