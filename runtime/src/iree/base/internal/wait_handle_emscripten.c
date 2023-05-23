@@ -53,6 +53,16 @@ extern void iree_wait_primitive_promise_reset(int promise_handle);
 //===----------------------------------------------------------------------===//
 
 void iree_wait_handle_close(iree_wait_handle_t* handle) {
+  switch (handle->type) {
+#if defined(IREE_HAVE_WAIT_TYPE_PROMISE)
+    case IREE_WAIT_PRIMITIVE_TYPE_PROMISE: {
+      iree_wait_primitive_promise_delete(handle->value.promise.handle);
+      break;
+    }
+#endif  // IREE_HAVE_WAIT_TYPE_PROMISE
+    default:
+      break;
+  }
   iree_wait_handle_deinitialize(handle);
 }
 
@@ -113,7 +123,6 @@ iree_status_t iree_event_initialize(bool initial_state,
 }
 
 void iree_event_deinitialize(iree_event_t* event) {
-  iree_wait_primitive_promise_delete(event->value.promise.handle);
   iree_wait_handle_close(event);
 }
 
