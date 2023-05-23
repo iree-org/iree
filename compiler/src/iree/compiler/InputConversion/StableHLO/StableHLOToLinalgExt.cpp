@@ -418,7 +418,7 @@ struct ReverseOpConversion final
     Value emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, mixedSizes, ty.getElementType());
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
-        op, op->getResultTypes(), adaptor.getOperands(), emptyTensor,
+        op, adaptor.getOperands().getType(), adaptor.getOperands(), emptyTensor,
         op.getDimensions());
     return success();
   }
