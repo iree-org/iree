@@ -276,8 +276,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
           .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
                 linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
                 linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp>([&](auto) {
+                linalg::PoolingNhwcMinUnsignedOp>([&](auto) {
             // Shape: N, OH, OW, OC, KH, KW, (IC)
             khSize = shape[4];
             kwSize = shape[5];

@@ -28,6 +28,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -1570,22 +1571,47 @@ static LogicalResult setRootConfig(
   return failure();
 }
 
-namespace {
-bool is2DPoolingOp(linalg::LinalgOp op) {
-  return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNchwSumOp,
-             linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-             linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-             linalg::PoolingNchwMaxOp>(op.getOperation());
+static bool is2DConvOp(Operation *op) {
+  return isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(op);
 }
-}  // namespace
+
+static bool is2DDepthConvOp(Operation *op) {
+  return isa<linalg::DepthwiseConv2DNhwcHwcOp>(op);
+}
+
+static bool is2DPoolingOp(Operation *op) {
+  return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+             linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+             linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+             linalg::PoolingNchwMaxOp>(op);
+}
+
+/// Helper enum to represent conv2d input traversal order.
+enum class Conv2DDimOrder {
+  // Corresponds to operation that traverses the input in (n, c, h, w) order.
+  Nchw,
+  // Corresponds to operation that traverses the input in (n, h, w, c) order.
+  Nhwc
+};
+
+static Conv2DDimOrder getConv2DDimOrder(Operation *op) {
+  if (isa<linalg::Conv2DNchwFchwOp, linalg::PoolingNchwSumOp,
+          linalg::PoolingNchwMaxOp>(op))
+    return Conv2DDimOrder::Nchw;
+  if (isa<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
+          linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+          linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+          linalg::DepthwiseConv2DNhwcHwcOp>(op))
+    return Conv2DDimOrder::Nhwc;
+  llvm::llvm_unreachable_internal("unsupported conv op");
+}
 
 /// Sets lowering configuration for conv ops. See below for supported conv ops.
 static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
                                        linalg::LinalgOp convOp,
                                        ArrayRef<int64_t> targetTileSizes,
                                        int64_t vectorSize) {
-  if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-           linalg::DepthwiseConv2DNhwcHwcOp>(convOp.getOperation()) &&
+  if (!is2DConvOp(convOp) && !is2DDepthConvOp(convOp) &&
       !is2DPoolingOp(convOp)) {
     return failure();
   }
@@ -1634,14 +1660,10 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
 /// Main utility to compute the workgroup (vectorization/unrolling) tile sizes.
 /// Note that this only works for NHWC input and HWCF kernel/filter
 /// convolutions, where the shape is [N, OH, OW, OC, KH, KW, (IC)].
-/// TODO(hanchung): Drive the tiling sizes through heuristics. The parameters
-/// are derived from limit experiments.
-static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
-                                                  linalg::LinalgOp op,
-                                                  int64_t vectorSize) {
-  bool isSupported = isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-                         linalg::DepthwiseConv2DNhwcHwcOp>(op.getOperation()) ||
-                     is2DPoolingOp(op);
+static SmallVector<int64_t> getNhwcConvWorkgroupSizes(
+    func::FuncOp entryPointFn, linalg::ConvolutionOpInterface op,
+    int64_t vectorSize) {
+  bool isSupported = is2DConvOp(op) || is2DDepthConvOp(op) || is2DPoolingOp(op);
   (void)isSupported;
   assert(isSupported && "conv op is not supported");
 
@@ -1649,133 +1671,65 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   if (isX86(targetAttr)) {
-    TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
-        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
-        .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
-        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
-  } else if (isRISCV(targetAttr)) {
-    TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
-        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
-        .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
-        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
-  } else if (isAArch64(targetAttr)) {
-    TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
-            [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 1, 16}; })
-        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp>(
-            [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 16}; })
-        .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) { tileSizes = {1, 1, 4, 4, 1, 4}; })
-        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
-  } else {
-    // Get default hard-coded tile sizes if we couldn't compute anything better.
-    TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>([&](auto op) {
-          tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
-        })
-        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp>([&](auto op) {
-          tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
-        })
-        .Case<linalg::DepthwiseConv2DNhwcHwcOp>([&](auto op) {
-          tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
-        })
-        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
+    if (is2DConvOp(op)) return {1, 1, 8, vectorSize * 2, 1, 1, 8};
+    if (is2DDepthConvOp(op)) return {1, 1, 8, vectorSize * 2, 1, 3};
+    if (is2DPoolingOp(op)) return {1, 1, 8, vectorSize * 2, 1, 8};
+    llvm_unreachable("unsupported conv");
+  }
+  if (isRISCV(targetAttr)) {
+    if (is2DConvOp(op)) return {1, 1, 8, vectorSize * 2, 1, 1, 8};
+    if (is2DDepthConvOp(op)) return {1, 1, 8, vectorSize, 1, 3};
+    if (is2DPoolingOp(op)) return {1, 1, 8, vectorSize * 2, 1, 8};
+    llvm_unreachable("unsupported conv");
+  }
+  if (isAArch64(targetAttr)) {
+    if (is2DConvOp(op)) return {1, 1, 32, 64, 1, 1, 16};
+    if (is2DDepthConvOp(op)) return {1, 1, 4, 4, 1, 4};
+    if (is2DPoolingOp(op)) return {1, 1, 32, 64, 1, 16};
+    llvm_unreachable("unsupported conv");
   }
 
-  return tileSizes;
+  // Get default hard-coded tile sizes if we couldn't compute anything
+  // better.
+  if (is2DConvOp(op)) return {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+  if (is2DDepthConvOp(op)) return {1, 1, vectorSize, vectorSize, 1, vectorSize};
+  if (is2DPoolingOp(op)) return {1, 1, vectorSize, vectorSize, 1, vectorSize};
+  llvm_unreachable("unsupported conv");
 }
 
-static LogicalResult setConvNhwcRootConfigImpl(func::FuncOp entryPointFn,
-                                               linalg::LinalgOp convOp) {
+static LogicalResult setConvInterfaceRootConfig(
+    func::FuncOp entryPointFn, linalg::ConvolutionOpInterface convOp) {
   int64_t vectorSize = getVectorSize(
-      entryPointFn,
-      cast<ShapedType>(convOp.getDpsInitOperand(0)->get().getType()));
+      entryPointFn, cast<ShapedType>(convOp->getResultTypes()[0]));
   SmallVector<int64_t> targetTileSizes =
-      getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
-  return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
-}
+      getNhwcConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
 
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::Conv2DNhwcHwcfOp convOp) {
-  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
-}
+  // The tiling sizes are for NHWC layout. We need to apply a permutation if
+  // they are in other layout format.
+  Conv2DDimOrder order = getConv2DDimOrder(convOp);
+  switch (order) {
+    case Conv2DDimOrder::Nhwc:
+      break;
+    case Conv2DDimOrder::Nchw:
+      SmallVector<int64_t> perm;
+      if (is2DConvOp(convOp)) {
+        // D.n, D.oh, D.ow,  D.f, D.kh, D.kw, D.c ->
+        // D.n,  D.f, D.oh, D.ow,  D.c, D.kh, D.kw
+        perm = {0, 3, 1, 2, 6, 4, 5};
+      } else if (is2DPoolingOp(convOp)) {
+        // D.n, D.oh, D.ow, D.c, D.kh, D.kw ->
+        // D.n, D.c, D.oh, D.ow, D.kh, D.kw
+        perm = {0, 3, 1, 2, 4, 5};
+      } else if (is2DDepthConvOp(convOp)) {
+        llvm_unreachable("Not implemented yet");
+      }
+      applyPermutationToVector(targetTileSizes, perm);
+      break;
+  }
 
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::PoolingNhwcSumOp convOp) {
-  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
-}
-
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::PoolingNhwcMaxOp convOp) {
-  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
-}
-
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::PoolingNhwcMaxUnsignedOp convOp) {
-  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
-}
-
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::PoolingNhwcMinOp convOp) {
-  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
-}
-
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::PoolingNhwcMinUnsignedOp convOp) {
-  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
-}
-
-/// Sets the lowering configuration for linalg.conv_2d_nchw_fchw
-/// operations.
-static LogicalResult setConvNchwRootConfigImpl(func::FuncOp entryPointFn,
-                                               linalg::LinalgOp convOp) {
-  int64_t vectorSize = getVectorSize(
-      entryPointFn,
-      cast<ShapedType>(convOp.getDpsInitOperand(0)->get().getType()));
-  SmallVector<int64_t> targetTileSizes = {1, vectorSize * 2, 1, 8, 8, 1, 1};
-  return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
-}
-
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::Conv2DNchwFchwOp convOp) {
-  return setConvNchwRootConfigImpl(entryPointFn, convOp);
-}
-
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::PoolingNchwSumOp convOp) {
-  return setConvNchwRootConfigImpl(entryPointFn, convOp);
-}
-
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::PoolingNchwMaxOp convOp) {
-  return setConvNchwRootConfigImpl(entryPointFn, convOp);
-}
-
-/// Sets the lowering configuration for linalg.depthwise_conv_2d_nhwc_hwc
-/// operations.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::DepthwiseConv2DNhwcHwcOp convOp) {
-  int64_t vectorSize = getVectorSize(
-      entryPointFn, cast<ShapedType>(convOp.getResult(0).getType()));
-  SmallVector<int64_t> targetTileSizes =
-      getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
-  return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
+  return setConvRootConfig(entryPointFn,
+                           cast<linalg::LinalgOp>(convOp.getOperation()),
+                           targetTileSizes, vectorSize);
 }
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
@@ -1880,13 +1834,16 @@ static LogicalResult setRootConfigImpl(
                                targetMLTransInfo);
         })
         .Case<IREE::LinalgExt::FftOp, tensor::PackOp, tensor::PadOp,
-              linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
-              linalg::Conv2DNchwFchwOp, linalg::PoolingNhwcSumOp,
-              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-              linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
-              linalg::DepthwiseConv2DNhwcHwcOp>(
+              linalg::Mmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+            [&](auto op) {
+              return setConvInterfaceRootConfig(entryPointFn, op);
+            })
         .Case<tensor::UnPackOp>(
             [&](auto op) { return setUnPackOpRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
