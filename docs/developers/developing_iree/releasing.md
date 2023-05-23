@@ -24,7 +24,7 @@ cherry picks that would affect the quality of the release (because they wouldn't
 be present in the promoted version).
 
 This gives some additional validation to the release because it is stress-tested
-running in a different environment and we not-infreuqently catch some issues. We
+running in a different environment and we not-infrequently catch some issues. We
 do not currently have a way to add cherry-picks to a release, so if cherry-picks
 for functional issues are required, we skip promoting the candidate to "stable".
 
@@ -39,7 +39,7 @@ the stable releases, so a 1:1 mapping there will not make sense.
 
 The PyPI password is also currently stored in Google's internal secret
 management system, so for others to manage the deployment, we would need to
-store it elsewhere withe appropriate ACLs.
+store it elsewhere with appropriate ACLs.
 
 At the point where others want to engage in the release process, we can easily
 remove any coupling to any Google processes.
