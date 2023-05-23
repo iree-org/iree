@@ -18,9 +18,9 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
   }
 }
 
@@ -150,9 +150,9 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
   }
 }
 
@@ -349,9 +349,9 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
   }
 }
 
@@ -536,9 +536,9 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
   }
 }
 
@@ -703,9 +703,9 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
   }
 }
 
@@ -852,9 +852,9 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
   }
 }
 
@@ -974,10 +974,10 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %reordered_func = transform.iree.reorder_transpose %top_level_func : (!pdl.operation) -> !pdl.operation
-    transform.iree.apply_patterns %reordered_func { cse } : (!pdl.operation) -> ()
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %reordered_func = transform.iree.reorder_transpose %top_level_func : (!transform.any_op) -> !transform.any_op
+    transform.iree.apply_patterns %reordered_func { cse } : (!transform.any_op) -> ()
   }
 }
 
@@ -1100,9 +1100,9 @@ builtin.module {
     return
   }
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
   }
 }
 
