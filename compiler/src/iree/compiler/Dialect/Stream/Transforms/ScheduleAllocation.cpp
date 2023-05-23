@@ -199,6 +199,26 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
   // Compute ranges for all values independently (ignoring aliasing).
   for (auto &op : *streamBlock) {
     int start = opOrdering[&op];
+    if (auto concurrentOp = dyn_cast<IREE::Stream::AsyncConcurrentOp>(op)) {
+      // HACK: allocation planning currently only works on the top-level
+      // execute op but sometimes we need to allocate locals inside of
+      // concurrent regions. The real fix here is to make allocation planning
+      // handle arbitrary nesting but for now we do a quick walk through the
+      // regions to see if there are any locals that need to be marked live for
+      // the duration of the region.
+      concurrentOp.walk([&](Operation *op) {
+        for (auto value : op->getResults()) {
+          if (!value.getType().isa<IREE::Stream::ResourceType>()) continue;
+          if (!value.use_empty()) continue;
+          LivenessInterval interval;
+          interval.start = start;
+          interval.end = start;
+          interval.value = value;
+          interval.ordinal = -1;
+          valueIntervals[value] = interval;
+        }
+      });
+    }
     for (auto value : op.getResults()) {
       if (!value.getType().isa<IREE::Stream::ResourceType>()) continue;
       LivenessInterval interval;
