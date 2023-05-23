@@ -479,7 +479,7 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
     to different workgroups.
   }];
 
-  let arguments = (ins PDL_Operation:$for_all_op);
+  let arguments = (ins TransformHandleTypeInterface:$for_all_op);
   let results = (outs);
   let assemblyFormat = [{
     attr-dict $for_all_op `:` functional-type($for_all_op, results)
