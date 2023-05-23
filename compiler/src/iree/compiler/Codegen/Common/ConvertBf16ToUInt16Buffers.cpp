@@ -122,8 +122,17 @@ struct GenericTypeConversionPattern : public ConversionPattern {
     if (op->hasTrait<OpTrait::ConstantLike>() ||
         isa<IREE::Util::GlobalOpInterface>(op)) {
       for (auto attr : op->getAttrs()) {
-        auto newAttr = convertAttribute(op->getLoc(), attr.getValue(),
-                                        *getTypeConverter());
+        auto oldAttr = attr.getValue();
+        Attribute newAttr = oldAttr;
+        if (auto floatAttr = dyn_cast<FloatAttr>(oldAttr)) {
+          APInt apint = floatAttr.getValue().bitcastToAPInt();
+          newAttr = rewriter.getI16IntegerAttr(apint.getZExtValue());
+        } else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(oldAttr)) {
+          newAttr = denseAttr.mapValues(
+              rewriter.getI16Type(),
+              [&](APFloat src) { return src.bitcastToAPInt(); });
+        }
+
         newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
       }
     } else {

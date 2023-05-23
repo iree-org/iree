@@ -327,6 +327,9 @@ struct ConvertArithTypesPass : public Base {
         .addDynamicallyLegalOp<vector::ReductionOp, vector::MultiDimReductionOp,
                                vector::MaskOp, vector::YieldOp>(checkOp);
 
+    // Some ops are always legal.
+    target.addLegalOp<arith::BitcastOp>();
+
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
       return this->signalPassFailure();

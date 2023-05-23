@@ -28,3 +28,14 @@ func.func @bf16_conversion() {
   }
   return
 }
+
+// -----
+
+// CHECK-LABEL: @bf16_constant
+func.func @bf16_constant(%arg0 : bf16) -> bf16 {
+  // CHECK: %[[CNST:.+]] = arith.constant 16256 : i16
+  // CHECK: %[[CAST:.+]] = arith.bitcast %[[CNST]]
+  %c0 = arith.constant 1.0 : bf16
+  // CHECK: return %[[CAST]]
+  return %c0 : bf16
+}
