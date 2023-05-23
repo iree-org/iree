@@ -56,6 +56,8 @@ class Platform {
   ConfigVars& config_vars() { return config_vars_; }
   Logger& logger() { return *logger_; }
   AbstractCompiler& compiler() { return *compiler_; }
+  // The partitioner is optional.
+  AbstractCompiler* partitioner() { return partitioner_.get(); }
   ArtifactDumper& artifact_dumper() { return *artifact_dumper_; }
 
  protected:
@@ -63,6 +65,7 @@ class Platform {
   ConfigVars config_vars_;
   std::unique_ptr<Logger> logger_;
   std::unique_ptr<AbstractCompiler> compiler_;
+  std::unique_ptr<AbstractCompiler> partitioner_;
   std::unique_ptr<ArtifactDumper> artifact_dumper_;
 };
 

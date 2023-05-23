@@ -1080,60 +1080,106 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
         "because IREE only supports MLIR input but got something else"));
   }
 
-  std::unique_ptr<CompilerJob> job = platform().compiler().StartJob();
-  if (artifact_tx) {
-    job->EnableCrashDumps(artifact_tx.get());
-  }
-  auto MakeCompilerError = [&]() {
-    std::string message = job->GetErrorMessage();
+  auto MakeCompilerError = [&](CompilerJob& job) {
+    std::string message = job.GetErrorMessage();
     return MakeError(iree_make_status(IREE_STATUS_INVALID_ARGUMENT, ": %s",
                                       message.c_str()));
   };
 
-  // Set flags.
-  // TODO: This should be done as part of session setup from a named pool.
-  // TODO: The HAL backends and other flags should come from the assigned
-  // devices.
-  if (!job->SetFlag("--iree-input-type=mhlo")) {
-    return MakeCompilerError();
-  }
-  if (!job->SetFlag("--iree-execution-model=async-external")) {
-    return MakeCompilerError();
-  }
-  if (!SetDefaultCompilerFlags(job.get())) {
-    return MakeCompilerError();
-  }
-  if (artifact_tx) {
-    artifact_tx->WriteArtifact(
-        /*label=*/"flags", /*extension=*/"txt", /*index=*/-1, job->GetFlags());
+  std::vector<std::unique_ptr<CompilerOutput>> retained_outputs;
+
+  // Partition.
+  if (platform().partitioner()) {
+    std::unique_ptr<CompilerJob> job = platform().partitioner()->StartJob();
+    if (artifact_tx) {
+      job->EnableCrashDumps(artifact_tx.get());
+    }
+
+    // TODO: Set flags (like num partitions).
+    if (artifact_tx) {
+      artifact_tx->WriteArtifact(
+          /*label=*/"partitioner_flags", /*extension=*/"txt", /*index=*/-1,
+          job->GetFlags());
+    }
+
+    // Parse the source.
+    if (!job->ParseSourceBuffer(code.data(), code.size())) {
+      return MakeCompilerError(*job);
+    }
+
+    // Partition.
+    std::unique_ptr<CompilerOutput> output = job->CompileStandardPipeline();
+    if (!output) {
+      return MakeCompilerError(*job);
+    }
+    if (artifact_tx) {
+      artifact_tx->WriteArtifact(
+          /*label=*/"partitioned", /*extension=*/"mlir", /*index=*/-1,
+          std::string_view(static_cast<const char*>(output->GetData()),
+                           output->GetDataSize()));
+    }
+
+    // Update the code alias and retain the backing output for the next
+    // compilation step.
+    code = std::string_view(static_cast<const char*>(output->GetData()),
+                            output->GetDataSize());
+    retained_outputs.push_back(std::move(output));
   }
 
-  // Parse the source.
-  if (!job->ParseSourceBuffer(code.data(), code.size())) {
-    return MakeCompilerError();
+  // Main compilation.
+  {
+    std::unique_ptr<CompilerJob> job = platform().compiler().StartJob();
+    if (artifact_tx) {
+      job->EnableCrashDumps(artifact_tx.get());
+    }
+    // Set flags.
+    // TODO: This should be done as part of session setup from a named pool.
+    // TODO: The HAL backends and other flags should come from the assigned
+    // devices.
+    if (!job->SetFlag("--iree-input-type=mhlo")) {
+      return MakeCompilerError(*job);
+    }
+    if (!job->SetFlag("--iree-execution-model=async-external")) {
+      return MakeCompilerError(*job);
+    }
+    if (!SetDefaultCompilerFlags(job.get())) {
+      return MakeCompilerError(*job);
+    }
+    if (artifact_tx) {
+      artifact_tx->WriteArtifact(
+          /*label=*/"flags", /*extension=*/"txt", /*index=*/-1,
+          job->GetFlags());
+    }
+
+    // Parse the source.
+    if (!job->ParseSourceBuffer(code.data(), code.size())) {
+      return MakeCompilerError(*job);
+    }
+
+    // Perform main compilation.
+    std::unique_ptr<CompilerOutput> output = job->CompileStandardPipeline();
+    if (!output) {
+      return MakeCompilerError(*job);
+    }
+    if (artifact_tx) {
+      artifact_tx->WriteArtifact(
+          /*label=*/"program", /*extension=*/"vmfb", /*index=*/-1,
+          std::string_view(static_cast<const char*>(output->GetData()),
+                           output->GetDataSize()));
+    }
+
+    auto executable = std::make_unique<LoadedExecutableInstance>(
+        *this, new ExecutableImage(std::move(output)), addressable_devices_);
+    status = executable->LoadAll();
+    if (!iree_status_is_ok(status)) {
+      return MakeError(status);
+    }
+
+    *out_executable = executable.release();
   }
 
-  // Perform main compilation.
-  std::unique_ptr<CompilerOutput> output = job->CompileStandardPipeline();
-  if (!output) {
-    return MakeCompilerError();
-  }
-  if (artifact_tx) {
-    artifact_tx->WriteArtifact(
-        /*label=*/"program", /*extension=*/"vmfb", /*index=*/-1,
-        std::string_view(static_cast<const char*>(output->GetData()),
-                         output->GetDataSize()));
-  }
-
-  auto executable = std::make_unique<LoadedExecutableInstance>(
-      *this, new ExecutableImage(std::move(output)), addressable_devices_);
-  status = executable->LoadAll();
-  if (!iree_status_is_ok(status)) {
-    return MakeError(status);
-  }
-
-  *out_executable = executable.release();
-
+  // Success? Cancel the artifact so we don't persist successful runs
+  // (unless if so configured).
   if (artifact_tx) {
     artifact_tx->Cancel();
   }

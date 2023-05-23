@@ -32,7 +32,7 @@ cc_test(
         ":tensor_utils",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
-    ]
+    ],
 )
 
 iree_pjrt_cc_library(
@@ -73,6 +73,8 @@ iree_pjrt_cc_library(
     deps = [
         ":debugging",
         ":impl",
+        "//partitioner:c_headers",
+        "//partitioner:loader",
         "@iree_core//compiler/bindings/c:headers",
         "@iree_core//compiler/bindings/c:loader",
         "@iree_core//runtime/src/iree/base/internal:file_io",
@@ -83,13 +85,15 @@ iree_pjrt_cc_library(
 iree_pjrt_cc_library(
     name = "compiler",
     srcs = [
-        "compiler.cc",
+        "hlo_partitioner.cc",
+        "iree_compiler.cc",
     ],
     hdrs = [
         "compiler.h",
     ],
     deps = [
         ":debugging",
+        "//partitioner:c_headers",
         "@iree_core//compiler/bindings/c:headers",
     ],
 )

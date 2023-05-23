@@ -4,16 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/integrations/pjrt/common/compiler.h"
-
 #include <functional>
 #include <iostream>  // TODO: Remove
 #include <vector>
 
+#include "iree/compiler/embedding_api.h"
+#include "iree/integrations/pjrt/common/compiler.h"
+
 namespace iree::pjrt {
 
 //===----------------------------------------------------------------------===//
-// In-process stub compiler
+// IREE compiler.
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -33,16 +34,16 @@ class MMapCompilerOutput : public CompilerOutput {
 };
 
 using SessionRecycler = std::function<void(iree_compiler_session_t*)>;
-class InprocessCompilerJob : public CompilerJob {
+class IREECompilerJob : public CompilerJob {
  public:
   // Takes ownership of both |session| and |inv|. On destruction, destroys
   // |inv| and passes |session| to the recycler (this can be used to implement
   // session pooling).
-  InprocessCompilerJob(iree_compiler_session_t* session,
-                       iree_compiler_invocation_t* inv,
-                       SessionRecycler session_recycler)
+  IREECompilerJob(iree_compiler_session_t* session,
+                  iree_compiler_invocation_t* inv,
+                  SessionRecycler session_recycler)
       : session_(session), inv_(inv), session_recycler_(session_recycler) {}
-  ~InprocessCompilerJob() {
+  ~IREECompilerJob() {
     if (error_) {
       ireeCompilerErrorDestroy(error_);
     }
@@ -71,7 +72,7 @@ class InprocessCompilerJob : public CompilerJob {
         inv_, /*genLocalReproducer=*/false,
         [](iree_compiler_output_t** outOutput,
            void* userData) -> iree_compiler_error_t* {
-          auto* self = static_cast<InprocessCompilerJob*>(userData);
+          auto* self = static_cast<IREECompilerJob*>(userData);
           auto maybePath = self->crash_dump_transaction_->AllocateArtifactPath(
               /*label=*/"crash_reproducer", /*extension=*/"mlir",
               /*index=*/self->crash_dump_count_++);
@@ -124,12 +125,11 @@ class InprocessCompilerJob : public CompilerJob {
   }
 
   std::unique_ptr<CompilerOutput> CompileStandardPipeline() override {
-    iree_compiler_error_t* error;
     if (!ireeCompilerInvocationPipeline(inv_, IREE_COMPILER_PIPELINE_STD)) {
       return nullptr;
     }
 
-    error = ireeCompilerOutputOpenMembuffer(&output_);
+    iree_compiler_error_t* error = ireeCompilerOutputOpenMembuffer(&output_);
     if (error) {
       SetError(error);
       return nullptr;
@@ -182,20 +182,20 @@ class InprocessCompilerJob : public CompilerJob {
 
 }  // namespace
 
-std::unique_ptr<CompilerJob> InprocessCompiler::StartJob() {
+std::unique_ptr<CompilerJob> IREECompiler::StartJob() {
   auto* session = ireeCompilerSessionCreate();
   auto* inv = ireeCompilerInvocationCreate(session);
 
   // TODO: Capture diagnostics, etc vs spewing to stderr.
   ireeCompilerInvocationEnableConsoleDiagnostics(inv);
 
-  return std::make_unique<InprocessCompilerJob>(
+  return std::make_unique<IREECompilerJob>(
       session, inv, [](iree_compiler_session_t* session) {
         ireeCompilerSessionDestroy(session);
       });
 }
 
-std::string InprocessCompiler::GetRevision() {
+std::string IREECompiler::GetRevision() {
   std::string result;
   const char* revision = ireeCompilerGetRevision();
   result.append(revision[0] ? revision : "<unknown>");

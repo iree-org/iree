@@ -423,8 +423,17 @@ struct Invocation {
 
   Session &session;
   PassManager passManager;
+
+  // Diagnostic handlers are instantiated upon parsing the source (when we
+  // have the SrcMgr) and held for the duration of the invocation. Each will
+  // de-register upon destruction if set.
+  std::optional<SourceMgrDiagnosticHandler> consoleDiagnosticHandler;
+
   OwningOpRef<Operation *> parsedModule;
   bool enableVerifier = true;
+
+  // Diagnostic options.
+  bool enableConsoleDiagnosticHandler = false;
 };
 
 Invocation::Invocation(Session &session)
@@ -441,6 +450,11 @@ Invocation::Invocation(Session &session)
 }
 
 bool Invocation::parseSource(Source &source) {
+  // Use the source manager's diagnostic handler if console diagnostics
+  // are enabled.
+  if (enableConsoleDiagnosticHandler && !consoleDiagnosticHandler) {
+    consoleDiagnosticHandler.emplace(source.sourceMgr, &session.context);
+  }
   parsedModule =
       mlir::parseSourceFile<ModuleOp>(source.sourceMgr, &session.context);
   if (!parsedModule || failed(mlir::verify(*parsedModule))) {
@@ -657,56 +671,56 @@ openxla_partitioner_invocation_t *openxlaPartitionerInvocationCreate(
 //   unwrap(inv)->diagnosticCallback = callback;
 //   unwrap(inv)->diagnosticCallbackUserData = userData;
 // }
-// void openxlaPartitionerInvocationEnableConsoleDiagnostics(
-//     openxla_partitioner_invocation_t *inv) {
-//   unwrap(inv)->enableConsoleDiagnosticHandler = true;
-// }
+
+void openxlaPartitionerInvocationEnableConsoleDiagnostics(
+    openxla_partitioner_invocation_t *inv) {
+  unwrap(inv)->enableConsoleDiagnosticHandler = true;
+}
 
 void openxlaPartitionerInvocationDestroy(
     openxla_partitioner_invocation_t *inv) {
   delete unwrap(inv);
 }
 
-// void openxlaPartitionerInvocationSetCrashHandler(
-//     openxla_partitioner_invocation_t *inv, bool genLocalReproducer,
-//     openxla_partitioner_error_t *(*onCrashCallback)(
-//         openxla_partitioner_output_t **outOutput, void *userData),
-//     void *userData) {
-//   struct StreamImpl : public mlir::PassManager::ReproducerStream {
-//     StreamImpl(openxla_partitioner_output_t *output) : output(output) {
-//       unwrap(output)->keep();
-//     }
-//     ~StreamImpl() { openxlaPartitionerOutputDestroy(output); }
+void openxlaPartitionerInvocationSetCrashHandler(
+    openxla_partitioner_invocation_t *inv, bool genLocalReproducer,
+    openxla_partitioner_error_t *(*onCrashCallback)(
+        openxla_partitioner_output_t **outOutput, void *userData),
+    void *userData) {
+  struct StreamImpl : public mlir::PassManager::ReproducerStream {
+    StreamImpl(openxla_partitioner_output_t *output) : output(output) {
+      unwrap(output)->keep();
+    }
+    ~StreamImpl() { openxlaPartitionerOutputDestroy(output); }
 
-//     llvm::StringRef description() override {
-//       return unwrap(output)->description;
-//     }
+    llvm::StringRef description() override {
+      return unwrap(output)->description;
+    }
 
-//     llvm::raw_ostream &os() override { return *unwrap(output)->outputStream;
-//     }
+    llvm::raw_ostream &os() override { return *unwrap(output)->outputStream; }
 
-//     openxla_partitioner_output_t *output;
-//   };
+    openxla_partitioner_output_t *output;
+  };
 
-//   unwrap(inv)->passManager.enableCrashReproducerGeneration(
-//       [=](std::string &errorMessage)
-//           -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
-//         openxla_partitioner_output_t *output = nullptr;
-//         auto error = onCrashCallback(&output, userData);
-//         if (error) {
-//           errorMessage = openxlaPartitionerErrorGetMessage(error);
-//           return nullptr;
-//         }
+  unwrap(inv)->passManager.enableCrashReproducerGeneration(
+      [=](std::string &errorMessage)
+          -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
+        openxla_partitioner_output_t *output = nullptr;
+        auto error = onCrashCallback(&output, userData);
+        if (error) {
+          errorMessage = openxlaPartitionerErrorGetMessage(error);
+          return nullptr;
+        }
 
-//         if (!output) {
-//           errorMessage = "callback did not set output";
-//           return nullptr;
-//         }
+        if (!output) {
+          errorMessage = "callback did not set output";
+          return nullptr;
+        }
 
-//         return std::make_unique<StreamImpl>(output);
-//       },
-//       /*genLocalReproducer=*/genLocalReproducer);
-// }
+        return std::make_unique<StreamImpl>(output);
+      },
+      /*genLocalReproducer=*/genLocalReproducer);
+}
 
 bool openxlaPartitionerInvocationParseSource(
     openxla_partitioner_invocation_t *inv,

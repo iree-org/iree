@@ -39,6 +39,11 @@ class DylibPlatform final : public Platform {
   // or computed from paths above.
   std::optional<std::string> GetCompilerLibraryPath();
 
+  // Gets the path to the libOpenXLAPartitioner.so shared library.
+  // This is taken from either the "PARTITIONER_LIB_PATH" config variable
+  // or computed from paths above.
+  std::optional<std::string> GetPartitionerLibraryPath();
+
  protected:
   iree_status_t SubclassInitialize() override;
 };

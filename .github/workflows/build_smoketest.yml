@@ -67,3 +67,11 @@ jobs:
       - name: "Build partitioner"
         run: |
           bazel build partitioner:libOpenXLAPartitioner.so
+
+      - name: "Test CPU plugin (with partitioner)"
+        run: |
+          source .env.sh
+          export IREE_PJRT_PARTITIONER_LIB_PATH=$PWD/bazel-bin/partitioner/libOpenXLAPartitioner.so
+          JAX_PLATFORMS=iree_cpu python test/test_simple.py
+          JAX_PLATFORMS=iree_cpu python test/test_degenerate.py
+

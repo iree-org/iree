@@ -10,7 +10,6 @@
 #include <memory>
 #include <string>
 
-#include "iree/compiler/embedding_api.h"
 #include "iree/integrations/pjrt/common/debugging.h"
 
 namespace iree::pjrt {
@@ -68,7 +67,15 @@ class AbstractCompiler {
   virtual std::string GetRevision() = 0;
 };
 
-class InprocessCompiler : public AbstractCompiler {
+// An AbstractCompiler based on IREE.
+class IREECompiler : public AbstractCompiler {
+ public:
+  std::unique_ptr<CompilerJob> StartJob() override;
+  std::string GetRevision() override;
+};
+
+// An AbstractCompiler based on the HLO partitioner.
+class OpenXLAPartitioner : public AbstractCompiler {
  public:
   std::unique_ptr<CompilerJob> StartJob() override;
   std::string GetRevision() override;

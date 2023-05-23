@@ -12,21 +12,22 @@
 
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/path.h"
+#include "iree/compiler/embedding_api.h"
 #include "iree/compiler/loader.h"
+#include "openxla/partitioner/embedding_api.h"
+#include "openxla/partitioner/loader.h"
 
 namespace iree::pjrt {
 
 namespace {
 
-std::optional<std::string> InitializeCompilerForProcess(
-    const std::string& library_path) {
+bool InitializeCompilerForProcess(const std::string& library_path) {
   if (!ireeCompilerLoadLibrary(library_path.c_str())) {
-    return {};
+    return false;
   }
 
   ireeCompilerGlobalInitialize();
-
-  return library_path;
+  return true;
 }
 
 // Since we delay load the compiler, it can only be done once per process.
@@ -36,7 +37,33 @@ std::optional<std::string> LoadCompilerStubOnce(
     const std::string& library_path) {
   static std::optional<std::string> loaded_path =
       ([&]() -> std::optional<std::string> {
-        return InitializeCompilerForProcess(library_path);
+        if (InitializeCompilerForProcess(library_path)) {
+          return library_path;
+        } else {
+          return {};
+        }
+      })();
+  return loaded_path;
+}
+
+bool InitializePartitionerForProcess(const std::string& library_path) {
+  if (!openxlaPartitionerLoadLibrary(library_path.c_str())) {
+    return false;
+  }
+
+  openxlaPartitionerGlobalInitialize();
+  return true;
+}
+
+std::optional<std::string> LoadPartitionerStubOnce(
+    const std::string& library_path) {
+  static std::optional<std::string> loaded_path =
+      ([&]() -> std::optional<std::string> {
+        if (InitializePartitionerForProcess(library_path)) {
+          return library_path;
+        } else {
+          return {};
+        }
       })();
   return loaded_path;
 }
@@ -50,7 +77,7 @@ iree_status_t DylibPlatform::SubclassInitialize() {
   // Just a vanilla logger for now.
   logger_ = std::make_unique<Logger>();
 
-  // Compute library path.
+  // Process once initialization of the compiler shared library.
   auto library_path = GetCompilerLibraryPath();
   if (!library_path) {
     return iree_make_status(
@@ -59,8 +86,6 @@ iree_status_t DylibPlatform::SubclassInitialize() {
         "'COMPILER_LIB_PATH' config var ('IREE_PJRT_COMPILER_LIB_PATH' "
         "env var)");
   }
-
-  // Process once initialization of the shared library.
   auto loaded_compiler = LoadCompilerStubOnce(*library_path);
   if (!loaded_compiler) {
     logger().error("Could not initialize compiler shared library");
@@ -73,13 +98,42 @@ iree_status_t DylibPlatform::SubclassInitialize() {
     message.append(*loaded_compiler);
     logger().debug(message);
   }
-
-  // And initialize the compiler.
-  compiler_ = std::make_unique<InprocessCompiler>();
+  compiler_ = std::make_unique<IREECompiler>();
   {
     std::string message("Compiler Version: ");
     message.append(compiler_->GetRevision());
     logger().debug(message);
+  }
+
+  // Process once initialization of the partitioner shared library.
+  // Note that the partitioner is optional but if specified, we error if
+  // unable to load it.
+  auto partitioner_library_path = GetPartitionerLibraryPath();
+  if (!partitioner_library_path) {
+    logger().debug(
+        "Partitioner was not enabled. The partitioner can be enabled by "
+        "setting the 'PARTITIONER_LIB_PATH' config var "
+        "('IREE_PJRT_PARTITIONER_LIB_PATH' env var)");
+  } else {
+    auto loaded_partitioner =
+        LoadPartitionerStubOnce(*partitioner_library_path);
+    if (!loaded_partitioner) {
+      logger().error("Could not initialize partitioner shared library");
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "unable to locate partitioner shared library: %s",
+                              partitioner_library_path->c_str());
+    }
+    {
+      std::string message("Using partitioner binary: ");
+      message.append(*partitioner_library_path);
+      logger().debug(message);
+    }
+    partitioner_ = std::make_unique<OpenXLAPartitioner>();
+    {
+      std::string message("Partitioner version: ");
+      message.append(partitioner_->GetRevision());
+      logger().debug(message);
+    }
   }
 
   // Initialize the artifact dumper.
@@ -171,6 +225,28 @@ std::optional<std::string> DylibPlatform::GetCompilerLibraryPath() {
       iree_make_string_view(lib_dir->data(), lib_dir->size()),
       iree_make_cstring_view("libIREECompiler.so"), iree_allocator_system(),
       &path);
+  if (!iree_status_is_ok(status)) return {};
+
+  std::string joined_path(path);
+  iree_allocator_free(iree_allocator_system(), path);
+  return joined_path;
+}
+
+std::optional<std::string> DylibPlatform::GetPartitionerLibraryPath() {
+  auto found_explicit = config_vars().Lookup("PARTITIONER_LIB_PATH");
+  if (found_explicit) {
+    return *found_explicit;
+  }
+
+  // Try to compute from lib dir.
+  auto lib_dir = GetLibraryDir();
+  if (!lib_dir) return {};
+
+  char* path = nullptr;
+  auto status = iree_file_path_join(
+      iree_make_string_view(lib_dir->data(), lib_dir->size()),
+      iree_make_cstring_view("libOpenXLAPartitioner.so"),
+      iree_allocator_system(), &path);
   if (!iree_status_is_ok(status)) return {};
 
   std::string joined_path(path);
