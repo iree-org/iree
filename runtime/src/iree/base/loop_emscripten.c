@@ -133,10 +133,7 @@ static iree_status_t iree_loop_emscripten_run_wait_one(
 static iree_status_t iree_loop_emscripten_run_wait_any(
     iree_loop_emscripten_t* loop_emscripten,
     iree_loop_wait_multi_params_t* params) {
-  int* promise_handles = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(loop_emscripten->allocator,
-                                             sizeof(int) * params->count,
-                                             (void**)&promise_handles));
+  int* promise_handles = (int*)iree_alloca(sizeof(int) * params->count);
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < params->count; ++i) {
@@ -162,10 +159,7 @@ static iree_status_t iree_loop_emscripten_run_wait_any(
 static iree_status_t iree_loop_emscripten_run_wait_all(
     iree_loop_emscripten_t* loop_emscripten,
     iree_loop_wait_multi_params_t* params) {
-  int* promise_handles = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(loop_emscripten->allocator,
-                                             sizeof(int) * params->count,
-                                             (void**)&promise_handles));
+  int* promise_handles = (int*)iree_alloca(sizeof(int) * params->count);
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < params->count; ++i) {
