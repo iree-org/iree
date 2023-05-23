@@ -1954,23 +1954,14 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     // Multiple pack ops case is not supported.
     if (hasChanged) return WalkResult::interrupt();
 
-    // TODO(hanchung): Support chain cases. It needs following use-def chain
-    // until rootOp.
-    if (packOp.getSource().getDefiningOp() != rootOp) {
-      return WalkResult::advance();
-    }
     hasChanged = true;
-    OpResult result = packOp.getSource().cast<OpResult>();
-    auto idxMap = linalgOp.getMatchingIndexingMap(
-        linalgOp.getDpsInitOperand(result.getResultNumber()));
-    (void)idxMap;
-    LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n"
-                         << "The corresponding indexing map is: " << idxMap
-                         << "\n");
-    assert(idxMap.isIdentity() && "unexpected codegen input");
+    LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n");
 
-    for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
-      SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+    // Only adjust tile sizes for distribution and TileAndFuse, which are the
+    // first two tile lists.
+    for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e; ++i) {
+      auto &tileSizes = tileSizesList[i];
+      ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
       ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
       for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
         if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;

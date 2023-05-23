@@ -1654,6 +1654,110 @@ hal.executable private @elem_pack {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @transpose_pack  {
+  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+avx2", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = false}> {
+    hal.executable.export @transpose_pack layout(#pipeline_layout)
+    builtin.module {
+      func.func @transpose_pack() {
+        %c1579008 = arith.constant 1579008 : index
+        %c3147776 = arith.constant 3147776 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c1579008) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<30522x768xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c3147776) : !flow.dispatch.tensor<writeonly:tensor<1908x768x16x1xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [30522, 768], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<30522x768xf32>> -> tensor<30522x768xf32>
+        %3 = tensor.empty() : tensor<768x30522xf32>
+        %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<30522x768xf32>) outs(%3 : tensor<768x30522xf32>) {
+        ^bb0(%in: f32, %out: f32):
+          linalg.yield %in : f32
+        } -> tensor<768x30522xf32>
+        %5 = tensor.empty() : tensor<1908x768x16x1xf32>
+        %pack = tensor.pack %4 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %5 : tensor<768x30522xf32> -> tensor<1908x768x16x1xf32>
+        flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [1908, 768, 16, 1], strides = [1, 1, 1, 1] : tensor<1908x768x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<1908x768x16x1xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 1], [8, 1], []]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.export public @transpose_pack
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @reduction_broadcast_pack  {
+  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+avx2", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = false}> {
+    hal.executable.export @reduction_broadcast_pack layout(#pipeline_layout)
+    builtin.module {
+      func.func @reduction_broadcast_pack() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant -0.000000e+00 : f32
+        %cst_0 = arith.constant 1.024000e+03 : f32
+        %cst_1 = arith.constant 9.99999996E-13 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384x1024xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024xf32>>
+        %4 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<24x1024x16x1xf32>>
+        %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [384, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x1024xf32>> -> tensor<384x1024xf32>
+        %6 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [384], strides = [1] : !flow.dispatch.tensor<readonly:tensor<384xf32>> -> tensor<384xf32>
+        %7 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [1024], strides = [1] : !flow.dispatch.tensor<readonly:tensor<1024xf32>> -> tensor<1024xf32>
+        %8 = flow.dispatch.tensor.load %3, offsets = [0], sizes = [1024], strides = [1] : !flow.dispatch.tensor<readonly:tensor<1024xf32>> -> tensor<1024xf32>
+        %9 = tensor.empty() : tensor<24x1024x16x1xf32>
+        %10 = tensor.empty() : tensor<384x1024xf32>
+        %11 = tensor.empty() : tensor<384xf32>
+        %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<384xf32>) -> tensor<384xf32>
+        %13 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%5, %6 : tensor<384x1024xf32>, tensor<384xf32>) outs(%12 : tensor<384xf32>) {
+        ^bb0(%in: f32, %in_2: f32, %out: f32):
+          %15 = arith.subf %in, %in_2 : f32
+          %16 = arith.mulf %15, %15 : f32
+          %17 = arith.addf %out, %16 : f32
+          linalg.yield %17 : f32
+        } -> tensor<384xf32>
+        %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5, %13, %7, %8, %6 : tensor<384x1024xf32>, tensor<384xf32>, tensor<1024xf32>, tensor<1024xf32>, tensor<384xf32>) outs(%10 : tensor<384x1024xf32>) {
+        ^bb0(%in: f32, %in_2: f32, %in_3: f32, %in_4: f32, %in_5: f32, %out: f32):
+          %15 = arith.divf %in_2, %cst_0 : f32
+          %16 = arith.addf %15, %cst_1 : f32
+          %17 = math.rsqrt %16 : f32
+          %18 = arith.mulf %17, %in_3 : f32
+          %19 = arith.mulf %in_5, %18 : f32
+          %20 = arith.subf %in_4, %19 : f32
+          %21 = arith.mulf %in, %18 : f32
+          %22 = arith.addf %21, %20 : f32
+          linalg.yield %22 : f32
+        } -> tensor<384x1024xf32>
+        %pack = tensor.pack %14 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %9 : tensor<384x1024xf32> -> tensor<24x1024x16x1xf32>
+        flow.dispatch.tensor.store %pack, %4, offsets = [0, 0, 0, 0], sizes = [24, 1024, 16, 1], strides = [1, 1, 1, 1] : tensor<24x1024x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<24x1024x16x1xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 0], [1, 0], [0, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.export public @reduction_broadcast_pack
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
 hal.executable private @unpack_elem {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
     hal.executable.export public @unpack_elem ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
