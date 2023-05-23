@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// This is the JavaScript side of wait_handle_promise.c
+// This is the JavaScript side of wait_handle_emscripten.c
 //
 // Each `iree_wait_handle_t` tracks a "iree_wait_primitive".
-// This Promise-backed implementation
+// This Emscripten implementation is backed by Promises and it
 //   * creates a "promise wrapper" for each active wait handle, where each
 //     wrapper includes a Promise object and supporting data
 //   * returns an opaque handle used to reference that wrapper
 
-const LibraryIreeWaitHandlePromise = {
-  $IreeWaitHandlePromise: {
+const LibraryIreeWaitHandleEmscripten = {
+  $IreeWaitHandleEmscripten: {
     // Counter for opaque handles, shared across the entire module/process/page.
     // Note: start at 1, leaving 0 as a sentinel for uninitialized.
     _nextPromiseHandle: 1,
@@ -36,7 +36,8 @@ const LibraryIreeWaitHandlePromise = {
           promise: resolvedPromise,
           isSettled: true,
         };
-        IreeWaitHandlePromise._promiseWrappers[promiseHandle] = promiseWrapper;
+        IreeWaitHandleEmscripten._promiseWrappers[promiseHandle] =
+            promiseWrapper;
       } else {
         // Start pending, track the resolve and reject functions.
         const pendingPromise = new Promise((resolve, reject) => {
@@ -46,38 +47,39 @@ const LibraryIreeWaitHandlePromise = {
             resolve: resolve,
             reject: reject,
           };
-          IreeWaitHandlePromise._promiseWrappers[promiseHandle] =
+          IreeWaitHandleEmscripten._promiseWrappers[promiseHandle] =
               promiseWrapper;
         });
-        IreeWaitHandlePromise._promiseWrappers[promiseHandle].promise =
+        IreeWaitHandleEmscripten._promiseWrappers[promiseHandle].promise =
             pendingPromise;
       }
     },
 
     getPromise: function(promiseHandle) {
-      return IreeWaitHandlePromise._promiseWrappers[promiseHandle].promise;
+      return IreeWaitHandleEmscripten._promiseWrappers[promiseHandle].promise;
     },
   },
 
   iree_wait_primitive_promise_create: function(initial_state) {
-    const promiseHandle = IreeWaitHandlePromise._nextPromiseHandle++;
-    IreeWaitHandlePromise._createPromiseWrapper(promiseHandle, initial_state);
+    const promiseHandle = IreeWaitHandleEmscripten._nextPromiseHandle++;
+    IreeWaitHandleEmscripten._createPromiseWrapper(
+        promiseHandle, initial_state);
     return promiseHandle;
   },
 
   iree_wait_primitive_promise_delete: function(promise_handle) {
     const promiseWrapper =
-        IreeWaitHandlePromise._promiseWrappers[promise_handle];
+        IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
     if (!promiseWrapper.isSettled && promiseWrapper.reject !== undefined) {
       promiseWrapper.reject();
       promiseWrapper.isSettled = true;
     }
-    delete IreeWaitHandlePromise._promiseWrappers[promise_handle];
+    delete IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
   },
 
   iree_wait_primitive_promise_set: function(promise_handle) {
     const promiseWrapper =
-        IreeWaitHandlePromise._promiseWrappers[promise_handle];
+        IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
     if (promiseWrapper.resolve !== undefined) {
       promiseWrapper.resolve();
       promiseWrapper.isSettled = true;
@@ -86,7 +88,7 @@ const LibraryIreeWaitHandlePromise = {
 
   iree_wait_primitive_promise_reset: function(promise_handle) {
     const promiseWrapper =
-        IreeWaitHandlePromise._promiseWrappers[promise_handle];
+        IreeWaitHandleEmscripten._promiseWrappers[promise_handle];
 
     // No-op if already unsignaled.
     if (!promiseWrapper.isSettled) return;
@@ -96,9 +98,9 @@ const LibraryIreeWaitHandlePromise = {
     // Since the previous Promise was resolved or rejected already, listeners
     // should have already been notified and we aren't leaving any orphaned.
     // (?) This synchronizes on the browser event loop, so there are no races.
-    IreeWaitHandlePromise._createPromiseWrapper(promise_handle, false);
+    IreeWaitHandleEmscripten._createPromiseWrapper(promise_handle, false);
   },
 }
 
-autoAddDeps(LibraryIreeWaitHandlePromise, '$IreeWaitHandlePromise');
-mergeInto(LibraryManager.library, LibraryIreeWaitHandlePromise);
+autoAddDeps(LibraryIreeWaitHandleEmscripten, '$IreeWaitHandleEmscripten');
+mergeInto(LibraryManager.library, LibraryIreeWaitHandleEmscripten);

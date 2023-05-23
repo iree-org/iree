@@ -12,7 +12,8 @@
 #include "iree/base/internal/wait_handle.h"
 #include "iree/base/target_platform.h"
 
-// This implementation uses JavaScript Promise objects for asynchronous waiting:
+// This implementation for the web platform via Emscripten uses JavaScript
+// Promise objects for asynchronous waiting:
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
 //
 // Synchronous wait APIs (e.g. iree_wait_one) are not supported, as using
@@ -39,7 +40,7 @@
 #include <emscripten.h>
 
 //===----------------------------------------------------------------------===//
-// externs from wait_handle_promise.js
+// externs from wait_handle_emscripten.js
 //===----------------------------------------------------------------------===//
 
 extern int iree_wait_primitive_promise_create(bool initial_state);

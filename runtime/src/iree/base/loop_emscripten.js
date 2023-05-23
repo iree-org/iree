@@ -306,7 +306,8 @@ const LibraryIreeLoopEmscripten = {
     _iree_loop_command_wait_all =
         instance.iree_loop_command_wait_all.bind(instance);
   },
-  $iree_loop_emscripten_support__deps: ['$dynCall', '$IreeWaitHandlePromise'],
+  $iree_loop_emscripten_support__deps:
+      ['$dynCall', '$IreeWaitHandleEmscripten'],
 
   iree_loop_allocate_scope: function() {},
   iree_loop_allocate_scope__deps: ['$iree_loop_emscripten_support'],

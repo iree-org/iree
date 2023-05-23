@@ -336,6 +336,7 @@ iree_cc_library(
     "wait_handle.h"
   SRCS
     "wait_handle.c"
+    "wait_handle_emscripten.c"
     "wait_handle_epoll.c"
     "wait_handle_impl.h"
     "wait_handle_inproc.c"
@@ -344,7 +345,6 @@ iree_cc_library(
     "wait_handle_poll.c"
     "wait_handle_posix.c"
     "wait_handle_posix.h"
-    "wait_handle_promise.c"
     "wait_handle_win32.c"
   DEPS
     ::synchronization
@@ -430,6 +430,6 @@ if(EMSCRIPTEN)
     TARGET
       ::wait_handle
     SRCS
-      "wait_handle_promise.js"
+      "wait_handle_emscripten.js"
   )
 endif()
