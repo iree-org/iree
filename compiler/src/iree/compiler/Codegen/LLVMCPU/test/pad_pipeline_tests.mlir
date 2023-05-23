@@ -37,25 +37,22 @@ hal.executable private @pad_only {
 // CHECK-LABEL: func @pad_only_dispatch()
 //       CHECK:   %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x112x112x64xf32
 //       CHECK:   %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x114x114x64xf32
-//       CHECK:   scf.for
+//       CHECK:   scf.if
+//       CHECK:     %[[OUTPUT_SUBVIEW_IF:.+]] = memref.subview %[[OUTPUT]]
+//       CHECK:     linalg.generic
+//  CHECK-SAME:         outs(%[[OUTPUT_SUBVIEW_IF]]
+//       CHECK:   else
+//       CHECK:     %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]]
+//       CHECK:     %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
 //       CHECK:     scf.for
 //       CHECK:       scf.for
-//       CHECK:         scf.if
-//       CHECK:           %[[OUTPUT_SUBVIEW_IF:.+]] = memref.subview %[[OUTPUT]]
-//       CHECK:           linalg.generic
-//  CHECK-SAME:               outs(%[[OUTPUT_SUBVIEW_IF]]
-//       CHECK:         else
-//       CHECK:           %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]]
-//       CHECK:           %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
-//       CHECK:           scf.for
-//       CHECK:             scf.for
-//       CHECK:               scf.for
-//       CHECK:                 %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
-//       CHECK:                 %[[RESULT_VEC:.+]] = scf.if %{{.+}} -> (vector<4xf32>) {
-//       CHECK:                   %[[VEC_LOAD:.+]] = vector.load %[[INPUT_SUBVIEW]]
-//       CHECK:                   scf.yield %[[VEC_LOAD]]
-//       CHECK:                 }
-//       CHECK:                 vector.store %[[RESULT_VEC]], %[[OUTPUT_SLICE]]
+//       CHECK:         scf.for
+//       CHECK:           %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
+//       CHECK:           %[[RESULT_VEC:.+]] = scf.if %{{.+}} -> (vector<4xf32>) {
+//       CHECK:             %[[VEC_LOAD:.+]] = vector.load %[[INPUT_SUBVIEW]]
+//       CHECK:             scf.yield %[[VEC_LOAD]]
+//       CHECK:           }
+//       CHECK:           vector.store %[[RESULT_VEC]], %[[OUTPUT_SLICE]]
 
 // -----
 
@@ -120,40 +117,39 @@ hal.executable private @pad_with_producer {
 //       CHECK:   %[[FILTER:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x1x256x128xf32
 //       CHECK:   %[[BIAS:.+]] = hal.interface.binding.subspan {{.+}} : memref<128xf32
 //       CHECK:   %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x30x30x128xf32
-//       CHECK:   scf.for
+//       CHECK:   scf.if
+//       CHECK:   else
+//   CHECK-DAG:     %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]]
+//   CHECK-DAG:     %[[FILTER_SUBVIEW:.+]] = memref.subview %[[FILTER]]
+//   CHECK-DAG:     %[[BIAS_SUBVIEW:.+]] = memref.subview %[[BIAS]]
+//   CHECK-DAG:     %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
 //       CHECK:     scf.for
-//       CHECK:       scf.if
-//       CHECK:       else
-//   CHECK-DAG:         %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]]
-//   CHECK-DAG:         %[[FILTER_SUBVIEW:.+]] = memref.subview %[[FILTER]]
-//   CHECK-DAG:         %[[BIAS_SUBVIEW:.+]] = memref.subview %[[BIAS]]
-//   CHECK-DAG:         %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
-//       CHECK:         scf.for
+//       CHECK:       scf.for
+//   CHECK-DAG:         %[[INPUT_SLICE:.+]] = memref.subview %[[INPUT_SUBVIEW]]
 //       CHECK:           scf.for
-//   CHECK-DAG:             %[[INPUT_SLICE:.+]] = memref.subview %[[INPUT_SUBVIEW]]
-//   CHECK-DAG:             %[[BIAS_ALLOC:.+]] = memref.alloca
-//       CHECK:               scf.for
-//       CHECK:               %[[FILTER_SLICE:.+]] = memref.subview %[[FILTER_SUBVIEW]]
-//       CHECK:               %[[FILL_ALLOC:.+]] = memref.alloca
-//       CHECK:               linalg.fill
-//  CHECK-SAME:                   outs(%[[FILL_ALLOC]]
-//       CHECK:               %[[CONV_OUTPUT:.+]] = memref.subview %[[FILL_ALLOC]]
-//       CHECK:               scf.for
-//       CHECK:                 %[[CONV_INPUT:.+]] = memref.subview %[[INPUT_SLICE]]
-//       CHECK:                 %[[CONV_FILTER:.+]] = memref.subview %[[FILTER_SLICE]]
-//       CHECK:                 linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME:                     ins(%[[CONV_INPUT]], %[[CONV_FILTER]] :
-//  CHECK-SAME:                     outs(%[[CONV_OUTPUT]] :
-//       CHECK:               %[[BIAS_INPUT:.+]] = memref.subview %[[BIAS_SUBVIEW]]
-//       CHECK:               linalg.generic
-//  CHECK-SAME:                   ins(%[[CONV_OUTPUT]], %[[BIAS_INPUT]] :
-//  CHECK-SAME:                   outs(%[[BIAS_ALLOC]]
-//       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
-//       CHECK:               linalg.fill ins(%{{.+}} :   f32) outs(%[[OUTPUT_SLICE]]
-//       CHECK:               %[[INTERIOR_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
-//       CHECK:               linalg.generic
-//  CHECK-SAME:                   ins(%[[BIAS_ALLOC]] :
-//  CHECK-SAME:                   outs(%[[INTERIOR_SLICE]] :
+//       CHECK:           %[[FILTER_SLICE:.+]] = memref.subview %[[FILTER_SUBVIEW]]
+//   CHECK-DAG:           %[[BIAS_ALLOC:.+]] = memref.alloca
+//       CHECK:           %[[FILL_ALLOC:.+]] = memref.alloca
+//       CHECK:           linalg.fill
+//  CHECK-SAME:               outs(%[[FILL_ALLOC]]
+//       CHECK:           scf.for
+//       CHECK:             %[[CONV_INPUT:.+]] = memref.subview %[[INPUT_SLICE]]
+//       CHECK:             %[[CONV_FILTER:.+]] = memref.subview %[[FILTER_SLICE]]
+//       CHECK:             %[[CONV_OUTPUT:.+]] = memref.subview %[[FILL_ALLOC]]
+//       CHECK:             linalg.conv_2d_nhwc_hwcf
+//  CHECK-SAME:                 ins(%[[CONV_INPUT]], %[[CONV_FILTER]] :
+//  CHECK-SAME:                 outs(%[[CONV_OUTPUT]] :
+//       CHECK:           %[[BIAS_INPUT:.+]] = memref.subview %[[BIAS_SUBVIEW]]
+//       CHECK:           %[[CONV_OUTPUT:.+]] = memref.subview %[[FILL_ALLOC]]
+//       CHECK:           linalg.generic
+//  CHECK-SAME:               ins(%[[CONV_OUTPUT]], %[[BIAS_INPUT]] :
+//  CHECK-SAME:               outs(%[[BIAS_ALLOC]]
+//       CHECK:           %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
+//       CHECK:           linalg.fill ins(%{{.+}} :   f32) outs(%[[OUTPUT_SLICE]]
+//       CHECK:           %[[INTERIOR_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
+//       CHECK:           linalg.generic
+//  CHECK-SAME:               ins(%[[BIAS_ALLOC]] :
+//  CHECK-SAME:               outs(%[[INTERIOR_SLICE]] :
 
 // -----
 

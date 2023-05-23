@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
@@ -577,8 +578,14 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
         neededValues.push_back(storeOp.getTarget());
         neededValues.append(storeOp.getTargetDims().begin(),
                             storeOp.getTargetDims().end());
-        neededValues.append(storeOp.getOffsets().begin(),
-                            storeOp.getOffsets().end());
+        for (auto offset : storeOp.getOffsets()) {
+          if (auto applyOp = offset.getDefiningOp<affine::AffineApplyOp>()) {
+            neededValues.append(applyOp.getMapOperands().begin(),
+                                applyOp.getMapOperands().end());
+          } else {
+            neededValues.push_back(offset);
+          }
+        }
         neededValues.append(storeOp.getSizes().begin(),
                             storeOp.getSizes().end());
         neededValues.append(storeOp.getStrides().begin(),
@@ -589,11 +596,20 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
       [](OpBuilder &b, Location loc, OpOperand &operand) {
         auto storeOp =
             cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+        SmallVector<OpFoldResult> offsets = storeOp.getMixedOffsets();
+        for (auto [idx, offset] : llvm::enumerate(offsets)) {
+          auto v = offset.dyn_cast<Value>();
+          if (!v) continue;
+          auto applyOp = v.getDefiningOp<affine::AffineApplyOp>();
+          if (!applyOp) continue;
+          offset = b.create<affine::AffineApplyOp>(loc, applyOp.getAffineMap(),
+                                                   applyOp.getMapOperands())
+                       .getResult();
+        }
         auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
             loc, storeOp.getValue().getType().cast<RankedTensorType>(),
-            storeOp.getTarget(), storeOp.getTargetDims(),
-            storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
-            storeOp.getMixedStrides());
+            storeOp.getTarget(), storeOp.getTargetDims(), offsets,
+            storeOp.getMixedSizes(), storeOp.getMixedStrides());
         return loadOp.getResult();
       });
 }
