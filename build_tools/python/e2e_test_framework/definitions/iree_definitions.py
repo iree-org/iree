@@ -235,6 +235,7 @@ class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   composite_id: str
   name: str
+  tags: List[str]
   imported_model: ImportedModel
   compile_config: CompileConfig
   # Full list of flags to compile with, derived from sub-components, with
@@ -267,7 +268,10 @@ class ModuleGenerationConfig(object):
                                  map_funcs=[_replace_module_dir_placeholder])
 
   @classmethod
-  def build(cls, imported_model: ImportedModel, compile_config: CompileConfig):
+  def build(cls,
+            imported_model: ImportedModel,
+            compile_config: CompileConfig,
+            tags: Sequence[str] = ()):
     composite_id = unique_ids.hash_composite_id(
         [imported_model.composite_id, compile_config.id])
     # Format: <imported_model_name> <compile_config_name>
@@ -276,6 +280,7 @@ class ModuleGenerationConfig(object):
         compile_config, imported_model.import_config.dialect_type)
     return cls(composite_id=composite_id,
                name=name,
+               tags=list(tags),
                imported_model=imported_model,
                compile_config=compile_config,
                compile_flags=compile_flags)

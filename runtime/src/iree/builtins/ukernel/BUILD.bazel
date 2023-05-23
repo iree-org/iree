@@ -52,7 +52,7 @@ iree_runtime_cc_library(
 
 # Entry points.
 iree_runtime_cc_library(
-    name = "ukernel",
+    name = "ukernel_noweak",
     srcs = [
         "elementwise.c",
         "mmt4d.c",
@@ -64,12 +64,29 @@ iree_runtime_cc_library(
         "unpack_tile.c",
     ] + internal_headers,
     hdrs = ["api.h"],
+    visibility = ["//visibility:private"],
     deps = [
         ":exported_bits",
         ":static_assert",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/builtins/ukernel/arch:config",
         "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "zzz_weak_linklast",
+    srcs = ["weak.c"],
+    visibility = ["//visibility:private"],
+    deps = [":internal_headers"],
+)
+
+iree_runtime_cc_library(
+    name = "ukernel",
+    hdrs = ["api.h"],
+    deps = [
+        ":ukernel_noweak",
+        ":zzz_weak_linklast",
     ],
 )
 
@@ -141,11 +158,7 @@ UKERNEL_HDRS = [
     "//runtime/src/iree/builtins/ukernel:pack_internal.h",
     "//runtime/src/iree/builtins/ukernel:elementwise.h",
     "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h",
     "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h",
     "//runtime/src/iree/schemas:cpu_data.h",
     "//runtime/src/iree/schemas:cpu_feature_bits.inl",
 ]

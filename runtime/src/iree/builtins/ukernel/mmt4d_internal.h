@@ -86,4 +86,8 @@ enum { iree_uk_mmt4d_tile_generic_max_bytes = 4096 };
 iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func(
     const iree_uk_mmt4d_params_t* params);
 
+// Architecture-specific implementation.
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
+    const iree_uk_mmt4d_params_t* params);
+
 #endif  // IREE_BUILTINS_UKERNEL_MMT4D_INTERNAL_H_

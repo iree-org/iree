@@ -22,10 +22,6 @@ iree_bitcode_library(
     "unpack_x86_64.c"
   HDRS
     "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h"
     "//runtime/src/iree/builtins/ukernel:api.h"
     "//runtime/src/iree/builtins/ukernel:common.h"
     "//runtime/src/iree/builtins/ukernel:elementwise.h"
@@ -72,10 +68,6 @@ iree_bitcode_library(
     "unpack_x86_64_avx2_fma.c"
   HDRS
     "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h"
     "//runtime/src/iree/builtins/ukernel:api.h"
     "//runtime/src/iree/builtins/ukernel:common.h"
     "//runtime/src/iree/builtins/ukernel:elementwise.h"
@@ -124,10 +116,6 @@ iree_bitcode_library(
     "unpack_x86_64_avx512_base.c"
   HDRS
     "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h"
     "//runtime/src/iree/builtins/ukernel:api.h"
     "//runtime/src/iree/builtins/ukernel:common.h"
     "//runtime/src/iree/builtins/ukernel:elementwise.h"
@@ -177,10 +165,6 @@ iree_bitcode_library(
     "mmt4d_x86_64_avx512_vnni.c"
   HDRS
     "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h"
     "//runtime/src/iree/builtins/ukernel:api.h"
     "//runtime/src/iree/builtins/ukernel:common.h"
     "//runtime/src/iree/builtins/ukernel:elementwise.h"
@@ -356,11 +340,6 @@ endif()
 iree_cc_library(
   NAME
     x86_64
-  HDRS
-    "mmt4d_x86_64.h"
-    "pack_x86_64.h"
-    "query_tile_sizes_x86_64.h"
-    "unpack_x86_64.h"
   SRCS
     "mmt4d_x86_64.c"
     "pack_x86_64.c"

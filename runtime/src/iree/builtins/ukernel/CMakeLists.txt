@@ -54,7 +54,7 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    ukernel
+    ukernel_noweak
   HDRS
     "api.h"
   SRCS
@@ -85,6 +85,27 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    zzz_weak_linklast
+  SRCS
+    "weak.c"
+  DEPS
+    ::internal_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    ukernel
+  HDRS
+    "api.h"
+  DEPS
+    ::ukernel_noweak
+    ::zzz_weak_linklast
+  PUBLIC
+)
+
 if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 
 iree_bitcode_library(
@@ -99,10 +120,6 @@ iree_bitcode_library(
     "unpack_tile.c"
   HDRS
     "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h"
     "//runtime/src/iree/builtins/ukernel:api.h"
     "//runtime/src/iree/builtins/ukernel:common.h"
     "//runtime/src/iree/builtins/ukernel:elementwise.h"

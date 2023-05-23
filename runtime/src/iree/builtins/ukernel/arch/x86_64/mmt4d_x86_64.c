@@ -4,9 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64.h"
-
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_i8i8i32_8x8x2_x86_64_avx2_fma)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
@@ -90,7 +89,7 @@ static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_x86_64_i8i8i32(
   return 0;
 }
 
-iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_x86_64(
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
     const iree_uk_mmt4d_params_t* params) {
   switch (iree_uk_mmt4d_type(params->flags)) {
     case iree_uk_mmt4d_type_f32f32f32:
