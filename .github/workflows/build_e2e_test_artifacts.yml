@@ -13,9 +13,6 @@ name: Build E2E Test Artifacts
 on:
   workflow_call:
     inputs:
-      gcs-suffix:
-        default: ""
-        type: string
       runner-group:
         required: true
         type: string
@@ -66,7 +63,7 @@ env:
   # want that to be the current attempt, not whatever attempt the setup step
   # last ran in. It therefore can't be passed in via inputs because the env
   # context isn't available there.
-  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}${{ inputs.gcs-suffix }}/${{ github.run_attempt }}
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 jobs:
   build_e2e_test_artifacts:
