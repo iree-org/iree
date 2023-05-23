@@ -571,10 +571,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   if (!enableMicrokernels) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUMmt4dVectorLoweringPass());
-#if 0
     nestedModulePM.addNestedPass<func::FuncOp>(
         createOptimizeVectorTransferPass(/*flatten=*/true));
-#endif
   }
 }
 
