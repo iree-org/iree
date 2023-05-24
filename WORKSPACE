@@ -37,11 +37,9 @@ new_local_repository(
     path = "third_party/llvm-project",
 )
 
-load("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure", "llvm_disable_optional_support_deps")
+load("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure")
 
 llvm_configure(name = "llvm-project")
-
-llvm_disable_optional_support_deps()
 
 ###############################################################################
 
