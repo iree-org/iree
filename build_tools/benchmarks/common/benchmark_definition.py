@@ -721,20 +721,17 @@ class CompilationStatistics(object):
   # Module compilation time in ms.
   compilation_time_ms: int
   # IR-level statistics
-  ir_stats: Optional[IRStatistics]
+  ir_stats: IRStatistics
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    ir_stats_json = json_object.get("ir_stats")
-    ir_stats = None if ir_stats_json is None else IRStatistics.from_json_object(
-        ir_stats_json)
     return CompilationStatistics(
         compilation_info=CompilationInfo.from_json_object(
             json_object["compilation_info"]),
         module_component_sizes=ModuleComponentSizes.from_json_object(
             json_object["module_component_sizes"]),
         compilation_time_ms=json_object["compilation_time_ms"],
-        ir_stats=ir_stats)
+        ir_stats=IRStatistics.from_json_object(json_object["ir_stats"]))
 
 
 @dataclasses.dataclass(frozen=True)

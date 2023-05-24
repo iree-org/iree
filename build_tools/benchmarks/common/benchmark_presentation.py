@@ -362,8 +362,7 @@ def collect_all_compilation_metrics(
 
     for compile_stats in file_results.compilation_statistics:
       component_sizes = compile_stats.module_component_sizes
-      total_dispatch_number = (-1 if compile_stats.ir_stats is None else
-                               compile_stats.ir_stats.dispatch_count)
+      total_dispatch_number = compile_stats.ir_stats.dispatch_count
 
       target_name = str(compile_stats.compilation_info)
       if target_name in target_names:

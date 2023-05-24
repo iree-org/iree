@@ -53,7 +53,7 @@ DISPATCH_COMPONENT_PATTERNS = [
 @dataclass(frozen=True)
 class ModuleInfo(object):
   module_path: pathlib.Path
-  stream_stats_path: Optional[pathlib.Path] = None
+  stream_stats_path: pathlib.Path
 
 
 def match_module_cmake_target(module_path: pathlib.PurePath) -> Optional[str]:
@@ -215,7 +215,8 @@ def get_module_map_from_benchmark_suite(
           target_arch=benchmark_case.target_arch,
           compile_tags=tuple(benchmark_case.bench_mode))
       module_map[compilation_info] = ModuleInfo(
-          module_path=(benchmark_case_dir / module_path).resolve())
+          module_path=(benchmark_case_dir / module_path).resolve(),
+          stream_stats_path=None)
 
   return module_map
 
@@ -317,13 +318,10 @@ def main(args: argparse.Namespace):
           f"Module path isn't a module cmake target: {module_path}")
     compilation_time_ms = target_build_time_map[cmake_target]
 
-    if module_info.stream_stats_path is None:
-      ir_stats = None
-    else:
-      stream_stats_json = json.loads(module_info.stream_stats_path.read_text())
-      exec_stats_json = stream_stats_json["stream-aggregate"]["execution"]
-      ir_stats = benchmark_definition.IRStatistics(
-          dispatch_count=exec_stats_json["dispatch-count"])
+    stream_stats_json = json.loads(module_info.stream_stats_path.read_text())
+    exec_stats_json = stream_stats_json["stream-aggregate"]["execution"]
+    ir_stats = benchmark_definition.IRStatistics(
+        dispatch_count=exec_stats_json["dispatch-count"])
 
     compilation_statistics = CompilationStatistics(
         compilation_info=compilation_info,
