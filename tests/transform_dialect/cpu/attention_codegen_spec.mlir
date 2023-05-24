@@ -10,6 +10,7 @@ transform.sequence failures(propagate) {
     %forall_grid, %tiled_attention =
     transform.structured.tile_to_forall_op %attention num_threads [2]
       ( mapping = [#gpu.block<x>] )
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid
     : (!pdl.operation) -> ()
 
@@ -24,7 +25,7 @@ transform.sequence failures(propagate) {
     // ==========================================
     %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-    %func_3 = transform.structured.vectorize %func
+    %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
     transform.iree.apply_patterns %variant_op
         { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 

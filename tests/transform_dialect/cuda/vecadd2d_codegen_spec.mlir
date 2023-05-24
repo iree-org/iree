@@ -5,6 +5,7 @@ transform.sequence failures(propagate) {
   %generics = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %forall_grid, %_ = transform.structured.tile_to_forall_op %generics 
                   tile_sizes [5, 3] ( mapping = [#gpu.block<z>, #gpu.block<x>])
+                  : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
 
 

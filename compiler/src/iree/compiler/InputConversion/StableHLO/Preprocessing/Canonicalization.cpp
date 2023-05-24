@@ -12,6 +12,10 @@
 
 #include "iree/compiler/InputConversion/StableHLO/Preprocessing/Passes.h"
 #include "iree/compiler/InputConversion/StableHLO/Preprocessing/Rewriters.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/CommonFolders.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
@@ -19,6 +23,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
@@ -45,6 +50,338 @@ static bool isIotaRange(ElementsAttr attr) {
 
   return true;
 }
+
+/// Matches when either of the submatchers match.
+template <typename MatcherA, typename MatcherB>
+struct m_AnyOf {
+  m_AnyOf(MatcherA a, MatcherB b) : matcherA(a), matcherB(b) {}
+
+  bool match(Operation *op) { return matcherA.match(op) || matcherB.match(op); }
+
+  MatcherA matcherA;
+  MatcherB matcherB;
+};
+
+template <typename MatcherA, typename MatcherB>
+m_AnyOf(MatcherA, MatcherB) -> m_AnyOf<MatcherA, MatcherB>;
+
+/// Binary constant folder that used a generic folder function to handle both
+/// ints and floats.
+template <typename Fn>
+static TypedAttr foldBinaryOpIntOrFloat(TypedAttr lhs, TypedAttr rhs,
+                                        Fn &&folder) {
+  Attribute operands[2] = {lhs, rhs};
+  Type elemTy = getElementTypeOrSelf(cast<TypedAttr>(lhs).getType());
+
+  if (isa<IntegerType>(elemTy)) {
+    if (Attribute res = constFoldBinaryOp<IntegerAttr>(
+            operands, [&folder](const APInt &lhs, const APInt &rhs) {
+              return folder(lhs, rhs);
+            })) {
+      return cast<TypedAttr>(res);
+    }
+    return nullptr;
+  }
+
+  if (isa<FloatType>(elemTy)) {
+    if (Attribute res = constFoldBinaryOp<FloatAttr>(
+            operands, [&folder](const APFloat &lhs, const APFloat &rhs) {
+              return folder(lhs, rhs);
+            })) {
+      return cast<TypedAttr>(res);
+    }
+    return nullptr;
+  }
+
+  return nullptr;
+}
+
+struct AddOpCanon final : OpRewritePattern<mlir::stablehlo::AddOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::AddOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    if (matchPattern(lhs, m_Zero())) {
+      rewriter.replaceOp(op, rhs);
+      return success();
+    }
+
+    if (matchPattern(rhs, m_AnyOf(m_Zero(), m_NegZeroFloat()))) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+
+    TypedAttr lhsAttr;
+    matchPattern(lhs, m_Constant(&lhsAttr));
+
+    TypedAttr rhsAttr;
+    matchPattern(rhs, m_Constant(&rhsAttr));
+
+    // The canonical form has the constant operand as the RHS.
+    if (isa<IntegerType>(type.getElementType()) && lhsAttr && !rhsAttr) {
+      rewriter.updateRootInPlace(op, [op, lhs, rhs] {
+        op->setOperands(ValueRange{rhs, lhs});
+      });
+      return success();
+    }
+
+    if (lhsAttr && rhsAttr) {
+      if (TypedAttr res =
+              foldBinaryOpIntOrFloat(lhsAttr, rhsAttr, std::plus<>{})) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
+
+struct SubtractOpCanon final : OpRewritePattern<mlir::stablehlo::SubtractOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::SubtractOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    if (isa<IntegerType>(type.getElementType()) && lhs == rhs) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+          op, rewriter.getZeroAttr(op.getType()));
+      return success();
+    }
+
+    // Subtraction of 0.
+    if (matchPattern(rhs, m_AnyOf(m_Zero(), m_PosZeroFloat()))) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+
+    TypedAttr lhsAttr;
+    matchPattern(lhs, m_Constant(&lhsAttr));
+
+    TypedAttr rhsAttr;
+    matchPattern(rhs, m_Constant(&rhsAttr));
+
+    if (lhsAttr && rhsAttr) {
+      if (TypedAttr res =
+              foldBinaryOpIntOrFloat(lhsAttr, rhsAttr, std::minus<>{})) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
+
+struct MulOpCanon final : OpRewritePattern<mlir::stablehlo::MulOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::MulOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    // Multiplication by 0. This fold is not trivial for floats in presence of
+    // NaN values.
+    if (matchPattern(lhs, m_Zero())) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+    if (matchPattern(rhs, m_Zero())) {
+      rewriter.replaceOp(op, rhs);
+      return success();
+    }
+
+    // Multiplication by 1.
+    if (matchPattern(rhs, m_One())) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+
+    TypedAttr lhsAttr;
+    matchPattern(lhs, m_Constant(&lhsAttr));
+
+    TypedAttr rhsAttr;
+    matchPattern(rhs, m_Constant(&rhsAttr));
+
+    // The canonical form has the constant operand as the RHS.
+    if (isa<IntegerType>(type.getElementType()) && lhsAttr && !rhsAttr) {
+      rewriter.updateRootInPlace(op, [op, lhs, rhs] {
+        op->setOperands(ValueRange{rhs, lhs});
+      });
+      return success();
+    }
+
+    if (lhsAttr && rhsAttr) {
+      if (TypedAttr res =
+              foldBinaryOpIntOrFloat(lhsAttr, rhsAttr, std::multiplies<>{})) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
+
+static mlir::stablehlo::ComparisonDirection invertDirection(
+    mlir::stablehlo::ComparisonDirection direction) {
+  using mlir::stablehlo::ComparisonDirection;
+
+  switch (direction) {
+    case ComparisonDirection::EQ:
+      return ComparisonDirection::EQ;
+    case ComparisonDirection::GE:
+      return ComparisonDirection::LE;
+    case ComparisonDirection::LE:
+      return ComparisonDirection::GE;
+    case ComparisonDirection::GT:
+      return ComparisonDirection::LT;
+    case ComparisonDirection::LT:
+      return ComparisonDirection::GT;
+    case ComparisonDirection::NE:
+      return ComparisonDirection::NE;
+  }
+
+  llvm_unreachable("Unhandled case");
+}
+
+static APInt calculateComp(mlir::stablehlo::ComparisonType kind,
+                           mlir::stablehlo::ComparisonDirection direction,
+                           const APInt &lhs, const APInt &rhs) {
+  using mlir::stablehlo::ComparisonDirection;
+  using mlir::stablehlo::ComparisonType;
+  assert(llvm::is_contained({ComparisonType::SIGNED, ComparisonType::UNSIGNED},
+                            kind) &&
+         "Not an integer comparison");
+
+  auto asBit = [](bool value) {
+    return value ? APInt::getAllOnes(1) : APInt::getZero(1);
+  };
+
+  // Signed comparison.
+  if (kind == ComparisonType::SIGNED) {
+    switch (direction) {
+      case ComparisonDirection::EQ:
+        return asBit(lhs == rhs);
+      case ComparisonDirection::GE:
+        return asBit(lhs.sge(rhs));
+      case ComparisonDirection::GT:
+        return asBit(lhs.sgt(rhs));
+      case ComparisonDirection::LE:
+        return asBit(lhs.sle(rhs));
+      case ComparisonDirection::LT:
+        return asBit(lhs.slt(rhs));
+      case ComparisonDirection::NE:
+        return asBit(lhs != rhs);
+    }
+  }
+
+  // Unsigned comparison.
+  switch (direction) {
+    case ComparisonDirection::EQ:
+      return asBit(lhs == rhs);
+    case ComparisonDirection::GE:
+      return asBit(lhs.uge(rhs));
+    case ComparisonDirection::GT:
+      return asBit(lhs.ugt(rhs));
+    case ComparisonDirection::LE:
+      return asBit(lhs.ule(rhs));
+    case ComparisonDirection::LT:
+      return asBit(lhs.ult(rhs));
+    case ComparisonDirection::NE:
+      return asBit(lhs != rhs);
+  }
+
+  llvm_unreachable("Unhandled case");
+}
+
+struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::CompareOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    // Bail out on non-integer comparison.
+    // TODO: Support more comparison types.
+    using mlir::stablehlo::ComparisonType;
+    std::optional<ComparisonType> compType = op.getCompareType();
+    if (!compType ||
+        !llvm::is_contained({ComparisonType::SIGNED, ComparisonType::UNSIGNED},
+                            *compType)) {
+      return failure();
+    }
+
+    using mlir::stablehlo::ComparisonDirection;
+    ComparisonDirection direction = op.getComparisonDirection();
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    if (lhs == rhs) {
+      switch (direction) {
+        case ComparisonDirection::EQ:
+        case ComparisonDirection::GE:
+        case ComparisonDirection::LE: {
+          rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+              op, SplatElementsAttr::get(type, rewriter.getBoolAttr(true)));
+          return success();
+        }
+        case ComparisonDirection::GT:
+        case ComparisonDirection::LT:
+        case ComparisonDirection::NE: {
+          rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+              op, rewriter.getZeroAttr(type));
+          return success();
+        }
+      }
+      llvm_unreachable("Unhandled case");
+    }
+
+    TypedAttr lhsAttr;
+    matchPattern(lhs, m_Constant(&lhsAttr));
+
+    TypedAttr rhsAttr;
+    matchPattern(rhs, m_Constant(&rhsAttr));
+
+    // The canonical form has the constant operand as the RHS.
+    if (lhsAttr && !rhsAttr) {
+      rewriter.updateRootInPlace(op, [&op, direction, lhs, rhs] {
+        op.setComparisonDirection(invertDirection(direction));
+        op->setOperands(ValueRange{rhs, lhs});
+      });
+      return success();
+    }
+
+    if (lhsAttr && rhsAttr) {
+      if (Attribute res = constFoldBinaryOp<IntegerAttr>(
+              ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
+              [direction, kind = *compType](const APInt &a, const APInt &b) {
+                return calculateComp(kind, direction, a, b);
+              })) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
 
 struct BroadcastInDimOpCanon final
     : OpRewritePattern<mlir::stablehlo::BroadcastInDimOp> {
@@ -309,9 +646,16 @@ struct StableHLOCanonicalize final
 void populateCanonicalizationPatterns(MLIRContext *context,
                                       RewritePatternSet *patterns,
                                       PatternBenefit benefit) {
-  patterns->add<BroadcastInDimOpCanon, ConcatenateOpCanon, ConvertOpCanon,
-                DynamicReshapeOpCanon, GetTupleElementOpCanon, RealOpCanon,
-                ImagOpCanon, GetDimensionSizeOpCanon, ReshapeOpCanon,
-                TransposeOpCanon>(context, benefit);
+  patterns->add<
+      // Arithmetic ops.
+      AddOpCanon, SubtractOpCanon, MulOpCanon, CompareOpCanon,
+      // Complex ops.
+      RealOpCanon, ImagOpCanon,
+      // Query ops.
+      GetDimensionSizeOpCanon, GetTupleElementOpCanon,
+      // Shape manipulation(-ish) ops.
+      BroadcastInDimOpCanon, ConcatenateOpCanon, ConvertOpCanon,
+      DynamicReshapeOpCanon, ReshapeOpCanon, TransposeOpCanon>(context,
+                                                               benefit);
 }
 }  // namespace mlir::iree_compiler::stablehlo

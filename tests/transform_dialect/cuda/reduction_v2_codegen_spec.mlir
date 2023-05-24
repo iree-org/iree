@@ -10,16 +10,19 @@ transform.sequence failures(propagate) {
   %forall_grid, %grid_reduction =
     transform.structured.tile_to_forall_op %reduction tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
-  transform.structured.fuse_into_containing_op %fill into %forall_grid
+  transform.structured.fuse_into_containing_op %fill into %forall_grid : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Step 2. Split the reduction to get meatier parallelism.
   // ===========================================================================
   %forall, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
     transform.structured.tile_reduction_using_scf %grid_reduction by tile_sizes = [0, 128]
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   %_1:2 =
     transform.structured.tile_to_forall_op %block_more_parallel_op_2 num_threads [0, 32]
     ( mapping = [#gpu.thread<x>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
   // Step 3. Second level of tiling parallelizes to threads.
   // ===========================================================================
@@ -27,17 +30,19 @@ transform.sequence failures(propagate) {
   %_2:2 =
     transform.structured.tile_to_forall_op %block_more_parallel_fill_op_2 tile_sizes [0, 4]
     ( mapping = [#gpu.thread<x>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   // 2nd op is [parallel, reduction] of 1x128, map the 1-dim to threadIdx.y to
   // trigger mapping of the reduction to threadIdx.x via predication via `if (x==0)`.
   %_3:2 =
     transform.structured.tile_to_forall_op %block_combiner_op_2 tile_sizes [1] 
     ( mapping = [#gpu.thread<y>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-  %func_3 = transform.structured.vectorize %func
+  %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================

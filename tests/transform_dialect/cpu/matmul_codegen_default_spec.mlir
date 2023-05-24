@@ -8,7 +8,7 @@ transform.sequence failures(propagate) {
   // ===================================================
   %forall, %tiled_generic =
     transform.structured.tile_to_forall_op %matmul tile_sizes [2]
-      ( mapping = [#gpu.block<x>] )
+      ( mapping = [#gpu.block<x>] ) : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
     : (!pdl.operation) -> ()
 
