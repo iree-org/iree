@@ -55,6 +55,7 @@ iree_cc_library(
     "BufferizationInterfaces.cpp"
   DEPS
     IREELinalgExtDialect
+    MLIRAffineDialect
     MLIRArithTransforms
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
