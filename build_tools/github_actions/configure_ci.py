@@ -302,6 +302,11 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
     preset_options.remove(DEFAULT_BENCHMARK_PRESET)
     preset_options.update(DEFAULT_BENCHMARK_PRESET_GROUP)
 
+  if preset_options.intersection(DEFAULT_BENCHMARK_PRESET_GROUP):
+    # The is a sugar to run the compilation benchmarks when any default
+    # benchmark preset is present.
+    preset_options.add("comp-stats")
+
   preset_options = sorted(preset_options)
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
