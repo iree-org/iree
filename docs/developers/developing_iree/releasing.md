@@ -71,13 +71,13 @@ regressions or request that some feature make the cut.
 1. (Googlers only) Integrate into Google's monorepo, following
    http://go/iree-g3-integrate-playbook.
 
-2. Open the release on GitHub. Rename the release from “candidate to “stable",
+2. (Googlers only) Push to PyPI using
+   [pypi_deploy.sh](../../../build_tools/python_deploy/pypi_deploy.sh) and the
+   password stored at http://go/iree-pypi-password.
+
+3. Open the release on GitHub. Rename the release from “candidate to “stable",
    uncheck the option for “pre-release”, and check the option for "latest".
 
    ![rename_release](../assets/rename_release.png)
 
    ![promote_release](../assets/promote_release.png)
-
-3. (Googlers only) Push to PyPI using
-   [pypi_deploy.sh](../../../build_tools/python_deploy/pypi_deploy.sh) and the
-   password stored at http://go/iree-pypi-password.
