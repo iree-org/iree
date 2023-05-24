@@ -505,7 +505,6 @@ extern void mlirShapedTypeGetDynamicSize();
 extern void mlirShapedTypeGetDynamicStrideOrOffset();
 extern void mlirShapedTypeGetElementType();
 extern void mlirShapedTypeGetRank();
-extern void mlirShapedTypeGetTypeID();
 extern void mlirShapedTypeHasRank();
 extern void mlirShapedTypeHasStaticShape();
 extern void mlirShapedTypeIsDynamicDim();
@@ -1120,7 +1119,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirShapedTypeGetDynamicStrideOrOffset;
   x += (uintptr_t)&mlirShapedTypeGetElementType;
   x += (uintptr_t)&mlirShapedTypeGetRank;
-  x += (uintptr_t)&mlirShapedTypeGetTypeID;
   x += (uintptr_t)&mlirShapedTypeHasRank;
   x += (uintptr_t)&mlirShapedTypeHasStaticShape;
   x += (uintptr_t)&mlirShapedTypeIsDynamicDim;

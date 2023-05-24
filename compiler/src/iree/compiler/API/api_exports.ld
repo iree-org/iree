@@ -498,7 +498,6 @@ VER_0 {
     mlirShapedTypeGetDynamicStrideOrOffset;
     mlirShapedTypeGetElementType;
     mlirShapedTypeGetRank;
-    mlirShapedTypeGetTypeID;
     mlirShapedTypeHasRank;
     mlirShapedTypeHasStaticShape;
     mlirShapedTypeIsDynamicDim;

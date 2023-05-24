@@ -496,7 +496,6 @@ _mlirShapedTypeGetDynamicSize
 _mlirShapedTypeGetDynamicStrideOrOffset
 _mlirShapedTypeGetElementType
 _mlirShapedTypeGetRank
-_mlirShapedTypeGetTypeID
 _mlirShapedTypeHasRank
 _mlirShapedTypeHasStaticShape
 _mlirShapedTypeIsDynamicDim

@@ -497,7 +497,6 @@ EXPORTS
   mlirShapedTypeGetDynamicStrideOrOffset
   mlirShapedTypeGetElementType
   mlirShapedTypeGetRank
-  mlirShapedTypeGetTypeID
   mlirShapedTypeHasRank
   mlirShapedTypeHasStaticShape
   mlirShapedTypeIsDynamicDim
