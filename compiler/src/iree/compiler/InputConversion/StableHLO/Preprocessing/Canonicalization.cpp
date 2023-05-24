@@ -429,7 +429,7 @@ struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
     for (auto [condElem, trueElem, falseElem] : llvm::zip_equal(
              cond.getValues<bool>(), trueAttr.getValues<Attribute>(),
              falseAttr.getValues<Attribute>())) {
-      newValues.push_back(condElem == 1 ? trueElem : falseElem);
+      newValues.push_back(condElem ? trueElem : falseElem);
     }
 
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
