@@ -5,7 +5,7 @@ IREE cuts automated releases via a workflow that is
 The only constraint placed on the commit that is released is that it has passed
 all CI checks. These are published on GitHub with the "pre-release" status. For
 debugging this process, see the
-[Debugging releases playbook](../debugging/releases.md).
+[Debugging releases playbook](/docs/developers/debugging/releases.md).
 
 We periodically promote one of these candidates to a "stable" release by
 removing the "pre-release" status. This makes it show up as a "latest" release
@@ -73,12 +73,12 @@ regressions or request that some feature make the cut.
    required to complete this, STOP: do not promote the candidate.
 
 2. (Googlers only) Push to PyPI using
-   [pypi_deploy.sh](../../../build_tools/python_deploy/pypi_deploy.sh) and the
+   [pypi_deploy.sh](/build_tools/python_deploy/pypi_deploy.sh) and the
    password stored at http://go/iree-pypi-password.
 
 3. Open the release on GitHub. Rename the release from “candidate to “stable",
    uncheck the option for “pre-release”, and check the option for "latest".
 
-   ![rename_release](../assets/rename_release.png)
+   ![rename_release](/docs/developers/assets/rename_release.png)
 
-   ![promote_release](../assets/promote_release.png)
+   ![promote_release](/docs/developers/assets/promote_release.png)
