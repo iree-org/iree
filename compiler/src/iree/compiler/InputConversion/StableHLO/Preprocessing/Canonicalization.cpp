@@ -12,6 +12,8 @@
 
 #include "iree/compiler/InputConversion/StableHLO/Preprocessing/Passes.h"
 #include "iree/compiler/InputConversion/StableHLO/Preprocessing/Rewriters.h"
+#include "llvm/ADT/APFloat.h"
+#include "mlir/Dialect/CommonFolders.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
@@ -19,6 +21,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
@@ -45,6 +48,193 @@ static bool isIotaRange(ElementsAttr attr) {
 
   return true;
 }
+
+/// Matches when either of the submatchers match.
+template <typename MatcherA, typename MatcherB>
+struct m_AnyOf {
+  m_AnyOf(MatcherA a, MatcherB b) : matcherA(a), matcherB(b) {}
+
+  bool match(Operation *op) { return matcherA.match(op) || matcherB.match(op); }
+
+  MatcherA matcherA;
+  MatcherB matcherB;
+};
+
+template <typename MatcherA, typename MatcherB>
+m_AnyOf(MatcherA, MatcherB) -> m_AnyOf<MatcherA, MatcherB>;
+
+/// Binary constant folder that used a generic folder function to handle both
+/// ints and floats.
+template <typename Fn>
+static TypedAttr foldBinaryOpIntOrFloat(TypedAttr lhs, TypedAttr rhs,
+                                        Fn &&folder) {
+  Attribute operands[2] = {lhs, rhs};
+  Type elemTy = getElementTypeOrSelf(cast<TypedAttr>(lhs).getType());
+
+  if (isa<IntegerType>(elemTy)) {
+    if (Attribute res = constFoldBinaryOp<IntegerAttr>(
+            operands, [&folder](const APInt &lhs, const APInt &rhs) {
+              return folder(lhs, rhs);
+            })) {
+      return cast<TypedAttr>(res);
+    }
+    return nullptr;
+  }
+
+  if (isa<FloatType>(elemTy)) {
+    if (Attribute res = constFoldBinaryOp<FloatAttr>(
+            operands, [&folder](const APFloat &lhs, const APFloat &rhs) {
+              return folder(lhs, rhs);
+            })) {
+      return cast<TypedAttr>(res);
+    }
+    return nullptr;
+  }
+
+  return nullptr;
+}
+
+struct AddOpCanon final : OpRewritePattern<mlir::stablehlo::AddOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::AddOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    if (matchPattern(lhs, m_Zero())) {
+      rewriter.replaceOp(op, rhs);
+      return success();
+    }
+
+    if (matchPattern(rhs, m_AnyOf(m_Zero(), m_NegZeroFloat()))) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+
+    TypedAttr lhsAttr;
+    matchPattern(lhs, m_Constant(&lhsAttr));
+
+    TypedAttr rhsAttr;
+    matchPattern(rhs, m_Constant(&rhsAttr));
+
+    // The canonical form has the constant operand as the RHS.
+    if (isa<IntegerType>(type.getElementType()) && lhsAttr && !rhsAttr) {
+      rewriter.updateRootInPlace(op, [op, lhs, rhs] {
+        op->setOperands(ValueRange{rhs, lhs});
+      });
+      return success();
+    }
+
+    if (lhsAttr && rhsAttr) {
+      if (TypedAttr res =
+              foldBinaryOpIntOrFloat(lhsAttr, rhsAttr, std::plus<>{})) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
+
+struct SubtractOpCanon final : OpRewritePattern<mlir::stablehlo::SubtractOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::SubtractOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    if (isa<IntegerType>(type.getElementType()) && lhs == rhs) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+          op, rewriter.getZeroAttr(op.getType()));
+      return success();
+    }
+
+    // Subtraction of 0.
+    if (matchPattern(rhs, m_AnyOf(m_Zero(), m_PosZeroFloat()))) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+
+    TypedAttr lhsAttr;
+    matchPattern(lhs, m_Constant(&lhsAttr));
+
+    TypedAttr rhsAttr;
+    matchPattern(rhs, m_Constant(&rhsAttr));
+
+    if (lhsAttr && rhsAttr) {
+      if (TypedAttr res =
+              foldBinaryOpIntOrFloat(lhsAttr, rhsAttr, std::minus<>{})) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
+
+struct MulOpCanon final : OpRewritePattern<mlir::stablehlo::MulOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::MulOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    // Multiplication by 0. This fold is not trivial for floats in presence of
+    // NaN values.
+    if (matchPattern(lhs, m_Zero())) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+    if (matchPattern(rhs, m_Zero())) {
+      rewriter.replaceOp(op, rhs);
+      return success();
+    }
+
+    // Multiplication by 1.
+    if (matchPattern(rhs, m_One())) {
+      rewriter.replaceOp(op, lhs);
+      return success();
+    }
+
+    TypedAttr lhsAttr;
+    matchPattern(lhs, m_Constant(&lhsAttr));
+
+    TypedAttr rhsAttr;
+    matchPattern(rhs, m_Constant(&rhsAttr));
+
+    // The canonical form has the constant operand as the RHS.
+    if (isa<IntegerType>(type.getElementType()) && lhsAttr && !rhsAttr) {
+      rewriter.updateRootInPlace(op, [op, lhs, rhs] {
+        op->setOperands(ValueRange{rhs, lhs});
+      });
+      return success();
+    }
+
+    if (lhsAttr && rhsAttr) {
+      if (TypedAttr res =
+              foldBinaryOpIntOrFloat(lhsAttr, rhsAttr, std::multiplies<>{})) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
 
 struct BroadcastInDimOpCanon final
     : OpRewritePattern<mlir::stablehlo::BroadcastInDimOp> {
@@ -309,9 +499,10 @@ struct StableHLOCanonicalize final
 void populateCanonicalizationPatterns(MLIRContext *context,
                                       RewritePatternSet *patterns,
                                       PatternBenefit benefit) {
-  patterns->add<BroadcastInDimOpCanon, ConcatenateOpCanon, ConvertOpCanon,
-                DynamicReshapeOpCanon, GetTupleElementOpCanon, RealOpCanon,
-                ImagOpCanon, GetDimensionSizeOpCanon, ReshapeOpCanon,
-                TransposeOpCanon>(context, benefit);
+  patterns->add<AddOpCanon, SubtractOpCanon, MulOpCanon, BroadcastInDimOpCanon,
+                ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon,
+                GetTupleElementOpCanon, RealOpCanon, ImagOpCanon,
+                GetDimensionSizeOpCanon, ReshapeOpCanon, TransposeOpCanon>(
+      context, benefit);
 }
 }  // namespace mlir::iree_compiler::stablehlo
