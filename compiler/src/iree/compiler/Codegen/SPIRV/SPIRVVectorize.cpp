@@ -328,6 +328,12 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
     {
       auto result = funcOp.walk([&](linalg::LinalgOp op) {
+        // linalg.generic ops for copy are fine to not vectorize; they will be
+        // handled in later steps.
+        if (isa<linalg::YieldOp>(op.getBlock()->begin())) {
+          return WalkResult::advance();
+        }
+        // Other ones should error out.
         op.emitOpError("should not remain after vectorization");
         return WalkResult::interrupt();
       });
