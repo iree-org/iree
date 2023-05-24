@@ -477,6 +477,25 @@ func.func @reverse_dim1(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 
 // -----
 
+func.func @reverse_unsigned(%arg0: tensor<3x5xui32>) -> tensor<3x5xui32> {
+  %0 = "mhlo.reverse"(%arg0) {
+    dimensions = dense<1> : tensor<1xi64>
+  } : (tensor<3x5xui32>) -> tensor<3x5xui32>
+  return %0 : tensor<3x5xui32>
+}
+// CHECK-LABEL: func.func @reverse_unsigned
+// CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
+// CHECK:        %[[BITCAST:.+]] = tensor.bitcast %[[IN]] : tensor<3x5xui32> to tensor<3x5xi32>
+// CHECK:        %[[INIT:.+]] = tensor.empty() : tensor<3x5xi32>
+// CHECK:        %[[REV:.+]] = iree_linalg_ext.reverse
+// CHECK-SAME:     dimensions(dense<1> : tensor<1xi64>)
+// CHECK-SAME:     ins(%[[BITCAST]] : tensor<3x5xi32>)
+// CHECK-SAME:     outs(%[[INIT]] : tensor<3x5xi32>) : tensor<3x5xi32>
+// CHECK:        %[[BITCAST:.+]] = tensor.bitcast %[[REV]] : tensor<3x5xi32> to tensor<3x5xui32>
+// CHECK:        return %[[BITCAST]]
+
+// -----
+
 func.func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %0 = "mhlo.reverse"(%arg0) {
     dimensions = dense<[0, 1]> : tensor<2xi64>
