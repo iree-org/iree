@@ -8,10 +8,6 @@
 
 # Build e2e test artifacts using a host tools directory.
 #
-# This is copied and modified from build_tools/cmake/build_benchmarks.sh. We
-# will remove build_tools/cmake/build_benchmarks.sh once everything has been
-# migrated.
-#
 # The required IREE_HOST_BIN_DIR environment variable indicates the location
 # of the precompiled IREE binaries. The IREE_BENCHMARK_PRESETS environment 
 # variable can be set to build required artifacts for the comma-separated
