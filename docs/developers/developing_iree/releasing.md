@@ -69,7 +69,8 @@ regressions or request that some feature make the cut.
 ## Releasing
 
 1. (Googlers only) Integrate into Google's monorepo, following
-   http://go/iree-g3-integrate-playbook.
+   http://go/iree-g3-integrate-playbook. If OSS-relevant cherry-picks were
+   required to complete this, STOP: do not promote the candidate.
 
 2. (Googlers only) Push to PyPI using
    [pypi_deploy.sh](../../../build_tools/python_deploy/pypi_deploy.sh) and the
