@@ -15,6 +15,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/CommonFolders.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -383,6 +384,60 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
   }
 };
 
+struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::SelectOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value trueVal = op.getOnTrue();
+    Value falseVal = op.getOnFalse();
+
+    // Eliminate select with two identical outcomes.
+    if (trueVal == falseVal) {
+      rewriter.replaceOp(op, trueVal);
+      return success();
+    }
+
+    // Simplify when the condition is a constant.
+    Value pred = op.getPred();
+    DenseElementsAttr cond;
+    if (!matchPattern(pred, m_Constant(&cond))) {
+      return failure();
+    }
+
+    // Handle splat predicate and select either `trueVal` or `falseVal`.
+    if (cond.isSplat()) {
+      rewriter.replaceOp(op, cond.getSplatValue<bool>() ? trueVal : falseVal);
+      return success();
+    }
+
+    // Handle elementwise selection when both outcomes are also constants. This
+    // will create a new, likely non-splat constant.
+    if (cond.getNumElements() > kFoldOpEltLimit) return failure();
+
+    DenseElementsAttr trueAttr;
+    if (!matchPattern(trueVal, m_Constant(&trueAttr))) return failure();
+
+    DenseElementsAttr falseAttr;
+    if (!matchPattern(falseVal, m_Constant(&falseAttr))) return failure();
+
+    SmallVector<Attribute> newValues;
+    newValues.reserve(cond.getNumElements());
+    for (auto [condElem, trueElem, falseElem] : llvm::zip_equal(
+             cond.getValues<bool>(), trueAttr.getValues<Attribute>(),
+             falseAttr.getValues<Attribute>())) {
+      newValues.push_back(condElem ? trueElem : falseElem);
+    }
+
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+        op, DenseElementsAttr::get(type, newValues));
+    return success();
+  }
+};
+
 struct BroadcastInDimOpCanon final
     : OpRewritePattern<mlir::stablehlo::BroadcastInDimOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -648,7 +703,7 @@ void populateCanonicalizationPatterns(MLIRContext *context,
                                       PatternBenefit benefit) {
   patterns->add<
       // Arithmetic ops.
-      AddOpCanon, SubtractOpCanon, MulOpCanon, CompareOpCanon,
+      AddOpCanon, SubtractOpCanon, MulOpCanon, CompareOpCanon, SelectOpCanon,
       // Complex ops.
       RealOpCanon, ImagOpCanon,
       // Query ops.
