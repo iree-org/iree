@@ -85,6 +85,69 @@ func.func @emplaceDispatchSequence(
 
 // -----
 
+// Tests that producers can be emplaced even if they have multiple consumers.
+
+// CHECK-LABEL: @emplaceDispatchWithConsumers
+func.func @emplaceDispatchWithConsumers(
+    // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
+    %input: !stream.resource<*>, %input_size: index,
+    // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
+    %update_size: index, %target_size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c49152 = arith.constant 49152 : index
+  %c98304 = arith.constant 98304 : index
+  %c147456 = arith.constant 147456 : index
+  // CHECK: %[[TARGET:.+]] = stream.async.alloca
+  // CHECK: %[[TARGET0:.+]] = stream.async.dispatch @ex::@dispatch0({{.+}}, %[[TARGET]][%c0 to %c49152 for %[[UPDATE_SIZE]]]) : ({{.+}}) -> %[[TARGET]]{%[[TARGET_SIZE]]}
+  %update0 = stream.async.dispatch @ex::@dispatch0(%input[%c0 to %input_size for %input_size]) : (!stream.resource<*>{%input_size}) -> !stream.resource<*>{%update_size}
+  // CHECK: %[[TARGET1:.+]] = stream.async.dispatch @ex::@dispatch1({{.+}}, %[[TARGET0]][%c49152 to %c98304 for %[[UPDATE_SIZE]]]) : ({{.+}}) -> %[[TARGET0]]{%[[TARGET_SIZE]]}
+  %update1 = stream.async.dispatch @ex::@dispatch1(%update0[%c0 to %update_size for %update_size]) : (!stream.resource<*>{%input_size}) -> !stream.resource<*>{%update_size}
+  // CHECK: %[[TARGET2:.+]] = stream.async.dispatch @ex::@dispatch2({{.+}}, %[[TARGET1]][%c98304 to %c147456 for %[[UPDATE_SIZE]]]) : ({{.+}}) -> %[[TARGET1]]{%[[TARGET_SIZE]]}
+  %update2 = stream.async.dispatch @ex::@dispatch2(%update0[%c0 to %update_size for %update_size]) : (!stream.resource<*>{%input_size}) -> !stream.resource<*>{%update_size}
+  // CHECK-NOT: stream.async.alloca
+  %target = stream.async.alloca : !stream.resource<*>{%target_size}
+  // CHECK-NOT: stream.async.update
+  %target0 = stream.async.update %update0, %target[%c0 to %c49152] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
+  // CHECK-NOT: stream.async.update
+  %target1 = stream.async.update %update1, %target0[%c49152 to %c98304] : !stream.resource<*>{%update_size} -> %target0 as !stream.resource<*>{%target_size}
+  // CHECK-NOT: stream.async.update
+  %target2 = stream.async.update %update2, %target1[%c98304 to %c147456] : !stream.resource<*>{%update_size} -> %target1 as !stream.resource<*>{%target_size}
+  // CHECK: return %[[TARGET2]]
+  return %target2 : !stream.resource<*>
+}
+
+// -----
+
+// Tests that emplacement propagation through tied results is stopped by
+// hazards. Here the %temp0 in-place operation on %update0 stops the placement
+// of %update1 into %target0.
+
+// CHECK-LABEL: @dontEmplaceDispatchWithTiedResults
+func.func @dontEmplaceDispatchWithTiedResults(
+    // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
+    %input: !stream.resource<*>, %input_size: index,
+    // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
+    %update_size: index, %target_size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c49152 = arith.constant 49152 : index
+  %c98304 = arith.constant 98304 : index
+  // CHECK: stream.async.dispatch @ex::@dispatch0
+  %update0 = stream.async.dispatch @ex::@dispatch0(%input[%c0 to %input_size for %input_size]) : (!stream.resource<*>{%input_size}) -> !stream.resource<*>{%update_size}
+  // CHECK: stream.async.dispatch @ex::@dispatch1
+  %temp0 = stream.async.dispatch @ex::@dispatch1(%update0[%c0 to %update_size for %update_size]) : (!stream.resource<*>{%update_size}) -> %update0{%update_size}
+  // CHECK: stream.async.dispatch @ex::@dispatch2
+  %update1 = stream.async.dispatch @ex::@dispatch2(%temp0[%c0 to %update_size for %update_size], %update0[%c0 to %update_size for %update_size]) : (!stream.resource<*>{%update_size}, !stream.resource<*>{%update_size}) -> %temp0{%update_size}
+  // CHECK: stream.async.alloca
+  %target = stream.async.alloca : !stream.resource<*>{%target_size}
+  // CHECK: stream.async.update
+  %target0 = stream.async.update %update0, %target[%c0 to %c49152] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
+  // CHECK: stream.async.update
+  %target1 = stream.async.update %update1, %target0[%c49152 to %c98304] : !stream.resource<*>{%update_size} -> %target0 as !stream.resource<*>{%target_size}
+  return %target1 : !stream.resource<*>
+}
+
+// -----
+
 // Tests a concat-like sequence that has some inter-dependencies - these
 // dependencies shouldn't stop us from emplacing.
 
