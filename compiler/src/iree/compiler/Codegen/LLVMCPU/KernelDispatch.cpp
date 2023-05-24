@@ -1671,9 +1671,9 @@ static SmallVector<int64_t> getNhwcConvWorkgroupSizes(
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   if (isX86(targetAttr)) {
-    if (is2DConvOp(op)) return {1, 1, 8, vectorSize * 2, 1, 1, 8};
-    if (is2DDepthConvOp(op)) return {1, 1, 8, vectorSize * 2, 1, 3};
-    if (is2DPoolingOp(op)) return {1, 1, 8, vectorSize * 2, 1, 8};
+    if (is2DConvOp(op)) return {1, 1, 8, vectorSize, 1, 1, 8};
+    if (is2DDepthConvOp(op)) return {1, 1, 8, vectorSize, 1, 3};
+    if (is2DPoolingOp(op)) return {1, 1, 8, vectorSize, 1, 8};
     llvm_unreachable("unsupported conv");
   }
   if (isRISCV(targetAttr)) {
