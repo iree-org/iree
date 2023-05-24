@@ -76,7 +76,7 @@ regressions or request that some feature make the cut.
    [pypi_deploy.sh](/build_tools/python_deploy/pypi_deploy.sh) and the
    password stored at http://go/iree-pypi-password.
 
-3. Open the release on GitHub. Rename the release from “candidate to “stable",
+3. Open the release on GitHub. Rename the release from “candidate" to “stable",
    uncheck the option for “pre-release”, and check the option for "latest".
 
    ![rename_release](/docs/developers/assets/rename_release.png)
