@@ -360,7 +360,7 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     matchPattern(rhs, m_Constant(&rhsAttr));
 
     // The canonical form has the constant operand as the RHS.
-    if (isa<IntegerType>(type.getElementType()) && lhsAttr && !rhsAttr) {
+    if (lhsAttr && !rhsAttr) {
       rewriter.updateRootInPlace(op, [&op, direction, lhs, rhs] {
         op.setComparisonDirection(invertDirection(direction));
         op->setOperands(ValueRange{rhs, lhs});
