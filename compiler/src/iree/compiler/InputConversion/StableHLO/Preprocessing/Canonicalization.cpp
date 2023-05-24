@@ -639,6 +639,82 @@ struct GetDimensionSizeOpCanon final
   }
 };
 
+/// Converts gather ops to slice ops in case we have a single set of constant
+/// indices.
+struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::GatherOp gather,
+                                PatternRewriter &rewriter) const override {
+    DenseIntElementsAttr index;
+    if (!matchPattern(gather.getStartIndices(), m_Constant(&index))) {
+      return failure();
+    }
+
+    mlir::stablehlo::GatherDimensionNumbersAttr dnums =
+        gather.getDimensionNumbers();
+    if (dnums.getIndexVectorDim() != 0 || index.getType().getRank() > 1) {
+      return failure();
+    }
+
+    // TODO: Remove when the verifier catches this case what is
+    // invalid if all previous condition holds.
+    if (index.getNumElements() !=
+        static_cast<int64_t>(dnums.getStartIndexMap().size())) {
+      return failure();
+    }
+
+    auto operandType =
+        dyn_cast<RankedTensorType>(gather->getOperand(0).getType());
+    if (!operandType || !operandType.hasStaticShape()) return failure();
+
+    auto sliceEnd =
+        llvm::to_vector(gather.getSliceSizes().getValues<int64_t>());
+    SmallVector<int64_t> sliceStart(sliceEnd.size(), 0);
+    for (auto [mapIndex, value] :
+         llvm::zip_equal(dnums.getStartIndexMap(), index.getValues<APInt>())) {
+      // Clamp the indices within bounds to faithfully mirror gather semantics.
+      int64_t offset =
+          std::clamp(value.getSExtValue(), static_cast<int64_t>(0),
+                     operandType.getDimSize(mapIndex) - sliceEnd[mapIndex]);
+      sliceStart[mapIndex] += offset;
+      sliceEnd[mapIndex] += offset;
+    }
+
+    SmallVector<int64_t> sliceStride(sliceEnd.size(), 1);
+    SmallVector<int64_t> sliceShape(sliceEnd.size());
+    for (auto [shapeElem, startElem, endElem] :
+         llvm::zip_equal(sliceShape, sliceStart, sliceEnd)) {
+      shapeElem = endElem - startElem;
+    }
+
+    Type elementType = gather.getType().getElementType();
+    auto sliceType = RankedTensorType::get(sliceShape, elementType);
+    Value result = rewriter.create<mlir::stablehlo::SliceOp>(
+        gather.getLoc(), sliceType, gather.getOperand(),
+        rewriter.getI64TensorAttr(sliceStart),
+        rewriter.getI64TensorAttr(sliceEnd),
+        rewriter.getI64TensorAttr(sliceStride));
+
+    ArrayRef<int64_t> collapsedSliceDims = dnums.getCollapsedSliceDims();
+    if (!collapsedSliceDims.empty()) {
+      llvm::SmallVector<int64_t> reshapeShape;
+      for (auto [idx, dim] : llvm::enumerate(sliceShape)) {
+        if (!llvm::is_contained(collapsedSliceDims, idx)) {
+          reshapeShape.push_back(dim);
+        }
+      }
+      auto reshapeType = RankedTensorType::get(reshapeShape, elementType);
+      result = rewriter.create<mlir::stablehlo::ReshapeOp>(gather.getLoc(),
+                                                           reshapeType, result);
+    }
+
+    result.setType(gather.getType());
+    rewriter.replaceOp(gather, result);
+    return success();
+  }
+};
+
 struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -710,7 +786,7 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       GetDimensionSizeOpCanon, GetTupleElementOpCanon,
       // Shape manipulation(-ish) ops.
       BroadcastInDimOpCanon, ConcatenateOpCanon, ConvertOpCanon,
-      DynamicReshapeOpCanon, ReshapeOpCanon, TransposeOpCanon>(context,
-                                                               benefit);
+      DynamicReshapeOpCanon, GatherOpCanon, ReshapeOpCanon, TransposeOpCanon>(
+      context, benefit);
 }
 }  // namespace mlir::iree_compiler::stablehlo
