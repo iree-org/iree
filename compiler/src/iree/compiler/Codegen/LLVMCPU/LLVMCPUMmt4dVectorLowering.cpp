@@ -152,6 +152,16 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       llvm::dbgs() << "\n\n";
     });
   }
+
+  // Flatten transfer ops.
+  {
+    RewritePatternSet patterns(&getContext());
+    mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+    mlir::vector::populateFlattenVectorTransferPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
