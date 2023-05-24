@@ -819,17 +819,24 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     llvm::Function *dummyFunc = llvm::Function::Create(
         llvm::FunctionType::get(voidType, false),
         llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
+
+    // If target supports AVX-512, enforce 512-bit vector registers.
+    llvm::StringRef targetFeatures = targetMachine->getTargetFeatureString();
+    if (targetFeatures.contains("avx512")) {
+      dummyFunc->addFnAttr("prefer-vector-width", "512");
+    }
+
     llvm::TargetTransformInfo tti =
         targetMachine->getTargetTransformInfo(*dummyFunc);
     config_.vectorSize = tti.getRegisterBitWidth(
                              llvm::TargetTransformInfo::RGK_FixedWidthVector) /
                          8;
+
     LLVM_DEBUG({
       llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
       llvm::dbgs() << "Target Triple : "
                    << targetMachine->getTargetTriple().normalize() << "\n";
-      llvm::dbgs() << "Target Feature string : "
-                   << targetMachine->getTargetFeatureString() << "\n";
+      llvm::dbgs() << "Target Feature string : " << targetFeatures << "\n";
       llvm::dbgs() << "Data Layout : " << config_.dataLayoutStr << "\n";
       llvm::dbgs() << "Vector Width : " << config_.vectorSize << "\n";
     });
