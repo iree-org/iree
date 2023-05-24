@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
@@ -567,6 +568,32 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
 ///   in-place.
 LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
     RewriterBase &rewriter, Operation *op, OneShotAnalysisState &state) {
+  auto appendAffineApplyOperandsOrSelf = [](SmallVectorImpl<Value> &vec,
+                                            Operation::operand_range values) {
+    for (auto v : values) {
+      if (auto applyOp = v.getDefiningOp<affine::AffineApplyOp>()) {
+        vec.append(applyOp.getMapOperands().begin(),
+                   applyOp.getMapOperands().end());
+      } else {
+        vec.push_back(v);
+      }
+    }
+  };
+  auto createAffineAplyOpOrSelf =
+      [&](OpBuilder &b, Location loc,
+         ArrayRef<OpFoldResult> values) -> SmallVector<OpFoldResult> {
+    SmallVector<OpFoldResult> res(values.begin(), values.end());
+    for (auto [idx, val] : llvm::enumerate(res)) {
+      auto v = val.dyn_cast<Value>();
+      if (!v) continue;
+      auto applyOp = v.getDefiningOp<affine::AffineApplyOp>();
+      if (!applyOp) continue;
+      val = b.create<affine::AffineApplyOp>(loc, applyOp.getAffineMap(),
+                                            applyOp.getMapOperands())
+                .getResult();
+    }
+    return res;
+  };
   return eliminateEmptyTensors(
       rewriter, op, state,
       /*anchorMatchFunc=*/
@@ -577,23 +604,25 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
         neededValues.push_back(storeOp.getTarget());
         neededValues.append(storeOp.getTargetDims().begin(),
                             storeOp.getTargetDims().end());
-        neededValues.append(storeOp.getOffsets().begin(),
-                            storeOp.getOffsets().end());
-        neededValues.append(storeOp.getSizes().begin(),
-                            storeOp.getSizes().end());
-        neededValues.append(storeOp.getStrides().begin(),
-                            storeOp.getStrides().end());
+        appendAffineApplyOperandsOrSelf(neededValues, storeOp.getOffsets());
+        appendAffineApplyOperandsOrSelf(neededValues, storeOp.getSizes());
+        appendAffineApplyOperandsOrSelf(neededValues, storeOp.getStrides());
         return true;
       },
       /*rewriteFunc=*/
-      [](OpBuilder &b, Location loc, OpOperand &operand) {
+      [&](OpBuilder &b, Location loc, OpOperand &operand) {
         auto storeOp =
             cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+        SmallVector<OpFoldResult> offsets =
+            createAffineAplyOpOrSelf(b, loc, storeOp.getMixedOffsets());
+        SmallVector<OpFoldResult> sizes =
+            createAffineAplyOpOrSelf(b, loc, storeOp.getMixedSizes());
+        SmallVector<OpFoldResult> strides =
+            createAffineAplyOpOrSelf(b, loc, storeOp.getMixedStrides());
         auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
             loc, storeOp.getValue().getType().cast<RankedTensorType>(),
-            storeOp.getTarget(), storeOp.getTargetDims(),
-            storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
-            storeOp.getMixedStrides());
+            storeOp.getTarget(), storeOp.getTargetDims(), offsets, sizes,
+            strides);
         return loadOp.getResult();
       });
 }
