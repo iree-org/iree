@@ -1757,15 +1757,15 @@ iree_bytecode_module(
   NAME
     "iree-module-16ec710cdd9921f37f164b180cd3e77db1dc96cce5aabdced6eb3d84382eb02a"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1_BertLargePTBatch1.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1_BertLargefp16PTBatch1.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1_module_16ec710cdd9921f37f164b180cd3e77db1dc96cce5aabdced6eb3d84382eb02a/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1_module_16ec710cdd9921f37f164b180cd3e77db1dc96cce5aabdced6eb3d84382eb02a/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1773,15 +1773,15 @@ iree_bytecode_module(
   NAME
     "iree-module-c451b302f020e742b3e66964f5909018fa51d93c753ea337b1bdfea6b69e0901"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-16_BertLargePTBatch16.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-16_BertLargefp16PTBatch16.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch16_module_c451b302f020e742b3e66964f5909018fa51d93c753ea337b1bdfea6b69e0901/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch16_module_c451b302f020e742b3e66964f5909018fa51d93c753ea337b1bdfea6b69e0901/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1789,15 +1789,15 @@ iree_bytecode_module(
   NAME
     "iree-module-feae531426d546aae8f1c579bfb8183a1315caa6347fe9efa99660a7c7c40947"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-24_BertLargePTBatch24.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-24_BertLargefp16PTBatch24.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch24_module_feae531426d546aae8f1c579bfb8183a1315caa6347fe9efa99660a7c7c40947/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch24_module_feae531426d546aae8f1c579bfb8183a1315caa6347fe9efa99660a7c7c40947/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch24(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch24(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1805,15 +1805,15 @@ iree_bytecode_module(
   NAME
     "iree-module-767c1b6faee0eddaca3e01469f49dc355a00f192f1ae5e226839cab3cafbe8d9"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-32_BertLargePTBatch32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-32_BertLargefp16PTBatch32.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch32_module_767c1b6faee0eddaca3e01469f49dc355a00f192f1ae5e226839cab3cafbe8d9/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch32_module_767c1b6faee0eddaca3e01469f49dc355a00f192f1ae5e226839cab3cafbe8d9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch32(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch32(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1821,15 +1821,15 @@ iree_bytecode_module(
   NAME
     "iree-module-4e879cbb18131becd2cc80ec9d77ef6c40bb1a9288201ee448278fdf2e81b14e"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-48_BertLargePTBatch48.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-48_BertLargefp16PTBatch48.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch48_module_4e879cbb18131becd2cc80ec9d77ef6c40bb1a9288201ee448278fdf2e81b14e/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch48_module_4e879cbb18131becd2cc80ec9d77ef6c40bb1a9288201ee448278fdf2e81b14e/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch48(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch48(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1837,15 +1837,15 @@ iree_bytecode_module(
   NAME
     "iree-module-75c29c7da698ad149e4ac580666595c3fbcfe86a50f0b8d8d3a9c737adf685c5"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-64_BertLargePTBatch64.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-64_BertLargefp16PTBatch64.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch64_module_75c29c7da698ad149e4ac580666595c3fbcfe86a50f0b8d8d3a9c737adf685c5/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch64_module_75c29c7da698ad149e4ac580666595c3fbcfe86a50f0b8d8d3a9c737adf685c5/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1853,15 +1853,15 @@ iree_bytecode_module(
   NAME
     "iree-module-58a0cb6e5c240493436ae2c1e304a572ff11060233b48dce1bf82f0d3b733a6f"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-512_BertLargePTBatch512.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-512_BertLargefp16PTBatch512.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch512_module_58a0cb6e5c240493436ae2c1e304a572ff11060233b48dce1bf82f0d3b733a6f/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch512_module_58a0cb6e5c240493436ae2c1e304a572ff11060233b48dce1bf82f0d3b733a6f/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch512(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch512(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1869,15 +1869,15 @@ iree_bytecode_module(
   NAME
     "iree-module-454fd6dea6195164691f1bd66e407131bc8ad41cb1ae9a0360ecd4d3fba8a372"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1024_BertLargePTBatch1024.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1024_BertLargefp16PTBatch1024.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1024_module_454fd6dea6195164691f1bd66e407131bc8ad41cb1ae9a0360ecd4d3fba8a372/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1024_module_454fd6dea6195164691f1bd66e407131bc8ad41cb1ae9a0360ecd4d3fba8a372/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch1024(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch1024(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1885,15 +1885,15 @@ iree_bytecode_module(
   NAME
     "iree-module-eaccfeb996e96d52d357fb276b3c864a4050fa8cf77f3f305ac2b64918037a37"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1280_BertLargePTBatch1280.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1280_BertLargefp16PTBatch1280.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1280_module_eaccfeb996e96d52d357fb276b3c864a4050fa8cf77f3f305ac2b64918037a37/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1280_module_eaccfeb996e96d52d357fb276b3c864a4050fa8cf77f3f305ac2b64918037a37/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargePTBatch1280(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargefp16PTBatch1280(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -5315,9 +5315,9 @@ iree_bytecode_module(
   NAME
     "iree-module-5afcbf3d3cd73477dba7cd674d13a936231393835addc705787daa643b051a81"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1_BertLargePTBatch1.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1_BertLargefp16PTBatch1.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1_module_5afcbf3d3cd73477dba7cd674d13a936231393835addc705787daa643b051a81/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1_module_5afcbf3d3cd73477dba7cd674d13a936231393835addc705787daa643b051a81/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5325,9 +5325,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1_module_5afcbf3d3cd73477dba7cd674d13a936231393835addc705787daa643b051a81/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1_module_5afcbf3d3cd73477dba7cd674d13a936231393835addc705787daa643b051a81/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5335,9 +5335,9 @@ iree_bytecode_module(
   NAME
     "iree-module-c42debd998a5a6b00a9f3b5a1087e17909498038cb9c24d0ff87a5761a4962f1"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-16_BertLargePTBatch16.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-16_BertLargefp16PTBatch16.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch16_module_c42debd998a5a6b00a9f3b5a1087e17909498038cb9c24d0ff87a5761a4962f1/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch16_module_c42debd998a5a6b00a9f3b5a1087e17909498038cb9c24d0ff87a5761a4962f1/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5345,9 +5345,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch16_module_c42debd998a5a6b00a9f3b5a1087e17909498038cb9c24d0ff87a5761a4962f1/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch16_module_c42debd998a5a6b00a9f3b5a1087e17909498038cb9c24d0ff87a5761a4962f1/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5355,9 +5355,9 @@ iree_bytecode_module(
   NAME
     "iree-module-edd2270e3119ce3d52a3752532cdcb4ee08420837cbdcac42025b46e7c196230"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-24_BertLargePTBatch24.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-24_BertLargefp16PTBatch24.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch24_module_edd2270e3119ce3d52a3752532cdcb4ee08420837cbdcac42025b46e7c196230/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch24_module_edd2270e3119ce3d52a3752532cdcb4ee08420837cbdcac42025b46e7c196230/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5365,9 +5365,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch24_module_edd2270e3119ce3d52a3752532cdcb4ee08420837cbdcac42025b46e7c196230/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch24_module_edd2270e3119ce3d52a3752532cdcb4ee08420837cbdcac42025b46e7c196230/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch24(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch24(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5375,9 +5375,9 @@ iree_bytecode_module(
   NAME
     "iree-module-57205a38cd8970cedf207e4d0c02d14103668a635dd341d6bf4ce12f6d1fd56c"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-32_BertLargePTBatch32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-32_BertLargefp16PTBatch32.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch32_module_57205a38cd8970cedf207e4d0c02d14103668a635dd341d6bf4ce12f6d1fd56c/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch32_module_57205a38cd8970cedf207e4d0c02d14103668a635dd341d6bf4ce12f6d1fd56c/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5385,9 +5385,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch32_module_57205a38cd8970cedf207e4d0c02d14103668a635dd341d6bf4ce12f6d1fd56c/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch32_module_57205a38cd8970cedf207e4d0c02d14103668a635dd341d6bf4ce12f6d1fd56c/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch32(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch32(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5395,9 +5395,9 @@ iree_bytecode_module(
   NAME
     "iree-module-88490c7b469b6be6ae374fbdd1f3b9e3d4a998dee5629741ab22f449cefaa1d8"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-48_BertLargePTBatch48.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-48_BertLargefp16PTBatch48.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch48_module_88490c7b469b6be6ae374fbdd1f3b9e3d4a998dee5629741ab22f449cefaa1d8/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch48_module_88490c7b469b6be6ae374fbdd1f3b9e3d4a998dee5629741ab22f449cefaa1d8/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5405,9 +5405,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch48_module_88490c7b469b6be6ae374fbdd1f3b9e3d4a998dee5629741ab22f449cefaa1d8/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch48_module_88490c7b469b6be6ae374fbdd1f3b9e3d4a998dee5629741ab22f449cefaa1d8/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch48(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch48(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5415,9 +5415,9 @@ iree_bytecode_module(
   NAME
     "iree-module-218daf4b21025dfcd8d446934c80b999ea21d0e0202fce7e87604c52f9224f66"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-64_BertLargePTBatch64.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-64_BertLargefp16PTBatch64.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch64_module_218daf4b21025dfcd8d446934c80b999ea21d0e0202fce7e87604c52f9224f66/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch64_module_218daf4b21025dfcd8d446934c80b999ea21d0e0202fce7e87604c52f9224f66/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5425,9 +5425,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch64_module_218daf4b21025dfcd8d446934c80b999ea21d0e0202fce7e87604c52f9224f66/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch64_module_218daf4b21025dfcd8d446934c80b999ea21d0e0202fce7e87604c52f9224f66/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5435,9 +5435,9 @@ iree_bytecode_module(
   NAME
     "iree-module-c838ded21eebe38f16ac159822b41648625ff507ae49f35845e9bfdc93732cd3"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-512_BertLargePTBatch512.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-512_BertLargefp16PTBatch512.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch512_module_c838ded21eebe38f16ac159822b41648625ff507ae49f35845e9bfdc93732cd3/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch512_module_c838ded21eebe38f16ac159822b41648625ff507ae49f35845e9bfdc93732cd3/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5445,9 +5445,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch512_module_c838ded21eebe38f16ac159822b41648625ff507ae49f35845e9bfdc93732cd3/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch512_module_c838ded21eebe38f16ac159822b41648625ff507ae49f35845e9bfdc93732cd3/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch512(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch512(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5455,9 +5455,9 @@ iree_bytecode_module(
   NAME
     "iree-module-dfdfa87bbaf9931a0e4c47c02866e103872cb20b30899b2358c9d7e59101d5a9"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1024_BertLargePTBatch1024.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1024_BertLargefp16PTBatch1024.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1024_module_dfdfa87bbaf9931a0e4c47c02866e103872cb20b30899b2358c9d7e59101d5a9/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1024_module_dfdfa87bbaf9931a0e4c47c02866e103872cb20b30899b2358c9d7e59101d5a9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5465,9 +5465,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1024_module_dfdfa87bbaf9931a0e4c47c02866e103872cb20b30899b2358c9d7e59101d5a9/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1024_module_dfdfa87bbaf9931a0e4c47c02866e103872cb20b30899b2358c9d7e59101d5a9/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch1024(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch1024(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5475,9 +5475,9 @@ iree_bytecode_module(
   NAME
     "iree-module-c480fe46ed6eef2a12e453924f953d7d0ad1a5178e11e2948b7d0223d0c0d9f5"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1280_BertLargePTBatch1280.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1280_BertLargefp16PTBatch1280.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1280_module_c480fe46ed6eef2a12e453924f953d7d0ad1a5178e11e2948b7d0223d0c0d9f5/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1280_module_c480fe46ed6eef2a12e453924f953d7d0ad1a5178e11e2948b7d0223d0c0d9f5/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5485,9 +5485,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1280_module_c480fe46ed6eef2a12e453924f953d7d0ad1a5178e11e2948b7d0223d0c0d9f5/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargefp16PTBatch1280_module_c480fe46ed6eef2a12e453924f953d7d0ad1a5178e11e2948b7d0223d0c0d9f5/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargePTBatch1280(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargefp16PTBatch1280(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 

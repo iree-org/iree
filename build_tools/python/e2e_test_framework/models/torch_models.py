@@ -169,7 +169,7 @@ BERT_LARGE_1280X384_FP32_TORCH = common_definitions.Model(
 # FP16 Versions
 BERT_LARGE_1X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_1X384_FP16_TORCH,
-    name="BertLargePTBatch1",
+    name="BertLargefp16PTBatch1",
     tags=["fp16", "transformer", "seqlen384", "batch-1"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -179,7 +179,7 @@ BERT_LARGE_1X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_16X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_16X384_FP16_TORCH,
-    name="BertLargePTBatch16",
+    name="BertLargefp16PTBatch16",
     tags=["fp16", "transformer", "seqlen384", "batch-16"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -189,7 +189,7 @@ BERT_LARGE_16X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_24X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_24X384_FP16_TORCH,
-    name="BertLargePTBatch24",
+    name="BertLargefp16PTBatch24",
     tags=["fp16", "transformer", "seqlen384", "batch-24"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -199,7 +199,7 @@ BERT_LARGE_24X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_32X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_32X384_FP16_TORCH,
-    name="BertLargePTBatch32",
+    name="BertLargefp16PTBatch32",
     tags=["fp16", "transformer", "seqlen384", "batch-32"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -209,7 +209,7 @@ BERT_LARGE_32X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_48X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_48X384_FP16_TORCH,
-    name="BertLargePTBatch48",
+    name="BertLargefp16PTBatch48",
     tags=["fp16", "transformer", "seqlen384", "batch-48"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -219,7 +219,7 @@ BERT_LARGE_48X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_64X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_64X384_FP16_TORCH,
-    name="BertLargePTBatch64",
+    name="BertLargefp16PTBatch64",
     tags=["fp16", "transformer", "seqlen384", "batch-64"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -229,7 +229,7 @@ BERT_LARGE_64X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_512X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_512X384_FP16_TORCH,
-    name="BertLargePTBatch512",
+    name="BertLargefp16PTBatch512",
     tags=["fp16", "transformer", "seqlen384", "batch-512"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -239,7 +239,7 @@ BERT_LARGE_512X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_1024X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_1024X384_FP16_TORCH,
-    name="BertLargePTBatch1024",
+    name="BertLargefp16PTBatch1024",
     tags=["fp16", "transformer", "seqlen384", "batch-1024"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
@@ -249,7 +249,7 @@ BERT_LARGE_1024X384_FP16_TORCH = common_definitions.Model(
 
 BERT_LARGE_1280X384_FP16_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_BERT_LARGE_1280X384_FP16_TORCH,
-    name="BertLargePTBatch1280",
+    name="BertLargefp16PTBatch1280",
     tags=["fp16", "transformer", "seqlen384", "batch-1280"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
