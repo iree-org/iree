@@ -8,6 +8,20 @@ func.func @attention() -> tensor<1x4x4xf32> {
   return %1 : tensor<1x4x4xf32>
 }
 
+// RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
+// RUN:   --iree-abi-transformation-pipeline \
+// RUN:   --iree-flow-transformation-pipeline \
+// RUN:   --iree-stream-transformation-pipeline \
+// RUN:   --iree-hal-configuration-pipeline | \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' \
+// RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/attention_codegen_spec.mlir | \
+// RUN: FileCheck %s --check-prefixes=CODEGEN-DEFAULT
+
+// CODEGEN-DEFAULT:     hal.executable.export public @attention_dispatch_0_attention_1x4x4xf32
+// CODEGEN-DEFAULT:         %[[C2:.+]] = arith.constant 2 : index
+// CODEGEN-DEFAULT:         %[[C1:.+]] = arith.constant 1 : index
+// CODEGEN-DEFAULT:         hal.return %[[C2]], %[[C1]], %[[C1]]
+
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
 // RUN: --iree-codegen-llvmcpu-use-transform-dialect=%p/attention_codegen_spec.mlir | \
 // RUN: iree-run-module --module=- --function=attention | \
