@@ -410,7 +410,7 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
     Value emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, mixedSizes, ty.getElementType());
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
-        op, adaptor.getOperands().getType(), adaptor.getOperands(), emptyTensor,
+        op, typeConverter->convertType(op.getType()), adaptor.getOperands(), emptyTensor,
         op.getDimensions());
     return success();
   }
