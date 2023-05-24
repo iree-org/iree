@@ -12,7 +12,7 @@ import unittest
 import zipfile
 
 from common.benchmark_definition import ModuleComponentSizes
-from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, get_module_path, parse_compilation_time_from_ninja_log
+from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, parse_compilation_time_from_ninja_log
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -84,13 +84,6 @@ class CollectCompilationStatistics(unittest.TestCase):
     self.assertRaises(
         RuntimeError, lambda: get_module_component_info(
             BytesIO(module_file_data), len(module_file_data)))
-
-  def test_get_module_path(self):
-    flag_file = StringIO(f"--module=/abcd.vmfb\n--inputs=1x2x3xf32")
-
-    moduel_path = get_module_path(flag_file)
-
-    self.assertEqual(moduel_path, "/abcd-compile-stats.vmfb")
 
   def test_get_module_map_from_compilation_benchmark_config(self):
     model_a = common_definitions.Model(

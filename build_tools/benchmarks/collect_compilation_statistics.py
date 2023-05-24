@@ -18,7 +18,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import argparse
 import json
-import os
 import re
 import zipfile
 
@@ -26,7 +25,6 @@ from dataclasses import asdict
 from typing import BinaryIO, Dict, List, Optional, TextIO
 
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
-from common.benchmark_suite import BenchmarkSuite
 from common import benchmark_config
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
@@ -129,20 +127,6 @@ def get_module_component_info(module: BinaryIO,
       total_dispatch_component_bytes=total_dispatch_component_bytes)
 
 
-def get_module_path(flag_file: TextIO) -> Optional[str]:
-  """Retrieve the module path for compilation statistics from the flag file."""
-
-  module_path = None
-  for line in flag_file:
-    match = re.match("--module=(.+)", line.strip())
-    if match:
-      module_name, module_ext = os.path.splitext(match.group(1))
-      module_path = f"{module_name}-{COMPILATION_STATS_MODULE_SUFFIX}{module_ext}"
-      break
-
-  return module_path
-
-
 def get_module_map_from_compilation_benchmark_config(
     compilation_benchmark_config_data: TextIO,
     e2e_test_artifacts_dir: pathlib.PurePath
@@ -177,52 +161,6 @@ def get_module_map_from_compilation_benchmark_config(
   return module_map
 
 
-def get_module_map_from_benchmark_suite(
-    benchmark_suite_dir: pathlib.Path) -> Dict[CompilationInfo, pathlib.Path]:
-  benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
-      benchmark_suite_dir)
-  module_map = {}
-  for category, _ in benchmark_suite.list_categories():
-    benchmark_cases = benchmark_suite.filter_benchmarks_for_category(
-        category=category)
-    for benchmark_case in benchmark_cases:
-      if benchmark_case.benchmark_case_dir is None:
-        raise ValueError("benchmark_case_dir can't be None.")
-      benchmark_case_dir = benchmark_case.benchmark_case_dir
-
-      flag_file_path = benchmark_case_dir / BENCHMARK_FLAGFILE
-      with flag_file_path.open("r") as flag_file:
-        module_path = get_module_path(flag_file)
-
-      if module_path is None:
-        raise RuntimeError(
-            f"Can't find the module file in the flagfile: {flag_file_path}")
-      compilation_info = CompilationInfo.build_with_legacy_name(
-          model_name=benchmark_case.model_name,
-          model_tags=tuple(benchmark_case.model_tags),
-          model_source=category,
-          target_arch=benchmark_case.target_arch,
-          compile_tags=tuple(benchmark_case.bench_mode))
-      module_map[compilation_info] = (benchmark_case_dir /
-                                      module_path).resolve()
-
-  return module_map
-
-
-def _legacy_get_module_map_and_build_log(args: argparse.Namespace):
-  module_map = get_module_map_from_benchmark_suite(
-      args.build_dir / benchmark_config.BENCHMARK_SUITE_REL_PATH)
-  return module_map, args.build_dir / NINJA_BUILD_LOG
-
-
-def _alpha_get_module_map_and_build_log(args: argparse.Namespace):
-  config_data = args.compilation_benchmark_config.open("r")
-  module_map = get_module_map_from_compilation_benchmark_config(
-      compilation_benchmark_config_data=config_data,
-      e2e_test_artifacts_dir=args.e2e_test_artifacts_dir)
-  return module_map, args.build_log
-
-
 def _check_dir_path(path_str: str) -> pathlib.Path:
   path = pathlib.Path(path_str)
   if not path.is_dir():
@@ -240,56 +178,38 @@ def _check_file_path(path_str: str) -> pathlib.Path:
 def _parse_arguments():
   """Returns an argument parser with common options."""
 
-  # Makes global options come *after* command.
-  # See https://stackoverflow.com/q/23296695
-  subparser_base = argparse.ArgumentParser(add_help=False)
-  subparser_base.add_argument("--output",
-                              type=pathlib.Path,
-                              help="Path to output JSON file.")
-  subparser_base.add_argument(
-      "--verbose",
-      action="store_true",
-      help="Print internal information during execution.")
-
   parser = argparse.ArgumentParser(
       description="Collect compilation statistics from benchmark suites.")
-
-  subparser = parser.add_subparsers(title="tool version", required=True)
-  legacy_parser = subparser.add_parser("legacy",
-                                       parents=[subparser_base],
-                                       help="Use with legacy benchmark suites.")
-  legacy_parser.set_defaults(
-      get_module_map_and_build_log=_legacy_get_module_map_and_build_log)
-  legacy_parser.add_argument(
-      "build_dir",
-      type=_check_dir_path,
-      help="Path to the build directory containing benchmark suites.")
-
-  alpha_parser = subparser.add_parser("alpha",
-                                      parents=[subparser_base],
-                                      help="Use with e2e test artifacts.")
-  alpha_parser.set_defaults(
-      get_module_map_and_build_log=_alpha_get_module_map_and_build_log)
-  alpha_parser.add_argument(
+  parser.add_argument("--output",
+                      type=pathlib.Path,
+                      help="Path to output JSON file.")
+  parser.add_argument("--verbose",
+                      action="store_true",
+                      help="Print internal information during execution.")
+  parser.add_argument(
       "--compilation_benchmark_config",
       type=_check_file_path,
       required=True,
       help="Exported compilation benchmark config of e2e test artifacts.")
-  alpha_parser.add_argument("--build_log",
-                            type=_check_file_path,
-                            required=True,
-                            help="Path to the ninja build log.")
-  alpha_parser.add_argument("--e2e_test_artifacts_dir",
-                            type=_check_dir_path,
-                            required=True,
-                            help="Path to the e2e test artifacts directory.")
+  parser.add_argument("--build_log",
+                      type=_check_file_path,
+                      required=True,
+                      help="Path to the ninja build log.")
+  parser.add_argument("--e2e_test_artifacts_dir",
+                      type=_check_dir_path,
+                      required=True,
+                      help="Path to the e2e test artifacts directory.")
 
   return parser.parse_args()
 
 
 def main(args: argparse.Namespace):
-  module_map, build_log_path = args.get_module_map_and_build_log(args)
-  with build_log_path.open("r") as log_file:
+  config_data = args.compilation_benchmark_config.open("r")
+  module_map = get_module_map_from_compilation_benchmark_config(
+      compilation_benchmark_config_data=config_data,
+      e2e_test_artifacts_dir=args.e2e_test_artifacts_dir)
+
+  with args.build_log.open("r") as log_file:
     target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
 
   compilation_statistics_list = []
