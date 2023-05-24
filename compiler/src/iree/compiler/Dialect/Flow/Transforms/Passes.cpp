@@ -241,6 +241,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
       .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
+      .addPass(createCollapseDimsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
@@ -250,7 +251,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
-      .addPass(createCollapseDimsPass)
       // Split reduction operations into parallel and reduction.
       .addPass(createSplitReductionPass)
       // SplitReductionPass may create reduction dimension that are not the last
