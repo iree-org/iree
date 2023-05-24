@@ -1200,12 +1200,14 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
   let summary = "Attention operator";
   let description = [{
     This operator takes in 3 tensors: query(Q), key(K) and value(V) and computes
-    the attention. Each of the inputs has shape BxNxd where B is the
+    the attention. For self-attention, all inputs have the same shape BxNxd where B is the
     of the batch dimension, N is the sequence length and d is head dimension.
     Typically N >>> d. Mathematically, the attention is defined as
     matmul(softmax(matmul(Q, transpose(K))), V) and has shape BxNxd. Usually,
     this operator also performs scaling, masking and dropout, but we leave
-    that out of the current implementation.
+    that out of the current implementation. For cross-attention, the query and output
+    have the same shape (BxNxd), while the key and value differ in sequence length
+    (they have shape BxLxd, where L != N).
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
