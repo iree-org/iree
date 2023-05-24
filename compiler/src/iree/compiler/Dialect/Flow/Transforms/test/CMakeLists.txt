@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "outline_dispatch_regions.mlir"
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"
+    "pipeline_tests.mlir"
     "raise_special_ops.mlir"
     "set_encoding.mlir"
     "strip_and_splat_constant_variables.mlir"

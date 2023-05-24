@@ -19,6 +19,7 @@ iree_compiler_cc_library(
     srcs = [
         "EncodingInfo.cpp",
         "GPUUtils.cpp",
+        "LinalgOpInfo.cpp",
         "LinkingUtils.cpp",
         "MarkerUtils.cpp",
         "Utils.cpp",
@@ -26,6 +27,7 @@ iree_compiler_cc_library(
     hdrs = [
         "EncodingInfo.h",
         "GPUUtils.h",
+        "LinalgOpInfo.h",
         "LinkingUtils.h",
         "MarkerUtils.h",
         "Utils.h",

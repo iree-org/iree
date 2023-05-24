@@ -66,11 +66,15 @@ class MatrixGenerator(enum.Enum):
 
 # Describes the shape of a matrix multiplication in the usual convention:
 # the LHS is {m}x{k}, the RHS is {k}x{n}, the accumulator/result is {m}x{n}.
+# The extra `accumulate` boolean tells whether the matmul is accumulating into
+# an existing accumulator (C += A * B) or just overwriting the result
+# (C = A * B).
 @dataclasses.dataclass
 class TestShape:
   m: int
   k: int
   n: int
+  accumulate: bool
 
 
 # Describes how to construct compilation info for the testcase.
@@ -105,32 +109,36 @@ def get_test_shapes(shapes_id: ShapesId):
   if shapes_id == ShapesId.SMALL:
     return [
         # square matrices. Start by the simplest case of 1x1x1.
-        TestShape(m=1, k=1, n=1),
+        TestShape(m=1, k=1, n=1, accumulate=True),
+        TestShape(m=1, k=1, n=1, accumulate=False),
         # test 9x9x9 because as many kernel M0/K0/N0 dims are equal to 8,
         # this will often be the smallest value that exercises something above
         # the kernel's size.
-        TestShape(m=9, k=9, n=9),
+        TestShape(m=9, k=9, n=9, accumulate=True),
         # rectangular matrices.
         # >= 2x differences between M/N/K dims may exercise tiling corner cases
         # not exercised by nearly-square matrices.
-        TestShape(m=6, k=13, n=3),
-        TestShape(m=15, k=37, n=7),
-        TestShape(m=81, k=19, n=41),
+        TestShape(m=6, k=13, n=3, accumulate=True),
+        TestShape(m=15, k=37, n=7, accumulate=False),
+        TestShape(m=81, k=19, n=41, accumulate=True),
         # shapes involving vectors (i.e. most rectangular cases)
         # This is particularly relevant because we have dedicated kernels for
         # the matrix*vector / vector*matrix case.
-        TestShape(m=1, k=10, n=10),  # vector*matrix
-        TestShape(m=10, k=1, n=10),  # outer-product
-        TestShape(m=10, k=10, n=1),  # matrix*vector
+        TestShape(m=1, k=10, n=10, accumulate=True),  # vector*matrix
+        TestShape(m=1, k=10, n=10, accumulate=False),  # vector*matrix
+        TestShape(m=10, k=1, n=10, accumulate=True),  # outer-product
+        TestShape(m=10, k=10, n=1, accumulate=True),  # matrix*vector
+        TestShape(m=10, k=10, n=1, accumulate=False),  # matrix*vector
     ]
   if shapes_id == ShapesId.LARGE:
     return [
         # some random large sizes
-        TestShape(m=123, k=456, n=789),
-        TestShape(m=654, k=321, n=234),
+        TestShape(m=123, k=456, n=789, accumulate=True),
+        TestShape(m=654, k=321, n=234, accumulate=False),
         # shapes involving vectors (i.e. most rectangular cases)
-        TestShape(m=1, k=1000, n=1000),  # large vector*matrix
-        TestShape(m=1000, k=1000, n=1),  # large matrix*vector
+        TestShape(m=1, k=1000, n=1000, accumulate=True),  # large vector*matrix
+        TestShape(m=1000, k=1000, n=1, accumulate=True),  # large matrix*vector
+        TestShape(m=1000, k=1000, n=1, accumulate=False),  # large matrix*vector
         # Be conservative in adding larger shapes. They can result in
         # high latency tests. If you have to, consider splitting them
         # out in a way that constrains the latency impact, e.g. by
@@ -138,7 +146,11 @@ def get_test_shapes(shapes_id: ShapesId):
         # (see get_test_generators).
     ]
   if shapes_id == ShapesId.GPU_LARGE:
-    return [TestShape(m=256, k=128, n=512)]
+    return [
+        TestShape(m=256, k=128, n=512, accumulate=True),
+        TestShape(m=256, k=128, n=512, accumulate=False),
+    ]
+
   raise ValueError(shapes_id)
 
 
@@ -252,16 +264,6 @@ def get_test_compilation_infos(
 local_pseudorandom_state = 1
 
 
-# Returns a pseudorandom boolean
-def pseudorandom_bool():
-  global local_pseudorandom_state
-  # Same as C++ std::minstd_rand.
-  # Using a local pseudorandom generator implementation ensures that it's
-  # completely reproducible, across runs and across machines.
-  local_pseudorandom_state = (local_pseudorandom_state * 48271) % 2147483647
-  return local_pseudorandom_state > 1073741824
-
-
 # A shape dimension value, i.e. a size value that could appear in a MLIR type
 # such as 'tensor<?x4xf32>'. None means a dynamic size, similar to '?' in MLIR.
 @dataclasses.dataclass
@@ -276,8 +278,6 @@ def shape_dim(x: int, dynamicity: Dynamicity):
     return DimSize(None)
   elif dynamicity == Dynamicity.STATIC:
     return DimSize(x)
-  elif dynamicity == Dynamicity.MIXED:
-    return DimSize(x if pseudorandom_bool() else None)
   else:
     raise ValueError(dynamicity)
 
@@ -320,28 +320,6 @@ def generate_shapes(shape: TestShape, dynamicity: Dynamicity):
       acc_rows=shape_dim(shape.m, dynamicity),
       acc_cols=shape_dim(shape.n, dynamicity),
   )
-  # In the mixed-shapes case, we have just randomly picked each of the above 6
-  # values independently, making it likely that we got discrepancies where some
-  # of the M, K, N dimensions of the problem appear as a static dim in some
-  # matrix and as a dynamic dim in another matrix, e.g. for the M dimension we
-  # might have lhs_rows=dynamic, acc_rows=3. We should be testing both such
-  # 'wild' mixed-shapes cases, and more 'tame' mixed-shapes cases where each of
-  # the M, K, N dimensions is consistently either static or dynamic in both
-  # matrices (among lhs, rhs, acc) where it appears. If we don't do anything
-  # about it, as there is a 1/2 chance of discrepancy for each of the M, K, N
-  # dimensions, 7/8 of the mixed-shapes testcases will be 'wild'. Given our
-  # limited number of overall mixed-shapes testcases, this risks not testing
-  # the 'tame' case at all.
-  #
-  # At the moment there is an additional practical reason to care about this
-  # here: the matmul-to-mmt4d transformation currently bails on most 'wild'
-  # cases. So we care even more to test 'tame' cases so that mmt4d is tested
-  # on some mixed-shapes cases.
-  if pseudorandom_bool():
-    # Ensure that we are generating a 'tame' case.
-    shapes.acc_rows = shapes.lhs_rows
-    shapes.acc_cols = shapes.rhs_cols
-    shapes.rhs_rows = shapes.lhs_cols
   return shapes
 
 
@@ -351,6 +329,7 @@ def generate_function_name(
     lhs_rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     shapes: TestInputMatricesShapes,
+    accumulate: bool,
     compilation_info: typing.Optional[CompilationInfo] = None):
   input_t = lhs_rhs_type.value
   acc_t = acc_type.value
@@ -369,7 +348,8 @@ def generate_function_name(
     ]) + "_" + "_".join([str(a) for a in compilation_info.workgroup_size])
     info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}_{tile_workgroup_key}"
 
-  return f"matmul_{lhs_m}x{lhs_k}x{input_t}_times_{rhs_k}x{rhs_n}x{input_t}_into_{acc_m}x{acc_n}x{acc_t}{info}"
+  matmul_kind = "matmul_accumulate" if accumulate else "matmul"
+  return f"{matmul_kind}_{lhs_m}x{lhs_k}x{input_t}_times_{rhs_k}x{rhs_n}x{input_t}_into_{acc_m}x{acc_n}x{acc_t}{info}"
 
 
 # Represents a generated test function.
@@ -390,7 +370,7 @@ def generate_function(
     compilation_info: typing.Optional[CompilationInfo] = None):
   shapes = generate_shapes(shape, dynamicity)
   func_name = generate_function_name(lhs_rhs_type, acc_type, shapes,
-                                     compilation_info)
+                                     shape.accumulate, compilation_info)
   lhs_m = int_or_question_mark(shapes.lhs_rows)
   lhs_k = int_or_question_mark(shapes.lhs_cols)
   rhs_k = int_or_question_mark(shapes.rhs_rows)
@@ -422,11 +402,37 @@ def generate_function(
     func_definition = func_definition + compilation_info_string
     generate_function.compilation_index += 1
 
-  func_definition = func_definition + (
-      f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
-      f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
-      f"  return %result: {acc_tensor_type}\n"
-      f"}}\n")
+  if shape.accumulate:
+    func_definition = func_definition + (
+        f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
+        f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+        f"  return %result: {acc_tensor_type}\n"
+        f"}}\n")
+  else:
+    literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
+    acc_dyn_sizes = []
+    if acc_m == "?":
+      func_definition = func_definition + (
+          f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+          f"  %c0 = arith.constant 0 : index\n"
+          f"  %c1 = arith.constant 1 : index\n"
+          f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
+          f"  %acc_dim1 = tensor.dim %rhs, %c1 : {rhs_tensor_type}\n"
+          f"  %init_acc = tensor.empty(%acc_dim0, %acc_dim1) : {acc_tensor_type}\n"
+          f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
+          f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
+          f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+          f"  return %result: {acc_tensor_type}\n"
+          f"}}\n")
+    else:
+      func_definition = func_definition + (
+          f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+          f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
+          f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
+          f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
+          f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+          f"  return %result: {acc_tensor_type}\n"
+          f"}}\n")
   return MLIRFunction(
       name=func_name,
       definition=func_definition,
@@ -474,23 +480,24 @@ def generate_trace_matrix_arg(matrix_shape: list,
 # as a dictionary to be passed to yaml.dump.
 def generate_trace(func_name: str, lhs_rhs_type: MatrixElemTypeId,
                    acc_type: MatrixElemTypeId, shape: TestShape):
-  lhs_arg = generate_trace_matrix_arg([shape.m, shape.k], lhs_rhs_type,
-                                      MatrixGenerator.RANDOM)
-  rhs_arg = generate_trace_matrix_arg([shape.k, shape.n], lhs_rhs_type,
-                                      MatrixGenerator.RANDOM)
-  acc_arg = generate_trace_matrix_arg([shape.m, shape.n], acc_type,
-                                      MatrixGenerator.RANDOM)
-  result_arg = generate_trace_matrix_arg([shape.m, shape.n], acc_type,
-                                         MatrixGenerator.ZERO)
+  args = [
+      generate_trace_matrix_arg([shape.m, shape.k], lhs_rhs_type,
+                                MatrixGenerator.RANDOM),
+      generate_trace_matrix_arg([shape.k, shape.n], lhs_rhs_type,
+                                MatrixGenerator.RANDOM),
+  ]
+  if shape.accumulate:
+    args.append(
+        generate_trace_matrix_arg([shape.m, shape.n], acc_type,
+                                  MatrixGenerator.RANDOM))
+
+  result = generate_trace_matrix_arg([shape.m, shape.n], acc_type,
+                                     MatrixGenerator.ZERO)
   return {
       "type": "call",
       "function": "module." + func_name,
-      "args": [
-          lhs_arg,
-          rhs_arg,
-          acc_arg,
-      ],
-      "results": [result_arg,],
+      "args": args,
+      "results": [result],
   }
 
 

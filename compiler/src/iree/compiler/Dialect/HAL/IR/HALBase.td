@@ -242,6 +242,7 @@ def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 4, "reduce">;
 def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 5, "reduce_scatter">;
 def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 6, "send">;
 def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 7, "recv">;
+def HAL_CollectiveKind_SendRecv: I32EnumAttrCase<"SendRecv", 8, "send_recv">;
 def HAL_CollectiveKindAttr :
     I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
       HAL_CollectiveKind_AllGather,
@@ -252,6 +253,7 @@ def HAL_CollectiveKindAttr :
       HAL_CollectiveKind_ReduceScatter,
       HAL_CollectiveKind_Send,
       HAL_CollectiveKind_Recv,
+      HAL_CollectiveKind_SendRecv,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
@@ -301,6 +303,18 @@ def HAL_CollectiveElementTypeAttr :
       HAL_CollectiveElementType_Float64,
       HAL_CollectiveElementType_BFloat16,
     ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_CallingConvention_Default : I32EnumAttrCase<"Default", 0>;
+def HAL_CallingConvention_ParameterStruct : I32EnumAttrCase<"ParameterStruct", 1>;
+def HAL_CallingConventionAttr :
+    I32EnumAttr<
+        "CallingConvention",
+        "Calling conversions for linked functions",[
+          HAL_CallingConvention_Default,
+          HAL_CallingConvention_ParameterStruct,
+        ]>{
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 

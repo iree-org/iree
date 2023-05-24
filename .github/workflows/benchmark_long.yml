@@ -55,7 +55,8 @@ jobs:
       build-dir: ${{ needs.build_all.outputs.build-dir }}
       build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      benchmark-presets: cuda-long
+      benchmark-presets: cuda-long,comp-stats-long
+      build-default-benchmark-suites: 0
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]

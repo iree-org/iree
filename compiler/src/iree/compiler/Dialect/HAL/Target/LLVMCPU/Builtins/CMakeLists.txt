@@ -16,9 +16,11 @@ iree_cc_library(
   HDRS
     "Device.h"
     "Musl.h"
+    "UKernel.h"
   SRCS
     "Device.cpp"
     "Musl.cpp"
+    "UKernel.cpp"
   DEPS
     LLVMBitReader
     LLVMCore
@@ -27,6 +29,7 @@ iree_cc_library(
     MLIRSupport
     iree::builtins::device::libdevice_bitcode
     iree::builtins::musl::bin::libmusl
+    iree::builtins::ukernel::libukernel_bitcode
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

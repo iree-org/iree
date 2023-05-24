@@ -21,11 +21,10 @@ import argparse
 
 def add_typical_arguments(parser):
   """Adds typical command line arguments to the parser."""
-  parser.add_argument("--build-dir", default=".", \
-                      help="IREE top-level build directory. Looks for "\
-                      "`iree/build/tools` dir in the build directory. "\
-                      "The dispatch profiler scripts uses iree-compile, "\
-                      "iree-benchmark-module from `build_dir` directory.")
+  parser.add_argument("--iree-bin-dir", default="./tools", \
+                      help="Directory containing IREE binaries, "\
+                      "e.g. iree-compile, iree-benchmark-module, "\
+                      "iree-run-module")
   parser.add_argument("--generated-dir", default=".", \
                       help="The dispatch profiler scripts generate "\
                       "mlir dispatches, compiled vmfbs, and reference_chache "\

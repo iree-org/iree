@@ -289,7 +289,7 @@ typedef struct iree_hal_executable_plugin_allocator_t {
   iree_hal_executable_plugin_allocator_ctl_fn_t ctl;
 } iree_hal_executable_plugin_allocator_t;
 
-static iree_hal_executable_plugin_status_t
+static inline iree_hal_executable_plugin_status_t
 iree_hal_executable_plugin_allocator_malloc(
     iree_hal_executable_plugin_allocator_t allocator, size_t byte_length,
     void** inout_ptr) {
@@ -299,7 +299,7 @@ iree_hal_executable_plugin_allocator_malloc(
                        &params, inout_ptr);
 }
 
-static iree_hal_executable_plugin_status_t
+static inline iree_hal_executable_plugin_status_t
 iree_hal_executable_plugin_allocator_free(
     iree_hal_executable_plugin_allocator_t allocator, void* ptr) {
   return allocator.ctl(allocator.self,

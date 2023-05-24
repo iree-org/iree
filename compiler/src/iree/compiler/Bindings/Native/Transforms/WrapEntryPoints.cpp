@@ -44,6 +44,22 @@ static Type mapToABIType(Type type) {
   return type;
 }
 
+// Removes all ABI attrs handled by this pass from all dictionaries.
+static void stripABIAttrs(SmallVectorImpl<DictionaryAttr> &allAttrs) {
+  for (auto &attrDict : allAttrs) {
+    SmallVector<NamedAttribute> attrs;
+    attrs.reserve(attrDict.size());
+    for (auto attr : attrDict) {
+      // TODO(benvanik): faster lookup.
+      if (attr.getName() != "iree.abi.output" &&
+          attr.getName() != "iree.abi.encoding") {
+        attrs.push_back(attr);
+      }
+    }
+    attrDict = DictionaryAttr::get(attrDict.getContext(), attrs);
+  }
+}
+
 // Creates the corresponding wrapper function for the given import function.
 static func::FuncOp createImportWrapperFunc(
     IREE::ABI::InvocationModel invocationModel, func::FuncOp importOp,
@@ -56,11 +72,13 @@ static func::FuncOp createImportWrapperFunc(
 
   // Copy arg/result attrs from the import op to the wrapper function.
   // We may want to remove them from the import but would need to filter.
-  SmallVector<DictionaryAttr, 4> argAttrDict;
+  SmallVector<DictionaryAttr> argAttrDict;
   importOp.getAllArgAttrs(argAttrDict);
+  stripABIAttrs(argAttrDict);
   wrapperOp.setAllArgAttrs(argAttrDict);
-  SmallVector<DictionaryAttr, 4> resultAttrDict;
+  SmallVector<DictionaryAttr> resultAttrDict;
   importOp.getAllResultAttrs(resultAttrDict);
+  stripABIAttrs(resultAttrDict);
   wrapperOp.setAllResultAttrs(resultAttrDict);
   switch (invocationModel) {
     default:
@@ -166,9 +184,11 @@ static func::FuncOp createImportWrapperFunc(
       // NOTE: we insert a barrier on this above if needed so that the wait
       // fence will be signaled when the tensor is ready for consumption by the
       // import.
-      auto argLoc = arg.getLoc();
+      auto encoding =
+          importOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
       auto exportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
-          argLoc, newType, arg, /*name=*/nullptr);
+          arg.getLoc(), newType, arg,
+          encoding ? encoding : TypeAttr::get(oldType), /*name=*/nullptr);
       arguments.push_back(exportOp.getTarget());
     } else {
       arguments.push_back(arg);
@@ -200,8 +220,11 @@ static func::FuncOp createImportWrapperFunc(
       // NOTE: we set the import pending on the signal fence from the import
       // indicating when the returned tensor is ready for consumption by the
       // program.
+      auto encoding = importOp.getResultAttrOfType<TypeAttr>(
+          resultIndex, "iree.abi.encoding");
       results.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
-          importOp.getLoc(), oldType, result, signalFence,
+          importOp.getLoc(), oldType, result,
+          encoding ? encoding : TypeAttr::get(oldType), signalFence,
           /*name=*/nullptr));
     } else {
       results.push_back(result);
@@ -326,8 +349,10 @@ static func::FuncOp createExportWrapperFunc(
   // We may want to remove them from the export but would need to filter.
   SmallVector<DictionaryAttr, 4> argAttrDict;
   exportOp.getAllArgAttrs(argAttrDict);
+  stripABIAttrs(argAttrDict);
   SmallVector<DictionaryAttr, 4> resultAttrDict;
   exportOp.getAllResultAttrs(resultAttrDict);
+  stripABIAttrs(resultAttrDict);
 
   // Convert argument types to those required by the binding ABI.
   //
@@ -383,7 +408,8 @@ static func::FuncOp createExportWrapperFunc(
     // Today all outputs need to be a !hal.buffer - we could change this
     // in the future to be something more generalized.
     auto storageArg = entryBlock->getArgument(i);
-    if (!storageArg.getType().isa<IREE::HAL::BufferType>()) {
+    if (!storageArg.getType().isa<IREE::HAL::BufferType>() &&
+        !storageArg.getType().isa<IREE::HAL::BufferViewType>()) {
       exportOp.emitError() << "storage argument " << i
                            << " has an invalid type " << storageArg.getType()
                            << "; must be a !hal.buffer";
@@ -414,9 +440,11 @@ static func::FuncOp createExportWrapperFunc(
            entryBlock->getArguments().slice(0, oldExportType.getNumInputs()))) {
     auto oldType = oldExportType.getInput(argIndex);
     if (oldType.isa<TensorType>()) {
-      auto argLoc = arg.getLoc();
+      auto encoding =
+          exportOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
       auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
-          argLoc, oldType, arg, waitFence,
+          arg.getLoc(), oldType, arg,
+          encoding ? encoding : TypeAttr::get(oldType), waitFence,
           inferArgumentName(argIndex, argAttrDict, entryBuilder));
       arguments.push_back(importOp.getTarget());
     } else {
@@ -455,11 +483,15 @@ static func::FuncOp createExportWrapperFunc(
     auto oldType = oldExportType.getResult(resultIndex);
     auto newType = newExportType.getResult(resultIndex);
     if (oldType.isa<TensorType>()) {
+      auto encoding = exportOp.getResultAttrOfType<TypeAttr>(
+          resultIndex, "iree.abi.encoding");
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           result.getLoc(), result, entryBuilder);
+      auto resultStorage = resultStorages[resultIndex];
       results.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
-          result.getLoc(), newType, result, TypeAttr::get(result.getType()),
-          dynamicDims, resultStorages[resultIndex],
+          result.getLoc(), newType, result,
+          encoding ? encoding : TypeAttr::get(result.getType()), dynamicDims,
+          resultStorage,
           inferResultName(resultIndex, resultAttrDict, entryBuilder)));
     } else {
       results.push_back(result);

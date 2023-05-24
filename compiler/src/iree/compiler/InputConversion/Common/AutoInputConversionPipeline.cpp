@@ -140,6 +140,7 @@ void AutoInputConversionPipelinePass::runOnOperation() {
 
   OpPassManager pm(ModuleOp::getOperationName(),
                    OpPassManager::Nesting::Explicit);
+#ifdef IREE_HAVE_MHLO_INPUT
   if (features.hasMHLO) {
     if (features.hasTuples) {
       MHLO::buildXLAInputConversionPassPipeline(pm);
@@ -147,13 +148,18 @@ void AutoInputConversionPipelinePass::runOnOperation() {
       MHLO::buildMHLOInputConversionPassPipeline(pm);
     }
   }
+#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_TOSA_INPUT
   if (features.hasTOSA) {
     buildTOSAInputConversionPassPipeline(pm);
   }
+#endif  // IREE_HAVE_TOSA_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
   if (features.hasTmTensor) {
     pm.addNestedPass<func::FuncOp>(
         TMTensor::createConvertTMTensorToLinalgExtPass());
   }
+#endif  // IREE_HAVE_TORCH_INPUT
 
   if (failed(runPipeline(pm, module))) {
     signalPassFailure();

@@ -6,12 +6,6 @@
 
 #include "iree/builtins/ukernel/unpack_internal.h"
 
-#if defined(IREE_UK_ARCH_ARM_64)
-#include "iree/builtins/ukernel/arch/arm_64/unpack_arm_64.h"
-#elif defined(IREE_UK_ARCH_X86_64)
-#include "iree/builtins/ukernel/arch/x86_64/unpack_x86_64.h"
-#endif
-
 static void iree_uk_unpack_tile_generic_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
@@ -67,16 +61,6 @@ static iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_generic(
   } else {
     return iree_uk_unpack_tile_generic_direct;
   }
-}
-
-static iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arch(
-    const iree_uk_unpack_params_t* params) {
-#if defined(IREE_UK_ARCH_ARM_64)
-  return iree_uk_unpack_select_tile_func_arm_64(params);
-#elif defined(IREE_UK_ARCH_X86_64)
-  return iree_uk_unpack_select_tile_func_x86_64(params);
-#endif
-  return 0;
 }
 
 // Select the 'tile function' that is the typically target-optimized inner loop

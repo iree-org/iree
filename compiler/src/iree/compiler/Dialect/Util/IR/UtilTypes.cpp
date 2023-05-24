@@ -86,6 +86,12 @@ bool ListType::isCompatible(Type type) { return true; }
 bool ListType::canImplicitlyCast(Type from, Type to) {
   if (from.isa<VariantType>() || to.isa<VariantType>()) {
     return true;
+  } else if (from.isa<ObjectType>() &&
+             IREE::Util::ObjectType::isCompatible(to)) {
+    return true;
+  } else if (IREE::Util::ObjectType::isCompatible(from) &&
+             to.isa<ObjectType>()) {
+    return true;
   } else if (from.isa<TensorType>() && to.isa<TensorType>()) {
     return true;
   }
@@ -115,6 +121,23 @@ LogicalResult PtrType::verify(function_ref<InFlightDiagnostic()> emitError,
     return emitError() << "invalid target type for a pointer: " << targetType;
   }
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// !util.object
+//===----------------------------------------------------------------------===//
+
+// static
+bool ObjectType::isCompatible(Type type) {
+  if (type.isa<ObjectType>()) {
+    // Already an object.
+    return true;
+  } else if (type.isIntOrIndexOrFloat() || type.isa<ComplexType>()) {
+    // Ignore known primitive types.
+    return false;
+  }
+  // Assume all other types (user types, buffers, etc) can be objects.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -170,16 +193,36 @@ bool isValueUsableForOp(Value value, Operation *op) {
 
 bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
   auto *producerOp = value.getDefiningOp();
-  if (!producerOp) return true;  // block arg, ok to use
+  if (!producerOp) {
+    return true;  // block arg, ok to use
+  }
+
+  // Producers and consumers in the same block are easy to check.
   if (producerOp->getBlock() == consumerOp->getBlock()) {
-    if (producerOp->isBeforeInBlock(consumerOp)) return true;
+    if (producerOp->isBeforeInBlock(consumerOp)) {
+      // Producer comes before the consumer in the same block and already
+      // satisfies the request based on SSA dominance.
+      return true;
+    }
     for (auto operand : producerOp->getOperands()) {
-      if (!isValueUsableForOp(operand, consumerOp)) return false;
+      if (!isValueUsableForOp(operand, consumerOp)) {
+        return false;
+      }
     }
     producerOp->moveBefore(consumerOp);
     return true;
   }
-  // Could extend this - really need a shared helper function.
+
+  // If the value is directly usable from another block (dominates, etc) then
+  // the condition is already satisfied. We don't move ops that don't satisfy
+  // this yet.
+  if (isValueUsableForOp(value, consumerOp)) {
+    return true;
+  }
+
+  // Could support more cases of satisfaction checks or movement. Ops that exist
+  // in ancestors (like those implicitly captured by nested scf.if/scf.for ops)
+  // are good candidates to check for.
   return false;
 }
 

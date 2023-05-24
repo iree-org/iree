@@ -1777,7 +1777,7 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
     `` $op `` `[` $element_count `]`
     (`on` `(` $affinity^ `)`)?
     `channel` `(` $channel `)`
-    custom<CollectiveParam>(ref($op), $param)
+    custom<CollectiveParam>(ref($op), $param) ``
     $source `[` $source_offset `to` $source_end `for` $source_length `]` `,`
     $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
     type($source) `` `{` $source_size `}` `->`
@@ -3321,7 +3321,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
 // Channels
 //===----------------------------------------------------------------------===//
 
-def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
+def Stream_ChannelCreateOp : Stream_PureOp<"channel.create", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Stream_AffinityOp,
@@ -3357,6 +3357,8 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
     `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
@@ -3387,6 +3389,8 @@ def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
     `:` type($channel) `->` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
@@ -3409,6 +3413,8 @@ def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
      $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
 
 def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
@@ -3430,6 +3436,8 @@ def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
     $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//

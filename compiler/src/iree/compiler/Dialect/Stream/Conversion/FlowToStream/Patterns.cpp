@@ -464,6 +464,55 @@ struct ConvertReduceScatterOp
   }
 };
 
+struct ConvertCollectiveSendRecvOp
+    : public OpConversionPattern<IREE::Flow::CollectiveSendRecvOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::CollectiveSendRecvOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto shape = op.getType().cast<ShapedType>();
+    auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
+        op.getContext(), IREE::Stream::CollectiveKind::SendRecv,
+        /*reduction=*/std::nullopt,
+        static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
+
+    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
+        op.getLoc(), shape.getNumElements());
+    auto newTargetCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
+    auto newSourceCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+
+    // Pack send, recv into param. The values are checked to be within the
+    // 16-bit range during lowering to Flow dialect.
+    auto send = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getI32Type(), adaptor.getSend());
+    auto lo = rewriter.create<arith::AndIOp>(
+        op.getLoc(), send,
+        rewriter.create<arith::ConstantIntOp>(op.getLoc(), 0xFFFF, 32));
+    auto recv = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getI32Type(), adaptor.getRecv());
+    auto hi = rewriter.create<arith::ShLIOp>(
+        op.getLoc(), recv,
+        rewriter.create<arith::ConstantIntOp>(op.getLoc(), 16, 32));
+    auto param = rewriter.create<arith::OrIOp>(op.getLoc(), hi, lo);
+
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
+        op, collectiveAttr, adaptor.getTarget(),
+        /*target_size=*/newTargetCast.resourceSize,
+        /*target_offset=*/zeroOffset,
+        /*target_end=*/newTargetCast.resourceSize,
+        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*source_size=*/newSourceCast.resourceSize,
+        /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
+        /*source_length=*/newSourceCast.resourceSize, elementCount,
+        adaptor.getChannel(),
+        /*param=*/param, getAffinityFor(op));
+    return success();
+  }
+};
+
 struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -808,9 +857,10 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
   patterns.insert<ConvertChannelDefaultOp, ConvertChannelSplitOp,
                   ConvertChannelRankOp, ConvertChannelCountOp>(typeConverter,
                                                                context);
-  patterns.insert<ConvertAllGatherOp, ConvertAllReduceOp,
-                  ConvertReduceScatterOp, ConvertAllToAllOp>(typeConverter,
-                                                             context);
+  patterns
+      .insert<ConvertAllGatherOp, ConvertAllReduceOp, ConvertReduceScatterOp,
+              ConvertAllToAllOp, ConvertCollectiveSendRecvOp>(typeConverter,
+                                                              context);
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertFuncOp, ConvertCallOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);

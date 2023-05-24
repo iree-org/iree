@@ -39,14 +39,14 @@ class IreeToolsLauncher:
       self.op_reference_cache_path.mkdir(parents=True, exist_ok=True)
 
     # path to iree-compile tool. (for compiling the input mlir file to vmfb)
-    self.iree_compile_path = Path(args.build_dir, 'tools', 'iree-compile')
+    self.iree_compile_path = Path(args.iree_bin_dir, 'iree-compile')
 
     # path to iree-benchmark-module tool. (for performance benchmarking and profiling)
-    self.iree_benchmark_module_path = Path(args.build_dir, 'tools',
+    self.iree_benchmark_module_path = Path(args.iree_bin_dir,
                                            'iree-benchmark-module')
 
     # path to iree-run-module tool. (for verification)
-    self.iree_run_module_path = Path(args.build_dir, 'tools', 'iree-run-module')
+    self.iree_run_module_path = Path(args.iree_bin_dir, 'iree-run-module')
 
     # output vmfb files for verification and profiling.
     vmfb_filename = f"{operation.name()}"

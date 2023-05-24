@@ -82,7 +82,8 @@ static inline iree_loop_t iree_loop_inline_initialize(
   return loop;
 }
 
-static void iree_loop_inline_deinitialize(iree_loop_inline_storage_t* storage) {
+static inline void iree_loop_inline_deinitialize(
+    iree_loop_inline_storage_t* storage) {
   if (!storage) return;
   iree_status_ignore(storage->status);
   storage->status = iree_ok_status();

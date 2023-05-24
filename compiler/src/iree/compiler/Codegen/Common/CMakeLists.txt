@@ -82,6 +82,7 @@ iree_cc_library(
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
+    "CommonPasses.h"
     "EncodingInfo.h"
     "Transforms.h"
   SRCS
@@ -90,6 +91,7 @@ iree_cc_library(
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
     "ConcretizePadResultShape.cpp"
+    "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposePackUnPackOps.cpp"
@@ -98,7 +100,6 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
-    "GPUPipelining.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
@@ -142,7 +143,6 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRNVGPUDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow
@@ -152,6 +152,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTensorUtils
     MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransforms
@@ -181,27 +182,16 @@ iree_cc_library(
     Common
   HDRS
     "ExtractAddressComputation.h"
-    "GPUPatterns.h"
-    "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "ExtractAddressComputation.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
-    "GPUDistributeSharedMemoryCopy.cpp"
-    "GPUMultiBuffering.cpp"
-    "GPUPatterns.cpp"
-    "GPUReduceBankConflicts.cpp"
-    "GPUTileReduction.cpp"
-    "GPUVectorization.cpp"
-    "LinalgOpInfo.cpp"
     "MemrefCopyToLinalg.cpp"
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"
     "UserConfig.cpp"
-    "VectorReductionToGPU.cpp"
-    "WorkGroupSwizzle.cpp"
   DEPS
     ::CommonPasses
     ::TransformDialectInterpreterPass
@@ -220,7 +210,6 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRGPUOps
-    MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
@@ -230,7 +219,6 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRNVGPUDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow

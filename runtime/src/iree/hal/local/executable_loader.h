@@ -81,7 +81,8 @@ iree_status_t iree_hal_executable_import_provider_try_resolve(
     iree_hal_executable_import_resolution_t* out_resolution);
 
 // Returns true if the import |symbol_name| is optional.
-static bool iree_hal_executable_import_is_optional(const char* symbol_name) {
+static inline bool iree_hal_executable_import_is_optional(
+    const char* symbol_name) {
   // A `?` prefix indicates the symbol is optional and can be NULL.
   // Since the strings are NUL terminated we know there's always 1 char and
   // we can just test that for the prefix.

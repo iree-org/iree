@@ -26,7 +26,7 @@ class TilingConfig {
     int numTileLevels = loweringConfig.getTileSizes().size();
 
     // Initialize indices as invalid.
-    int invalidIdx = std::numeric_limits<unsigned>::max();
+    constexpr unsigned invalidIdx = std::numeric_limits<unsigned>::max();
     for (int i = 0; i < MaxNumTileLevels; ++i) {
       levelToIdxMap[i] = invalidIdx;
     }
@@ -110,13 +110,13 @@ class TilingConfig {
     ReductionCacheTiles = 3,
     // Tile TilingInterface operations on workgroup thread for reduction dims.
     ReductionVectorTiles = 4,
-    MaxNumTileLevels = 5
+    MaxNumTileLevels = 5,
+    InvalidLevel = 6,
   };
 
   unsigned getIdx(TilingLevel level) {
     unsigned idx = levelToIdxMap[level];
-    assert(idx != std::numeric_limits<unsigned>::max() &&
-           "Searching for unavailable tiling level");
+    assert(idx != InvalidLevel && "Searching for unavailable tiling level");
     return idx;
   }
 

@@ -159,11 +159,10 @@ struct ConvertTensorExportOp
     if (adaptor.getTargetStorage()) {
       // Query the target storage buffer length; we will only populate up to
       // what is required for the output.
-      auto storageSize =
-          rewriter
-              .create<IREE::HAL::BufferLengthOp>(
-                  op.getLoc(), rewriter.getIndexType(), op.getTargetStorage())
-              .getResult();
+      auto storageSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+          op.getLoc(), rewriter.getIndexType(),
+          TypeAttr::get(op.getSource().getType()), adaptor.getSourceDims(),
+          /*affinity=*/nullptr);
 
       // Import the target storage as a resource that we can use as an update
       // target. We overwrite the contents and just cast the storage to the

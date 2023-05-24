@@ -4,11 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Pass/PassManager.h"
+//===---------------------------------------------------------------------===//
+// Include pass headers per target device
+//===---------------------------------------------------------------------===//
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
+#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
+#include "iree/compiler/Codegen/WGSL/WGSLPasses.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -65,31 +75,31 @@ void registerCodegenPasses() {
       });
 }
 
-/// Hook to verify the lowering configuration and translation info for an
-/// operation.
-LogicalResult verifyLoweringConfiguration(
-    Operation *op, TilingConfig &tilingConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize) {
-  if (translationInfo.getDispatchLoweringPassPipeline() ==
-      IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert) {
-    return verifyDoubleTilingExpertPassPipelineConfig(op, tilingConfig,
-                                                      translationInfo);
-  }
-  return success();
-}
-
-LogicalResult verifyLoweringConfiguration(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize) {
-  if (translationInfo.getDispatchLoweringPassPipeline() ==
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt) {
-    return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo,
-                                   workgroupSize);
-  }
-  return success();
-}
+///// Hook to verify the lowering configuration and translation info for an
+///// operation.
+//LogicalResult verifyLoweringConfiguration(
+//    Operation *op, TilingConfig &tilingConfig,
+//    IREE::Codegen::TranslationInfoAttr translationInfo,
+//    ArrayRef<int64_t> workgroupSize) {
+//  if (translationInfo.getDispatchLoweringPassPipeline() ==
+//      IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert) {
+//    return verifyDoubleTilingExpertPassPipelineConfig(op, tilingConfig,
+//                                                      translationInfo);
+//  }
+//  return success();
+//}
+//
+//LogicalResult verifyLoweringConfiguration(
+//    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+//    IREE::Codegen::TranslationInfoAttr translationInfo,
+//    ArrayRef<int64_t> workgroupSize) {
+//  if (translationInfo.getDispatchLoweringPassPipeline() ==
+//      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt) {
+//    return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo,
+//                                   workgroupSize);
+//  }
+//  return success();
+//}
 
 void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createTypePropagationPass());

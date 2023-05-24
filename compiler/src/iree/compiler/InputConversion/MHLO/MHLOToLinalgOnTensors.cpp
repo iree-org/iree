@@ -240,6 +240,67 @@ struct OptimizationBarrierOpConversion
   }
 };
 
+// Returns true if all attributes in the given dictionary are valid for IREE
+// input dialects.
+static bool isValidFuncAttr(DictionaryAttr attrs) {
+  // TODO: switch to using a dialect-based exclusion list or some other way that
+  // is not a big string table.
+  for (auto attr : attrs) {
+    if (attr.getName() == "tf.aliasing_output") return false;
+  }
+  return true;
+}
+
+// Adds iree.abi.encoding attributes for arguments and results when they have
+// had their type changed during conversion.
+static void setFuncEncodings(func::FuncOp funcOp, FunctionType oldFuncType,
+                             FunctionType newFuncType) {
+  auto encodingName = StringAttr::get(funcOp.getContext(), "iree.abi.encoding");
+  for (auto [i, oldType, newType] :
+       llvm::enumerate(oldFuncType.getInputs(), newFuncType.getInputs())) {
+    if (oldType != newType)
+      funcOp.setArgAttr(i, encodingName, TypeAttr::get(oldType));
+  }
+  for (auto [i, oldType, newType] :
+       llvm::enumerate(oldFuncType.getResults(), newFuncType.getResults())) {
+    if (oldType != newType)
+      funcOp.setResultAttr(i, encodingName, TypeAttr::get(oldType));
+  }
+}
+
+// Rewrites attributes on the function from ones coming from HLO-based frontends
+// to the IREE supported versions.
+static void rewriteFuncAttrs(func::FuncOp funcOp) {
+  auto *context = funcOp.getContext();
+  auto indexType = IndexType::get(context);
+  auto abiOutputName = StringAttr::get(context, "iree.abi.output");
+  auto aliasingOutputName = StringAttr::get(context, "tf.aliasing_output");
+  auto rewriteAttrs = [&](DictionaryAttr &allAttrs) {
+    SmallVector<NamedAttribute> newAttrs;
+    newAttrs.reserve(allAttrs.size());
+    for (auto attr : allAttrs) {
+      if (attr.getName() == aliasingOutputName) {
+        newAttrs.push_back({
+            abiOutputName,
+            IntegerAttr::get(indexType,
+                             attr.getValue().cast<IntegerAttr>().getInt()),
+        });
+      } else {
+        newAttrs.push_back(attr);
+      }
+    }
+    allAttrs = DictionaryAttr::get(context, newAttrs);
+  };
+  SmallVector<DictionaryAttr> argAttrs;
+  funcOp.getAllArgAttrs(argAttrs);
+  llvm::for_each(argAttrs, rewriteAttrs);
+  funcOp.setAllArgAttrs(argAttrs);
+  SmallVector<DictionaryAttr> resultAttrs;
+  funcOp.getAllResultAttrs(resultAttrs);
+  llvm::for_each(resultAttrs, rewriteAttrs);
+  funcOp.setAllResultAttrs(resultAttrs);
+}
+
 // We need to convert func ops in order to convert types.
 class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
@@ -266,6 +327,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     }
 
     // Create new function with converted argument and result types.
+    auto oldFuncType = srcOp.getFunctionType();
     auto newFuncType = mlir::FunctionType::get(
         srcOp.getContext(), signatureConversion.getConvertedTypes(),
         convertedResultTypes);
@@ -273,6 +335,8 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     // Update the function in place.
     rewriter.startRootUpdate(srcOp);
     srcOp.setType(newFuncType);
+    rewriteFuncAttrs(srcOp);
+    setFuncEncodings(srcOp, oldFuncType, newFuncType);
 
     // Tell the rewriter to convert the region signature.
     TypeConverter &typeConverter = *getTypeConverter();
@@ -445,11 +509,6 @@ struct ConvertMHLOToLinalgOnTensorsPass
     ConversionTarget target(getContext());
 
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
-    auto isIllegalFuncType = [&](Type t) {
-      // Allows unsigned integers for function inputs and outputs.
-      return !typeConverter->isLegal(t) &&
-             !getElementTypeOrSelf(t).isUnsignedInteger();
-    };
     auto isLegallyTypedOp = [&](Operation *op) -> bool {
       for (Type type : op->getResultTypes()) {
         if (isIllegalType(type)) return false;
@@ -465,34 +524,46 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     // Functions must have legal types.
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
+      if (auto attrs = funcOp.getAllArgAttrs()) {
+        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
+                          isValidFuncAttr)) {
+          return false;
+        }
+      }
+      if (auto attrs = funcOp.getAllResultAttrs()) {
+        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
+                          isValidFuncAttr)) {
+          return false;
+        }
+      }
       for (Type type : funcOp.getFunctionType().getInputs()) {
-        if (isIllegalFuncType(type)) return false;
+        if (isIllegalType(type)) return false;
       }
       for (Type type : funcOp.getFunctionType().getResults()) {
-        if (isIllegalFuncType(type)) return false;
+        if (isIllegalType(type)) return false;
       }
       for (Block &block : funcOp.getFunctionBody()) {
         for (Type type : block.getArgumentTypes()) {
-          if (isIllegalFuncType(type)) return false;
+          if (isIllegalType(type)) return false;
         }
       }
       return true;
     });
     target.addDynamicallyLegalOp<func::ReturnOp>([&](func::ReturnOp op) {
       return llvm::all_of(op.getOperandTypes(),
-                          [&](Type type) { return !isIllegalFuncType(type); });
+                          [&](Type type) { return !isIllegalType(type); });
     });
     target.addDynamicallyLegalOp<func::CallOp>([&](func::CallOp op) {
       return llvm::all_of(op.getOperandTypes(),
-                          [&](Type type) { return !isIllegalFuncType(type); });
+                          [&](Type type) { return !isIllegalType(type); });
     });
     target.addDynamicallyLegalOp<cf::CondBranchOp>([&](cf::CondBranchOp op) {
       return llvm::all_of(op.getOperandTypes(),
-                          [&](Type type) { return !isIllegalFuncType(type); });
+                          [&](Type type) { return !isIllegalType(type); });
     });
     target.addDynamicallyLegalOp<cf::BranchOp>([&](cf::BranchOp op) {
       return llvm::all_of(op.getOperandTypes(),
-                          [&](Type type) { return !isIllegalFuncType(type); });
+                          [&](Type type) { return !isIllegalType(type); });
     });
     target.addDynamicallyLegalOp<ml_program::GlobalOp>(
         [&](ml_program::GlobalOp op) {

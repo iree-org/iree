@@ -6,7 +6,7 @@
 """Defines IREE CUDA benchmarks."""
 
 from typing import List, Tuple, Sequence
-from benchmark_suites.iree import module_execution_configs
+from benchmark_suites.iree import benchmark_tags, module_execution_configs
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
@@ -46,14 +46,14 @@ class Linux_CUDA_Benchmarks(object):
       compile_config: iree_definitions.CompileConfig,
       execution_config: iree_definitions.
       ModuleExecutionConfig = module_execution_configs.CUDA_CONFIG,
-      run_tags: Sequence[str] = [],
+      tags: Sequence[str] = (),
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=compile_config,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in models
+            imported_model=iree_definitions.ImportedModel.from_model(model),
+            tags=tags) for model in models
     ]
     sm80_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
@@ -62,7 +62,7 @@ class Linux_CUDA_Benchmarks(object):
         module_generation_configs=gen_configs,
         module_execution_configs=[execution_config],
         device_specs=sm80_devices,
-        tags=run_tags)
+        tags=tags)
 
     return (gen_configs, run_module_configs)
 
@@ -71,24 +71,25 @@ class Linux_CUDA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
-    # The `cuda` tag is required to put them into the CUDA benchmark preset.
-    gen_configs, run_configs = self._generate_configs(model_groups.CUDA_MODELS,
-                                                      self.SM_80_COMPILE_CONFIG,
-                                                      run_tags=["cuda"])
+    # The CUDA tag is required to put them into the CUDA benchmark preset.
+    gen_configs, run_configs = self._generate_configs(
+        model_groups.CUDA_MODELS,
+        self.SM_80_COMPILE_CONFIG,
+        tags=[benchmark_tags.CUDA])
     ubench_gen_configs, ubench_run_configs = self._generate_configs(
         model_groups.MICRO_MATMUL,
         self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,
         execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-        run_tags=["cuda"])
+        tags=[benchmark_tags.CUDA])
     ubench_splitk_gen_configs, ubench_splitk_run_configs = self._generate_configs(
         model_groups.MICRO_MATMUL_SPLITK,
         self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
         execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-        run_tags=["cuda"])
+        tags=[benchmark_tags.CUDA])
     long_running_gen_configs, long_running_module_configs = self._generate_configs(
         model_groups.CUDA_MODELS_LONG,
         self.SM_80_COMPILE_CONFIG,
-        run_tags=["cuda", "long-running"])
+        tags=[benchmark_tags.CUDA, benchmark_tags.LONG_RUNNING])
     return (gen_configs + ubench_gen_configs + ubench_splitk_gen_configs +
             long_running_gen_configs, run_configs + ubench_run_configs +
             ubench_splitk_run_configs + long_running_module_configs)

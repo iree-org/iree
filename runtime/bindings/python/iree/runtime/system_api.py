@@ -240,6 +240,11 @@ class SystemContext:
   def modules(self) -> BoundModules:
     return self._bound_modules
 
+  def add_module_dependency(self, name, minimum_version=0):
+    resolved_module = _binding.VmModule.resolve_module_dependency(
+        self._config.vm_instance, name, minimum_version)
+    self._vm_context.register_modules([resolved_module])
+
   def add_vm_modules(self, vm_modules):
     assert self._is_dynamic, "Cannot 'add_module' on a static context"
     for m in vm_modules:

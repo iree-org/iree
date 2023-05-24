@@ -9,15 +9,13 @@ from typing import List, Tuple
 
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
-from benchmark_suites.iree import (riscv_benchmarks, x86_64_benchmarks,
-                                   adreno_benchmarks, armv8_a_benchmarks,
-                                   cuda_benchmarks, mali_benchmarks,
-                                   vulkan_nvidia_benchmarks, vmvx_benchmarks)
+from benchmark_suites.iree import (benchmark_tags, riscv_benchmarks,
+                                   x86_64_benchmarks, adreno_benchmarks,
+                                   armv8_a_benchmarks, cuda_benchmarks,
+                                   mali_benchmarks, vulkan_nvidia_benchmarks,
+                                   vmvx_benchmarks)
 
 COMPILE_STATS_ID_SUFFIX = "-compile-stats"
-# Tag that indicates this compile config is generated for collecting compilation
-# statistics.
-COMPILE_STATS_TAG = "compile-stats"
 
 
 def generate_benchmarks(
@@ -49,7 +47,7 @@ def generate_benchmarks(
     scheduling_stats_path = f"{iree_definitions.MODULE_DIR_VARIABLE}/{iree_artifacts.SCHEDULING_STATS_FILENAME}"
     compile_stats_config = iree_definitions.CompileConfig.build(
         id=compile_config.id + COMPILE_STATS_ID_SUFFIX,
-        tags=compile_config.tags + [COMPILE_STATS_TAG],
+        tags=compile_config.tags + [benchmark_tags.COMPILE_STATS],
         compile_targets=compile_config.compile_targets,
         extra_flags=compile_config.extra_flags + [
             # Enable zip polyglot to provide component sizes.
@@ -63,7 +61,8 @@ def generate_benchmarks(
     compile_stats_gen_configs.append(
         iree_definitions.ModuleGenerationConfig.build(
             imported_model=gen_config.imported_model,
-            compile_config=compile_stats_config))
+            compile_config=compile_stats_config,
+            tags=gen_config.tags))
   all_gen_configs += compile_stats_gen_configs
 
   return (all_gen_configs, all_run_configs)

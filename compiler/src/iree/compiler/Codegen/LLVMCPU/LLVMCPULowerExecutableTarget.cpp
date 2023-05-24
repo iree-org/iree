@@ -9,16 +9,18 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -112,6 +114,37 @@ static LogicalResult verifyLoweringConfiguration(
   return failure(walkResult.wasInterrupted());
 }
 
+// TODO: Move
+FailureOr<Operation *> getRootOperation(Operation *op) {
+  // Check for self first.
+  if (iree_compiler::getLoweringConfig(op)) {
+    return op;
+  }
+
+  Operation *rootOp = nullptr;
+  mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr rootLoweringConfig;
+  auto result = op->walk([&](Operation *op) -> WalkResult {
+    auto loweringConfig = iree_compiler::getLoweringConfig(op);
+    if (!loweringConfig) {
+      return WalkResult::advance();
+    }
+    if (rootLoweringConfig) {
+      if (rootLoweringConfig != loweringConfig) {
+        return WalkResult::interrupt();
+      }
+    } else {
+      rootOp = op;
+      rootLoweringConfig = loweringConfig;
+    }
+    return WalkResult::advance();
+  });
+
+  if (!rootOp || result.wasInterrupted()) {
+    return failure();
+  }
+  return rootOp;
+}
+
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
@@ -187,9 +220,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       }
 
       auto maybeRootOp = getRootOperation(variantOp);
-      if (failed(maybeRootOp)) {
-        return signalPassFailure();
-      }
+      assert(succeeded(maybeRootOp) && "Expected root operation");
       TilingConfig tilingConfig(
           mlir::iree_compiler::getLoweringConfig(*maybeRootOp));
 

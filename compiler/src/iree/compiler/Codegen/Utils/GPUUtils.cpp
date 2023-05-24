@@ -587,6 +587,25 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
+      // TODO: The condition for unrolling elementwise should be restricted
+      // only to operations that need unrolling (connected to the contract).
+      if (vecType.getRank() < 2) return std::nullopt;
+
+      // First check whether there is a slice to infer the shape from. This is
+      // required for cases where the accumulator type differs from the input
+      // types, in which case we will see an `arith.ext_` between the contract
+      // and transfer_read which needs to be unrolled.
+      VectorType sliceType;
+      for (Operation *users : op->getUsers()) {
+        auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
+        if (!extract) return std::nullopt;
+        auto vecType = extract.getResult().getType().cast<VectorType>();
+        if (sliceType && sliceType != vecType) return std::nullopt;
+        sliceType = vecType;
+      }
+      if (sliceType) return llvm::to_vector(sliceType.getShape());
+
+      // Else unroll for trailing elementwise.
       SmallVector<int64_t> nativeSize(vecType.getRank() - 2, 1);
       // Map elementwise ops to the output shape.
       nativeSize.append({m, n});
@@ -759,6 +778,24 @@ bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
       memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
   return addrSpace &&
          addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
+}
+
+//===----------------------------------------------------------------------===//
+// GPU CodeGen op filter
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem.
+bool sharedMemTransposeFilter(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace iree_compiler

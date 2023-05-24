@@ -1667,6 +1667,58 @@ OpFoldResult CastF32UI32Op::fold(FoldAdaptor operands) {
       });
 }
 
+namespace {
+
+/// Folds cast ops into the result of other ops.
+/// Only safe to apply to ops that don't care about their types.
+template <typename CastOp>
+struct FoldCastRefIntoOpResult : public OpRewritePattern<CastOp> {
+  using OpRewritePattern<CastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    auto zeroOp =
+        dyn_cast_or_null<ConstRefZeroOp>(castOp.getOperand().getDefiningOp());
+    if (!zeroOp) return failure();
+    rewriter.replaceOpWithNewOp<ConstRefZeroOp>(castOp,
+                                                castOp.getResult().getType());
+    return success();
+  }
+};
+
+}  // namespace
+
+OpFoldResult CastAnyRefOp::fold(FoldAdaptor operands) {
+  if (getOperand().getType() == getResult().getType()) return getOperand();
+  if (auto castOp =
+          dyn_cast_or_null<CastRefAnyOp>(getOperand().getDefiningOp())) {
+    if (castOp.getOperand().getType() == getResult().getType()) {
+      return castOp.getOperand();
+    }
+  }
+  return {};
+}
+
+void CastAnyRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<FoldCastRefIntoOpResult<CastAnyRefOp>>(context);
+}
+
+OpFoldResult CastRefAnyOp::fold(FoldAdaptor operands) {
+  if (getOperand().getType() == getResult().getType()) return getOperand();
+  if (auto castOp =
+          dyn_cast_or_null<CastAnyRefOp>(getOperand().getDefiningOp())) {
+    if (castOp.getOperand().getType() == getResult().getType()) {
+      return castOp.getOperand();
+    }
+  }
+  return {};
+}
+
+void CastRefAnyOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<FoldCastRefIntoOpResult<CastRefAnyOp>>(context);
+}
+
 //===----------------------------------------------------------------------===//
 // Native reduction (horizontal) arithmetic
 //===----------------------------------------------------------------------===//

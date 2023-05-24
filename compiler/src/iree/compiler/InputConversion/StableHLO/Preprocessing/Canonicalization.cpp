@@ -14,6 +14,7 @@
 #include "iree/compiler/InputConversion/StableHLO/Preprocessing/Rewriters.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -31,6 +32,84 @@ namespace {
 // This is an upper limit on how many elements canonicalization patterns are
 // allowed to materialize as new constants.
 constexpr int64_t kFoldOpEltLimit = 65536;
+
+static bool isIotaRange(ElementsAttr attr) {
+  auto elems = attr.tryGetValues<APInt>();
+  if (!elems) return false;
+
+  for (auto [idx, value] : llvm::enumerate(*elems)) {
+    if (idx != value) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+struct BroadcastInDimOpCanon final
+    : OpRewritePattern<mlir::stablehlo::BroadcastInDimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::BroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type) return failure();
+
+    Value operand = op.getOperand();
+    auto operandTy = dyn_cast<RankedTensorType>(operand.getType());
+    if (!operandTy) return failure();
+
+    // Fold when broadcast is a noop.
+    DenseIntElementsAttr dims = op.getBroadcastDimensions();
+    bool isDimsIota = isIotaRange(dims);
+    if (type == operandTy && isDimsIota) {
+      rewriter.replaceOp(op, operand);
+      return success();
+    }
+
+    // Handle splat broadcasts.
+    if (SplatElementsAttr cstAttr;
+        matchPattern(operand, m_Constant(&cstAttr))) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+          op, SplatElementsAttr::get(op.getType(),
+                                     cstAttr.getSplatValue<Attribute>()));
+      return success();
+    }
+
+    auto bsDimIndices = dims.getValues<int64_t>();
+    if (operandTy.hasStaticShape() && type.hasStaticShape() &&
+        type.getNumElements() == operandTy.getNumElements()) {
+      // BroadcastInDim equivalent to reshape.
+      if (isDimsIota) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, type,
+                                                                operand);
+        return success();
+      }
+      // BroadcastInDim equivalent to transpose.
+      if (type.getRank() == operandTy.getRank()) {
+        rewriter.replaceOpWithNewOp<mlir::stablehlo::TransposeOp>(
+            op, type, operand, dims);
+        return success();
+      }
+    }
+
+    // Eliminate redundant nested BroadcastInDim.
+    if (auto broadcastInDimOp =
+            operand.getDefiningOp<mlir::stablehlo::BroadcastInDimOp>()) {
+      auto newIndices = cast<DenseIntElementsAttr>(
+          broadcastInDimOp.getBroadcastDimensions().mapValues(
+              dims.getElementType(), [&bsDimIndices](const APInt &dim) {
+                return APInt(dim.getBitWidth(),
+                             bsDimIndices[dim.getSExtValue()], true);
+              }));
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::BroadcastInDimOp>(
+          op, type, broadcastInDimOp.getOperand(), newIndices);
+      return success();
+    }
+
+    return failure();
+  }
+};
 
 struct ConcatenateOpCanon final
     : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
@@ -206,15 +285,7 @@ struct TransposeOpCanon final : OpRewritePattern<mlir::stablehlo::TransposeOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::TransposeOp op,
                                 PatternRewriter &rewriter) const override {
     // Check if this transpose is a noop and use the operand instead.
-    auto dims = op.getPermutation().tryGetValues<APInt>();
-    if (failed(dims)) return failure();
-
-    // Check if dims is an iota range.
-    for (auto [idx, dim] : llvm::enumerate(*dims)) {
-      if (idx != dim.getLimitedValue()) {
-        return failure();
-      }
-    }
+    if (!isIotaRange(op.getPermutation())) return failure();
 
     rewriter.replaceOp(op, op.getOperand());
     return success();
@@ -238,9 +309,9 @@ struct StableHLOCanonicalize final
 void populateCanonicalizationPatterns(MLIRContext *context,
                                       RewritePatternSet *patterns,
                                       PatternBenefit benefit) {
-  patterns->add<ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon,
-                GetTupleElementOpCanon, RealOpCanon, ImagOpCanon,
-                GetDimensionSizeOpCanon, ReshapeOpCanon, TransposeOpCanon>(
-      context, benefit);
+  patterns->add<BroadcastInDimOpCanon, ConcatenateOpCanon, ConvertOpCanon,
+                DynamicReshapeOpCanon, GetTupleElementOpCanon, RealOpCanon,
+                ImagOpCanon, GetDimensionSizeOpCanon, ReshapeOpCanon,
+                TransposeOpCanon>(context, benefit);
 }
 }  // namespace mlir::iree_compiler::stablehlo

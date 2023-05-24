@@ -877,6 +877,55 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
 }
 
 //===----------------------------------------------------------------------===//
+// Type manipulation
+//===----------------------------------------------------------------------===//
+
+bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
+  if (inputs.size() != 1 || outputs.size() != 1) return false;
+  Type a = inputs.front(), b = outputs.front();
+  if (a == b) {
+    // Both types are the same.
+    return true;
+  }
+  if (a.isa<IREE::Util::ObjectType>() || b.isa<IREE::Util::ObjectType>()) {
+    // Either type is an opaque object.
+    return true;
+  }
+  // Don't currently allow casting between types as we don't have runtime
+  // support for such operations (we don't generally care in the VM).
+  return false;
+}
+
+LogicalResult CastOp::verify() {
+  auto operandType = getOperand().getType();
+  if (!IREE::Util::ObjectType::isCompatible(operandType)) {
+    return this->emitOpError() << "operand type " << operandType
+                               << " is not object cast compatible";
+  }
+  auto resultType = getResult().getType();
+  if (!IREE::Util::ObjectType::isCompatible(resultType)) {
+    return this->emitOpError()
+           << "result type " << resultType << " is not object cast compatible";
+  }
+  return success();
+}
+
+Value CastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getOperand());
+}
+
+Value CastOp::getTiedResultOperand(Value result) { return getOperand(); }
+
+::std::optional<unsigned> CastOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // operand
+}
+
+SmallVector<int64_t, 4> CastOp::getTiedResultOperandIndices() {
+  return {0};  // operand
+}
+
+//===----------------------------------------------------------------------===//
 // Numeric ops
 //===----------------------------------------------------------------------===//
 

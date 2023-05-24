@@ -242,6 +242,14 @@ extern "C" {
 #define IREE_UK_ATTRIBUTE_ALIGNED(N)
 #endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
+#if IREE_UK_HAVE_ATTRIBUTE(weak) || (defined(__GNUC__) && !defined(__clang__))
+#define IREE_UK_WEAK __attribute__((weak))
+#define IREE_UK_HAVE_WEAK 1
+#else
+#define IREE_UK_WEAK
+#define IREE_UK_HAVE_WEAK 0
+#endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
+
 //===----------------------------------------------------------------------===//
 // Local replacements for stdint.h types and constants
 // Refer to the comment at the top of this file for why we can't include
@@ -279,23 +287,10 @@ IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint64_t) == 8);
 #define IREE_UK_INT16_MAX 0x7fff
 #define IREE_UK_INT32_MAX 0x7fffffff
 #define IREE_UK_INT64_MAX 0x7fffffffffffffffLL
-#define IREE_UK_UINT8_MAX 0xff
-#define IREE_UK_UINT16_MAX 0xffff
+#define IREE_UK_UINT8_MAX 0xffU
+#define IREE_UK_UINT16_MAX 0xffffU
 #define IREE_UK_UINT32_MAX 0xffffffffU
 #define IREE_UK_UINT64_MAX 0xffffffffffffffffULL
-
-IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MIN == -(1 << 7));
-IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MIN == -(1 << 15));
-IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MIN == -(1U << 31));
-IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MIN == -(1ULL << 63));
-IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MAX == (1 << 7) - 1);
-IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MAX == (1 << 15) - 1);
-IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MAX == (1U << 31) - 1);
-IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MAX == (1ULL << 63) - 1);
-IREE_UK_STATIC_ASSERT(IREE_UK_UINT8_MAX == ((iree_uk_uint8_t)-1));
-IREE_UK_STATIC_ASSERT(IREE_UK_UINT16_MAX == ((iree_uk_uint16_t)-1));
-IREE_UK_STATIC_ASSERT(IREE_UK_UINT32_MAX == ((iree_uk_uint32_t)-1));
-IREE_UK_STATIC_ASSERT(IREE_UK_UINT64_MAX == ((iree_uk_uint64_t)-1));
 
 // Helper for microkernel input validation
 #define IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \

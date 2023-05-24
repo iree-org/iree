@@ -70,6 +70,7 @@ class BenchmarkConfig:
   driver_filter: Optional[str] = None
   model_name_filter: Optional[str] = None
   mode_filter: Optional[str] = None
+  use_compatible_filter: bool = False
 
   keep_going: bool = False
   benchmark_min_time: float = 0
@@ -131,6 +132,7 @@ class BenchmarkConfig:
                            driver_filter=args.driver_filter_regex,
                            model_name_filter=args.model_name_regex,
                            mode_filter=args.mode_regex,
+                           use_compatible_filter=args.compatible_only,
                            keep_going=args.keep_going,
                            benchmark_min_time=args.benchmark_min_time,
                            continue_from_previous=args.continue_from_previous)

@@ -47,3 +47,21 @@ func.func @addf_vector_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> v
 // CHECK: %[[EXT1:.+]] = arith.extf %[[ARG1]] : vector<4xbf16> to vector<4xf32>
 // CHECK: %[[ADD:.+]] = arith.addf %[[EXT0]], %[[EXT1]] : vector<4xf32>
 // CHECK: %[[TRUNC:.+]] = arith.truncf %[[ADD]] : vector<4xf32> to vector<4xbf16>
+
+// -----
+
+func.func @bitcast_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> vector<4xbf16> {
+    %0 = arith.bitcast %arg0 : vector<4xbf16> to vector<4xi16>
+    %1 = arith.bitcast %arg1 : vector<4xbf16> to vector<4xi16>
+    %2 = arith.xori %0, %1 : vector<4xi16>
+    %3 = arith.bitcast %2 : vector<4xi16> to vector<4xbf16>
+    return %3 : vector<4xbf16>
+}
+
+
+// CHECK-LABEL: @bitcast_bf16
+// CHECK-DAG: %[[BITCAST0:.+]] = arith.bitcast %arg0 : vector<4xbf16> to vector<4xi16>
+// CHECK-DAG: %[[BITCAST1:.+]] = arith.bitcast %arg1 : vector<4xbf16> to vector<4xi16>
+// CHECK-DAG: %[[XOR:.+]] = arith.xori %[[BITCAST0]], %[[BITCAST1]]
+// CHECK-DAG: %[[BITCAST2:.+]] = arith.bitcast %[[XOR]]
+// CHECK: return %[[BITCAST2]]

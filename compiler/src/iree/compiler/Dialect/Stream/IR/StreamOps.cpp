@@ -1424,6 +1424,8 @@ static const char *getCollectiveParamKeyword(Attribute opAttr) {
       return "target";
     case IREE::Stream::CollectiveKind::Recv:
       return "source";
+    case IREE::Stream::CollectiveKind::SendRecv:
+      return "source_target_pair";
     default:
       return nullptr;
   }
@@ -1450,7 +1452,7 @@ static void printCollectiveParam(OpAsmPrinter &p, Operation *op,
     assert(keyword && "collective op must have a param keyword");
     p << keyword << "(";
     p.printOperand(paramValue);
-    p << ")";
+    p << ") ";
   }
 }
 

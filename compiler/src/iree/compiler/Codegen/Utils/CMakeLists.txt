@@ -16,12 +16,14 @@ iree_cc_library(
   HDRS
     "EncodingInfo.h"
     "GPUUtils.h"
+    "LinalgOpInfo.h"
     "LinkingUtils.h"
     "MarkerUtils.h"
     "Utils.h"
   SRCS
     "EncodingInfo.cpp"
     "GPUUtils.cpp"
+    "LinalgOpInfo.cpp"
     "LinkingUtils.cpp"
     "MarkerUtils.cpp"
     "Utils.cpp"

@@ -159,6 +159,31 @@ class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtrType> {
 }
 
 //===----------------------------------------------------------------------===//
+// !util.object
+//===----------------------------------------------------------------------===//
+
+def Util_ObjectType : TypeDef<Util_Dialect, "Object"> {
+  let mnemonic = "object";
+
+  let summary = [{a placeholder for an unspecified object type}];
+  let description = [{
+    Describes a runtime object type. These may be reference counted or garbage
+    collected at runtime.
+  }];
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return $_get($_ctxt);
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    /// Returns true if the given type is object-like.
+    static bool isCompatible(Type type);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // !util.variant
 //===----------------------------------------------------------------------===//
 
@@ -167,7 +192,8 @@ def Util_VariantType : TypeDef<Util_Dialect, "Variant"> {
 
   let summary = [{a placeholder for a variant type (`?`)}];
   let description = [{
-    Describes a runtime variant type.
+    Describes a runtime variant type. These may be primitives (i32, f32, etc) or
+    object types.
   }];
 
   let builders = [

@@ -8,8 +8,8 @@
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 
@@ -41,10 +41,6 @@ struct IREETileAndFuseResult {
 FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     RewriterBase &rewriter, TilingInterface op,
     linalg::LinalgTilingOptions tilingOptions);
-
-FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
-    RewriterBase &rewriter, scf::ForOp forOp,
-    PipeliningSchedulingStrategy startegy, bool peelEpilogue, int64_t depth);
 
 /// Populate patterns related to clean up the IR after tile and distribute to
 /// workgroups.

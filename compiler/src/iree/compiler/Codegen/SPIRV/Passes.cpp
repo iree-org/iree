@@ -11,13 +11,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -183,6 +184,14 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
 
   pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
 
+  // Check to make sure we are not exceeding shared memory usage limit.
+  auto getSharedMemoryLimit = [](func::FuncOp func) {
+    auto moduleOp = func->getParentOfType<ModuleOp>();
+    spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
+    return target.getResourceLimits().getMaxComputeSharedMemorySize();
+  };
+  pm.addPass(createGPUCheckResourceUsagePass(getSharedMemoryLimit));
+
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
@@ -229,7 +238,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addNestedPass<func::FuncOp>(createSPIRVMapMemRefStorageClassPass());
   pm.addPass(createSPIRVEmulateI64Pass());
   pm.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
-  pm.addPass(createSPIRVEmulateBf16Pass());
+  pm.addPass(createConvertBf16ToUInt16BuffersPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
