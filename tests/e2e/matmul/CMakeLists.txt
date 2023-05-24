@@ -299,7 +299,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulSimt"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -317,12 +317,13 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_unaligned
+    e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=large"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUMatmulTensorCore"
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -341,13 +342,12 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore
+    e2e_matmul_direct_f32_gpu_large_unaligned
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large"
-    "--compilation_info=LLVMGPUMatmulTensorCore"
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -371,7 +371,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -396,7 +396,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCore"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -421,7 +421,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -473,7 +473,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeMali"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -495,7 +495,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeMali"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -517,7 +517,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeMali"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -539,7 +539,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeNVIDIA"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -561,7 +561,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeNVIDIA"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -583,7 +583,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeNVIDIA"
   TRACE_RUNNER
     iree-e2e-matmul-test
