@@ -13,17 +13,17 @@ transform.sequence failures(propagate) {
   // Step 2. Tile the matmul and fuse the fill
   // ===========================================================================
   %forall_grid, %grid_reduction =
-  transform.structured.tile_to_forall_op %broadcast tile_sizes [16] ( mapping = [#gpu.block<x>] )
+  transform.structured.tile_to_forall_op %broadcast tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
-  transform.structured.fuse_into_containing_op %reduce into %forall_grid
-  transform.structured.fuse_into_containing_op %matmul into %forall_grid
-  transform.structured.fuse_into_containing_op %fill into %forall_grid
+  transform.structured.fuse_into_containing_op %reduce into %forall_grid : (!pdl.operation, !pdl.operation) -> !pdl.operation
+  transform.structured.fuse_into_containing_op %matmul into %forall_grid : (!pdl.operation, !pdl.operation) -> !pdl.operation
+  transform.structured.fuse_into_containing_op %fill into %forall_grid : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Step 3. Vectorize
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-  %func_3 = transform.structured.vectorize %func
+  %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
 
   // Step 4. Bufferize
   // ===========================================================================

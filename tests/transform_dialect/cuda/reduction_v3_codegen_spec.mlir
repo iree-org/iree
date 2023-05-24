@@ -12,9 +12,10 @@ transform.sequence failures(propagate) {
   %forall_grid, %grid_reduction =
     transform.structured.tile_to_forall_op %reduction tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
 
-  transform.structured.fuse_into_containing_op %fill into %forall_grid
+  transform.structured.fuse_into_containing_op %fill into %forall_grid : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -26,16 +27,18 @@ transform.sequence failures(propagate) {
   %forall, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 =
      transform.structured.tile_reduction_using_forall %grid_reduction
         by num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
+        : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
 
   // Fuse the fill and pointwise to privatize them.
   transform.structured.fuse_into_containing_op %block_more_parallel_fill_op_2
-    into %forall
+    into %forall : (!pdl.operation, !pdl.operation) -> !pdl.operation
 
   // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
   // map the 1-dim to threadIdx.y to trigger mapping of the reduction to
   // threadIdx.x via predication via `if (x==0)`.
   transform.structured.tile_to_forall_op %block_combiner_op_2 num_threads [1]
     ( mapping = [#gpu.thread<y>] )
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -49,7 +52,7 @@ transform.sequence failures(propagate) {
   // vector<4> to work as intended.
   transform.iree.apply_patterns %func
     { rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-  %func_3 = transform.structured.vectorize %func
+  %func_3 = transform.structured.vectorize %func : (!pdl.operation) -> !pdl.operation
 
   // Canonicalizations is necessary to get rid of some tensor.cast that block
   // hoisting.

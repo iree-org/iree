@@ -38,7 +38,7 @@ iree_cc_library(
     LLVMTarget
     LLVMipo
     MLIRBuiltinToLLVMIRTranslation
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
     MLIRNVGPUDialect

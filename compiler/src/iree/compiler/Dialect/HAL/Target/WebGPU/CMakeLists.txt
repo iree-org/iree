@@ -21,7 +21,7 @@ iree_cc_library(
     "WebGPUTarget.cpp"
   DEPS
     LLVMSupport
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRSPIRVDialect
     MLIRSPIRVSerialization

@@ -495,8 +495,8 @@ def LayoutAnalysisAndDistributionOp :
 
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs Variadic<PDL_Operation>:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
   let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

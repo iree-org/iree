@@ -40,7 +40,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUTransformOps
     MLIRGPUTransforms
     MLIRIR

@@ -12,13 +12,13 @@ transform.sequence failures(propagate) {
   %2, %loops2:3  = transform.structured.tile %1 [2, 2, 2]
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   // CHECK: %[[PADDED:.*]] = transform.structured.pad %[[TILED2]] {pack_paddings = [1, 1, 0]}
-  %3 = transform.structured.pad %2 {pack_paddings = [1, 1, 0]}
+  %3 = transform.structured.pad %2 {pack_paddings = [1, 1, 0]} : (!pdl.operation) -> !pdl.operation
   // CHECK: %{{.*}} = transform.structured.vectorize %[[PADDED]] {vectorize_padding}
-  %4 = transform.structured.vectorize %3 { vectorize_padding }
+  %4 = transform.structured.vectorize %3 { vectorize_padding } : (!pdl.operation) -> !pdl.operation
   // CHECK: %[[OPS2:.*]] = pdl_match @{{.*}}
   %5 = pdl_match @match2 in %arg0 : (!pdl.operation) -> !pdl.operation
   // CHECK: transform.structured.vectorize %[[OPS2]]
-  transform.structured.vectorize %5
+  transform.structured.vectorize %5 : (!pdl.operation) -> !pdl.operation
   // CHECK: %[[FUNC:.*]] = transform.structured.match ops{["func.func"]} in %arg0
   // CHECK: vector.lower_contraction %[[FUNC]] {{.*}}
   %6 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
