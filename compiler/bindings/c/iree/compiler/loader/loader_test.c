@@ -20,6 +20,10 @@ static void printFlag(const char *flag, size_t length, void *userData) {
   flagCount += 1;
 };
 
+static void printPlugin(const char *pluginId, void *userData) {
+  printf("  LOADED PLUGIN: %s\n", pluginId);
+}
+
 static bool manipulateFlags(iree_compiler_session_t *session) {
   iree_compiler_error_t *error;
   // Flags.
@@ -138,6 +142,8 @@ int main(int argc, char **argv) {
 
   const char *revision = ireeCompilerGetRevision();
   printf("Revision: %s\n", revision);
+
+  ireeCompilerEnumeratePlugins(printPlugin, NULL);
 
   // Session.
   iree_compiler_session_t *session = ireeCompilerSessionCreate();
