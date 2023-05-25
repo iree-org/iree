@@ -15,12 +15,11 @@ import urllib.parse
 import markdown_strings as md
 import math
 
-from common import benchmark_definition
+from common import benchmark_definition, benchmark_thresholds
 from common.benchmark_thresholds import (BENCHMARK_THRESHOLDS,
                                          COMPILATION_TIME_THRESHOLDS,
                                          TOTAL_ARTIFACT_SIZE_THRESHOLDS,
                                          TOTAL_DISPATCH_SIZE_THRESHOLDS,
-                                         TOTAL_DISPATCH_NUMBER_THRESHOLDS,
                                          BenchmarkThreshold, ThresholdUnit)
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
@@ -40,8 +39,8 @@ TOTAL_DISPATCH_SIZE_METRIC_ID = "9e15f7e6-383c-47ec-bd38-ecba55a5f10a"
 TOTAL_DISPATCH_SIZE_SERIES_SUFFIX = "compilation:module:component-size:total-dispatch-size"
 TOTAL_ARTIFACT_SIZE_METRIC_ID = "2c8a9198-c01c-45b9-a7da-69c82cf749f7"
 TOTAL_ARTIFACT_SIZE_SERIES_SUFFIX = "compilation:module:total-artifact-size"
-TOTAL_DISPATCH_NUMBER_METRIC_ID = "7b72cd9e-43ed-4078-b6d3-20b810f9e4ad"
-TOTAL_DISPATCH_NUMBER_SERIES_SUFFIX = "compilation:ir:total-dispatch-number"
+STREAM_IR_DISPATCH_COUNT_METRIC_ID = "7b72cd9e-43ed-4078-b6d3-20b810f9e4ad"
+STREAM_IR_DISPATCH_COUNT_SERIES_SUFFIX = "compilation:ir:stream-dispatch-count"
 
 
 @dataclass
@@ -67,11 +66,11 @@ class CompilationMetrics:
   compilation_time_ms: int
   total_dispatch_component_bytes: int
   total_artifact_bytes: int
-  total_dispatch_number: int
+  stream_ir_dispatch_count: int
   base_compilation_time_ms: Optional[int] = None
   base_total_artifact_bytes: Optional[int] = None
   base_total_dispatch_component_bytes: Optional[int] = None
-  base_total_dispatch_number: Optional[int] = None
+  base_stream_ir_dispatch_count: Optional[int] = None
 
   def __str__(self) -> str:
     return self.name
@@ -241,38 +240,38 @@ class TotalArtifactSizeToTable(MetricsToTableMapper[CompilationMetrics]):
     return "Total Artifact Sizes"
 
 
-class TotalDispatchNumberToTable(MetricsToTableMapper[CompilationMetrics]):
-  """Helper to map CompilationMetrics to total dispatch number column."""
+class StreamIRDispatchCountToTable(MetricsToTableMapper[CompilationMetrics]):
+  """Helper to map CompilationMetrics to Stream IR Dispatch Count column."""
 
   def update_base_value(self, compile_metrics: CompilationMetrics,
                         base_value: Any) -> CompilationMetrics:
     return dataclasses.replace(compile_metrics,
-                               base_total_dispatch_number=base_value)
+                               base_stream_ir_dispatch_count=base_value)
 
   def get_current_and_base_value(
       self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:
-    return (compile_metrics.total_dispatch_number,
-            compile_metrics.base_total_dispatch_number)
+    return (compile_metrics.stream_ir_dispatch_count,
+            compile_metrics.base_stream_ir_dispatch_count)
 
   def get_metric_id(self) -> str:
-    return TOTAL_DISPATCH_NUMBER_METRIC_ID
+    return STREAM_IR_DISPATCH_COUNT_METRIC_ID
 
   def get_series_name(self, name: str) -> str:
-    return f"{name} [{TOTAL_DISPATCH_NUMBER_SERIES_SUFFIX}]"
+    return f"{name} [{STREAM_IR_DISPATCH_COUNT_SERIES_SUFFIX}]"
 
   def get_unit(self) -> str:
     return "number"
 
   def get_table_header(self) -> str:
-    return f"Total Dispatch Number ({self.get_unit()})"
+    return f"Stream IR Dispatch Count (# of cmd.execute ops)"
 
   @staticmethod
   def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
-    return TOTAL_DISPATCH_NUMBER_THRESHOLDS
+    return benchmark_thresholds.STREAM_IR_DISPATCH_COUNT_THRESHOLDS
 
   @staticmethod
   def get_table_title() -> str:
-    return "Total Dispatch Number"
+    return "Stream IR Dispatch Count (# of cmd.execute ops)"
 
 
 COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
@@ -280,7 +279,7 @@ COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
         CompilationTimeToTable(),
         TotalDispatchSizeToTable(),
         TotalArtifactSizeToTable(),
-        TotalDispatchNumberToTable(),
+        StreamIRDispatchCountToTable(),
     ]
 
 
@@ -362,7 +361,7 @@ def collect_all_compilation_metrics(
 
     for compile_stats in file_results.compilation_statistics:
       component_sizes = compile_stats.module_component_sizes
-      total_dispatch_number = compile_stats.ir_stats.dispatch_count
+      stream_dispatch_count = compile_stats.ir_stats.stream_dispatch_count
 
       target_name = str(compile_stats.compilation_info)
       if target_name in target_names:
@@ -384,7 +383,7 @@ def collect_all_compilation_metrics(
           total_artifact_bytes=component_sizes.file_bytes,
           total_dispatch_component_bytes=component_sizes.
           total_dispatch_component_bytes,
-          total_dispatch_number=total_dispatch_number)
+          stream_ir_dispatch_count=stream_dispatch_count)
 
   return compile_metrics
 

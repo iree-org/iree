@@ -119,8 +119,8 @@ TOTAL_ARTIFACT_SIZE_THRESHOLDS = [
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
 ]
 
-TOTAL_DISPATCH_NUMBER_THRESHOLDS = [
+STREAM_IR_DISPATCH_COUNT_THRESHOLDS = [
     # Default threshold: 0%.
-    # Any change on number of dispatches should be reported.
+    # Any change on dispatch count should be reported.
     BenchmarkThreshold(re.compile(r".*"), 0, ThresholdUnit.PERCENTAGE),
 ]

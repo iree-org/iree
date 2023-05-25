@@ -706,7 +706,8 @@ class ModuleComponentSizes(object):
 
 @dataclasses.dataclass(frozen=True)
 class IRStatistics(object):
-  dispatch_count: int
+  # Number of cmd.execute ops in IR.
+  stream_dispatch_count: int
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):

@@ -321,12 +321,12 @@ def main(args: argparse.Namespace):
     if module_info.stream_stats_path is None:
       # TODO(#11076): Set dummy data as the legacy benchmark suites don't
       # support IR statistics. Will be removed during the cleanup.
-      ir_stats = benchmark_definition.IRStatistics(dispatch_count=-1)
+      ir_stats = benchmark_definition.IRStatistics(stream_dispatch_count=-1)
     else:
       stream_stats_json = json.loads(module_info.stream_stats_path.read_text())
       exec_stats_json = stream_stats_json["stream-aggregate"]["execution"]
       ir_stats = benchmark_definition.IRStatistics(
-          dispatch_count=exec_stats_json["dispatch-count"])
+          stream_dispatch_count=exec_stats_json["dispatch-count"])
 
     compilation_statistics = CompilationStatistics(
         compilation_info=compilation_info,
