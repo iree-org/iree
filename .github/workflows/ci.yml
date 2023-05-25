@@ -550,7 +550,7 @@ jobs:
 
   gcc:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
+    # if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -568,11 +568,11 @@ jobs:
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
         run: |
+          # TODO(#11394): Enable Web GPU
           ./build_tools/github_actions/docker_run.sh \
             --env CC=/usr/bin/gcc-9 \
             --env CXX=/usr/bin/g++-9 \
             --env CMAKE_BUILD_TYPE=Release \
-            --env "IREE_TARGET_BACKEND_WEBGPU=OFF" \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb" \
@@ -600,7 +600,6 @@ jobs:
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
         run: |
-          # TODO(#11394): Enable Web GPU
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
