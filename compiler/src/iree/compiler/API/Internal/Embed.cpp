@@ -84,7 +84,7 @@
 #endif
 
 #define IREE_COMPILER_API_MAJOR 1
-#define IREE_COMPILER_API_MINOR 1
+#define IREE_COMPILER_API_MINOR 2
 
 namespace mlir::iree_compiler::embed {
 namespace {
@@ -847,6 +847,19 @@ void ireeCompilerEnumerateRegisteredHALTargetBackends(
       mlir::iree_compiler::IREE::HAL::getRegisteredTargetBackends();
   for (auto &b : registeredTargetBackends) {
     callback(b.c_str(), userData);
+  }
+}
+
+void ireeCompilerEnumeratePlugins(void (*callback)(const char *pluginName,
+                                                   void *userData),
+                                  void *userData) {
+  if (!globalInit) {
+    fprintf(stderr, "FATAL ERROR: Not initialized\n");
+    abort();
+  }
+  auto plugins = globalInit->pluginManager.getLoadedPlugins();
+  for (std::string &pluginId : plugins) {
+    callback(pluginId.c_str(), userData);
   }
 }
 

@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 
+extern void ireeCompilerEnumeratePlugins();
 extern void ireeCompilerEnumerateRegisteredHALTargetBackends();
 extern void ireeCompilerErrorDestroy();
 extern void ireeCompilerErrorGetMessage();
@@ -601,6 +602,7 @@ extern void mlirVectorTypeGetChecked();
 
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
+  x += (uintptr_t)&ireeCompilerEnumeratePlugins;
   x += (uintptr_t)&ireeCompilerEnumerateRegisteredHALTargetBackends;
   x += (uintptr_t)&ireeCompilerErrorDestroy;
   x += (uintptr_t)&ireeCompilerErrorGetMessage;

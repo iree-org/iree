@@ -121,6 +121,11 @@ IREE_EMBED_EXPORTED void ireeCompilerGlobalShutdown();
 IREE_EMBED_EXPORTED void ireeCompilerEnumerateRegisteredHALTargetBackends(
     void (*callback)(const char *backend, void *userData), void *userData);
 
+// Enumerates all plugins that are linked into the compiler.
+// Available since: 1.2
+IREE_EMBED_EXPORTED void ireeCompilerEnumeratePlugins(
+    void (*callback)(const char *pluginName, void *userData), void *userData);
+
 //===----------------------------------------------------------------------===//
 // Session management.
 // A session represents a scope where one or more runs can be executed.
