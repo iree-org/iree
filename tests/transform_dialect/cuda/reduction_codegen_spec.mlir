@@ -80,7 +80,7 @@ transform.sequence failures(propagate) {
   // at this point.
   transform.sequence %variant_op_3 : !transform.any_op failures(suppress) {
   ^bb0(%arg0: !transform.any_op):
-    transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
+    transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 } : (!transform.any_op) -> !transform.any_op
   }
   transform.iree.vector.warp_distribute %func_5 : (!transform.any_op) -> ()
 
