@@ -22,9 +22,10 @@ import os
 import re
 import zipfile
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from typing import BinaryIO, Dict, List, Optional, TextIO
 
+from common import benchmark_definition
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
 from common.benchmark_suite import BenchmarkSuite
 from common import benchmark_config
@@ -47,6 +48,12 @@ DISPATCH_COMPONENT_PATTERNS = [
     r".+_cuda_nvptx_fb\.fb",
     r".+_vmvx_bytecode_fb\.fb",
 ]
+
+
+@dataclass(frozen=True)
+class ModuleInfo(object):
+  module_path: pathlib.Path
+  stream_stats_path: Optional[pathlib.Path]
 
 
 def match_module_cmake_target(module_path: pathlib.PurePath) -> Optional[str]:
@@ -146,7 +153,7 @@ def get_module_path(flag_file: TextIO) -> Optional[str]:
 def get_module_map_from_compilation_benchmark_config(
     compilation_benchmark_config_data: TextIO,
     e2e_test_artifacts_dir: pathlib.PurePath
-) -> Dict[CompilationInfo, pathlib.Path]:
+) -> Dict[CompilationInfo, ModuleInfo]:
   benchmark_config = json.load(compilation_benchmark_config_data)
   gen_configs = serialization.unpack_and_deserialize(
       data=benchmark_config["generation_configs"],
@@ -169,16 +176,20 @@ def get_module_map_from_compilation_benchmark_config(
         target_arch=f"[{','.join(target_archs)}]",
         compile_tags=tuple(compile_config.tags),
         gen_config_id=gen_config.composite_id)
-    module_dir_path = iree_artifacts.get_module_dir_path(
-        module_generation_config=gen_config, root_path=e2e_test_artifacts_dir)
+    module_dir_path = pathlib.Path(
+        iree_artifacts.get_module_dir_path(module_generation_config=gen_config,
+                                           root_path=e2e_test_artifacts_dir))
     module_path = module_dir_path / iree_artifacts.MODULE_FILENAME
-    module_map[compilation_info] = pathlib.Path(module_path)
+    stream_stats_path = (module_dir_path /
+                         iree_artifacts.SCHEDULING_STATS_FILENAME)
+    module_map[compilation_info] = ModuleInfo(
+        module_path=module_path, stream_stats_path=stream_stats_path)
 
   return module_map
 
 
 def get_module_map_from_benchmark_suite(
-    benchmark_suite_dir: pathlib.Path) -> Dict[CompilationInfo, pathlib.Path]:
+    benchmark_suite_dir: pathlib.Path) -> Dict[CompilationInfo, ModuleInfo]:
   benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
       benchmark_suite_dir)
   module_map = {}
@@ -203,8 +214,9 @@ def get_module_map_from_benchmark_suite(
           model_source=category,
           target_arch=benchmark_case.target_arch,
           compile_tags=tuple(benchmark_case.bench_mode))
-      module_map[compilation_info] = (benchmark_case_dir /
-                                      module_path).resolve()
+      module_map[compilation_info] = ModuleInfo(
+          module_path=(benchmark_case_dir / module_path).resolve(),
+          stream_stats_path=None)
 
   return module_map
 
@@ -293,7 +305,8 @@ def main(args: argparse.Namespace):
     target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
 
   compilation_statistics_list = []
-  for compilation_info, module_path in module_map.items():
+  for compilation_info, module_info in module_map.items():
+    module_path = module_info.module_path
     with module_path.open("rb") as module_file:
       module_component_sizes = get_module_component_info(
           module_file,
@@ -304,10 +317,22 @@ def main(args: argparse.Namespace):
       raise RuntimeError(
           f"Module path isn't a module cmake target: {module_path}")
     compilation_time_ms = target_build_time_map[cmake_target]
+
+    if module_info.stream_stats_path is None:
+      # TODO(#11076): Set dummy data as the legacy benchmark suites don't
+      # support IR statistics. Will be removed during the cleanup.
+      ir_stats = benchmark_definition.IRStatistics(stream_dispatch_count=-1)
+    else:
+      stream_stats_json = json.loads(module_info.stream_stats_path.read_text())
+      exec_stats_json = stream_stats_json["stream-aggregate"]["execution"]
+      ir_stats = benchmark_definition.IRStatistics(
+          stream_dispatch_count=exec_stats_json["dispatch-count"])
+
     compilation_statistics = CompilationStatistics(
         compilation_info=compilation_info,
         module_component_sizes=module_component_sizes,
-        compilation_time_ms=compilation_time_ms)
+        compilation_time_ms=compilation_time_ms,
+        ir_stats=ir_stats)
     compilation_statistics_list.append(compilation_statistics)
 
   commit = get_git_commit_hash("HEAD")
