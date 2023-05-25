@@ -203,12 +203,6 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   auto tileToForeachOp = b.create<TileToForallOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
 
-  // TODO: remove this hack once all IREE transform ops no longer hardcode PDL.
-  static_cast<Value>(tileToForeachOp.getForallOp())
-      .setType(pdl::OperationType::get(b.getContext()));
-  static_cast<Value>(tileToForeachOp.getTiledOp())
-      .setType(pdl::OperationType::get(b.getContext()));
-
   result.forallH = tileToForeachOp.getForallOp();
   result.tiledOpH = tileToForeachOp.getTiledOp();
 
