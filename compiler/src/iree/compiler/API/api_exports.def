@@ -147,6 +147,7 @@ EXPORTS
   mlirAttributeParseGet
   mlirAttributePrint
   mlirBF16TypeGet
+  mlirBFloat16TypeGetTypeID
   mlirBlockAddArgument
   mlirBlockAppendOwnedOperation
   mlirBlockArgumentGetArgNumber
@@ -174,6 +175,7 @@ EXPORTS
   mlirBytecodeWriterConfigDestroy
   mlirComplexTypeGet
   mlirComplexTypeGetElementType
+  mlirComplexTypeGetTypeID
   mlirContextAppendDialectRegistry
   mlirContextAttachDiagnosticHandler
   mlirContextCreate
@@ -296,11 +298,19 @@ EXPORTS
   mlirF64TypeGet
   mlirFlatSymbolRefAttrGet
   mlirFlatSymbolRefAttrGetValue
+  mlirFloat16TypeGetTypeID
+  mlirFloat32TypeGetTypeID
+  mlirFloat64TypeGetTypeID
   mlirFloat8E4M3B11FNUZTypeGet
+  mlirFloat8E4M3B11FNUZTypeGetTypeID
   mlirFloat8E4M3FNTypeGet
+  mlirFloat8E4M3FNTypeGetTypeID
   mlirFloat8E4M3FNUZTypeGet
+  mlirFloat8E4M3FNUZTypeGetTypeID
   mlirFloat8E5M2FNUZTypeGet
+  mlirFloat8E5M2FNUZTypeGetTypeID
   mlirFloat8E5M2TypeGet
+  mlirFloat8E5M2TypeGetTypeID
   mlirFloatAttrDoubleGet
   mlirFloatAttrDoubleGetChecked
   mlirFloatAttrGetValueDouble
@@ -309,6 +319,7 @@ EXPORTS
   mlirFunctionTypeGetNumInputs
   mlirFunctionTypeGetNumResults
   mlirFunctionTypeGetResult
+  mlirFunctionTypeGetTypeID
   mlirGetDialectHandle__iree_input__
   mlirGetDialectHandle__iree_linalg_ext__
   mlirGetDialectHandle__iree_linalg_transform__
@@ -320,6 +331,7 @@ EXPORTS
   mlirIdentifierGetContext
   mlirIdentifierStr
   mlirIndexTypeGet
+  mlirIndexTypeGetTypeID
   mlirInferShapedTypeOpInterfaceInferReturnTypes
   mlirInferShapedTypeOpInterfaceTypeID
   mlirInferTypeOpInterfaceInferReturnTypes
@@ -345,6 +357,7 @@ EXPORTS
   mlirIntegerSetPrint
   mlirIntegerSetReplaceGet
   mlirIntegerTypeGet
+  mlirIntegerTypeGetTypeID
   mlirIntegerTypeGetWidth
   mlirIntegerTypeIsSigned
   mlirIntegerTypeIsSignless
@@ -370,6 +383,7 @@ EXPORTS
   mlirMemRefTypeGetChecked
   mlirMemRefTypeGetLayout
   mlirMemRefTypeGetMemorySpace
+  mlirMemRefTypeGetTypeID
   mlirModuleCreateEmpty
   mlirModuleCreateParse
   mlirModuleDestroy
@@ -379,6 +393,7 @@ EXPORTS
   mlirModuleGetOperation
   mlirNamedAttributeGet
   mlirNoneTypeGet
+  mlirNoneTypeGetTypeID
   mlirOpOperandGetNextUse
   mlirOpOperandGetOperandNumber
   mlirOpOperandGetOwner
@@ -401,6 +416,7 @@ EXPORTS
   mlirOpaqueTypeGet
   mlirOpaqueTypeGetData
   mlirOpaqueTypeGetDialectNamespace
+  mlirOpaqueTypeGetTypeID
   mlirOperationClone
   mlirOperationCreate
   mlirOperationCreateParse
@@ -466,6 +482,7 @@ EXPORTS
   mlirRankedTensorTypeGet
   mlirRankedTensorTypeGetChecked
   mlirRankedTensorTypeGetEncoding
+  mlirRankedTensorTypeGetTypeID
   mlirRegionAppendOwnedBlock
   mlirRegionCreate
   mlirRegionDestroy
@@ -518,6 +535,7 @@ EXPORTS
   mlirTupleTypeGet
   mlirTupleTypeGetNumTypes
   mlirTupleTypeGetType
+  mlirTupleTypeGetTypeID
   mlirTypeAttrGet
   mlirTypeAttrGetValue
   mlirTypeDump
@@ -577,9 +595,11 @@ EXPORTS
   mlirUnmanagedDenseUInt8ResourceElementsAttrGet
   mlirUnrankedMemRefTypeGet
   mlirUnrankedMemRefTypeGetChecked
+  mlirUnrankedMemRefTypeGetTypeID
   mlirUnrankedMemrefGetMemorySpace
   mlirUnrankedTensorTypeGet
   mlirUnrankedTensorTypeGetChecked
+  mlirUnrankedTensorTypeGetTypeID
   mlirValueDump
   mlirValueEqual
   mlirValueGetFirstUse
@@ -591,3 +611,4 @@ EXPORTS
   mlirValueReplaceAllUsesOfWith
   mlirVectorTypeGet
   mlirVectorTypeGetChecked
+  mlirVectorTypeGetTypeID

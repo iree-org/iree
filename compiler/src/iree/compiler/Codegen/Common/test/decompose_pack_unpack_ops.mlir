@@ -220,14 +220,16 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
   %pack = tensor.pack %src inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
   return %pack : tensor<?x?x16x1xf32>
 }
-// CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * 16 - s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK:      func.func @pack_matmul_DYN_LHS
 // CHECK-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:   %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[IN]], %c0 : tensor<?x?xf32>
-// CHECK-DAG:    %[[H0:.+]] = affine.apply #[[MAP]]()[%[[D0]]]
-// CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%0, 0]
+// CHECK-DAG:    %[[H0:.+]] = affine.apply #[[MAP0]]
+// CHECK-DAG:    %[[H1:.+]] = affine.apply #[[MAP1]]
+// CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
 // CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
 // CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x16x?x1xf32>
 // CHECK:        %[[TILE:.+]] = tensor.extract_slice %expanded
@@ -245,14 +247,15 @@ func.func @pack_matmul_DYN_RHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
   %pack = tensor.pack %src outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
   return %pack : tensor<?x?x16x1xf32>
 }
-// CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * 16 - s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK:      func.func @pack_matmul_DYN_RHS
 // CHECK-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:   %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[IN]], %c1 : tensor<?x?xf32>
-// CHECK-DAG:    %[[H1:.+]] = affine.apply #[[MAP]]()[%[[D1]]]
-// CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[0, %[[H1]]]
+// CHECK-DAG:    %[[H0:.+]] = affine.apply #[[MAP1]]
+// CHECK-DAG:    %[[H1:.+]] = affine.apply #[[MAP0]]
+// CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
 // CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
 // CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x1x?x16xf32>
 // CHECK:        %[[TRANSP:.+]] = linalg.transpose

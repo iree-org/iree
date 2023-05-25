@@ -44,6 +44,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -159,6 +160,8 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
   ADD_PATTERN(foldTensorSubsets, getFoldTensorSubsetsAttrName)
+  ADD_PATTERN(foldVectorTransferTensorSlice,
+              getFoldVectorTransferTensorSliceAttrName)
   ADD_PATTERN(licm, getLicmAttrName)
   ADD_PATTERN(linalgElementwiseGreedyFusion,
               getLinalgElementwiseGreedyFusionAttrName)
@@ -321,6 +324,11 @@ static void addFoldTensorSubsetsPatterns(RewritePatternSet &patterns) {
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
 }
 
+static void addFoldVectorTransferTensorExtractPatterns(
+    RewritePatternSet &patterns) {
+  vector::populateVectorTransferTensorSliceTransforms(patterns);
+}
+
 static void addEraseUnnecessaryTensorOperandsPatterns(
     RewritePatternSet &patterns) {
   linalg::populateEraseUnnecessaryInputsPatterns(patterns);
@@ -443,6 +451,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
   if (getFoldTensorSubsets()) addFoldTensorSubsetsPatterns(patterns);
+  if (getFoldVectorTransferTensorSlice())
+    addFoldVectorTransferTensorExtractPatterns(patterns);
   if (getLinalgElementwiseGreedyFusion())
     linalg::populateElementwiseOpsFusionPatterns(patterns,
                                                  setFusedOpOperandLimit<3>);

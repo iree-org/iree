@@ -284,6 +284,7 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
   // spurious allocations.
   ApplyPatternsOpPatterns configuration;
   configuration.foldReassociativeReshapes = true;
+  configuration.foldVectorTransferTensorSlice = true;
   variantH =
       buildCanonicalizationAndEnablingTransforms(b, configuration, variantH);
   b.create<IREEEliminateEmptyTensorsOp>(variantH);

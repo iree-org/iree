@@ -16,6 +16,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -237,30 +238,23 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::LinalgOp>(op)) candidates.push_back(op);
-    if (vectorizePadding && isa<tensor::PadOp>(op)) candidates.push_back(op);
+    if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
+      candidates.push_back(op);
   });
   for (auto op : candidates) {
     SmallVector<int64_t> vectorSizes;
-    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-      if (enableVectorMasking) {
+    if (enableVectorMasking) {
+      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
         vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
-      }
-      (void)linalg::vectorize(rewriter, linalgOp, vectorSizes,
-                              vectorizeGatherAccesses);
-    } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
-      if (!enableVectorMasking) continue;
-      auto ty = padOp.getResultType();
-      // TODO(hanchung): Infer the vector sizes for pad op after
-      // maskedVectorize method allows dynamic result shapes.
-      if (!ty.hasStaticShape()) continue;
-      SmallVector<int64_t> vectorSizes(ty.getShape().begin(),
-                                       ty.getShape().end());
-      FailureOr<vector::TransferWriteOp> maybeWriteOp =
-          linalg::maskedVectorize(rewriter, padOp, vectorSizes);
-      if (failed(maybeWriteOp)) {
-        continue;
+      } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
+        auto ty = padOp.getResultType();
+        // TODO(hanchung): Infer the vector sizes for pad op after
+        // maskedVectorize method allows dynamic result shapes.
+        if (!ty.hasStaticShape()) continue;
+        vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
       }
     }
+    (void)linalg::vectorize(rewriter, op, vectorSizes, vectorizeGatherAccesses);
   };
 
   // TODO: Move this down the pipeline once we have the ODM-based masking
@@ -278,6 +272,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                                                       funcOp.getContext());
   vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                        funcOp.getContext());
+  vector::populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the

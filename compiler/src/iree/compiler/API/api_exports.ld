@@ -148,6 +148,7 @@ VER_0 {
     mlirAttributeParseGet;
     mlirAttributePrint;
     mlirBF16TypeGet;
+    mlirBFloat16TypeGetTypeID;
     mlirBlockAddArgument;
     mlirBlockAppendOwnedOperation;
     mlirBlockArgumentGetArgNumber;
@@ -175,6 +176,7 @@ VER_0 {
     mlirBytecodeWriterConfigDestroy;
     mlirComplexTypeGet;
     mlirComplexTypeGetElementType;
+    mlirComplexTypeGetTypeID;
     mlirContextAppendDialectRegistry;
     mlirContextAttachDiagnosticHandler;
     mlirContextCreate;
@@ -297,11 +299,19 @@ VER_0 {
     mlirF64TypeGet;
     mlirFlatSymbolRefAttrGet;
     mlirFlatSymbolRefAttrGetValue;
+    mlirFloat16TypeGetTypeID;
+    mlirFloat32TypeGetTypeID;
+    mlirFloat64TypeGetTypeID;
     mlirFloat8E4M3B11FNUZTypeGet;
+    mlirFloat8E4M3B11FNUZTypeGetTypeID;
     mlirFloat8E4M3FNTypeGet;
+    mlirFloat8E4M3FNTypeGetTypeID;
     mlirFloat8E4M3FNUZTypeGet;
+    mlirFloat8E4M3FNUZTypeGetTypeID;
     mlirFloat8E5M2FNUZTypeGet;
+    mlirFloat8E5M2FNUZTypeGetTypeID;
     mlirFloat8E5M2TypeGet;
+    mlirFloat8E5M2TypeGetTypeID;
     mlirFloatAttrDoubleGet;
     mlirFloatAttrDoubleGetChecked;
     mlirFloatAttrGetValueDouble;
@@ -310,6 +320,7 @@ VER_0 {
     mlirFunctionTypeGetNumInputs;
     mlirFunctionTypeGetNumResults;
     mlirFunctionTypeGetResult;
+    mlirFunctionTypeGetTypeID;
     mlirGetDialectHandle__iree_input__;
     mlirGetDialectHandle__iree_linalg_ext__;
     mlirGetDialectHandle__iree_linalg_transform__;
@@ -321,6 +332,7 @@ VER_0 {
     mlirIdentifierGetContext;
     mlirIdentifierStr;
     mlirIndexTypeGet;
+    mlirIndexTypeGetTypeID;
     mlirInferShapedTypeOpInterfaceInferReturnTypes;
     mlirInferShapedTypeOpInterfaceTypeID;
     mlirInferTypeOpInterfaceInferReturnTypes;
@@ -346,6 +358,7 @@ VER_0 {
     mlirIntegerSetPrint;
     mlirIntegerSetReplaceGet;
     mlirIntegerTypeGet;
+    mlirIntegerTypeGetTypeID;
     mlirIntegerTypeGetWidth;
     mlirIntegerTypeIsSigned;
     mlirIntegerTypeIsSignless;
@@ -371,6 +384,7 @@ VER_0 {
     mlirMemRefTypeGetChecked;
     mlirMemRefTypeGetLayout;
     mlirMemRefTypeGetMemorySpace;
+    mlirMemRefTypeGetTypeID;
     mlirModuleCreateEmpty;
     mlirModuleCreateParse;
     mlirModuleDestroy;
@@ -380,6 +394,7 @@ VER_0 {
     mlirModuleGetOperation;
     mlirNamedAttributeGet;
     mlirNoneTypeGet;
+    mlirNoneTypeGetTypeID;
     mlirOpOperandGetNextUse;
     mlirOpOperandGetOperandNumber;
     mlirOpOperandGetOwner;
@@ -402,6 +417,7 @@ VER_0 {
     mlirOpaqueTypeGet;
     mlirOpaqueTypeGetData;
     mlirOpaqueTypeGetDialectNamespace;
+    mlirOpaqueTypeGetTypeID;
     mlirOperationClone;
     mlirOperationCreate;
     mlirOperationCreateParse;
@@ -467,6 +483,7 @@ VER_0 {
     mlirRankedTensorTypeGet;
     mlirRankedTensorTypeGetChecked;
     mlirRankedTensorTypeGetEncoding;
+    mlirRankedTensorTypeGetTypeID;
     mlirRegionAppendOwnedBlock;
     mlirRegionCreate;
     mlirRegionDestroy;
@@ -519,6 +536,7 @@ VER_0 {
     mlirTupleTypeGet;
     mlirTupleTypeGetNumTypes;
     mlirTupleTypeGetType;
+    mlirTupleTypeGetTypeID;
     mlirTypeAttrGet;
     mlirTypeAttrGetValue;
     mlirTypeDump;
@@ -578,9 +596,11 @@ VER_0 {
     mlirUnmanagedDenseUInt8ResourceElementsAttrGet;
     mlirUnrankedMemRefTypeGet;
     mlirUnrankedMemRefTypeGetChecked;
+    mlirUnrankedMemRefTypeGetTypeID;
     mlirUnrankedMemrefGetMemorySpace;
     mlirUnrankedTensorTypeGet;
     mlirUnrankedTensorTypeGetChecked;
+    mlirUnrankedTensorTypeGetTypeID;
     mlirValueDump;
     mlirValueEqual;
     mlirValueGetFirstUse;
@@ -592,6 +612,7 @@ VER_0 {
     mlirValueReplaceAllUsesOfWith;
     mlirVectorTypeGet;
     mlirVectorTypeGetChecked;
+    mlirVectorTypeGetTypeID;
   local:
     *;
 };

@@ -32,6 +32,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -310,8 +311,8 @@ static bool canUseInOperandAsInitOperand(
   }
 
   if (auto producerOp = inOperand->get().getDefiningOp<linalg::LinalgOp>()) {
-    if (succeeded(linalg::vectorizeLinalgOpPrecondition(linalgOp)) &&
-        succeeded(linalg::vectorizeLinalgOpPrecondition(producerOp))) {
+    if (succeeded(linalg::vectorizeOpPrecondition(linalgOp)) &&
+        succeeded(linalg::vectorizeOpPrecondition(producerOp))) {
       return false;
     }
   }

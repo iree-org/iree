@@ -146,6 +146,7 @@ _mlirAttributeIsAUnit
 _mlirAttributeParseGet
 _mlirAttributePrint
 _mlirBF16TypeGet
+_mlirBFloat16TypeGetTypeID
 _mlirBlockAddArgument
 _mlirBlockAppendOwnedOperation
 _mlirBlockArgumentGetArgNumber
@@ -173,6 +174,7 @@ _mlirBytecodeWriterConfigDesiredEmitVersion
 _mlirBytecodeWriterConfigDestroy
 _mlirComplexTypeGet
 _mlirComplexTypeGetElementType
+_mlirComplexTypeGetTypeID
 _mlirContextAppendDialectRegistry
 _mlirContextAttachDiagnosticHandler
 _mlirContextCreate
@@ -295,11 +297,19 @@ _mlirF32TypeGet
 _mlirF64TypeGet
 _mlirFlatSymbolRefAttrGet
 _mlirFlatSymbolRefAttrGetValue
+_mlirFloat16TypeGetTypeID
+_mlirFloat32TypeGetTypeID
+_mlirFloat64TypeGetTypeID
 _mlirFloat8E4M3B11FNUZTypeGet
+_mlirFloat8E4M3B11FNUZTypeGetTypeID
 _mlirFloat8E4M3FNTypeGet
+_mlirFloat8E4M3FNTypeGetTypeID
 _mlirFloat8E4M3FNUZTypeGet
+_mlirFloat8E4M3FNUZTypeGetTypeID
 _mlirFloat8E5M2FNUZTypeGet
+_mlirFloat8E5M2FNUZTypeGetTypeID
 _mlirFloat8E5M2TypeGet
+_mlirFloat8E5M2TypeGetTypeID
 _mlirFloatAttrDoubleGet
 _mlirFloatAttrDoubleGetChecked
 _mlirFloatAttrGetValueDouble
@@ -308,6 +318,7 @@ _mlirFunctionTypeGetInput
 _mlirFunctionTypeGetNumInputs
 _mlirFunctionTypeGetNumResults
 _mlirFunctionTypeGetResult
+_mlirFunctionTypeGetTypeID
 _mlirGetDialectHandle__iree_input__
 _mlirGetDialectHandle__iree_linalg_ext__
 _mlirGetDialectHandle__iree_linalg_transform__
@@ -319,6 +330,7 @@ _mlirIdentifierGet
 _mlirIdentifierGetContext
 _mlirIdentifierStr
 _mlirIndexTypeGet
+_mlirIndexTypeGetTypeID
 _mlirInferShapedTypeOpInterfaceInferReturnTypes
 _mlirInferShapedTypeOpInterfaceTypeID
 _mlirInferTypeOpInterfaceInferReturnTypes
@@ -344,6 +356,7 @@ _mlirIntegerSetIsConstraintEq
 _mlirIntegerSetPrint
 _mlirIntegerSetReplaceGet
 _mlirIntegerTypeGet
+_mlirIntegerTypeGetTypeID
 _mlirIntegerTypeGetWidth
 _mlirIntegerTypeIsSigned
 _mlirIntegerTypeIsSignless
@@ -369,6 +382,7 @@ _mlirMemRefTypeGetAffineMap
 _mlirMemRefTypeGetChecked
 _mlirMemRefTypeGetLayout
 _mlirMemRefTypeGetMemorySpace
+_mlirMemRefTypeGetTypeID
 _mlirModuleCreateEmpty
 _mlirModuleCreateParse
 _mlirModuleDestroy
@@ -378,6 +392,7 @@ _mlirModuleGetContext
 _mlirModuleGetOperation
 _mlirNamedAttributeGet
 _mlirNoneTypeGet
+_mlirNoneTypeGetTypeID
 _mlirOpOperandGetNextUse
 _mlirOpOperandGetOperandNumber
 _mlirOpOperandGetOwner
@@ -400,6 +415,7 @@ _mlirOpaqueAttrGetDialectNamespace
 _mlirOpaqueTypeGet
 _mlirOpaqueTypeGetData
 _mlirOpaqueTypeGetDialectNamespace
+_mlirOpaqueTypeGetTypeID
 _mlirOperationClone
 _mlirOperationCreate
 _mlirOperationCreateParse
@@ -465,6 +481,7 @@ _mlirPrintPassPipeline
 _mlirRankedTensorTypeGet
 _mlirRankedTensorTypeGetChecked
 _mlirRankedTensorTypeGetEncoding
+_mlirRankedTensorTypeGetTypeID
 _mlirRegionAppendOwnedBlock
 _mlirRegionCreate
 _mlirRegionDestroy
@@ -517,6 +534,7 @@ _mlirTransformOperationTypeGetOperationName
 _mlirTupleTypeGet
 _mlirTupleTypeGetNumTypes
 _mlirTupleTypeGetType
+_mlirTupleTypeGetTypeID
 _mlirTypeAttrGet
 _mlirTypeAttrGetValue
 _mlirTypeDump
@@ -576,9 +594,11 @@ _mlirUnmanagedDenseUInt64ResourceElementsAttrGet
 _mlirUnmanagedDenseUInt8ResourceElementsAttrGet
 _mlirUnrankedMemRefTypeGet
 _mlirUnrankedMemRefTypeGetChecked
+_mlirUnrankedMemRefTypeGetTypeID
 _mlirUnrankedMemrefGetMemorySpace
 _mlirUnrankedTensorTypeGet
 _mlirUnrankedTensorTypeGetChecked
+_mlirUnrankedTensorTypeGetTypeID
 _mlirValueDump
 _mlirValueEqual
 _mlirValueGetFirstUse
@@ -590,3 +610,4 @@ _mlirValuePrintAsOperand
 _mlirValueReplaceAllUsesOfWith
 _mlirVectorTypeGet
 _mlirVectorTypeGetChecked
+_mlirVectorTypeGetTypeID
