@@ -42,11 +42,14 @@ jobs:
           cd ..
           openxla-workspace init
           # We presently do not need deps or submodules to bump versions.
-          openxla-workspace checkout --ro --no-submodules --no-deps openxla-pjrt-plugin
+          openxla-workspace checkout --ro --no-submodules openxla-pjrt-plugin
 
       - name: "Roll dependencies"
         run: |
           openxla-workspace roll nightly
+          # Don't need submodules but do need repos in order to show pretty
+          # update description.
+          openxla-workspace sync --exclude-submodule=".*"
 
       - name: "Create pull request"
         env:
@@ -66,7 +69,8 @@ jobs:
             git checkout -b "$branch"
             git commit -m "Update nightly dependencies"
             git push origin "HEAD:$branch"
-            pr="$(gh pr create --base main --head "$branch" --title "Update nightly dependencies" --body "Automatically created")"
+            body="$(openxla-workspace show-pins)"
+            pr="$(gh pr create --base main --head "$branch" --title "Update nightly dependencies" --body "$body")"
             echo "Created pull request $pr"
             gh pr merge $pr --auto --delete-branch --squash
             # Can't approve your own PR, so approve with the github actions bot.
