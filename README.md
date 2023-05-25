@@ -174,6 +174,72 @@ The plugin `openxla_pjrt_artifacts` is in the `ctstools` directory and
 performs additional manipulation of the environment in order to save
 compilation artifacts, reproducers, etc.
 
+## Project Maintenance
+
+This section is a work in progress describing various project maintenance
+tasks.
+
+### Pre-requisite: Install openxla-devtools
+
+```
+pip install git+https://github.com/openxla/openxla-devtools.git
+```
+
+### Sync all deps to pinned versions
+
+This updates the git repositories and upgrades Python packages.
+
+```
+openxla-workspace sync
+python -m pip install -U -r requirements.txt
+```
+
+### Update to latest nightlies
+
+This updates the pinned revisions to track upstream nightlies.
+Note that the roll action will upgrade Python packages implicitly.
+
+```
+# Updates the sync_deps.py metadata.
+openxla-workspace roll nightly
+# Brings all dependencies to pinned versions.
+openxla-workspace sync
+```
+
+### Update just IREE to its latest nightly.
+
+This just updates the IREE compiler and source pins to IREE's latest
+nightly. It is useful for when there is some issue blocking a jax/xla
+upgrade but progress is desired.
+Note that the roll action will upgrade Python packages implicitly.
+
+```
+# Updates the sync_deps.py metadata.
+openxla-workspace roll iree_nightly
+# Brings all dependencies to pinned versions.
+openxla-workspace sync
+```
+
+Alternatively, just the IREE source dep (runtime and APIs) can be pinned
+to head:
+
+```
+# Updates the sync_deps.py metadata.
+openxla-workspace roll iree
+# Brings all dependencies to pinned versions.
+openxla-workspace sync
+```
+
+### Pin current versions of all deps
+
+This can be done if local, cross project changes have been made and landed.
+It snapshots the state of all deps as actually checked out and updates
+the metadata.
+
+```
+openxla-workspace pin
+```
+
 ## Contacts
 
 * [GitHub issues](https://github.com/openxla/openxla-pjrt-plugin/issues):
