@@ -421,6 +421,16 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
   // If aligning an already-aligned value then fold if this is provably a
   // no-op. We can check this for equality even with dynamic alignments.
   if (isAlignedTo(getValue(), getAlignment())) return getValue();
+
+  // If values are static we can perform the alignment here.
+  APInt staticValue;
+  APInt staticAlignment;
+  if (matchPattern(getValue(), m_ConstantInt(&staticValue)) &&
+      matchPattern(getAlignment(), m_ConstantInt(&staticAlignment))) {
+    return IntegerAttr::get(getResult().getType(),
+                            align(staticValue.getZExtValue(), staticAlignment));
+  }
+
   return {};
 }
 

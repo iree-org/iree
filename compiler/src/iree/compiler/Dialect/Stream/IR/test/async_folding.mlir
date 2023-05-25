@@ -146,6 +146,57 @@ func.func @FlattenFullFillToSplat(%arg0: !stream.resource<*>, %arg1: index, %arg
 
 // -----
 
+// CHECK-LABEL: @ElideRedundantFill
+func.func @ElideRedundantFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[T:.+]] = stream.async.splat %arg2 : i32 -> !stream.resource<*>{%arg1}
+  %0 = stream.async.splat %arg2 : i32 -> !stream.resource<*>{%arg1}
+  // CHECK-NOT: stream.async.fill
+  %1 = stream.async.fill %arg2, %0[%c0 to %arg1 for %arg1] : i32 -> %0 as !stream.resource<*>{%arg1}
+  // CHECK: return %[[T]]
+  return %1 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideRedundantFillBitPatterns
+func.func @ElideRedundantFillBitPatterns(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[CD_I8:.+]] = arith.constant -51 : i8
+  %cCDCD_i16 = arith.constant 0xCDCD : i16
+  %cCDCDCDCD_i32 = arith.constant 0xCDCDCDCD : i32
+  // CHECK: %[[T:.+]] = stream.async.splat %[[CD_I8]] : i8 -> !stream.resource<*>{%arg1}
+  %0 = stream.async.splat %cCDCDCDCD_i32 : i32 -> !stream.resource<*>{%arg1}
+  // CHECK-NOT: stream.async.fill
+  %1 = stream.async.fill %cCDCD_i16, %0[%c0 to %arg1 for %arg1] : i16 -> %0 as !stream.resource<*>{%arg1}
+  // CHECK: return %[[T]]
+  return %1 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @CoalesceAdjacentFills
+func.func @CoalesceAdjacentFills(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c4 = arith.constant 4 : index
+  %c8 = arith.constant 8 : index
+  %c12 = arith.constant 12 : index
+  %c16 = arith.constant 16 : index
+  %c20 = arith.constant 20 : index
+  %c0_i8 = arith.constant 0 : i8
+  %c1_i8 = arith.constant 1 : i8
+  %c0_i32 = arith.constant 0 : i32
+  // CHECK: %[[FILL_0:.+]] = stream.async.fill %c0_i8, %arg0[%c4 to %c16 for %c12] : i8 -> %arg0 as !stream.resource<*>{%arg1}
+  %0 = stream.async.fill %c0_i8, %arg0[%c4 to %c8 for %c4] : i8 -> %arg0 as !stream.resource<*>{%arg1}
+  %1 = stream.async.fill %c0_i32, %0[%c8 to %c12 for %c4] : i32 -> %0 as !stream.resource<*>{%arg1}
+  %2 = stream.async.fill %c0_i8, %1[%c12 to %c16 for %c4] : i8 -> %1 as !stream.resource<*>{%arg1}
+  // CHECK: %[[FILL_1:.+]] = stream.async.fill %c1_i8, %[[FILL_0]][%c16 to %c20 for %c4] : i8 -> %[[FILL_0]] as !stream.resource<*>{%arg1}
+  %3 = stream.async.fill %c1_i8, %2[%c16 to %c20 for %c4] : i8 -> %2 as !stream.resource<*>{%arg1}
+  // CHECK: return %[[FILL_1]]
+  return %3 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncUpdateOp
 func.func @FoldAsyncUpdateOp(%arg0: !stream.resource<*>, %arg1: !stream.resource<*>, %arg2: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
