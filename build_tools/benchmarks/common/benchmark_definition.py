@@ -706,7 +706,7 @@ class ModuleComponentSizes(object):
 
 @dataclasses.dataclass(frozen=True)
 class IRStatistics(object):
-  # Number of cmd.execute ops in IR.
+  # Number of cmd.dispatch ops in IR.
   stream_dispatch_count: int
 
   @staticmethod

@@ -263,7 +263,7 @@ class StreamIRDispatchCountToTable(MetricsToTableMapper[CompilationMetrics]):
     return "number"
 
   def get_table_header(self) -> str:
-    return f"Stream IR Dispatch Count (# of cmd.execute ops)"
+    return f"Stream IR Dispatch Count (# of cmd.dispatch ops)"
 
   @staticmethod
   def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
@@ -271,7 +271,7 @@ class StreamIRDispatchCountToTable(MetricsToTableMapper[CompilationMetrics]):
 
   @staticmethod
   def get_table_title() -> str:
-    return "Stream IR Dispatch Count (# of cmd.execute ops)"
+    return "Stream IR Dispatch Count (# of cmd.dispatch ops)"
 
 
 COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
