@@ -30,7 +30,7 @@ extern "C" {
 #elif defined(IREE_PLATFORM_EMSCRIPTEN)
 // Emscripten can use JavaScript Promises (pipe also works via Emscripten's
 // emulation, but Promises are platform-native primitives).
-#define IREE_HAVE_WAIT_TYPE_PROMISE 1
+#define IREE_HAVE_WAIT_TYPE_JAVASCRIPT_PROMISE 1
 #elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
 // Treat Android and modern linux as (mostly) the same.
 #define IREE_HAVE_WAIT_TYPE_EVENTFD 1
@@ -110,7 +110,7 @@ enum iree_wait_primitive_type_bits_t {
   // More information:
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises
-  IREE_WAIT_PRIMITIVE_TYPE_PROMISE = 6u,
+  IREE_WAIT_PRIMITIVE_TYPE_JAVASCRIPT_PROMISE = 6u,
 
   // Placeholder for wildcard queries of primitive types.
   // On an export request this indicates that the source may export any type it
@@ -155,11 +155,11 @@ typedef union {
 #if defined(IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX)
   /*iree_futex_handle_t*/ void* local_futex;
 #endif  // IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX
-#if defined(IREE_HAVE_WAIT_TYPE_PROMISE)
+#if defined(IREE_HAVE_WAIT_TYPE_JAVASCRIPT_PROMISE)
   struct {
     int handle;
   } promise;
-#endif  // IREE_HAVE_WAIT_TYPE_PROMISE
+#endif  // IREE_HAVE_WAIT_TYPE_JAVASCRIPT_PROMISE
 } iree_wait_primitive_value_t;
 
 // A (type, value) pair describing a system wait primitive handle.

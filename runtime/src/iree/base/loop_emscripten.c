@@ -107,7 +107,7 @@ static iree_status_t iree_loop_emscripten_get_promise_handle(
                             "wait handle export/import not implemented");
   }
 
-  if (wait_handle.type != IREE_WAIT_PRIMITIVE_TYPE_PROMISE) {
+  if (wait_handle.type != IREE_WAIT_PRIMITIVE_TYPE_JAVASCRIPT_PROMISE) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only Promise wait primitives are supported");
   }

@@ -54,12 +54,12 @@ extern void iree_wait_primitive_promise_reset(int promise_handle);
 
 void iree_wait_handle_close(iree_wait_handle_t* handle) {
   switch (handle->type) {
-#if defined(IREE_HAVE_WAIT_TYPE_PROMISE)
-    case IREE_WAIT_PRIMITIVE_TYPE_PROMISE: {
+#if defined(IREE_HAVE_WAIT_TYPE_JAVASCRIPT_PROMISE)
+    case IREE_WAIT_PRIMITIVE_TYPE_JAVASCRIPT_PROMISE: {
       iree_wait_primitive_promise_delete(handle->value.promise.handle);
       break;
     }
-#endif  // IREE_HAVE_WAIT_TYPE_PROMISE
+#endif  // IREE_HAVE_WAIT_TYPE_JAVASCRIPT_PROMISE
     default:
       break;
   }
@@ -115,7 +115,7 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
 iree_status_t iree_event_initialize(bool initial_state,
                                     iree_event_t* out_event) {
   memset(out_event, 0, sizeof(*out_event));
-  out_event->type = IREE_WAIT_PRIMITIVE_TYPE_PROMISE;
+  out_event->type = IREE_WAIT_PRIMITIVE_TYPE_JAVASCRIPT_PROMISE;
 
   int promise_handle = iree_wait_primitive_promise_create(initial_state);
   out_event->value.promise.handle = promise_handle;
