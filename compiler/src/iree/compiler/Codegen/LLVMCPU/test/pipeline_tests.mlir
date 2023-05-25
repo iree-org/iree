@@ -394,7 +394,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
 //   CHECK-NOT:    linalg.fill
 //       CHECK:    vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
 //   CHECK-NOT:    linalg.generic
-//       CHECK:    arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x8xf32>
+//       CHECK:    arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x4xf32>
 
 // -----
 
@@ -545,8 +545,8 @@ hal.executable private @mmt4d_ukernel {
 hal.executable private @ukernel_pass_through {
   hal.executable.variant public @embedded_elf_x86_64, target = <
     "llvm-cpu", "embedded-elf-x86_64", {
-      cpu = "generic", cpu_features = "", 
-      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", 
+      cpu = "generic", cpu_features = "",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf",
       ukernels = false}> {
     hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<
