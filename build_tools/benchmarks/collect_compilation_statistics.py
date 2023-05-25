@@ -53,7 +53,7 @@ DISPATCH_COMPONENT_PATTERNS = [
 @dataclass(frozen=True)
 class ModuleInfo(object):
   module_path: pathlib.Path
-  stream_stats_path: pathlib.Path
+  stream_stats_path: Optional[pathlib.Path]
 
 
 def match_module_cmake_target(module_path: pathlib.PurePath) -> Optional[str]:
@@ -318,10 +318,15 @@ def main(args: argparse.Namespace):
           f"Module path isn't a module cmake target: {module_path}")
     compilation_time_ms = target_build_time_map[cmake_target]
 
-    stream_stats_json = json.loads(module_info.stream_stats_path.read_text())
-    exec_stats_json = stream_stats_json["stream-aggregate"]["execution"]
-    ir_stats = benchmark_definition.IRStatistics(
-        dispatch_count=exec_stats_json["dispatch-count"])
+    if module_info.stream_stats_path is None:
+      # TODO(#11076): Set dummy data as the legacy benchmark suites don't
+      # support IR statistics. Will be removed during the cleanup.
+      ir_stats = benchmark_definition.IRStatistics(dispatch_count=-1)
+    else:
+      stream_stats_json = json.loads(module_info.stream_stats_path.read_text())
+      exec_stats_json = stream_stats_json["stream-aggregate"]["execution"]
+      ir_stats = benchmark_definition.IRStatistics(
+          dispatch_count=exec_stats_json["dispatch-count"])
 
     compilation_statistics = CompilationStatistics(
         compilation_info=compilation_info,
