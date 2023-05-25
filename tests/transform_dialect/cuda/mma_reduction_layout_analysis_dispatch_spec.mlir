@@ -10,7 +10,7 @@ transform.sequence failures(propagate){
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation,
                              !pdl.operation, !pdl.operation)
 
-  %region_op = transform.iree.wrap_in_dispatch_region %broadcast { generateWorkload = false }
+  %region_op = transform.iree.wrap_in_dispatch_region %broadcast { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
 
   %non_broadcast = transform.merge_handles %fill0, %fill1, %matmul, %reduce : !pdl.operation
   %region_op_2 = transform.iree.move_preceding_op_into_dispatch_region %non_broadcast into %region_op
