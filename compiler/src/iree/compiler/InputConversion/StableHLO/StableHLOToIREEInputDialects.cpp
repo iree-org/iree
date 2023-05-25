@@ -14,6 +14,7 @@
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
+#include "iree/compiler/InputConversion/StableHLO/Preprocessing/Rewriters.h"
 #include "iree/compiler/InputConversion/StableHLO/Rewriters.h"
 #include "iree/compiler/InputConversion/StableHLO/TypeConversion.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
@@ -426,6 +427,10 @@ struct ConvertStableHloToIreeInputDialects final
     std::unique_ptr<TypeConverter> typeConverter =
         createStableHloToLinalgTypeConverter();
     typeConverter->addArgumentMaterialization(scalarToTensor);
+
+    // Run stablehlo canonicalization patterns with a high benefit to avoid some
+    // expensive expansions.
+    populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
     // TODO(#12678): Handle chlo lowering.
 
