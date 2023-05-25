@@ -81,7 +81,7 @@ class BufferInstance {
   iree_hal_buffer_view_t* buffer_view() { return buffer_view_.get(); }
   DeviceInstance& device() { return device_; }
   iree_status_t AsyncDeallocate();
-  bool is_deleted() { return false; }
+  bool is_deleted() { return is_deleted_; }
   bool is_on_cpu() {
     // TODO: Plumb through an indication if running on CPU and then implement
     // the hook to get an unsafe pointer (avoids a copy).
@@ -109,7 +109,8 @@ class BufferInstance {
   // Various things require XLA's idea of shapes, layouts, etc.
   // We keep one around for such cases.
   std::optional<xla::Shape> cached_shape_;
-
+  // When the buffer resource gets freed, this is set to true.
+  bool is_deleted_ = false;
   // Fences.
   // ready_fence_: Signalled when the buffer is ready to be consumed. Consumers
   //   should wait on this fence.
