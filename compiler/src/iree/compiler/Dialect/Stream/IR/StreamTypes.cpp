@@ -28,7 +28,7 @@ namespace Stream {
 static llvm::cl::opt<Favor> clPartitioningFavor(
     "iree-stream-partitioning-favor",
     llvm::cl::desc("Default stream partitioning favor configuration."),
-    llvm::cl::init(Favor::MaxConcurrency),
+    llvm::cl::init(Favor::MinPeakMemory),
     llvm::cl::values(
         clEnumValN(Favor::Debug, "debug",
                    "Force debug partitioning (no concurrency or pipelining)."),
