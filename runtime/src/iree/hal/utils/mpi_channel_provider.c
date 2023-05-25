@@ -68,10 +68,15 @@ IREE_API_EXPORT iree_status_t iree_hal_mpi_channel_provider_create(
 
   // If the library successfully loaded then try to initialize MPI.
   if (iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "MPI_Init");
-    status = MPI_RESULT_TO_STATUS(&channel_provider->symbols,
-                                  MPI_Init(NULL, NULL), "MPI_Init");
-    IREE_TRACE_ZONE_END(z1);
+    int flag = 0;
+    MPI_IGNORE_ERROR(&channel_provider->symbols, MPI_Initialized(&flag));
+
+    if (!flag) {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z1, "MPI_Init");
+      status = MPI_RESULT_TO_STATUS(&channel_provider->symbols,
+                                    MPI_Init(NULL, NULL), "MPI_Init");
+      IREE_TRACE_ZONE_END(z1);
+    }
   }
 
   if (iree_status_is_ok(status)) {
