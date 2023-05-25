@@ -201,13 +201,13 @@ class DumpDispatchGraphPass
     int64_t largeAttrLimit = getLargeAttributeSizeLimit();
 
     // Always emit splat attributes.
-    if (attr.isa<SplatElementsAttr>()) {
+    if (llvm::isa<SplatElementsAttr>(attr)) {
       attr.print(os);
       return;
     }
 
     // Elide "big" elements attributes.
-    auto elements = attr.dyn_cast<ElementsAttr>();
+    auto elements = llvm::dyn_cast<ElementsAttr>(attr);
     if (elements && elements.getNumElements() > largeAttrLimit) {
       auto type = cast<ShapedType>(elements.getType());
       os << std::string(type.getRank(), '[') << "..."
@@ -215,7 +215,7 @@ class DumpDispatchGraphPass
       return;
     }
 
-    auto array = attr.dyn_cast<ArrayAttr>();
+    auto array = llvm::dyn_cast<ArrayAttr>(attr);
     if (array && static_cast<int64_t>(array.size()) > largeAttrLimit) {
       os << "[...]";
       return;
@@ -406,9 +406,9 @@ class DumpDispatchGraphPass
 
       if (op && isScalarConstantOp(op)) {
         auto ty = operand.getType();
-        if (ty.isa<IntegerType>()) {
+        if (llvm::isa<IntegerType>(ty)) {
           os << cast<arith::ConstantIntOp>(op).value();
-        } else if (ty.isa<FloatType>()) {
+        } else if (llvm::isa<FloatType>(ty)) {
           cast<arith::ConstantFloatOp>(op).value().print(os);
         } else {
           os << cast<arith::ConstantIndexOp>(op).value();

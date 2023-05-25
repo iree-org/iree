@@ -228,7 +228,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
 
   // Starts analysis of the |value| with known bits based on its resource type.
   void initializeValue(Value value, DFX::Solver &solver) override {
-    auto resourceType = value.getType().cast<IREE::Stream::ResourceType>();
+    auto resourceType = llvm::cast<IREE::Stream::ResourceType>(value.getType());
     initializeFromType(resourceType);
   }
 
@@ -237,7 +237,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
   // itself is under analysis.
   void updateFromDefiningOp(Value value, OpResult result, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!result.getType().isa<IREE::Stream::ResourceType>()) return;
+    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) return;
 
     TypeSwitch<Operation *, void>(result.getOwner())
         .Case([&](mlir::arith::SelectOp op) {
@@ -260,8 +260,8 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
           removeAssumedBits(NOT_GLOBAL_READ);
           auto *globalInfo =
               solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
-          auto globalType = globalInfo->op.getGlobalType()
-                                .template cast<IREE::Stream::ResourceType>();
+          auto globalType = llvm::cast<IREE::Stream::ResourceType>(
+              globalInfo->op.getGlobalType());
           switch (globalType.getLifetime()) {
             case IREE::Stream::Lifetime::Constant:
               removeAssumedBits(NOT_CONSTANT);
@@ -450,7 +450,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
   // This walks through tied uses as well.
   void updateFromUse(Value value, OpOperand &operand, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!operand.get().getType().isa<IREE::Stream::ResourceType>()) return;
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.get().getType())) return;
 
     auto *userOp = operand.getOwner();
     unsigned operandIdx = operand.getOperandNumber();
@@ -499,8 +499,8 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
           removeAssumedBits(NOT_GLOBAL_WRITE);
           auto *globalInfo =
               solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
-          auto globalType = globalInfo->op.getGlobalType()
-                                .template cast<IREE::Stream::ResourceType>();
+          auto globalType = llvm::cast<IREE::Stream::ResourceType>(
+              globalInfo->op.getGlobalType());
           switch (globalType.getLifetime()) {
             case IREE::Stream::Lifetime::Constant:
               removeAssumedBits(NOT_CONSTANT);
@@ -723,7 +723,7 @@ LogicalResult ResourceUsageAnalysis::run() {
 
   // Initialize all SSA values we can do just with trivial search.
   explorer.walkValues([&](Value value) {
-    if (value.getType().isa<IREE::Stream::ResourceType>()) {
+    if (llvm::isa<IREE::Stream::ResourceType>(value.getType())) {
       solver.getOrCreateElementFor<ValueResourceUsage>(
           Position::forValue(value));
     }

@@ -161,17 +161,18 @@ static LogicalResult serializeSplatValue(Attribute splatAttr, int64_t count,
                                          llvm::raw_ostream &os) {
   // Get the encoded byte contents of the splat element.
   SmallVector<char> elementBuffer;
-  if (auto attr = splatAttr.dyn_cast<IREE::Util::SerializableAttrInterface>()) {
+  if (auto attr =
+          llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(splatAttr)) {
     if (failed(attr.serializeToVector(endian, elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = splatAttr.dyn_cast<IntegerAttr>()) {
+  } else if (auto attr = llvm::dyn_cast<IntegerAttr>(splatAttr)) {
     if (failed(getAPIntRawData(attr.getValue(),
                                attr.getType().getIntOrFloatBitWidth(), endian,
                                elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = splatAttr.dyn_cast<FloatAttr>()) {
+  } else if (auto attr = llvm::dyn_cast<FloatAttr>(splatAttr)) {
     if (failed(getAPFloatRawData(attr.getValue(),
                                  attr.getType().getIntOrFloatBitWidth(), endian,
                                  elementBuffer))) {
@@ -250,7 +251,7 @@ static LogicalResult serializeGenericElementData(
     DenseElementsAttr elementsAttr, llvm::support::endianness endian,
     llvm::raw_ostream &os) {
   int32_t bitwidth = elementsAttr.getType().getElementTypeBitWidth();
-  if (auto attr = elementsAttr.dyn_cast<DenseIntElementsAttr>()) {
+  if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
     switch (bitwidth) {
       case 8:
         return serializeRawData(attr, os);
@@ -265,7 +266,7 @@ static LogicalResult serializeGenericElementData(
                << "unhandled integer element bitwidth " << bitwidth
                << " for type " << elementsAttr.getType();
     }
-  } else if (auto attr = elementsAttr.dyn_cast<DenseFPElementsAttr>()) {
+  } else if (auto attr = llvm::dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
     switch (bitwidth) {
       case 16:
         return serializeGenericF16Elements(attr, endian, os);
@@ -352,7 +353,7 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
     if (auto serializableAttr =
-            valueAttr.dyn_cast<SerializableAttrInterface>()) {
+            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
       calculatedLength += serializableAttr.getStorageSize();
     } else {
       return {};
@@ -368,7 +369,7 @@ LogicalResult CompositeAttr::verify(
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
     if (auto serializableAttr =
-            valueAttr.dyn_cast<SerializableAttrInterface>()) {
+            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
       calculatedLength += serializableAttr.getStorageSize();
     } else {
       return emitError() << "value is not serializable: " << valueAttr;
@@ -452,7 +453,8 @@ LogicalResult CompositeAttr::serializeToBuffer(llvm::support::endianness endian,
 LogicalResult CompositeAttr::serializeToStream(llvm::support::endianness endian,
                                                llvm::raw_ostream &os) const {
   for (auto valueAttr : getValues()) {
-    auto serializableAttr = valueAttr.dyn_cast<SerializableAttrInterface>();
+    auto serializableAttr =
+        llvm::dyn_cast<SerializableAttrInterface>(valueAttr);
     if (!serializableAttr) {
       llvm::errs() << "unable to serialize a non-serializable attribute: "
                    << valueAttr << "\n";
@@ -471,7 +473,7 @@ struct SerializableDenseElementsAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = baseAttr.cast<ElementsAttr>();
+    auto attr = llvm::cast<ElementsAttr>(baseAttr);
     return attr.getNumElements() *
            IREE::Util::getRoundedElementByteWidth(
                cast<ShapedType>(attr.getType()).getElementType());
@@ -498,7 +500,7 @@ struct SerializableDenseElementsAttrModel
     // it can really help.
     os.reserveExtraSpace(getStorageSize(baseAttr));
 
-    auto elementsAttr = baseAttr.cast<DenseElementsAttr>();
+    auto elementsAttr = llvm::cast<DenseElementsAttr>(baseAttr);
     if (elementsAttr.isSplat()) {
       // Fast-path for splat (no need to convert the value a bunch).
       return serializeSplatValue(elementsAttr.getSplatValue<Attribute>(),
@@ -524,7 +526,7 @@ struct SerializableDenseResourceElementsAttrModel
           SerializableDenseResourceElementsAttrModel,
           DenseResourceElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = baseAttr.cast<DenseResourceElementsAttr>();
+    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
     return attr.getNumElements() * IREE::Util::getRoundedElementByteWidth(
                                        attr.getType().getElementType());
   }
@@ -546,7 +548,7 @@ struct SerializableDenseResourceElementsAttrModel
   LogicalResult serializeToStream(Attribute baseAttr,
                                   llvm::support::endianness endian,
                                   llvm::raw_ostream &os) const {
-    auto attr = baseAttr.cast<DenseResourceElementsAttr>();
+    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
     auto handle = attr.getRawHandle();
 
     // Special testing path for elided attributes. We want this to be an
@@ -576,7 +578,7 @@ struct SerializableStringAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableStringAttrModel, StringAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = baseAttr.cast<StringAttr>();
+    auto attr = llvm::cast<StringAttr>(baseAttr);
     return attr.getValue().size();
   }
 
@@ -600,7 +602,7 @@ struct SerializableStringAttrModel
     // NOTE: not all ostream implementations handle this but for buffering ones
     // it can really help.
     os.reserveExtraSpace(getStorageSize(baseAttr));
-    auto stringAttr = baseAttr.cast<StringAttr>();
+    auto stringAttr = llvm::cast<StringAttr>(baseAttr);
     os.write(stringAttr.data(), stringAttr.size());
     return success();
   }

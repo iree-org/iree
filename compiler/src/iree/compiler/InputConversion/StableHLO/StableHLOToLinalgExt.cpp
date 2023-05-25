@@ -207,7 +207,7 @@ struct ScatterOpConversion final
   /// * Update window dims order: (d + 1, ... , m)
   static bool hasCanonicalDimensionNumbers(mlir::stablehlo::ScatterOp op) {
     auto dimNumbers = op.getScatterDimensionNumbers();
-    auto indicesType = op.getScatterIndices().getType().cast<ShapedType>();
+    auto indicesType = llvm::cast<ShapedType>(op.getScatterIndices().getType());
     auto indicesRank = indicesType.getRank();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     auto indexDepth = indicesType.getShape().back();
@@ -297,7 +297,7 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
 
   static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
                                                 Value real, int fftLength) {
-    auto realType = real.getType().cast<ShapedType>();
+    auto realType = llvm::cast<ShapedType>(real.getType());
     auto rank = realType.getRank();
 
     SmallVector<OpFoldResult> mixedSizes =
@@ -325,11 +325,11 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
           b.create<linalg::YieldOp>(
               loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
         });
-    return {
-        genericOp.getResult(0),
-        b.create<arith::ConstantOp>(
-            realType, DenseFPElementsAttr::get(
-                          realType, b.getF32FloatAttr(0.0).cast<Attribute>()))};
+    return {genericOp.getResult(0),
+            b.create<arith::ConstantOp>(
+                realType,
+                DenseFPElementsAttr::get(
+                    realType, llvm::cast<Attribute>(b.getF32FloatAttr(0.0))))};
   }
 
   static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
@@ -355,7 +355,7 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
       ConversionPatternRewriter &rewriter) const override {
     // Only handle 2^n fft length.
     auto operandType =
-        adaptor.getOperand().getType().dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
     if (!operandType || !operandType.hasStaticShape()) {
       return failure();
     }
@@ -436,9 +436,11 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
     Location loc = op.getLoc();
     Value operand = adaptor.getOperand();
 
-    auto inputValuesType = operand.getType().dyn_cast<ShapedType>();
-    auto outputValuesType = op.getValues().getType().dyn_cast<ShapedType>();
-    auto outputIndicesType = op.getIndices().getType().dyn_cast<ShapedType>();
+    auto inputValuesType = llvm::dyn_cast<ShapedType>(operand.getType());
+    auto outputValuesType =
+        llvm::dyn_cast<ShapedType>(op.getValues().getType());
+    auto outputIndicesType =
+        llvm::dyn_cast<ShapedType>(op.getIndices().getType());
     if (!inputValuesType || !outputValuesType || !outputIndicesType) {
       return rewriter.notifyMatchFailure(
           op, "Input and output must be of ShapedType");
@@ -447,7 +449,7 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
     Type valueElementType = outputValuesType.getElementType();
     Type indicesElementType = outputIndicesType.getElementType();
     // Only handle integer types for indicies. Index type is not supported.
-    if (!indicesElementType.isa<IntegerType>()) {
+    if (!llvm::isa<IntegerType>(indicesElementType)) {
       return rewriter.notifyMatchFailure(
           op, "Output indices must be of integer type.");
     }
@@ -463,12 +465,12 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
         loc, mixedSizes, indicesElementType);
     // Initialize indices to 0 and values to negative infinity
     TypedAttr negInfAttr;
-    if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
+    if (auto intType = llvm::dyn_cast<IntegerType>(valueElementType)) {
       negInfAttr = rewriter.getIntegerAttr(
           intType, APInt::getSignedMinValue(intType.getWidth()));
     } else {
       auto negApFloat = APFloat::getInf(
-          valueElementType.cast<FloatType>().getFloatSemantics(),
+          llvm::cast<FloatType>(valueElementType).getFloatSemantics(),
           /*Negative=*/true);
       negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
     }
@@ -500,7 +502,7 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
       Value lhs = block->getArgument(0);
       Value rhs = block->getArgument(1);
       Value condition;
-      if (valueElementType.isa<IntegerType>()) {
+      if (llvm::isa<IntegerType>(valueElementType)) {
         condition = rewriter.create<arith::CmpIOp>(
             loc, arith::CmpIPredicate::sge, lhs, rhs);
       } else {

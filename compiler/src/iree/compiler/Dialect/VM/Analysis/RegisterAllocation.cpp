@@ -275,8 +275,9 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
       for (auto result : op.getResults()) {
         auto reg = registerUsage.allocateRegister(result.getType());
         if (!reg.has_value()) {
-          return op.emitError() << "register allocation failed for result "
-                                << result.cast<OpResult>().getResultNumber();
+          return op.emitError()
+                 << "register allocation failed for result "
+                 << llvm::cast<OpResult>(result).getResultNumber();
         }
         map_[result] = reg.value();
         if (result.use_empty()) {

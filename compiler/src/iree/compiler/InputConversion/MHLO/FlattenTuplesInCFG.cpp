@@ -28,8 +28,8 @@ namespace {
 // Given a set of types, unpack to a list of a types, removing all tuples.
 void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> &newTypes) {
   for (Type type : types) {
-    if (type.isa<TupleType>()) {
-      untupleTypes(type.dyn_cast<TupleType>().getTypes(), newTypes);
+    if (llvm::isa<TupleType>(type)) {
+      untupleTypes(llvm::dyn_cast<TupleType>(type).getTypes(), newTypes);
     } else {
       newTypes.push_back(type);
     }
@@ -37,11 +37,11 @@ void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> &newTypes) {
 }
 
 Value processTuple(Type type, Location loc, Block *block, OpBuilder &builder) {
-  if (!type.isa<TupleType>()) {
+  if (!llvm::isa<TupleType>(type)) {
     return block->addArgument(type, loc);
   }
 
-  auto tupleType = type.dyn_cast<TupleType>();
+  auto tupleType = llvm::dyn_cast<TupleType>(type);
   llvm::SmallVector<Value, 4> values;
   values.reserve(tupleType.size());
   for (auto subtype : tupleType.getTypes()) {
@@ -68,12 +68,12 @@ bool recursiveUntuple(Value value, Location loc, OpBuilder &builder,
                       llvm::SmallVectorImpl<Value> *newValues) {
   Type type = value.getType();
   // We can return the value as is.
-  if (!type.isa<TupleType>()) {
+  if (!llvm::isa<TupleType>(type)) {
     newValues->push_back(value);
     return false;
   }
 
-  TupleType tupleType = type.dyn_cast<TupleType>();
+  TupleType tupleType = llvm::dyn_cast<TupleType>(type);
   for (int i = 0; i < tupleType.size(); i++) {
     auto subType = tupleType.getType(i);
 
@@ -87,13 +87,13 @@ bool recursiveUntuple(Value value, Location loc, OpBuilder &builder,
 
 Value recursiveRetuple(Type oldType, Operation::result_range *values,
                        OpBuilder &builder, Location loc) {
-  if (!oldType.isa<TupleType>()) {
+  if (!llvm::isa<TupleType>(oldType)) {
     Value returnValue = *values->begin();
     *values = {values->begin() + 1, values->end()};
     return returnValue;
   }
 
-  TupleType tupleType = oldType.dyn_cast<TupleType>();
+  TupleType tupleType = llvm::dyn_cast<TupleType>(oldType);
   llvm::SmallVector<Value, 10> subValues;
   for (auto subtype : tupleType.getTypes()) {
     subValues.push_back(recursiveRetuple(subtype, values, builder, loc));

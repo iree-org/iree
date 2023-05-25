@@ -50,7 +50,7 @@ struct ExpandedGlobal {
 using ExpandedGlobalMap = DenseMap<StringRef, ExpandedGlobal>;
 
 static bool isDynamicTensor(Type type) {
-  if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
+  if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
     return !tensorType.hasStaticShape();
   }
   return false;
@@ -81,7 +81,7 @@ static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp) {
     OpBuilder builder(global.tensorOp);
     builder.setInsertionPointAfter(global.tensorOp);
 
-    auto tensorType = global.tensorOp.getType().cast<RankedTensorType>();
+    auto tensorType = llvm::cast<RankedTensorType>(global.tensorOp.getType());
     for (auto it : llvm::enumerate(tensorType.getShape())) {
       if (it.value() == ShapedType::kDynamic) {
         auto dimName =
@@ -119,7 +119,7 @@ static SmallVector<Type> expandTypes(TypeRange types) {
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
     newTypes.push_back(type);
-    if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
+    if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
       newTypes.append(tensorType.getNumDynamicDims(), indexType);
     }
   }
@@ -202,7 +202,7 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
     SmallVector<ExpandedValue> expansions;
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto arg = block.getArgument(i);
-      auto tensorType = arg.getType().dyn_cast<RankedTensorType>();
+      auto tensorType = llvm::dyn_cast<RankedTensorType>(arg.getType());
       if (!tensorType || tensorType.hasStaticShape()) continue;
       ExpandedValue expandedValue;
       expandedValue.tensor = arg;
@@ -361,7 +361,7 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
   unsigned newIdx = 0;
   for (unsigned oldIdx = 0; oldIdx < op.getNumResults(); ++oldIdx) {
     auto oldResult = op.getResult(oldIdx);
-    auto tensorType = oldResult.getType().dyn_cast<RankedTensorType>();
+    auto tensorType = llvm::dyn_cast<RankedTensorType>(oldResult.getType());
     if (!tensorType || tensorType.hasStaticShape()) {
       auto newResult = newOp.getResult(newIdx++);
       oldResult.replaceAllUsesWith(newResult);

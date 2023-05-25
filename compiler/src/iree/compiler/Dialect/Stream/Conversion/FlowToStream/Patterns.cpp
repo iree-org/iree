@@ -330,7 +330,7 @@ struct ConvertAllGatherOp
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveAllGatherOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getSource().getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getSource().getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllGather,
         /*reduction=*/std::nullopt,
@@ -365,7 +365,7 @@ struct ConvertAllReduceOp
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveAllReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllReduce,
         static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
@@ -400,7 +400,7 @@ struct ConvertAllToAllOp
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveAllToAllOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getSource().getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getSource().getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllToAll,
         /*reduction=*/std::nullopt,
@@ -435,7 +435,7 @@ struct ConvertReduceScatterOp
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveReduceScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::ReduceScatter,
         static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
@@ -470,7 +470,7 @@ struct ConvertCollectiveSendRecvOp
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveSendRecvOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::SendRecv,
         /*reduction=*/std::nullopt,
@@ -530,7 +530,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     SmallVector<Value> operandSizes;
     for (auto [oldOperand, newOperand] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
-      if (oldOperand.getType().isa<ShapedType>()) {
+      if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             consumeTensorOperand(op.getLoc(), newOperand, rewriter);
         newOperand = newOperandCast.resource;
@@ -552,7 +552,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!oldResultType.isa<ShapedType>()) {
+      if (!llvm::isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         continue;
       }
@@ -586,7 +586,7 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
       IREE::Flow::FuncOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto convertType = [&](Type type) -> Type {
-      if (type.isa<TensorType>()) {
+      if (llvm::isa<TensorType>(type)) {
         // Tensors become resources without sizes. The default type converter
         // adds the size so we bypass that here. We may want to allow the user
         // to override the lifetime with attributes, too.
@@ -634,7 +634,7 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
     SmallVector<Value> operandSizes;
     for (auto [oldOperand, newOperand] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
-      if (oldOperand.getType().isa<ShapedType>()) {
+      if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             consumeTensorOperand(op.getLoc(), newOperand, rewriter);
         newOperand = newOperandCast.resource;
@@ -656,7 +656,7 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!oldResultType.isa<ShapedType>()) {
+      if (!llvm::isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         continue;
       }
@@ -804,7 +804,7 @@ struct ConvertExecutableOp
       for (auto arg : funcOp.front().getArguments()) {
         auto oldType = arg.getType();
         if (auto tensorType =
-                oldType.dyn_cast<IREE::Flow::DispatchTensorType>()) {
+                llvm::dyn_cast<IREE::Flow::DispatchTensorType>(oldType)) {
           // Now a binding - insert the stream.binding.subspan op to slice it.
           auto newType = rewriter.getType<IREE::Stream::BindingType>();
           newTypes.push_back(newType);

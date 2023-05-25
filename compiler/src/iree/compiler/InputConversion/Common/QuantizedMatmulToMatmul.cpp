@@ -64,7 +64,7 @@ struct QuantizedMatmulToMatmul
       return success();
     }
     // Create the result. No need to zero-fill it as we will overwrite it.
-    ShapedType accType = acc.getType().cast<ShapedType>();
+    ShapedType accType = llvm::cast<ShapedType>(acc.getType());
     auto accDynShape = linalg::createDynamicDimensions(rewriter, loc, acc);
     Value initResult = builder.create<tensor::EmptyOp>(
         accType.getShape(), accType.getElementType(), accDynShape);

@@ -38,7 +38,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   auto boundTensorType =
-      dispatchTensorType.getBoundType().dyn_cast<RankedTensorType>();
+      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
   if (!boundTensorType) {
     return failure();
   }
@@ -99,15 +99,14 @@ struct MaterializeInterfaceBindingEncoding
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = subspanOp.getResult()
-                          .getType()
-                          .dyn_cast<IREE::Flow::DispatchTensorType>();
+    auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+        subspanOp.getResult().getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
           subspanOp, "expected result type to be !flow.dispatch.tensor");
     }
     auto boundTensorType =
-        resultType.getBoundType().dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(resultType.getBoundType());
     if (!boundTensorType) {
       return rewriter.notifyMatchFailure(
           subspanOp, "bound type is not a RankedTensorType");
@@ -272,7 +271,8 @@ IREE::LinalgExt::MaterializeEncodingInfo chooseEncodingInfoForMatmul(
 }
 
 std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
-  auto encodingAttr = tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
+  auto encodingAttr =
+      llvm::dyn_cast_if_present<EncodingAttr>(tensorType.getEncoding());
   if (!encodingAttr) return std::nullopt;
   return encodingAttr.getEncoding().getValue();
 }
@@ -396,10 +396,8 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-        auto resultType =
-            subspanOp.getResult()
-                .getType()
-                .template dyn_cast<IREE::Flow::DispatchTensorType>();
+        auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+            subspanOp.getResult().getType());
         // For types that are not `Flow::DispatchTensorType` mark as legal.
         if (!resultType) return true;
         return resultType == typeConverter.convertType(resultType);

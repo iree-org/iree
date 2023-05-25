@@ -77,9 +77,8 @@ static MemRefType getMemrefTypeForTensor(
 static Value findOrCreateSubspanBuffer(
     RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
   // Ensure that this a tensor subspan op.
-  auto shapedType = subspanOp.getResult()
-                        .getType()
-                        .dyn_cast<IREE::Flow::DispatchTensorType>();
+  auto shapedType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+      subspanOp.getResult().getType());
   assert(shapedType && shapedType.hasRank());
 
   Value byteOffset = subspanOp.getByteOffset();
@@ -93,7 +92,7 @@ static Value findOrCreateSubspanBuffer(
     if (!elementOffsetInt) {
       elementOffsetInt = ShapedType::kDynamic;
     }
-    auto tensorType = shapedType.getBoundType().cast<RankedTensorType>();
+    auto tensorType = llvm::cast<RankedTensorType>(shapedType.getBoundType());
     SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
                                         elementOffsetInt.value(), strides);
@@ -109,7 +108,7 @@ static Value findOrCreateSubspanBuffer(
     if (!bufferSubspanOp) continue;
 
     auto bufferMemrefType =
-        bufferSubspanOp.getResult().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(bufferSubspanOp.getResult().getType());
     if (!bufferMemrefType) continue;
 
     if (bufferSubspanOp.getSet() != subspanOp.getSet() ||
@@ -161,8 +160,8 @@ struct DispatchTensorLoadOpInterface
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
-    auto shapedType =
-        loadOp.getSource().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+    auto shapedType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+        loadOp.getSource().getType());
     assert(shapedType && "unexpected source type");
     return shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly;
   }
@@ -176,10 +175,10 @@ struct DispatchTensorLoadOpInterface
     assert(tensorSubspanOp && "expected that source is a SubspanOp");
     Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
-    if (equalTensorShape(
-            loadOp.getType(), loadOp.sizes(),
-            loadOp.getSource().getType().cast<IREE::Flow::DispatchTensorType>(),
-            loadOp.getSourceDims())) {
+    if (equalTensorShape(loadOp.getType(), loadOp.sizes(),
+                         llvm::cast<IREE::Flow::DispatchTensorType>(
+                             loadOp.getSource().getType()),
+                         loadOp.getSourceDims())) {
       // The entire tensor is loaded.
       replaceOpWithBufferizedValues(rewriter, op, source);
       return success();
@@ -187,11 +186,11 @@ struct DispatchTensorLoadOpInterface
 
     // Bufferize to subview.
     auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
-        loadOp.getType().getShape(), source.getType().cast<MemRefType>(),
+        loadOp.getType().getShape(), llvm::cast<MemRefType>(source.getType()),
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
     replaceOpWithNewBufferizedOp<memref::SubViewOp>(
-        rewriter, op, subviewMemRefType.cast<MemRefType>(), source,
+        rewriter, op, llvm::cast<MemRefType>(subviewMemRefType), source,
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
 
@@ -226,19 +225,18 @@ struct DispatchTensorStoreOpInterface
     assert(tensorSubspanOp && "expected that target is a SubspanOp");
     Value target = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
-    if (!equalTensorShape(storeOp.getValue().getType().cast<RankedTensorType>(),
-                          storeOp.getSizes(),
-                          storeOp.getTarget()
-                              .getType()
-                              .cast<IREE::Flow::DispatchTensorType>(),
-                          storeOp.getTargetDims())) {
+    if (!equalTensorShape(
+            llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
+            storeOp.getSizes(),
+            llvm::cast<IREE::Flow::DispatchTensorType>(
+                storeOp.getTarget().getType()),
+            storeOp.getTargetDims())) {
       // Writing to a part of the tensor.
       auto subviewMemRefType =
-          memref::SubViewOp::inferRankReducedResultType(
+          llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
               storeOp.getValue().getType().cast<ShapedType>().getShape(),
               target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
-              storeOp.getMixedSizes(), storeOp.getMixedStrides())
-              .cast<MemRefType>();
+              storeOp.getMixedSizes(), storeOp.getMixedStrides()));
 
       target = rewriter.create<memref::SubViewOp>(
           storeOp->getLoc(), subviewMemRefType, target,
@@ -590,7 +588,7 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
         auto storeOp =
             cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
         auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-            loc, storeOp.getValue().getType().cast<RankedTensorType>(),
+            loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
             storeOp.getTarget(), storeOp.getTargetDims(),
             storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
             storeOp.getMixedStrides());

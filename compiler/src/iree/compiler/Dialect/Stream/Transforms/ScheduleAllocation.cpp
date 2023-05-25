@@ -60,7 +60,7 @@ static void computeRegionValueAliases(Operation *regionOp,
   // things like stream.async.execute returning a timepoint.
   auto resourceResults = llvm::to_vector_of<OpResult>(
       llvm::make_filter_range(regionOp->getResults(), [](OpResult result) {
-        return result.getType().isa<IREE::Stream::ResourceType>();
+        return llvm::isa<IREE::Stream::ResourceType>(result.getType());
       }));
 
   // Start with outputs so that we handle tied values that may lead all the way
@@ -90,7 +90,7 @@ static void computeRegionValueAliases(Operation *regionOp,
     // Tied results reuse their operand buffer.
     auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
     for (auto result : op.getResults()) {
-      if (!result.getType().isa<IREE::Stream::ResourceType>()) continue;
+      if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) continue;
       if (tiedOp) {
         auto tiedOperand = tiedOp.getTiedResultOperand(result);
         if (tiedOperand) {
@@ -173,7 +173,7 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
   SmallPtrSet<Value, 16> liveOuts;
   auto yieldOp = cast<IREE::Stream::YieldOp>(streamBlock->back());
   for (auto returnValue : yieldOp.getResourceOperands()) {
-    if (!returnValue.getType().isa<IREE::Stream::ResourceType>()) continue;
+    if (!llvm::isa<IREE::Stream::ResourceType>(returnValue.getType())) continue;
     liveOuts.insert(returnValue);
   }
 
@@ -182,7 +182,7 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
   LivenessIntervalMap valueIntervals;
   int ordinal = 0;
   for (Value value : streamBlock->getArguments()) {
-    if (!value.getType().isa<IREE::Stream::ResourceType>()) continue;
+    if (!llvm::isa<IREE::Stream::ResourceType>(value.getType())) continue;
     LivenessInterval interval;
     interval.start = LIVE_IN;
     if (liveOuts.contains(value)) {
@@ -208,7 +208,7 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
       // the duration of the region.
       concurrentOp.walk([&](Operation *op) {
         for (auto value : op->getResults()) {
-          if (!value.getType().isa<IREE::Stream::ResourceType>()) continue;
+          if (!llvm::isa<IREE::Stream::ResourceType>(value.getType())) continue;
           if (!value.use_empty()) continue;
           LivenessInterval interval;
           interval.start = start;
@@ -220,7 +220,7 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
       });
     }
     for (auto value : op.getResults()) {
-      if (!value.getType().isa<IREE::Stream::ResourceType>()) continue;
+      if (!llvm::isa<IREE::Stream::ResourceType>(value.getType())) continue;
       LivenessInterval interval;
       interval.start = start;
       if (liveOuts.contains(value)) {
@@ -614,8 +614,8 @@ static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
   // Lookup the affinity for where we are executing. This lets us determine if
   // this transfer is incoming or outgoing.
   auto isStaging = [](Value value) {
-    return value.getType().cast<IREE::Stream::ResourceType>().getLifetime() ==
-           IREE::Stream::Lifetime::Staging;
+    return llvm::cast<IREE::Stream::ResourceType>(value.getType())
+               .getLifetime() == IREE::Stream::Lifetime::Staging;
   };
   auto currentAffinityAttr = IREE::Stream::AffinityAttr::lookup(asyncOp);
   bool transferIn = asyncOp.getSourceAffinityAttr() != currentAffinityAttr ||
@@ -665,7 +665,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   unsigned resourceIndex = 0;
   for (auto it : llvm::enumerate(asyncOp.getResourceOperands())) {
     auto operand = it.value();
-    if (!operand.getType().isa<IREE::Stream::ResourceType>()) {
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
       // Primitive operand.
       newOperands.push_back(operand);
       continue;
@@ -733,7 +733,7 @@ static void convertAsyncFuncOp(IREE::Stream::AsyncFuncOp asyncOp) {
   SmallVector<DictionaryAttr> newArgAttrs;
   for (auto [i, oldInput] : llvm::enumerate(oldFunctionType.getInputs())) {
     auto oldArgAttr = asyncOp.getArgAttrDict(i);
-    if (oldInput.isa<IREE::Stream::ResourceType>()) {
+    if (llvm::isa<IREE::Stream::ResourceType>(oldInput)) {
       newInputs.push_back(oldInput);  // resource
       newArgAttrs.push_back(oldArgAttr);
       newInputs.push_back(indexType);  // offset
@@ -750,7 +750,7 @@ static void convertAsyncFuncOp(IREE::Stream::AsyncFuncOp asyncOp) {
   SmallVector<DictionaryAttr> newResultAttrs;
   for (auto [i, oldResult] : llvm::enumerate(oldFunctionType.getResults())) {
     auto oldResultAttr = asyncOp.getResultAttrDict(i);
-    if (oldResult.isa<IREE::Stream::ResourceType>()) {
+    if (llvm::isa<IREE::Stream::ResourceType>(oldResult)) {
       if (asyncOp.isResultTied(i)) {
         // Tied results reuse the operands they are tied to.
         continue;
@@ -790,7 +790,7 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
 
   unsigned resourceIndex = 0;
   for (auto [i, operand] : llvm::enumerate(asyncOp.getResourceOperands())) {
-    if (!operand.getType().isa<IREE::Stream::ResourceType>()) {
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
       // Primitive operand.
       newResourceOperands.push_back(operand);
       continue;
@@ -819,7 +819,7 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
   }
 
   for (auto result : asyncOp.getResults()) {
-    if (!result.getType().isa<IREE::Stream::ResourceType>()) {
+    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
       // Primitive result.
       newResultTypes.push_back(result.getType());
       continue;
@@ -986,7 +986,8 @@ static std::optional<TransientAllocation> allocateLocalTransients(
   for (auto valueInterval : livenessIntervals) {
     auto value = valueInterval.value;
     assert(value && "must have value for interval");
-    auto valueType = value.getType().dyn_cast<IREE::Stream::ResourceType>();
+    auto valueType =
+        llvm::dyn_cast<IREE::Stream::ResourceType>(value.getType());
     if (!valueType) continue;
 
     // Only handle transient buffers (created/used/dropped within the stream).
@@ -1368,7 +1369,7 @@ static LogicalResult allocateExecutionRegion(
   SmallVector<ResultReservation> resultReservations;
   for (auto [result, resultSize] :
        llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
-    auto resultType = result.getType().cast<IREE::Stream::ResourceType>();
+    auto resultType = llvm::cast<IREE::Stream::ResourceType>(result.getType());
     if (handledResults.contains(result)) {
       resultReplacements.push_back(std::make_pair(result, Value{}));
       continue;
@@ -1406,7 +1407,7 @@ static LogicalResult allocateExecutionRegion(
     if (!definingOp) {
       // Directly returning an operand; this usually gets canonicalized away but
       // may be introduced by intermediate transformations.
-      auto arg = definingValue.cast<BlockArgument>();
+      auto arg = llvm::cast<BlockArgument>(definingValue);
       auto operand = newOperands[arg.getArgNumber()];
       LLVM_DEBUG({
         AsmState asmState(executeOp->getParentOp());

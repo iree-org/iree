@@ -302,7 +302,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
 
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
-        inputOutputOpOperands[index].get().getType().cast<ShapedType>();
+        llvm::cast<ShapedType>(inputOutputOpOperands[index].get().getType());
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
     minTileSizes[fastestVaryingDim] =
@@ -796,7 +796,7 @@ static LogicalResult setMatmulPadRootConfig(
   // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
   // if the dim size is small (e.g., K=24).
   SmallVector<int64_t> reductionTileSizes(workgroupTileSizes.size() - 1, 0);
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
   int64_t K = lhsShapedType.getShape().back();
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
@@ -892,7 +892,7 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
                              workgroupTileSizes[index], vectorSize));
   }
 
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
   int64_t K = lhsShapedType.getShape().back();
   parallelTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
@@ -995,10 +995,10 @@ static LogicalResult setRootConfig(
 
   // Consider all element types and use the smallest vector size. The tiling
   // sizes are chosen based on the vector size.
-  auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
-  auto rhsShapedType = contractionOp.rhs().getType().cast<ShapedType>();
+  auto lhsShapedType = llvm::cast<ShapedType>(contractionOp.lhs().getType());
+  auto rhsShapedType = llvm::cast<ShapedType>(contractionOp.rhs().getType());
   auto resShapedType =
-      linalgOp.getDpsInitOperand(0)->get().getType().cast<ShapedType>();
+      llvm::cast<ShapedType>(linalgOp.getDpsInitOperand(0)->get().getType());
   int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, rhsShapedType));
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
@@ -1095,9 +1095,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
   auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
     auto lhsShape =
-        mmt4dOp.getInputs()[0].getType().cast<ShapedType>().getShape();
+        llvm::cast<ShapedType>(mmt4dOp.getInputs()[0].getType()).getShape();
     auto rhsShape =
-        mmt4dOp.getInputs()[1].getType().cast<ShapedType>().getShape();
+        llvm::cast<ShapedType>(mmt4dOp.getInputs()[1].getType()).getShape();
     int M0 = lhsShape[2];
     int N0 = rhsShape[2];
     int K0 = lhsShape[3];

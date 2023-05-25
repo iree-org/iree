@@ -101,7 +101,7 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
 
   LogicalResult matchAndRewrite(MathOpTy mathOp,
                                 PatternRewriter &rewriter) const override {
-    auto vecType = mathOp.getType().template dyn_cast<VectorType>();
+    auto vecType = llvm::dyn_cast<VectorType>(mathOp.getType());
     if (!vecType) return failure();
     Location loc = mathOp.getLoc();
     Value newVector = rewriter.create<arith::ConstantOp>(
@@ -147,7 +147,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     } else {
       // If no alignment specified align at least to the size of an element.
       Type elType = allocOp.getType().getElementType();
-      if (auto shapeType = elType.dyn_cast<ShapedType>())
+      if (auto shapeType = llvm::dyn_cast<ShapedType>(elType))
         alignement =
             shapeType.getNumElements() * shapeType.getElementTypeBitWidth() / 8;
       else
@@ -333,7 +333,7 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(
         operands, op->getAttrDictionary());
     MemRefType memrefType =
-        subspanOp.getResult().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(subspanOp.getResult().getType());
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
         argMapping[SetBinding(subspanOp.getSet(), subspanOp.getBinding())]);
     // As a convention with HAL all the kernel argument pointers are 16Bytes

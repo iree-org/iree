@@ -184,7 +184,8 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
 // Materialize copy-on-write (🐄) ops where required for |rootValue|.
 // Only valid in tensor/async ops - don't use with stream.cmd.*.
 static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
-  auto valueType = rootValue.getType().dyn_cast<IREE::Stream::ResourceType>();
+  auto valueType =
+      llvm::dyn_cast<IREE::Stream::ResourceType>(rootValue.getType());
   if (!valueType) return false;
 
   // If our rootValue is a constant then we need to ensure that we aren't
@@ -235,8 +236,7 @@ static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
     builder.setInsertionPoint(tiedUse.user);
 
     auto sizeAwareType =
-        tiedUse.value.getType()
-            .template cast<IREE::Util::SizeAwareTypeInterface>();
+        llvm::cast<IREE::Util::SizeAwareTypeInterface>(tiedUse.value.getType());
     auto targetSize =
         sizeAwareType.queryValueSize(cloneLoc, tiedUse.value, builder);
 
@@ -303,7 +303,7 @@ struct TieRegionResults : public OpRewritePattern<Op> {
         }
         auto baseValue =
             IREE::Util::TiedOpInterface::findTiedBaseValue(result.value());
-        if (auto blockArg = baseValue.template dyn_cast<BlockArgument>()) {
+        if (auto blockArg = llvm::dyn_cast<BlockArgument>(baseValue)) {
           unsigned operandIndex = blockArg.getArgNumber();
           rewriter.updateRootInPlace(op, [&]() {
             op.setTiedResultOperandIndex(result.index(), operandIndex);
@@ -441,7 +441,7 @@ void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult ResourceSizeOp::fold(FoldAdaptor operands) {
   auto sizeAwareType =
-      getOperand().getType().cast<IREE::Util::SizeAwareTypeInterface>();
+      llvm::cast<IREE::Util::SizeAwareTypeInterface>(getOperand().getType());
   Operation *op = this->getOperation();
   return sizeAwareType.findSizeValue(getOperand(), op->getBlock(),
                                      Block::iterator(op));
@@ -778,7 +778,7 @@ struct SinkSubviewAcrossSelectOps
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getType().isa<IREE::Stream::ResourceType>()) return failure();
+    if (!llvm::isa<IREE::Stream::ResourceType>(op.getType())) return failure();
     auto trueSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
         op.getTrueValue().getDefiningOp());
     auto falseSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
@@ -869,7 +869,8 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto shapedType = constantOp.getResultEncoding().dyn_cast<ShapedType>();
+    auto shapedType =
+        llvm::dyn_cast<ShapedType>(constantOp.getResultEncoding());
     if (!shapedType) return failure();
 
     // See if any dim (including dynamic ones) is known zero.
@@ -909,7 +910,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatAttr = constantOp.getValue().dyn_cast<SplatElementsAttr>();
+    auto splatAttr = llvm::dyn_cast<SplatElementsAttr>(constantOp.getValue());
     if (!splatAttr || !splatAttr.isSplat()) {
       return rewriter.notifyMatchFailure(
           constantOp,
@@ -1042,9 +1043,9 @@ static TypedAttr tryNarrowPatternBits(TypedAttr patternAttr) {
   // Get the old pattern bitcast to an APInt. Splats are bitwise operations
   // and we don't care what the value originally was.
   APInt oldPattern;
-  if (auto floatAttr = patternAttr.dyn_cast<FloatAttr>()) {
+  if (auto floatAttr = llvm::dyn_cast<FloatAttr>(patternAttr)) {
     oldPattern = floatAttr.getValue().bitcastToAPInt();
-  } else if (auto intAttr = patternAttr.dyn_cast<IntegerAttr>()) {
+  } else if (auto intAttr = llvm::dyn_cast<IntegerAttr>(patternAttr)) {
     oldPattern = intAttr.getValue();
   } else {
     // Can't handle today.
@@ -1311,7 +1312,7 @@ struct ConvertSplatConstantsIntoSplats
     if (!value.isSplat()) return failure();
 
     auto splatElementAttr =
-        value.dyn_cast<SplatElementsAttr>().getSplatValue<TypedAttr>();
+        llvm::dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
     auto splatValue = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
@@ -1848,7 +1849,7 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
     }
     SmallVector<Value> newResults;
     for (auto operand : yieldOp->getResourceOperands()) {
-      auto arg = operand.cast<BlockArgument>();
+      auto arg = llvm::cast<BlockArgument>(operand);
       auto capture = op.getResourceOperands()[arg.getArgNumber()];
       assert(arg.getType() == capture.getType() &&
              "expect 1:1 types on captures to results");
@@ -2197,7 +2198,7 @@ struct FoldSubviewsIntoCmdCallOp : public OpRewritePattern<CmdCallOp> {
     bool anySubviewOps = false;
     for (auto [operandIndex, operand] :
          llvm::enumerate(op.getResourceOperands())) {
-      if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+      if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
         auto subviewOp = ResourceSubviewOp::findSubviewOp(operand);
         if (subviewOp) anySubviewOps = true;
         resourceSubviewOps.push_back({operandIndex, subviewOp});
@@ -2847,8 +2848,9 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       auto awaitOp = dyn_cast<TimepointAwaitOp>(use.getOwner());
       if (!awaitOp ||
           !AffinityAttr::areCompatible(
-              op.getAffinityAttr().dyn_cast_or_null<AffinityAttr>(),
-              awaitOp.getAffinityAttr().dyn_cast_or_null<AffinityAttr>())) {
+              llvm::dyn_cast_if_present<AffinityAttr>(op.getAffinityAttr()),
+              llvm::dyn_cast_if_present<AffinityAttr>(
+                  awaitOp.getAffinityAttr()))) {
         // Can't combine if the affinities differ as the wait semantics are
         // load-bearing. Probably. They really shouldn't be.
         // TODO(benvanik): remove affinity from stream.timepoint.await.

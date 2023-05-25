@@ -277,9 +277,11 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
-      op.getDpsInputOperand(0)->get().getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType())
+          .getShape();
   auto rhsShape =
-      op.getDpsInputOperand(1)->get().getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(op.getDpsInputOperand(1)->get().getType())
+          .getShape();
   int64_t sizeM = ShapedType::kDynamic;
   int64_t sizeN = ShapedType::kDynamic;
   int64_t sizeK = ShapedType::kDynamic;
@@ -316,10 +318,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-      Type elementType = op.getDpsInputOperand(0)
-                             ->get()
-                             .getType()
-                             .cast<RankedTensorType>()
+      Type elementType = llvm::cast<RankedTensorType>(
+                             op.getDpsInputOperand(0)->get().getType())
                              .getElementType();
 
       getTensorCoreConfig(TCtileSizeConfig, elementType, sizeM, sizeN, sizeK);
@@ -531,12 +531,12 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         vectorSize = 1;
         break;
       }
-      ArrayRef<int64_t> shape = cast<linalg::LinalgOp>(op)
-                                    .getDpsInitOperand(index)
-                                    ->get()
-                                    .getType()
-                                    .cast<ShapedType>()
-                                    .getShape();
+      ArrayRef<int64_t> shape =
+          llvm::cast<ShapedType>(cast<linalg::LinalgOp>(op)
+                                     .getDpsInitOperand(index)
+                                     ->get()
+                                     .getType())
+              .getShape();
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;
         break;
@@ -633,7 +633,7 @@ static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
     for (auto [dimIdx, dim] : llvm::enumerate(map.getResults())) {
       auto expr = dim.dyn_cast<AffineDimExpr>();
       if (expr && expr.getPosition() == d) {
-        auto type = op->getOperand(mapIdx).getType().cast<ShapedType>();
+        auto type = llvm::cast<ShapedType>(op->getOperand(mapIdx).getType());
         if (type.isDynamicDim(dimIdx)) return std::nullopt;
         return type.getDimSize(dimIdx);
       }
@@ -719,11 +719,9 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   std::optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
-  const Type elementType = op.getDpsInitOperand(0)
-                               ->get()
-                               .getType()
-                               .cast<ShapedType>()
-                               .getElementType();
+  const Type elementType =
+      llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
+          .getElementType();
   if (!elementType.isIntOrFloat()) return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
   // Reduction distribution only supports 8/16/32 bit types now.
@@ -902,9 +900,9 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
   const int ocIndex = isNHWC ? 3 : 1;
 
   Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
-  ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> inputShape = llvm::cast<ShapedType>(inputType).getShape();
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
-  ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
   if (ShapedType::isDynamic(inputShape[3]) ||
       llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
     return failure();

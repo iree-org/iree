@@ -191,7 +191,7 @@ void replaceEntryPointUses(
     funcLikeOp->walk([&](DispatchOp dispatchOp) {
       auto it = replacements.find(dispatchOp.getEntryPoint());
       if (it != replacements.end()) {
-        dispatchOp.setEntryPointAttr(it->second.cast<SymbolRefAttr>());
+        dispatchOp.setEntryPointAttr(llvm::cast<SymbolRefAttr>(it->second));
       }
     });
   }

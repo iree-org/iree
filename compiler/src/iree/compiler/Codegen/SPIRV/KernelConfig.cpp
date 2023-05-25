@@ -70,7 +70,7 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
   func::FuncOp entryPoint = matmul->getParentOfType<func::FuncOp>();
 
   auto getResultBits = [](linalg::LinalgOp linalgOp) {
-    auto shapedType = linalgOp->getResult(0).getType().cast<ShapedType>();
+    auto shapedType = llvm::cast<ShapedType>(linalgOp->getResult(0).getType());
     return shapedType.getElementType().getIntOrFloatBitWidth();
   };
   auto matmulResultBits = getResultBits(matmul);
@@ -171,9 +171,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as convolution...\n");
 
   Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
-  ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> inputShape = llvm::cast<ShapedType>(inputType).getShape();
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
-  ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
   // Restrict to pure 4-D input/output shapes for now. This excludes convolution
   // ops with 1- or 3-D window sizes. It also excludes 2-D-window convolution
   // ops like `linalg.depthwise_conv_2d_nhwc_hwcm`.
@@ -235,7 +235,8 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return failure();
   }
 
-  const int bitwidth = outputType.cast<ShapedType>().getElementTypeBitWidth();
+  const int bitwidth =
+      llvm::cast<ShapedType>(outputType).getElementTypeBitWidth();
   const int vectorSize = kMaxVectorNumBits / bitwidth;
 
   // We use `vectorSize` as the tile size along IC dimension. If smaller than
@@ -343,8 +344,8 @@ std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
                                                   int *lastParallelDim) {
   OpOperand *lhs = op.getDpsInputOperand(0);
   OpOperand *rhs = op.getDpsInputOperand(1);
-  auto lhsShape = lhs->get().getType().cast<ShapedType>().getShape();
-  auto rhsShape = rhs->get().getType().cast<ShapedType>().getShape();
+  auto lhsShape = llvm::cast<ShapedType>(lhs->get().getType()).getShape();
+  auto rhsShape = llvm::cast<ShapedType>(rhs->get().getType()).getShape();
 
   auto lhsLoopIndices = llvm::to_vector(llvm::map_range(
       llvm::seq<int>(0, lhsShape.size()),
@@ -601,8 +602,8 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   OpOperand *lhs = op.getDpsInputOperand(0);
   OpOperand *rhs = op.getDpsInputOperand(1);
 
-  auto lhsType = lhs->get().getType().cast<ShapedType>();
-  auto rhsType = rhs->get().getType().cast<ShapedType>();
+  auto lhsType = llvm::cast<ShapedType>(lhs->get().getType());
+  auto rhsType = llvm::cast<ShapedType>(rhs->get().getType());
   auto elementBits =
       static_cast<int>(lhsType.getElementType().getIntOrFloatBitWidth());
   if (!llvm::is_contained({8, 16, 32}, elementBits)) return failure();
@@ -772,7 +773,7 @@ bool isCooperativeMatrixFusable(linalg::GenericOp genericOp) {
   // matrix loads can only happen from StorageBuffer or Workgroup storage
   // classes.
   for (Value input : genericOp.getInputs()) {
-    if (input.getType().isa<TensorType>()) {
+    if (llvm::isa<TensorType>(input.getType())) {
       if (matchPattern(input, m_Constant())) return false;
       continue;
     }
@@ -954,7 +955,7 @@ LogicalResult setCooperativeMatrixConfig(
   // vectorization.
 
   auto getElementType = [](Value v) {
-    return v.getType().cast<ShapedType>().getElementType();
+    return llvm::cast<ShapedType>(v.getType()).getElementType();
   };
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
@@ -1151,7 +1152,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   if (!dimSize || *dimSize % subgroupSize != 0) return failure();
 
   const Type elementType =
-      op.getOutputs()[0].getType().cast<ShapedType>().getElementType();
+      llvm::cast<ShapedType>(op.getOutputs()[0].getType()).getElementType();
   if (!elementType.isIntOrFloat()) return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
   // Reduction distribution only supports 8/16/32 bit types now.
@@ -1296,10 +1297,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   // Returns true if the given `operand` has 32-bit element type.
   auto has32BitElementType = [](Value operand) {
-    auto shapedType = operand.getType().dyn_cast<ShapedType>();
+    auto shapedType = llvm::dyn_cast<ShapedType>(operand.getType());
     Type elementType =
         (shapedType ? shapedType.getElementType() : operand.getType());
-    return elementType.isa<FloatType>() || elementType.isInteger(32);
+    return llvm::isa<FloatType>(elementType) || elementType.isInteger(32);
   };
 
   // Whether we can try to use the vectorization pipeline.
@@ -1509,8 +1510,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
         std::array<int64_t, 3> threadMNK;
-        auto inputType =
-            op.getInputs()[0].getType().template cast<ShapedType>();
+        auto inputType = llvm::cast<ShapedType>(op.getInputs()[0].getType());
         if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
           threadMNK = {8, 8, 8};
         } else {

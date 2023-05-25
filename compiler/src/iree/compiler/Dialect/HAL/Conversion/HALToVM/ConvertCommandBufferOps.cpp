@@ -275,7 +275,7 @@ class CommandBufferPushDescriptorSetOpConversion
       callOperands.push_back(
           castToImportType(adaptor.getBindingOrdinals()[i], i32Type, rewriter));
       auto bindingBuffer = adaptor.getBindingBuffers()[i];
-      if (bindingBuffer.getType().isa<IREE::VM::RefType>()) {
+      if (llvm::isa<IREE::VM::RefType>(bindingBuffer.getType())) {
         // Buffer binding; pass 0 for table slot.
         callOperands.push_back(getI32Zero());
         callOperands.push_back(bindingBuffer);

@@ -401,7 +401,8 @@ class CUDATargetBackend final : public TargetBackend {
       if (std::optional<ArrayAttr> workgroupSizeAttr =
               exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
-          workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
+          workgroupSize[it.index()] =
+              llvm::cast<IntegerAttr>(it.value()).getInt();
         }
       } else {
         workgroupSize = {1, 1, 1};
@@ -440,10 +441,8 @@ class CUDATargetBackend final : public TargetBackend {
         entryPointNames.emplace_back(exportOp.getSymName());
       }
 
-      auto objectAttr = variantOp.getObjects()
-                            ->getValue()
-                            .front()
-                            .cast<IREE::HAL::ExecutableObjectAttr>();
+      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
+          variantOp.getObjects()->getValue().front());
       if (auto data = objectAttr.loadData()) {
         ptxImage = data.value();
       } else {

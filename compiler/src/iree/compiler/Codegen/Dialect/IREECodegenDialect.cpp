@@ -19,13 +19,13 @@ namespace Codegen {
 struct IREECodegenDialectOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (attr.isa<TranslationInfoAttr>()) {
+    if (llvm::isa<TranslationInfoAttr>(attr)) {
       os << "translation";
       return AliasResult::OverridableAlias;
-    } else if (attr.isa<CompilationInfoAttr>()) {
+    } else if (llvm::isa<CompilationInfoAttr>(attr)) {
       os << "compilation";
       return AliasResult::OverridableAlias;
-    } else if (attr.isa<LoweringConfigAttr>()) {
+    } else if (llvm::isa<LoweringConfigAttr>(attr)) {
       os << "config";
       return AliasResult::OverridableAlias;
     }

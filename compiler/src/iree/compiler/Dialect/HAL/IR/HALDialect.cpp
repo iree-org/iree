@@ -40,13 +40,13 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
   /// end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (auto targetAttr = attr.dyn_cast<DeviceTargetAttr>()) {
+    if (auto targetAttr = llvm::dyn_cast<DeviceTargetAttr>(attr)) {
       os << "device_target_" << targetAttr.getSymbolNameFragment();
       return AliasResult::OverridableAlias;
-    } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
+    } else if (auto targetAttr = llvm::dyn_cast<ExecutableTargetAttr>(attr)) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
       return AliasResult::OverridableAlias;
-    } else if (auto layoutAttr = attr.dyn_cast<PipelineLayoutAttr>()) {
+    } else if (auto layoutAttr = llvm::dyn_cast<PipelineLayoutAttr>(attr)) {
       os << "pipeline_layout";
       return AliasResult::OverridableAlias;
     }
@@ -102,7 +102,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
     MLIRContext *context = attr.getContext();
     // TODO(benvanik): remove this interface or make it an attr interface.
     if (auto bindingAttr =
-            attr.dyn_cast<IREE::HAL::DescriptorSetBindingAttr>()) {
+            llvm::dyn_cast<IREE::HAL::DescriptorSetBindingAttr>(attr)) {
       fn(IntegerAttr::get(IndexType::get(context),
                           APInt(64, bindingAttr.getOrdinal())));
       fn(IREE::HAL::DescriptorTypeAttr::get(context, bindingAttr.getType()));
@@ -111,7 +111,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
           bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None)));
       return success();
     }
-    if (auto dtAttr = attr.dyn_cast<IREE::HAL::DescriptorTypeAttr>()) {
+    if (auto dtAttr = llvm::dyn_cast<IREE::HAL::DescriptorTypeAttr>(attr)) {
       // Repack as a normal integer attribute.
       fn(IntegerAttr::get(IntegerType::get(context, 32),
                           APInt(32, static_cast<uint32_t>(dtAttr.getValue()))));
@@ -145,11 +145,11 @@ HALDialect::HALDialect(MLIRContext *context)
 
 Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                            Type type, Location loc) {
-  if (type.isa<IndexType>()) {
+  if (llvm::isa<IndexType>(type)) {
     // Some folders materialize raw index types, which just become std
     // constants.
     return builder.create<mlir::arith::ConstantIndexOp>(
-        loc, value.cast<IntegerAttr>().getValue().getSExtValue());
+        loc, llvm::cast<IntegerAttr>(value).getValue().getSExtValue());
   }
   return nullptr;
 }

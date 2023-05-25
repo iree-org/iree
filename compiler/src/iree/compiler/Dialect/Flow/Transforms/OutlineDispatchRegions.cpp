@@ -55,7 +55,7 @@ static TensorType getMainTensorForLinalgExtOp(Operation *op) {
   auto operandTypes = llvm::to_vector(op->getOperandTypes());
   auto resultTypes = llvm::to_vector(op->getResultTypes());
   for (Type t : llvm::concat<Type>(operandTypes, resultTypes)) {
-    auto tensorType = t.dyn_cast<TensorType>();
+    auto tensorType = llvm::dyn_cast<TensorType>(t);
     if (!tensorType) continue;
     if (!main) {
       main = tensorType;

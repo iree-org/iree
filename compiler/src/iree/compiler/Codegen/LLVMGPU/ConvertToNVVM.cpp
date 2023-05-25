@@ -46,7 +46,7 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
     if (!hasSharedMemoryAddressSpace(
-            op.getMemref().getType().cast<MemRefType>()))
+            llvm::cast<MemRefType>(op.getMemref().getType())))
       return failure();
     rewriter.eraseOp(op);
     return success();

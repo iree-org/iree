@@ -439,7 +439,7 @@ class TimepointCoverage
     };
 
     auto *definingOp = value.getDefiningOp();
-    if (auto blockArg = value.dyn_cast<BlockArgument>()) {
+    if (auto blockArg = llvm::dyn_cast<BlockArgument>(value)) {
       // Block arguments need an intersection of all incoming branch/call edges.
       gatherBlockOperands(blockArg);
       return DFX::clampStateAndIndicateChange(getState(), newState);
@@ -476,13 +476,13 @@ class TimepointCoverage
           // sites.
           auto callableOp =
               callOp.resolveCallable(&solver.getExplorer().getSymbolTables());
-          unsigned resultIndex = value.cast<OpResult>().getResultNumber();
+          unsigned resultIndex = llvm::cast<OpResult>(value).getResultNumber();
           gatherRegionReturns(callableOp, resultIndex);
         })
         .Case([&](RegionBranchOpInterface regionOp) {
           // Step into regions and get a coverage intersection of all return
           // sites.
-          unsigned resultIndex = value.cast<OpResult>().getResultNumber();
+          unsigned resultIndex = llvm::cast<OpResult>(value).getResultNumber();
           gatherRegionReturns(regionOp, resultIndex);
         })
         .Case([&](arith::SelectOp op) {
@@ -552,7 +552,7 @@ class TimepointCoverageAnalysis {
       for (auto &block : region) {
         // Seed all block arguments.
         for (auto arg : block.getArguments()) {
-          if (arg.getType().isa<IREE::Stream::TimepointType>()) {
+          if (llvm::isa<IREE::Stream::TimepointType>(arg.getType())) {
             solver.getOrCreateElementFor<IsImmediate>(Position::forValue(arg));
           }
         }
@@ -576,7 +576,7 @@ class TimepointCoverageAnalysis {
         // Seed all terminator operands.
         if (auto *terminatorOp = block.getTerminator()) {
           for (auto operand : terminatorOp->getOperands()) {
-            if (operand.getType().isa<IREE::Stream::TimepointType>()) {
+            if (llvm::isa<IREE::Stream::TimepointType>(operand.getType())) {
               solver.getOrCreateElementFor<TimepointCoverage>(
                   Position::forValue(operand));
               solver.getOrCreateElementFor<IsImmediate>(
@@ -717,7 +717,7 @@ static bool tryElideTimepointsInRegion(Region &region,
   // Elides all timepoint operands of |op| that are immediately resolved.
   auto elideTimepointOperands = [&](Operation *op) {
     for (auto operand : llvm::make_early_inc_range(op->getOperands())) {
-      if (!operand.getType().isa<IREE::Stream::TimepointType>()) continue;
+      if (!llvm::isa<IREE::Stream::TimepointType>(operand.getType())) continue;
       if (isDefinedImmediate(operand)) continue;
       if (analysis.isImmediate(operand)) {
         LLVM_DEBUG({
@@ -753,7 +753,7 @@ static bool tryElideTimepointsInRegion(Region &region,
     //  %imm0 = immediate
     //  %imm1 = immediate
     for (auto result : llvm::reverse(op->getResults())) {
-      if (!result.getType().isa<IREE::Stream::TimepointType>()) continue;
+      if (!llvm::isa<IREE::Stream::TimepointType>(result.getType())) continue;
       if (isDefinedImmediate(result)) continue;
       if (analysis.isImmediate(result)) {
         LLVM_DEBUG({

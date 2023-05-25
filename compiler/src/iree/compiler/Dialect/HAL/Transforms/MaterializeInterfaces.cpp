@@ -150,7 +150,7 @@ static LogicalResult materializeExecutablesFromSourceOps(
 static LogicalResult verifyEntryPointTypes(mlir::func::FuncOp entryFuncOp) {
   for (auto inputType :
        llvm::enumerate(entryFuncOp.getFunctionType().getInputs())) {
-    if (inputType.value().isa<IREE::Stream::BindingType>() ||
+    if (llvm::isa<IREE::Stream::BindingType>(inputType.value()) ||
         inputType.value().isInteger(32)) {
       // OK - directly translates to a HAL interface binding.
     } else {
@@ -238,13 +238,13 @@ static mlir::func::FuncOp cloneFuncWithInterface(
   // for use by the binding accessors.
   unsigned operandIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!arg.getType().isa<IREE::Stream::BindingType>()) {
+    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
       convertOperandUsage(sourceFuncOp, arg, operandIdx++, entryBuilder);
     }
   }
   unsigned resourceIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!arg.getType().isa<IREE::Stream::BindingType>()) continue;
+    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) continue;
     auto setBinding = pipelineLayout.resourceMap[resourceIdx++];
     auto setLayoutAttr = layoutAttr.getSetLayouts()[setBinding.first];
     auto bindingAttr = setLayoutAttr.getBindings()[setBinding.second];

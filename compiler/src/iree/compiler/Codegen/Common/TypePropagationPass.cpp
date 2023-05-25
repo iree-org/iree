@@ -43,7 +43,8 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
                                 Value source) {
   Type sourceType = source.getType();
   if (sourceType == targetType) return source;
-  if (sourceType.isa<IntegerType>() && targetType.isa<IntegerType>()) {
+  if (llvm::isa<IntegerType>(sourceType) &&
+      llvm::isa<IntegerType>(targetType)) {
     unsigned sourceBitWidth = sourceType.getIntOrFloatBitWidth();
     unsigned destBitWidth = targetType.getIntOrFloatBitWidth();
     if (sourceBitWidth > destBitWidth) {
@@ -58,7 +59,7 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
 /// Legalizes the given type. If the type is already legal, returns
 /// std::nullopt.
 static std::optional<Type> getLegalizedType(Type t) {
-  if (auto shapedType = t.dyn_cast<RankedTensorType>()) {
+  if (auto shapedType = llvm::dyn_cast<RankedTensorType>(t)) {
     Type elementType = shapedType.getElementType();
     std::optional<Type> legalizedElementType =
         legalizeStorageElementType(elementType);
@@ -99,8 +100,8 @@ struct ConstantOpTypeConversion
   LogicalResult matchAndRewrite(
       arith::ConstantOp constantOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
-    auto attr = constantOp.getValue().cast<DenseElementsAttr>();
-    auto attrType = attr.getType().dyn_cast<ShapedType>();
+    auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
+    auto attrType = llvm::dyn_cast<ShapedType>(attr.getType());
     if (!attrType) {
       return rewriter.notifyMatchFailure(
           constantOp, "expected attribute type to be shaped type");

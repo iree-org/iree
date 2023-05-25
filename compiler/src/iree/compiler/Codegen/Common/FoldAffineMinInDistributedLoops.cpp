@@ -41,7 +41,7 @@ namespace iree_compiler {
 static Value getAsValue(OpFoldResult attrOrValue, OpBuilder &builder,
                         Location loc) {
   if (Value val = attrOrValue.dyn_cast<Value>()) return val;
-  auto attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+  auto attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
   return builder.create<arith::ConstantIndexOp>(loc, attr.getInt());
 }
 

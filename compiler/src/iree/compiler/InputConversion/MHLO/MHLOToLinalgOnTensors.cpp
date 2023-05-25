@@ -68,8 +68,8 @@ struct ConcatenateOpConversion
   LogicalResult matchAndRewrite(
       mhlo::ConcatenateOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = this->typeConverter->convertType(op.getResult().getType())
-                          .dyn_cast<RankedTensorType>();
+    auto resultType = llvm::dyn_cast<RankedTensorType>(
+        this->typeConverter->convertType(op.getResult().getType()));
     if (!resultType || !resultType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(op,
                                          "expected static shape for output");
@@ -156,7 +156,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
   Value zeroTensor =
       b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
 
-  switch (lhs.getType().cast<RankedTensorType>().getRank()) {
+  switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
     case 1:
       return b
           .create<linalg::VecmatOp>(loc, TypeRange{resultType},
@@ -188,7 +188,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     }
 
     auto inputType =
-        adaptor.getOperand().getType().dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
     if (!inputType || !inputType.hasStaticShape() || inputType.getRank() > 2) {
       return rewriter.notifyMatchFailure(op, "only static 1D or 2D dft ops");
     }
@@ -201,9 +201,9 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     Location loc = op.getLoc();
     auto matrixType =
         RankedTensorType::get({n, fftLength}, inputType.getElementType());
-    auto resultType =
-        RankedTensorType::get(op.getType().cast<RankedTensorType>().getShape(),
-                              inputType.getElementType());
+    auto resultType = RankedTensorType::get(
+        llvm::cast<RankedTensorType>(op.getType()).getShape(),
+        inputType.getElementType());
 
     auto realMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
@@ -283,7 +283,7 @@ static void rewriteFuncAttrs(func::FuncOp funcOp) {
         newAttrs.push_back({
             abiOutputName,
             IntegerAttr::get(indexType,
-                             attr.getValue().cast<IntegerAttr>().getInt()),
+                             llvm::cast<IntegerAttr>(attr.getValue()).getInt()),
         });
       } else {
         newAttrs.push_back(attr);
@@ -411,7 +411,7 @@ class GenericTypeConvert : public ConversionPattern {
 std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
                                     ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
-  if (inputs.front().getType().isa<ShapedType>()) {
+  if (llvm::isa<ShapedType>(inputs.front().getType())) {
     return std::nullopt;
   }
   return builder

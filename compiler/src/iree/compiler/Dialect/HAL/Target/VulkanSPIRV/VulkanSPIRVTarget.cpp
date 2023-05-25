@@ -68,7 +68,7 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
     MLIRContext *context) {
   if (!vulkanTargetEnv.empty()) {
     if (auto attr = parseAttribute(vulkanTargetEnv, context)) {
-      if (auto vkTargetEnv = attr.dyn_cast<Vulkan::TargetEnvAttr>()) {
+      if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
         return convertTargetEnv(vkTargetEnv);
       }
     }
@@ -237,10 +237,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     }
 
     // Load .spv object file.
-    auto objectAttr = variantOp.getObjects()
-                          ->getValue()
-                          .front()
-                          .cast<IREE::HAL::ExecutableObjectAttr>();
+    auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
+        variantOp.getObjects()->getValue().front());
     std::string spvBinary;
     if (auto data = objectAttr.loadData()) {
       spvBinary = data.value();

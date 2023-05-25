@@ -38,7 +38,7 @@ using IREE::LinalgExt::TensorEncoding;
 // Returns the element type of `t` if it is a `ShapedType`, else return
 // `t` itself.
 static Type getElementTypeOrType(Type t) {
-  if (auto shapedType = t.dyn_cast<ShapedType>()) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(t)) {
     return shapedType.getElementType();
   }
   return t;
@@ -123,7 +123,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     auto inputs = matmulOp.getDpsInputOperands();
     auto outputs = matmulOp.getDpsInitOperands();
     auto hasEncoding = [](OpOperand *operand) -> bool {
-      auto type = operand->get().getType().dyn_cast<RankedTensorType>();
+      auto type = llvm::dyn_cast<RankedTensorType>(operand->get().getType());
       return type && type.getEncoding();
     };
     if (llvm::any_of(inputs, hasEncoding) ||
@@ -136,7 +136,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     Value origOut = outputs[0]->get();
 
     auto getElemType = [](Value v) -> Type {
-      if (auto tensorType = v.getType().dyn_cast<RankedTensorType>()) {
+      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType())) {
         return tensorType.getElementType();
       }
       return {};
@@ -206,7 +206,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     // If the output was padded, extract the actual output.
     if (paddedOut.value() != origOut) {
       auto replacementRank =
-          replacement.getType().cast<RankedTensorType>().getRank();
+          llvm::cast<RankedTensorType>(replacement.getType()).getRank();
       // Offsets are all 0.
       OpFoldResult zero = rewriter.getIndexAttr(0);
       SmallVector<OpFoldResult> offsets(replacementRank, zero);

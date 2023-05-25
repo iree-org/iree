@@ -35,7 +35,7 @@ static SmallVector<int64_t, 4> getShapeFromSizes(
   return llvm::to_vector<4>(llvm::map_range(
       valueOrAttrList, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          return attr.cast<IntegerAttr>().getInt();
+          return llvm::cast<IntegerAttr>(attr).getInt();
         }
         return ShapedType::kDynamic;
       }));
@@ -55,7 +55,7 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
   }
   auto getVal = [](OpFoldResult valueOrAttr, int64_t dynamicVal) -> int64_t {
     auto attr = valueOrAttr.dyn_cast<Attribute>();
-    return attr ? attr.cast<IntegerAttr>().getInt() : dynamicVal;
+    return attr ? llvm::cast<IntegerAttr>(attr).getInt() : dynamicVal;
   };
   /// To ensure contiguity, start from the least significant dimension. As long
   /// as the inner slices are "full slices", the current slice can be any offset

@@ -51,9 +51,8 @@ Value transposeReshape(Value arg, Location loc,
                             rewriter.getIntegerType(64));
 
   auto transposePermutationAttr =
-      DenseIntElementsAttr::get(transposePermutationType,
-                                llvm::ArrayRef(transposePermutation))
-          .cast<DenseIntElementsAttr>();
+      llvm::cast<DenseIntElementsAttr>(DenseIntElementsAttr::get(
+          transposePermutationType, llvm::ArrayRef(transposePermutation)));
 
   // Compute the resulting shape.
   llvm::SmallVector<int64_t, 5> transposedShape;
@@ -120,7 +119,7 @@ Value transposeReshape(Value arg, Location loc,
 
 Value processDotArg(Value arg, Location loc, ArrayRef<int64_t> contractDimsAttr,
                     bool outerDimsFirst, PatternRewriter &rewriter) {
-  auto shape = arg.getType().cast<ShapedType>().getShape();
+  auto shape = llvm::cast<ShapedType>(arg.getType()).getShape();
 
   llvm::SmallVector<bool, 5> isOuterDim;
   isOuterDim.resize(shape.size(), true);
@@ -270,7 +269,7 @@ struct GeneralDotConvert final
 
     auto getDynamicDims = [&](Value arg,
                               llvm::ArrayRef<int64_t> contractingDims) {
-      RankedTensorType ty = arg.getType().cast<RankedTensorType>();
+      RankedTensorType ty = llvm::cast<RankedTensorType>(arg.getType());
       int index = 0;
       for (int64_t contractingDim : contractingDims) {
         for (; index < contractingDim; ++index) {

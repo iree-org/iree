@@ -323,12 +323,12 @@ void ResourceType::print(AsmPrinter &p) const {
 }
 
 bool ResourceType::isAccessStorageCompatible(Type accessType) const {
-  if (auto resourceType = accessType.dyn_cast<ResourceType>()) {
+  if (auto resourceType = llvm::dyn_cast<ResourceType>(accessType)) {
     // We could allow widening loads or stores here but today we require
     // transfers to accomplish that.
     return accessType == resourceType;
   }
-  return accessType.isa<ShapedType>();
+  return llvm::isa<ShapedType>(accessType);
 }
 
 Value ResourceType::inferSizeFromValue(Location loc, Value value,

@@ -53,7 +53,7 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
 static llvm::SmallVector<utils::IteratorType> getIteratorTypesFromAttr(
     ArrayAttr iteratorTypesAttr) {
   return llvm::to_vector(llvm::map_range(iteratorTypesAttr, [](Attribute attr) {
-    return utils::symbolizeIteratorType(attr.cast<StringAttr>().getValue())
+    return utils::symbolizeIteratorType(llvm::cast<StringAttr>(attr).getValue())
         .value();
   }));
 }

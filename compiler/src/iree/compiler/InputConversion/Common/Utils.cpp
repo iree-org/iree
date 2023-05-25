@@ -25,7 +25,7 @@ namespace iree_compiler {
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction) {
   auto context = val.getContext();
-  RankedTensorType ty = val.getType().cast<RankedTensorType>();
+  RankedTensorType ty = llvm::cast<RankedTensorType>(val.getType());
 
   llvm::SmallVector<int64_t> staticSizes;
   SmallVector<Value> dynSizes;

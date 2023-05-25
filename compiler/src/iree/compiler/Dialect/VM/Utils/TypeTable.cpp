@@ -17,7 +17,7 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   llvm::DenseMap<Type, std::string> typeMap;
   std::function<void(Type)> tryInsertType;
   tryInsertType = [&](Type type) {
-    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
+    if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
       type = refPtrType.getObjectType();
     }
     if (typeMap.count(type)) return;
@@ -26,7 +26,7 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
     type.print(sstream);
     sstream.flush();
     typeMap.try_emplace(type, str);
-    if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
+    if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(type)) {
       assert(listType.getElementType());
       tryInsertType(listType.getElementType());
     }

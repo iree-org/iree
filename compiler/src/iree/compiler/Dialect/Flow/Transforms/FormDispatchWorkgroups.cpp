@@ -197,7 +197,7 @@ static void createDefaultWorkgroupCountRegion(
   SmallVector<Location> workloadLocs;
   for (auto argument : workgroupsOp.getArguments()) {
     Type argumentType = argument.getType();
-    if (!argumentType.isa<IndexType>()) continue;
+    if (!llvm::isa<IndexType>(argumentType)) continue;
     workload.push_back(argument);
     workloadTypes.push_back(argumentType);
     workloadLocs.push_back(argument.getLoc());
@@ -225,7 +225,7 @@ static void createDefaultWorkgroupCountRegion(
     rewriter.setInsertionPointToStart(workgroupsOp.getBody());
     int ordinalNumber = 0;
     for (auto [index, operand] : llvm::enumerate(workgroupsOp.getArguments())) {
-      if (!operand.getType().isa<IndexType>()) continue;
+      if (!llvm::isa<IndexType>(operand.getType())) continue;
       BlockArgument arg = workgroupsOp.getInputBlockArgument(index);
       auto ordinalOp = rewriter.create<Flow::DispatchWorkloadOrdinalOp>(
           loc, arg, rewriter.getIndexAttr(ordinalNumber++));

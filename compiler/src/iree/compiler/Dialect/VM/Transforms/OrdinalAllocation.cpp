@@ -73,7 +73,7 @@ class OrdinalAllocationPass
       } else if (isa<RodataOp>(op)) {
         ordinal = nextRodataOrdinal++;
       } else if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-        if (globalOp.getGlobalType().isa<IREE::VM::RefType>()) {
+        if (llvm::isa<IREE::VM::RefType>(globalOp.getGlobalType())) {
           ordinal = nextGlobalRefOrdinal++;
         } else {
           // Bucket the primitive global ops (like vm.global.i32) by byte size

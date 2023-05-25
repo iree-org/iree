@@ -80,7 +80,8 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
     std::optional<int64_t> idx = dimOp.getConstantIndex();
     if (!idx.has_value()) continue;
     // Only DimOps with ranked tensors are supported.
-    auto tensorType = dimOp.getSource().getType().dyn_cast<RankedTensorType>();
+    auto tensorType =
+        llvm::dyn_cast<RankedTensorType>(dimOp.getSource().getType());
     if (!tensorType) continue;
 
     if (!tensorType.isDynamicDim(*idx)) {
@@ -143,7 +144,7 @@ static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
   if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
     fusionGroups = llvm::to_vector<1>(llvm::map_range(
         fusionGroupsAttr,
-        [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+        [](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); }));
   }
   return fusionGroups;
 }
@@ -157,7 +158,7 @@ static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
 static bool isInFusionGroup(Operation *op, unsigned targetGroup) {
   if (ArrayAttr opGroupAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
     return llvm::any_of(opGroupAttr, [&targetGroup](Attribute attr) {
-      return attr.cast<IntegerAttr>().getInt() == targetGroup;
+      return llvm::cast<IntegerAttr>(attr).getInt() == targetGroup;
     });
   }
   return false;
@@ -210,7 +211,7 @@ static Value getSourceOfPackLikeOp(Operation *op) {
 static RankedTensorType getSourceTypeOfPackLikeOp(Operation *op) {
   Value source = getSourceOfPackLikeOp(op);
   if (!source) return nullptr;
-  return source.getType().cast<RankedTensorType>();
+  return llvm::cast<RankedTensorType>(source.getType());
 }
 
 /// Returns true if the operation is an `unpack` op or an `unset_encoding` op
@@ -324,8 +325,8 @@ static bool hasCompatibleOuterParallelLoops(
     return false;
   }
 
-  auto producerIndexingMap =
-      producer.getIndexingMapMatchingResult(operand.get().cast<OpResult>());
+  auto producerIndexingMap = producer.getIndexingMapMatchingResult(
+      llvm::cast<OpResult>(operand.get()));
   auto consumerIndexingMap = consumer.getMatchingIndexingMap(&operand);
   if (!producerIndexingMap.isProjectedPermutation() ||
       !consumerIndexingMap.isProjectedPermutation()) {
@@ -461,10 +462,9 @@ static bool isFusableWithConsumer(
     // could be generalized, but unpack fusion code-generation is harder.
     if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
       return linalg::isElementwise(consumerLinalgOp) &&
-             consumerLinalgOp.getNumLoops() == producer->getResult(0)
-                                                   .getType()
-                                                   .cast<RankedTensorType>()
-                                                   .getRank();
+             consumerLinalgOp.getNumLoops() ==
+                 llvm::cast<RankedTensorType>(producer->getResult(0).getType())
+                     .getRank();
     }
     return false;
   }

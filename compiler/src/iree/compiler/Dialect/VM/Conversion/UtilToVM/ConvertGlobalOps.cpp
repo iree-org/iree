@@ -60,7 +60,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       ConversionPatternRewriter &rewriter) const override {
     Operation *newOp = nullptr;
     auto convertedType = typeConverter.convertType(op.getType());
-    if (convertedType.isa<IREE::VM::RefType>() ||
+    if (llvm::isa<IREE::VM::RefType>(convertedType) ||
         IREE::VM::RefType::isCompatible(convertedType)) {
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
           op, op.getSymName(), op.getIsMutable(), convertedType,
@@ -69,7 +69,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getI32IntegerAttr(static_cast<int32_t>(
-            op.getInitialValue().value().cast<IntegerAttr>().getInt()));
+            llvm::cast<IntegerAttr>(op.getInitialValue().value()).getInt()));
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
@@ -78,7 +78,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getI64IntegerAttr(
-            op.getInitialValue().value().cast<IntegerAttr>().getInt());
+            llvm::cast<IntegerAttr>(op.getInitialValue().value()).getInt());
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
@@ -87,7 +87,8 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getF32FloatAttr(static_cast<float>(
-            op.getInitialValue().value().cast<FloatAttr>().getValueAsDouble()));
+            llvm::cast<FloatAttr>(op.getInitialValue().value())
+                .getValueAsDouble()));
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
@@ -96,7 +97,8 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getF64FloatAttr(
-            op.getInitialValue().value().cast<FloatAttr>().getValueAsDouble());
+            llvm::cast<FloatAttr>(op.getInitialValue().value())
+                .getValueAsDouble());
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
@@ -216,7 +218,7 @@ class GlobalStoreOpConversion
       IREE::Util::GlobalStoreOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getValue().getType();
-    if (operandType.isa<IREE::VM::RefType>()) {
+    if (llvm::isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreRefOp>(
           op, adaptor.getValue(), op.getGlobal());
     } else if (operandType.isInteger(32)) {
@@ -249,7 +251,7 @@ class GlobalStoreIndirectOpConversion
       IREE::Util::GlobalStoreIndirectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getValue().getType();
-    if (operandType.isa<IREE::VM::RefType>()) {
+    if (llvm::isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectRefOp>(
           op, adaptor.getValue(), adaptor.getGlobal());
     } else if (operandType.isInteger(32)) {

@@ -74,8 +74,8 @@ static std::optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
     return type.getIntOrFloatBitWidth();
   }
-  if (type.isa<VectorType>()) {
-    auto vecType = type.cast<VectorType>();
+  if (llvm::isa<VectorType>(type)) {
+    auto vecType = llvm::cast<VectorType>(type);
     auto elementType = vecType.getElementType();
     return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
   }
@@ -115,7 +115,7 @@ static unsigned calculateMemRefVectorNumBits(
     // still need to make sure we can load/store with good strides.
     // The `leadingDimension` attributes specifies the stride (numer of
     // *elements*) over the memref for the leading dimension.
-    auto memrefType = memrefVal.getType().cast<MemRefType>();
+    auto memrefType = llvm::cast<MemRefType>(memrefVal.getType());
     std::optional<unsigned> elementBits =
         getBitWidth(memrefType.getElementType());
     if (!elementBits) return 0;
@@ -132,11 +132,11 @@ static unsigned calculateMemRefVectorNumBits(
 /// memref uses.
 static unsigned isMemRefVectorizable(Value value,
                                      SmallVectorImpl<Operation *> &uses) {
-  auto memrefType = value.getType().dyn_cast<MemRefType>();
+  auto memrefType = llvm::dyn_cast<MemRefType>(value.getType());
 
   // Require scalar element type
-  if (!memrefType || (!memrefType.getElementType().isa<IntegerType>() &&
-                      !memrefType.getElementType().isa<FloatType>())) {
+  if (!memrefType || (!llvm::isa<IntegerType>(memrefType.getElementType()) &&
+                      !llvm::isa<FloatType>(memrefType.getElementType()))) {
     LLVM_DEBUG(llvm::dbgs() << "failed: not (scalar) memref\n");
     return 0;
   }
@@ -291,9 +291,10 @@ class ProcessTransferRead final
 
     Location loc = read.getLoc();
 
-    auto scalarMemrefType = read.getSource().getType().dyn_cast<MemRefType>();
+    auto scalarMemrefType =
+        llvm::dyn_cast<MemRefType>(read.getSource().getType());
     auto vectorMemrefType =
-        adaptor.getSource().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(adaptor.getSource().getType());
     auto readVectorType = read.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) return failure();
 
@@ -343,9 +344,10 @@ class ProcessTransferWrite final
 
     Location loc = write.getLoc();
 
-    auto scalarMemrefType = write.getSource().getType().dyn_cast<MemRefType>();
+    auto scalarMemrefType =
+        llvm::dyn_cast<MemRefType>(write.getSource().getType());
     auto vectorMemrefType =
-        adaptor.getSource().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(adaptor.getSource().getType());
     auto writeVectorType = write.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) return failure();
 
@@ -388,7 +390,7 @@ template <typename OpTy>
 std::optional<MemRefType>
 MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
     ConversionPatternRewriter &rewriter, Value memRefValue) const {
-  MemRefType type = memRefValue.getType().cast<MemRefType>();
+  MemRefType type = llvm::cast<MemRefType>(memRefValue.getType());
   unsigned vectorNumBits =
       memrefUsageAnalysis.getMemRefVectorSizeInBits(memRefValue);
 
@@ -398,9 +400,9 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   // If the vector we need to generate is bigger than the the max vector size
   // allowed for loads use a larger element type.
   if (vectorNumElements > kMaxVectorNumElements) {
-    scalarType = scalarType.isa<IntegerType>()
-                     ? rewriter.getI32Type().cast<Type>()
-                     : rewriter.getF32Type().cast<Type>();
+    scalarType = llvm::isa<IntegerType>(scalarType)
+                     ? llvm::cast<Type>(rewriter.getI32Type())
+                     : llvm::cast<Type>(rewriter.getF32Type());
     scalarNumBits = scalarType.getIntOrFloatBitWidth();
     vectorNumElements = vectorNumBits / scalarNumBits;
   }
@@ -412,7 +414,8 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   newShape.back() = newShape.back() / ratio;
 
   MemRefLayoutAttrInterface layout = {};
-  if (auto stridedLayout = type.getLayout().dyn_cast<StridedLayoutAttr>()) {
+  if (auto stridedLayout =
+          llvm::dyn_cast<StridedLayoutAttr>(type.getLayout())) {
     auto offset = stridedLayout.getOffset();
     if (offset != ShapedType::kDynamic) {
       offset = offset / ratio;
@@ -478,7 +481,7 @@ class ProcessInterfaceBindingSubspan final
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = subspanOp.getType().dyn_cast<MemRefType>();
+    auto memrefType = llvm::dyn_cast<MemRefType>(subspanOp.getType());
     if (!memrefType) return failure();
 
     // This should be guaranteed by the analysis step. But just double check.
@@ -507,9 +510,9 @@ struct ProcessSubgroupMMALoad final
       gpu::SubgroupMmaLoadMatrixOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto scalarMemrefType =
-        loadOp.getSrcMemref().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(loadOp.getSrcMemref().getType());
     auto vectorMemrefType =
-        adaptor.getSrcMemref().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(adaptor.getSrcMemref().getType());
 
     Location loc = loadOp.getLoc();
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
@@ -540,9 +543,9 @@ struct ProcessSubgroupMMAStore final
       gpu::SubgroupMmaStoreMatrixOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto scalarMemrefType =
-        storeOp.getDstMemref().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(storeOp.getDstMemref().getType());
     auto vectorMemrefType =
-        adaptor.getDstMemref().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(adaptor.getDstMemref().getType());
 
     Location loc = storeOp.getLoc();
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,

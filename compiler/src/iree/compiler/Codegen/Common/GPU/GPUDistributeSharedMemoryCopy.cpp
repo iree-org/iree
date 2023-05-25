@@ -67,11 +67,11 @@ static void populateTilingCopyToWorkgroupMemPatterns(
         // We tile to 4 as we want each thread to load 4 element in a cyclic
         // distribution.
         SmallVector<Value, 4> tileSizesVal;
-        MemRefType dstMemRefType = cast<linalg::GenericOp>(operation)
+        MemRefType dstMemRefType =
+            llvm::cast<MemRefType>(cast<linalg::GenericOp>(operation)
                                        .getDpsInitOperand(0)
                                        ->get()
-                                       .getType()
-                                       .cast<MemRefType>();
+                                       .getType());
 
         unsigned rank = dstMemRefType.getRank();
         // Return empty tile size for zero dim tensor.
@@ -115,11 +115,9 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 static std::optional<SmallVector<int64_t>> getTileToDistributableSize(
     linalg::GenericOp copyOp, int64_t flatWorkgroupSize) {
   SmallVector<int64_t, 4> shape = copyOp.getStaticLoopRanges();
-  unsigned bitWidth = copyOp.getDpsInitOperand(0)
-                          ->get()
-                          .getType()
-                          .cast<MemRefType>()
-                          .getElementTypeBitWidth();
+  unsigned bitWidth =
+      llvm::cast<MemRefType>(copyOp.getDpsInitOperand(0)->get().getType())
+          .getElementTypeBitWidth();
   int targetVectorSize = copyVectorNumBits / bitWidth;
   SmallVector<int64_t> unroll;
   assert(shape.back() % targetVectorSize == 0);
@@ -182,9 +180,9 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
     auto stride = r.stride.dyn_cast<Attribute>();
     auto size = r.size.dyn_cast<Attribute>();
     assert(offset && stride && size);
-    int64_t numThreadsDim = (size.cast<IntegerAttr>().getInt() -
-                             offset.cast<IntegerAttr>().getInt()) /
-                            stride.cast<IntegerAttr>().getInt();
+    int64_t numThreadsDim = (llvm::cast<IntegerAttr>(size).getInt() -
+                             llvm::cast<IntegerAttr>(offset).getInt()) /
+                            llvm::cast<IntegerAttr>(stride).getInt();
     Value dimId = id;
     if (infos.size() != parallelLoopRanges.size() - 1)
       dimId =
@@ -204,11 +202,9 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
 /// Return the shape of copy op that can be vectorized to a
 /// transfer_read/transfer_write of size `targetVectorSize`.
 SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp) {
-  unsigned bitWidth = copyOp.getDpsInitOperand(0)
-                          ->get()
-                          .getType()
-                          .cast<MemRefType>()
-                          .getElementTypeBitWidth();
+  unsigned bitWidth =
+      llvm::cast<MemRefType>(copyOp.getDpsInitOperand(0)->get().getType())
+          .getElementTypeBitWidth();
   int targetVectorSize = copyVectorNumBits / bitWidth;
   SmallVector<int64_t> dstShape;
   for (int64_t dim : copyOp.getStaticLoopRanges()) {
@@ -374,8 +370,8 @@ class GPUDistributeSharedMemoryCopyPass
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     bool isAligned = llvm::all_of(
         copiesToWorkgroupMem, [flatWorkgroupSize](linalg::GenericOp copyOp) {
-          MemRefType dstMemRefType =
-              copyOp.getDpsInitOperand(0)->get().getType().cast<MemRefType>();
+          MemRefType dstMemRefType = llvm::cast<MemRefType>(
+              copyOp.getDpsInitOperand(0)->get().getType());
           auto shape = dstMemRefType.getShape();
           int targetVectorSize =
               copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();

@@ -403,9 +403,8 @@ namespace {
 // TODO(antigainst): enable dynamic shape support once they are needed.
 template <typename TensorReshapeOp>
 static std::optional<Value> getStaticReshapeOpSrc(TensorReshapeOp reshapeOp) {
-  auto reshapeSrcType =
-      reshapeOp.getSrc().getType().template cast<ShapedType>();
-  auto reshapeDstType = reshapeOp.getType().template cast<ShapedType>();
+  auto reshapeSrcType = llvm::cast<ShapedType>(reshapeOp.getSrc().getType());
+  auto reshapeDstType = llvm::cast<ShapedType>(reshapeOp.getType());
   if (!reshapeSrcType.hasStaticShape() || !reshapeDstType.hasStaticShape())
     return std::nullopt;
   return reshapeOp.getSrc();
@@ -457,9 +456,9 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
     if (!subspanOp) return failure();
     assert(subspanOp.getDynamicDims().empty());
 
-    auto tensorAccess = subspanOp.getType()
-                            .template cast<IREE::Flow::DispatchTensorType>()
-                            .getAccess();
+    auto tensorAccess =
+        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType())
+            .getAccess();
     auto newSubspanType = IREE::Flow::DispatchTensorType::get(
         tensorAccess, reshapeOp.getResultType());
 
@@ -528,9 +527,9 @@ struct FoldReshapeIntoInterfaceTensorStore
     if (!subspanOp) return failure();
     assert(subspanOp.getDynamicDims().empty());
 
-    auto tensorAccess = subspanOp.getType()
-                            .template cast<IREE::Flow::DispatchTensorType>()
-                            .getAccess();
+    auto tensorAccess =
+        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType())
+            .getAccess();
     auto newSubspanType = IREE::Flow::DispatchTensorType::get(
         tensorAccess, reshapeSrc->getType());
 
@@ -711,10 +710,9 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
     }
     maxAlloc = std::max(maxAlloc, allocSize);
   }
-  Attribute memorySpace = aliasGroups[0][0]
-                              ->getResultTypes()[0]
-                              .cast<MemRefType>()
-                              .getMemorySpace();
+  Attribute memorySpace =
+      llvm::cast<MemRefType>(aliasGroups[0][0]->getResultTypes()[0])
+          .getMemorySpace();
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
                                          AffineMap(), memorySpace);
   Value packedAlloc =
