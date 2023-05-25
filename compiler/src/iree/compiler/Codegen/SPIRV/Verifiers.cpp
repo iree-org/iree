@@ -19,6 +19,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
 constexpr unsigned kWorkgroupTileLevel = 0;
 constexpr unsigned kThreadTileLevel = 1;
 constexpr unsigned kReductionTileLevel = 2;
@@ -29,16 +31,13 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     ArrayRef<int64_t> workgroupSize) {
   // Verify that the translation info is using the right pipeline.
   if (translationInfo.getDispatchLoweringPassPipeline() !=
-      IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVMatmulPromoteVectorize) {
+      CodeGenPipeline::SPIRVMatmulPromoteVectorize) {
     return op->emitOpError("expected pipeline in translation_info to be ")
-           << stringifyEnum(IREE::Codegen::DispatchLoweringPassPipeline::
-                                SPIRVMatmulPromoteVectorize);
+           << stringifyEnum(CodeGenPipeline::SPIRVMatmulPromoteVectorize);
   }
 
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
-    return success();
-  }
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) return success();
+
   LLVM_DEBUG({
     llvm::dbgs() << "verifying op: " << *op << "\n";
     llvm::dbgs() << "chosen workgroup size: [";
@@ -98,43 +97,29 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   ArrayRef<int64_t> rhsShape =
       llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
-  SmallVector<int64_t> workgroupTileSizes =
-      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
-  SmallVector<int64_t> threadTileSizes =
-      loweringConfig.getTileSizeVals(kThreadTileLevel);
-  SmallVector<int64_t> reductionTileSizes =
-      loweringConfig.getTileSizeVals(kReductionTileLevel);
-
-  if (loweringConfig.getTileSizes().size() != 3) {
-    return op->emitOpError("expected 3 levels of tiling sizes, got ")
+  if (loweringConfig.getTileSizes().size() != 1) {
+    return op->emitOpError("expected 1 levels of tiling sizes, got ")
            << loweringConfig.getTileSizes().size();
   }
+
+  SmallVector<int64_t> tileSizes =
+      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
 
   // For BatchMatmul, the first dimension is the batch dimension.
   // We don't check the batch.
   if (isa<linalg::BatchMatmulOp>(op)) {
     lhsShape = lhsShape.drop_front(1);
     rhsShape = rhsShape.drop_front(1);
-    workgroupTileSizes.erase(workgroupTileSizes.begin());
-    threadTileSizes.erase(threadTileSizes.begin());
-    reductionTileSizes.erase(reductionTileSizes.begin());
+    tileSizes.erase(tileSizes.begin());
   }
 
   // Verify the tile size divides the matmul inputs A [M x K] & B [K x N].
   const int64_t dimM = lhsShape[0], dimN = rhsShape[1], dimK = lhsShape[1];
-  if (dimM % workgroupTileSizes[0] != 0 || dimK % reductionTileSizes[2] != 0) {
+  if (dimM % tileSizes[0] != 0 || dimK % tileSizes[2] != 0) {
     return op->emitOpError("LHS shape is indivisible by first level tile size");
   }
-  if (dimK % reductionTileSizes[2] != 0 || dimN % workgroupTileSizes[1] != 0) {
+  if (dimK % tileSizes[2] != 0 || dimN % tileSizes[1] != 0) {
     return op->emitOpError("RHS shape is indivisible by first level tile size");
-  }
-
-  // Verify that workgroup_tile_size = thread_tile_size * workgroup_size.
-  if (threadTileSizes[0] * workgroupSize[1] != workgroupTileSizes[0] ||
-      threadTileSizes[1] * workgroupSize[0] != workgroupTileSizes[1]) {
-    return op->emitOpError(
-        "expected workgroup tile sizes to be the product of thread tile "
-        "sizes and workgroup sizes");
   }
 
   auto pipelineDepth = translationInfo.getSoftwarePipelineDepth();
@@ -149,11 +134,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
     ArrayRef<int64_t> workgroupSize) {
   // Verify that the translation info is using the right pipeline.
   if (translationInfo.getDispatchLoweringPassPipeline() !=
-      IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVCooperativeMatrixVectorize) {
+      CodeGenPipeline::SPIRVCooperativeMatrixVectorize) {
     return op->emitOpError("expected pipeline in translation_info to be ")
-           << stringifyEnum(IREE::Codegen::DispatchLoweringPassPipeline::
-                                SPIRVCooperativeMatrixVectorize);
+           << stringifyEnum(CodeGenPipeline::SPIRVCooperativeMatrixVectorize);
   }
 
   if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
@@ -316,10 +299,9 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
     ArrayRef<int64_t> workgroupSize) {
   // Verify that the translation info is using the right pipeline.
   if (translationInfo.getDispatchLoweringPassPipeline() !=
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize) {
+      CodeGenPipeline::SPIRVBaseVectorize) {
     return op->emitOpError("expected pipeline in translation_info to be ")
-           << stringifyEnum(IREE::Codegen::DispatchLoweringPassPipeline::
-                                SPIRVBaseVectorize);
+           << stringifyEnum(CodeGenPipeline::SPIRVBaseVectorize);
   }
 
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(op)) {

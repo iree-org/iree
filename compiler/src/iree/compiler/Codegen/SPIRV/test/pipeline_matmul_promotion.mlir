@@ -173,7 +173,7 @@ hal.executable @matmul_f16_128x256x64 {
 ]>
 
 #user_config = #iree_codegen.compilation_info<
-  lowering_config = <tile_sizes = [[16, 128], [2, 8], [0, 0, 16]]>,
+  lowering_config = <tile_sizes = [[16, 128, 16]]>,
   translation_info = <SPIRVMatmulPromoteVectorize>,
   workgroup_size = [16, 8, 1]>
 

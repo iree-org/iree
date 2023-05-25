@@ -3,7 +3,7 @@
 // Verify pipelining + multi-buffering.
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [8, 4], [0, 0, 16]]>,
+    lowering_config  = <tile_sizes = [[64, 64, 16]]>,
     translation_info = <SPIRVMatmulPromoteVectorize pipeline_depth = 2>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

@@ -392,7 +392,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   }
 }
 
-void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
                                                 unsigned pipelineDepth,
                                                 unsigned storeStage) {
   // Guards against 0 for consistency with older user provided tuning configs.
@@ -400,47 +400,56 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
   LLVM_DEBUG(llvm::dbgs() << "Non-zero Pipeline Depth: " << pipelineDepth
                           << "\n";);
   addTileAndDistributeToWorkgroupsPasses(
-      pm, /*useFuseTensorPadWithConsumerPass=*/false,
+      topPM, /*useFuseTensorPadWithConsumerPass=*/false,
       /*useWARForCooperativeMatrixCodegen=*/true);
 
-  auto &nestedModulePM = pm.nest<ModuleOp>();
-  addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
+  // Promote to workgroups and tile to threads.
+  auto &nestedPM = topPM.nest<ModuleOp>();
+  nestedPM.addNestedPass<func::FuncOp>(createGPUTensorAlloc());
+  nestedPM.addNestedPass<func::FuncOp>(
+      createGPUTensorTile(/*distributeToWarp=*/false));
 
-  // Tile and distribute to GPU invocations.
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTileAndPromotePass());
+  // High-level n-D vectorization.
+  nestedPM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
+  nestedPM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedPM.addNestedPass<func::FuncOp>(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
-  if (pipelineDepth > 1 || storeStage == 0)
-    nestedModulePM.addNestedPass<func::FuncOp>(createGPUMultiBuffering(
+  // Bufferize.
+  addBufferizePasses(nestedPM, gpuAllocateWorkgroupMemoryFn);
+
+  // Distribute scf.forall to GPU threads.
+  nestedPM.addNestedPass<func::FuncOp>(createGPUDistribute());
+
+  if (pipelineDepth > 1 || storeStage == 0) {
+    nestedPM.addNestedPass<func::FuncOp>(createGPUMultiBuffering(
         storeStage == 0 ? pipelineDepth + 1 : pipelineDepth));
+  }
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUDistributeSharedMemoryCopy());
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
+  nestedPM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedPM.addNestedPass<func::FuncOp>(createGPUDistributeSharedMemoryCopy());
+  nestedPM.addPass(createCanonicalizerPass());
+  nestedPM.addPass(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUReduceSharedMemoryBankConflicts(
-          detail::bankConflictReductionPaddingBits));
+  nestedPM.addNestedPass<func::FuncOp>(createGPUReduceSharedMemoryBankConflicts(
+      detail::bankConflictReductionPaddingBits));
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      memref::createFoldMemRefAliasOpsPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+  nestedPM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedPM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
+  nestedPM.addPass(createCanonicalizerPass());
+  nestedPM.addPass(createCSEPass());
 
+  nestedPM.addNestedPass<func::FuncOp>(memref::createFoldMemRefAliasOpsPass());
+  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
+
+  // Hoist loop invariant code to avoid pipelining it.
+  nestedPM.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
   PipeliningSchedulingStrategy schedule =
       storeStage == 0 ? PipeliningSchedulingStrategy::loadStoreStage0
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+  nestedPM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
       /*epiloguePeeling=*/true, pipelineDepth, schedule));
 
-  addLoopMaterializationPasses(nestedModulePM);
+  addLoopMaterializationPasses(nestedPM);
 }
 
 void addSPIRVBaseDistributePassPipeline(OpPassManager &pm) {
