@@ -238,8 +238,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::LinalgOp>(op)) candidates.push_back(op);
-    if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
-      candidates.push_back(op);
+    //if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
+      //candidates.push_back(op);
   });
   for (auto op : candidates) {
     SmallVector<int64_t> vectorSizes;

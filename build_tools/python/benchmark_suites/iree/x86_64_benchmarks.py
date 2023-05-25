@@ -28,13 +28,14 @@ class Linux_x86_64_Benchmarks(object):
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
       tags=["default-flags"],
       compile_targets=[CASCADELAKE_CPU_TARGET])
-  CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-      id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING,
-      tags=["experimental-flags", "fuse-padding"],
+  CASCADELAKE_DATA_TILING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+      id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_DATA_TILING,
+      tags=["experimental-flags", "data-tiling", "ukernel"],
       compile_targets=[CASCADELAKE_CPU_TARGET],
       extra_flags=[
-          "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-          "--iree-llvmcpu-enable-pad-consumer-fusion"
+          "--iree-flow-enable-data-tiling",
+          "--iree-llvmcpu-enable-microkernels",
+          "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
       ])
 
   def _generate(
@@ -96,7 +97,7 @@ class Linux_x86_64_Benchmarks(object):
         tags=[benchmark_tags.X86_64])
     experimental_gen_configs, experimental_run_configs = self._generate(
         model_groups.X86_64_BENCHMARK_CONFIG_EXPERIMENTAL,
-        self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
+        self.CASCADELAKE_DATA_TILING_COMPILE_CONFIG,
         cascadelake_devices,
         tags=[benchmark_tags.X86_64])
 
