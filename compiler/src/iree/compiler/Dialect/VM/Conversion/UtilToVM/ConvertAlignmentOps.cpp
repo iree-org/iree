@@ -87,7 +87,7 @@ struct FixateIndexSizeofConversion
       IREE::Util::SizeOfOp sizeofOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type sizedType = sizeofOp.getSizedType();
-    if (sizedType.isa<IndexType>()) {
+    if (llvm::isa<IndexType>(sizedType)) {
       Type converted = getTypeConverter()->convertType(sizedType);
       if (converted) {
         Value newSizeof = rewriter.createOrFold<IREE::Util::SizeOfOp>(

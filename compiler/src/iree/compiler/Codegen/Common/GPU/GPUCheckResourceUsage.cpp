@@ -35,7 +35,8 @@ static int shapedTypeStaticSize(ShapedType shapedType) {
     if (ShapedType::isDynamic(dimSize)) continue;
     allocSize *= dimSize;
   }
-  if (auto elementType = shapedType.getElementType().dyn_cast<ShapedType>()) {
+  if (auto elementType =
+          llvm::dyn_cast<ShapedType>(shapedType.getElementType())) {
     allocSize *= shapedTypeStaticSize(elementType);
   } else {
     allocSize *= shapedType.getElementType().getIntOrFloatBitWidth();
@@ -55,7 +56,7 @@ static LogicalResult checkGPUAllocationSize(func::FuncOp funcOp,
 
   int cumSize = 0;
   for (auto allocOp : allocOps) {
-    auto allocType = allocOp.getType().cast<MemRefType>();
+    auto allocType = llvm::cast<MemRefType>(allocOp.getType());
     if (!hasSharedMemoryAddressSpace(allocType)) continue;
 
     if (!allocOp.getDynamicSizes().empty()) {

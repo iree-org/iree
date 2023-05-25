@@ -101,9 +101,9 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
 
     auto loc = op.getLoc();
     Value input = op.getOperand();
-    ShapedType inputType = input.getType().dyn_cast<ShapedType>();
+    ShapedType inputType = llvm::dyn_cast<ShapedType>(input.getType());
     ShapedType resultType =
-        op.getResult().getType().dyn_cast_or_null<ShapedType>();
+        llvm::dyn_cast_if_present<ShapedType>(op.getResult().getType());
     if (!inputType || !resultType || !inputType.hasRank() ||
         !resultType.hasRank()) {
       return rewriter.notifyMatchFailure(op, "not ranked shaped types");

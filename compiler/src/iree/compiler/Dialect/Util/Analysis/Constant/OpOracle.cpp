@@ -115,8 +115,8 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 
   // Never hoist sub-byte aligned values: in legal programs, these will be
   // cast or packed in some successor.
-  if (auto integerType = getElementTypeOrSelf(info->constValue.getType())
-                             .dyn_cast<IntegerType>()) {
+  if (auto integerType = llvm::dyn_cast<IntegerType>(
+          getElementTypeOrSelf(info->constValue.getType()))) {
     if (integerType.getWidth() % 8 != 0) {
       return false;
     }

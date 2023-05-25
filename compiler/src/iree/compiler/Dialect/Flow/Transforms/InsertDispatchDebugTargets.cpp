@@ -28,7 +28,7 @@ namespace Flow {
 static SmallVector<Value, 4> filterNonTensorValues(ValueRange &&range) {
   SmallVector<Value, 4> result;
   for (auto value : range) {
-    if (value.getType().isa<TensorType>()) result.push_back(value);
+    if (llvm::isa<TensorType>(value.getType())) result.push_back(value);
   }
   return result;
 }
@@ -92,7 +92,7 @@ static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
   SmallVector<Value> exports;
   SmallVector<Type> newTypes;
   for (auto retVal : op->getResults()) {
-    if (retVal.getType().isa<TensorType>()) {
+    if (llvm::isa<TensorType>(retVal.getType())) {
       auto type = IREE::HAL::BufferViewType::get(context);
       auto exportOp = builder.create<IREE::HAL::TensorExportOp>(
           loc, type, retVal, TypeAttr::get(retVal.getType()), /*name=*/nullptr);

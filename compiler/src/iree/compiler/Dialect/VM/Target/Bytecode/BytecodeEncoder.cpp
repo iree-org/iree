@@ -75,7 +75,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeType(Value value) override {
-    auto refPtrType = value.getType().dyn_cast<IREE::VM::RefType>();
+    auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(value.getType());
     if (!refPtrType) {
       return currentOp_->emitOpError()
              << "type " << value.getType()
@@ -86,8 +86,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 
   LogicalResult encodeType(Type type) override {
     // HACK: it'd be nice to remove the implicit ref wrapper hiding.
-    if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
-      if (refType.getObjectType().isa<IREE::VM::ListType>()) {
+    if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
+      if (llvm::isa<IREE::VM::ListType>(refType.getObjectType())) {
         type = refType.getObjectType();
       }
     }
@@ -103,7 +103,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 
   LogicalResult encodePrimitiveAttr(TypedAttr attr) override {
     unsigned int bitWidth = attr.getType().getIntOrFloatBitWidth();
-    if (auto integerAttr = attr.dyn_cast<IntegerAttr>()) {
+    if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
       uint64_t limitedValue =
           integerAttr.getValue().extractBitsAsZExtValue(bitWidth, 0);
       switch (bitWidth) {
@@ -119,7 +119,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
           return currentOp_->emitOpError()
                  << "attribute of bitwidth " << bitWidth << " not supported";
       }
-    } else if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
+    } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
       switch (bitWidth) {
         case 32: {
           union {

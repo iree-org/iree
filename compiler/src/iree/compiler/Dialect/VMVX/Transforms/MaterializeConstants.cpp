@@ -71,9 +71,9 @@ class MaterializeConstantsPass
                 return loadOp.getLoc();
               })));
       auto globalType = loadOps.front().getType();
-      auto globalName =
-          (kConstantBlockGlobalPrefix + keyAttr.cast<StringAttr>().getValue())
-              .str();
+      auto globalName = (kConstantBlockGlobalPrefix +
+                         llvm::cast<StringAttr>(keyAttr).getValue())
+                            .str();
 
       // Placeholder ordinal that'll be updated during linking.
       auto ordinalGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(

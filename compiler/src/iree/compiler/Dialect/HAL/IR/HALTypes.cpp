@@ -46,7 +46,7 @@ static LogicalResult parseEnumAttr(AsmParser &parser, StringRef attrName,
     return parser.emitError(loc)
            << "failed to parse '" << attrName << "' enum string value";
   }
-  auto stringAttr = genericAttr.dyn_cast<StringAttr>();
+  auto stringAttr = llvm::dyn_cast<StringAttr>(genericAttr);
   if (!stringAttr) {
     return parser.emitError(loc)
            << "expected " << attrName << " attribute specified as string";
@@ -96,7 +96,7 @@ constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
 }  // namespace
 
 std::optional<int32_t> getElementTypeValue(Type type) {
-  if (auto intType = type.dyn_cast_or_null<IntegerType>()) {
+  if (auto intType = llvm::dyn_cast_if_present<IntegerType>(type)) {
     NumericalType numericalType;
     if (intType.isInteger(1)) {
       return makeElementTypeValue(NumericalType::kBoolean, 8);
@@ -112,7 +112,7 @@ std::optional<int32_t> getElementTypeValue(Type type) {
       numericalType = NumericalType::kInteger;
     }
     return makeElementTypeValue(numericalType, intType.getWidth());
-  } else if (auto floatType = type.dyn_cast_or_null<FloatType>()) {
+  } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(type)) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
       case APFloat::S_IEEEhalf:
       case APFloat::S_IEEEsingle:
@@ -126,7 +126,7 @@ std::optional<int32_t> getElementTypeValue(Type type) {
       default:
         return std::nullopt;
     }
-  } else if (auto complexType = type.dyn_cast_or_null<ComplexType>()) {
+  } else if (auto complexType = llvm::dyn_cast_if_present<ComplexType>(type)) {
     return makeElementTypeValue(
         NumericalType::kFloatComplex,
         complexType.getElementType().getIntOrFloatBitWidth() * 2);
@@ -283,7 +283,7 @@ SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
     auto targetsAttr = configAttr.getAs<ArrayAttr>("executable_targets");
     if (targetsAttr) {
       for (auto attr : targetsAttr.getValue()) {
-        resultAttrs.push_back(attr.dyn_cast<ExecutableTargetAttr>());
+        resultAttrs.push_back(llvm::dyn_cast<ExecutableTargetAttr>(attr));
       }
     }
   }
@@ -299,7 +299,7 @@ SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
     if (targetsAttr) {
       SmallVector<IREE::HAL::DeviceTargetAttr, 4> result;
       for (auto targetAttr : targetsAttr) {
-        result.push_back(targetAttr.cast<IREE::HAL::DeviceTargetAttr>());
+        result.push_back(llvm::cast<IREE::HAL::DeviceTargetAttr>(targetAttr));
       }
       return result;
     }
@@ -453,8 +453,9 @@ Attribute ExecutableObjectAttr::parse(AsmParser &p, Type type) {
       failed(p.parseGreater())) {
     return {};
   }
-  auto pathAttr = dict.get("path").dyn_cast_or_null<StringAttr>();
-  auto dataAttr = dict.get("data").dyn_cast_or_null<DenseIntElementsAttr>();
+  auto pathAttr = llvm::dyn_cast_if_present<StringAttr>(dict.get("path"));
+  auto dataAttr =
+      llvm::dyn_cast_if_present<DenseIntElementsAttr>(dict.get("data"));
   return get(p.getContext(), pathAttr, dataAttr);
 }
 
@@ -566,13 +567,13 @@ LogicalResult ExecutableObjectsAttr::verify(
     return emitError() << "targets and objects must be 1:1";
   }
   for (auto targetAttr : targetsAttr) {
-    if (!targetAttr.isa<IREE::HAL::ExecutableTargetAttr>()) {
+    if (!llvm::isa<IREE::HAL::ExecutableTargetAttr>(targetAttr)) {
       return emitError()
              << "target keys must be #hal.executable.target attributes";
     }
   }
   for (auto objectsAttr : targetObjectsAttr) {
-    auto objectsArrayAttr = objectsAttr.dyn_cast<ArrayAttr>();
+    auto objectsArrayAttr = llvm::dyn_cast<ArrayAttr>(objectsAttr);
     if (!objectsArrayAttr) {
       return emitError() << "target objects must be an array of "
                             "#hal.executable.object attributes";
@@ -622,9 +623,10 @@ std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
   SmallVector<Attribute> allObjectAttrs;
   for (auto [targetAttr, objectsAttr] :
        llvm::zip_equal(getTargets(), getTargetObjects())) {
-    auto genericTargetAttr = targetAttr.cast<IREE::HAL::ExecutableTargetAttr>();
+    auto genericTargetAttr =
+        llvm::cast<IREE::HAL::ExecutableTargetAttr>(targetAttr);
     if (genericTargetAttr.isGenericOf(specificTargetAttr)) {
-      auto objectsArrayAttr = objectsAttr.cast<ArrayAttr>();
+      auto objectsArrayAttr = llvm::cast<ArrayAttr>(objectsAttr);
       allObjectAttrs.append(objectsArrayAttr.begin(), objectsArrayAttr.end());
     }
   }
@@ -684,7 +686,7 @@ bool AffinityQueueAttr::isExecutableWith(
   if (!other) return true;
   // Only compatible with other queue affinities today. When we extend the
   // attributes to specify device targets we'd want to check here.
-  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  auto otherQueueAttr = llvm::dyn_cast_if_present<AffinityQueueAttr>(other);
   if (!otherQueueAttr) return false;
   // If this affinity is a subset of the target affinity then it can execute
   // with it.
@@ -699,7 +701,7 @@ IREE::Stream::AffinityAttr AffinityQueueAttr::joinOR(
   if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
-  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  auto otherQueueAttr = llvm::dyn_cast_if_present<AffinityQueueAttr>(other);
   return AffinityQueueAttr::get(getContext(),
                                 getMask() | otherQueueAttr.getMask());
 }
@@ -710,7 +712,7 @@ IREE::Stream::AffinityAttr AffinityQueueAttr::joinAND(
   if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
-  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  auto otherQueueAttr = llvm::dyn_cast_if_present<AffinityQueueAttr>(other);
   return AffinityQueueAttr::get(getContext(),
                                 getMask() & otherQueueAttr.getMask());
 }
@@ -770,8 +772,8 @@ Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
     return builder.create<arith::ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
   }
   auto conditionValues = llvm::map_range(getConditions(), [&](Attribute attr) {
-    return attr.cast<MatchAttrInterface>().buildConditionExpression(loc, value,
-                                                                    builder);
+    return llvm::cast<MatchAttrInterface>(attr).buildConditionExpression(
+        loc, value, builder);
   });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
@@ -799,8 +801,8 @@ Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
     return builder.create<arith::ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
   }
   auto conditionValues = llvm::map_range(getConditions(), [&](Attribute attr) {
-    return attr.cast<MatchAttrInterface>().buildConditionExpression(loc, value,
-                                                                    builder);
+    return llvm::cast<MatchAttrInterface>(attr).buildConditionExpression(
+        loc, value, builder);
   });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
@@ -1003,31 +1005,31 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (type.isa<AllocatorType>()) {
+  if (llvm::isa<AllocatorType>(type)) {
     p << "allocator";
-  } else if (type.isa<BufferType>()) {
+  } else if (llvm::isa<BufferType>(type)) {
     p << "buffer";
-  } else if (type.isa<BufferViewType>()) {
+  } else if (llvm::isa<BufferViewType>(type)) {
     p << "buffer_view";
-  } else if (type.isa<ChannelType>()) {
+  } else if (llvm::isa<ChannelType>(type)) {
     p << "channel";
-  } else if (type.isa<CommandBufferType>()) {
+  } else if (llvm::isa<CommandBufferType>(type)) {
     p << "command_buffer";
-  } else if (type.isa<DescriptorSetLayoutType>()) {
+  } else if (llvm::isa<DescriptorSetLayoutType>(type)) {
     p << "descriptor_set_layout";
-  } else if (type.isa<DeviceType>()) {
+  } else if (llvm::isa<DeviceType>(type)) {
     p << "device";
-  } else if (type.isa<EventType>()) {
+  } else if (llvm::isa<EventType>(type)) {
     p << "event";
-  } else if (type.isa<ExecutableType>()) {
+  } else if (llvm::isa<ExecutableType>(type)) {
     p << "executable";
-  } else if (type.isa<PipelineLayoutType>()) {
+  } else if (llvm::isa<PipelineLayoutType>(type)) {
     p << "pipeline_layout";
-  } else if (type.isa<FenceType>()) {
+  } else if (llvm::isa<FenceType>(type)) {
     p << "fence";
-  } else if (type.isa<RingBufferType>()) {
+  } else if (llvm::isa<RingBufferType>(type)) {
     p << "ring_buffer";
-  } else if (type.isa<SemaphoreType>()) {
+  } else if (llvm::isa<SemaphoreType>(type)) {
     p << "semaphore";
   } else {
     assert(false && "unknown HAL type");

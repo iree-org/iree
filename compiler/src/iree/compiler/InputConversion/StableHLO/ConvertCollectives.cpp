@@ -158,7 +158,7 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
   Value noColor = indexSet.get(-1);
   if (!groups) return std::make_pair(noColor, noColor);
 
-  auto groupsType = groups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(groups.getType());
   assert(groupsType.getRank() == 2);
   int64_t rows = groupsType.getShape()[0];
   int64_t cols = groupsType.getShape()[1];
@@ -210,7 +210,7 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
     return replicaGroups;
   }
 
-  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(replicaGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -244,7 +244,7 @@ static DenseIntElementsAttr convertToRankGroupsByCrossPartition(
     return partitionGroups;
   }
 
-  auto groupsType = partitionGroups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(partitionGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -282,7 +282,7 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplicaAndPartition(
     return replicaGroups;
   }
 
-  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(replicaGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -476,7 +476,8 @@ struct PartitionIdOpConversion
                                                   /*value=*/numPartitions);
       value = rewriter.create<arith::RemUIOp>(loc, rank, cst);
     }
-    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto resultType =
+        llvm::cast<RankedTensorType>(op.getType());  // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, value);
@@ -510,7 +511,8 @@ struct ReplicaIdOpConversion
       rank = rewriter.create<arith::DivUIOp>(loc, rank, cst);
     }
 
-    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto resultType =
+        llvm::cast<RankedTensorType>(op.getType());  // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, rank);
@@ -920,7 +922,7 @@ struct CollectivePermuteOpConversion
         loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
         replicaGroupsAttr, /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
-    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
+    auto inputType = llvm::cast<RankedTensorType>(op.getOperand().getType());
 
     // Get the collective element type attribute.
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =

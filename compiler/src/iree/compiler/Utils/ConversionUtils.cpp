@@ -54,12 +54,12 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
 Attribute convertAttribute(Location loc, Attribute oldAttr,
                            TypeConverter &typeConverter) {
   // Type attributes get their nested type converted.
-  if (auto oldTypeAttr = oldAttr.dyn_cast<TypeAttr>()) {
+  if (auto oldTypeAttr = llvm::dyn_cast<TypeAttr>(oldAttr)) {
     return TypeAttr::get(typeConverter.convertType(oldTypeAttr.getValue()));
   }
 
   // Return the same attribute if it doesn't have a type.
-  auto typedOldAttr = oldAttr.dyn_cast<TypedAttr>();
+  auto typedOldAttr = llvm::dyn_cast<TypedAttr>(oldAttr);
   if (!typedOldAttr) return oldAttr;
 
   // Convert the attribute type - if it's the same then it's already legal.
@@ -67,7 +67,7 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
   auto newType = typeConverter.convertType(oldType);
   if (oldType == newType) return typedOldAttr;
 
-  if (auto intAttr = typedOldAttr.dyn_cast<IntegerAttr>()) {
+  if (auto intAttr = llvm::dyn_cast<IntegerAttr>(typedOldAttr)) {
     APInt value = intAttr.getValue();
     if (newType.isSignedInteger()) {
       value = value.truncSSat(newType.getIntOrFloatBitWidth());
@@ -77,22 +77,23 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
       value = value.trunc(newType.getIntOrFloatBitWidth());
     }
     return IntegerAttr::get(newType, value);
-  } else if (auto floatAttr = typedOldAttr.dyn_cast<FloatAttr>()) {
-    auto newFloatType = newType.cast<FloatType>();
+  } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(typedOldAttr)) {
+    auto newFloatType = llvm::cast<FloatType>(newType);
     APFloat value = floatAttr.getValue();
     bool losesInfo = false;
     value.convert(newFloatType.getFloatSemantics(), APFloat::rmTowardZero,
                   &losesInfo);
     return FloatAttr::get(newType, value);
-  } else if (auto splatAttr = typedOldAttr.dyn_cast<SplatElementsAttr>()) {
+  } else if (auto splatAttr = llvm::dyn_cast<SplatElementsAttr>(typedOldAttr)) {
     // NOTE: splats are also dense but this way we avoid needing to convert the
     // same splat value N times.
     return SplatElementsAttr::get(
-        newType.cast<ShapedType>(),
+        llvm::cast<ShapedType>(newType),
         convertAttribute(loc, splatAttr.getSplatValue<Attribute>(),
                          typeConverter));
-  } else if (auto denseAttr = typedOldAttr.dyn_cast<DenseIntElementsAttr>()) {
-    auto newElementType = newType.cast<ShapedType>().getElementType();
+  } else if (auto denseAttr =
+                 llvm::dyn_cast<DenseIntElementsAttr>(typedOldAttr)) {
+    auto newElementType = llvm::cast<ShapedType>(newType).getElementType();
     auto newElementBitWidth = newElementType.getIntOrFloatBitWidth();
     if (newElementType.isSignedInteger()) {
       return denseAttr.mapValues(newElementType, [&](APInt src) {
@@ -107,9 +108,10 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
         return src.trunc(newElementBitWidth);
       });
     }
-  } else if (auto denseAttr = typedOldAttr.dyn_cast<DenseFPElementsAttr>()) {
+  } else if (auto denseAttr =
+                 llvm::dyn_cast<DenseFPElementsAttr>(typedOldAttr)) {
     auto newElementType =
-        newType.cast<ShapedType>().getElementType().cast<FloatType>();
+        llvm::cast<FloatType>(newType.cast<ShapedType>().getElementType());
     const auto &newFloatSemantics = newElementType.getFloatSemantics();
     return denseAttr.mapValues(newElementType, [&](APFloat src) {
       bool losesInfo = false;

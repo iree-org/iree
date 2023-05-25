@@ -92,13 +92,13 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
 
   std::string getTypedTypeStr(Type type, bool forceUnsigned = false) const {
     Type elementType = type;
-    auto shapedType = type.dyn_cast<ShapedType>();
+    auto shapedType = llvm::dyn_cast<ShapedType>(type);
     if (shapedType) {
       elementType = shapedType.getElementType();
     }
 
     std::string typePrefix = "x";
-    if (elementType.isa<FloatType>()) {
+    if (llvm::isa<FloatType>(elementType)) {
       typePrefix = "f";
     } else if (elementType.isSignlessInteger()) {
       typePrefix = forceUnsigned ? "u" : "i";

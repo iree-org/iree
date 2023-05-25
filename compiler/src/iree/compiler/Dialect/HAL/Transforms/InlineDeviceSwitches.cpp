@@ -98,8 +98,8 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
   for (auto condition :
        llvm::enumerate(llvm::zip_equal(switchOp.getConditions().getValue(),
                                        switchOp.getConditionRegions()))) {
-    auto conditionAttr =
-        std::get<0>(condition.value()).cast<IREE::HAL::MatchAttrInterface>();
+    auto conditionAttr = llvm::cast<IREE::HAL::MatchAttrInterface>(
+        std::get<0>(condition.value()));
     auto &conditionRegion = std::get<1>(condition.value());
 
     // Insert the branch based on the match. We either match and jump to a

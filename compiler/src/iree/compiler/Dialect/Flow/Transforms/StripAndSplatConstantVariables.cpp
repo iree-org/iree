@@ -47,7 +47,7 @@ class StripAndSplatConstantVariablesPass
     auto getSplatAttr = [&](TensorType tensorType) {
       auto elementType = tensorType.getElementType();
       TypedAttr newAttr;
-      if (elementType.isa<FloatType>()) {
+      if (llvm::isa<FloatType>(elementType)) {
         newAttr = DenseElementsAttr::get(
             tensorType, FloatAttr::get(elementType, 1.0 / replaceIndex));
       } else {
@@ -66,9 +66,9 @@ class StripAndSplatConstantVariablesPass
         if (globalOp.getIsMutable()) return;
 
         // Only strip tensor type constants (to replace with dense<>).
-        if (!globalOp.getType().isa<TensorType>()) return;
+        if (!llvm::isa<TensorType>(globalOp.getType())) return;
 
-        auto tensorType = globalOp.getType().cast<TensorType>();
+        auto tensorType = llvm::cast<TensorType>(globalOp.getType());
         TypedAttr newValue = getSplatAttr(tensorType);
 
         builder.setInsertionPoint(globalOp);
@@ -79,9 +79,9 @@ class StripAndSplatConstantVariablesPass
         newOp->setAttr("noinline", UnitAttr::get(builder.getContext()));
         globalOp.erase();
       } else if (auto cstOp = dyn_cast<arith::ConstantOp>(op)) {
-        if (!cstOp.getType().isa<TensorType>()) return;
+        if (!llvm::isa<TensorType>(cstOp.getType())) return;
 
-        auto tensorType = cstOp.getType().cast<TensorType>();
+        auto tensorType = llvm::cast<TensorType>(cstOp.getType());
         TypedAttr newValue = getSplatAttr(tensorType);
         builder.setInsertionPoint(cstOp);
         auto newOp =

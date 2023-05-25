@@ -578,7 +578,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
   // Fast-path short-circuit for constants, which are like 25% of all IR.
   if (value.getDefiningOp() &&
       value.getDefiningOp()->hasTrait<OpTrait::ConstantLike>()) {
-    fn(value.cast<OpResult>());
+    fn(llvm::cast<OpResult>(value));
     return TraversalResult::COMPLETE;
   }
 
@@ -723,7 +723,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
     if (!definingOp) {
       // Op comes from a block argument; we need to continue walking through all
       // predecessors.
-      result |= traverseBlockArg(work.cast<BlockArgument>());
+      result |= traverseBlockArg(llvm::cast<BlockArgument>(work));
       continue;
     }
 
@@ -737,7 +737,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
     }
 
     // Op is visible in the CFG as a leaf.
-    auto resultValue = work.cast<OpResult>();
+    auto resultValue = llvm::cast<OpResult>(work);
     LLVM_DEBUG(llvm::dbgs() << "  == emitting op "
                             << definingOp->getName().getStringRef() << "\n");
     auto fnResult = fn(resultValue);

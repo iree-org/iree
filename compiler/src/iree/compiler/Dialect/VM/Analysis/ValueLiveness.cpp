@@ -66,7 +66,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
     SmallVector<StringAttr, 8> valueNames;
     for (auto value : values) {
       std::string str;
-      if (auto blockArg = value.dyn_cast<BlockArgument>()) {
+      if (auto blockArg = llvm::dyn_cast<BlockArgument>(value)) {
         if (blockArg.getOwner()->isEntryBlock()) {
           str = llvm::formatv("%arg{0}", blockArg.getArgNumber());
         } else {

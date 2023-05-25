@@ -100,7 +100,7 @@ static LogicalResult verifyEntryPoint(
   if (workgroupSizeAttr.has_value()) {
     std::array<int64_t, 3> workgroupSizes;
     for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-      workgroupSizes[index] = attr.cast<IntegerAttr>().getInt();
+      workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
     }
     return verifyLoweringConfiguration(moduleOp, translationInfo,
                                        workgroupSizes, verifyGPUMatmulPipeline);

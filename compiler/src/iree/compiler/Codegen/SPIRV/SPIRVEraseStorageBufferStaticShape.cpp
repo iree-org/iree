@@ -35,10 +35,10 @@ class EraseStorageBufferStaticShapePass final
 /// buffer.
 bool is1DStaticShapedStorageBuffer(
     IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-  auto type = subspanOp.getType().dyn_cast<MemRefType>();
+  auto type = llvm::dyn_cast<MemRefType>(subspanOp.getType());
   if (!type) return false;
-  auto attr =
-      type.getMemorySpace().dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>();
+  auto attr = llvm::dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(
+      type.getMemorySpace());
   if (!attr) return false;
   return type.hasStaticShape() && type.getRank() == 1 &&
          attr.getValue() == IREE::HAL::DescriptorType::StorageBuffer;
@@ -70,7 +70,7 @@ IREE::HAL::InterfaceBindingSubspanOp rewriteStorageBufferSubspanOp(
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(subspanOp);
 
-  auto oldType = subspanOp.getType().cast<MemRefType>();
+  auto oldType = llvm::cast<MemRefType>(subspanOp.getType());
   auto newType =
       MemRefType::get({ShapedType::kDynamic}, oldType.getElementType(),
                       oldType.getLayout(), oldType.getMemorySpace());

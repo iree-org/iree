@@ -28,7 +28,7 @@ namespace {
 // either a !util.buffer or an external !hal.buffer.
 static Value getResourceBuffer(Location loc, Value resource,
                                OpBuilder &builder) {
-  if (resource.getType().isa<IREE::HAL::BufferType>()) {
+  if (llvm::isa<IREE::HAL::BufferType>(resource.getType())) {
     // Get the storage of the buffer; the returned buffer is already a subspan.
     return builder.createOrFold<IREE::HAL::Inline::BufferStorageOp>(loc,
                                                                     resource);
@@ -56,7 +56,7 @@ struct CmdDispatchOpPattern
                                          "multiple variant targets not yet "
                                          "supported in the inline HAL loader");
     }
-    auto entryPointAttr = entryPointAttrs.front().cast<SymbolRefAttr>();
+    auto entryPointAttr = llvm::cast<SymbolRefAttr>(entryPointAttrs.front());
 
     // Get the handle to the executable that is compatible with our device.
     auto executableOp =

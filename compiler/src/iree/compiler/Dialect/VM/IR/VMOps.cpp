@@ -34,7 +34,7 @@ template <typename NameTy>
 void setResultName(OpAsmSetValueNameFn &setNameFn, Value result, NameTy name) {
   SmallString<32> osBuffer;
   llvm::raw_svector_ostream os(osBuffer);
-  if (result.getType().isa<VectorType>()) {
+  if (llvm::isa<VectorType>(result.getType())) {
     os << "v";
   }
   os << name;
@@ -45,7 +45,7 @@ void setResultIntegerName(OpAsmSetValueNameFn &setNameFn, Value result,
                           IntegerAttr value) {
   SmallString<32> osBuffer;
   llvm::raw_svector_ostream os(osBuffer);
-  if (result.getType().isa<VectorType>()) {
+  if (llvm::isa<VectorType>(result.getType())) {
     os << "v";
   }
   if (!value) {
@@ -141,7 +141,7 @@ Block *FuncOp::addEntryBlock() {
 
 LogicalResult FuncOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!type.isa<FunctionType>())
+  if (!llvm::isa<FunctionType>(type))
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
   return success();
@@ -371,7 +371,7 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
 LogicalResult ImportOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!type.isa<FunctionType>())
+  if (!llvm::isa<FunctionType>(type))
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
   return success();
@@ -489,18 +489,18 @@ void GlobalLoadRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 template <int SZ>
 static bool isConstIntegerBuildableWith(TypedAttr value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
-  if (value.isa<FlatSymbolRefAttr>()) {
+  if (llvm::isa<FlatSymbolRefAttr>(value)) {
     return false;
   }
   // Otherwise, the attribute must have the same type as 'type'.
   if (value.getType() != type) {
     return false;
   }
-  if (value.isa<UnitAttr>()) {
+  if (llvm::isa<UnitAttr>(value)) {
     return SZ == 32;  // Conditions/bools are always i32
-  } else if (auto intAttr = value.dyn_cast<IntegerAttr>()) {
+  } else if (auto intAttr = llvm::dyn_cast<IntegerAttr>(value)) {
     return intAttr.getType().isInteger(SZ);
-  } else if (auto elementsAttr = value.dyn_cast<ElementsAttr>()) {
+  } else if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(value)) {
     return elementsAttr.getShapedType().getElementType().isInteger(SZ);
   }
   return false;
@@ -509,7 +509,7 @@ static bool isConstIntegerBuildableWith(TypedAttr value, Type type) {
 template <int SZ>
 static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
-  if (value.isa<FlatSymbolRefAttr>()) {
+  if (llvm::isa<FlatSymbolRefAttr>(value)) {
     return false;
   }
   // Otherwise, the attribute must have the same type as 'type'.
@@ -517,9 +517,9 @@ static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
     return false;
   }
   Type elementType;
-  if (auto floatAttr = value.dyn_cast<FloatAttr>()) {
+  if (auto floatAttr = llvm::dyn_cast<FloatAttr>(value)) {
     elementType = floatAttr.getType();
-  } else if (auto elementsAttr = value.dyn_cast<ElementsAttr>()) {
+  } else if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(value)) {
     elementType = elementsAttr.getShapedType().getElementType();
   }
   if (!elementType) return false;
@@ -532,18 +532,18 @@ static TypedAttr convertConstIntegerValue(TypedAttr value) {
   Builder builder(value.getContext());
   auto integerType = builder.getIntegerType(SZ);
   int32_t dims = 1;
-  if (value.isa<UnitAttr>()) {
+  if (llvm::isa<UnitAttr>(value)) {
     return IntegerAttr::get(integerType, APInt(SZ, 1));
-  } else if (auto v = value.dyn_cast<BoolAttr>()) {
+  } else if (auto v = llvm::dyn_cast<BoolAttr>(value)) {
     return IntegerAttr::get(integerType,
                             APInt(SZ, v.getValue() ? 1 : 0, false));
-  } else if (auto v = value.dyn_cast<IntegerAttr>()) {
+  } else if (auto v = llvm::dyn_cast<IntegerAttr>(value)) {
     return IntegerAttr::get(integerType,
                             APInt(SZ, v.getValue().getLimitedValue()));
-  } else if (auto v = value.dyn_cast<ElementsAttr>()) {
+  } else if (auto v = llvm::dyn_cast<ElementsAttr>(value)) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, integerType);
-    if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
+    if (auto elements = llvm::dyn_cast<SplatElementsAttr>(v)) {
       return SplatElementsAttr::get(adjustedType,
                                     elements.getSplatValue<Attribute>());
     } else {
@@ -575,12 +575,12 @@ static TypedAttr convertConstFloatValue(TypedAttr value) {
   Builder builder(value.getContext());
   auto floatType = getFloatType(SZ, value.getContext());
   int32_t dims = 1;
-  if (auto v = value.dyn_cast<FloatAttr>()) {
+  if (auto v = llvm::dyn_cast<FloatAttr>(value)) {
     return FloatAttr::get(floatType, v.getValue());
-  } else if (auto v = value.dyn_cast<ElementsAttr>()) {
+  } else if (auto v = llvm::dyn_cast<ElementsAttr>(value)) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, floatType);
-    if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
+    if (auto elements = llvm::dyn_cast<SplatElementsAttr>(v)) {
       return SplatElementsAttr::get(adjustedType,
                                     elements.getSplatValue<Attribute>());
     } else {
@@ -611,7 +611,7 @@ void ConstI32Op::build(OpBuilder &builder, OperationState &result,
 
 void ConstI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultIntegerName(setNameFn, getResult(),
-                       getValue().dyn_cast<IntegerAttr>());
+                       llvm::dyn_cast<IntegerAttr>(getValue()));
 }
 
 void ConstI32Op::build(OpBuilder &builder, OperationState &result,
@@ -643,7 +643,7 @@ void ConstI64Op::build(OpBuilder &builder, OperationState &result,
 
 void ConstI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultIntegerName(setNameFn, getResult(),
-                       getValue().dyn_cast<IntegerAttr>());
+                       llvm::dyn_cast<IntegerAttr>(getValue()));
 }
 
 // static
@@ -816,22 +816,19 @@ void RodataInlineOp::build(OpBuilder &builder, OperationState &result,
 
 LogicalResult ListGetRefOp::verify() {
   Operation *op = getOperation();
-  auto listType = getList()
-                      .getType()
-                      .cast<IREE::VM::RefType>()
-                      .getObjectType()
-                      .cast<IREE::VM::ListType>();
+  auto listType = llvm::cast<IREE::VM::ListType>(
+      getList().getType().cast<IREE::VM::RefType>().getObjectType());
   auto elementType = listType.getElementType();
   auto resultType = getResult().getType();
-  if (!elementType.isa<IREE::VM::OpaqueType>()) {
-    if (elementType.isa<IREE::VM::RefType>() !=
-        resultType.isa<IREE::VM::RefType>()) {
+  if (!llvm::isa<IREE::VM::OpaqueType>(elementType)) {
+    if (llvm::isa<IREE::VM::RefType>(elementType) !=
+        llvm::isa<IREE::VM::RefType>(resultType)) {
       // Attempting to go between a primitive type and ref type.
       return op->emitError()
              << "cannot convert between list type " << elementType
              << " and result type " << resultType;
-    } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
-      if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
+    } else if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(elementType)) {
+      if (!llvm::isa<IREE::VM::OpaqueType>(refType.getObjectType()) &&
           elementType != resultType) {
         // List has a concrete type, verify it matches.
         return op->emitError() << "list contains " << elementType
@@ -844,21 +841,18 @@ LogicalResult ListGetRefOp::verify() {
 
 LogicalResult ListSetRefOp::verify() {
   Operation *op = getOperation();
-  auto listType = getList()
-                      .getType()
-                      .cast<IREE::VM::RefType>()
-                      .getObjectType()
-                      .cast<IREE::VM::ListType>();
+  auto listType = llvm::cast<IREE::VM::ListType>(
+      getList().getType().cast<IREE::VM::RefType>().getObjectType());
   auto elementType = listType.getElementType();
   auto valueType = getValue().getType();
-  if (!elementType.isa<IREE::VM::OpaqueType>()) {
-    if (elementType.isa<IREE::VM::RefType>() !=
-        valueType.isa<IREE::VM::RefType>()) {
+  if (!llvm::isa<IREE::VM::OpaqueType>(elementType)) {
+    if (llvm::isa<IREE::VM::RefType>(elementType) !=
+        llvm::isa<IREE::VM::RefType>(valueType)) {
       // Attempting to go between a primitive type and ref type.
       return op->emitError() << "cannot convert between list type "
                              << elementType << " and value type " << valueType;
-    } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
-      if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
+    } else if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(elementType)) {
+      if (!llvm::isa<IREE::VM::OpaqueType>(refType.getObjectType()) &&
           elementType != valueType) {
         // List has a concrete type, verify it matches.
         return op->emitError() << "list contains " << elementType
@@ -1147,7 +1141,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
     bool isVariadic = succeeded(parser.parseOptionalEllipsis());
     if (isVariadic) {
       int flatSegmentSize = flatSegmentSizes[segmentIndex];
-      if (auto tupleType = operandType.dyn_cast<TupleType>()) {
+      if (auto tupleType = llvm::dyn_cast<TupleType>(operandType)) {
         for (int i = 0; i < flatSegmentSize / tupleType.size(); ++i) {
           for (auto type : tupleType) {
             flatOperandTypes.push_back(type);
@@ -1189,7 +1183,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addAttribute("segment_types",
                       parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
                           llvm::map_range(segmentTypes, [&](Type type) {
-                            return TypeAttr::get(type).cast<Attribute>();
+                            return llvm::cast<Attribute>(TypeAttr::get(type));
                           }))));
 
   if (failed(parser.parseOptionalArrowTypeList(result.types))) {
@@ -1209,12 +1203,12 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
-            std::get<1>(segmentSizeType).cast<TypeAttr>().getValue();
+            llvm::cast<TypeAttr>(std::get<1>(segmentSizeType)).getValue();
         if (segmentSize == -1) {
           p.printOperand(getOperand(operand++));
         } else {
           p << '[';
-          if (auto tupleType = segmentType.dyn_cast<TupleType>()) {
+          if (auto tupleType = llvm::dyn_cast<TupleType>(segmentType)) {
             for (size_t i = 0; i < segmentSize; ++i) {
               p << '(';
               SmallVector<Value, 4> tupleOperands;
@@ -1247,7 +1241,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
-            std::get<1>(segmentSizeType).cast<TypeAttr>().getValue();
+            llvm::cast<TypeAttr>(std::get<1>(segmentSizeType)).getValue();
         if (segmentSize == -1) {
           p.printType(segmentType);
         } else {

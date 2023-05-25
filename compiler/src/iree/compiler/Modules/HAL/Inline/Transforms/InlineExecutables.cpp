@@ -71,7 +71,7 @@ class InlineExecutablesPass
           return WalkResult::interrupt();
         }
         auto targetFuncName =
-            exportToFuncMap[entryPointAttrs.front()].cast<StringAttr>();
+            llvm::cast<StringAttr>(exportToFuncMap[entryPointAttrs.front()]);
         assert(targetFuncName && "missing mapping");
         dispatchOp->setAttr("hal_inline.target",
                             FlatSymbolRefAttr::get(targetFuncName));

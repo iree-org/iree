@@ -59,19 +59,19 @@ SmallVector<Value, 2> getDotOpEmptyTensorDynSizes(OpBuilder& b, Location loc,
   SmallVector<Value, 2> dynShape;
   switch (type) {
     case DotOperationType::kMatrixMatrix: {
-      if (lhs.getType().cast<ShapedType>().isDynamicDim(0))
+      if (llvm::cast<ShapedType>(lhs.getType()).isDynamicDim(0))
         dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
-      if (rhs.getType().cast<ShapedType>().isDynamicDim(1))
+      if (llvm::cast<ShapedType>(rhs.getType()).isDynamicDim(1))
         dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
       break;
     }
     case DotOperationType::kMatrixVector: {
-      if (lhs.getType().cast<ShapedType>().isDynamicDim(0))
+      if (llvm::cast<ShapedType>(lhs.getType()).isDynamicDim(0))
         dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
       break;
     }
     case DotOperationType::kVectorMatrix: {
-      if (rhs.getType().cast<ShapedType>().isDynamicDim(1))
+      if (llvm::cast<ShapedType>(rhs.getType()).isDynamicDim(1))
         dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
       break;
     }
@@ -125,7 +125,7 @@ struct DotGeneralBatchMatMulOpConversion final
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) {
       return failure();
     }
-    if (op.getType().cast<RankedTensorType>().getRank() != 3) {
+    if (llvm::cast<RankedTensorType>(op.getType()).getRank() != 3) {
       return rewriter.notifyMatchFailure(op, "expected a batch matmul");
     }
 
@@ -204,10 +204,12 @@ struct DotGeneralOpConversion final
     size_t targetRank = outputType.getRank();
     size_t totalLoopCount = numContracting + targetRank;
 
-    int64_t lhsRank = adaptor.getLhs().getType().cast<ShapedType>().getRank();
+    int64_t lhsRank =
+        llvm::cast<ShapedType>(adaptor.getLhs().getType()).getRank();
     size_t lhsExtraDims =
         lhsRank - lhsBatchingDims.size() - lhsContractingDims.size();
-    int64_t rhsRank = adaptor.getRhs().getType().cast<ShapedType>().getRank();
+    int64_t rhsRank =
+        llvm::cast<ShapedType>(adaptor.getRhs().getType()).getRank();
 
     Location loc = op.getLoc();
     Value emptyTensor =

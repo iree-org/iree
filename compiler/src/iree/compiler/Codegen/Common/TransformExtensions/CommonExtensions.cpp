@@ -211,7 +211,8 @@ struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
 
   LogicalResult matchAndRewrite(tensor::GenerateOp generateOp,
                                 PatternRewriter &rewriter) const final {
-    auto tensorType = generateOp.getResult().getType().cast<RankedTensorType>();
+    auto tensorType =
+        llvm::cast<RankedTensorType>(generateOp.getResult().getType());
     if (!tensorType.hasStaticShape()) return failure();
     auto terminatorOp =
         cast<tensor::YieldOp>(generateOp.getBody().front().getTerminator());
@@ -651,7 +652,7 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   SmallVector<Attribute> blockMapping =
       llvm::to_vector(forallOp.getMapping()->getValue());
   if (llvm::any_of(blockMapping, [](Attribute map) {
-        return !map.isa<gpu::GPUBlockMappingAttr>();
+        return !llvm::isa<gpu::GPUBlockMappingAttr>(map);
       })) {
     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
   }
@@ -671,8 +672,10 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   }
   // Step 2. sort the values by the corresponding GPUBlockMappingAttr.
   auto comparator = [](Attribute a, Attribute b) -> bool {
-    return static_cast<int64_t>(a.cast<gpu::GPUBlockMappingAttr>().getBlock()) <
-           static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
+    return static_cast<int64_t>(
+               llvm::cast<gpu::GPUBlockMappingAttr>(a).getBlock()) <
+           static_cast<int64_t>(
+               llvm::cast<gpu::GPUBlockMappingAttr>(b).getBlock());
   };
   SmallVector<Value> gridDimValues =
       getValuesSortedByKey(blockMapping, numBlocks, comparator);
@@ -681,8 +684,8 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   IRMapping bvm;
   SmallVector<Value> workgroupIdOps, workgroupCountOps;
   for (Attribute attr : blockMapping) {
-    auto idx =
-        static_cast<int64_t>(attr.cast<gpu::GPUBlockMappingAttr>().getBlock());
+    auto idx = static_cast<int64_t>(
+        llvm::cast<gpu::GPUBlockMappingAttr>(attr).getBlock());
     workgroupIdOps.push_back(
         rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, idx));
     workgroupCountOps.push_back(
@@ -813,7 +816,8 @@ DiagnosedSilenceableFailure transform_dialect::
     // Get the mapping IDs.
     auto mappingIds = llvm::to_vector(
         llvm::map_range(blockMapping.value(), [](Attribute mappingAttr) -> int {
-          return mappingAttr.cast<DeviceMappingAttrInterface>().getMappingId();
+          return llvm::cast<DeviceMappingAttrInterface>(mappingAttr)
+              .getMappingId();
         }));
     int maxId = 0;
     for (auto id : mappingIds) {
@@ -941,8 +945,8 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Value to) {
   // Insert barriers for copies from and to shared memory.
   bool needsBarrier = false;
-  if (hasSharedMemoryAddressSpace(from.getType().cast<MemRefType>()) !=
-      hasSharedMemoryAddressSpace(to.getType().cast<MemRefType>())) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType())) !=
+      hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
@@ -971,7 +975,7 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
   // memref type can be inferred from the context.
   options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = value.getType().cast<TensorType>();
+    auto tensorType = llvm::cast<TensorType>(value.getType());
 
     // Special rule for ConstantOps: These always lower to some memref with a
     // static identity layout.

@@ -41,7 +41,7 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
@@ -58,7 +58,7 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
                            Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
   bool isUnsigned = eTy.isUnsignedInteger();
 
   int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();

@@ -52,7 +52,7 @@ static void hoistImmutableLoads(Region &region,
         llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOpInterface>());
     for (auto &op : ops) {
       if (!immutableGlobals.contains(op.getGlobalName())) continue;
-      auto globalRef = op.getGlobalAttr().cast<Attribute>();
+      auto globalRef = llvm::cast<Attribute>(op.getGlobalAttr());
       auto it = loadOps.find(globalRef);
       if (it == loadOps.end()) {
         // Move to entry block; even if it's already there (so loads are

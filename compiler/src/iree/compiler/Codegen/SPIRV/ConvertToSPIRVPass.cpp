@@ -292,8 +292,8 @@ struct RemoveStaticDynamicCast final : public OpRewritePattern<memref::CastOp> {
 
   LogicalResult matchAndRewrite(memref::CastOp castOp,
                                 PatternRewriter &rewriter) const override {
-    auto srcType = castOp.getSource().getType().cast<MemRefType>();
-    auto dstType = castOp.getType().cast<MemRefType>();
+    auto srcType = llvm::cast<MemRefType>(castOp.getSource().getType());
+    auto dstType = llvm::cast<MemRefType>(castOp.getType());
     if (srcType.getRank() == 1 && dstType.getRank() == 1 &&
         srcType.hasStaticShape() != dstType.hasStaticShape()) {
       rewriter.replaceOp(castOp, castOp.getSource());

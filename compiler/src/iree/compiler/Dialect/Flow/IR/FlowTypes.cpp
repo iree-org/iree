@@ -56,7 +56,7 @@ Type DispatchTensorType::getBoundElementType() const {
   if (boundType.isIntOrFloat()) {
     return boundType;
   }
-  return boundType.cast<RankedTensorType>().getElementType();
+  return llvm::cast<RankedTensorType>(boundType).getElementType();
 }
 
 unsigned DispatchTensorType::getBoundElementTypeBitWidth() const {
@@ -76,7 +76,7 @@ int64_t DispatchTensorType::getRank() const {
   if (boundType.isIntOrIndexOrFloat()) {
     return 0;
   }
-  return boundType.cast<RankedTensorType>().getRank();
+  return llvm::cast<RankedTensorType>(boundType).getRank();
 }
 
 bool DispatchTensorType::hasRank() const { return true; }
@@ -102,7 +102,7 @@ ArrayRef<int64_t> DispatchTensorType::getShape() const {
   if (boundType.isIntOrIndexOrFloat()) {
     return {};
   }
-  return boundType.cast<RankedTensorType>().getShape();
+  return llvm::cast<RankedTensorType>(boundType).getShape();
 }
 
 int64_t DispatchTensorType::getNumDynamicDims() const {
@@ -120,7 +120,7 @@ bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
 LogicalResult DispatchTensorType::verify(
     function_ref<InFlightDiagnostic()> emitError, uint32_t access,
     Type boundType) {
-  if (!boundType.isIntOrFloat() && !boundType.isa<RankedTensorType>()) {
+  if (!boundType.isIntOrFloat() && !llvm::isa<RankedTensorType>(boundType)) {
     return emitError() << "unhandled bounded type in dispatch. Must by int, "
                           "float or ranked tensor type";
   }
@@ -213,7 +213,7 @@ Type FlowDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (auto inputType = type.dyn_cast<DispatchTensorType>()) {
+  if (auto inputType = llvm::dyn_cast<DispatchTensorType>(type)) {
     IREE::Flow::printType(inputType, p);
   } else if (failed(generatedTypePrinter(type, p))) {
     assert(false && "unknown Flow type");

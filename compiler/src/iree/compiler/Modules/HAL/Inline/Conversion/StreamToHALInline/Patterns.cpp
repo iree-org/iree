@@ -24,7 +24,7 @@ namespace iree_compiler {
 namespace {
 
 static Value getResourceSize(Location loc, Value resource, OpBuilder &builder) {
-  if (resource.getType().isa<IREE::HAL::BufferType>()) {
+  if (llvm::isa<IREE::HAL::BufferType>(resource.getType())) {
     return builder.createOrFold<IREE::HAL::Inline::BufferLengthOp>(
         loc, builder.getIndexType(), resource);
   }
@@ -41,7 +41,7 @@ struct Storage {
 
 static Storage getResourceStorage(Location loc, Value resource,
                                   Value resourceSize, OpBuilder &builder) {
-  if (resource.getType().isa<IREE::HAL::BufferType>()) {
+  if (llvm::isa<IREE::HAL::BufferType>(resource.getType())) {
     // Get the storage of the buffer; the returned buffer is already a subspan.
     auto storageBuffer =
         builder.createOrFold<IREE::HAL::Inline::BufferStorageOp>(loc, resource);
@@ -217,7 +217,7 @@ struct ResourceSubviewOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::ResourceSubviewOp subviewOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (adaptor.getSource().getType().isa<IREE::HAL::BufferType>()) {
+    if (llvm::isa<IREE::HAL::BufferType>(adaptor.getSource().getType())) {
       auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
       // NOTE: this aliases! We assume at this point all useful alias analysis
       // has been performed and it's fine to lose the tie information here.
@@ -239,7 +239,7 @@ struct TensorImportBufferOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!importOp.getSource().getType().isa<IREE::HAL::BufferType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(importOp.getSource().getType())) {
       return failure();
     }
 
@@ -257,8 +257,8 @@ struct TensorImportBufferViewOpPattern
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = importOp.getSource().getType();
-    if (!sourceType.isa<IREE::HAL::BufferViewType>() &&
-        !sourceType.isa<TensorType>()) {
+    if (!llvm::isa<IREE::HAL::BufferViewType>(sourceType) &&
+        !llvm::isa<TensorType>(sourceType)) {
       return failure();
     }
 
@@ -276,7 +276,7 @@ struct TensorExportBufferOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!exportOp.getResult().getType().isa<IREE::HAL::BufferType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(exportOp.getResult().getType())) {
       return failure();
     }
     rewriter.replaceOp(exportOp, adaptor.getSource());
@@ -291,13 +291,13 @@ struct TensorExportBufferViewOpPattern
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto targetType = exportOp.getResult().getType();
-    if (!targetType.isa<IREE::HAL::BufferViewType>() &&
-        !targetType.isa<TensorType>()) {
+    if (!llvm::isa<IREE::HAL::BufferViewType>(targetType) &&
+        !llvm::isa<TensorType>(targetType)) {
       return failure();
     }
 
     auto loc = exportOp.getLoc();
-    auto tensorType = adaptor.getSourceEncoding().cast<RankedTensorType>();
+    auto tensorType = llvm::cast<RankedTensorType>(adaptor.getSourceEncoding());
     auto dynamicDims = adaptor.getSourceEncodingDims();
 
     // NOTE: we should have verified supported encodings/types at entry into the
@@ -481,7 +481,7 @@ struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
     size_t resourceIndex = 0;
     for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
              callOp.getResourceOperands(), adaptor.getResourceOperands())) {
-      if (originalOperand.getType().isa<IREE::Stream::ResourceType>()) {
+      if (llvm::isa<IREE::Stream::ResourceType>(originalOperand.getType())) {
         // Resource type, add offset/length.
         auto resourceSize = adaptor.getResourceOperandSizes()[resourceIndex];
         auto storage = getResourceStorage(callOp.getLoc(), convertedOperand,
@@ -567,7 +567,8 @@ struct GlobalTimepointConversionPattern
       ConversionPatternRewriter &rewriter) const override {
     auto initialValue = op.getInitialValue();
     if (!initialValue.has_value()) return failure();
-    if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
+    if (!llvm::isa<IREE::Stream::TimepointAttr>(*initialValue))
+      return failure();
     rewriter.updateRootInPlace(
         op, [&]() { op.setInitialValueAttr(rewriter.getI64IntegerAttr(0)); });
     return success();

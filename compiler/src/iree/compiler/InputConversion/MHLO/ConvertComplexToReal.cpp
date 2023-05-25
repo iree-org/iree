@@ -58,21 +58,21 @@ inline std::optional<chlo::ComparisonType> chloComparisonType(
 }
 
 bool isComplexTensor(Value v) {
-  if (auto tt = v.getType().dyn_cast<TensorType>()) {
-    return tt.getElementType().isa<ComplexType>();
+  if (auto tt = llvm::dyn_cast<TensorType>(v.getType())) {
+    return llvm::isa<ComplexType>(tt.getElementType());
   }
   return false;
 }
 
 Type convertComplexTensorTypeToReal(Type complexTensorType) {
-  auto newElementType = complexTensorType.cast<TensorType>()
-                            .getElementType()
-                            .cast<ComplexType>()
-                            .getElementType();
-  if (auto tt = complexTensorType.dyn_cast<RankedTensorType>()) {
+  auto newElementType =
+      llvm::cast<ComplexType>(
+          complexTensorType.cast<TensorType>().getElementType())
+          .getElementType();
+  if (auto tt = llvm::dyn_cast<RankedTensorType>(complexTensorType)) {
     return RankedTensorType::get(tt.getShape(), newElementType,
                                  tt.getEncoding());
-  } else if (auto tt = complexTensorType.dyn_cast<UnrankedTensorType>()) {
+  } else if (auto tt = llvm::dyn_cast<UnrankedTensorType>(complexTensorType)) {
     return UnrankedTensorType::get(newElementType);
   }
   assert(false && "unknown TensorType subclass");
@@ -473,15 +473,15 @@ struct TestMHLOConvertComplexToRealPass
     ConversionTarget target(*context);
     auto hasNoComplexTypes = [](Operation *op) {
       for (Value operand : op->getOperands()) {
-        if (auto st = operand.getType().dyn_cast<ShapedType>()) {
-          if (st.getElementType().isa<ComplexType>()) {
+        if (auto st = llvm::dyn_cast<ShapedType>(operand.getType())) {
+          if (llvm::isa<ComplexType>(st.getElementType())) {
             return false;
           }
         }
       }
       for (Value result : op->getResults()) {
-        if (auto st = result.getType().dyn_cast<ShapedType>()) {
-          if (st.getElementType().isa<ComplexType>()) {
+        if (auto st = llvm::dyn_cast<ShapedType>(result.getType())) {
+          if (llvm::isa<ComplexType>(st.getElementType())) {
             return false;
           }
         }

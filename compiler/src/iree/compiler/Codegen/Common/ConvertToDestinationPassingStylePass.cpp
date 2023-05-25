@@ -78,7 +78,8 @@ static Value getTensorLoadOpForTensorStoreOp(
   // Clone the offset, size and stride values. They will be CSE-ed later.
   SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      storeOp.getLoc(), storeOp.getValue().getType().cast<RankedTensorType>(),
+      storeOp.getLoc(),
+      llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
       storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
       clonedVals.sizes, clonedVals.strides);
   return tensorLoadOp;
@@ -254,7 +255,7 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
   auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
       [&](tensor::EmptyOp emptyOp) -> WalkResult {
         for (auto result : emptyOp->getResults()) {
-          if (!result.getType().isa<RankedTensorType>()) continue;
+          if (!llvm::isa<RankedTensorType>(result.getType())) continue;
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
           }
@@ -503,7 +504,7 @@ struct RemoveCstOutsDependency
       DenseElementsAttr attr;
       if (!matchPattern(opOperand->get(), m_Constant(&attr))) continue;
       if (!attr.isSplat()) continue;
-      auto type = attr.getType().dyn_cast<RankedTensorType>();
+      auto type = llvm::dyn_cast<RankedTensorType>(attr.getType());
       if (!type) continue;
       TypedAttr scalarAttr = attr.getValues<TypedAttr>()[0];
 
@@ -560,7 +561,8 @@ struct SwitchStoreOfIfResultValue
                                          "store source is not an if statement");
     }
 
-    auto resultNumber = storeOp.getValue().cast<OpResult>().getResultNumber();
+    auto resultNumber =
+        llvm::cast<OpResult>(storeOp.getValue()).getResultNumber();
     auto moveStoreInsideBody = [&](Block *body) {
       OpBuilder::InsertionGuard guard(rewriter);
       auto yieldOp = cast<scf::YieldOp>(body->getTerminator());

@@ -94,9 +94,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> lhsShape =
-      op->getOperand(0).getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(op->getOperand(0).getType()).getShape();
   ArrayRef<int64_t> rhsShape =
-      op->getOperand(1).getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
   SmallVector<int64_t> workgroupTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
@@ -220,9 +220,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> lhsShape =
-      op->getOperand(0).getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(op->getOperand(0).getType()).getShape();
   ArrayRef<int64_t> rhsShape =
-      op->getOperand(1).getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
   SmallVector<int64_t> workgroupTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
@@ -244,7 +244,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   auto getElementType = [](Value v) {
-    return v.getType().cast<ShapedType>().getElementType();
+    return llvm::cast<ShapedType>(v.getType()).getElementType();
   };
 
   Type lhsType = getElementType(op->getOperand(0));
@@ -340,7 +340,7 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> outputShape =
-      op->getOperand(2).getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(op->getOperand(2).getType()).getShape();
   const int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
 
   // Verify the first level tile size divides the Convolution

@@ -173,7 +173,7 @@ class WrapEntryPointsPass
     for (auto [arg, inputName, inputType] : llvm::zip_equal(
              funcOp.getArguments(), inputNames, funcType.getInputs())) {
       auto fullName = (namePrefix + "_" + inputName + "_shape").str();
-      auto tensorType = inputType.dyn_cast<TensorType>();
+      auto tensorType = llvm::dyn_cast<TensorType>(inputType);
       assert(tensorType && "expecting only tensors in tflite function I/O");
       inputDynamicDims.push_back(createDynamicDimGlobals(
           arg.getLoc(), fullName, tensorType, moduleBuilder));
@@ -182,7 +182,7 @@ class WrapEntryPointsPass
     for (auto [outputName, outputType] :
          llvm::zip_equal(outputNames, funcType.getResults())) {
       auto fullName = (namePrefix + "_" + outputName + "_shape").str();
-      auto tensorType = outputType.dyn_cast<TensorType>();
+      auto tensorType = llvm::dyn_cast<TensorType>(outputType);
       assert(tensorType && "expecting only tensors in tflite function I/O");
       outputDynamicDims.push_back(
           createDynamicDimGlobals(loc, fullName, tensorType, moduleBuilder));

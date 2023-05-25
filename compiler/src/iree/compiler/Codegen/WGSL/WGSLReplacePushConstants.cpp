@@ -40,7 +40,7 @@ static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
   unsigned destBitWidth = opType.getIntOrFloatBitWidth();
 
   // AnySignlessInteger
-  if (opType.isa<IntegerType>()) {
+  if (llvm::isa<IntegerType>(opType)) {
     if (sourceBitWidth > destBitWidth) {
       return builder.create<arith::TruncIOp>(loc, opType, extractElementOp);
     } else if (sourceBitWidth < destBitWidth) {

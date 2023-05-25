@@ -38,7 +38,7 @@ static IREE::ABI::InvocationModel getInvocationModel(
 
 // Maps a source type to the native ABI type.
 static Type mapToABIType(Type type) {
-  if (type.isa<TensorType>()) {
+  if (llvm::isa<TensorType>(type)) {
     return IREE::HAL::BufferViewType::get(type.getContext());
   }
   return type;
@@ -106,7 +106,7 @@ static func::FuncOp createImportWrapperFunc(
   SmallVector<Value> tensorArgs;
   for (auto [argIndex, arg] : llvm::enumerate(entryArgs)) {
     auto oldType = oldImportType.getInput(argIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       tensorArgIndices.push_back(argIndex);
       tensorArgs.push_back(arg);
     }
@@ -159,7 +159,7 @@ static func::FuncOp createImportWrapperFunc(
       // want to allow for async work using fences that's not device-related.
       const bool haveTensorResults =
           llvm::any_of(oldImportType.getResults(),
-                       [](Type type) { return type.isa<TensorType>(); });
+                       [](Type type) { return llvm::isa<TensorType>(type); });
       if (!haveTensorResults && !hasSideEffects) {
         // No tensors returned from import - pass in an immediate signal.
         signalFence = entryBuilder.create<IREE::Util::NullOp>(
@@ -178,7 +178,7 @@ static func::FuncOp createImportWrapperFunc(
   for (auto [argIndex, arg] : llvm::enumerate(entryArgs)) {
     auto oldType = oldImportType.getInput(argIndex);
     auto newType = newImportType.getInput(argIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       // This is where we could perform type casting or in-place storage binding
       // if the user had any attrs specifying it.
       // NOTE: we insert a barrier on this above if needed so that the wait
@@ -216,7 +216,7 @@ static func::FuncOp createImportWrapperFunc(
   SmallVector<Value> results;
   for (auto [resultIndex, result] : llvm::enumerate(callOp.getResults())) {
     auto oldType = oldImportType.getResult(resultIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       // NOTE: we set the import pending on the signal fence from the import
       // indicating when the returned tensor is ready for consumption by the
       // program.
@@ -408,8 +408,8 @@ static func::FuncOp createExportWrapperFunc(
     // Today all outputs need to be a !hal.buffer - we could change this
     // in the future to be something more generalized.
     auto storageArg = entryBlock->getArgument(i);
-    if (!storageArg.getType().isa<IREE::HAL::BufferType>() &&
-        !storageArg.getType().isa<IREE::HAL::BufferViewType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(storageArg.getType()) &&
+        !llvm::isa<IREE::HAL::BufferViewType>(storageArg.getType())) {
       exportOp.emitError() << "storage argument " << i
                            << " has an invalid type " << storageArg.getType()
                            << "; must be a !hal.buffer";
@@ -439,7 +439,7 @@ static func::FuncOp createExportWrapperFunc(
   for (auto [argIndex, arg] : llvm::enumerate(
            entryBlock->getArguments().slice(0, oldExportType.getNumInputs()))) {
     auto oldType = oldExportType.getInput(argIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       auto encoding =
           exportOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
       auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
@@ -463,7 +463,8 @@ static func::FuncOp createExportWrapperFunc(
   if (signalFence) {
     SmallVector<Value> asyncTensors;
     for (auto result : asyncResults) {
-      if (result.getType().isa<TensorType>()) asyncTensors.push_back(result);
+      if (llvm::isa<TensorType>(result.getType()))
+        asyncTensors.push_back(result);
     }
     if (asyncTensors.empty()) {
       // TODO(benvanik): maybe use a global timeline? global stores may not
@@ -482,7 +483,7 @@ static func::FuncOp createExportWrapperFunc(
   for (auto [resultIndex, result] : llvm::enumerate(asyncResults)) {
     auto oldType = oldExportType.getResult(resultIndex);
     auto newType = newExportType.getResult(resultIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       auto encoding = exportOp.getResultAttrOfType<TypeAttr>(
           resultIndex, "iree.abi.encoding");
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(

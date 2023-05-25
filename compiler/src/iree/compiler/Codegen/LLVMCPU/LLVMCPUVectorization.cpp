@@ -132,8 +132,8 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
     unsigned firstOperandDim = operandDimPairs[0].second;
 
     // Trivial case: `dim` size is available in the operand type.
-    int64_t dimSize =
-        firstOperand.getType().cast<ShapedType>().getShape()[firstOperandDim];
+    int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
+                          .getShape()[firstOperandDim];
     if (!ShapedType::isDynamic(dimSize)) {
       vectorSizes.push_back(dimSize);
       LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize

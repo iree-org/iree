@@ -248,9 +248,9 @@ static LogicalResult replaceAllStoresWithTiledVersion(
       return rewriter.notifyMatchFailure(
           untiledOp, "failed to rewrite destructive update");
     }
-    if (failed(replaceStoresWithTiledVersion(rewriter, result.cast<OpResult>(),
-                                             tiledValues[index], resultOffsets,
-                                             resultSizes, innerLoopBody))) {
+    if (failed(replaceStoresWithTiledVersion(
+            rewriter, llvm::cast<OpResult>(result), tiledValues[index],
+            resultOffsets, resultSizes, innerLoopBody))) {
       return failure();
     }
   }
@@ -519,7 +519,7 @@ FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
       rewriter.setInsertionPoint(sliceOp);
 
       // Generate the tiled implementation of the producer.
-      OpResult untiledValue = sliceOp.getSource().cast<OpResult>();
+      OpResult untiledValue = llvm::cast<OpResult>(sliceOp.getSource());
       FailureOr<TilingResult> swapSliceResult =
           tensor::replaceExtractSliceWithTiledProducer(rewriter, sliceOp,
                                                        untiledValue);

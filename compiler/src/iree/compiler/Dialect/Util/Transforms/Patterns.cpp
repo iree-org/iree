@@ -248,7 +248,7 @@ struct ElideBranchOperandsPattern
 
           // Operand for this source differs from previous. This is either
           // because it's non-uniform _or_ that it's a cycle.
-          if (auto sourceArg = operand.dyn_cast<BlockArgument>()) {
+          if (auto sourceArg = llvm::dyn_cast<BlockArgument>(operand)) {
             // Operand comes from a block argument. If that is the block
             // argument we are analyzing it means there's a cycle (%0 -> %0) and
             // we can ignore it for the purposes of this analysis.

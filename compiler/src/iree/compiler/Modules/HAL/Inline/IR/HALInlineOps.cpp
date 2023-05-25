@@ -161,7 +161,7 @@ struct FoldBufferViewCreateSubspan
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = op.getSourceOffset().cast<Value>();
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
@@ -227,7 +227,8 @@ void BufferViewBufferOp::getCanonicalizationPatterns(RewritePatternSet &results,
 LogicalResult DeviceQueryOp::verify() {
   DeviceQueryOp op = *this;
   if (op.getDefaultValue().has_value()) {
-    if (auto typedDefaultValue = op.getDefaultValue()->dyn_cast<TypedAttr>()) {
+    if (auto typedDefaultValue =
+            llvm::dyn_cast<TypedAttr>(*op.getDefaultValue())) {
       if (typedDefaultValue.getType() != op.getValue().getType()) {
         return op.emitOpError()
                << "type mismatch between result and default value";

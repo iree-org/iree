@@ -26,13 +26,13 @@ struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
       ConversionPatternRewriter &rewriter) const override {
     // Only handle tensor types - other arith.constant types (like i32) are
     // ignored.
-    if (!constantOp.getType().isa<TensorType>()) return failure();
+    if (!llvm::isa<TensorType>(constantOp.getType())) return failure();
 
     Type constantType = IREE::Stream::ResourceType::get(
         getContext(), IREE::Stream::Lifetime::Constant);
     auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
         constantOp.getLoc(), constantType,
-        constantOp.getValue().cast<ElementsAttr>(),
+        llvm::cast<ElementsAttr>(constantOp.getValue()),
         TypeAttr::get(constantOp.getType()),
         /*result_encoding_dims=*/ValueRange{},
         /*affinity=*/nullptr);
@@ -54,7 +54,9 @@ void populateStandardConstantToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
     TypeConverter &typeConverter, RewritePatternSet &patterns) {
   conversionTarget.addDynamicallyLegalOp<arith::ConstantOp>(
-      [](arith::ConstantOp op) { return !op.getType().isa<TensorType>(); });
+      [](arith::ConstantOp op) {
+        return !llvm::isa<TensorType>(op.getType());
+      });
 
   patterns.insert<ConvertTensorConstantOp>(typeConverter, context);
 }

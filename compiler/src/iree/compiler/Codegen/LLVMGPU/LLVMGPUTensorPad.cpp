@@ -99,7 +99,8 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   paddedSubviewResults.reserve(paddedOp->getNumResults());
   for (const auto &[resultNumber, paddedResult] :
        llvm::enumerate(paddedOp->getResults())) {
-    int64_t rank = paddedResult.getType().cast<RankedTensorType>().getRank();
+    int64_t rank =
+        llvm::cast<RankedTensorType>(paddedResult.getType()).getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> sizes;
     for (OpFoldResult v : reifiedResultShapes[resultNumber]) sizes.push_back(v);

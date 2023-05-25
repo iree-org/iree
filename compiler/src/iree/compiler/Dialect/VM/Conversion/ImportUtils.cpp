@@ -63,11 +63,11 @@ Value castToImportType(Value value, Type targetType,
                        ConversionPatternRewriter &rewriter) {
   auto sourceType = value.getType();
   if (sourceType == targetType) return value;
-  bool sourceIsInteger = sourceType.isa<IntegerType>();
+  bool sourceIsInteger = llvm::isa<IntegerType>(sourceType);
 
   // Allow bitcast between same width float/int types. This is used for
   // marshalling to "untyped" VM interfaces, which will have an integer type.
-  if (sourceType.isa<FloatType>() && targetType.isa<IntegerType>() &&
+  if (llvm::isa<FloatType>(sourceType) && llvm::isa<IntegerType>(targetType) &&
       sourceType.getIntOrFloatBitWidth() ==
           targetType.getIntOrFloatBitWidth()) {
     return rewriter.create<mlir::arith::BitcastOp>(value.getLoc(), targetType,
@@ -111,7 +111,7 @@ void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp) {
 namespace detail {
 
 size_t getSegmentSpanSize(Type spanType) {
-  if (auto tupleType = spanType.dyn_cast<TupleType>()) {
+  if (auto tupleType = llvm::dyn_cast<TupleType>(spanType)) {
     return tupleType.size();
   } else {
     return 1;
@@ -121,7 +121,7 @@ size_t getSegmentSpanSize(Type spanType) {
 std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter) {
-  if (auto intAttr = attrValue.dyn_cast<IntegerAttr>()) {
+  if (auto intAttr = llvm::dyn_cast<IntegerAttr>(attrValue)) {
     // NOTE: we intentionally go to std.constant ops so that the standard
     // conversions can do their job. If we want to remove the dependency
     // from standard ops in the future we could instead go directly to
@@ -132,7 +132,7 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
                          APInt(32, static_cast<int32_t>(intAttr.getInt()))));
     return {{constValue}};
   }
-  if (auto elementsAttr = attrValue.dyn_cast<DenseIntElementsAttr>()) {
+  if (auto elementsAttr = llvm::dyn_cast<DenseIntElementsAttr>(attrValue)) {
     SmallVector<Value, 4> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
@@ -142,7 +142,7 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     }
     return elementValues;
   }
-  if (auto arrayAttr = attrValue.dyn_cast<ArrayAttr>()) {
+  if (auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attrValue)) {
     SmallVector<Value, 4> allValues;
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
@@ -152,7 +152,7 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     }
     return allValues;
   }
-  if (auto strAttr = attrValue.dyn_cast<StringAttr>()) {
+  if (auto strAttr = llvm::dyn_cast<StringAttr>(attrValue)) {
     return {{rewriter.create<IREE::VM::RodataInlineOp>(loc, strAttr)}};
   }
 
@@ -164,7 +164,7 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
   if (conversionInterface) {
     bool anyFailed = false;
     SmallVector<Value, 4> allValues;
-    if (auto tupleType = inputType.dyn_cast<TupleType>()) {
+    if (auto tupleType = llvm::dyn_cast<TupleType>(inputType)) {
       // Custom dialect type maps into a tuple; we expect 1:1 tuple elements to
       // attribute storage elements.
       auto tupleTypes = llvm::to_vector<4>(tupleType.getTypes());

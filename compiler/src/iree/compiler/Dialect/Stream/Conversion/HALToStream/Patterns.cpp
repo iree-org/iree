@@ -30,19 +30,19 @@ struct ConvertTensorImportOp
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSource().getType();
     auto targetType = op.getTargetEncoding();
-    if (!sourceType.isa<IREE::HAL::BufferType>() &&
-        !sourceType.isa<IREE::HAL::BufferViewType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(sourceType) &&
+        !llvm::isa<IREE::HAL::BufferViewType>(sourceType)) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
     // Assert the shape of the buffer view matches the expected encoding
     // shape. We can only do this when we are importing a buffer view as that's
     // what carries the information we need to validate.
-    if (sourceType.isa<IREE::HAL::BufferViewType>()) {
+    if (llvm::isa<IREE::HAL::BufferViewType>(sourceType)) {
       // NOTE: we do this before the other checks as it's the most likely
       // mistake and it's better to know of a shape mismatch than just buffer
       // byte length difference.
-      if (auto tensorType = targetType.dyn_cast<RankedTensorType>()) {
+      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(targetType)) {
         if (failed(buildEncodingAssertions(op.getLoc(), adaptor.getSource(),
                                            op.getNameAttr(), tensorType,
                                            op.getTargetDims(), rewriter))) {
@@ -145,8 +145,8 @@ struct ConvertTensorExportOp
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSourceEncoding();
     auto targetType = op.getTarget().getType();
-    if (!targetType.isa<IREE::HAL::BufferType>() &&
-        !targetType.isa<IREE::HAL::BufferViewType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(targetType) &&
+        !llvm::isa<IREE::HAL::BufferViewType>(targetType)) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 

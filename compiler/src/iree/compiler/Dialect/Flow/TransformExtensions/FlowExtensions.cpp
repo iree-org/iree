@@ -98,7 +98,8 @@ static void rewriteParallelInsertSlices(PatternRewriter &rewriter,
     rewriter.setInsertionPoint(block.getTerminator());
     auto dynamicDims = Util::findVariadicDynamicDims(
         resultIndex, resultTensorOperands, resultTensorsDynamicDims);
-    BlockArgument destBbArg = parallelInsertOp.getDest().cast<BlockArgument>();
+    BlockArgument destBbArg =
+        llvm::cast<BlockArgument>(parallelInsertOp.getDest());
     assert(destBbArg.getOwner()->getParentOp() == forallOp &&
            "expected that dest is an output bbArg");
     Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
@@ -129,7 +130,7 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
                                  IRMapping tensorToFlowBvm) {
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
     Value source = extractSliceOp.getSource();
-    if (auto sourceBbArg = source.dyn_cast<BlockArgument>())
+    if (auto sourceBbArg = llvm::dyn_cast<BlockArgument>(source))
       if (sourceBbArg.getOwner()->getParentOp() == forallOp.getOperation())
         source = forallOp.getTiedOpOperand(sourceBbArg)->get();
 
@@ -208,7 +209,7 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
     for (OpOperand &use : op->getUses())
       if (forallOp->isProperAncestor(use.getOwner())) uses.push_back(&use);
     for (OpOperand *use : uses) {
-      unsigned resultNum = use->get().cast<OpResult>().getResultNumber();
+      unsigned resultNum = llvm::cast<OpResult>(use->get()).getResultNumber();
       rewriter.updateRootInPlace(
           use->getOwner(), [&]() { use->set(cloned->getOpResult(resultNum)); });
     }
@@ -259,12 +260,13 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
   llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
   for (const Operation &yieldingOp : InParallelOp.getYieldingOps()) {
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
-    BlockArgument destBbArg = parallelInsertOp.getDest().cast<BlockArgument>();
+    BlockArgument destBbArg =
+        llvm::cast<BlockArgument>(parallelInsertOp.getDest());
     Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
     bool inserted = resultTensorOperands.insert(dest);
     if (!inserted) continue;
     auto dynamicDims =
-        getIndicesOfDynamicDims(dest.getType().cast<ShapedType>());
+        getIndicesOfDynamicDims(llvm::cast<ShapedType>(dest.getType()));
     for (int64_t dim : dynamicDims)
       resultTensorsDynamicDims.insert(
           rewriter.create<tensor::DimOp>(loc, dest, dim));
@@ -281,7 +283,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
 
   SmallVector<Value> nonTensorOperands, tensorOperands, tensorDynamicDims;
   for (Value v : valuesDefinedAbove) {
-    auto tensorType = v.getType().dyn_cast<RankedTensorType>();
+    auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType());
     if (!tensorType) {
       nonTensorOperands.push_back(v);
       continue;
@@ -294,7 +296,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
   // Also add shared outputs. (These are usually already added as result
   // tensor operands.)
   for (Value v : forallOp.getOutputs()) {
-    auto tensorType = v.getType().cast<RankedTensorType>();
+    auto tensorType = llvm::cast<RankedTensorType>(v.getType());
     if (resultTensorOperands.contains(v)) continue;
     tensorOperands.push_back(v);
     for (int64_t dim : getIndicesOfDynamicDims(tensorType))
@@ -404,7 +406,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
     auto dynamicDims = Util::findVariadicDynamicDims(
         en.index(), allTensorOperands, allTensorDimsBBArgs);
     auto loadOp = rewriter.create<Flow::DispatchTensorLoadOp>(
-        loc, en.value().getType().cast<RankedTensorType>(),
+        loc, llvm::cast<RankedTensorType>(en.value().getType()),
         tensorToFlowBvm.lookup(en.value()), dynamicDims);
     // Replace the tensor -> flow.dispatch.tensor entry by a
     // tensor -> flow.dispatch.tensor.load entry.
@@ -498,7 +500,7 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   auto dispatchRegion = state.getPayloadOps(getDispatchRegion());
 
   if (targetOps.empty() && dispatchRegion.empty()) {
-    transformResults.set(getResult().cast<OpResult>(),
+    transformResults.set(llvm::cast<OpResult>(getResult()),
                          SmallVector<mlir::Operation *>{});
     return DiagnosedSilenceableFailure::success();
   }
@@ -529,7 +531,7 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
     clonedTargets.push_back(*clonedTarget);
   }
 
-  transformResults.set(getCloned().cast<OpResult>(), clonedTargets);
+  transformResults.set(llvm::cast<OpResult>(getCloned()), clonedTargets);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -549,7 +551,7 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   auto dispatchRegion = state.getPayloadOps(getDispatchRegion());
 
   if (targetOps.empty() && dispatchRegion.empty()) {
-    transformResults.set(getResult().cast<OpResult>(),
+    transformResults.set(llvm::cast<OpResult>(getResult()),
                          SmallVector<mlir::Operation *>{});
     return DiagnosedSilenceableFailure::success();
   }
@@ -579,7 +581,7 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
     regionOp = *newRegionOp;
   }
 
-  transformResults.set(getTransformed().cast<OpResult>(),
+  transformResults.set(llvm::cast<OpResult>(getTransformed()),
                        {regionOp.getOperation()});
   return DiagnosedSilenceableFailure::success();
 }
@@ -640,7 +642,8 @@ static FailureOr<Operation *> cloneSucceedingOpIntoDispatchRegion(
   // Replace all operands that are results of the regionOp.
   for (OpOperand &operand : newTargetOp->getOpOperands()) {
     if (operand.get().getDefiningOp() == regionOp) {
-      unsigned resultNumber = operand.get().cast<OpResult>().getResultNumber();
+      unsigned resultNumber =
+          llvm::cast<OpResult>(operand.get()).getResultNumber();
       operand.set(returnOp->getOperand(resultNumber));
     }
   }
@@ -707,7 +710,8 @@ static FailureOr<Flow::DispatchRegionOp> moveSucceedingOpIntoDispatchRegion(
   // Replace all operands that are results of the regionOp.
   for (OpOperand &operand : target->getOpOperands()) {
     if (operand.get().getDefiningOp() == regionOp) {
-      unsigned resultNumber = operand.get().cast<OpResult>().getResultNumber();
+      unsigned resultNumber =
+          llvm::cast<OpResult>(operand.get()).getResultNumber();
       rewriter.updateRootInPlace(
           target, [&]() { operand.set(returnOp->getOperand(resultNumber)); });
     }
@@ -730,7 +734,8 @@ static FailureOr<Flow::DispatchRegionOp> moveSucceedingOpIntoDispatchRegion(
   for (OpOperand *use : usesOutsideOfRegion) {
     rewriter.updateRootInPlace(use->getOwner(), [&]() {
       use->set(regionOp->getResult(
-          previousNumResults + use->get().cast<OpResult>().getResultNumber()));
+          previousNumResults +
+          llvm::cast<OpResult>(use->get()).getResultNumber()));
     });
   }
 
@@ -765,7 +770,7 @@ transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
     newTargets.push_back(*newTarget);
   }
 
-  transformResults.set(getCloned().cast<OpResult>(), newTargets);
+  transformResults.set(llvm::cast<OpResult>(getCloned()), newTargets);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -806,7 +811,7 @@ transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
     regionOp = *newRegionOp;
   }
 
-  transformResults.set(getTransformed().cast<OpResult>(),
+  transformResults.set(llvm::cast<OpResult>(getTransformed()),
                        {regionOp.getOperation()});
   return DiagnosedSilenceableFailure::success();
 }

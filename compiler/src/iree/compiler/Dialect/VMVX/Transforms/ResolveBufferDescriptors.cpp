@@ -96,7 +96,7 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
 static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
     IREE::HAL::InterfaceBindingSubspanOp binding, RewriterBase &rewriter,
     Location loc) {
-  auto memRefType = binding.getResult().getType().template cast<MemRefType>();
+  auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
   int rank = memRefType.getRank();
   DescriptorInfo resultDescriptor;
 
@@ -130,7 +130,7 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForAllocation(
   //   offset: byte offset from subspan divided by element type size
   //   sizes: static and dynamic sizes from the subspan
   //   strides: identity strides
-  auto memRefType = alloca.getResult().getType().cast<MemRefType>();
+  auto memRefType = llvm::cast<MemRefType>(alloca.getResult().getType());
   int rank = memRefType.getRank();
 
   // Compute sizes.
@@ -163,7 +163,7 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForGetGlobalOp(
   //   offset: byte offset from subspan divided by element type size
   //   sizes: static and dynamic sizes from the subspan
   //   strides: identity strides
-  auto memRefType = global.getResult().getType().cast<MemRefType>();
+  auto memRefType = llvm::cast<MemRefType>(global.getResult().getType());
   int rank = memRefType.getRank();
 
   // Compute sizes.
@@ -228,9 +228,9 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
     IndexSet indexSet(loc, rewriter);
 
     // Get types.
-    auto subType = subview.getResult().getType().template cast<MemRefType>();
+    auto subType = llvm::cast<MemRefType>(subview.getResult().getType());
     Value source = subview.getSource();
-    auto sourceType = source.getType().template cast<MemRefType>();
+    auto sourceType = llvm::cast<MemRefType>(source.getType());
     int sourceRank = sourceType.getRank();
     int subRank = subType.getRank();
     (void)subRank;
@@ -333,7 +333,7 @@ struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
                                 PatternRewriter &rewriter) const override {
     auto alloca = op.getSource().template getDefiningOp<memref::AllocaOp>();
     if (!alloca) return failure();
-    auto memRefType = alloca.getResult().getType().template cast<MemRefType>();
+    auto memRefType = llvm::cast<MemRefType>(alloca.getResult().getType());
     if (!memRefType.getLayout().isIdentity()) {
       return rewriter.notifyMatchFailure(op, "not identity allocation");
     }
@@ -366,7 +366,7 @@ struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
                                 PatternRewriter &rewriter) const override {
     auto global = op.getSource().template getDefiningOp<memref::GetGlobalOp>();
     if (!global) return failure();
-    auto memRefType = global.getResult().getType().template cast<MemRefType>();
+    auto memRefType = llvm::cast<MemRefType>(global.getResult().getType());
     if (!memRefType.getLayout().isIdentity()) {
       return rewriter.notifyMatchFailure(op, "not identity allocation");
     }

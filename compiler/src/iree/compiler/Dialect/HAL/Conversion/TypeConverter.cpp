@@ -41,9 +41,9 @@ HALTypeConverter::HALTypeConverter(
   addTargetMaterialization([](OpBuilder &builder, IREE::HAL::BufferType type,
                               ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
-    if (inputs[0].getType().isa<TensorType>()) {
+    if (llvm::isa<TensorType>(inputs[0].getType())) {
       return builder.create<IREE::HAL::TensorExportOp>(loc, type, inputs[0]);
-    } else if (inputs[0].getType().isa<IREE::HAL::BufferViewType>()) {
+    } else if (llvm::isa<IREE::HAL::BufferViewType>(inputs[0].getType())) {
       return builder.create<IREE::HAL::BufferViewBufferOp>(loc, type,
                                                            inputs[0]);
     } else {
@@ -58,9 +58,9 @@ HALTypeConverter::HALTypeConverter(
     assert(inputs.size() == 1);
     auto inputValue = inputs[0];
     auto inputType = inputValue.getType();
-    if (inputType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(inputType)) {
       return builder.create<IREE::HAL::TensorExportOp>(loc, type, inputValue);
-    } else if (inputType.isa<IREE::HAL::BufferType>()) {
+    } else if (llvm::isa<IREE::HAL::BufferType>(inputType)) {
       // Look for the buffer view this buffer came from, if any.
       // If we don't have the origin buffer view then we can't know the shape
       // and can't materialize one here - it's too late.

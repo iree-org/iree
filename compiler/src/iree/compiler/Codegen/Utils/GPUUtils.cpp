@@ -81,7 +81,7 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   assert(workgroupSizeAttr.has_value());
   for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
     workgroupSize[index] =
-        attr.cast<mlir::IntegerAttr>().getValue().getZExtValue();
+        llvm::cast<mlir::IntegerAttr>(attr).getValue().getZExtValue();
   }
   return workgroupSize;
 }
@@ -347,7 +347,7 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
                            uint32_t numLaneToReduce) {
-  VectorType unpackedType = input.getType().dyn_cast<VectorType>();
+  VectorType unpackedType = llvm::dyn_cast<VectorType>(input.getType());
   Value laneVal = input;
   assert(llvm::isPowerOf2_32(numLaneToReduce));
   // Parallel reduction using butterfly shuffles.
@@ -410,12 +410,12 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
       return builder.getZeroAttr(type);
     case vector::CombiningKind::MINF: {
       auto posInfApFloat = APFloat::getInf(
-          type.cast<FloatType>().getFloatSemantics(), /*Negative=*/false);
+          llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
       return builder.getFloatAttr(type, posInfApFloat);
     }
     case vector::CombiningKind::MAXF: {
       auto negInfApFloat = APFloat::getInf(
-          type.cast<FloatType>().getFloatSemantics(), /*Negative=*/true);
+          llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);
       return builder.getFloatAttr(type, negInfApFloat);
     }
   }
@@ -428,7 +428,7 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
 /// width for shuffles.
 static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
                                     Value input, vector::CombiningKind kind) {
-  auto vecType = input.getType().cast<VectorType>();
+  auto vecType = llvm::cast<VectorType>(input.getType());
   Type elementType = vecType.getElementType();
   int64_t vecSize = vecType.getDimSize(0);
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
@@ -479,7 +479,7 @@ static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
 static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
                                        vector::CombiningKind kind,
                                        Type identityType) {
-  auto vectorType = identityType.dyn_cast<VectorType>();
+  auto vectorType = llvm::dyn_cast<VectorType>(identityType);
   Type elementType = identityType;
   if (vectorType) {
     elementType = vectorType.getElementType();
@@ -550,7 +550,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
   }
   // Handles cases for sub-32bit precision where output is still in vector form.
-  if (laneVal.getType().isa<VectorType>()) {
+  if (llvm::isa<VectorType>(laneVal.getType())) {
     laneVal = builder.create<vector::ReductionOp>(loc, kind, laneVal);
   }
   return laneVal;
@@ -579,14 +579,14 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     for (Operation *users : op->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
       if (!extract) return std::nullopt;
-      auto vecType = extract.getResult().getType().cast<VectorType>();
+      auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
     return llvm::to_vector(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
+    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       // TODO: The condition for unrolling elementwise should be restricted
       // only to operations that need unrolling (connected to the contract).
       if (vecType.getRank() < 2) return std::nullopt;
@@ -599,7 +599,7 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
       for (Operation *users : op->getUsers()) {
         auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
         if (!extract) return std::nullopt;
-        auto vecType = extract.getResult().getType().cast<VectorType>();
+        auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
         if (sliceType && sliceType != vecType) return std::nullopt;
         sliceType = vecType;
       }
@@ -692,7 +692,8 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
   // Shape of warp-level vector read (load) operation.
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-    auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
+    auto resultVectorType =
+        llvm::cast<VectorType>(readOp.getVector().getType());
     Type resultElementType = resultVectorType.getElementType();
 
     std::optional<int> operandId =
@@ -762,7 +763,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         for (Operation *users : op->getUsers()) {
           auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
           if (!extract) return std::nullopt;
-          auto vecType = extract.getResult().getType().cast<VectorType>();
+          auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
           if (sliceType && sliceType != vecType) return std::nullopt;
           sliceType = vecType;
         }
@@ -774,8 +775,8 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 }
 
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
-  auto addrSpace =
-      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+  auto addrSpace = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(
+      memrefType.getMemorySpace());
   return addrSpace &&
          addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }

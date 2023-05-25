@@ -160,8 +160,8 @@ bool CompiledBinary::isSupportedResultType(Type type) {
   // TODO(laurenzo): Not currently supported. VMVX would need to support these
   // and today it doesn't. We could use alternative backends (LLVM CPU/etc) if
   // we wanted to handle f64, but f16 and bf16 often need special hardware.
-  if (type.isa<Float16Type>() || type.isa<BFloat16Type>() ||
-      type.isa<Float64Type>()) {
+  if (llvm::isa<Float16Type>(type) || llvm::isa<BFloat16Type>(type) ||
+      llvm::isa<Float64Type>(type)) {
     return false;
   }
 
@@ -171,12 +171,12 @@ bool CompiledBinary::isSupportedResultType(Type type) {
   }
 
   // Special support for i1.
-  if (type.isa<IntegerType>() && type.getIntOrFloatBitWidth() == 1) {
+  if (llvm::isa<IntegerType>(type) && type.getIntOrFloatBitWidth() == 1) {
     return true;
   }
 
   // Support tensors.
-  if (auto tt = type.dyn_cast<RankedTensorType>()) {
+  if (auto tt = llvm::dyn_cast<RankedTensorType>(type)) {
     return isSupportedResultType(tt.getElementType());
   }
 

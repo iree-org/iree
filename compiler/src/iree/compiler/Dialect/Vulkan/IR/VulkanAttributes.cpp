@@ -105,17 +105,17 @@ StringRef TargetEnvAttr::getKindName() { return "target_env"; }
 
 Version TargetEnvAttr::getVersion() {
   return static_cast<Version>(
-      getImpl()->version.cast<IntegerAttr>().getValue().getZExtValue());
+      llvm::cast<IntegerAttr>(getImpl()->version).getValue().getZExtValue());
 }
 
 unsigned TargetEnvAttr::getRevision() {
-  return getImpl()->revision.cast<IntegerAttr>().getValue().getZExtValue();
+  return llvm::cast<IntegerAttr>(getImpl()->revision).getValue().getZExtValue();
 }
 
 TargetEnvAttr::ext_iterator::ext_iterator(ArrayAttr::iterator it)
     : llvm::mapped_iterator<ArrayAttr::iterator, Extension (*)(Attribute)>(
           it, [](Attribute attr) {
-            return attr.cast<ExtensionAttr>().getValue();
+            return llvm::cast<ExtensionAttr>(attr).getValue();
           }) {}
 
 TargetEnvAttr::ext_range TargetEnvAttr::getExtensions() {
@@ -124,7 +124,7 @@ TargetEnvAttr::ext_range TargetEnvAttr::getExtensions() {
 }
 
 ArrayAttr TargetEnvAttr::getExtensionsAttr() {
-  return getImpl()->extensions.cast<ArrayAttr>();
+  return llvm::cast<ArrayAttr>(getImpl()->extensions);
 }
 
 spirv::Vendor TargetEnvAttr::getVendorID() { return getImpl()->vendorID; }
@@ -136,7 +136,7 @@ spirv::DeviceType TargetEnvAttr::getDeviceType() {
 uint32_t TargetEnvAttr::getDeviceID() { return getImpl()->deviceID; }
 
 CapabilitiesAttr TargetEnvAttr::getCapabilitiesAttr() {
-  return getImpl()->capabilities.cast<CapabilitiesAttr>();
+  return llvm::cast<CapabilitiesAttr>(getImpl()->capabilities);
 }
 
 LogicalResult TargetEnvAttr::verify(
@@ -331,7 +331,7 @@ void VulkanDialect::printAttribute(Attribute attr,
                                    DialectAsmPrinter &printer) const {
   if (succeeded(generatedAttributePrinter(attr, printer))) return;
 
-  if (auto targetEnv = attr.dyn_cast<TargetEnvAttr>())
+  if (auto targetEnv = llvm::dyn_cast<TargetEnvAttr>(attr))
     return print(targetEnv, printer);
 
   assert(false && "unhandled Vulkan attribute kind");

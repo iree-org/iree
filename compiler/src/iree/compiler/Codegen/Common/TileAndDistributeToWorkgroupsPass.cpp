@@ -129,7 +129,7 @@ getMaterializationInfo(tensor::PackOp packOp) {
       encodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
     } else {
       encodingInfo.innerTileSizes.push_back(
-          tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
+          llvm::cast<IntegerAttr>(tileSize.get<Attribute>()).getInt());
     }
   }
   encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());

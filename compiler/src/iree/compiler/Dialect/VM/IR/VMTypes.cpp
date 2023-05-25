@@ -50,10 +50,10 @@ struct ListTypeStorage : public TypeStorage {
 
 // static
 bool ListType::isCompatible(Type type) {
-  if (type.isa<OpaqueType>()) {
+  if (llvm::isa<OpaqueType>(type)) {
     // Allow all types (variant).
     return true;
-  } else if (type.isa<RefType>()) {
+  } else if (llvm::isa<RefType>(type)) {
     // Allow all ref types.
     return true;
   } else if (type.isIntOrFloat()) {
@@ -86,7 +86,7 @@ Type ListType::getElementType() { return getImpl()->elementType; }
 namespace detail {
 
 struct RefTypeStorage : public TypeStorage {
-  RefTypeStorage(Type objectType) : objectType(objectType.cast<Type>()) {}
+  RefTypeStorage(Type objectType) : objectType(llvm::cast<Type>(objectType)) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
@@ -105,10 +105,11 @@ struct RefTypeStorage : public TypeStorage {
 
 // static
 bool RefType::isCompatible(Type type) {
-  if (type.isa<RefType>()) {
+  if (llvm::isa<RefType>(type)) {
     // Already a ref - don't double-wrap.
     return false;
-  } else if (type.isSignlessIntOrIndexOrFloat() || type.isa<ComplexType>()) {
+  } else if (type.isSignlessIntOrIndexOrFloat() ||
+             llvm::isa<ComplexType>(type)) {
     // Ignore known primitive types.
     return false;
   }
