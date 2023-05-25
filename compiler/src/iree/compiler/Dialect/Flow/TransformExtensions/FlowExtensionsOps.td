@@ -38,10 +38,10 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.forall
     handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -69,10 +69,10 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
     handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -101,11 +101,11 @@ def WrapInDispatchRegionOp : Op<
     handle (i.e., the `dispatch.region` op).
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                        DefaultValuedAttr<BoolAttr, "true">:$generateWorkload);
-  let results = (outs PDL_Operation:$transformed);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -133,10 +133,13 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the cloned ops.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$cloned);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$cloned);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
@@ -166,10 +169,13 @@ def MovePrecedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the extended dispatch region.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$transformed);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$transformed);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
@@ -199,10 +205,13 @@ def CloneSucceedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the cloned ops.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$cloned);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$cloned);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
@@ -232,10 +241,13 @@ def MoveSucceedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the new dispatch region.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$transformed);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$transformed);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(

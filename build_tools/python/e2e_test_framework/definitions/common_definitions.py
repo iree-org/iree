@@ -207,3 +207,9 @@ ZEROS_MODEL_INPUT_DATA = ModelInputData(id=unique_ids.MODEL_INPUT_DATA_ZEROS,
                                         tags=[],
                                         data_format=InputDataFormat.ZEROS,
                                         source_url="")
+
+
+@dataclass(frozen=True)
+class CpuBenchmarkConfig(object):
+  model: Model
+  threads: List[int]
