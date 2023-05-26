@@ -237,7 +237,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 
   pm.addNestedPass<func::FuncOp>(createSPIRVMapMemRefStorageClassPass());
   pm.addPass(createSPIRVEmulateI64Pass());
-  pm.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
+  pm.addPass(createConvertBf16ArithToF32Pass());
   pm.addPass(createConvertBf16ToUInt16BuffersPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
