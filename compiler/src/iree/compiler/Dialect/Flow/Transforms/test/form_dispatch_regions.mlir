@@ -374,3 +374,23 @@ func.func @data_dependent_shape(%arg0 : tensor<f32>, %arg1 : tensor<2xi32>)
 //      CHECK:     count(%[[B0:.+]]: index, %[[B1:.+]]: index)
 //      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_dag_root %[[B0]], %[[B1]]
 //      CHECK:       flow.return %[[X]], %[[Y]], %[[Z]]
+
+// -----
+
+func.func @no_yield_dead_results(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?xf32>, %arg2 : tensor<?xf32>) -> tensor<?xf32> {
+  %0:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0 : tensor<?x?xf32>) outs(%arg1, %arg2 : tensor<?xf32>, tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %1 = arith.addf %b0, %b1 : f32
+      %2 = arith.addf %b0, %b2 : f32
+      linalg.yield %1, %2 : f32, f32
+    } -> (tensor<?xf32>, tensor<?xf32>)
+  return %0#1 : tensor<?xf32>
+}
+// CHECK: func @no_yield_dead_results
+// CHECK:   %[[RESULT:.+]] = flow.dispatch.region 
+// CHECK:     %[[GENERIC:.+]]:2 = linalg.generic
+// CHECK:     flow.return %[[GENERIC]]#1
+// CHECK:   return %[[RESULT]]
