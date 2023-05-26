@@ -482,17 +482,42 @@ class CudaMatmulGenerator:
     ]
 
     # Create a list of matmul problem and initialize with some *default* shapes.
-    self.matmul_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
-                          [2560, 2560, 2560], [3456, 1024, 2048]]
+    self.matmul_shapes = [[256, 512, 128], [2560, 2560, 2560],
+                          [3456, 1024, 2048]]
 
     # Append matmul problem with *user* provided shapes.
-    for m in get_cmd_line_argument_list(self.args.problem_m):
-      for n in get_cmd_line_argument_list(self.args.problem_n):
-        for k in get_cmd_line_argument_list(self.args.problem_k):
-          self.matmul_shapes.append([m, n, k])
+    self.add_cmd_line_shapes()
 
     # Matmul dispatches collection.
     self.dispatches_collection_list = []
+
+  def add_cmd_line_shapes(self):
+    """Adds matmul shapes from command line arguments."""
+
+    m_list = get_cmd_line_argument_list(self.args.problem_m)
+    n_list = get_cmd_line_argument_list(self.args.problem_n)
+    k_list = get_cmd_line_argument_list(self.args.problem_k)
+
+    # If no command line matmul problem shapes are provided, only
+    # use the default shapes.
+    if len(m_list) == 0 and len(n_list) == 0 and len(k_list) == 0:
+      return
+
+    # If any of the command line matmul problem shapes are provided,
+    # set the default shapes to empty problem dimension.
+    if len(m_list) == 0:
+      m_list = [256]
+    if len(n_list) == 0:
+      n_list = [256]
+    if len(k_list) == 0:
+      k_list = [256]
+
+    # Append the command line matmul problem shapes with user-proivded
+    # matmul problem shapes.
+    for m in m_list:
+      for n in n_list:
+        for k in k_list:
+          self.matmul_shapes.append([m, n, k])
 
   def _cuda_supported_configuration_list(self, operation, configuration_list):
     """Returns a list of supported configurations for CUDA."""
@@ -545,7 +570,7 @@ class CudaMatmulGenerator:
         operation, supported_configuration_list))
 
   def _cuda_matmul_tensor_cores_f16(self):
-    """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
+    """Appends dispatches for TensorCore with F16 input, F16 accum, F16 output."""
     configuration_list = self._get_matmul_custom_compilation_info_list(
         self.tile_descriptions_tensor_cores_f16, self.translation_infos,
         OperationKind.Matmul)
@@ -554,7 +579,7 @@ class CudaMatmulGenerator:
                                             configuration_list)
 
   def _cuda_matmul_tensor_cores_f32(self):
-    """Appends a list of matmul dispatches for GPU TensorCore F32 data type."""
+    """Appends dispatches for TensorCore with F32 input, F32 accum, F32 output."""
     configuration_list = self._get_matmul_custom_compilation_info_list(
         self.tile_descriptions_tensor_cores_f32, self.translation_infos,
         OperationKind.Matmul)
@@ -562,8 +587,18 @@ class CudaMatmulGenerator:
     self._append_matmul_dispatch_collection(self.matmul_shapes, data_type,
                                             configuration_list)
 
+  def _cuda_matmul_tensor_cores_mixed_precision(self):
+    """Appends dispatches for TensorCore with F16 input, F32 accum, F32 output."""
+    configuration_list = self._get_matmul_custom_compilation_info_list(
+        self.tile_descriptions_tensor_cores_f16, self.translation_infos,
+        OperationKind.Matmul)
+    data_type = [DataType.f16, DataType.f16, DataType.f32]
+    self._append_matmul_dispatch_collection(self.matmul_shapes, data_type,
+                                            configuration_list)
+
   def generate(self):
     """Generates a list of matmul operations."""
     self._cuda_matmul_tensor_cores_f16()
     self._cuda_matmul_tensor_cores_f32()
+    self._cuda_matmul_tensor_cores_mixed_precision()
     return self.dispatches_collection_list
