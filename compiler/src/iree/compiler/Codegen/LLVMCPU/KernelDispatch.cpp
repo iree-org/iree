@@ -44,11 +44,6 @@ namespace iree_compiler {
 /// changed/modified at any time.
 /// TODO: Find a way to plumb this through to not rely on these flags.
 
-static llvm::cl::opt<int> clNativeVectorSizeInBytes(
-    "iree-codegen-llvm-vector-size-in-bytes",
-    llvm::cl::desc("native vector size to use on the hardware"),
-    llvm::cl::init(16));
-
 static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     "iree-codegen-llvm-number-of-threads",
     llvm::cl::desc("number of threads that are used at runtime if codegen "
@@ -250,26 +245,32 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
 /// looked up from this op.
-static std::optional<int64_t> getNativeVectorSizeInBytes(
-    func::FuncOp entryPointFn) {
+static int64_t getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto nativeVectorSizeAttr =
       getConfigIntegerAttr(targetAttr, "native_vector_size");
-  if (!nativeVectorSizeAttr) return std::nullopt;
-  int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
-  if (!nativeVectorSizeVal) return std::nullopt;
-  return nativeVectorSizeVal;
+  if (nativeVectorSizeAttr) {
+    int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
+    if (nativeVectorSizeVal) {
+      return nativeVectorSizeVal;
+    }
+  }
+
+  // TODO(dcaballe): Remove this workaround for VMVX.
+  if (isVMVXBackend(targetAttr)) {
+    constexpr int64_t defaultNativeVectorSizeforVMVX = 16;
+    return defaultNativeVectorSizeforVMVX;
+  }
+
+  assert(0 && "Missing 'native_vector_size' attribute");
+  return 0;
 }
 
 /// For a given `shapedType` or (`byteWidth` of element type) return the number
 /// of elements that correspond to the native vector size. Returns 1 as the
 /// fallback.
 static int64_t getVectorSize(func::FuncOp entryPointFn, unsigned byteWidth) {
-  if (std::optional<int64_t> nativeVectorSize =
-          getNativeVectorSizeInBytes(entryPointFn)) {
-    return nativeVectorSize.value() / byteWidth;
-  }
-  return clNativeVectorSizeInBytes / byteWidth;
+  return getNativeVectorSizeInBytes(entryPointFn) / byteWidth;
 }
 static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   Type elementType = shapedType.getElementType();
@@ -1507,10 +1508,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
   // the cases are f32 and i32, so we divide it by 4.
-  auto nativeVecSize = getNativeVectorSizeInBytes(entryPointFn);
-  int64_t vecSize =
-      nativeVecSize ? nativeVecSize.value() : clNativeVectorSizeInBytes;
-  vecSize /= 4;
+  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
   SmallVector<int64_t> vecTileSizes(minTileSizes.begin(), minTileSizes.end());
   for (auto &i : vecTileSizes) {
     i = roundUpToPow2(std::min(i, vecSize),

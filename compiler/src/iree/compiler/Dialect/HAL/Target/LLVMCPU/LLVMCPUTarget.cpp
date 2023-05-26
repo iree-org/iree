@@ -48,6 +48,16 @@ static llvm::cl::opt<bool> clEnableCPUMicrokernels(
         "Enables microkernel lowering for llvmcpu backend (experimental)"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
+    "iree-llvmcpu-native-vector-width-in-bytes",
+    llvm::cl::desc("sets the native vector register width of the hardware. It "
+                   "overrides any inferred vector register width"),
+    llvm::cl::init(0));
+
+// Default native vector width when target or specific native vector width are
+// not provided.
+constexpr unsigned defaultNativeVectorWidth = 16;
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -828,9 +838,19 @@ class LLVMCPUTargetBackend final : public TargetBackend {
 
     llvm::TargetTransformInfo tti =
         targetMachine->getTargetTransformInfo(*dummyFunc);
-    config_.vectorSize = tti.getRegisterBitWidth(
-                             llvm::TargetTransformInfo::RGK_FixedWidthVector) /
-                         8;
+
+    // Set the native vector width. We prioritize user-specified widths over
+    // widths provided by TTI.
+    if (clNativeVectorWidthInBytes) {
+      config_.vectorSize = clNativeVectorWidthInBytes;
+    } else {
+      unsigned ttiVectorWidth =
+          tti.getRegisterBitWidth(
+              llvm::TargetTransformInfo::RGK_FixedWidthVector) /
+          8;
+      config_.vectorSize =
+          ttiVectorWidth > 1 ? ttiVectorWidth : defaultNativeVectorWidth;
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
