@@ -788,7 +788,7 @@ static LogicalResult createFusionGroups(
       }
 
       auto newRegionOp =
-          movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
+          movePrecedingOpsIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }

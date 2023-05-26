@@ -576,7 +576,7 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   IRRewriter rewriter(regionOp->getContext());
   for (Operation *target : orderedTargets) {
     auto newRegionOp =
-        movePrecedingOpIntoDispatchRegion(rewriter, target, regionOp);
+        movePrecedingOpsIntoDispatchRegion(rewriter, target, regionOp);
     if (failed(newRegionOp)) return emitDefaultDefiniteFailure(target);
     regionOp = *newRegionOp;
   }
@@ -724,7 +724,7 @@ static FailureOr<Flow::DispatchRegionOp> moveSucceedingOpIntoDispatchRegion(
   // specific results in the future. Many ops have just one result, so this
   // should not be a large overhead.
   for (const auto &it : llvm::enumerate(target->getResults())) {
-    auto newRegionOp = appendDispatchRegionResult(
+    auto newRegionOp = appendDispatchRegionResults(
         rewriter, regionOp, it.value(), dynamicDims[it.index()]);
     if (failed(newRegionOp)) return failure();
     regionOp = *newRegionOp;
