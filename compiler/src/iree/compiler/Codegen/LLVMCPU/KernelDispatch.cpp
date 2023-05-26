@@ -262,7 +262,7 @@ static int64_t getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
     return defaultNativeVectorSizeforVMVX;
   }
 
-  llvm_unreachable("Missing 'native_vector_size' attribute");
+  assert(0 && "Missing 'native_vector_size' attribute");
 }
 
 /// For a given `shapedType` or (`byteWidth` of element type) return the number
