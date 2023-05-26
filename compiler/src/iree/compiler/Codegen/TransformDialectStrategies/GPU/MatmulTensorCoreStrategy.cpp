@@ -221,9 +221,11 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
       buildMatmulStrategyBlockDistribution(b, variantH, strategy);
   // Tile reduction loop.
   SmallVector<int64_t> tileSizes{0, 0, strategy.reductionTileSize};
+  // Avoid canonicalizing before the pad to avoid folding away the extract_slice
+  // on the output needed to hoist the output pad.
   auto tileReductionResult = buildTileFuseToScfFor(
       b, variantH, matmulH, {}, getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)),
-      /*canonicalize=*/!strategy.alignedRes());
+      /*canonicalize=*/false);
 
   // Step 2. Pad the matmul op.
   // TODO: use captured type information to configure the padding values.
