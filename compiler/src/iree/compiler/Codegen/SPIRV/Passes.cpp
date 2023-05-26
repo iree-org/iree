@@ -437,6 +437,12 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
   nestedPM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedPM.addPass(createCanonicalizerPass());
   nestedPM.addPass(createCSEPass());
+  // After vectorization and some basic cleanup, optimize vector transfer ops.
+  // Here we won't have large n-D vectors being put as loop carried values due
+  // to hoisting. Because this is before folding all memref subview ops away, we
+  // still have subview ops using the same indices, which allows for transfer
+  // read/write forwarding.
+  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
   nestedPM.addNestedPass<func::FuncOp>(memref::createFoldMemRefAliasOpsPass());
   nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());

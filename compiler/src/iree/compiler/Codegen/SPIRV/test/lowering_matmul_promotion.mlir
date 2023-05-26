@@ -91,8 +91,7 @@ hal.executable @matmul_f32_128x256x64 {
 //  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<2x64x20xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 //  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<2x16x68xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 // CHECK-COUNT-128:   vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
-//  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<128x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//   CHECK-COUNT-8:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<128x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //   CHECK-COUNT-8:   arith.divf %{{.+}}, %{{.+}} : vector<4xf32>
 //   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
 
@@ -159,8 +158,6 @@ hal.executable @matmul_f32_128x256x64 {
 //           CHECK:   memref.alloc() : memref<3x64x20xf32, #gpu.address_space<workgroup>>
 //           CHECK:   memref.alloc() : memref<3x16x68xf32, #gpu.address_space<workgroup>>
 // TODO: transfer_writes should be forwarded to the following transfer_reads
-//   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
-//   CHECK-COUNT-8:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<128x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:   vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_first_stage__, in_bounds = [true]} : memref<128x512xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:   vector.transfer_write %{{.+}}, %{{.+}} {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x64x20xf32, #gpu.address_space<workgroup>>
 //           CHECK:   vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_first_stage__, in_bounds = [true]} : memref<128x512xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
@@ -199,7 +196,75 @@ hal.executable @matmul_f32_128x256x64 {
 //  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x64x20xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 //  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x16x68xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 // CHECK-COUNT-128:   vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
-//  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<128x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//   CHECK-COUNT-8:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<128x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //   CHECK-COUNT-8:   arith.divf %{{.+}}, %{{.+}} : vector<4xf32>
 //   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
+
+// -----
+
+// Check that fused transposed consumer elementwise op does not cause extra workgroup memory allocations.
+
+#compilation = #iree_codegen.compilation_info<
+    lowering_config  = <tile_sizes = [[64, 256, 32]]>,
+    translation_info = <SPIRVMatmulPromoteVectorize pipeline_depth = 1>,
+    workgroup_size = [32, 8, 1]>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
+
+hal.executable @matmul_f16_4096x512x512 {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+    spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, AMD:DiscreteGPU, #spirv.resource_limits<
+      max_compute_shared_memory_size = 49152,
+      max_compute_workgroup_invocations = 1024,
+      max_compute_workgroup_size = [65535, 65535, 65535],
+      subgroup_size = 32>>}> {
+    hal.executable.export public @matmul_f16_4096x512x512 ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_f16_4096x512x512() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x512xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512x512xf16>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512xf16>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<512x4096xf16>>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4096, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x512xf16>> -> tensor<4096x512xf16>
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [512, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x512xf16>> -> tensor<512x512xf16>
+        %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [512], strides = [1] : !flow.dispatch.tensor<readonly:tensor<512xf16>> -> tensor<512xf16>
+        %7 = tensor.empty() : tensor<512x4096xf16>
+        %8 = tensor.empty() : tensor<4096x512xf16>
+        %9 = linalg.fill ins(%cst : f16) outs(%8 : tensor<4096x512xf16>) -> tensor<4096x512xf16>
+        %10 = linalg.matmul {compilation_info = #compilation}
+          ins(%4, %5 : tensor<4096x512xf16>, tensor<512x512xf16>) outs(%9 : tensor<4096x512xf16>) -> tensor<4096x512xf16>
+        %11 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1, d0)>],
+          iterator_types = ["parallel", "parallel"]
+        } ins(%10, %6 : tensor<4096x512xf16>, tensor<512xf16>) outs(%7 : tensor<512x4096xf16>) {
+        ^bb0(%in: f16, %in_0: f16, %out: f16):
+          %12 = arith.addf %in, %in_0 : f16
+          linalg.yield %12 : f16
+        } -> tensor<512x4096xf16>
+        flow.dispatch.tensor.store %11, %3, offsets = [0, 0], sizes = [512, 4096], strides = [1, 1] : tensor<512x4096xf16> -> !flow.dispatch.tensor<writeonly:tensor<512x4096xf16>>
+        return
+      }
+    }
+  }
+}
+
+//     CHECK-LABEL: func.func @matmul_f16_4096x512x512()
+//       CHECK-NOT:   memref.alloc()
+//           CHECK:   %{{.+}} = memref.alloc() : memref<32x264xf16, #gpu.address_space<workgroup>>
+//           CHECK:   %{{.+}} = memref.alloc() : memref<64x40xf16, #gpu.address_space<workgroup>>
+//       CHECK-NOT:   memref.alloc()
+//           CHECK:   scf.for %{{.+}} = %c0 to %c480 step %c32
+// CHECK-COUNT-512:     vector.fma
+//           CHECK:   scf.yield
