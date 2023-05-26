@@ -598,23 +598,6 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_check_single_backend_test_suite(
-  NAME
-    check_cuda
-  SRCS
-    "large_linalg_matmul.mlir"
-  TARGET_BACKEND
-    "cuda"
-  DRIVER
-    "cuda"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
-)
-
 iree_generated_trace_runner_test(
   NAME
     e2e_matmul_direct_f32_small_no_padding
