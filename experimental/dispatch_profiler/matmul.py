@@ -460,13 +460,13 @@ class CudaMatmulGenerator:
 
     # List of pre-defined threadblock tile shapes for Tensor Core.
     self.tile_descriptions_tensor_cores_f16 = [
-        TileDescription([256, 128, 32], 3, [64, 4, 1]),
-        TileDescription([128, 256, 32], 3, [128, 2, 1]),
+        #TileDescription([256, 128, 32], 3, [64, 4, 1]),
+        #TileDescription([128, 256, 32], 3, [128, 2, 1]),
         TileDescription([128, 128, 64], 4, [64, 2, 1]),
-        TileDescription([128, 128, 32], 5, [64, 2, 1]),
-        TileDescription([128, 64, 32], 5, [64, 2, 1]),
-        TileDescription([64, 64, 64], 5, [64, 2, 1]),
-        TileDescription([64, 64, 32], 10, [64, 2, 1]),
+        #TileDescription([128, 128, 32], 5, [64, 2, 1]),
+        #TileDescription([128, 64, 32], 5, [64, 2, 1]),
+        #TileDescription([64, 64, 64], 5, [64, 2, 1]),
+        #TileDescription([64, 64, 32], 10, [64, 2, 1]),
     ]
 
     self.tile_descriptions_tensor_cores_f32 = [
@@ -498,13 +498,13 @@ class CudaMatmulGenerator:
     n_list = get_cmd_line_argument_list(self.args.problem_n)
     k_list = get_cmd_line_argument_list(self.args.problem_k)
 
-    # If no command line matmul problem shapes are provided, only
-    # use the default shapes.
-    if len(m_list) == 0 and len(n_list) == 0 and len(k_list) == 0:
-      return
+
 
     # If any of the command line matmul problem shapes are provided,
     # set the default shapes to empty problem dimension.
+    if len(m_list) == 0 and len(n_list) == 0 and len(k_list) == 0:
+      return
+
     if len(m_list) == 0:
       m_list = [256]
     if len(n_list) == 0:
@@ -575,6 +575,15 @@ class CudaMatmulGenerator:
         self.tile_descriptions_tensor_cores_f16, self.translation_infos,
         OperationKind.Matmul)
     data_type = [DataType.f16, DataType.f16, DataType.f16]
+    self._append_matmul_dispatch_collection(self.matmul_shapes, data_type,
+                                            configuration_list)
+
+  def _cuda_matmul_tensor_cores_mixed_precision(self):
+    """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
+    configuration_list = self._get_matmul_custom_compilation_info_list(
+        self.tile_descriptions_tensor_cores_f16, self.translation_infos,
+        OperationKind.Matmul)
+    data_type = [DataType.f16, DataType.f16, DataType.f32]
     self._append_matmul_dispatch_collection(self.matmul_shapes, data_type,
                                             configuration_list)
 
