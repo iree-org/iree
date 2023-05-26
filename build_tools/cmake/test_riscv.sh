@@ -83,6 +83,7 @@ if [[ "${RISCV_PLATFORM}-${RISCV_ARCH}" == "linux-riscv_32" ]]; then
   # mhlo.power is also disabled because musl math library is not compiled for
   # 32-bit.
   test_exclude_args+=(
+    "stablehlo.*llvm-cpu.*pow"
     "xla.*llvm-cpu.*pow"
   )
 fi
