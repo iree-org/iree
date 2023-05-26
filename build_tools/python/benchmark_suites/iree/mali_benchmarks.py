@@ -25,11 +25,14 @@ class Android_Mali_Benchmarks(object):
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[ARM_VALHALL_GPU_TARGET])
-  FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_FUSE_PADDING,
-      tags=["experimental-flags", "fuse-padding"],
+  EXPERIMENTAL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_EXPERIMENTAL,
+      tags=["experimental-flags", "fuse-padding", "max-concurrency"],
       compile_targets=[ARM_VALHALL_GPU_TARGET],
-      extra_flags=["--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"])
+      extra_flags=[
+          "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+          "--iree-stream-partitioning-favor=max-concurrency"
+      ])
   # Kernel execution
   # Note that for kernel-execution benchmarks batch_size/repeat-count need to be
   # low enough that the whole dispatch completes within an OS-specific timeout.
@@ -38,14 +41,17 @@ class Android_Mali_Benchmarks(object):
   # INTERNAL; VK_ERROR_DEVICE_LOST; vkQueueSubmit; while invoking native function
   # hal.fence.await; while calling import;
   # ```
-  FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+  EXPERIMENTAL_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.
-      IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_FUSE_PADDING_REPEATED_KERNEL,
-      tags=["experimental-flags", "fuse-padding", "repeated-kernel"],
+      IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_EXPERIMENTAL_REPEATED_KERNEL,
+      tags=[
+          "experimental-flags", "fuse-padding", "max-concurrency",
+          "repeated-kernel"
+      ],
       compile_targets=[ARM_VALHALL_GPU_TARGET],
-      extra_flags=FUSE_PADDING_COMPILE_CONFIG.extra_flags +
+      extra_flags=EXPERIMENTAL_COMPILE_CONFIG.extra_flags +
       ["--iree-hal-benchmark-dispatch-repeat-count=32"])
-  FUSE_PADDING_REPEATED_KERNEL_RUN_FLAGS = ["--batch_size=32"]
+  EXPERIMENTAL_REPEATED_KERNEL_RUN_FLAGS = ["--batch_size=32"]
 
   FP32_MODELS = [
       tflite_models.DEEPLABV3_FP32,
@@ -71,13 +77,13 @@ class Android_Mali_Benchmarks(object):
         fp32_models=self.FP32_MODELS,
         fp16_models=self.FP16_MODELS,
         quant_models=self.QUANT_MODELS)
-    fuse_padding_gen_configs = self._get_module_generation_configs(
-        compile_config=self.FUSE_PADDING_COMPILE_CONFIG,
+    experimental_gen_configs = self._get_module_generation_configs(
+        compile_config=self.EXPERIMENTAL_COMPILE_CONFIG,
         fp32_models=self.FP32_MODELS,
         fp16_models=self.FP16_MODELS,
         quant_models=self.QUANT_MODELS)
-    fuse_padding_repeated_kernel_gen_configs = self._get_module_generation_configs(
-        compile_config=self.FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG,
+    experimental_repeated_kernel_gen_configs = self._get_module_generation_configs(
+        compile_config=self.EXPERIMENTAL_REPEATED_KERNEL_COMPILE_CONFIG,
         fp32_models=self.FP32_MODELS,
         fp16_models=self.FP16_MODELS,
         quant_models=self.QUANT_MODELS)
@@ -87,18 +93,18 @@ class Android_Mali_Benchmarks(object):
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_configs +
-        fuse_padding_gen_configs,
+        experimental_gen_configs,
         module_execution_configs=[module_execution_configs.VULKAN_CONFIG],
         device_specs=mali_devices)
     run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
-        module_generation_configs=fuse_padding_repeated_kernel_gen_configs,
+        module_generation_configs=experimental_repeated_kernel_gen_configs,
         module_execution_configs=[
             module_execution_configs.VULKAN_BATCH_SIZE_32_CONFIG
         ],
         device_specs=mali_devices)
 
-    gen_configs = (default_gen_configs + fuse_padding_gen_configs +
-                   fuse_padding_repeated_kernel_gen_configs)
+    gen_configs = (default_gen_configs + experimental_gen_configs +
+                   experimental_repeated_kernel_gen_configs)
     return (gen_configs, run_configs)
 
   def _get_module_generation_configs(
