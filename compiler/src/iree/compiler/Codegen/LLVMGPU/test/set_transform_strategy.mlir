@@ -260,7 +260,6 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-SAME:   pack_paddings = [1, 1, 1]
 // CHECK-SAME:   padding_dimensions = [0, 1, 2]
 // CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
-// CHECK:      transform.structured.match ops{["linalg.fill"]}
 // CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
 // CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
@@ -314,14 +313,13 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-LABEL: func @aligned_matmul
 
 // Block level is the same for aligned.
-// CHECK: transform.structured.tile %tiled_op[0, 0, 16] : (!pdl.operation) -> (!pdl.operation, !transform.any_op)
+// CHECK: transform.structured.tile %tiled_op[0, 0, 16]
 
 // Make sure we do not canonicalize if the result is aligned to avoid folding the extract_slice on the iterator.
 // CHECK-NEXT: transform.structured.pad %tiled_linalg_op
 // CHECK-SAME:   pack_paddings = [1, 1, 1]
 // CHECK-SAME:   padding_dimensions = [0, 1, 2]
 // CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
-// CHECK:      transform.structured.match ops{["linalg.fill"]}
 
 // Canonicalization is currently required here to enable pad to dps to produce linalg.copy ops.
 // CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
@@ -329,17 +327,13 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
 // CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
 // CHECK:      %[[RHS_PAD:.+]] = get_producer_of_operand %{{.*}}[1]
-// CHECK:      %[[LHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[LHS_PAD]] : (!pdl.operation) -> !pdl.operation
-// CHECK:      %[[RHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS_PAD]] : (!pdl.operation) -> !pdl.operation
+// CHECK:      %[[LHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[LHS_PAD]]
+// CHECK:      %[[RHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS_PAD]]
 // CHECK:      transform.structured.tile_to_forall_op %[[LHS_COPY]]   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
 // CHECK:      transform.structured.tile_to_forall_op %[[RHS_COPY]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
-
-// We shouldn't be generating masks so don't bother handling them.
-// CHECK-NOT:  transform.vector.lower_masks
-// CHECK-NOT:  transform.vector.materialize_masks
 
 // Verify we don't go down the path without the flag.
 // WITH_OPTIONS-LABEL: func @aligned_matmul
