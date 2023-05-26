@@ -263,6 +263,7 @@ static int64_t getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
   }
 
   assert(0 && "Missing 'native_vector_size' attribute");
+  return 0;
 }
 
 /// For a given `shapedType` or (`byteWidth` of element type) return the number
