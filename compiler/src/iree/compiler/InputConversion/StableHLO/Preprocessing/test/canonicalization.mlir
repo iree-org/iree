@@ -417,6 +417,67 @@ func.func @transpose(%arg0: tensor<2xf32>, %arg1: tensor<1x2xf32>, %arg2: tensor
 
 // -----
 
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic(%arg0: tensor<4xf32>, %arg1: tensor<2xi64>) -> tensor<5x4xf32> {
+  // CHECK: %[[RESULT:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [1] : (tensor<4xf32>) -> tensor<5x4xf32>
+  %0 = stablehlo.dynamic_broadcast_in_dim %arg0, %arg1, dims = [1] : (tensor<4xf32>, tensor<2xi64>) -> tensor<5x4xf32>
+  // CHECK: return %[[RESULT]] : tensor<5x4xf32>
+  func.return %0 : tensor<5x4xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_shape
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_shape(%arg0: tensor<i32>) -> tensor<4x32xi32> {
+  %0 = mhlo.constant dense<[4, 32]> : tensor<2xi32>
+  // CHECK: %[[RESULT:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [] : (tensor<i32>) -> tensor<4x32xi32>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [] : (tensor<i32>, tensor<2xi32>) -> tensor<?x32xi32>
+  %2 = stablehlo.dynamic_reshape %1, %0 : (tensor<?x32xi32>, tensor<2xi32>) -> tensor<4x32xi32>
+  // CHECK: return %[[RESULT]] : tensor<4x32xi32>
+  func.return %2 : tensor<4x32xi32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_index_shape
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_index_shape(%arg0: tensor<f32>) -> tensor<4x32xf32> {
+  %0 = shape.const_shape [4, 32] : tensor<2xindex>
+  // CHECK: %[[RESULT:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [] : (tensor<f32>) -> tensor<4x32xf32>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [] : (tensor<f32>, tensor<2xindex>) -> tensor<?x32xf32>
+  %2 = stablehlo.dynamic_reshape %1, %0 : (tensor<?x32xf32>, tensor<2xindex>) -> tensor<4x32xf32>
+  // CHECK: return %[[RESULT]] : tensor<4x32xf32>
+  func.return %2 : tensor<4x32xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_requires_cast
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_requires_cast(%arg0: tensor<f32>) -> tensor<?x?xf32> {
+  %0 = shape.const_shape [4, 32] : tensor<2xindex>
+  // CHECK: %[[BCAST:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [] : (tensor<f32>) -> tensor<4x32xf32>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [] : (tensor<f32>, tensor<2xindex>) -> tensor<?x?xf32>
+  // CHECK: %[[RESULT:.*]] = tensor.cast %[[BCAST]] : tensor<4x32xf32> to tensor<?x?xf32>
+  // CHECK: return %[[RESULT]] : tensor<?x?xf32>
+  func.return %1 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic
+func.func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<2xi64>) -> tensor<5x4xf32> {
+  // CHECK: %[[RESULT:.+]] = stablehlo.dynamic_broadcast_in_dim %arg0, %arg1, dims = [1] : (tensor<?xf32>, tensor<2xi64>) -> tensor<5x4xf32>
+  %0 = stablehlo.dynamic_broadcast_in_dim %arg0, %arg1, dims = [1] : (tensor<?xf32>, tensor<2xi64>) -> tensor<5x4xf32>
+  // CHECK: return %[[RESULT]] : tensor<5x4xf32>
+  func.return %0 : tensor<5x4xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_all_dims_non_expanding
+func.func @dynamic_broadcast_in_dim_all_dims_non_expanding(%arg0: tensor<*xf32>, %arg1: tensor<1xindex>) -> tensor<?xf32> {
+  // CHECK-SAME: %[[ARG:.*]]: tensor<*xf32>
+  %1 = "stablehlo.dynamic_broadcast_in_dim"(%arg0, %arg1) {
+    broadcast_dimensions = dense<0> : tensor<1xi64>,
+    known_expanding_dimensions = dense<> : tensor<0xi64>,
+    known_nonexpanding_dimensions = dense<0> : tensor<1xi64>
+  } : (tensor<*xf32>, tensor<1xindex>) -> tensor<?xf32>
+  // CHECK: %[[RES:.*]] = tensor.cast %[[ARG]] : tensor<*xf32> to tensor<?xf32>
+  // CHECK: return %[[RES]] : tensor<?xf32>
+  func.return %1 : tensor<?xf32>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @gather_to_slice
 func.func @gather_to_slice(%arg0: tensor<5x6x7xf32>) -> tensor<3x6x5xf32> {
   %0 = arith.constant dense<[1, 2]> : tensor<2xi32>

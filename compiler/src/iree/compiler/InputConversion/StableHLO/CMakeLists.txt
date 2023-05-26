@@ -39,6 +39,7 @@ iree_cc_library(
     StableHLOLegalization
   SRCS
     "ConvertCollectives.cpp"
+    "LegalizeCHLO.cpp"
     "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
