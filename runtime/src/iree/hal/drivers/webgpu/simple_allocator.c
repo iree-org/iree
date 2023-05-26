@@ -113,7 +113,7 @@ iree_hal_webgpu_simple_allocator_query_buffer_compatibility(
     }
   }
 
-  // DO NOT SUBMIT don't map anything
+  // WebGPU does not support synchronous buffer mapping, so disallow.
   if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
     return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
   }
@@ -155,9 +155,13 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
     //
     // We don't have copy source/dest modeled in IREE's HAL (yet) so for now
     // we only enable mapping if transfer is set and hope it's not a copy dest.
-    // For now, any copy dest buffers (such as for readback) must be allocated
-    // externally.
-    // DO NOT SUBMIT
+    // Any copy dest buffers (such as for readback) must be allocated directly:
+    //     WGPUBufferDescriptor descriptor = {
+    //       ...
+    //       .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+    //     };
+    //     buffer = wgpuDeviceCreateBuffer(device, descriptor);
+    //     iree_hal_webgpu_buffer_wrap(..., buffer, ...);
     if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER) &&
         !iree_any_bit_set(params->usage,
                           IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {

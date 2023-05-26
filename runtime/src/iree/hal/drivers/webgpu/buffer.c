@@ -94,82 +94,20 @@ static iree_status_t iree_hal_webgpu_buffer_map_range(
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
+  // WebGPU does not allow for synchronous buffer mapping.
+  // Use wgpuBufferMapAsync directly to avoid this emulation.
   iree_hal_webgpu_buffer_t* buffer = iree_hal_webgpu_buffer_cast(base_buffer);
-
-  // DO NOT SUBMIT
-  // if transfer + mapping only (matching webgpu limits) _or_ is_mapped==true
-  // -> use webgpu API
-  // else: emulated
   return iree_hal_buffer_emulated_map_range(
       buffer->device, base_buffer, mapping_mode, memory_access,
       local_byte_offset, local_byte_length, mapping);
-
-  if (!iree_all_bits_set(buffer->base.memory_type,
-                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "trying to map memory not host visible");
-  }
-
-  if (!buffer->is_mapped) {
-    WGPUMapMode map_mode = WGPUMapMode_None;
-    if (iree_all_bits_set(mapping_mode, IREE_HAL_MEMORY_ACCESS_READ)) {
-      map_mode |= WGPUMapMode_Read;
-    }
-    if (iree_all_bits_set(mapping_mode, IREE_HAL_MEMORY_ACCESS_WRITE)) {
-      map_mode |= WGPUMapMode_Write;
-    }
-    IREEWGPUBufferMapSyncStatus sync_status = iree_wgpuBufferMapSync(
-        iree_hal_webgpu_device_handle(buffer->device), buffer->handle, map_mode,
-        (size_t)local_byte_offset, (size_t)local_byte_length);
-    switch (sync_status) {
-      case IREEWGPUBufferMapSyncStatus_Success:
-        // Succeeded!
-        break;
-      case IREEWGPUBufferMapSyncStatus_Error:
-        return iree_make_status(IREE_STATUS_INTERNAL, "failed to map buffer");
-      default:
-      case IREEWGPUBufferMapSyncStatus_Unknown:
-        return iree_make_status(IREE_STATUS_UNKNOWN, "failed to map buffer");
-      case IREEWGPUBufferMapSyncStatus_DeviceLost:
-        return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                                "device lost while mapping buffer");
-    }
-  }
-
-  uint8_t* data_ptr = NULL;
-  if (iree_all_bits_set(memory_access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
-    data_ptr = (uint8_t*)wgpuBufferGetMappedRange(
-        buffer->handle, local_byte_offset, local_byte_length);
-  } else {
-    data_ptr = (uint8_t*)wgpuBufferGetConstMappedRange(
-        buffer->handle, local_byte_offset, local_byte_length);
-  }
-  if (!data_ptr) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "failed to get mapped buffer range");
-  }
-
-  // If we mapped for discard scribble over the bytes. This is not a mandated
-  // behavior but it will make debugging issues easier. Alternatively for
-  // heap buffers we could reallocate them such that ASAN yells, but that
-  // would only work if the entire buffer was discarded.
-#ifndef NDEBUG
-  if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
-    memset(data_ptr, 0xCD, local_byte_length);
-  }
-#endif  // !NDEBUG
-
-  mapping->contents = iree_make_byte_span(data_ptr, local_byte_length);
-  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_webgpu_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
+  // WebGPU does not allow for synchronous buffer mapping.
+  // Use wgpuBufferMapAsync directly to avoid this emulation.
   iree_hal_webgpu_buffer_t* buffer = iree_hal_webgpu_buffer_cast(base_buffer);
-  // DO NOT SUBMIT
-  // wgpuBufferUnmap(buffer->handle);
-  // buffer->is_mapped = false;
   return iree_hal_buffer_emulated_unmap_range(buffer->device, base_buffer,
                                               local_byte_offset,
                                               local_byte_length, mapping);

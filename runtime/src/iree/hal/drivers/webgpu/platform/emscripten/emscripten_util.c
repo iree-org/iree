@@ -52,16 +52,3 @@ void iree_wgpuQuerySetDrop(WGPUQuerySet querySet) {
 void iree_wgpuShaderModuleDrop(WGPUShaderModule shaderModule) {
   // Not implemented on the web / Emscripten.
 }
-
-//===----------------------------------------------------------------------===//
-// Speculative WebGPU API additions
-//===----------------------------------------------------------------------===//
-
-IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
-                                                   WGPUBuffer buffer,
-                                                   WGPUMapModeFlags mode,
-                                                   size_t offset, size_t size) {
-  // WebGPU (browser/Emscripten) does not support synchronous buffer mapping.
-  // We could maybe emulate this with Asyncify and wgpuBufferMapAsync.
-  return IREEWGPUBufferMapSyncStatus_Error;
-}

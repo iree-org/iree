@@ -54,29 +54,6 @@ void iree_wgpuPipelineLayoutDrop(WGPUPipelineLayout pipelineLayout);
 void iree_wgpuQuerySetDrop(WGPUQuerySet querySet);
 void iree_wgpuShaderModuleDrop(WGPUShaderModule shaderModule);
 
-//===----------------------------------------------------------------------===//
-// Speculative WebGPU API additions
-//===----------------------------------------------------------------------===//
-
-// Emulation of synchronous mapping. WebGPU only has async mapping today and
-// that's not sufficient for real compute-focused usage. The native
-// implementations have the ability to block until the callbacks are fired so we
-// can emulate synchronous mapping and we wrap that here. Hopefully WebGPU can
-// get a synchronous method so we can use this on the web too 🤞.
-
-typedef enum IREEWGPUBufferMapSyncStatus {
-  IREEWGPUBufferMapSyncStatus_Success = 0x00000000,
-  IREEWGPUBufferMapSyncStatus_Error = 0x00000001,
-  IREEWGPUBufferMapSyncStatus_Unknown = 0x00000002,
-  IREEWGPUBufferMapSyncStatus_DeviceLost = 0x00000003,
-  IREEWGPUBufferMapSyncStatus_Force32 = 0x7FFFFFFF
-} IREEWGPUBufferMapSyncStatus;
-
-IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
-                                                   WGPUBuffer buffer,
-                                                   WGPUMapModeFlags mode,
-                                                   size_t offset, size_t size);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
