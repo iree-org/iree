@@ -500,16 +500,6 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-587e595d-2adf-4e41-9617-43178a133725-batch-512"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_512/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-512_T5LargeTFBatch512.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
     "model-cbc5e400-7c93-4844-aca8-bce8f1bf9948-batch-1"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_1/linalg.mlir"

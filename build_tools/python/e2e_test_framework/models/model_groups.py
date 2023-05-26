@@ -181,7 +181,8 @@ T5_LARGE_TF_BATCHES = [
     tf_models.T5_LARGE_32x512_FP32_TF,
     tf_models.T5_LARGE_48x512_FP32_TF,
     tf_models.T5_LARGE_64x512_FP32_TF,
-    tf_models.T5_LARGE_512x512_FP32_TF,
+    # Disabled due to https://github.com/openxla/iree/issues/13801.
+    # tf_models.T5_LARGE_512x512_FP32_TF,
 ]
 
 CUDA_MODELS = [
