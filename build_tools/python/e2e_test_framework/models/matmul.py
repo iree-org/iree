@@ -67,3 +67,33 @@ MATMUL_128X256X8192_FP32_MLIR = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f32t_f32t_f32t_tile_config_default.mlirbc",
     entry_function="matmul_128x256x8192_f32t_f32t_f32t_tile_config_default",
     input_types=["128x8192xf32", "8192x256xf32"])
+
+MATMUL_2564x2564x2564_FP32_MLIR = common_definitions.Model(
+    id=unique_ids.MICRO_MATMUL_2564x2564x2564_FP32_MLIR,
+    name="matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default",
+    tags=["fp32", "ubench", "matmul"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230525_1685058259/matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default.mlirbc",
+    entry_function="matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default",
+    input_types=["2564x2564xf32", "2564x2564xf32", "2564x2564xf32"])
+
+MATMUL_2562x2564x2562_FP32_MLIR = common_definitions.Model(
+    id=unique_ids.MICRO_MATMUL_2562x2564x2562_FP32_MLIR,
+    name="matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default",
+    tags=["fp32", "ubench", "matmul"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230525_1685058259/matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default.mlirbc",
+    entry_function="matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default",
+    input_types=["2562x2562xf32", "2562x2564xf32", "2562x2564xf32"])
+
+MATMUL_2562x2561x2561_FP32_MLIR = common_definitions.Model(
+    id=unique_ids.MICRO_MATMUL_2562x2561x2561_FP32_MLIR,
+    name="matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default",
+    tags=["fp32", "ubench", "matmul"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230525_1685058259/matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc",
+    entry_function="matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default",
+    input_types=["2562x2561xf32", "2561x2561xf32", "2562x2561xf32"])
