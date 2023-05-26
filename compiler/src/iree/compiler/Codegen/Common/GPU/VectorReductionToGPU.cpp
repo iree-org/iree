@@ -32,7 +32,7 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   MemRefType memrefType;
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  if (auto vectorType = type.dyn_cast<VectorType>()) {
+  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
     memrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType(),
                         MemRefLayoutAttrInterface{}, addressSpaceAttr);
@@ -51,7 +51,7 @@ static bool isUniformLoad(Operation *op) {
   auto loadOp = dyn_cast<memref::LoadOp>(op);
   if (!loadOp) return false;
   auto space = loadOp.getMemRefType().getMemorySpace();
-  auto attr = space.dyn_cast_or_null<DescriptorTypeAttr>();
+  auto attr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
   if (!attr) return false;
 
   if (attr.getValue() == DescriptorType::UniformBuffer) return true;
@@ -99,7 +99,7 @@ static void moveScalarAndBindingUniformCode(
   // operations from there.
   for (auto &op : body->without_terminator()) {
     bool hasVectorResult = llvm::any_of(op.getResults(), [](Value result) {
-      return result.getType().isa<VectorType>();
+      return llvm::isa<VectorType>(result.getType());
     });
     if ((!hasVectorResult || isUniformLoad(&op)) &&
         canBeHoisted(&op, isDefinedOutsideOfBody)) {
@@ -182,8 +182,9 @@ class VectorReduceToGPUPass
     });
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+        getEntryPoint(funcOp)->getWorkgroupSize().value(), [&](Attribute attr) {
+          return llvm::cast<IntegerAttr>(attr).getInt();
+        }));
     assert(workgroupSize[1] == 1 && workgroupSize[2] == 1);
     // 2. Create the warp op and move the function body into it.
     const int groupSize = workgroupSize[0];
@@ -229,7 +230,7 @@ class VectorReduceToGPUPass
       };
       auto distributionFn = [](Value val) {
         AffineMap map = AffineMap::get(val.getContext());
-        auto vecType = val.getType().dyn_cast<VectorType>();
+        auto vecType = llvm::dyn_cast<VectorType>(val.getType());
         if (!vecType) return map;
         // Create a map (d0, d1) -> (d1) to distribute along the inner
         // dimension. Once we support n-d distribution we can add more

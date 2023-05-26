@@ -342,7 +342,7 @@ LogicalResult generateLinalgThreeFry32(OpBuilder &builder, Location loc,
   Value destRight = builder.create<tensor::EmptyOp>(
       loc, ArrayRef<int64_t>({count}), resultETy);
 
-  ShapedType destTy = destLeft.getType().cast<ShapedType>();
+  ShapedType destTy = llvm::cast<ShapedType>(destLeft.getType());
 
   SmallVector<AffineMap> indexingMaps(2, builder.getMultiDimIdentityMap(1));
   SmallVector<utils::IteratorType> iterators(1, utils::IteratorType::parallel);
@@ -423,7 +423,7 @@ LogicalResult generateLinalgThreeFry64(OpBuilder &builder, Location loc,
   // Generate a 1D tensor with for the random values.
   Value dest = builder.create<tensor::EmptyOp>(loc, ArrayRef<int64_t>({count}),
                                                resultETy);
-  ShapedType destTy = dest.getType().cast<ShapedType>();
+  ShapedType destTy = llvm::cast<ShapedType>(dest.getType());
 
   SmallVector<AffineMap> indexingMaps(1, builder.getMultiDimIdentityMap(1));
   SmallVector<utils::IteratorType> iterators(1, utils::IteratorType::parallel);

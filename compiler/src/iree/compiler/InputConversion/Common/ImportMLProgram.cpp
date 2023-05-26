@@ -100,7 +100,7 @@ class MLProgramGlobalOpPattern
     bool isExtern = srcOpAttr && isa<ml_program::ExternAttr>(*srcOpAttr);
     auto srcOpTypedAttr =
         (srcOpAttr && !isExtern)
-            ? std::optional<TypedAttr>(srcOpAttr.value().cast<TypedAttr>())
+            ? std::optional<TypedAttr>(llvm::cast<TypedAttr>(srcOpAttr.value()))
             : std::nullopt;
     const SymbolTable::Visibility visibility = srcOp.getVisibility();
     // Create util Global which is mutable if the ML program global was or if

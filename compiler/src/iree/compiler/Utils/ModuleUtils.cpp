@@ -18,29 +18,29 @@ namespace mlir {
 namespace iree_compiler {
 
 std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
-  if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
+  if (auto loc = llvm::dyn_cast<FileLineColLoc>(baseLoc)) {
     return loc;
   }
 
-  if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
+  if (auto loc = llvm::dyn_cast<FusedLoc>(baseLoc)) {
     // Recurse through fused locations.
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
       if (childResult) return childResult;
     }
-  } else if (auto loc = baseLoc.dyn_cast<CallSiteLoc>()) {
+  } else if (auto loc = llvm::dyn_cast<CallSiteLoc>(baseLoc)) {
     // First check caller...
     auto callerResult = findFirstFileLoc(loc.getCaller());
     if (callerResult) return callerResult;
     // Then check callee...
     auto calleeResult = findFirstFileLoc(loc.getCallee());
     if (calleeResult) return calleeResult;
-  } else if (auto loc = baseLoc.dyn_cast<NameLoc>()) {
+  } else if (auto loc = llvm::dyn_cast<NameLoc>(baseLoc)) {
     auto childResult = findFirstFileLoc(loc.getChildLoc());
     if (childResult) return childResult;
-  } else if (auto loc = baseLoc.dyn_cast<OpaqueLoc>()) {
+  } else if (auto loc = llvm::dyn_cast<OpaqueLoc>(baseLoc)) {
     // TODO(scotttodd): Use loc.fallbackLocation()?
-  } else if (auto loc = baseLoc.dyn_cast<UnknownLoc>()) {
+  } else if (auto loc = llvm::dyn_cast<UnknownLoc>(baseLoc)) {
     // ¯\_(ツ)_/¯
   }
 

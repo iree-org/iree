@@ -83,7 +83,7 @@ class BufferLoadOpConversion
     }
 
     // i32 -> f32, etc
-    if (targetType.isa<FloatType>()) {
+    if (llvm::isa<FloatType>(targetType)) {
       value = rewriter.create<arith::BitcastOp>(op.getLoc(), targetType, value);
     }
 
@@ -124,7 +124,7 @@ class BufferStoreOpConversion
 
     // f32 -> i32, etc
     auto value = adaptor.getValue();
-    if (elementType.isa<FloatType>()) {
+    if (llvm::isa<FloatType>(elementType)) {
       value = rewriter.createOrFold<arith::BitcastOp>(
           op.getLoc(),
           rewriter.getIntegerType(value.getType().getIntOrFloatBitWidth()),

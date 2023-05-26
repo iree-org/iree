@@ -38,11 +38,11 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
   LogicalResult matchAndRewrite(tosa::ScatterOp op,
                                 PatternRewriter &rewriter) const final {
     auto values = op.getValuesIn();
-    auto indices = op.getIndices().cast<Value>();
+    auto indices = llvm::cast<Value>(op.getIndices());
     auto updates = op.getInput();
-    auto valuesTy = values.getType().dyn_cast<RankedTensorType>();
-    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
-    auto updatesTy = updates.getType().dyn_cast<RankedTensorType>();
+    auto valuesTy = llvm::dyn_cast<RankedTensorType>(values.getType());
+    auto indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
+    auto updatesTy = llvm::dyn_cast<RankedTensorType>(updates.getType());
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
 
     if (!valuesTy || !indicesTy || !updatesTy)
@@ -66,7 +66,7 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
 
     indices = builder.create<tensor::ExpandShapeOp>(
         indicesTy.clone(expandIndShape), indices, expandIndMap);
-    indicesTy = indices.getType().dyn_cast<RankedTensorType>();
+    indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
 
     // Materialize the batch indice as LinalgExt scatter is not batched.
     {
@@ -105,16 +105,15 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
                        .getResult(0);
       }
 
-      indicesTy =
-          indicesTy.clone({indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2})
-              .cast<RankedTensorType>();
+      indicesTy = llvm::cast<RankedTensorType>(indicesTy.clone(
+          {indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2}));
       indices = builder.create<tosa::ConcatOp>(indicesTy,
                                                ValueRange{batchIdx, indices},
                                                rewriter.getI64IntegerAttr(2));
     }
 
     auto collapseBatch = [](Value value, ImplicitLocOpBuilder &b) -> Value {
-      auto valueTy = value.getType().cast<ShapedType>();
+      auto valueTy = llvm::cast<ShapedType>(value.getType());
       llvm::SmallVector<int64_t> collapseShape(valueTy.getShape().drop_front());
       llvm::SmallVector<ReassociationExprs, 4> collapseMap(valueTy.getRank() -
                                                            1);

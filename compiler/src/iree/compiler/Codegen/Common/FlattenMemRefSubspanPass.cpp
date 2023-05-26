@@ -70,7 +70,7 @@ namespace {
 
 /// Returns true if the given `type` is a 0-D MemRef.
 static bool isRankZeroMemRef(Type type) {
-  if (auto memrefType = type.dyn_cast<MemRefType>()) {
+  if (auto memrefType = llvm::dyn_cast<MemRefType>(type)) {
     return memrefType.hasRank() && memrefType.getRank() == 0;
   }
   return false;
@@ -78,7 +78,7 @@ static bool isRankZeroMemRef(Type type) {
 
 /// Returns true if the given `type` is a 0-D or 1-D MemRef.
 static bool isRankZeroOrOneMemRef(Type type) {
-  if (auto memrefType = type.dyn_cast<MemRefType>()) {
+  if (auto memrefType = llvm::dyn_cast<MemRefType>(type)) {
     return memrefType.hasRank() && memrefType.getRank() <= 1;
   }
   return false;
@@ -149,15 +149,15 @@ struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
   LogicalResult matchAndRewrite(
       AllocOpTy allocOp, typename AllocOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto oldType = allocOp.getType().template dyn_cast<MemRefType>();
+    auto oldType = llvm::dyn_cast<MemRefType>(allocOp.getType());
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     Value dynamicDim = createTotalElementCountValue(
         oldType, allocOp.getDynamicSizes(), allocOp.getLoc(), rewriter);
     Type newType = this->getTypeConverter()->convertType(oldType);
 
-    rewriter.replaceOpWithNewOp<AllocOpTy>(allocOp, newType.cast<MemRefType>(),
-                                           ValueRange{dynamicDim});
+    rewriter.replaceOpWithNewOp<AllocOpTy>(
+        allocOp, llvm::cast<MemRefType>(newType), ValueRange{dynamicDim});
 
     return success();
   }
@@ -169,9 +169,9 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
 
   static Attribute flattenAttribute(Attribute value, ShapedType newType) {
     if (!value) return value;
-    if (auto splatAttr = value.dyn_cast<SplatElementsAttr>()) {
+    if (auto splatAttr = llvm::dyn_cast<SplatElementsAttr>(value)) {
       return splatAttr.reshape(newType);
-    } else if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
+    } else if (auto denseAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
       return denseAttr.reshape(newType);
     }
     return {};
@@ -180,7 +180,7 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
   LogicalResult matchAndRewrite(
       memref::GlobalOp globalOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto oldType = globalOp.getType().dyn_cast<MemRefType>();
+    auto oldType = llvm::dyn_cast<MemRefType>(globalOp.getType());
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     auto tensorType = RankedTensorType::get({oldType.getNumElements()},
@@ -206,7 +206,7 @@ struct FlattenGetGlobal final
   LogicalResult matchAndRewrite(
       memref::GetGlobalOp getOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto oldType = getOp.getType().dyn_cast<MemRefType>();
+    auto oldType = llvm::dyn_cast<MemRefType>(getOp.getType());
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
@@ -216,7 +216,8 @@ struct FlattenGetGlobal final
     auto loadedValue = rewriter.createOrFold<memref::GetGlobalOp>(
         getOp.getLoc(), globalOp.getType(), getOp.getNameAttr());
 
-    auto newType = getTypeConverter()->convertType(oldType).cast<ShapedType>();
+    auto newType =
+        llvm::cast<ShapedType>(getTypeConverter()->convertType(oldType));
     rewriter.replaceOpWithNewOp<memref::CastOp>(getOp, newType, loadedValue);
     return success();
   }
@@ -230,7 +231,7 @@ struct FlattenBindingSubspan final
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto oldType = subspanOp.getType().dyn_cast<MemRefType>();
+    auto oldType = llvm::dyn_cast<MemRefType>(subspanOp.getType());
     // IREE subspan ops only use memref types with the default identity
     // layout maps.
     if (!oldType) return failure();
@@ -277,10 +278,10 @@ struct FlattenBindingSubspan final
       OpFoldResult stride = rewriter.getIndexAttr(1);
       MemRefType returnType =
           oldType.getRank() == 0
-              ? memref::SubViewOp::inferRankReducedResultType(
-                    {}, newType, elementOffset, linearShapeWithoutOffset,
-                    stride)
-                    .cast<MemRefType>()
+              ? llvm::cast<MemRefType>(
+                    memref::SubViewOp::inferRankReducedResultType(
+                        {}, newType, elementOffset, linearShapeWithoutOffset,
+                        stride))
               : nullptr;
       replacement = rewriter.create<memref::SubViewOp>(
           loc, returnType, newOp, elementOffset, linearShapeWithoutOffset,
@@ -326,7 +327,7 @@ struct FlattenReinterpretCast
 /// indexing into the given memref `sourceValue`.
 static Value linearizeIndices(Value sourceValue, ValueRange indices,
                               Location loc, OpBuilder &builder) {
-  MemRefType sourceType = sourceValue.getType().cast<MemRefType>();
+  MemRefType sourceType = llvm::cast<MemRefType>(sourceValue.getType());
   assert(sourceType.hasRank());
 
   int64_t rank = sourceType.getRank();
@@ -633,7 +634,7 @@ struct AdjustConversionCast final
 
     Value input = adaptor.getOperands().front();
     // We only want to handle cases where the cast op handles memref types.
-    if (!input.getType().isa<BaseMemRefType>()) return failure();
+    if (!llvm::isa<BaseMemRefType>(input.getType())) return failure();
 
     if (!isRankZeroOrOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
@@ -694,7 +695,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
 /// calculated in the subspan ops!
 std::optional<int64_t> getNumBytes(Type type) {
   if (type.isIntOrFloat()) return IREE::Util::getRoundedElementByteWidth(type);
-  if (auto vectorType = type.dyn_cast<VectorType>()) {
+  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
     auto elementBytes = getNumBytes(vectorType.getElementType());
     if (!elementBytes) return std::nullopt;
     return elementBytes.value() * vectorType.getNumElements();
@@ -721,8 +722,8 @@ struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
 
   LogicalResult matchAndRewrite(memref::CastOp castOp,
                                 PatternRewriter &rewriter) const override {
-    auto srcType = castOp.getSource().getType().cast<MemRefType>();
-    auto dstType = castOp.getType().cast<MemRefType>();
+    auto srcType = llvm::cast<MemRefType>(castOp.getSource().getType());
+    auto dstType = llvm::cast<MemRefType>(castOp.getType());
     // Restrict to the cases we generate in this pass--1-D static shape to 1-D
     // dynamic shape.
     if (srcType.getRank() == 1 && srcType.hasStaticShape() &&
@@ -843,19 +844,19 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
           return isRankZeroOrOneMemRef(
-              readOp.getSource().getType().cast<MemRefType>());
+              llvm::cast<MemRefType>(readOp.getSource().getType()));
         });
     target.addDynamicallyLegalOp<vector::TransferWriteOp>(
         [](vector::TransferWriteOp writeOp) {
           return isRankZeroOrOneMemRef(
-              writeOp.getSource().getType().cast<MemRefType>());
+              llvm::cast<MemRefType>(writeOp.getSource().getType()));
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {
           if (castOp->getNumOperands() != 1) return false;
 
           Type inputType = castOp->getOperandTypes().front();
-          return !inputType.isa<BaseMemRefType>() ||
+          return !llvm::isa<BaseMemRefType>(inputType) ||
                  isRankZeroOrOneMemRef(inputType);
         });
     target.addDynamicallyLegalOp<memref::SubViewOp>([](memref::SubViewOp op) {

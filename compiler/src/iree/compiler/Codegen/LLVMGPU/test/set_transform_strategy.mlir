@@ -67,7 +67,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.vector.lower_masked_transfers %{{.*}}
 // CHECK: transform.structured.vectorize %{{.*}}
 // CHECK: transform.iree.eliminate_empty_tensors %{{.*}}
-// CHECK: transform.iree.bufferize {target_gpu} %{{.*}} : (!pdl.operation) -> !pdl.operation
+// CHECK: transform.iree.bufferize {target_gpu} %{{.*}}
 // CHECK: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}}
 // CHECK: transform.iree.forall_to_workgroup %{{.*}}
 // CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
@@ -76,15 +76,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
 // CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_wmma}
 // CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}}
-// CHECK: transform.iree.apply_buffer_optimizations %{{.*}} : (!pdl.operation) -> ()
-// CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_wmma} : (!pdl.operation) -> ()
+// CHECK: transform.iree.apply_buffer_optimizations %{{.*}}
+// CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_wmma}
 // CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
-// CHECK: transform.memref.multibuffer %{{.*}} {factor = 3 : i64, skip_analysis} : (!transform.op<"memref.alloc">) -> !pdl.operation
-// CHECK: transform.vector.transfer_to_scf %{{.*}}   max_transfer_rank = 1 full_unroll = true : (!pdl.operation) -> !pdl.operation
-// CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync = false} : (!pdl.operation) -> ()
-// CHECK: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 3 : i64} : (!pdl.operation) -> !pdl.operation
-// CHECK: transform.vector.lower_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
-// CHECK: transform.vector.materialize_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
+// CHECK: transform.memref.multibuffer %{{.*}} {factor = 3 : i64, skip_analysis}
+// CHECK: transform.vector.transfer_to_scf %{{.*}}   max_transfer_rank = 1 full_unroll = true
+// CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync = false}
+// CHECK: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 3 : i64}
+// CHECK: transform.vector.lower_masks %{{.*}}
+// CHECK: transform.vector.materialize_masks %{{.*}}
 // CHECK: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization}
 
 
@@ -114,7 +114,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.vector.lower_masked_transfers %{{.*}}
 // WITH_OPTIONS: transform.structured.vectorize %{{.*}}
 // WITH_OPTIONS: transform.iree.eliminate_empty_tensors %{{.*}}
-// WITH_OPTIONS: transform.iree.bufferize {target_gpu} %{{.*}} : (!pdl.operation) -> !pdl.operation
+// WITH_OPTIONS: transform.iree.bufferize {target_gpu} %{{.*}}
 // WITH_OPTIONS: transform.iree.erase_hal_descriptor_type_from_memref %{{.*}}
 // WITH_OPTIONS: transform.iree.forall_to_workgroup %{{.*}}
 // The workgroup dimensions are controled by td-matmul-strategy-num-threads-XX.
@@ -127,20 +127,20 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // for false:_wmma.
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_mma_sync}
 // WITH_OPTIONS: transform.structured.hoist_redundant_vector_transfers %{{.*}}
-// WITH_OPTIONS: transform.iree.apply_buffer_optimizations %{{.*}} : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.apply_buffer_optimizations %{{.*}}
 // The attribute should match td-matmul-use-mma-sync.
-// WITH_OPTIONS: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync} : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync}
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
 // The multibuffer pass is only run when we set use-async-copies.
 // The factor should match td-matmul-strategy-pipeline-depth: 5.
-// WITH_OPTIONS: transform.memref.multibuffer %{{.*}} {factor = 5 : i64, skip_analysis} : (!transform.op<"memref.alloc">) -> !pdl.operation
-// WITH_OPTIONS: transform.vector.transfer_to_scf %{{.*}}   max_transfer_rank = 1 full_unroll = true : (!pdl.operation) -> !pdl.operation
+// WITH_OPTIONS: transform.memref.multibuffer %{{.*}} {factor = 5 : i64, skip_analysis}
+// WITH_OPTIONS: transform.vector.transfer_to_scf %{{.*}}   max_transfer_rank = 1 full_unroll = true
 // The attribute should match td-matmul-use-mma-sync.
-// WITH_OPTIONS: transform.iree.create_async_groups %{{.*}} {use_mma_sync = true} : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.create_async_groups %{{.*}} {use_mma_sync = true}
 // The depth should match td-matmul-strategy-pipeline-depth: 5.
-// WITH_OPTIONS: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 5 : i64} : (!pdl.operation) -> !pdl.operation
-// WITH_OPTIONS: transform.vector.lower_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
-// WITH_OPTIONS: transform.vector.materialize_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
+// WITH_OPTIONS: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 5 : i64}
+// WITH_OPTIONS: transform.vector.lower_masks %{{.*}}
+// WITH_OPTIONS: transform.vector.materialize_masks %{{.*}}
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization}
 
 // -----

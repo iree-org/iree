@@ -214,7 +214,7 @@ class ArgumentSemantics
     // If the operand is a block argument then we need to ask for the argument
     // semantics first - if it's by reference then it's definitely not the last
     // use and we can short-circuit this.
-    if (auto arg = operand.get().dyn_cast<BlockArgument>()) {
+    if (auto arg = llvm::dyn_cast<BlockArgument>(operand.get())) {
       auto &argumentSemantics = solver.getElementFor<ArgumentSemantics>(
           *this, Position::forValue(operand.get()), DFX::Resolution::REQUIRED);
       LLVM_DEBUG(llvm::dbgs()
@@ -241,7 +241,7 @@ class ArgumentSemantics
     auto assumedBits = getAssumed();
     auto traversalResult = TraversalResult::COMPLETE;
 
-    auto arg = value.cast<BlockArgument>();
+    auto arg = llvm::cast<BlockArgument>(value);
     bool isEntryArg = arg.getParentBlock()->isEntryBlock();
     if (isEntryArg) {
       // Call argument.
@@ -312,7 +312,7 @@ class LastUseAnalysis {
       if (!region) continue;
       for (auto &block : *region) {
         for (auto arg : block.getArguments()) {
-          if (arg.getType().isa<IREE::Stream::ResourceType>()) {
+          if (llvm::isa<IREE::Stream::ResourceType>(arg.getType())) {
             solver.getOrCreateElementFor<ArgumentSemantics>(
                 Position::forValue(arg));
           }
@@ -383,9 +383,9 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   // TODO(benvanik): remove this carveout - could make clone not change type
   // and transfer be needed instead.
   auto sourceType =
-      cloneOp.getSource().getType().cast<IREE::Stream::ResourceType>();
+      llvm::cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
-      cloneOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+      llvm::cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
   if (sourceType != targetType &&
       sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
     LLVM_DEBUG(llvm::dbgs()
@@ -397,7 +397,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   // to see if it's been classified as a last use/by-value move. If it isn't
   // then we cannot mutate it in-place as it could be used by the caller/another
   // branch and we need to respect the forking of the value.
-  if (auto arg = cloneOp.getSource().dyn_cast<BlockArgument>()) {
+  if (auto arg = llvm::dyn_cast<BlockArgument>(cloneOp.getSource())) {
     if (!analysis.isArgMoved(arg)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "  - clone source is a by-ref arg; cannot elide\n");

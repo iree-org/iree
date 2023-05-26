@@ -71,6 +71,9 @@ class PluginManager : public PluginRegistrar {
   // available plugins.
   void registerGlobalDialects(DialectRegistry &registry);
 
+  // Gets a list of all loaded plugin names.
+  llvm::SmallVector<std::string> getLoadedPlugins();
+
  private:
   friend class PluginManagerSession;
 };

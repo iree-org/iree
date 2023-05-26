@@ -36,7 +36,7 @@ namespace Util {
 //===----------------------------------------------------------------------===//
 
 bool BufferType::isAccessStorageCompatible(Type accessType) const {
-  return accessType.isa<IREE::Util::BufferType>();
+  return llvm::isa<IREE::Util::BufferType>(accessType);
 }
 
 Value BufferType::inferSizeFromValue(Location loc, Value value,
@@ -72,7 +72,7 @@ static LogicalResult parseListElementType(AsmParser &parser,
 }
 
 static void printListElementType(AsmPrinter &printer, Type elementType) {
-  if (elementType.isa<IREE::Util::VariantType>()) {
+  if (llvm::isa<IREE::Util::VariantType>(elementType)) {
     printer << "?";
   } else {
     printer << elementType;
@@ -84,15 +84,15 @@ bool ListType::isCompatible(Type type) { return true; }
 
 // static
 bool ListType::canImplicitlyCast(Type from, Type to) {
-  if (from.isa<VariantType>() || to.isa<VariantType>()) {
+  if (llvm::isa<VariantType>(from) || llvm::isa<VariantType>(to)) {
     return true;
-  } else if (from.isa<ObjectType>() &&
+  } else if (llvm::isa<ObjectType>(from) &&
              IREE::Util::ObjectType::isCompatible(to)) {
     return true;
   } else if (IREE::Util::ObjectType::isCompatible(from) &&
-             to.isa<ObjectType>()) {
+             llvm::isa<ObjectType>(to)) {
     return true;
-  } else if (from.isa<TensorType>() && to.isa<TensorType>()) {
+  } else if (llvm::isa<TensorType>(from) && llvm::isa<TensorType>(to)) {
     return true;
   }
   return from == to;
@@ -129,10 +129,10 @@ LogicalResult PtrType::verify(function_ref<InFlightDiagnostic()> emitError,
 
 // static
 bool ObjectType::isCompatible(Type type) {
-  if (type.isa<ObjectType>()) {
+  if (llvm::isa<ObjectType>(type)) {
     // Already an object.
     return true;
-  } else if (type.isIntOrIndexOrFloat() || type.isa<ComplexType>()) {
+  } else if (type.isIntOrIndexOrFloat() || llvm::isa<ComplexType>(type)) {
     // Ignore known primitive types.
     return false;
   }
@@ -169,7 +169,7 @@ bool isValueUsableForOp(Value value, Block *block,
   }
   if (definingBlock == block) {
     // Defined in the same block; ensure block order.
-    if (value.isa<BlockArgument>()) return true;
+    if (llvm::isa<BlockArgument>(value)) return true;
     if (insertionPoint == block->end()) return true;
     if (value.getDefiningOp()->isBeforeInBlock(&*insertionPoint)) {
       return true;
@@ -236,11 +236,12 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
 static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
   // If one is a shaped type, then they both must be and have compatible
   // shapes.
-  if (globalType.isa<ShapedType>() && accessType.isa<ShapedType>()) {
+  if (llvm::isa<ShapedType>(globalType) && llvm::isa<ShapedType>(accessType)) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
   }
 
-  if (auto knownType = globalType.dyn_cast<IREE::Util::GlobalTypeInterface>()) {
+  if (auto knownType =
+          llvm::dyn_cast<IREE::Util::GlobalTypeInterface>(globalType)) {
     return knownType.isAccessStorageCompatible(accessType);
   }
 
@@ -250,7 +251,8 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 
 LogicalResult detail::verifyGlobalOp(IREE::Util::GlobalOpInterface globalOp) {
   auto initialValue = globalOp.getGlobalInitialValue();
-  if (auto typedInitialValue = initialValue.dyn_cast_or_null<TypedAttr>()) {
+  if (auto typedInitialValue =
+          llvm::dyn_cast_if_present<TypedAttr>(initialValue)) {
     // Ensure the value is something we can convert to a const.
     if (!isGlobalTypeCompatible(globalOp.getGlobalType(),
                                 typedInitialValue.getType())) {
@@ -350,7 +352,7 @@ std::optional<unsigned> detail::getTiedResultOperandIndex(
     resultIndex -= indexAndLength.first;
     if (resultIndex >= indexAndLength.second) return std::nullopt;
   }
-  int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
+  int64_t value = llvm::cast<IntegerAttr>(valueAttrs[resultIndex]).getInt();
   if (value == IREE::Util::TiedOpInterface::kUntiedIndex) return std::nullopt;
   if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
     unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
@@ -396,7 +398,7 @@ SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {
   unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
   indices.resize(resultRange.second);
   for (unsigned i = 0; i < valueAttrs.size(); ++i) {
-    int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
+    int64_t index = llvm::cast<IntegerAttr>(valueAttrs[i]).getInt();
     indices[i] = index != TiedOpInterface::kUntiedIndex
                      ? tiedOperandsOffset + index
                      : TiedOpInterface::kUntiedIndex;
@@ -564,8 +566,8 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
 // static
 Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
                                              OpBuilder &builder) {
-  auto sizeAwareType =
-      resourceValue.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>();
+  auto sizeAwareType = llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
+      resourceValue.getType());
   if (!sizeAwareType) {
     return {};  // Not a sized type.
   }
@@ -583,8 +585,8 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
               definingOp)) {
     return sizeAwareOp.getResultSizeFromValue(resourceValue);
   } else if (auto inferSizeType =
-                 resourceValue.getType()
-                     .dyn_cast<IREE::Util::InferTypeSizeInterface>()) {
+                 llvm::dyn_cast<IREE::Util::InferTypeSizeInterface>(
+                     resourceValue.getType())) {
     return inferSizeType.inferSizeFromValue(loc, resourceValue, builder);
   }
   return {};
@@ -642,7 +644,7 @@ std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
                                    ValueRange dynamicDims) {
   auto value = values[idx];
-  auto shapedType = value.getType().dyn_cast<ShapedType>();
+  auto shapedType = llvm::dyn_cast<ShapedType>(value.getType());
   if (!shapedType) return ValueRange{};
 
   // Bail immediately if the shape is static.
@@ -651,7 +653,7 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
   // Find where the dynamic dims start in the flattened list.
   unsigned offset = 0;
   for (unsigned i = 0; i < idx; ++i) {
-    if (auto type = values[i].getType().dyn_cast<ShapedType>()) {
+    if (auto type = llvm::dyn_cast<ShapedType>(values[i].getType())) {
       offset += type.getNumDynamicDims();
     }
   }
@@ -662,7 +664,7 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
 
 SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
                                             OpBuilder &builder) {
-  auto valueType = value.getType().dyn_cast<ShapedType>();
+  auto valueType = llvm::dyn_cast<ShapedType>(value.getType());
   if (!valueType) {
     mlir::emitError(loc) << "cannot construct shape for non shaped value: "
                          << value.getType();
@@ -727,7 +729,7 @@ static SmallVector<Value> buildShape(Location loc, ShapedType type,
 SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
                                      unsigned operandIdx, OpBuilder &builder) {
   auto operand = op->getOperand(operandIdx);
-  auto type = operand.getType().cast<ShapedType>();
+  auto type = llvm::cast<ShapedType>(operand.getType());
   auto dynamicDims = op.getOperandDynamicDims(operandIdx);
   return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
@@ -735,7 +737,7 @@ SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
 SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
                                     unsigned resultIdx, OpBuilder &builder) {
   auto result = op->getResult(resultIdx);
-  auto type = result.getType().cast<ShapedType>();
+  auto type = llvm::cast<ShapedType>(result.getType());
   auto dynamicDims = op.getResultDynamicDims(resultIdx);
   return buildShape(op.getLoc(), type, dynamicDims, builder);
 }

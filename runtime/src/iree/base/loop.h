@@ -292,10 +292,9 @@ typedef struct iree_loop_dispatch_params_t {
 
 // Parameters for IREE_LOOP_COMMAND_WAIT_UTIL.
 typedef struct iree_loop_wait_until_params_t {
-  // Callback issued after the wait condition is satisfied.
+  // Callback issued after the deadline has passed.
   iree_loop_callback_t callback;
-  // Maximum time to wait before failing the wait with
-  // IREE_STATUS_DEADLINE_EXCEEDED.
+  // Minimum time to wait before issueing the callback.
   iree_time_t deadline_ns;
 } iree_loop_wait_until_params_t;
 

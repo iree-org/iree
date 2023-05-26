@@ -72,6 +72,14 @@ void PluginManager::registerGlobalDialects(DialectRegistry &registry) {
   }
 }
 
+llvm::SmallVector<std::string> PluginManager::getLoadedPlugins() {
+  llvm::SmallVector<std::string> plugins;
+#define HANDLE_PLUGIN_ID(plugin_id) plugins.push_back(#plugin_id);
+#include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
+#undef HANDLE_PLUGIN_ID
+  return plugins;
+}
+
 PluginManagerSession::PluginManagerSession(PluginManager &pluginManager,
                                            OptionsBinder &binder,
                                            PluginManagerOptions &options)

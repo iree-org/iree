@@ -62,10 +62,10 @@ static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   bool needsBarrier = false;
-  if (hasSharedMemoryAddressSpace(from.getType().cast<MemRefType>())) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType()))) {
     needsBarrier = true;
   }
-  if (hasSharedMemoryAddressSpace(to.getType().cast<MemRefType>())) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier) builder.create<gpu::BarrierOp>(loc);

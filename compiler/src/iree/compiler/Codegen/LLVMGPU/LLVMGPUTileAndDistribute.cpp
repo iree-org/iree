@@ -216,8 +216,9 @@ struct LLVMGPUTileAndDistributePass
     });
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+        getEntryPoint(funcOp)->getWorkgroupSize().value(), [&](Attribute attr) {
+          return llvm::cast<IntegerAttr>(attr).getInt();
+        }));
 
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];

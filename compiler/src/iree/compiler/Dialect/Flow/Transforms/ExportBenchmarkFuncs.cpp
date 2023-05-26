@@ -117,7 +117,7 @@ static IREE::Util::GlobalOp createImportBufferViewGlobalOp(
 
   // Extract the type, which must be a static tensor.
   auto targetType = importOp.getTarget().getType();
-  auto tensorType = targetType.dyn_cast<RankedTensorType>();
+  auto tensorType = llvm::dyn_cast<RankedTensorType>(targetType);
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view import tensor type on "
                          << arg << " used as " << targetType;
@@ -158,7 +158,7 @@ static IREE::Util::GlobalOp createExportBufferGlobalOp(std::string name,
 
   // Extract the type, which must be a static tensor.
   auto sourceType = exportOp.getSourceEncoding();
-  auto tensorType = sourceType.dyn_cast<RankedTensorType>();
+  auto tensorType = llvm::dyn_cast<RankedTensorType>(sourceType);
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view export tensor type on "
                          << arg << " used as " << sourceType;

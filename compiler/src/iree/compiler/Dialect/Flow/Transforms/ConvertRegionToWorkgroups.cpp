@@ -27,7 +27,7 @@ namespace {
 /// Compute the dynamic dims of the given value and add them to the vector.
 static void appendDynamicDims(OpBuilder &b, Location loc,
                               SmallVector<Value> &argumentDims, Value tensor) {
-  auto tensorType = tensor.getType().cast<RankedTensorType>();
+  auto tensorType = llvm::cast<RankedTensorType>(tensor.getType());
 
   // Fast-path for if the value comes from ops that support our dynamic
   // shape interfaces. Otherwise we have to insert tensor.dim ops.
@@ -52,7 +52,7 @@ static std::optional<Value> findFirstTiedValueOutsideOfRegionOp(
     Flow::DispatchRegionOp regionOp, Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
-    if (v.isa<OpResult>()) return !regionOp->isAncestor(v.getDefiningOp());
+    if (llvm::isa<OpResult>(v)) return !regionOp->isAncestor(v.getDefiningOp());
     assert(v.isa<BlockArgument>() && "expected bbArg");
     // DispatchRegionOp does not have block arguments.
     return true;
@@ -104,7 +104,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   // Compute dimensions of tensor args.
   SmallVector<Value> argumentDims;
   for (Value tensor : argumentsSet) {
-    auto tensorType = tensor.getType().dyn_cast<RankedTensorType>();
+    auto tensorType = llvm::dyn_cast<RankedTensorType>(tensor.getType());
     if (!tensorType) continue;
     appendDynamicDims(rewriter, loc, argumentDims, tensor);
   }
@@ -165,7 +165,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   assert(newBody.empty() && "expected empty block after constructor");
   rewriter.setInsertionPointToStart(&newBody);
   for (const auto &it : llvm::enumerate(arguments)) {
-    auto tensorType = it.value().getType().dyn_cast<RankedTensorType>();
+    auto tensorType = llvm::dyn_cast<RankedTensorType>(it.value().getType());
     if (!tensorType) continue;
     auto inputBbArg = workgroupsOp.getInputBlockArgument(it.index());
     auto dims =

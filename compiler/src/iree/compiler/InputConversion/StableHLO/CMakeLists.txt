@@ -88,6 +88,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::InputConversion::StableHLO::Preprocessing
     iree::compiler::Utils
   PUBLIC
 )

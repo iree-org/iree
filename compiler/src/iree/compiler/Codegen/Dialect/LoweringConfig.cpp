@@ -28,8 +28,8 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 static bool checkIntegerArrayAttr(ArrayAttr arrayAttr) {
-  return !llvm::any_of(arrayAttr,
-                       [](Attribute attr) { return !attr.isa<IntegerAttr>(); });
+  return !llvm::any_of(
+      arrayAttr, [](Attribute attr) { return !llvm::isa<IntegerAttr>(attr); });
 }
 
 /// Returns an `ArrayAttr` where each element is an `IntegerAttr` of `IndexType`
@@ -61,7 +61,7 @@ static SmallVector<int64_t> getIntegerVals(ArrayAttr arrayAttr) {
   if (!arrayAttr) return {};
   SmallVector<int64_t> values(arrayAttr.size());
   for (auto [index, attr] : llvm::enumerate(arrayAttr)) {
-    values[index] = attr.cast<IntegerAttr>().getInt();
+    values[index] = llvm::cast<IntegerAttr>(attr).getInt();
   }
   return values;
 }
@@ -129,7 +129,7 @@ TileSizesListType LoweringConfigAttr::getTileSizeVals() {
   if (!tileSizesAttr) return {};
   TileSizesListType tileSizes;
   for (auto attr : tileSizesAttr) {
-    auto vals = getIntegerVals(attr.cast<ArrayAttr>());
+    auto vals = getIntegerVals(llvm::cast<ArrayAttr>(attr));
     tileSizes.emplace_back(std::move(vals));
   }
   return tileSizes;
@@ -138,14 +138,14 @@ TileSizesListType LoweringConfigAttr::getTileSizeVals() {
 SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) {
   ArrayAttr tileSizesAttr = getTileSizes();
   if (!tileSizesAttr || tileSizesAttr.size() <= level) return {};
-  return getIntegerVals(tileSizesAttr[level].cast<ArrayAttr>());
+  return getIntegerVals(llvm::cast<ArrayAttr>(tileSizesAttr[level]));
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getTileInterchangeVals(
     unsigned level) {
   ArrayAttr tileInterchangeAttr = getTileInterchange();
   if (!tileInterchangeAttr || tileInterchangeAttr.size() <= level) return {};
-  return getIntegerVals(tileInterchangeAttr[level].cast<ArrayAttr>());
+  return getIntegerVals(llvm::cast<ArrayAttr>(tileInterchangeAttr[level]));
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getNativeVectorSizeVals() {
@@ -163,7 +163,7 @@ LogicalResult LoweringConfigAttr::verify(
   }
   auto hasNonIntElems = [](ArrayAttr sizes) -> bool {
     return llvm::any_of(sizes, [](Attribute attr) {
-      auto arrayAttr = attr.dyn_cast<ArrayAttr>();
+      auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attr);
       return !arrayAttr || !checkIntegerArrayAttr(arrayAttr);
     });
   };

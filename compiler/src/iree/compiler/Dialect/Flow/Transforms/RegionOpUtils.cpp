@@ -148,7 +148,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
       // unnecessary for IREEs use case. For now avoid this assert by bailing if
       // any operands are block arguments.
       if (llvm::any_of(op->getOperands(),
-                       [](Value v) { return v.isa<BlockArgument>(); })) {
+                       [](Value v) { return llvm::isa<BlockArgument>(v); })) {
         auto parentOp = op->getParentOp();
         if (parentOp->getNumRegions() != 1 ||
             parentOp->getRegion(0).getBlocks().size() != 1) {
@@ -189,7 +189,7 @@ static void createWorkgroupCountFromDagRootRegion(
 /// Return `true` if the given type is a ShapedType and has at least one
 /// dynamic dimension.
 static bool hasDynamicShape(Type t) {
-  auto shapedType = t.dyn_cast<ShapedType>();
+  auto shapedType = llvm::dyn_cast<ShapedType>(t);
   if (!shapedType) return false;
   return !shapedType.hasStaticShape();
 }
@@ -203,7 +203,7 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   if (!hasDynamicShape(value.getType())) return success();
 
   // There is at least one dynamic dimension, continue...
-  ShapedType shapedType = value.getType().cast<ShapedType>();
+  ShapedType shapedType = llvm::cast<ShapedType>(value.getType());
 
   // Helper function that generates tensor.dim ops.
   auto emitTensorDimOps = [&]() {
@@ -216,7 +216,7 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   };
 
   // Case 2: Value is a block argument.
-  if (auto bbArg = value.dyn_cast<BlockArgument>()) {
+  if (auto bbArg = llvm::dyn_cast<BlockArgument>(value)) {
     b.setInsertionPointToStart(bbArg.getOwner());
     emitTensorDimOps();
     return success();
@@ -224,7 +224,7 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
 
   // Value is an OpResult.
   Operation *op = value.getDefiningOp();
-  OpResult opResult = value.cast<OpResult>();
+  OpResult opResult = llvm::cast<OpResult>(value);
   b.setInsertionPoint(op);
 
   // Case 3: Value is tied. Reify the dimensions of the tied operand.
@@ -341,7 +341,7 @@ FailureOr<Operation *> Flow::clonePrecedingOpIntoDispatchRegion(
   for (OpOperand *use : usesInsideOfRegion) {
     rewriter.updateRootInPlace(use->getOwner(), [&]() {
       use->set(newTargetOp->getResult(
-          use->get().cast<OpResult>().getResultNumber()));
+          llvm::cast<OpResult>(use->get()).getResultNumber()));
     });
   }
 
@@ -402,9 +402,9 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
     // Replace uses of `target` after the dispatch region.
     for (OpOperand *use : usesOutsideOfRegion) {
       rewriter.updateRootInPlace(use->getOwner(), [&]() {
-        use->set(
-            regionOp->getResult(previousNumResults +
-                                use->get().cast<OpResult>().getResultNumber()));
+        use->set(regionOp->getResult(
+            previousNumResults +
+            llvm::cast<OpResult>(use->get()).getResultNumber()));
       });
     }
   }
@@ -461,11 +461,11 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
     if (clInlineConstantByteLength == 0) return false;
     auto constantValueAttr = constantOp.getValue();
     auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
+    if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
       return true;
     } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      auto shapedType = constantOp.getType().cast<ShapedType>();
+                   llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
+      auto shapedType = llvm::cast<ShapedType>(constantOp.getType());
       uint64_t estimatedByteLength =
           (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
           8;

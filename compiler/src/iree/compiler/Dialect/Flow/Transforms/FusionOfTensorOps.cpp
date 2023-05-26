@@ -68,7 +68,7 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
   // Check for i1 return types, if so aggressively fuse to avoid `i1` buffers.
   if (llvm::all_of(producerOp->getResultTypes(), [](Type t) {
         if (t.isInteger(1)) return true;
-        if (auto shapedType = t.dyn_cast<ShapedType>()) {
+        if (auto shapedType = llvm::dyn_cast<ShapedType>(t)) {
           if (shapedType.getElementType().isInteger(1)) return true;
         }
         return false;
@@ -192,7 +192,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
     auto consumer = dyn_cast<linalg::GenericOp>(fusableUse.value()->getOwner());
     auto isParallelIteratorType = [](Attribute attr) {
       return linalg::isParallelIterator(
-          attr.cast<linalg::IteratorTypeAttr>().getValue());
+          llvm::cast<linalg::IteratorTypeAttr>(attr).getValue());
     };
     if (!consumer ||
         !(llvm::all_of(genericOp.getIteratorTypes(), isParallelIteratorType) &&

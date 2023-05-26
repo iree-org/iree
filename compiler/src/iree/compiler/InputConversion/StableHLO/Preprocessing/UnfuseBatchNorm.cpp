@@ -96,7 +96,7 @@ struct UnfuseBatchNormInferencePattern final
     // which should not be subject to quantization at a higher level.
     auto inputType = dyn_cast<RankedTensorType>(bnOp.getOperand().getType());
     auto varianceType =
-        bnOp.getVariance().getType().dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(bnOp.getVariance().getType());
     if (!inputType || !varianceType) {
       return failure();
     }

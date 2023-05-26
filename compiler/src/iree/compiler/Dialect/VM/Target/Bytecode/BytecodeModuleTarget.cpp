@@ -107,7 +107,7 @@ static flatbuffers_uint8_vec_ref_t serializeEmbeddedData(
     return {};
   }
 
-  auto value = valueAttr.dyn_cast<IREE::Util::SerializableAttrInterface>();
+  auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(valueAttr);
   assert(value && "expected a serializable rodata value");
 
   // Reserve memory in the FlatBuffer for the data.
@@ -241,7 +241,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeFunctionSignatureDef(
     SmallVector<iree_vm_AttrDef_ref_t, 4> attrRefs;
     for (auto attr : attrs) {
       auto key = attr.getName().strref();
-      auto value = attr.getValue().dyn_cast<StringAttr>();
+      auto value = llvm::dyn_cast<StringAttr>(attr.getValue());
       if (!value || key.empty()) continue;
       // NOTE: if we actually want to keep these we should dedupe them (as the
       // keys and likely several of the values are shared across all functions).
@@ -628,8 +628,8 @@ LogicalResult translateModuleToBytecode(
   SmallVector<RodataRef> rodataRefs;
   rodataRefs.resize(rodataOps.size());
   for (auto &rodataOp : rodataOps) {
-    auto rodataValue =
-        rodataOp.getValue().dyn_cast<IREE::Util::SerializableAttrInterface>();
+    auto rodataValue = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
+        rodataOp.getValue());
     assert(rodataValue && "expected a serializable rodata value");
 
     // Split large rodata out of the FlatBuffer to avoid going over 2GB.

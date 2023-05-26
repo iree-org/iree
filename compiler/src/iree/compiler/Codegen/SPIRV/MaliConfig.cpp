@@ -27,7 +27,7 @@ static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
   Type inputType = op.getDpsInputOperand(0)->get().getType();
-  Type elementType = inputType.cast<ShapedType>().getElementType();
+  Type elementType = llvm::cast<ShapedType>(inputType).getElementType();
   if (elementType.getIntOrFloatBitWidth() == 16) {
     threadMNK = {2, 8, 8};
   } else if (elementType.isInteger(8)) {

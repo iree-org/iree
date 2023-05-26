@@ -16,7 +16,7 @@ namespace iree_compiler {
 ConvertedTensor consumeTensorOperand(Location loc, Value operand,
                                      OpBuilder &builder) {
   auto operandType = operand.getType();
-  if (operandType.isa<IREE::Stream::ResourceType>()) {
+  if (llvm::isa<IREE::Stream::ResourceType>(operandType)) {
     // Prior to https://reviews.llvm.org/D111620 this is the path we'd take;
     // the tensor operands would be remapped into their new resource types.
     // This is still possible during rewriting if we ourselves produce a new

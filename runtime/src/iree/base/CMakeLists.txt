@@ -184,6 +184,7 @@ if(EMSCRIPTEN)
       "loop_emscripten.c"
     DEPS
       ::base
+      iree::base::internal::wait_handle
     PUBLIC
   )
 

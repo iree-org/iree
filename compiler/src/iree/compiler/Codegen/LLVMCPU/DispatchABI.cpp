@@ -91,10 +91,10 @@ static const struct iree_llvm_name_and_bit_pattern_t
 
 // Returns the size, in bits, of |typeAttr|.
 static unsigned getDITypeSizeInBits(LLVM::DITypeAttr typeAttr) {
-  if (auto basicTypeAttr = typeAttr.dyn_cast<LLVM::DIBasicTypeAttr>()) {
+  if (auto basicTypeAttr = llvm::dyn_cast<LLVM::DIBasicTypeAttr>(typeAttr)) {
     return basicTypeAttr.getSizeInBits();
   } else if (auto derivedTypeAttr =
-                 typeAttr.dyn_cast<LLVM::DIDerivedTypeAttr>()) {
+                 llvm::dyn_cast<LLVM::DIDerivedTypeAttr>(typeAttr)) {
     if (unsigned derivedSize = derivedTypeAttr.getSizeInBits()) {
       return derivedSize;
     } else {
@@ -517,7 +517,7 @@ LLVM::DISubprogramAttr HALDispatchABI::buildScopeAttr(
   Builder builder(context);
 
   std::string inputFilePath("-");
-  if (auto fileLoc = moduleOp.getLoc().dyn_cast<mlir::FileLineColLoc>()) {
+  if (auto fileLoc = llvm::dyn_cast<mlir::FileLineColLoc>(moduleOp.getLoc())) {
     inputFilePath = fileLoc.getFilename().getValue();
   }
 
@@ -582,19 +582,19 @@ static StringRef getDimName(int32_t dim) {
 // the ops if MLIR or LLVM is likely to reject them.
 static bool isLocationValidForDI(Location loc) {
   // Unknown locations are passed as null and DI doesn't like that.
-  if (loc.isa<UnknownLoc>()) return false;
+  if (llvm::isa<UnknownLoc>(loc)) return false;
   // MLIR currently can't handle name-only locations. We do this check to ensure
   // there's at least one real location MLIR can pass along.
-  if (auto callLoc = loc.dyn_cast<CallSiteLoc>()) {
+  if (auto callLoc = llvm::dyn_cast<CallSiteLoc>(loc)) {
     return isLocationValidForDI(callLoc.getCaller()) &&
            isLocationValidForDI(callLoc.getCallee());
-  } else if (auto fileLoc = loc.dyn_cast<FileLineColLoc>()) {
+  } else if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
     return true;
-  } else if (auto fusedLoc = loc.dyn_cast<FusedLoc>()) {
+  } else if (auto fusedLoc = llvm::dyn_cast<FusedLoc>(loc)) {
     return llvm::all_of(fusedLoc.getLocations(), isLocationValidForDI);
-  } else if (auto namedLoc = loc.dyn_cast<NameLoc>()) {
+  } else if (auto namedLoc = llvm::dyn_cast<NameLoc>(loc)) {
     return isLocationValidForDI(namedLoc.getChildLoc());
-  } else if (auto opaqueLoc = loc.dyn_cast<OpaqueLoc>()) {
+  } else if (auto opaqueLoc = llvm::dyn_cast<OpaqueLoc>(loc)) {
     return isLocationValidForDI(opaqueLoc.getFallbackLocation());
   }
   return false;
@@ -892,8 +892,9 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
       featureToBitPattern[llvmName] = bitPattern;
     }
     SmallVector<StringRef> cpuFeatureStrings;
-    cpuFeatures->getValue().cast<StringAttr>().getValue().split(
-        cpuFeatureStrings, ',', /*MakeSplit=*/-1, /*KeepEmpty=*/false);
+    llvm::cast<StringAttr>(cpuFeatures->getValue())
+        .getValue()
+        .split(cpuFeatureStrings, ',', /*MakeSplit=*/-1, /*KeepEmpty=*/false);
     for (auto featureString : cpuFeatureStrings) {
       if (featureToBitPattern.count(featureString.drop_front())) {
         specifiedFeatureBitPatterns.push_back(
@@ -1179,8 +1180,8 @@ FailureOr<LLVM::LLVMFunctionType> HALDispatchABI::getABIFunctionType(
                      [](auto it) {
                        auto lhsType = std::get<0>(it);
                        auto rhsType = std::get<1>(it);
-                       return (lhsType.template isa<LLVM::LLVMPointerType>() &&
-                               rhsType.template isa<LLVM::LLVMPointerType>()) ||
+                       return (llvm::isa<LLVM::LLVMPointerType>(lhsType) &&
+                               llvm::isa<LLVM::LLVMPointerType>(rhsType)) ||
                               std::get<0>(it) == std::get<1>(it);
                      })) {
       // Extra fields already added. Drop them.
@@ -1218,8 +1219,8 @@ bool HALDispatchABI::hasCompatibleFunctionSignature(
   if (!llvm::all_of(llvm::zip(funcParamTypes, paramTypes), [](auto it) {
         auto lhsType = std::get<0>(it);
         auto rhsType = std::get<1>(it);
-        return (lhsType.template isa<LLVM::LLVMPointerType>() &&
-                rhsType.template isa<LLVM::LLVMPointerType>()) ||
+        return (llvm::isa<LLVM::LLVMPointerType>(lhsType) &&
+                llvm::isa<LLVM::LLVMPointerType>(rhsType)) ||
                std::get<0>(it) == std::get<1>(it);
       })) {
     return false;

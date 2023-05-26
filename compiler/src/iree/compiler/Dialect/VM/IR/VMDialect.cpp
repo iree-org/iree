@@ -40,14 +40,14 @@ struct VMDialect::VMOpAsmInterface
     SmallString<32> osBuffer;
     llvm::raw_svector_ostream os(osBuffer);
 
-    if (op->getResult(0).getType().isa<VectorType>()) {
+    if (llvm::isa<VectorType>(op->getResult(0).getType())) {
       os << "v";
     }
     if (auto refType =
-            op->getResult(0).getType().dyn_cast<IREE::VM::RefType>()) {
-      if (refType.getObjectType().isa<BufferType>()) {
+            llvm::dyn_cast<IREE::VM::RefType>(op->getResult(0).getType())) {
+      if (llvm::isa<BufferType>(refType.getObjectType())) {
         os << "buffer";
-      } else if (refType.getObjectType().isa<ListType>()) {
+      } else if (llvm::isa<ListType>(refType.getObjectType())) {
         os << "list";
       } else {
         os << "ref";
@@ -227,24 +227,24 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
-  if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
+  if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
     auto objectType = refType.getObjectType();
-    if (auto bufferType = objectType.dyn_cast<IREE::VM::BufferType>()) {
+    if (auto bufferType = llvm::dyn_cast<IREE::VM::BufferType>(objectType)) {
       printType(bufferType, os);
-    } else if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
+    } else if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(objectType)) {
       printType(listType, os);
-    } else if (objectType.isa<IREE::VM::OpaqueType>()) {
+    } else if (llvm::isa<IREE::VM::OpaqueType>(objectType)) {
       os << "ref<?>";
     } else {
       os << "ref<" << objectType << ">";
     }
-  } else if (type.isa<IREE::VM::OpaqueType>()) {
+  } else if (llvm::isa<IREE::VM::OpaqueType>(type)) {
     os << "opaque";
-  } else if (type.isa<IREE::VM::BufferType>()) {
+  } else if (llvm::isa<IREE::VM::BufferType>(type)) {
     os << "buffer";
-  } else if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
+  } else if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(type)) {
     os << "list<";
-    if (listType.getElementType().isa<OpaqueType>()) {
+    if (llvm::isa<OpaqueType>(listType.getElementType())) {
       os << "?";
     } else {
       os << listType.getElementType();
@@ -266,29 +266,29 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
 
   if (ConstI32Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstI32Op::convertConstValue(typedValue);
-    if (convertedValue.cast<IntegerAttr>().getValue() == 0) {
+    if (llvm::cast<IntegerAttr>(convertedValue).getValue() == 0) {
       return builder.create<VM::ConstI32ZeroOp>(loc);
     }
     return builder.create<VM::ConstI32Op>(loc, convertedValue);
   } else if (ConstI64Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstI64Op::convertConstValue(typedValue);
-    if (convertedValue.cast<IntegerAttr>().getValue() == 0) {
+    if (llvm::cast<IntegerAttr>(convertedValue).getValue() == 0) {
       return builder.create<VM::ConstI64ZeroOp>(loc);
     }
     return builder.create<VM::ConstI64Op>(loc, convertedValue);
   } else if (ConstF32Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstF32Op::convertConstValue(typedValue);
-    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+    if (llvm::cast<FloatAttr>(convertedValue).getValue().isZero()) {
       return builder.create<VM::ConstF32ZeroOp>(loc);
     }
     return builder.create<VM::ConstF32Op>(loc, convertedValue);
   } else if (ConstF64Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstF64Op::convertConstValue(typedValue);
-    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+    if (llvm::cast<FloatAttr>(convertedValue).getValue().isZero()) {
       return builder.create<VM::ConstF64ZeroOp>(loc);
     }
     return builder.create<VM::ConstF64Op>(loc, convertedValue);
-  } else if (type.isa<IREE::VM::RefType>()) {
+  } else if (llvm::isa<IREE::VM::RefType>(type)) {
     // The only constant type we support for refs is null so we can just
     // emit that here.
     // TODO(benvanik): relace unit attr with a proper null ref attr.

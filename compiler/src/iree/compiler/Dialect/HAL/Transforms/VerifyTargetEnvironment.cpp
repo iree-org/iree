@@ -74,7 +74,7 @@ class VerifyTargetEnvironmentPass
 
     // Verify each target is registered.
     for (auto attr : targetsAttr) {
-      auto targetAttr = attr.dyn_cast<IREE::HAL::DeviceTargetAttr>();
+      auto targetAttr = llvm::dyn_cast<IREE::HAL::DeviceTargetAttr>(attr);
       if (!targetAttr) {
         moduleOp.emitError() << "invalid target attr type: " << attr;
         signalPassFailure();

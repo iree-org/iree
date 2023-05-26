@@ -64,11 +64,11 @@ def ExpertOp : Linalg_Transform_Operation<"expert"> {
   sequence of transformations. The details of the lowering depend on the name
   and are expressed declaratively.}];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                    StrAttr:$expertName);
-  let results = (outs PDL_Operation:$transformed);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "`apply` $expertName `to` $target attr-dict";
+  let assemblyFormat = "`apply` $expertName `to` $target attr-dict `:` functional-type(operands, results)";
 }
 
 #endif // LINALG_TRANSFORM_OPS

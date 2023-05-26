@@ -74,7 +74,7 @@ struct FoldTrailingUnitTranspose
 
   LogicalResult matchAndRewrite(linalg::TransposeOp op,
                                 PatternRewriter &rewriter) const override {
-    auto inputTy = op.getInput().getType().cast<ShapedType>();
+    auto inputTy = llvm::cast<ShapedType>(op.getInput().getType());
     int numDropDims = 0;
     ArrayRef<int64_t> perm = op.getPermutation();
     for (int idx = inputTy.getRank() - 1; idx >= 0; idx--) {
@@ -98,7 +98,7 @@ struct FoldTrailingUnitTranspose
 
     SmallVector<OpFoldResult> destMixedSizes =
         tensor::createDimValues(rewriter, loc, op.getInit());
-    auto initTy = op.getInit().getType().cast<ShapedType>();
+    auto initTy = llvm::cast<ShapedType>(op.getInit().getType());
     destMixedSizes.resize(initTy.getRank() - numDropDims);
     auto dest = rewriter.create<tensor::EmptyOp>(loc, destMixedSizes,
                                                  initTy.getElementType());

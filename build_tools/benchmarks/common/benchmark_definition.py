@@ -705,12 +705,24 @@ class ModuleComponentSizes(object):
 
 
 @dataclasses.dataclass(frozen=True)
+class IRStatistics(object):
+  # Number of cmd.dispatch ops in IR.
+  stream_dispatch_count: int
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return IRStatistics(**json_object)
+
+
+@dataclasses.dataclass(frozen=True)
 class CompilationStatistics(object):
   compilation_info: CompilationInfo
   # Module file and component sizes.
   module_component_sizes: ModuleComponentSizes
   # Module compilation time in ms.
   compilation_time_ms: int
+  # IR-level statistics
+  ir_stats: IRStatistics
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
@@ -719,7 +731,8 @@ class CompilationStatistics(object):
             json_object["compilation_info"]),
         module_component_sizes=ModuleComponentSizes.from_json_object(
             json_object["module_component_sizes"]),
-        compilation_time_ms=json_object["compilation_time_ms"])
+        compilation_time_ms=json_object["compilation_time_ms"],
+        ir_stats=IRStatistics.from_json_object(json_object["ir_stats"]))
 
 
 @dataclasses.dataclass(frozen=True)

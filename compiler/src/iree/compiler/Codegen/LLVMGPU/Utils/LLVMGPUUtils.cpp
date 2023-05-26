@@ -85,7 +85,7 @@ static MaskResult getMask(Operation* op) {
           : transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
   if (maybeExtractOp) {
     if (maybeExtractOp.getPosition().size() + 1 !=
-        maskOp->getResultTypes().front().cast<VectorType>().getRank()) {
+        llvm::cast<VectorType>(maskOp->getResultTypes().front()).getRank()) {
       LDBG("----mask through extract unexpected position size -> Skip: "
            << maybeExtractOp);
       return MaskResult{};
@@ -108,7 +108,7 @@ static Value getMaskValue(RewriterBase& rewriter, Operation* op) {
   if (maybeExtractOp) {
     assert(maybeExtractOp.getPosition().size() == 1 && "expected single pos");
     int64_t sliceNum =
-        maybeExtractOp.getPosition()[0].cast<IntegerAttr>().getInt();
+        llvm::cast<IntegerAttr>(maybeExtractOp.getPosition()[0]).getInt();
     // TODO: to support >2-D mask + extract, and all the cmp.
     Location loc = op->getLoc();
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -154,13 +154,13 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
     }
     LDBG("--candidate writeOp: " << writeOp);
     Value vectorVal = getValueStored(writeOp);
-    if (vectorVal.getType().cast<VectorType>().getRank() != 1) {
+    if (llvm::cast<VectorType>(vectorVal.getType()).getRank() != 1) {
       LDBG("----writeOp is not an inbounds 1-D minor identity -> Skip");
       return WalkResult::advance();
     }
     Value memrefOperand = getMemrefOperand(writeOp);
     if (!hasSharedMemoryAddressSpace(
-            memrefOperand.getType().cast<MemRefType>())) {
+            llvm::cast<MemRefType>(memrefOperand.getType()))) {
       LDBG("----address space is not workgroup -> Skip");
       return WalkResult::advance();
     }
@@ -187,7 +187,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
       }
     }
 
-    VectorType vecType = vectorVal.getType().cast<VectorType>();
+    VectorType vecType = llvm::cast<VectorType>(vectorVal.getType());
     if (!((vecType.getElementType().isF32() && vecType.getNumElements() <= 4) ||
           (vecType.getElementType().isF16() &&
            vecType.getNumElements() <= 8))) {
@@ -219,7 +219,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
         Operation* readOp = nextNode;
         Value memrefOperand = getMemrefOperand(readOp);
         if (!hasSharedMemoryAddressSpace(
-                memrefOperand.getType().cast<MemRefType>())) {
+                llvm::cast<MemRefType>(memrefOperand.getType()))) {
           continue;
         }
       }
@@ -246,7 +246,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
           rewriter.getIndexAttr(
-              vectorVal.getType().cast<VectorType>().getNumElements()),
+              llvm::cast<VectorType>(vectorVal.getType()).getNumElements()),
           mask,
           /*bypassL1=*/useMMASync ? rewriter.getUnitAttr() : UnitAttr());
       tokens.push_back(token);

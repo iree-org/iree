@@ -161,14 +161,14 @@ static void replaceEntryPointUses(
             if (attr == oldAttr) {
               // Found old->new replacement.
               return {newAttr, WalkResult::skip()};
-            } else if (attr.isa<SymbolRefAttr>()) {
+            } else if (llvm::isa<SymbolRefAttr>(attr)) {
               // Don't recurse into symbol refs - we only want to match roots.
               return {attr, WalkResult::skip()};
             }
             // Non-symbol ref attr.
             return {attr, WalkResult::advance()};
           });
-      use.getUser()->setAttrs(newDict.cast<DictionaryAttr>());
+      use.getUser()->setAttrs(llvm::cast<DictionaryAttr>(newDict));
     }
   };
   replaceSymbolRefs(moduleOp, symbolReplacements.exportRefs);

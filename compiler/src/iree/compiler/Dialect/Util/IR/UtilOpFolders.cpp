@@ -101,7 +101,7 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
   // If all operands are constant then fold into a constant.
   int64_t value = initialValue;
   for (auto operand : attrOperands) {
-    auto intValue = operand.dyn_cast_or_null<IntegerAttr>();
+    auto intValue = llvm::dyn_cast_if_present<IntegerAttr>(operand);
     if (!intValue) return {};
     value = expr(value, intValue.getValue().getSExtValue());
   }
@@ -421,6 +421,16 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
   // If aligning an already-aligned value then fold if this is provably a
   // no-op. We can check this for equality even with dynamic alignments.
   if (isAlignedTo(getValue(), getAlignment())) return getValue();
+
+  // If values are static we can perform the alignment here.
+  APInt staticValue;
+  APInt staticAlignment;
+  if (matchPattern(getValue(), m_ConstantInt(&staticValue)) &&
+      matchPattern(getAlignment(), m_ConstantInt(&staticAlignment))) {
+    return IntegerAttr::get(getResult().getType(),
+                            align(staticValue.getZExtValue(), staticAlignment));
+  }
+
   return {};
 }
 
@@ -430,7 +440,7 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
 
 OpFoldResult SizeOfOp::fold(FoldAdaptor operands) {
   Type t = getSizedType();
-  if (t.isa<IntegerType>() || t.isa<FloatType>()) {
+  if (llvm::isa<IntegerType>(t) || llvm::isa<FloatType>(t)) {
     return IntegerAttr::get(IndexType::get(getContext()),
                             getRoundedElementByteWidth(t));
   }
@@ -733,7 +743,7 @@ struct SinkSubspanAcrossSelectOps
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getType().isa<IREE::Util::BufferType>()) return failure();
+    if (!llvm::isa<IREE::Util::BufferType>(op.getType())) return failure();
     auto trueSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
         op.getTrueValue().getDefiningOp());
     auto falseSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
@@ -773,8 +783,8 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   // During A->B->C dialect conversion, the type may not be legal so be
   // defensive.
   auto operand = getOperand();
-  if (auto sizeAwareType =
-          operand.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+  if (auto sizeAwareType = llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
+          operand.getType())) {
     Operation *op = this->getOperation();
     if (auto sizeValue = sizeAwareType.findSizeValue(operand, op->getBlock(),
                                                      Block::iterator(op))) {
@@ -786,8 +796,8 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   if (auto constantOp = dyn_cast_or_null<IREE::Util::BufferConstantOp>(
           operand.getDefiningOp())) {
     if (auto attr =
-            constantOp.getValue()
-                .dyn_cast_or_null<IREE::Util::SerializableAttrInterface>()) {
+            llvm::dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
+                constantOp.getValue())) {
       return IntegerAttr::get(IndexType::get(attr.getContext()),
                               attr.getStorageSize());
     }

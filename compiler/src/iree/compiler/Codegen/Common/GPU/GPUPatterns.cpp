@@ -51,9 +51,9 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
                                 PatternRewriter &rewriter) const override {
     auto loc = transferReadOp.getLoc();
     Value vector = transferReadOp.getVector();
-    VectorType vectorType = vector.getType().cast<VectorType>();
+    VectorType vectorType = llvm::cast<VectorType>(vector.getType());
     Value source = transferReadOp.getSource();
-    MemRefType sourceType = source.getType().dyn_cast<MemRefType>();
+    MemRefType sourceType = llvm::dyn_cast<MemRefType>(source.getType());
     // Contiguity check is valid on tensors only.
     if (!sourceType) return failure();
     // Already 2D or lower nothing to do.
@@ -115,10 +115,10 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
       subViewOffsets.push_back(transferReadOp.getIndices()[i]);
       subViewStrides.push_back(rewriter.getIndexAttr(1));
     }
-    MemRefType resultType = memref::SubViewOp::inferRankReducedResultType(
-                                vectorShapeCollapse, sourceType, subViewOffsets,
-                                subViewSizes, subViewStrides)
-                                .cast<MemRefType>();
+    MemRefType resultType =
+        llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
+            vectorShapeCollapse, sourceType, subViewOffsets, subViewSizes,
+            subViewStrides));
     Value subView = rewriter.create<memref::SubViewOp>(
         loc, resultType, source, subViewOffsets, subViewSizes, subViewStrides);
     Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);

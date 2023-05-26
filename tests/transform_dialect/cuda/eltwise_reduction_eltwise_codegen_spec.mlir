@@ -95,6 +95,7 @@ transform.sequence failures(propagate) {
   transform.sequence %variant_op_2 : !pdl.operation failures(suppress) {
   ^bb0(%arg0: !pdl.operation):
     transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
+    : (!transform.any_op) -> !transform.any_op
   }
   transform.iree.vector.warp_distribute %func_3 : (!pdl.operation) -> ()
 }

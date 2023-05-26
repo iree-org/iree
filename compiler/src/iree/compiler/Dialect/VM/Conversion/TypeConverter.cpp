@@ -109,7 +109,8 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
 
   addSourceMaterialization([](OpBuilder &builder, IndexType type,
                               ValueRange inputs, Location loc) -> Value {
-    if (inputs.size() != 1 || !inputs.front().getType().isa<IntegerType>()) {
+    if (inputs.size() != 1 ||
+        !llvm::isa<IntegerType>(inputs.front().getType())) {
       return nullptr;
     }
     return builder.create<arith::IndexCastOp>(loc, type, inputs.front());
