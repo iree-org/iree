@@ -23,6 +23,7 @@ LLVM_SRCS = enforce_glob(
         "conv2d.mlir",
     ],
     include = ["*.mlir"],
+    exclude = ["large_linalg_matmul.mlir"],
 )
 
 iree_check_single_backend_test_suite(
@@ -47,6 +48,7 @@ VMVX_SRCS = enforce_glob(
         "conv2d.mlir",
     ],
     include = ["*.mlir"],
+    exclude = ["large_linalg_matmul.mlir"],
 )
 
 iree_check_single_backend_test_suite(
@@ -61,6 +63,7 @@ VULKAN_SRCS = enforce_glob(
         "conv2d.mlir",
     ],
     include = ["*.mlir"],
+    exclude = ["large_linalg_matmul.mlir"],
 )
 
 iree_check_single_backend_test_suite(
@@ -80,9 +83,29 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_large_linalg_matmul_cuda",
+    srcs =
+        [
+            # currently only enabled on cuda as it can be slow on other backends.
+            "large_linalg_matmul.mlir",
+        ],
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
+
 test_suite(
     name = "check",
     tests = [
+        ":check_large_linalg_matmul_cuda",
         ":check_llvm-cpu_local-task",
         ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",

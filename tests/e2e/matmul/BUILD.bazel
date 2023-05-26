@@ -7,7 +7,6 @@
 # End-to-end matrix multiplication tests.
 
 load("//build_tools/bazel:iree_trace_runner_test.bzl", "iree_generated_trace_runner_test")
-load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
     features = ["layering_check"],
@@ -406,26 +405,6 @@ iree_generated_trace_runner_test(
     "f16",
     "f32",
 ]]
-
-# Check tests
-iree_check_single_backend_test_suite(
-    name = "check_cuda",
-    srcs =
-        [
-            # currently only enabled on cuda as it can be slow on other backends.
-            "large_linalg_matmul.mlir",
-        ],
-    driver = "cuda",
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-    ],
-    target_backend = "cuda",
-)
 
 iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_small_no_padding",
