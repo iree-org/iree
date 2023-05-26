@@ -172,7 +172,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
 /// These is the legacy path for workgroup count calculation that
 /// arent handled by the current default.
 static void createWorkgroupCountFromDagRootRegion(
-    RewriterBase &rewriter, Location loc, Flow::DispatchRegionOp &regionOp,
+    RewriterBase &rewriter, Flow::DispatchRegionOp &regionOp,
     TypeRange workloadTypes, ArrayRef<Location> workloadLocs) {
   Region &countRegion = regionOp.getWorkgroupCount();
   if (!countRegion.empty()) return;
@@ -181,6 +181,7 @@ static void createWorkgroupCountFromDagRootRegion(
   auto args = body->getArguments();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(body);
+  Location loc = regionOp.getLoc();
   auto countOp =
       rewriter.create<Flow::DispatchWorkgroupCountFromDagRootOp>(loc, args);
   rewriter.create<Flow::ReturnOp>(loc, countOp->getResults());
@@ -456,8 +457,8 @@ FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
         llvm::map_range(newWorkload, [](Value v) { return v.getType(); }));
     auto workloadLocs = llvm::to_vector(
         llvm::map_range(newWorkload, [](Value v) { return v.getLoc(); }));
-    createWorkgroupCountFromDagRootRegion(rewriter, op->getLoc(), *newRegionOp,
-                                          workloadTypes, workloadLocs);
+    createWorkgroupCountFromDagRootRegion(rewriter, *newRegionOp, workloadTypes,
+                                          workloadLocs);
   }
 
   return newRegionOp;
