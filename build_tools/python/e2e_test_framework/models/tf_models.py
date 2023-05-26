@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines Tensorflow models."""
-import uuid
+
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 
@@ -63,10 +63,18 @@ TUNED_BERT_LARGE_1024X384_FP32_TF = common_definitions.Model(
     name="TunedBertLargeTFBatch1024",
     tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-1024"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=f"{TF_TUNED_MODELS_ROOT_DIR}/bert_large_batch-1024.mlirc",
+    source_url=f"{TF_TUNED_MODELS_ROOT_DIR}/tuned_bert_large_batch-1024.mlir",
     entry_function="forward",
     input_types=["1024x384xi32", "1024x384xi32"])
 
+LINALG_BERT_LARGE_1024X384_FP32_TF = common_definitions.Model(
+    id=unique_ids.LINALG_MODEL_BERT_LARGE_1024X384_FP32_TF,
+    name="LinalgBertLargeTFBatch1024",
+    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-1024"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=f"{TF_TUNED_MODELS_ROOT_DIR}/bert_large_batch-1024.mlir",
+    entry_function="forward",
+    input_types=["1024x384xi32", "1024x384xi32"])
 
 TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084"
 
