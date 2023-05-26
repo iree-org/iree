@@ -111,19 +111,17 @@ class BuildFileFunctions(object):
     return self._convert_string_arg_block(name, target, quote=False)
 
   def _convert_srcs_block(self, srcs):
-    if srcs is None:
+    if not srcs:
       return ""
-    generated_srcs = [src for src in srcs if src.startswith(":")]
-    srcs = [src for src in srcs if src not in generated_srcs]
-    sets = []
-    if srcs:
-      sets.append(self._convert_string_list_block("SRCS", srcs, sort=True))
-    if generated_srcs:
-      sets.append(
-          self._convert_string_list_block("GENERATED_SRCS",
-                                          [src[1:] for src in generated_srcs],
-                                          sort=True))
-    return "\n".join(sets)
+    # Bazel allows srcs to reference targets in the current package (leading
+    # ':') or in other packages (leading '//'). We map that to paths by:
+    # - dropping any leading ':' as in:
+    #      ':generated.c' -> 'generated.c'
+    # - dropping any leading '//', and internal ':' by '/', as in:
+    #      '//path/to/package:generated.c' ->  'path/to/package/generated.c'
+    srcs = [s.lstrip('//').lstrip(':').replace(':', '/') for s in srcs]
+
+    return self._convert_string_list_block("SRCS", srcs, sort=True)
 
   def _convert_td_file_block(self, td_file):
     if td_file.startswith("//iree"):
