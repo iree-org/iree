@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "experimental/webgpu/platform/native/native_driver.h"
+#include "experimental/webgpu/registration/driver_module.h"
 #include "iree/base/api.h"
-#include "iree/hal/drivers/webgpu/platform/native/native_driver.h"
-#include "iree/hal/drivers/webgpu/registration/driver_module.h"
 
 // TODO(#4298): remove this driver registration and wrapper.
 

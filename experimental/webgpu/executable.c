@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/executable.h"
+#include "experimental/webgpu/executable.h"
 
 #include <stddef.h>
 

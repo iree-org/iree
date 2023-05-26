@@ -4,23 +4,23 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/webgpu_device.h"
+#include "experimental/webgpu/webgpu_device.h"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
+#include "experimental/webgpu/bind_group_cache.h"
+#include "experimental/webgpu/builtins.h"
+#include "experimental/webgpu/command_buffer.h"
+#include "experimental/webgpu/nop_event.h"
+#include "experimental/webgpu/nop_executable_cache.h"
+#include "experimental/webgpu/nop_semaphore.h"
+#include "experimental/webgpu/pipeline_layout.h"
+#include "experimental/webgpu/simple_allocator.h"
+#include "experimental/webgpu/staging_buffer.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/bind_group_cache.h"
-#include "iree/hal/drivers/webgpu/builtins.h"
-#include "iree/hal/drivers/webgpu/command_buffer.h"
-#include "iree/hal/drivers/webgpu/nop_event.h"
-#include "iree/hal/drivers/webgpu/nop_executable_cache.h"
-#include "iree/hal/drivers/webgpu/nop_semaphore.h"
-#include "iree/hal/drivers/webgpu/pipeline_layout.h"
-#include "iree/hal/drivers/webgpu/simple_allocator.h"
-#include "iree/hal/drivers/webgpu/staging_buffer.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
 //===----------------------------------------------------------------------===//

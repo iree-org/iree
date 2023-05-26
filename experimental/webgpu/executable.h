@@ -9,10 +9,10 @@
 
 #include <stdint.h>
 
+#include "experimental/webgpu/pipeline_layout.h"
+#include "experimental/webgpu/platform/webgpu.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/webgpu/pipeline_layout.h"
-#include "iree/hal/drivers/webgpu/platform/webgpu.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/platform/native/native_driver.h"
+#include "experimental/webgpu/platform/native/native_driver.h"
 
 #include "iree/base/tracing.h"
 

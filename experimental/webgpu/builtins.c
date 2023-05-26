@@ -4,11 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/builtins.h"
+#include "experimental/webgpu/builtins.h"
 
+#include "experimental/webgpu/shaders/builtin_shaders.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/shaders/builtin_shaders.h"
 
 static const char* iree_hal_webgpu_builtins_find_code(const char* file_name) {
   const iree_file_toc_t* files = iree_hal_wgsl_builtin_shaders_create();

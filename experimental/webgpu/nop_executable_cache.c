@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/nop_executable_cache.h"
+#include "experimental/webgpu/nop_executable_cache.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "experimental/webgpu/executable.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/executable.h"
 
 typedef struct iree_hal_webgpu_nop_executable_cache_t {
   iree_hal_resource_t resource;

@@ -25,7 +25,7 @@
 #endif  // IREE_HAVE_HAL_VULKAN_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE)
-#include "iree/hal/drivers/webgpu/registration/driver_module.h"
+#include "experimental/webgpu/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE
 
 #if defined(IREE_HAVE_HAL_EXTERNAL_DRIVERS)

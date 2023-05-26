@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/staging_buffer.h"
+#include "experimental/webgpu/staging_buffer.h"
 
 #include <stdint.h>
 
+#include "experimental/webgpu/buffer.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/buffer.h"
 
 iree_status_t iree_hal_webgpu_staging_buffer_initialize(
     WGPUDevice device, const WGPULimits* limits,

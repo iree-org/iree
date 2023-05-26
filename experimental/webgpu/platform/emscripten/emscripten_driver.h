@@ -7,10 +7,10 @@
 #ifndef IREE_HAL_DRIVERS_WEBGPU_PLATFORM_EMSCRIPTEN_EMSCRIPTEN_DRIVER_H_
 #define IREE_HAL_DRIVERS_WEBGPU_PLATFORM_EMSCRIPTEN_EMSCRIPTEN_DRIVER_H_
 
+#include "experimental/webgpu/api.h"
+#include "experimental/webgpu/platform/webgpu.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/webgpu/api.h"
-#include "iree/hal/drivers/webgpu/platform/webgpu.h"
 
 #ifdef __cplusplus
 extern "C" {

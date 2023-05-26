@@ -4,19 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/buffer.h"
+#include "experimental/webgpu/buffer.h"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
+#include "experimental/webgpu/webgpu_device.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/webgpu_device.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
 // TODO(benvanik): decouple via injection.
-#include "iree/hal/drivers/webgpu/simple_allocator.h"
+#include "experimental/webgpu/simple_allocator.h"
 
 typedef struct iree_hal_webgpu_buffer_t {
   iree_hal_buffer_t base;

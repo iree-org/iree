@@ -7,10 +7,10 @@
 #ifndef IREE_HAL_DRIVERS_WEBGPU_PIPELINE_LAYOUT_H_
 #define IREE_HAL_DRIVERS_WEBGPU_PIPELINE_LAYOUT_H_
 
+#include "experimental/webgpu/platform/webgpu.h"
+#include "experimental/webgpu/staging_buffer.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/webgpu/platform/webgpu.h"
-#include "iree/hal/drivers/webgpu/staging_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {

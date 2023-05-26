@@ -7,13 +7,13 @@
 #ifndef IREE_HAL_DRIVERS_WEBGPU_COMMAND_BUFFER_H_
 #define IREE_HAL_DRIVERS_WEBGPU_COMMAND_BUFFER_H_
 
+#include "experimental/webgpu/bind_group_cache.h"
+#include "experimental/webgpu/builtins.h"
+#include "experimental/webgpu/platform/webgpu.h"
+#include "experimental/webgpu/staging_buffer.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/webgpu/bind_group_cache.h"
-#include "iree/hal/drivers/webgpu/builtins.h"
-#include "iree/hal/drivers/webgpu/platform/webgpu.h"
-#include "iree/hal/drivers/webgpu/staging_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {

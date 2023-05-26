@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/bind_group_cache.h"
+#include "experimental/webgpu/bind_group_cache.h"
 
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "experimental/webgpu/buffer.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/buffer.h"
 
 void iree_hal_webgpu_bind_group_cache_initialize(
     WGPUDevice device, iree_hal_webgpu_bind_group_cache_t* out_cache) {

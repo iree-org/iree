@@ -8,11 +8,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "experimental/webgpu/buffer.h"
+#include "experimental/webgpu/platform/webgpu.h"
+#include "experimental/webgpu/webgpu_device.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/webgpu/buffer.h"
-#include "iree/hal/drivers/webgpu/platform/webgpu.h"
-#include "iree/hal/drivers/webgpu/webgpu_device.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
 #include "iree/vm/bytecode/module.h"

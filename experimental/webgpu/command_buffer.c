@@ -4,18 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/webgpu/command_buffer.h"
+#include "experimental/webgpu/command_buffer.h"
 
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "experimental/webgpu/buffer.h"
+#include "experimental/webgpu/executable.h"
+#include "experimental/webgpu/pipeline_layout.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/buffer.h"
-#include "iree/hal/drivers/webgpu/executable.h"
-#include "iree/hal/drivers/webgpu/pipeline_layout.h"
 
 //===----------------------------------------------------------------------===//
 // Segmented submission management
