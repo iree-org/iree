@@ -78,8 +78,8 @@ RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
 DEFAULT_BENCHMARK_PRESET_GROUP = [
-    "cuda", "x86_64", "android-cpu", "android-gpu", "vulkan-nvidia",
-    "comp-stats"
+    "cuda", "cuda-long", "x86_64", "android-cpu", "android-gpu",
+    "vulkan-nvidia", "comp-stats"
 ]
 DEFAULT_BENCHMARK_PRESET = "default"
 # All available benchmark preset options including experimental presets.
