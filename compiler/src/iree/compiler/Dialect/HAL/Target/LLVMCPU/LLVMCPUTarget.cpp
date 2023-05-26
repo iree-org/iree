@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/UKernel.h"
@@ -444,23 +445,46 @@ class LLVMCPUTargetBackend final : public TargetBackend {
              << targetTriple.str() << "'";
     }
 
-    // Link in ukernel file.
+    // Link in ukernel bitcode.
     if (hasMicrokernel(variantOp)) {
       auto setAlwaysInline = [&](llvm::Module &module) {
         for (auto &func : module.getFunctionList()) {
           func.addFnAttr(llvm::Attribute::AlwaysInline);
         }
       };
-      if (std::optional<std::unique_ptr<llvm::Module>> libUKernel =
-              loadUKernelBitcode(targetMachine.get(), context)) {
-        if (failed(linkBitcodeModule(
-                variantOp.getLoc(), moduleLinker, llvm::Linker::LinkOnlyNeeded,
-                *targetMachine, "libukernel", std::move(libUKernel.value()),
-                setAlwaysInline))) {
+
+      std::unique_ptr<llvm::Module> archBitcode =
+          loadUKernelArchBitcode(targetMachine.get(), context);
+
+      if (archBitcode) {
+        // Sequence that access before we std::move(archBitcode)!
+        StringRef archBitcodeName = archBitcode->getName();
+        if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
+                                     /*linkerFlags=*/0, *targetMachine,
+                                     archBitcodeName, std::move(archBitcode),
+                                     setAlwaysInline))) {
           return mlir::emitError(variantOp.getLoc())
-                 << "failed linking in ukernel library for target triple '"
+                 << "failed linking in architecture-specific ukernel bitcode "
+                    "for target triple '"
                  << targetTriple.str() << "'";
         }
+      }
+
+      // The baseBitcode module contains weak symbols for fallbacks.
+      // In a native-toolchain build, these would have to be linked last to
+      // ensure that they are overridden by non-weak symbols from the
+      // archBitcode module. Here it seems not to matter (?) but we still link
+      // this last out of habit.
+      std::unique_ptr<llvm::Module> baseBitcode =
+          loadUKernelBaseBitcode(context);
+      // Sequence that access before we std::move(baseBitcode)!
+      StringRef baseBitcodeName = baseBitcode->getName();
+      if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
+                                   /*linkerFlags=*/0, *targetMachine,
+                                   baseBitcodeName, std::move(baseBitcode),
+                                   setAlwaysInline))) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed linking in base ukernel bitcode";
       }
     }
 
@@ -752,35 +776,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
             break;
         }
       }
-      switch (targetTriple.getArch()) {
-        case llvm::Triple::ArchType::arm:
-          format += "arm_32";
-          break;
-        case llvm::Triple::ArchType::aarch64:
-          format += "arm_64";
-          break;
-        case llvm::Triple::ArchType::riscv32:
-          format += "riscv_32";
-          break;
-        case llvm::Triple::ArchType::riscv64:
-          format += "riscv_64";
-          break;
-        case llvm::Triple::ArchType::wasm32:
-          format += "wasm_32";
-          break;
-        case llvm::Triple::ArchType::wasm64:
-          format += "wasm_64";
-          break;
-        case llvm::Triple::ArchType::x86:
-          format += "x86_32";
-          break;
-        case llvm::Triple::ArchType::x86_64:
-          format += "x86_64";
-          break;
-        default:
-          format += "unknown";
-          break;
-      }
+      format += getIreeArchNameForTargetTriple(targetTriple);
     }
 
     // Add some configurations to the `hal.executable.target` attribute.

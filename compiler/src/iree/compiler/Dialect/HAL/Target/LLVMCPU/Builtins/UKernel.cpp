@@ -6,7 +6,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/UKernel.h"
 
-#include "iree/builtins/ukernel/libukernel.h"
+#include "iree/builtins/ukernel/ukernel_bitcode.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
@@ -16,46 +17,42 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static const iree_file_toc_t *lookupUKernelFile(StringRef filename) {
-  for (size_t i = 0; i < iree_builtins_libukernel_size(); ++i) {
-    const auto &file_toc = iree_builtins_libukernel_create()[i];
-    if (filename == file_toc.name) return &file_toc;
+static std::unique_ptr<llvm::Module> loadUKernelBitcodeFile(
+    StringRef filename, llvm::LLVMContext& context) {
+  const iree_file_toc_t* file_start = iree_ukernel_bitcode_create();
+  const iree_file_toc_t* file_end = file_start + iree_ukernel_bitcode_size();
+  for (const iree_file_toc_t* file = file_start; file < file_end; ++file) {
+    if (filename == file->name) {
+      llvm::MemoryBufferRef bitcodeBufferRef(
+          llvm::StringRef(file->data, file->size), file->name);
+      auto bitcodeFile = llvm::parseBitcodeFile(bitcodeBufferRef, context);
+      if (!bitcodeFile) return nullptr;
+      return std::move(*bitcodeFile);
+    }
   }
   return nullptr;
 }
 
-static const iree_file_toc_t *lookupUKernelFile(
-    llvm::TargetMachine *targetMachine) {
-  const auto &triple = targetMachine->getTargetTriple();
-
-  // NOTE: other arch-specific checks go here.
-
-  // Fallback path using the generic wasm variants as they are largely
-  // machine-agnostic.
-  if (triple.isX86()) {
-    return lookupUKernelFile("ukernel_bitcode.bc");
-  } else {
-    return nullptr;
-  }
+std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
+    llvm::LLVMContext& context) {
+  std::unique_ptr<llvm::Module> baseBitcode =
+      loadUKernelBitcodeFile("ukernel_bitcode_base.bc", context);
+  assert(baseBitcode && "base ukernel bitcode file not found");
+  return baseBitcode;
 }
 
-std::optional<std::unique_ptr<llvm::Module>> loadUKernelBitcode(
-    llvm::TargetMachine *targetMachine, llvm::LLVMContext &context) {
-  // Find a bitcode file for the current architecture.
-  const auto *file = lookupUKernelFile(targetMachine);
-  if (!file) {
-    return std::nullopt;
-  }
-
-  // Load the generic bitcode file contents.
-  llvm::MemoryBufferRef bitcodeBufferRef(
-      llvm::StringRef(file->data, file->size), file->name);
-  auto bitcodeFile = llvm::parseBitcodeFile(bitcodeBufferRef, context);
-  if (!bitcodeFile) {
-    // TODO: Do we want to error out here or silently proceed.
-    return std::nullopt;
-  }
-  return std::move(*bitcodeFile);
+std::unique_ptr<llvm::Module> loadUKernelArchBitcode(
+    llvm::TargetMachine* targetMachine, llvm::LLVMContext& context) {
+  const char* archName =
+      getIreeArchNameForTargetTriple(targetMachine->getTargetTriple());
+  char archBitcodeFilename[64];
+  snprintf(archBitcodeFilename, sizeof archBitcodeFilename,
+           "ukernel_bitcode_%s.bc", archName);
+  std::unique_ptr<llvm::Module> archBitcode =
+      loadUKernelBitcodeFile(archBitcodeFilename, context);
+  // archBitcode is optional: we don't have arch-specific ukernel code for all
+  // architectures. So it's normal to be returning nullptr here.
+  return archBitcode;
 }
 
 }  // namespace HAL

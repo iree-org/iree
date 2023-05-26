@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library")
+load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library", "iree_link_bitcode")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -24,49 +24,12 @@ if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
     inline = True,
 )
 
-BITCODE_COPTS = [
-    # C17 with no system deps.
-    "-std=c17",
-    "-nostdinc",
-    "-ffreestanding",
-
-    # Optimized and unstamped.
-    "-O3",
-    "-DNDEBUG",
-    "-fno-ident",
-    "-fdiscard-value-names",
-
-    # Set the size of wchar_t to 4 bytes (instead of 2 bytes).
-    # This must match what the runtime is built with.
-    "-fno-short-wchar",
-
-    # Object file only in bitcode format:
-    "-c",
-    "-emit-llvm",
-
-    # Force configure for X86_64.
-    "-target",
-    "x86_64-unknown-unknown-eabi-elf",
-]
-
-UKERNEL_HDRS = [
-    "//runtime/src/iree/builtins/ukernel:common.h",
-    "//runtime/src/iree/builtins/ukernel:pack.h",
-    "//runtime/src/iree/builtins/ukernel:exported_bits.h",
-    "//runtime/src/iree/builtins/ukernel:static_assert.h",
-    "//runtime/src/iree/builtins/ukernel:api.h",
-    "//runtime/src/iree/builtins/ukernel:unpack.h",
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes.h",
-    "//runtime/src/iree/builtins/ukernel:unpack_internal.h",
-    "//runtime/src/iree/builtins/ukernel:mmt4d.h",
-    "//runtime/src/iree/builtins/ukernel:mmt4d_internal.h",
-    "//runtime/src/iree/builtins/ukernel:pack_internal.h",
-    "//runtime/src/iree/builtins/ukernel:elementwise.h",
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h",
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h",
-    "//runtime/src/iree/schemas:cpu_data.h",
-    "//runtime/src/iree/schemas:cpu_feature_bits.inl",
-]
+filegroup(
+    name = "bitcode_internal_headers",
+    srcs = [
+        "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h",
+    ],
+)
 
 UKERNEL_X86_64_BASE_SRCS = [
     "mmt4d_x86_64.c",
@@ -78,8 +41,11 @@ UKERNEL_X86_64_BASE_SRCS = [
 iree_bitcode_library(
     name = "ukernel_bitcode_x86_64_base",
     srcs = UKERNEL_X86_64_BASE_SRCS,
-    hdrs = UKERNEL_HDRS,
-    copts = BITCODE_COPTS,
+    arch = "x86_64",
+    internal_hdrs = [
+        ":bitcode_internal_headers",
+        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
+    ],
 )
 
 UKERNEL_X86_64_AVX2_FMA_SRCS = [
@@ -88,13 +54,20 @@ UKERNEL_X86_64_AVX2_FMA_SRCS = [
     "unpack_x86_64_avx2_fma.c",
 ]
 
+UKERNEL_X86_64_AVX2_FMA_COPTS = [
+    "-mavx",
+    "-mavx2",
+    "-mfma",
+]
+
 iree_bitcode_library(
     name = "ukernel_bitcode_x86_64_avx2_fma",
     srcs = UKERNEL_X86_64_AVX2_FMA_SRCS,
-    hdrs = UKERNEL_HDRS,
-    copts = BITCODE_COPTS + [
-        "-mavx2",
-        "-mfma",
+    arch = "x86_64",
+    copts = UKERNEL_X86_64_AVX2_FMA_COPTS,
+    internal_hdrs = [
+        ":bitcode_internal_headers",
+        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
     ],
 )
 
@@ -104,16 +77,22 @@ UKERNEL_X86_64_AVX512_BASE_SRCS = [
     "unpack_x86_64_avx512_base.c",
 ]
 
+UKERNEL_X86_64_AVX512_BASE_COPTS = UKERNEL_X86_64_AVX2_FMA_COPTS + [
+    "-mavx512f",
+    "-mavx512vl",
+    "-mavx512cd",
+    "-mavx512bw",
+    "-mavx512dq",
+]
+
 iree_bitcode_library(
     name = "ukernel_bitcode_x86_64_avx512_base",
     srcs = UKERNEL_X86_64_AVX512_BASE_SRCS,
-    hdrs = UKERNEL_HDRS,
-    copts = BITCODE_COPTS + [
-        "-mavx512f",
-        "-mavx512vl",
-        "-mavx512cd",
-        "-mavx512bw",
-        "-mavx512dq",
+    arch = "x86_64",
+    copts = UKERNEL_X86_64_AVX512_BASE_COPTS,
+    internal_hdrs = [
+        ":bitcode_internal_headers",
+        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
     ],
 )
 
@@ -121,17 +100,28 @@ UKERNEL_X86_64_AVX512_VNNI_SRCS = [
     "mmt4d_x86_64_avx512_vnni.c",
 ]
 
+UKERNEL_X86_64_AVX512_VNNI_COPTS = UKERNEL_X86_64_AVX512_BASE_COPTS + [
+    "-mavx512vnni",
+]
+
 iree_bitcode_library(
     name = "ukernel_bitcode_x86_64_avx512_vnni",
     srcs = UKERNEL_X86_64_AVX512_VNNI_SRCS,
-    hdrs = UKERNEL_HDRS,
-    copts = BITCODE_COPTS + [
-        "-mavx512f",
-        "-mavx512vl",
-        "-mavx512cd",
-        "-mavx512bw",
-        "-mavx512dq",
-        "-mavx512vnni",
+    arch = "x86_64",
+    copts = UKERNEL_X86_64_AVX512_VNNI_COPTS,
+    internal_hdrs = [
+        ":bitcode_internal_headers",
+        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
+    ],
+)
+
+iree_link_bitcode(
+    name = "ukernel_bitcode_x86_64",
+    bitcode_files = [
+        "ukernel_bitcode_x86_64_base.bc",
+        "ukernel_bitcode_x86_64_avx2_fma.bc",
+        "ukernel_bitcode_x86_64_avx512_base.bc",
+        "ukernel_bitcode_x86_64_avx512_vnni.bc",
     ],
 )
 

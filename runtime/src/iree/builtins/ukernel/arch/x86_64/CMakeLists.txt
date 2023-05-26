@@ -20,37 +20,8 @@ iree_bitcode_library(
     "pack_x86_64.c"
     "query_tile_sizes_x86_64.c"
     "unpack_x86_64.c"
-  HDRS
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel:api.h"
-    "//runtime/src/iree/builtins/ukernel:common.h"
-    "//runtime/src/iree/builtins/ukernel:elementwise.h"
-    "//runtime/src/iree/builtins/ukernel:exported_bits.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d_internal.h"
-    "//runtime/src/iree/builtins/ukernel:pack.h"
-    "//runtime/src/iree/builtins/ukernel:pack_internal.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h"
-    "//runtime/src/iree/builtins/ukernel:static_assert.h"
-    "//runtime/src/iree/builtins/ukernel:unpack.h"
-    "//runtime/src/iree/builtins/ukernel:unpack_internal.h"
-    "//runtime/src/iree/schemas:cpu_data.h"
-    "//runtime/src/iree/schemas:cpu_feature_bits.inl"
-  COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-DNDEBUG"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-fno-short-wchar"
-    "-c"
-    "-emit-llvm"
-    "-target"
-    "x86_64-unknown-unknown-eabi-elf"
-  PUBLIC
+  ARCH
+    x86_64
 )
 
 iree_bitcode_library(
@@ -60,39 +31,12 @@ iree_bitcode_library(
     "mmt4d_x86_64_avx2_fma.c"
     "pack_x86_64_avx2_fma.c"
     "unpack_x86_64_avx2_fma.c"
-  HDRS
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel:api.h"
-    "//runtime/src/iree/builtins/ukernel:common.h"
-    "//runtime/src/iree/builtins/ukernel:elementwise.h"
-    "//runtime/src/iree/builtins/ukernel:exported_bits.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d_internal.h"
-    "//runtime/src/iree/builtins/ukernel:pack.h"
-    "//runtime/src/iree/builtins/ukernel:pack_internal.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h"
-    "//runtime/src/iree/builtins/ukernel:static_assert.h"
-    "//runtime/src/iree/builtins/ukernel:unpack.h"
-    "//runtime/src/iree/builtins/ukernel:unpack_internal.h"
-    "//runtime/src/iree/schemas:cpu_data.h"
-    "//runtime/src/iree/schemas:cpu_feature_bits.inl"
   COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-DNDEBUG"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-fno-short-wchar"
-    "-c"
-    "-emit-llvm"
-    "-target"
-    "x86_64-unknown-unknown-eabi-elf"
+    "-mavx"
     "-mavx2"
     "-mfma"
-  PUBLIC
+  ARCH
+    x86_64
 )
 
 iree_bitcode_library(
@@ -102,42 +46,17 @@ iree_bitcode_library(
     "mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
     "unpack_x86_64_avx512_base.c"
-  HDRS
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel:api.h"
-    "//runtime/src/iree/builtins/ukernel:common.h"
-    "//runtime/src/iree/builtins/ukernel:elementwise.h"
-    "//runtime/src/iree/builtins/ukernel:exported_bits.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d_internal.h"
-    "//runtime/src/iree/builtins/ukernel:pack.h"
-    "//runtime/src/iree/builtins/ukernel:pack_internal.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h"
-    "//runtime/src/iree/builtins/ukernel:static_assert.h"
-    "//runtime/src/iree/builtins/ukernel:unpack.h"
-    "//runtime/src/iree/builtins/ukernel:unpack_internal.h"
-    "//runtime/src/iree/schemas:cpu_data.h"
-    "//runtime/src/iree/schemas:cpu_feature_bits.inl"
   COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-DNDEBUG"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-fno-short-wchar"
-    "-c"
-    "-emit-llvm"
-    "-target"
-    "x86_64-unknown-unknown-eabi-elf"
+    "-mavx"
+    "-mavx2"
+    "-mfma"
     "-mavx512f"
     "-mavx512vl"
     "-mavx512cd"
     "-mavx512bw"
     "-mavx512dq"
-  PUBLIC
+  ARCH
+    x86_64
 )
 
 iree_bitcode_library(
@@ -145,43 +64,29 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx512_vnni
   SRCS
     "mmt4d_x86_64_avx512_vnni.c"
-  HDRS
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel:api.h"
-    "//runtime/src/iree/builtins/ukernel:common.h"
-    "//runtime/src/iree/builtins/ukernel:elementwise.h"
-    "//runtime/src/iree/builtins/ukernel:exported_bits.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d_internal.h"
-    "//runtime/src/iree/builtins/ukernel:pack.h"
-    "//runtime/src/iree/builtins/ukernel:pack_internal.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h"
-    "//runtime/src/iree/builtins/ukernel:static_assert.h"
-    "//runtime/src/iree/builtins/ukernel:unpack.h"
-    "//runtime/src/iree/builtins/ukernel:unpack_internal.h"
-    "//runtime/src/iree/schemas:cpu_data.h"
-    "//runtime/src/iree/schemas:cpu_feature_bits.inl"
   COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-DNDEBUG"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-fno-short-wchar"
-    "-c"
-    "-emit-llvm"
-    "-target"
-    "x86_64-unknown-unknown-eabi-elf"
+    "-mavx"
+    "-mavx2"
+    "-mfma"
     "-mavx512f"
     "-mavx512vl"
     "-mavx512cd"
     "-mavx512bw"
     "-mavx512dq"
     "-mavx512vnni"
-  PUBLIC
+  ARCH
+    x86_64
+)
+
+iree_link_bitcode(
+  NAME
+    ukernel_bitcode_x86_64
+  SRCS
+    "ukernel_bitcode_x86_64_avx2_fma.bc"
+    "ukernel_bitcode_x86_64_avx512_base.bc"
+    "ukernel_bitcode_x86_64_avx512_vnni.bc"
+    "ukernel_bitcode_x86_64_base.bc"
+
 )
 
 endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU
