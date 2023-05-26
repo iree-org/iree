@@ -200,8 +200,8 @@ class Manifest:
   def initialize(self):
     """Initialize the mainfest object by generating dispatches for supported operations."""
     self.append(CudaMatmulGenerator(self.args).generate())
-    self.append(CudaSplitKMatmulGenerator(self.args).generate())
-    self.append(CudaBatchMatmulGenerator(self.args).generate())
+    #self.append(CudaSplitKMatmulGenerator(self.args).generate())
+    #self.append(CudaBatchMatmulGenerator(self.args).generate())
 
     # Serialize the initialized mainfest state.
     self.dump()
