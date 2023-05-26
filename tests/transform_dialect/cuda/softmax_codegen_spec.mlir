@@ -23,11 +23,11 @@ transform.sequence failures(propagate) {
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!transform.any_op) -> ()
 
   // TODO: Merging and fusing merged handles does not work properly atm.
-  transform.structured.fuse_into_containing_op %exps_sum into %forall : (!transform.any_op, !transform.any_op) -> !transform.any_op
-  transform.structured.fuse_into_containing_op %exps into %forall : (!transform.any_op, !transform.any_op) -> !transform.any_op
-  transform.structured.fuse_into_containing_op %exps_sum_fill into %forall : (!transform.any_op, !transform.any_op) -> !transform.any_op
-  transform.structured.fuse_into_containing_op %input_max into %forall : (!transform.any_op, !transform.any_op) -> !transform.any_op
-  transform.structured.fuse_into_containing_op %input_max_fill into %forall : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %exps_sum into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+  transform.structured.fuse_into_containing_op %exps into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+  transform.structured.fuse_into_containing_op %exps_sum_fill into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+  transform.structured.fuse_into_containing_op %input_max into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+  transform.structured.fuse_into_containing_op %input_max_fill into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
   // By default, fusion into scf.forall does not promote captured values
   // to shared as this involves a cross-thread dependence analysis.
   // Instead, we activate it explicitly post-hoc to promote all the extract_slice

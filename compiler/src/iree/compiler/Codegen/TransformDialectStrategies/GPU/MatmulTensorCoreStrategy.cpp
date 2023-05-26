@@ -287,10 +287,10 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // Step 13. Late lowerings and cleanups.
   // TODO: not a functional style op to avoid invalidating artificially.
   funcH = b.create<transform::LowerMasksOp>(
-      pdl::OperationType::get(b.getContext()), funcH);
+      transform::AnyOpType::get(b.getContext()), funcH);
   // TODO: not a functional style op to avoid invalidating artificially.
   funcH = b.create<transform::MaterializeMasksOp>(
-      pdl::OperationType::get(b.getContext()), funcH);
+      transform::AnyOpType::get(b.getContext()), funcH);
   {
     ApplyPatternsOpPatterns config;
     config.foldMemrefAliases = true;

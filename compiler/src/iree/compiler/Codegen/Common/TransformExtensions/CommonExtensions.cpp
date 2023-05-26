@@ -35,7 +35,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/IndexingUtils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -891,7 +890,7 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
                         builder.getUnitAttr());
   }
   MLIRContext *ctx = builder.getContext();
-  result.addTypes(pdl::OperationType::get(ctx));
+  result.addTypes(transform::AnyOpType::get(ctx));
 }
 
 //===---------------------------------------------------------------------===//

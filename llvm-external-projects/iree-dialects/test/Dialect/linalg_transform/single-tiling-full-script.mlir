@@ -15,26 +15,26 @@ func.func @matmul_tensors(
 
 
 transform.sequence failures(propagate) {
-^bb1(%module_op: !pdl.operation):
-  %0 = transform.structured.match ops{["linalg.matmul"]} in %module_op : (!pdl.operation) -> !pdl.operation
+^bb1(%module_op: !transform.any_op):
+  %0 = transform.structured.match ops{["linalg.matmul"]} in %module_op : (!transform.any_op) -> !transform.any_op
   %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-  %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-  transform.structured.vectorize %2 { vectorize_padding } : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+  %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+  transform.structured.vectorize %2 { vectorize_padding } : (!transform.any_op) -> !transform.any_op
   %module_op1 = transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
-    {bufferize_function_boundaries = true} : (!pdl.operation) -> !pdl.operation
+    {bufferize_function_boundaries = true} : (!transform.any_op) -> !transform.any_op
   %3 = transform.structured.match ops{["func.func"]} in %module_op1
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
 
 
   %func = transform.structured.match ops{["func.func"]} in %module_op1
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
   %func_e_2 = transform.vector.lower_contraction %func
     lowering_strategy = "outerproduct"
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
   %func_e_3 = transform.vector.lower_transpose %func_e_2
     lowering_strategy = "shuffle_1d"
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
 
-  lower_to_llvm %module_op1 : (!pdl.operation) -> !pdl.operation
+  lower_to_llvm %module_op1 : (!transform.any_op) -> !transform.any_op
 }

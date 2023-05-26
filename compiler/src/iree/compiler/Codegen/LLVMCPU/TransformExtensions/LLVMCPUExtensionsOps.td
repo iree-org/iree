@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_TRANSFORMEXTENSIONS_LLVMCPUEXTENSIONS
 #define IREE_COMPILER_CODEGEN_LLVMCPU_TRANSFORMEXTENSIONS_LLVMCPUEXTENSIONS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
