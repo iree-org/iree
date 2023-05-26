@@ -76,7 +76,7 @@ func.func @truncf_vector(%arg0 : vector<4xbf16>) -> vector<4xbf16> {
 }
 
 // CHECK-LABEL: @truncf_vector
-// CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xbf16>
+// CHECK: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<4xbf16>
 // CHECK: %[[VAL0:.+]] = arith.extf %arg0 : vector<4xbf16> to vector<4xf32>
 // CHECK: %[[VAL1:.+]] = arith.extf %[[CST]] : vector<4xbf16> to vector<4xf32>
 // CHECK: %[[VAL2:.+]] = arith.addf %[[VAL1]], %[[VAL0]] : vector<4xf32>
@@ -91,13 +91,13 @@ func.func @extf_scalar_noop(%arg0 : vector<bf16>) -> vector<bf16> {
 }
 
 // CHECK-LABEL: @extf_scalar_noop
-// CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<bf16>
+// CHECK: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<bf16>
 // CHECK: return %[[CST]]
 
 // -----
 
 func.func @store_reduction_bf16(%arg0 : vector<3xbf16>, %arg1 : vector<3xbf16>, %arg2 : memref<bf16>) {
-  %cst = arith.constant dense<0.000000e+00> : vector<bf16>
+  %cst = arith.constant dense<1.000000e+00> : vector<bf16>
   %5 = vector.extractelement %cst[] : vector<bf16>
   %6 = arith.mulf %arg0, %arg1 : vector<3xbf16>
   %7 = vector.reduction <add>, %6, %5 : vector<3xbf16> into bf16
@@ -108,7 +108,7 @@ func.func @store_reduction_bf16(%arg0 : vector<3xbf16>, %arg1 : vector<3xbf16>, 
 }
 
 // CHECK-LABEL: @store_reduction_bf16
-// CHECK:  %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<bf16>
+// CHECK:  %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<bf16>
 // CHECK:  %[[VAL0:.+]] = arith.extf %arg0 : vector<3xbf16> to vector<3xf32>
 // CHECK:  %[[VAL1:.+]] = arith.extf %arg1 : vector<3xbf16> to vector<3xf32>
 // CHECK:  %[[VAL2:.+]] = vector.extractelement %[[CST]][] : vector<bf16>
