@@ -210,8 +210,8 @@ class PropagateCastF : public OpRewritePattern<SrcOp> {
     }
 
     mlir::FloatAttr val = vectorCst.getSplatValue<mlir::FloatAttr>();
-    auto newVal =
-        FloatAttr::get(op.getType(), val.getValue().convertToDouble());
+    auto newVal = FloatAttr::get(resultTy.getElementType(),
+                                 val.getValue().convertToDouble());
     auto vectorVal = DenseElementsAttr::get(resultTy, newVal);
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, resultTy, vectorVal);
     return success();
