@@ -69,7 +69,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
 
 /// Pass to tile TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
-    int64_t tilingLevel = -1);
+    int64_t tilingLevel = -1, bool reductionOnly = false);
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
