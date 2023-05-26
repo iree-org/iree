@@ -191,7 +191,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -220,7 +220,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -239,6 +239,30 @@ py_binary(
     "LLVMGPUMatmulTensorCore",
 ]]
 
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f32_gpu_large_unaligned",
+    compiler_flags = [
+        "--iree-hal-cuda-llvm-target-arch=sm_80",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--shapes=gpu_large",
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+)
+
 # MMA.SYNC TensorCore(F32): mma.sync.1688.f32.t32
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_mma_sync_%s" % compilation_info,
@@ -248,7 +272,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -276,7 +300,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -304,7 +328,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -363,7 +387,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % vulkan_target_and_pipeline[1],
     ],
     tags = [
