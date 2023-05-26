@@ -146,7 +146,7 @@ iree_bitcode_library(
     "-fno-short-wchar"
     "-c"
     "-emit-llvm"
-    "-DIREE_UK_STANDALONE=1"
+    "-DIREE_DEVICE_STANDALONE=1"
     "-target"
     "x86_64-unknown-unknown-eabi-elf"
     "-DIREE_UK_ARCH_X86_64"
