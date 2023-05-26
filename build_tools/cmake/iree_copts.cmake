@@ -378,7 +378,7 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
-if(EMSCRIPTEN AND IREE_HAL_DRIVER_WEBGPU)
+if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)
   iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ALL
       # TODO(scotttodd): Only add when using WebGPU in a library/binary?

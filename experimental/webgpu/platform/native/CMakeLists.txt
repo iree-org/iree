@@ -17,6 +17,6 @@ iree_cc_library(
     iree::base::internal
     iree::base::tracing
     iree::hal
-    iree::hal::drivers::webgpu::platform
+    iree::experimental::webgpu::platform
   PUBLIC
 )

@@ -13,32 +13,32 @@ iree_cc_library(
     iree::base
     iree::base::internal::flags
     iree::hal
-    iree::hal::drivers::webgpu
+    iree::experimental::webgpu
   DEFINES
-    "IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE=1"
+    "IREE_HAL_HAVE_EXPERIMENTAL_WEBGPU_DRIVER_MODULE=1"
   PUBLIC
 )
 
 if(${EMSCRIPTEN})
   target_sources(
-    iree_hal_drivers_webgpu_registration_registration
+    iree_experimental_webgpu_registration_registration
     PUBLIC
       "driver_module_emscripten.c"
   )
   target_link_libraries(
-    iree_hal_drivers_webgpu_registration_registration
+    iree_experimental_webgpu_registration_registration
     INTERFACE
-      iree::hal::drivers::webgpu::platform::emscripten
+      iree::experimental::webgpu::platform::emscripten
   )
 else()
   target_sources(
-    iree_hal_drivers_webgpu_registration_registration
+    iree_experimental_webgpu_registration_registration
     PUBLIC
       "driver_module_native.c"
   )
   target_link_libraries(
-    iree_hal_drivers_webgpu_registration_registration
+    iree_experimental_webgpu_registration_registration
     INTERFACE
-      iree::hal::drivers::webgpu::platform::native
+      iree::experimental::webgpu::platform::native
   )
 endif()

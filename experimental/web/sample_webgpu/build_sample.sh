@@ -56,7 +56,7 @@ compile_sample() {
     --o ${BINARY_DIR}/$1_webgpu.vmfb
 }
 
-compile_sample "simple_abs"     "mhlo" "${ROOT_DIR?}/samples/models/simple_abs.mlir"
+compile_sample "simple_abs"     "none" "${ROOT_DIR?}/samples/models/simple_abs.mlir"
 compile_sample "fullyconnected" "mhlo" "${ROOT_DIR?}/tests/e2e/models/fullyconnected.mlir"
 
 # Does not run yet (uses internal readback, which needs async buffer mapping?)
@@ -85,7 +85,7 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=OFF \
   -DIREE_HAL_DRIVER_LOCAL_TASK=OFF \
-  -DIREE_HAL_DRIVER_WEBGPU=ON \
+  -DIREE_EXTERNAL_HAL_DRIVERS=webgpu \
   -DIREE_ENABLE_ASAN=OFF \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF

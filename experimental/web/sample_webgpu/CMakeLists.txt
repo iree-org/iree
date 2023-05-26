@@ -25,8 +25,8 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 # drivers/devices, which include code not compatible with Emscripten.
 target_link_libraries(${_NAME}
   iree_runtime_runtime
-  iree_hal_drivers_webgpu_webgpu
-  iree_hal_drivers_webgpu_platform_emscripten_emscripten
+  iree_experimental_webgpu_webgpu
+  iree_experimental_webgpu_platform_emscripten_emscripten
 )
 
 target_link_options(${_NAME} PRIVATE

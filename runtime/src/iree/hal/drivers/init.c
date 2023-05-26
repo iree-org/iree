@@ -24,10 +24,6 @@
 #include "iree/hal/drivers/vulkan/registration/driver_module.h"
 #endif  // IREE_HAVE_HAL_VULKAN_DRIVER_MODULE
 
-#if defined(IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE)
-#include "experimental/webgpu/registration/driver_module.h"
-#endif  // IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE
-
 #if defined(IREE_HAVE_HAL_EXTERNAL_DRIVERS)
 // Defined in the generated init_external.c file:
 extern iree_status_t iree_hal_register_external_drivers(
@@ -62,11 +58,6 @@ iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_vulkan_driver_module_register(registry));
 #endif  // IREE_HAVE_HAL_VULKAN_DRIVER_MODULE
-
-#if defined(IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE)
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_webgpu_driver_module_register(registry));
-#endif  // IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_register_external_drivers(registry));

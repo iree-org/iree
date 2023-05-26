@@ -4,10 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT EMSCRIPTEN)
-  return()
-endif()
-
 iree_hal_cts_test_suite(
   DRIVER_NAME
     webgpu
@@ -20,5 +16,5 @@ iree_hal_cts_test_suite(
   EXECUTABLE_FORMAT
     "\"webgpu-wgsl-fb\""
   DEPS
-    iree::hal::drivers::webgpu::registration
+    iree::experimental::webgpu::registration
 )

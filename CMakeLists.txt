@@ -221,16 +221,10 @@ if(APPLE)
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
 endif()
 
-# WebGPU is disabled by default as it's experimental.
-# TODO(benvanik): FindPackage the deps or default to on when under Emscripten?
-#     (also see iree_copts.cmake and anywhere that uses IREE_HAL_DRIVER_WEBGPU)
-set(IREE_HAL_DRIVER_WEBGPU_DEFAULT OFF)
-
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
-option(IREE_HAL_DRIVER_WEBGPU "Enables the 'webgpu' runtime HAL driver" ${IREE_HAL_DRIVER_WEBGPU_DEFAULT})
 
 option(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS "Sets the default value for all runtime HAL executable loaders" ON)
 set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
@@ -291,9 +285,6 @@ endif()
 if(IREE_HAL_DRIVER_VULKAN)
   message(STATUS "  - vulkan")
 endif()
-if(IREE_HAL_DRIVER_WEBGPU)
-  message(STATUS "  - webgpu")
-endif()
 if(IREE_EXTERNAL_HAL_DRIVERS)
   message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS}")
 endif()
@@ -325,6 +316,15 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experi
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
+
+#-------------------------------------------------------------------------------
+# Experimental WebGPU HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_TARGET "iree::experimental::webgpu::registration")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_REGISTER "iree_hal_webgpu_driver_module_register")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
