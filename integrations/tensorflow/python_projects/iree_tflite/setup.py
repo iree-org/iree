@@ -41,39 +41,6 @@ except FileNotFoundError:
 PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
 PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
 
-# Force platform specific wheel.
-# https://stackoverflow.com/questions/45150304
-try:
-  from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
-
-  class bdist_wheel(_bdist_wheel):
-
-    def finalize_options(self):
-      _bdist_wheel.finalize_options(self)
-      self.root_is_pure = False
-
-    def get_tag(self):
-      python, abi, plat = _bdist_wheel.get_tag(self)
-      # We don't contain any python extensions so are version agnostic
-      # but still want to be platform specific.
-      python, abi = 'py3', 'none'
-      return python, abi, plat
-
-except ImportError:
-  bdist_wheel = None
-
-
-# Force installation into platlib.
-# Since this is a pure-python library with platform binaries, it is
-# mis-detected as "pure", which fails audit. Usually, the presence of an
-# extension triggers non-pure install. We force it here.
-class platlib_install(install):
-
-  def finalize_options(self):
-    install.finalize_options(self)
-    self.install_lib = self.install_platlib
-
-
 setup(
     name=f"iree-tools-tflite{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
@@ -99,10 +66,6 @@ setup(
     ]),
     package_data={
         "iree.tools.tflite": [f"iree-import-tflite{exe_suffix}",],
-    },
-    cmdclass={
-        'bdist_wheel': bdist_wheel,
-        'install': platlib_install,
     },
     entry_points={
         "console_scripts": [
