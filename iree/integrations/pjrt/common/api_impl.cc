@@ -455,10 +455,15 @@ void BufferInstance::BindApi(PJRT_Api* api) {
     return MakeError(
         iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_ReadyEvent"));
   };
+  // TODO: Rework the API to be Aliases(b1, b2) to let the plugin explicitly
+  // check for aliases.
   api->PJRT_Buffer_UnsafePointer =
       +[](PJRT_Buffer_UnsafePointer_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Buffer_UnsafePointer"));
+    BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+    iree_hal_buffer_t* hal_buffer =
+        iree_hal_buffer_view_buffer(buffer->buffer_view());
+    args->buffer_pointer = (uintptr_t)hal_buffer;
+    return nullptr;
   };
 }
 
