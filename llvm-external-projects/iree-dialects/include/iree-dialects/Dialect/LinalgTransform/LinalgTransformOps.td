@@ -9,7 +9,6 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/OpAsmInterface.td"
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -22,8 +21,8 @@ def Linalg_Transform_Dialect : Dialect {
 }
 
 // Operations with this trait must provide the following methods:
-//   - `Value target()` - returns the operation handle (value of !pdl.operation
-//     type) targeted by this transformation, if available;
+//   - `Value target()` - returns the operation handle targeted by this
+//     transformation, if available;
 //   - `Optional<SymbolRefAttr> matcher()` - returns the name of the PDL matcher
 //     that selects the ops targeted by this transformation, if provided.
 class Linalg_Transform_Operation<string name, list<Trait> props = []>

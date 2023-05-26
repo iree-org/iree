@@ -7,7 +7,6 @@
 #ifndef STRUCTURED_TRANSFORM_OPS_EXT
 #define STRUCTURED_TRANSFORM_OPS_EXT
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformAttrs.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"

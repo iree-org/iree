@@ -83,8 +83,6 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCFDialect

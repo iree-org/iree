@@ -90,8 +90,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:NVGPUTransforms",
         "@llvm-project//mlir:NVGPUUtils",
         "@llvm-project//mlir:NVVMDialect",
-        "@llvm-project//mlir:PDLDialect",
-        "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:ROCDLDialect",
         "@llvm-project//mlir:SCFDialect",

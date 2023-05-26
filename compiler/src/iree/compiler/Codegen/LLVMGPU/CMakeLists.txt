@@ -72,8 +72,6 @@ iree_cc_library(
     MLIRNVGPUTransforms
     MLIRNVGPUUtils
     MLIRNVVMDialect
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
     MLIRPass
     MLIRROCDLDialect
     MLIRSCFDialect

@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 #define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Dialect/Transform/IR/TransformTypes.td"
@@ -46,7 +45,7 @@ def MapNestedForallToGpuThreadsOp :
     fails.
 
     If all the scf.forall operations contained within the FuncOp
-    referred to by the `target` PDLOperation lower to GPU properly, the
+    referred to by the `target` operand lower to GPU properly, the
     transform succeeds. Otherwise the transform definitely fails.
 
     The returned handle points to the same FuncOp operand, consuming it and
@@ -135,7 +134,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
     =============
     This operation ignores non-scf::IfOp ops and drops them in the return.
 
-    If all the operations referred to by the `target` PDLOperation are properly
+    If all the operations referred to by the `target` operand are properly
     properly, the transform succeeds. Otherwise the transform silently fails.
 
     If the transform is anchored at a top-level that is not isolated from above,

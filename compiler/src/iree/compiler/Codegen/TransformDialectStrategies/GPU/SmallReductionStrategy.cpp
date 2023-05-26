@@ -122,12 +122,12 @@ static void buildSmallReductionStrategyThreadDistribution(
       b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH);
 
   // 1. Scalarize all ops to ensure vectorization.
-  auto pdlOperation = pdl::OperationType::get(b.getContext());
-  fillH = b.create<ScalarizeOp>(pdlOperation, fillH);
-  maybeLeadingH = b.create<ScalarizeOp>(pdlOperation, maybeLeadingH);
-  Value tiledH = b.create<ScalarizeOp>(pdlOperation, tileResult.tiledOpH);
+  auto anyOpType = transform::AnyOpType::get(b.getContext());
+  fillH = b.create<ScalarizeOp>(anyOpType, fillH);
+  maybeLeadingH = b.create<ScalarizeOp>(anyOpType, maybeLeadingH);
+  Value tiledH = b.create<ScalarizeOp>(anyOpType, tileResult.tiledOpH);
   Value fusedH = b.create<ScalarizeOp>(
-      pdlOperation, tileResult.resultingFusedOpsHandles.front());
+      anyOpType, tileResult.resultingFusedOpsHandles.front());
   auto [blockReductionH, maybeBlockTrailingH] =
       iree_compiler::buildSelectFirstNonEmpty(b, fusedH, tiledH);
 

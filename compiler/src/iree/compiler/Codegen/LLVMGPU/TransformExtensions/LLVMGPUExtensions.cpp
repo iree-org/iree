@@ -126,7 +126,7 @@ void transform_dialect::VectorToWarpExecuteOnLane0Op::build(
   result.addAttribute(
       VectorToWarpExecuteOnLane0Op::getWarpSizeAttrName(result.name),
       builder.getI64IntegerAttr(warpSize));
-  result.addTypes({pdl::OperationType::get(ctx)});
+  result.addTypes({transform::AnyOpType::get(ctx)});
 }
 
 /// Helper method to replace all uses of the laneId operand by the constant

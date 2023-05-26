@@ -535,6 +535,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformPDLExtension",
 
         # IR
         "@llvm-project//mlir:IR",

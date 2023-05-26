@@ -37,6 +37,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
@@ -54,12 +55,16 @@ using namespace mlir;
 // Additional constraints for PDLMatchOp.
 //===----------------------------------------------------------------------===//
 
-/// Hook for PDL driver to check if an operation (`values[0]`) is directly
+/// Hook for PDL driver to check if an operation (`pdlValues[0]`) is directly
 /// nested in a function with the name provided by an attribute
-/// (`values[1]`).
+/// (`pdlValues[1]`).
 /// TODO: PDL needs user-defined "questions".
 static LogicalResult nestedInFunc(PatternRewriter &rewriter,
-                                  Operation *operation, Attribute attr) {
+                                  ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  Operation *operation = pdlValues[0].cast<Operation *>();
+  Attribute attr = pdlValues[1].cast<Attribute>();
+
   auto func = operation->getParentOfType<func::FuncOp>();
   if (!func)
     return rewriter.notifyMatchFailure(operation, "not nested in a function");
@@ -152,23 +157,26 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
   return haveEquivalentBodies(linalgOp, linalgModelOp, rewriter);
 }
 
-/// Check whether the unique Operation* stored in `values[0]` (assumed) is
-/// equivalent to the unique StringRefAttr passed in `values[1]` (assumed).
+/// Check whether the unique Operation* stored in `pdlValues[0]` (assumed) is
+/// equivalent to the unique StringRefAttr passed in `pdlValues[1]` (assumed).
 /// Equivalence is achieved when either:
-///   1. `values[0]` has the name stored in `values[1]`.
-///   2. `values[0]` and `values[1]` are both linalg ops and their structured
-///      interfaces as well as their bodies are equivalent.
+///   1. `pdlValues[0]` has the name stored in `pdlValues[1]`.
+///   2. `pdlValues[0]` and `pdlValues[1]` are both linalg ops and their
+///      structured interfaces as well as their bodies are equivalent.
 ///      Structured interfaces equivalence is a simple attribute level check.
 ///      Body equivalence is more involved and currently limited:
 ///        a. the current impl constructs an instance of the op whose name is
-///           specified in `values[1]` and checks for exact body equality.
+///           specified in `pdlValues[1]` and checks for exact body equality.
 ///        b. a more advanced version would "subtract" the bodies and fold, cse
 ///           and canonicalize to fixed point. If the result is "all zeros",
 ///           then the bodies would be equivalent (really isomorphic).
 ///   3. other cases TBD (e.g. vector.generic when available).
 static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
-                                      Operation *operation,
-                                      Attribute attribute) {
+                                      ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  Operation *operation = pdlValues[0].cast<Operation *>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto modelOpNameAttr = attribute.dyn_cast<StringAttr>();
   if (!modelOpNameAttr)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -196,15 +204,19 @@ static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
 }
 
 /// Assume that:
-///   1. `values[0]` is an operands range
-///   2. `values[1]` contains a DictAttr with `operand_number`, `dim` and
+///   1. `pdlValues[0]` is an operands range
+///   2. `pdlValues[1]` contains a DictAttr with `operand_number`, `dim` and
 ///      `divisor` IntegerAttr entries.
 /// Succeed if `operands`[`operand_number`] is a ranked type whose `dim` is a
 /// multiple of `divisor`.
 /// Note: 0 is the convention to express "do not tile", it is considered to
 /// divide everything.
 static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
-                                     ValueRange operands, Attribute attribute) {
+                                     ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  ValueRange operands = pdlValues[0].cast<ValueRange>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -237,13 +249,17 @@ static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
 }
 
 /// Assume that:
-///   1. `values[0]` is an operands range
-///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
+///   1. `pdlValues[0]` is an operands range
+///   2. `pdlValues[1]` contains a DictAttr with `operand_number` and `dim`
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
-static LogicalResult isDimStatic(PatternRewriter &rewriter, ValueRange operands,
-                                 Attribute attribute) {
+static LogicalResult isDimStatic(PatternRewriter &rewriter,
+                                 ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  ValueRange operands = pdlValues[0].cast<ValueRange>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -267,13 +283,17 @@ static LogicalResult isDimStatic(PatternRewriter &rewriter, ValueRange operands,
 }
 
 /// Assume that:
-///   1. `values[0]` is an operands range
-///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
+///   1. `pdlValues[0]` is an operands range
+///   2. `pdlValues[1]` contains a DictAttr with `operand_number` and `dim`
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
 static LogicalResult isDimDynamic(PatternRewriter &rewriter,
-                                  ValueRange operands, Attribute attribute) {
+                                  ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  ValueRange operands = pdlValues[0].cast<ValueRange>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -307,11 +327,16 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.cpp.inc"
       >();
 
-  registerPDLMatchConstraintFn("nestedInFunc", nestedInFunc);
-  registerPDLMatchConstraintFn("isDimDynamic", isDimDynamic);
-  registerPDLMatchConstraintFn("isDimMultipleOf", isDimMultipleOf);
-  registerPDLMatchConstraintFn("isDimStatic", isDimStatic);
-  registerPDLMatchConstraintFn("isEquivalentToOp", isEquivalentToOp);
+  addDialectDataInitializer<transform::PDLMatchHooks>(
+      [&](transform::PDLMatchHooks &hooks) {
+        llvm::StringMap<PDLConstraintFunction> constraints;
+        constraints.try_emplace("nestedInFunc", nestedInFunc);
+        constraints.try_emplace("isDimDynamic", isDimDynamic);
+        constraints.try_emplace("isDimMultipleOf", isDimMultipleOf);
+        constraints.try_emplace("isDimStatic", isDimStatic);
+        constraints.try_emplace("isEquivalentToOp", isEquivalentToOp);
+        hooks.mergeInPDLMatchHooks(std::move(constraints));
+      });
 
   declareDependentDialect<bufferization::BufferizationDialect>();
   declareDependentDialect<vector::VectorDialect>();

@@ -114,10 +114,10 @@ ParseResult LinalgExt::FuseProducersOp::parse(OpAsmParser &parser,
                             llvm::formatv("`{0}` attribute must be an array",
                                           operandsToFuseAttrName));
   }
-  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
+  Type anyOpType = transform::AnyOpType::get(parser.getBuilder().getContext());
   size_t numProducers = operandsToFuseArrayAttr.size();
-  result.addTypes(SmallVector<Type>(numProducers + 1, pdlOpType));
-  if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
+  result.addTypes(SmallVector<Type>(numProducers + 1, anyOpType));
+  if (parser.resolveOperand(targetOperand, anyOpType, result.operands))
     return failure();
   return success();
 }
