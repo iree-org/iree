@@ -69,4 +69,21 @@ iree_check_single_backend_test_suite(
     "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_large_linalg_matmul_cuda
+  SRCS
+    "large_linalg_matmul.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

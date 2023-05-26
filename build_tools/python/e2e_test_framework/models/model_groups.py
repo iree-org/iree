@@ -143,6 +143,9 @@ MICRO_MATMUL = [
     matmul.MATMUL_3456X1024X2048_FP32_MLIR,
     matmul.MATMUL_2560X2560X2560_FP16_MLIR,
     matmul.MATMUL_2560X2560X2560_FP32_MLIR,
+    matmul.MATMUL_2564x2564x2564_FP32_MLIR,
+    matmul.MATMUL_2562x2564x2562_FP32_MLIR,
+    matmul.MATMUL_2562x2561x2561_FP32_MLIR,
 ]
 
 MICRO_MATMUL_SPLITK = [
@@ -178,7 +181,8 @@ T5_LARGE_TF_BATCHES = [
     tf_models.T5_LARGE_32x512_FP32_TF,
     tf_models.T5_LARGE_48x512_FP32_TF,
     tf_models.T5_LARGE_64x512_FP32_TF,
-    tf_models.T5_LARGE_512x512_FP32_TF,
+    # Disabled due to https://github.com/openxla/iree/issues/13801.
+    # tf_models.T5_LARGE_512x512_FP32_TF,
 ]
 
 CUDA_MODELS = [

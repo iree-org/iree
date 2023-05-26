@@ -330,6 +330,36 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-4e75ff72-f807-49f6-b740-febca1794334"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230525_1685058259/matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_4e75ff72-f807-49f6-b740-febca1794334_matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-8d6be288-9b88-41bd-bc5a-5644df0481bb"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230525_1685058259/matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_8d6be288-9b88-41bd-bc5a-5644df0481bb_matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-0a3d952b-41ca-43d2-9ec3-ccb8dde20ce3"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230525_1685058259/matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_0a3d952b-41ca-43d2-9ec3-ccb8dde20ce3_matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-699fd533-02a9-49f0-bf26-1902d8dbb5af"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f16t_f16t_f16t_tile_config_default.mlirbc"
@@ -465,16 +495,6 @@ iree_fetch_artifact(
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_64/hlo.mlirbc"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-64_T5LargeTFBatch64.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-587e595d-2adf-4e41-9617-43178a133725-batch-512"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_512/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-512_T5LargeTFBatch512.mlirbc"
   UNPACK
 )
 
