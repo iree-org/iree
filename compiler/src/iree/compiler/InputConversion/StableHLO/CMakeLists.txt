@@ -39,6 +39,7 @@ iree_cc_library(
     StableHLOLegalization
   SRCS
     "ConvertCollectives.cpp"
+    "LegalizeCHLO.cpp"
     "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
@@ -84,6 +85,7 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTransforms
     MLIRVectorDialect
+    StablehloBroadcastUtils
     StablehloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR

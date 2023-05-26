@@ -46,6 +46,7 @@ iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
         "ConvertCollectives.cpp",
+        "LegalizeCHLO.cpp",
         "LegalizeControlFlow.cpp",
         "LegalizeShapeComputations.cpp",
         "LegalizeToLinalgUtils.cpp",
@@ -97,6 +98,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
+        "@mlir-hlo//stablehlo:broadcast_utils",
         "@mlir-hlo//stablehlo:chlo_ops",
         "@mlir-hlo//stablehlo:stablehlo_ops",
     ],

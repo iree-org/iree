@@ -18,6 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/CommonFolders.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -560,6 +561,139 @@ struct ConvertOpCanon final : OpRewritePattern<mlir::stablehlo::ConvertOp> {
   }
 };
 
+/// Does the same as PatternRewriter::replaceOpWithNewOp, but with a twist.
+///
+/// Sometimes, we want to replace an op with a new op and simultaneously refine
+/// the result type from a dynamically-shaped type to a statically-shaped type.
+/// (Search for usages of this function for examples).
+//
+/// Oftentimes, this works just fine because HLO is designed to accommodate
+/// this kind of type refinements. But sometimes, this doesn't work - when
+/// the op is used outside of the HLO dialect (e.g. in func.return). In these
+/// cases, we insert a tensor.cast to smooth things out.
+template <typename OpTy, typename... Args>
+static OpTy refineOpWithNewOp(PatternRewriter &rewriter, Operation *op,
+                              Args &&...args) {
+  auto newOp = rewriter.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
+
+  llvm::SmallVector<Value> replacementResults;
+  assert(op->getNumResults() == newOp->getNumResults() &&
+         "replacement op doesn't match results of original op");
+  for (auto [opResult, newOpResult] :
+       llvm::zip(op->getResults(), newOp->getResults())) {
+    Value replacementResult = newOpResult;
+    if (llvm::any_of(opResult.getUsers(), [&](Operation *user) {
+          return user->getDialect() != op->getDialect();
+        })) {
+      replacementResult = rewriter.create<mlir::tensor::CastOp>(
+          op->getLoc(), opResult.getType(), newOpResult);
+    }
+    replacementResults.push_back(replacementResult);
+  }
+
+  rewriter.replaceOp(op, replacementResults);
+  return newOp;
+}
+
+/// If a DynamicBroadCastInDimOp is not actually dynamic, use an ordinary
+/// BroadcastInDimOp.
+struct DynamicBroadcastInDimOpNotActuallyDynamic final
+    : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    auto operandType = dyn_cast<RankedTensorType>(op.getOperand().getType());
+    if (!type || !operandType || !operandType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "requires operand static shape");
+    }
+
+    // output has static shape, replace with broadcast_in_dim
+    if (type.hasStaticShape()) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::BroadcastInDimOp>(
+          op, type, op.getOperand(), op.getBroadcastDimensions());
+      return success();
+    }
+
+    // output_dimensions are constant, set output shape with output_dimensions,
+    // then replace with broadcast_in_dim
+    auto *outputDimOp = op.getOutputDimensions().getDefiningOp();
+    if (outputDimOp && outputDimOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
+      DenseIntElementsAttr shapeAttr;
+      if (matchPattern(outputDimOp, m_Constant(&shapeAttr))) {
+        SmallVector<int64_t> outputShape;
+        for (APInt shape : shapeAttr.getValues<APInt>()) {
+          outputShape.push_back(shape.getZExtValue());
+        }
+        refineOpWithNewOp<mlir::stablehlo::BroadcastInDimOp>(
+            rewriter, op,
+            RankedTensorType::get(outputShape, type.getElementType()),
+            op.getOperand(), op.getBroadcastDimensions());
+        return success();
+      }
+    }
+    return rewriter.notifyMatchFailure(
+        op, "requires output static shape or constant broadcast dimensions");
+  }
+};
+
+struct ChainedDynamicBroadcastInDimCanonicalization final
+    : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp bcast,
+                                PatternRewriter &rewriter) const override {
+    auto precedingBcast =
+        bcast.getOperand()
+            .getDefiningOp<mlir::stablehlo::DynamicBroadcastInDimOp>();
+    if (!precedingBcast) return failure();
+
+    // Compose broadcast dimensions.
+    DenseIntElementsAttr precedingBcastDims =
+        precedingBcast.getBroadcastDimensions();
+    DenseIntElementsAttr bcastDims = bcast.getBroadcastDimensions();
+    SmallVector<APInt, 4> composition;
+    for (APInt precedingDim : precedingBcastDims) {
+      composition.push_back(
+          *(bcastDims.value_begin<APInt>() + precedingDim.getZExtValue()));
+    }
+    auto composedBcastDims =
+        DenseIntElementsAttr::get(precedingBcastDims.getType(), composition);
+
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::DynamicBroadcastInDimOp>(
+        bcast, bcast.getType(), precedingBcast.getOperand(),
+        bcast.getOutputDimensions(), composedBcastDims);
+    return success();
+  }
+};
+
+// If all dimensions are known to be nonexpanding from the attribute, replace
+// the dynamic broadcast with a cast.
+struct DynamicBroadcastInDimAllDimsNonExpanding final
+    : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto resultType = dyn_cast<RankedTensorType>(op.getResult().getType());
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(op, "requires ranked result type");
+    }
+
+    if (!op.getKnownNonexpandingDimensions() ||
+        op.getKnownNonexpandingDimensions()->size() != resultType.getRank()) {
+      return rewriter.notifyMatchFailure(
+          op, "known_nonexpanding_dimensions don't cover all output dims");
+    }
+
+    auto cast = rewriter.createOrFold<tensor::CastOp>(op.getLoc(), resultType,
+                                                      op.getOperand());
+    rewriter.replaceOp(op, cast);
+    return success();
+  }
+};
+
 struct DynamicReshapeOpCanon final
     : OpRewritePattern<mlir::stablehlo::DynamicReshapeOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -784,9 +918,12 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       RealOpCanon, ImagOpCanon,
       // Query ops.
       GetDimensionSizeOpCanon, GetTupleElementOpCanon,
+      // Broadcast ops.
+      BroadcastInDimOpCanon, DynamicBroadcastInDimOpNotActuallyDynamic,
+      ChainedDynamicBroadcastInDimCanonicalization,
+      DynamicBroadcastInDimAllDimsNonExpanding,
       // Shape manipulation(-ish) ops.
-      BroadcastInDimOpCanon, ConcatenateOpCanon, ConvertOpCanon,
-      DynamicReshapeOpCanon, GatherOpCanon, ReshapeOpCanon, TransposeOpCanon>(
-      context, benefit);
+      ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
+      ReshapeOpCanon, TransposeOpCanon>(context, benefit);
 }
 }  // namespace mlir::iree_compiler::stablehlo
