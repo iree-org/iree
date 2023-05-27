@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,17 +7,10 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
-#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
 namespace mlir {
@@ -55,7 +48,7 @@ struct ExpandF16MaxFToF32Pattern : public OpRewritePattern<arith::MaxFOp> {
 };
 
 struct ExpandF16MaxFToF32Pass
-    : public ExpandF16MaxFToF32Base<
+    : public ExpandArithF16ToF32Base<
           ExpandF16MaxFToF32Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();

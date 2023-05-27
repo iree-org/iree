@@ -1,4 +1,5 @@
-
+// RUN: iree-opt %s
+// RUN: FileChange %s
 
 func.func @test_expand_f16_maxf(%arg0: tensor<4xf16>, %arg1: tensor<4xf16>) -> tensor<4xf16>{
     %1 = arith.maxf %arg0, %arg1 : tensor<4xf16>
