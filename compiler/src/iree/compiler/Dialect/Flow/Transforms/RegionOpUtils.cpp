@@ -6,10 +6,10 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
-#include <iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h>
-
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -489,7 +489,8 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
                    llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
       auto shapedType = llvm::cast<ShapedType>(constantOp.getType());
       uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
+          (shapedType.getNumElements() *
+           IREE::Util::getTypeBitWidth(shapedType.getElementType())) /
           8;
       return denseAttr.isSplat() ||
              estimatedByteLength <= clInlineConstantByteLength;
