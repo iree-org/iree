@@ -23,6 +23,13 @@ func.func @tensorReshapeDynamic(%arg0 : tensor<?x4xf32>) -> tensor<?x2xf32> {
   return %0 : tensor<?x2xf32>
 }
 
+// CHECK-LABEL: @tensorReshapeComplex
+func.func @tensorReshapeComplex(%arg0 : tensor<4x4xcomplex<f32>>) -> tensor<16xcomplex<f32>> {
+  // CHECK-NEXT: flow.tensor.reshape %arg0 : tensor<4x4xcomplex<f32>> -> tensor<16xcomplex<f32>>
+  %0 = flow.tensor.reshape %arg0 : tensor<4x4xcomplex<f32>> -> tensor<16xcomplex<f32>>
+  return %0 : tensor<16xcomplex<f32>>
+}
+
 // -----
 
 // CHECK-LABEL: @tensorLoad
