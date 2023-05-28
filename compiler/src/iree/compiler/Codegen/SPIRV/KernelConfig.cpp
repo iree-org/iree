@@ -1444,7 +1444,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     SmallVector<int64_t> loopTileSizes(linalgOp.getNumLoops(), 0);
     for (const auto &[i, iter] :
          llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-      if (linalg::isReductionIterator(iter) || workgroupTileSizes[i] == 0) {
+      if (linalg::isReductionIterator(iter) || i >= workgroupTileSizes.size() ||
+          workgroupTileSizes[i] == 0) {
         loopTileSizes[i] = getReductionTilingFactor(loopBounds[i]);
       }
     }
