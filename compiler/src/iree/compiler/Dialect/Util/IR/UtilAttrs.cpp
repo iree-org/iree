@@ -72,9 +72,17 @@ class raw_inplace_ostream : public llvm::raw_pwrite_stream {
 
 // Returns true if the raw data of the attribute matches our expected output
 // format. This allows the use of the attribute getRawData() method.
-static bool canUseRawData(DenseElementsAttr elementsAttr,
+static bool canUseRawData(DenseElementsAttr attr,
                           llvm::support::endianness endian) {
-  int32_t bitwidth = elementsAttr.getType().getElementTypeBitWidth();
+  Type elementType = attr.getElementType();
+  if (!isa<IntegerType, FloatType, ComplexType>(elementType)) {
+    // We cannot assume composite element types have the raw layout we want,
+    // other than ComplexType, which is effectively vector<2xfN> and goes
+    // through the later logic.
+    return false;
+  }
+
+  int32_t bitwidth = getTypeBitWidth(elementType);
   if (bitwidth == 8) {
     // Don't care about endianness at all for single-byte data.
     return true;
@@ -250,8 +258,10 @@ static LogicalResult serializeGenericF64Elements(
 static LogicalResult serializeGenericElementData(
     DenseElementsAttr elementsAttr, llvm::support::endianness endian,
     llvm::raw_ostream &os) {
-  int32_t bitwidth = elementsAttr.getType().getElementTypeBitWidth();
   if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
+    // Don't hoist |bitwidth| given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    int32_t bitwidth = attr.getType().getElementTypeBitWidth();
     switch (bitwidth) {
       case 8:
         return serializeRawData(attr, os);
@@ -267,6 +277,9 @@ static LogicalResult serializeGenericElementData(
                << " for type " << elementsAttr.getType();
     }
   } else if (auto attr = llvm::dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
+    // Don't hoist |bitwidth| given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    int32_t bitwidth = attr.getType().getElementTypeBitWidth();
     switch (bitwidth) {
       case 16:
         return serializeGenericF16Elements(attr, endian, os);
