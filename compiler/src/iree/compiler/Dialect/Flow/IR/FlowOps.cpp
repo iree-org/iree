@@ -1447,8 +1447,8 @@ LogicalResult TensorReshapeOp::verify() {
   // The element types don't need to match but the bit widths need to.
   auto sourceType = llvm::cast<ShapedType>(getSource().getType());
   auto resultType = llvm::cast<ShapedType>(getResult().getType());
-  if (sourceType.getElementTypeBitWidth() !=
-      resultType.getElementTypeBitWidth()) {
+  if (IREE::Util::getTypeBitWidth(sourceType.getElementType()) !=
+      IREE::Util::getTypeBitWidth(resultType.getElementType())) {
     return emitOpError() << "element bit widths must match";
   }
 
