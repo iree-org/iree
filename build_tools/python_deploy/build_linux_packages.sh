@@ -41,8 +41,8 @@ set -xeu -o errtrace
 
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
-repo_root="$(cd "${this_dir}" && git rev-parse --show-toplevel)"
-manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:794513562cca263480c0c169c708eec9ff70abfe279d6dc44e115b04488b9ab5}"
+repo_root="$(cd "${this_dir}" && while [[ "$(pwd)" != "/" && ! -d .git ]]; do cd ..; done; [[ -d .git ]] && pwd || echo "No git repo found")"
+manylinux_docker_image="${manylinux_docker_image:-quay.io/pypa/manylinux_2_28_$(uname -m)}"
 python_versions="${override_python_versions:-cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
@@ -95,16 +95,19 @@ function run_in_docker() {
       case "${package}" in
         iree-runtime)
           clean_wheels "iree_runtime${package_suffix}" "${python_version}"
+          install_deps "iree_runtime${package_suffix}" "${python_version}"
           build_iree_runtime
           run_audit_wheel "iree_runtime${package_suffix}" "${python_version}"
           ;;
         iree-runtime-instrumented)
           clean_wheels "iree_runtime_instrumented${package_suffix}" "${python_version}"
+          install_deps "iree_runtime${package_suffix}" "${python_version}"
           build_iree_runtime_instrumented
           run_audit_wheel "iree_runtime_instrumented${package_suffix}" "${python_version}"
           ;;
         iree-compiler)
           clean_wheels "iree_compiler${package_suffix}" "${python_version}"
+          install_deps "iree_runtime${package_suffix}" "${python_version}"
           build_iree_compiler
           run_audit_wheel "iree_compiler${package_suffix}" "${python_version}"
           ;;
@@ -122,18 +125,19 @@ function build_wheel() {
 }
 
 function build_iree_runtime() {
-  IREE_HAL_DRIVER_CUDA=ON \
+  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   build_wheel runtime/
 }
 
 function build_iree_runtime_instrumented() {
-  IREE_HAL_DRIVER_CUDA=ON IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
+  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
+  IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
-  IREE_TARGET_BACKEND_CUDA=ON \
+  IREE_TARGET_BACKEND_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   build_wheel compiler/
 }
 
@@ -141,7 +145,7 @@ function run_audit_wheel() {
   local wheel_basename="$1"
   local python_version="$2"
   # Force wildcard expansion here
-  generic_wheel="$(echo "${output_dir}/${wheel_basename}-"*"-${python_version}-linux_x86_64.whl")"
+  generic_wheel="$(echo "${output_dir}/${wheel_basename}-"*"-${python_version}-linux_$(uname -m).whl")"
   ls "${generic_wheel}"
   echo ":::: Auditwheel ${generic_wheel}"
   auditwheel repair -w "${output_dir}" "${generic_wheel}"
@@ -154,6 +158,17 @@ function clean_wheels() {
   echo ":::: Clean wheels ${wheel_basename} ${python_version}"
   rm -f -v "${output_dir}/${wheel_basename}-"*"-${python_version}-"*".whl"
 }
+
+function install_deps() {
+  local wheel_basename="$1"
+  local python_version="$2"
+  echo ":::: Install Deps for ${wheel_basename} ${python_version}"
+  yum install -y epel-release
+  yum update -y
+  # Required for Tracy
+  yum install -y capstone-devel tbb-devel libzstd-devel
+}
+
 
 # Trampoline to the docker container if running on the host.
 if [ -z "${__MANYLINUX_BUILD_WHEELS_IN_DOCKER-}" ]; then
