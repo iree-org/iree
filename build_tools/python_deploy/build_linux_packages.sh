@@ -41,8 +41,8 @@ set -xeu -o errtrace
 
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
-repo_root="$(cd "${this_dir}" && git rev-parse --show-toplevel)"
-manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:794513562cca263480c0c169c708eec9ff70abfe279d6dc44e115b04488b9ab5}"
+repo_root="$(cd "${this_dir}" && while [[ "$(pwd)" != "/" && ! -d .git ]]; do cd ..; done; [[ -d .git ]] && pwd || echo "No git repo found")"
+manylinux_docker_image="${manylinux_docker_image:-quay.io/pypa/manylinux2014_$(uname -m)}"
 python_versions="${override_python_versions:-cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
@@ -122,18 +122,19 @@ function build_wheel() {
 }
 
 function build_iree_runtime() {
-  IREE_HAL_DRIVER_CUDA=ON \
+  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   build_wheel runtime/
 }
 
 function build_iree_runtime_instrumented() {
-  IREE_HAL_DRIVER_CUDA=ON IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
+  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
+  IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
-  IREE_TARGET_BACKEND_CUDA=ON \
+  IREE_TARGET_BACKEND_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   build_wheel compiler/
 }
 
@@ -141,7 +142,7 @@ function run_audit_wheel() {
   local wheel_basename="$1"
   local python_version="$2"
   # Force wildcard expansion here
-  generic_wheel="$(echo "${output_dir}/${wheel_basename}-"*"-${python_version}-linux_x86_64.whl")"
+  generic_wheel="$(echo "${output_dir}/${wheel_basename}-"*"-${python_version}-linux_$(uname -m).whl")"
   ls "${generic_wheel}"
   echo ":::: Auditwheel ${generic_wheel}"
   auditwheel repair -w "${output_dir}" "${generic_wheel}"
