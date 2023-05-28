@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "capture_dispatch_dynamic_dims.mlir"
     "cleanup_numeric_narrowing.mlir"
     "cleanup_tensor_shapes.mlir"
+    "clone_producers_into_dispath_regions.mlir"
     "collapse_linalg_generic_on_tensors.mlir"
     "collapse_reduction.mlir"
     "conv1x1_to_matmul.mlir"
