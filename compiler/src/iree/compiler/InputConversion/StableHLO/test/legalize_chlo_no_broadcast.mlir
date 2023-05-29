@@ -4,6 +4,18 @@
 // Check the non-broadcast case for each registered op, then just check a
 // representative op for detailed broadcast semantics.
 
+// CHECK-LABEL: @constants
+func.func @constants() -> (tensor<4xi32>, tensor<2x2xf32>) {
+  %0 = chlo.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+  %1 = chlo.constant dense<0.0> : tensor<2x2xf32>
+
+  // CHECK-DAG: stablehlo.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+  // CHECK-DAG: stablehlo.constant dense<0.000000e+00> : tensor<2x2xf32>
+  func.return %0, %1 : tensor<4xi32>, tensor<2x2xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @addWithoutBroadcast
 func.func @addWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: stablehlo.add %arg0, %arg1

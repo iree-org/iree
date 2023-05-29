@@ -279,6 +279,17 @@ struct ConvertRankedDynamicBroadcastBinaryOp final
   }
 };
 
+struct ConvertConstantOp final : OpConversionPattern<mlir::chlo::ConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::chlo::ConstantOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter& rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, op.getValue());
+    return success();
+  }
+};
+
 struct ConvertConstantLikeOp final
     : OpConversionPattern<mlir::chlo::ConstantLikeOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -483,8 +494,7 @@ void populateLegalizeChloPatterns(MLIRContext* context,
       context, patterns, 10);
   populateForBroadcastingBinaryOp<ConvertRankedDynamicBroadcastBinaryOp>(
       context, patterns, 5);
-  patterns
-      ->add<ConvertConstantLikeOp, ConvertDynamicReshapeOp, ConvertSelectOp>(
-          context);
+  patterns->add<ConvertConstantOp, ConvertConstantLikeOp,
+                ConvertDynamicReshapeOp, ConvertSelectOp>(context);
 }
 }  // namespace mlir::iree_compiler::stablehlo
