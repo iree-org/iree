@@ -185,7 +185,7 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
   }
 
   // Named feature sets.
-#if defined(IREE_UK_ARCH_X86_64)
+#if defined(IREE_ARCH_X86_64)
   iree_uk_uint64_t avx2_fma =
       IREE_CPU_DATA0_X86_64_AVX2 | IREE_CPU_DATA0_X86_64_FMA;
   iree_uk_uint64_t avx512_base =
@@ -205,7 +205,7 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
     out_cpu_data_fields[0] = avx512_vnni;
     return;
   }
-#endif  // defined(IREE_UK_ARCH_X86_64)
+#endif  // defined(IREE_ARCH_X86_64)
 
   // Fall back to interpreting cpu_features as a comma-separated list of LLVM
   // feature names.

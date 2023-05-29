@@ -198,15 +198,15 @@ int main(int argc, char** argv) {
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 3, 5, "");
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 3, 4, "");
 
-#if defined(IREE_UK_ARCH_ARM_64)
+#if defined(IREE_ARCH_ARM_64)
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, "");
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8, "");
-#elif defined(IREE_UK_ARCH_X86_64)
+#elif defined(IREE_ARCH_X86_64)
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, "avx2_fma");
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8, "avx2_fma");
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 16, 16, "avx512_base");
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 16, 16, "avx512_base");
-#endif  // defined(IREE_UK_ARCH_ARM_64)
+#endif  // defined(IREE_ARCH_ARM_64)
 
   return iree_uk_test_exit_status();
 }

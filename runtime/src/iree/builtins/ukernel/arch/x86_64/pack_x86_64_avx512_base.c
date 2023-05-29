@@ -7,6 +7,8 @@
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
 #include "iree/builtins/ukernel/pack_internal.h"
 
+#if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
+
 void iree_uk_pack_tile_16x16_x32_x86_64_avx512_base_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
@@ -146,3 +148,5 @@ void iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_transpose(
     in_ptr += 16;
   }
 }
+
+#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_BASE)

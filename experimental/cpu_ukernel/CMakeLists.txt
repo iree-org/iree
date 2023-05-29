@@ -22,27 +22,6 @@ iree_experimental_system_plugin(
     iree::builtins::ukernel
 )
 
-set(IREE_UK_COMMON_COPTS
-  "-DIREE_UK_ENABLE_INLINE_ASM"
-)
-
-set(IREE_UK_X86_64_COPTS
-  ${IREE_UK_COMMON_COPTS}
-  "-DIREE_UK_ARCH_X86_64"
-  "-DIREE_UK_POINTER_SIZE=8"
-  "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
-  "-DIREE_UK_BUILD_X86_64_AVX512_BASE"
-  "-DIREE_UK_BUILD_X86_64_AVX512_VNNI"
-)
-
-set(IREE_UK_ARM_64_COPTS
-  ${IREE_UK_COMMON_COPTS}
-  "-DIREE_UK_ARCH_ARM_64"
-  "-DIREE_UK_POINTER_SIZE=8"
-  "-DIREE_UK_BUILD_ARM_64_DOTPROD"
-  "-DIREE_UK_BUILD_ARM_64_I8MM"
-)
-
 set(IREE_UK_X86_64_AVX2_FMA_COPTS
  "-mavx2"
  "-mfma"
@@ -74,8 +53,8 @@ iree_experimental_standalone_plugin(
   NAME
     builtin_ukernel_standalone_plugin
   ARCHS
-    "x86_64:IREE_UK_X86_64_COPTS"
-    "arm_64:IREE_UK_ARM_64_COPTS"
+    "x86_64"
+    "arm_64"
   SRCS
     plugin.c
     runtime/src/iree/builtins/ukernel/mmt4d.c

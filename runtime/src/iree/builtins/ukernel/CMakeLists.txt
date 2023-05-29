@@ -48,7 +48,6 @@ iree_cc_library(
     ::exported_bits
     ::static_assert
     iree::base::core_headers
-    iree::builtins::ukernel::arch::config
   PUBLIC
 )
 
@@ -80,7 +79,6 @@ iree_cc_library(
     ::exported_bits
     ::static_assert
     iree::base::core_headers
-    iree::builtins::ukernel::arch::config
     iree::builtins::ukernel::arch::ukernel_arch
   PUBLIC
 )
@@ -146,14 +144,8 @@ iree_bitcode_library(
     "-fno-short-wchar"
     "-c"
     "-emit-llvm"
-    "-DIREE_UK_STANDALONE=1"
     "-target"
     "x86_64-unknown-unknown-eabi-elf"
-    "-DIREE_UK_ARCH_X86_64"
-    "-DIREE_UK_POINTER_SIZE=8"
-    "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
-    "-DIREE_UK_BUILD_X86_64_AVX512_BASE"
-    "-DIREE_UK_BUILD_X86_64_AVX512_VNNI"
   PUBLIC
 )
 
