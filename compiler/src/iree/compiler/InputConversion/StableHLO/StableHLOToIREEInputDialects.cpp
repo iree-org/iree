@@ -432,8 +432,6 @@ struct ConvertStableHloToIreeInputDialects final
     // expensive expansions.
     populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
-    // TODO(#12678): Handle chlo lowering.
-
     populateStableHloToLinalgOnTensorsConversionPatterns(
         context, *typeConverter, &patterns);
     populateStableHloCollectivesConversionPatterns(context, *typeConverter,
