@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "convert_collectives.mlir"
     "legalize_chlo_no_broadcast.mlir"
+    "legalize_chlo_with_broadcast.mlir"
     "legalize_control_flow.mlir"
     "legalize_shape_computations.mlir"
     "stablehlo_to_iree_input_dialects.mlir"
