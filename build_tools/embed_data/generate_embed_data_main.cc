@@ -90,6 +90,11 @@ static bool GenerateHeader(const std::string& identifier,
                            const std::string& header_file,
                            const std::vector<std::string>& toc_files) {
   std::ofstream f(header_file, std::ios::out | std::ios::trunc);
+  if (!f) {
+    fprintf(stderr, "Failed to open '%s' for write.\n", header_file.c_str());
+    exit(EXIT_FAILURE);
+  }
+
   f << "#pragma once\n";  // Pragma once isn't great but is the best we can do.
   f << "#include <stddef.h>\n";
   GenerateTocStruct(f);
@@ -106,6 +111,10 @@ static bool GenerateHeader(const std::string& identifier,
 static bool SlurpFile(const std::string& file_name, std::string* contents) {
   constexpr std::streamoff kMaxSize = 100000000;
   std::ifstream f(file_name, std::ios::in | std::ios::binary);
+  if (!f) {
+    fprintf(stderr, "Failed to open '%s' for read.\n", file_name.c_str());
+    exit(EXIT_FAILURE);
+  }
   // get length of file:
   f.seekg(0, f.end);
   std::streamoff length = f.tellg();
@@ -133,6 +142,11 @@ static bool GenerateImpl(const std::string& identifier,
                          const std::vector<std::string>& input_files,
                          const std::vector<std::string>& toc_files) {
   std::ofstream f(impl_file, std::ios::out | std::ios::trunc);
+  if (!f) {
+    fprintf(stderr, "Failed to open '%s' for write.\n", impl_file.c_str());
+    exit(EXIT_FAILURE);
+  }
+
   f << "#include <stddef.h>\n";
   f << "#include <stdint.h>\n";
   f << R"(

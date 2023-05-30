@@ -13,10 +13,8 @@ include(CMakeParseArguments)
 # Parameters:
 # PACKAGE: Name of the package (overrides actual path)
 # NAME: Name of target (see Note).
-# SRCS: List of source files to embed (non-absolute paths will be resolved
-#     relative to CMAKE_CURRENT_SRC_DIR).
+# SRCS: List of files to embed (in source or build directory).
 # INCLUDES: Include directories to add to dependencies
-# GENERATED_SRCS: List of generated source files to embed.
 # C_FILE_OUTPUT: The C implementation file to output.
 # H_FILE_OUTPUT: The H header file to output.
 # STRIP_PREFIX: Strips this verbatim prefix from filenames (in the TOC).
@@ -34,7 +32,7 @@ function(iree_c_embed_data)
     _RULE
     "PUBLIC;TESTONLY;FLATTEN"
     "PACKAGE;NAME;IDENTIFIER;STRIP_PREFIX;C_FILE_OUTPUT;H_FILE_OUTPUT"
-    "DEPS;SRCS;GENERATED_SRCS;INCLUDES"
+    "DEPS;SRCS;INCLUDES"
     ${ARGN}
   )
 
@@ -59,21 +57,48 @@ function(iree_c_embed_data)
     list(APPEND _ARGS "--flatten")
   endif()
 
+  set(_RELATIVE_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+  cmake_path(RELATIVE_PATH _RELATIVE_BINARY_DIR BASE_DIRECTORY "${IREE_BINARY_DIR}")
+
   foreach(_SRC ${_RULE_SRCS})
-    if(IS_ABSOLUTE "${_SRC}")
-      list(APPEND _ARGS "${_SRC}")
+    if(_SRC MATCHES "^/")
+      # _SRC is an absolute path (starts with `/`).
+      list(APPEND _RESOLVED_SRCS "${_SRC}")
+    elseif(_SRC MATCHES "^[$]<")
+      # _SRC is a CMake generator expression (starts with `$<`).
+      list(APPEND _RESOLVED_SRCS "${_SRC}")
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC}")
+      # _SRC path exists relatively to current source dir.
+      list(APPEND _RESOLVED_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC}")
+    elseif(EXISTS "${IREE_SOURCE_DIR}/${_SRC}")
+      # _SRC path exists relatively to root source dir.
+      list(APPEND _RESOLVED_SRCS "${IREE_SOURCE_DIR}/${_SRC}")
     else()
-      list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC}")
+      # All else having failed, interpret _SRC as a path in the binary dir,
+      # that is, a generated file. As the present logic executes before
+      # that file would be generated, we can't perform a if(EXISTS) test to
+      # validate that hypothesis.
+      #
+      # Additional difficulty: _SRC could be a path relative to either the
+      # current binary dir, or the root binary dir. Again, it's too early here
+      # to use a if(EXISTS) test to determine that. Instead, the following
+      # regex replacement strips the current binary dir as a prefix from _SRC.
+      # So if _SRC was relative to the root binary dir, now it is relative to
+      # the current binary dir. And if it was already relative to the current
+      # binary dir, then the regex should fail to match (unless we're very
+      # unlucky and we have paths of the from root/a/b/a/b, but that's not a
+      # problem that we have today. And if that ever happens, people will still
+      # be able to get the correct behavior by passing a path relative to the
+      # root dir).
+      string(REGEX REPLACE "^${_RELATIVE_BINARY_DIR}/" "" _SRC_RELATIVE "${_SRC}")
+      list(APPEND _RESOLVED_SRCS "${CMAKE_CURRENT_BINARY_DIR}/${_SRC_RELATIVE}")
     endif()
-  endforeach(_SRC)
-  foreach(_SRC ${_RULE_GENERATED_SRCS})
-    list(APPEND _ARGS "${_SRC}")
   endforeach(_SRC)
 
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_C_FILE_OUTPUT}"
-    COMMAND generate_embed_data ${_ARGS}
-    DEPENDS generate_embed_data ${_RULE_SRCS} ${_RULE_GENERATED_SRCS}
+    COMMAND generate_embed_data ${_ARGS} ${_RESOLVED_SRCS}
+    DEPENDS generate_embed_data ${_RESOLVED_SRCS}
   )
 
   if(_RULE_TESTONLY)

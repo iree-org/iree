@@ -71,7 +71,7 @@ iree_bitcode_library(
 iree_c_embed_data(
   NAME
     libdevice_bitcode
-  GENERATED_SRCS
+  SRCS
     "libdevice_wasm32_generic.bc"
     "libdevice_wasm64_generic.bc"
   DEPS

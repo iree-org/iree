@@ -172,7 +172,7 @@ iree_link_bitcode(
 iree_c_embed_data(
   NAME
     libukernel_bitcode
-  GENERATED_SRCS
+  SRCS
     "ukernel_bitcode.bc"
   DEPS
 

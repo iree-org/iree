@@ -12,6 +12,8 @@
 #cmakedefine IREE_CTS_DRIVER_NAME "@IREE_CTS_DRIVER_NAME@"
 #cmakedefine IREE_CTS_EXECUTABLE_FORMAT @IREE_CTS_EXECUTABLE_FORMAT@
 #cmakedefine IREE_CTS_EXECUTABLES_TESTDATA_HDR "@IREE_CTS_EXECUTABLES_TESTDATA_HDR@"
+#cmakedefine IREE_CTS_TARGET_BACKEND "@IREE_CTS_TARGET_BACKEND@"
+
 // clang-format on
 
 #include IREE_CTS_TEST_FILE_PATH
@@ -43,9 +45,15 @@ const char* get_test_executable_format() {
 iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name) {
 #ifdef IREE_CTS_EXECUTABLES_TESTDATA_HDR
   const struct iree_file_toc_t* toc = iree_cts_testdata_executables_create();
+  char file_name_with_target_backend[256];
+  snprintf(file_name_with_target_backend, sizeof file_name_with_target_backend,
+    "%s_%.*s", IREE_CTS_TARGET_BACKEND, static_cast<int>(file_name.size), file_name.data);
   for (size_t i = 0; i < iree_cts_testdata_executables_size(); ++i) {
     const auto& file = toc[i];
-    if (iree_string_view_equal(file_name, iree_make_cstring_view(file.name))) {
+    if (iree_string_view_equal(
+      iree_make_cstring_view(file_name_with_target_backend),
+      iree_make_cstring_view(file.name)))
+    {
       return iree_make_const_byte_span(file.data, file.size);
     }
   }

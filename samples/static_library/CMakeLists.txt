@@ -55,7 +55,7 @@ iree_c_embed_data(
     simple_mul_c
   IDENTIFIER
     iree_samples_static_library_simple_mul
-  GENERATED_SRCS
+  SRCS
     simple_mul.vmfb
   C_FILE_OUTPUT
     simple_mul_c.c
