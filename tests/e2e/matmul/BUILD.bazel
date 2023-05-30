@@ -140,7 +140,7 @@ py_binary(
 # Test VMVX+ukernel, mmt4d, with target CPU features variants relevant to each
 # lhs_rhs_type.
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_small_ukernel" % lhs_rhs_type,
+    name = "e2e_matmul_mmt4d_%s_small_vmvx_ukernel" % lhs_rhs_type,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
         "--iree-flow-enable-data-tiling",
@@ -159,10 +159,27 @@ py_binary(
     "f32",
 ]]
 
-# Test x86_64+ukernel, mmt4d, with target CPU features variants relevant to each
-# lhs_rhs_type.
+X86_64_AVX2_FMA = [
+    "+avx",
+    "+avx2",
+    "+fma",
+]
+
+X86_64_AVX512_BASE = X86_64_AVX2_FMA + [
+    "+avx512f",
+    "+avx512vl",
+    "+avx512cd",
+    "+avx512bw",
+    "+avx512dq",
+]
+
+X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
+    "+avx512vnni",
+]
+
+# Test mmt4d with --iree-llvmcpu-enable-microkernels.
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_small_ukernel_x86" % lhs_rhs_type,
+    name = "e2e_matmul_mmt4d_%s_%s_ukernel" % (lhs_rhs_type, size),
     compiler_flags = [
         "--iree-llvmcpu-enable-microkernels",
         "--iree-flow-enable-data-tiling",
@@ -170,23 +187,27 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=small",
-    ],
-    tags = [
-        "hostonly",
-        "x86_64_only",
+        "--shapes=%s" % size,
     ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = [
         "default",
-        "x86_64:+avx,+avx2,+fma",
-    ],
+        "x86_64:" + ",".join(X86_64_AVX2_FMA),
+        "x86_64:" + ",".join(X86_64_AVX512_BASE),
+    ] + ([
+        "x86_64:" + ",".join(X86_64_AVX512_VNNI),
+        "arm_64:+dotprod",
+        "arm_64:+i8mm",
+    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
+] for size in [
+    "small",
+    "large",
 ]]
 
 [iree_generated_trace_runner_test(

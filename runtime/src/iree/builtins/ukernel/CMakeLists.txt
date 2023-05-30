@@ -123,6 +123,7 @@ iree_c_embed_data(
   NAME
     embed_ukernel_bitcode
   SRCS
+    "runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64.bc"
     "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
     "ukernel_bitcode_base.bc"
   DEPS
