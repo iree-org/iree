@@ -36,7 +36,7 @@ transform.sequence failures(propagate) {
     transform.split_handle %generics : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
   %forall_grid_2 = transform.structured.match ops{["scf.forall"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %not_combiner = transform.merge_handles %fill_2, %more_parallel_fill_2, %more_parallel_2, %expanded_eltwise : !transform.any_op
-  transform.structured.fuse_into_containing_op %not_combiner into %forall_grid_2 : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %not_combiner into %forall_grid_2 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Step 3. Second level of tiling + fusion parallelizes to threads. Also
   // fuse in the leading elementwise.
@@ -46,7 +46,7 @@ transform.sequence failures(propagate) {
     transform.structured.tile_to_forall_op %combiner_2 tile_sizes [1]
     ( mapping = [#gpu.thread<z>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-  transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op : (!transform.any_op) -> !transform.any_op
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
@@ -57,8 +57,8 @@ transform.sequence failures(propagate) {
     transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
-  transform.structured.fuse_into_containing_op %grid_eltwise_op into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+  transform.structured.fuse_into_containing_op %grid_eltwise_op into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================

@@ -117,9 +117,11 @@ static void buildSmallReductionStrategyThreadDistribution(
           /*numThreads=*/
           getAsOpFoldResult(b.getI64ArrayAttr(strategy.workgroupTileSizes)),
           /*threadDimMapping=*/b.getArrayAttr(threadDimMapping));
-  fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.forallH);
+  fillH =
+      b.create<FuseIntoContainingOp>(fillH, tileResult.forallH).getFusedOp();
   maybeLeadingH =
-      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH);
+      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH)
+          .getFusedOp();
 
   // 1. Scalarize all ops to ensure vectorization.
   auto anyOpType = transform::AnyOpType::get(b.getContext());

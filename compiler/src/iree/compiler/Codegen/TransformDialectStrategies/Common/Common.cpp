@@ -217,10 +217,11 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   if (opsHToFuse.size() > 1) {
     Value mergedOpsH =
         b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
-    b.create<FuseIntoContainingOp>(mergedOpsH, result.forallH);
+    b.create<FuseIntoContainingOp>(mergedOpsH, result.forallH).getFusedOp();
   } else if (opsHToFuse.size() == 1) {
     Value fusedH =
-        b.create<FuseIntoContainingOp>(opsHToFuse.front(), result.forallH);
+        b.create<FuseIntoContainingOp>(opsHToFuse.front(), result.forallH)
+            .getFusedOp();
     result.resultingFusedOpsHandles.push_back(fusedH);
   }
   return result;
@@ -414,7 +415,8 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
   Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
   // Fuse the fill and elementwise to privatize them.
   blockParallelFillH =
-      b.create<FuseIntoContainingOp>(blockParallelFillH, blockParallelForallOp);
+      b.create<FuseIntoContainingOp>(blockParallelFillH, blockParallelForallOp)
+          .getFusedOp();
   return std::make_tuple(blockParallelForallOp, blockParallelFillH,
                          blockCombinerOpH);
 }
@@ -450,9 +452,11 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
   b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
       tileResult.forallH);
 
-  fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.forallH);
+  fillH =
+      b.create<FuseIntoContainingOp>(fillH, tileResult.forallH).getFusedOp();
   maybeLeadingH =
-      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH);
+      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH)
+          .getFusedOp();
 
   // Perform a pass of canonicalization + enabling after fusion.
   ApplyPatternsOpPatterns configuration;
