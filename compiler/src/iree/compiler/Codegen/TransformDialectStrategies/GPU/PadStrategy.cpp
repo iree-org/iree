@@ -1,0 +1,169 @@
+// Copyright 2023 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/PadStrategy.h"
+
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Strategies.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/Dialect/Transform/IR/TransformTypes.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
+
+using namespace mlir;
+
+#define DEBUG_TYPE "iree-transform-builder"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+
+// TODO: significantly better namespacing.
+using iree_compiler::blockX;
+using iree_compiler::blockY;
+using iree_compiler::blockZ;
+using iree_compiler::buildPad;
+using iree_compiler::buildTileFuseDistToForallWithNumThreads;
+using iree_compiler::buildTileFuseDistToForallWithTileSizes;
+using iree_compiler::TileToForallAndFuseAndDistributeResult;
+using iree_compiler::gpu::buildBufferize;
+using iree_compiler::gpu::buildConvertToAsyncCopies;
+using iree_compiler::gpu::buildDistributeOnePadOrCopyWithNumThreads;
+using iree_compiler::gpu::buildDistributeOnePadOrCopyWithTileSizes;
+using iree_compiler::gpu::kCudaWarpSize;
+using iree_compiler::gpu::PadStrategy;
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
+using iree_compiler::IREE::transform_dialect::
+    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
+using transform::MatchOp;
+using transform_ext::RegisterMatchCallbacksOp;
+
+/// Block tile size X, Y, Z.
+static llvm::cl::opt<int64_t> clBlockTileSizeX(
+    "td-pad-strategy-blk-size-x",
+    llvm::cl::desc("block tile size for dim X (x,y,z) for the transform "
+                   "dialect pad strategy"),
+    llvm::cl::init(64));
+static llvm::cl::opt<int64_t> clBlockTileSizeY(
+    "td-pad-strategy-blk-size-y",
+    llvm::cl::desc("block tile size for dim Y (x,y,z) for the transform "
+                   "dialect pad strategy"),
+    llvm::cl::init(64));
+static llvm::cl::opt<int64_t> clBlockTileSizeZ(
+    "td-pad-strategy-blk-size-z",
+    llvm::cl::desc("block tile size for dim z (x,y,z) for the transform "
+                   "dialect pad strategy"),
+    llvm::cl::init(1));
+
+/// Number of threads X, Y, Z.
+static llvm::cl::opt<int64_t> clNumThreadsX(
+    "td-pad-strategy-num-threads-x",
+    llvm::cl::desc("number of threads for dim X (x,y,z) for the transform "
+                   "dialect pad strategy"),
+    llvm::cl::init(16));
+static llvm::cl::opt<int64_t> clNumThreadsY(
+    "td-pad-strategy-num-threads-y",
+    llvm::cl::desc("number of threads for dim Y (x,y,z) for the transform "
+                   "dialect pad strategy"),
+    llvm::cl::init(16));
+static llvm::cl::opt<int64_t> clNumThreadsZ(
+    "td-pad-strategy-num-threads-z",
+    llvm::cl::desc("number of threads for dim z (x,y,z) for the transform "
+                   "dialect pad strategy"),
+    llvm::cl::init(1));
+
+static llvm::cl::list<int64_t> clVectorSize(
+    "td-pad-strategy-vector-size",
+    llvm::cl::desc("vector size  for the transform dialect pad strategy"),
+    llvm::cl::list_init(ArrayRef<int64_t>{4, 4}));
+static llvm::cl::opt<bool> clUseAsyncCopies(
+    "td-pad-strategy-use-async-copies",
+    llvm::cl::desc(
+        "use async copies through shared memory for the pad strategy"),
+    llvm::cl::init(false));
+
+void iree_compiler::gpu::PadStrategy::initDefaultValues() {
+  blockTileSizes = {clBlockTileSizeX, clBlockTileSizeY, clBlockTileSizeZ};
+  numThreads = {clNumThreadsX, clNumThreadsY, clNumThreadsZ};
+  vectorSize = SmallVector<int64_t>{clVectorSize.begin(), clVectorSize.end()};
+  useAsyncCopies = clUseAsyncCopies;
+}
+
+void iree_compiler::gpu::PadStrategy::configure(GPUModel gpuModel) {}
+
+static std::tuple<Value, Value> buildPadStrategyBlockDistribution(
+    ImplicitLocOpBuilder &b, Value variantH, const PadStrategy &strategy) {
+  // Step 1. Call the matcher. Note that this is the same matcher as used to
+  // trigger this compilation path, so it must always apply.
+  b.create<RegisterMatchCallbacksOp>();
+  auto [padH] = unpackRegisteredMatchCallback<1>(
+      b, "pad", transform::FailurePropagationMode::Propagate, variantH);
+
+  // Step 2. Create the block/mapping tiling level.
+  MLIRContext *ctx = b.getContext();
+  auto [tiledPadH, forallH] = buildDistributeOnePadOrCopyWithTileSizes(
+      b, variantH, padH,
+      /*tileSizes=*/ArrayRef<int64_t>{strategy.blockTileSizes}.take_front(2),
+      /*threadDimMapping=*/{blockY(ctx), blockX(ctx)}, /*foldIfBranch=*/true);
+
+  // Step 3.Handle the workgroup count region.
+  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(forallH);
+  return std::make_tuple(tiledPadH, forallH);
+}
+
+void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
+                                          Value variantH,
+                                          const PadStrategy &strategy) {
+  MLIRContext *ctx = b.getContext();
+  // Step 1. Apply block-level part of the strategy.
+  auto [padBlockH, forallBlockH] =
+      buildPadStrategyBlockDistribution(b, variantH, strategy);
+
+  // Step 2. Apply thread-level part of the strategy.
+  auto padThreadH = buildDistributeOnePadOrCopyWithNumThreads(
+      b, variantH, padBlockH,
+      /*numThreads=*/ArrayRef<int64_t>{strategy.numThreads}.take_front(2),
+      /*threadDimMapping=*/{threadY(ctx), threadX(ctx)}, /*foldIfBranch=*/true);
+
+  // Step 3. Masked vectorization.
+  b.create<transform::MaskedVectorizeOp>(padThreadH, ValueRange(), false,
+                                         strategy.vectorSize);
+
+  // Step 4. Lower all masked vector transfers at this point, as they make
+  // canonicalization generate incorrect IR.
+  // TODO: don't rematch, apply on the variant op directly.
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH);
+
+  // Step 5. Vectorize the rest of func normally.
+  funcH = buildVectorize(b, funcH, /*applyCleanups=*/true);
+
+  // Step 6. Bufferize and drop HAL descriptor from memref ops.
+  variantH = buildBufferize(b, variantH);
+
+  // Step 7. Post-bufferization mapping to blocks and threads.
+  // Need to match again since bufferize invalidated all handles.
+  // TODO: assumes a single func::FuncOp to transform, needs hardening.
+  funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = buildMapToBlockAndThreads(b, funcH,
+                                    /*blockSize=*/strategy.blockTileSizes);
+
+  // TODO: Multi-buffering and async copies in cases where HW supports it.
+  assert(!strategy.useAsyncCopies && "not implemented yet");
+
+  // Step 8. Lower masks before returning to the default lowering pipeline.
+  buildLowerVectorMasksAndCleanup(b, funcH);
+}
