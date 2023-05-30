@@ -46,8 +46,9 @@ static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
 /// be specified. It picks the `tilingLevel`-th list as tiling sizes from
 /// lowering_config.
 struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
-  LLVMCPUTilePass(int64_t tilingLevel = -1) {
+  LLVMCPUTilePass(int64_t tilingLevel, bool reductionOnly) {
     this->tilingLevel.setValue(tilingLevel);
+    this->reductionOnly.setValue(reductionOnly);
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
@@ -89,6 +90,13 @@ void LLVMCPUTilePass::runOnOperation() {
     // Need a better way for handling this, but this works for now.
     if (isa<tensor::PadOp>(computeOp)) continue;
 
+    if (reductionOnly &&
+        llvm::none_of(op.getLoopIteratorTypes(), [](auto iterType) {
+          return iterType == utils::IteratorType::reduction;
+        })) {
+      continue;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
 
     IRRewriter rewriter(context);
@@ -117,8 +125,8 @@ void LLVMCPUTilePass::runOnOperation() {
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
-    int64_t tilingLevel) {
-  return std::make_unique<LLVMCPUTilePass>(tilingLevel);
+    int64_t tilingLevel, bool reductionOnly) {
+  return std::make_unique<LLVMCPUTilePass>(tilingLevel, reductionOnly);
 }
 
 }  // namespace iree_compiler
