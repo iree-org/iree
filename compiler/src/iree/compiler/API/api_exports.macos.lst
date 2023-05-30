@@ -531,6 +531,7 @@ _mlirSymbolTableWalkSymbolTables
 _mlirTransformAnyOpTypeGet
 _mlirTransformOperationTypeGet
 _mlirTransformOperationTypeGetOperationName
+_mlirTransformOperationTypeGetTypeID
 _mlirTupleTypeGet
 _mlirTupleTypeGetNumTypes
 _mlirTupleTypeGetType
@@ -540,6 +541,7 @@ _mlirTypeAttrGetValue
 _mlirTypeDump
 _mlirTypeEqual
 _mlirTypeGetContext
+_mlirTypeGetDialect
 _mlirTypeGetTypeID
 _mlirTypeIDAllocatorAllocateTypeID
 _mlirTypeIDAllocatorCreate
