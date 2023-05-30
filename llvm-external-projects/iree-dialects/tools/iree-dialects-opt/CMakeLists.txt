@@ -30,6 +30,7 @@ set(LIBS
   MLIRSCFTransforms
   MLIRTensorDialect
   MLIRTransforms
+  MLIRTransformPDLExtension
   MLIRVectorTransformOps
 )
 
