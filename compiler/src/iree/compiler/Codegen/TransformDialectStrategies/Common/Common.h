@@ -192,7 +192,23 @@ Value buildPad(ImplicitLocOpBuilder &b, Value opH,
 /// Build transform IR that applies rank-reduction patterns and vectorizes.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
+/// If `applyCleanups` is true, also apply cleanup patterns.
+Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
+                     bool applyCleanups = false);
+
+/// Build transform IR that applies lowering of masked vector transfer
+/// operations and subsequent cleanup patterns (fold-memref-aliases).
+/// Takes a handle to a containing op and returns an updated handle to the
+/// containing op.
+Value buildLowerMaskedTransfersAndCleanup(ImplicitLocOpBuilder &b,
+                                          Value containingOpH);
+
+/// Build transform IR that applies vector mask lowering and subsequent cleanup
+/// patterns (fold-memref-aliases).
+/// Takes a handle to a containing op and returns an updated handle to the
+/// containing op.
+Value buildLowerVectorMasksAndCleanup(ImplicitLocOpBuilder &b,
+                                      Value containingOpH);
 
 /// Build transform IR to hoist redundant subset operations.
 void buildHoisting(ImplicitLocOpBuilder &b, Value funcH);

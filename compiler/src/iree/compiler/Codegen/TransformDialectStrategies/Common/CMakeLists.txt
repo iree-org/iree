@@ -52,6 +52,7 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTransformDialect
     MLIRVectorDialect
+    MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Dialect::Flow::IR

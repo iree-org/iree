@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 
 using namespace mlir;
@@ -267,9 +268,46 @@ Value mlir::iree_compiler::buildPad(
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 // TODO: configure patterns.
-Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b,
-                                          Value funcH) {
-  return b.create<VectorizeOp>(funcH);
+Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
+                                          bool applyCleanups) {
+  funcH = b.create<VectorizeOp>(funcH);
+  if (applyCleanups) {
+    ApplyPatternsOpPatterns configuration;
+    funcH = iree_compiler::buildCanonicalizationAndEnablingTransforms(
+        b, configuration, funcH);
+  }
+  return funcH;
+}
+
+Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
+    ImplicitLocOpBuilder &b, Value containingOpH) {
+  // TODO: avoid functional style transform so we can apply to the variant.
+  containingOpH = b.create<transform::LowerMaskedTransfersOp>(
+      containingOpH.getType(), containingOpH);
+  {
+    ApplyPatternsOpPatterns configuration;
+    configuration.rankReducingLinalg = true;
+    configuration.rankReducingVector = true;
+    b.create<ApplyPatternsOp>(containingOpH, configuration);
+  }
+  return containingOpH;
+}
+
+Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
+    ImplicitLocOpBuilder &b, Value containingOpH) {
+  // TODO: not a functional style op to avoid invalidating artificially.
+  containingOpH = b.create<transform::LowerMasksOp>(
+      pdl::OperationType::get(b.getContext()), containingOpH);
+  // TODO: not a functional style op to avoid invalidating artificially.
+  containingOpH = b.create<transform::MaterializeMasksOp>(
+      pdl::OperationType::get(b.getContext()), containingOpH);
+  {
+    ApplyPatternsOpPatterns config;
+    config.foldMemrefAliases = true;
+    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config,
+                                                              containingOpH);
+  }
+  return containingOpH;
 }
 
 /// Hoist redundant subet ops.
