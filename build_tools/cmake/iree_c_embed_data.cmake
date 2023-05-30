@@ -62,7 +62,10 @@ function(iree_c_embed_data)
 
   foreach(_SRC ${_RULE_SRCS})
     if(_SRC MATCHES "^/")
-      # _SRC is an absolute path (starts with `/`).
+      # _SRC is a Unix-style absolute path (starts with `/`).
+      list(APPEND _RESOLVED_SRCS "${_SRC}")
+    elseif(_SRC MATCHES "^[a-zA-Z]:/")
+      # _SRC is a Windows-style absolute path (starts with `X:/`).
       list(APPEND _RESOLVED_SRCS "${_SRC}")
     elseif(_SRC MATCHES "^[$]<")
       # _SRC is a CMake generator expression (starts with `$<`).
