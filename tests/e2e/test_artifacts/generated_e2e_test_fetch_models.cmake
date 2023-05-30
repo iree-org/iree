@@ -647,3 +647,63 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/model_fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-2048_Resnet50PTBatch2048.mlir"
   UNPACK
 )
+
+iree_fetch_artifact(
+  NAME
+    "model-5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_1/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-1_Resnet50fp16PTBatch1.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_8/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8_Resnet50fp16PT16Batch8.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-64"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_64/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-64_Resnet50fp16PTBatch64.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-128"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_128/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-128_Resnet50fp16PTBatch128.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-256"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_256/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-256_Resnet50fp16PTBatch256.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-2048"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_2048/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-2048_Resnet50fp16PTBatch2048.mlir"
+  UNPACK
+)
