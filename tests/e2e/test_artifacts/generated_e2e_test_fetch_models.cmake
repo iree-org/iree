@@ -300,6 +300,16 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-271ea7a0-68e7-45b6-91f4-f39d5ce9e29c"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684831160/EFFICIENTNET_V2_S_FP16/batch_1/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_271ea7a0-68e7-45b6-91f4-f39d5ce9e29c_EfficientNetV2Sfp16PT.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-50a7aece-73f9-47f4-a93a-4a1178f45407"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_default.mlirbc"
