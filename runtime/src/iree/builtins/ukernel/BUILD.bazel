@@ -136,6 +136,7 @@ c_embed_data(
     srcs = [
         ":ukernel_bitcode_32bit_base.bc",
         ":ukernel_bitcode_64bit_base.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/arm_64:ukernel_bitcode_arm_64.bc",
         "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64.bc",
     ],
     c_file_output = "ukernel_bitcode.c",

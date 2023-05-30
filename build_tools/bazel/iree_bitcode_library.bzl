@@ -89,6 +89,9 @@ def iree_bitcode_library(
         # This must match what the runtime is built with.
         "-fno-short-wchar",
 
+        # Enable inline asm.
+        "-fasm",
+
         # Object file only in bitcode format:
         "-c",
         "-emit-llvm",
