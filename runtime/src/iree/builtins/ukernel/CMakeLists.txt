@@ -116,6 +116,7 @@ iree_bitcode_library(
     "pack_tile.c"
     "query_tile_sizes.c"
     "unpack_tile.c"
+    "weak.c"
 )
 
 iree_c_embed_data(

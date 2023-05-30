@@ -456,13 +456,16 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       std::unique_ptr<llvm::Module> archBitcode =
           loadUKernelArchBitcode(targetMachine.get(), context);
 
+      // The archBitcode contains overrides for weak symbols that will come in
+      // the baseBitcode below. So we link it before baseBitcode, with
+      // OverrideFromSrc.
       if (archBitcode) {
         // Sequence that access before we std::move(archBitcode)!
         StringRef archBitcodeName = archBitcode->getName();
-        if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
-                                     /*linkerFlags=*/0, *targetMachine,
-                                     archBitcodeName, std::move(archBitcode),
-                                     setAlwaysInline))) {
+        if (failed(linkBitcodeModule(
+                variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
+                *targetMachine, archBitcodeName, std::move(archBitcode),
+                setAlwaysInline))) {
           return mlir::emitError(variantOp.getLoc())
                  << "failed linking in architecture-specific ukernel bitcode "
                     "for target triple '"
@@ -471,16 +474,13 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       }
 
       // The baseBitcode module contains weak symbols for fallbacks.
-      // In a native-toolchain build, these would have to be linked last to
-      // ensure that they are overridden by non-weak symbols from the
-      // archBitcode module. Here it seems not to matter (?) but we still link
-      // this last out of habit.
+      // So we link it after the archBitcode and with LinkOnlyNeeded.
       std::unique_ptr<llvm::Module> baseBitcode =
           loadUKernelBaseBitcode(context);
       // Sequence that access before we std::move(baseBitcode)!
       StringRef baseBitcodeName = baseBitcode->getName();
       if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
-                                   /*linkerFlags=*/0, *targetMachine,
+                                   llvm::Linker::LinkOnlyNeeded, *targetMachine,
                                    baseBitcodeName, std::move(baseBitcode),
                                    setAlwaysInline))) {
         return mlir::emitError(variantOp.getLoc())

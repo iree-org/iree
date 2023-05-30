@@ -106,6 +106,7 @@ UKERNEL_BASE_SRCS = [
     "pack_tile.c",
     "query_tile_sizes.c",
     "unpack_tile.c",
+    "weak.c",
 ]
 
 filegroup(
