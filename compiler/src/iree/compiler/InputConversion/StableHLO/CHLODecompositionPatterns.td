@@ -11,7 +11,6 @@
 // lowering to non-canonical forms.
 
 include "mlir/IR/OpBase.td"
-include "mlir/Dialect/Shape/IR/ShapeOps.td"
 include "stablehlo/dialect/ChloOps.td"
 include "stablehlo/dialect/StablehloOps.td"
 

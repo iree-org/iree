@@ -53,7 +53,6 @@ iree_gentbl_cc_library(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CHLODecompositionPatterns.td",
     deps = [
-        "@llvm-project//mlir:ShapeTdFiles",
         "@mlir-hlo//stablehlo:chlo_ops_td_files",
         "@mlir-hlo//stablehlo:stablehlo_ops_td_files",
     ],
