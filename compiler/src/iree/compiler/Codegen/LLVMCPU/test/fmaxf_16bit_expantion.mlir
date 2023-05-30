@@ -1,21 +1,23 @@
-// RUN: iree-opt --iree-llvmcpu-expand-max-f16-to-f32 %s | FileCheck %s
+// RUN: iree-opt --iree-llvmcpu-expand-f16-Op-to-f32 %s | FileCheck %s
 
 func.func @test_expand_f16_maxf(%arg0: tensor<4xf16>, %arg1: tensor<4xf16>) -> tensor<4xf16>{
-    %1 = arith.maxf %arg0, %arg1 : tensor<4xf16>
-    return %1: tensor<4xf16>
+    %1 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], 
+                        iterator_types = ["parallel"]} ins(%arg0: tensor<4xf16>) outs(%arg1: tensor<4xf16>) {
+        ^bb0(%in: f16, %out: f16):
+        %2 = arith.maxf %in, %out : f16
+        linalg.yield %2: f16
+    } -> tensor<4xf16>
+
+    return %1 : tensor<4xf16>
 }
 
-// CHECK-LABEL: func @test_expand_f16_maxf
-// CHECK: %[[EXT1:.*]] = arith.extf %arg0 : tensor<4xf16> to tensor<4xf32> 
-// CHECK: %[[EXT2:.*]] = arith.extf %arg1 : tensor<4xf16> to tensor<4xf32>
-// CHECK: %[[MAX:.*]] = arith.maxf %[[EXT1]], %[[EXT2]] : tensor<4xf32>
-// CHECK: %[[TRUNC:.*]] = arith.truncf %[[MAX]] : tensor<4xf16>
-// CHECK: return %[[TRUNC]] : tensor<4xf16>
+// CHECK-LABEL: func.func @test_expand_f16_maxf
+// CHECK: %[[GEN:.*]] = linalg.generic
+// CHECK: %[[RHSEXT:.*]] = arith.extf %in : f16 to f32 
+// CHECK: %[[LHSEXT:.*]] = arith.extf %out : f16 to f32
+// CHECK: %[[MAX:.*]] = arith.maxf %[[RHSEXT]], %[[LHSEXT]] : f32
+// CHECK: %[[TRUNC:.*]] = arith.truncf %[[MAX]] : f32 to f16
+// CHECK: linalg.yield %[[TRUNC:.*]] : f16
+// CHECK: return %[[GEN:.*]] : tensor<4xf16>
 
-// CHECK-LABEL: func @test_expand_f16_maxf
-// CHECK: %[[EXT1:.*]] = arith.extf %arg0 : vector<4xf16> to vector<4xf32> 
-// CHECK: %[[EXT2:.*]] = arith.extf %arg1 : vector<4xf16> to vector<4xf32>
-// CHECK: %[[MAX:.*]] = arith.maxf %[[EXT1]], %[[EXT2]] : vector<4xf32>
-// CHECK: %[[TRUNC:.*]] = arith.truncf %[[MAX]] : vector<4xf16>
-// CHECK: return %[[TRUNC]] : vector<4xf16>
 
