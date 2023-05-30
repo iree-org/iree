@@ -9,6 +9,8 @@ cmake_minimum_required(VERSION 3.16.3)
 project(IREETracyServer C CXX)
 
 set(TRACY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/tracy")
+# Tracy itself doesn't use TBB. But when enabled we need tbb to be working across platforms (aarch64, macOS)
+set(NO_TBB "1")
 
 find_package(Threads REQUIRED)
 
@@ -23,7 +25,6 @@ if(NOT PKGCONFIG)
 else()
   include(FindPkgConfig)
   pkg_check_modules(TRACY_DEPS
-    tbb
     libzstd
   )
   pkg_check_modules(TRACY_CAPSTONE_DEPS
@@ -40,7 +41,7 @@ endif()
 
 if(NOT TRACY_DEPS_FOUND)
   message(STATUS "Could not find Tracy dependencies (Tracy server will not be built).")
-  message(STATUS "To build Tracy, install packages libzstd, and tbb (on Ubuntu/Debian, 'apt install libcapstone-dev libtbb-dev libzstd-dev')")
+  message(STATUS "To build Tracy, install packages libzstd, and tbb (on Ubuntu/Debian, 'apt install libcapstone-dev libzstd-dev')")
   return()
 endif()
 
