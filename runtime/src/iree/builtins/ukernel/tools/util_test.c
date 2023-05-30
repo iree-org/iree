@@ -31,7 +31,7 @@ static void iree_uk_test_make_cpu_data_for_features(iree_uk_test_t* test,
   iree_uk_test_make_cpu_data_for_features_case(
       test, "host", (const iree_uk_uint64_t*)iree_cpu_data_fields());
 
-#if defined(IREE_UK_ARCH_X86_64)
+#if defined(IREE_ARCH_X86_64)
   // Individual x86-64 features.
   expected[0] = IREE_CPU_DATA0_X86_64_AVX;
   iree_uk_test_make_cpu_data_for_features_case(test, "avx", expected);
@@ -54,7 +54,7 @@ static void iree_uk_test_make_cpu_data_for_features(iree_uk_test_t* test,
   expected[0] = avx512_vnni;
   iree_uk_test_make_cpu_data_for_features_case(test, "avx512_vnni", expected);
 
-#elif defined(IREE_UK_ARCH_ARM_64)
+#elif defined(IREE_ARCH_ARM_64)
   // Individual arm64 features.
   expected[0] = IREE_CPU_DATA0_ARM_64_DOTPROD;
   iree_uk_test_make_cpu_data_for_features_case(test, "dotprod", expected);
@@ -63,7 +63,7 @@ static void iree_uk_test_make_cpu_data_for_features(iree_uk_test_t* test,
   iree_uk_test_make_cpu_data_for_features_case(test, "dotprod,i8mm", expected);
   // Named arm64 feature sets: none at the moment.
 
-#endif  // defined(IREE_UK_ARCH_X86_64)
+#endif  // defined(IREE_ARCH_X86_64)
 }
 
 int main(int argc, char** argv) {

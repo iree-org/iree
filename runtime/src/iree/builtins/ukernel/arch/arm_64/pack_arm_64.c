@@ -4,9 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <arm_neon.h>
-
-#include "iree/builtins/ukernel/arch/arm_64/common_arm_neon.h"
+#include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
 #include "iree/builtins/ukernel/pack_internal.h"
 
 static void iree_uk_pack_tile_8x1_x8_arm_64_direct(

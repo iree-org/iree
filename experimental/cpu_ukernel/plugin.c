@@ -9,7 +9,7 @@
 
 // Implementation of iree_uk_assert_fail failure is deferred to users code, i.e.
 // to us here, as core ukernel/ code can't use the standard library.
-#if defined(IREE_UK_STANDALONE)  // Building a standalone plugin.
+#if defined(IREE_DEVICE_STANDALONE)  // Building a standalone plugin.
 void iree_uk_assert_fail(const char* file, int line, const char* function,
                          const char* condition) {
   // Doing nothing at the moment.
@@ -27,7 +27,7 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
   fflush(stderr);
   abort();
 }
-#endif  // defined(IREE_UK_STANDALONE)
+#endif  // defined(IREE_DEVICE_STANDALONE)
 
 // Plugin entry points wrapping the actual ukernels.
 static int iree_uk_plugin_mmt4d(void* params_ptr, void* context,
@@ -122,7 +122,7 @@ iree_hal_executable_plugin_query(
     // Declares what library version is present: newer runtimes may support
     // loading older plugins but newer plugins cannot load on older runtimes.
     .version = IREE_HAL_EXECUTABLE_PLUGIN_VERSION_LATEST,
-#if defined(IREE_UK_STANDALONE)  // Building a standalone plugin.
+#if defined(IREE_DEVICE_STANDALONE)  // Building a standalone plugin.
     // Name and description are used for tracing/logging/diagnostics.
     .name = "builtin_ukernel_standalone_plugin",
     .description = "builtin ukernels as standalone plugin (" __FILE__ ")",
@@ -138,7 +138,7 @@ iree_hal_executable_plugin_query(
     .features = 0,
     // Let the runtime know what sanitizer this plugin was compiled with.
     .sanitizer = IREE_HAL_EXECUTABLE_PLUGIN_SANITIZER_KIND,
-#endif  // defined(IREE_UK_STANDALONE)
+#endif  // defined(IREE_DEVICE_STANDALONE)
   };
   static const iree_hal_executable_plugin_v0_t plugin = {
       .header = &header,

@@ -4,9 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <arm_neon.h>
-
+#include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
 #include "iree/builtins/ukernel/mmt4d_internal.h"
+
+#if defined(IREE_UK_BUILD_ARM_64_I8MM)
 
 static inline int32x4_t iree_uk_neon_zip1_s32_as_s64(int32x4_t a, int32x4_t b) {
   return vreinterpretq_s32_s64(
@@ -437,3 +438,5 @@ void iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_inline_asm(
         "v27", "v28", "v29", "v30", "v31");
 }
 #endif  // defined(IREE_UK_ENABLE_INLINE_ASM)
+
+#endif  // defined(IREE_UK_BUILD_ARM_64_I8MM)

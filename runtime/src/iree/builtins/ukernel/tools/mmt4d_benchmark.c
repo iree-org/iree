@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_uk_benchmark_initialize(&argc, argv);
 
-#if defined(IREE_UK_ARCH_ARM_64)
+#if defined(IREE_ARCH_ARM_64)
   // On arm64, some code paths have inline asm and intrinsics variants. For them
   // we use iree_uk_benchmark_register_mmt4d_default_and_intrinsics to benchmark
   // both.
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
                                    "dotprod");
   iree_uk_benchmark_register_mmt4d_default_and_intrinsics(
       IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8, "i8mm");
-#elif defined(IREE_UK_ARCH_X86_64)
+#elif defined(IREE_ARCH_X86_64)
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
                                    "avx2_fma");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 16, 16, 1,
@@ -145,14 +145,14 @@ int main(int argc, char** argv) {
                                    "avx512_base");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2,
                                    "avx512_vnni");
-#else  // defined(IREE_UK_ARCH_ARM_64)
+#else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
                                    "");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1,
                                    "");
-#endif  // defined(IREE_UK_ARCH_ARM_64)
+#endif  // defined(IREE_ARCH_ARM_64)
 
   iree_uk_benchmark_run_and_cleanup();
 }

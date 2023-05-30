@@ -94,7 +94,7 @@ function(iree_experimental_standalone_plugin_arch)
         -fdata-sections
         -ffunction-sections
         -funique-section-names
-        -DIREE_UK_STANDALONE
+        -DIREE_DEVICE_STANDALONE
         -I "${IREE_SOURCE_DIR}/runtime/src/"
         -c "${_SRC_FILE}"
         -o "${CMAKE_CURRENT_BINARY_DIR}/${_OBJECT_FILE}"
