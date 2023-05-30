@@ -29,11 +29,11 @@ transform.sequence failures(propagate) {
     transform.sequence %arg0 : !transform.any_op -> !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op
     failures(propagate) {
   ^bb1(%arg1: !transform.any_op):
-    %fused_22 = transform.structured.fuse_into_containing_op %fusion_group_1 into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    %parallel_reduction_22 = transform.structured.fuse_into_containing_op %parallel_reduction into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    %more_parallel_fill_22 = transform.structured.fuse_into_containing_op %more_parallel_fill into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    %original_fill_22 = transform.structured.fuse_into_containing_op %original_fill into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    %maybe_leading_22 = transform.structured.fuse_into_containing_op %maybe_leading into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %fused_22, %new_containing_1 = transform.structured.fuse_into_containing_op %fusion_group_1 into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %parallel_reduction_22, %new_containing_2 = transform.structured.fuse_into_containing_op %parallel_reduction into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %more_parallel_fill_22, %new_containing_3 = transform.structured.fuse_into_containing_op %more_parallel_fill into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %original_fill_22, %new_containing_4 = transform.structured.fuse_into_containing_op %original_fill into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %maybe_leading_22, %new_containing_5 = transform.structured.fuse_into_containing_op %maybe_leading into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     transform.yield %fused_22, %parallel_reduction_22, %more_parallel_fill_22, %original_fill_22, %maybe_leading_22
       : !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op
