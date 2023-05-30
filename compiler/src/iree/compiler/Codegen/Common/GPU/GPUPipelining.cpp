@@ -19,6 +19,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-pipelining"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
@@ -340,7 +342,7 @@ struct MainLoopInfo {
 
   // Iterate through the mainloop and collect `cp.async`, `cp.commit_group`,
   // `cp.wait_group`, and `barrier` operations. These operations are used to
-  // pipeline the mainloop and cheorograph asyncroncy for a *coarse-grained*
+  // pipeline the mainloop and choreograph asyncroncy for a *coarse-grained*
   // schedule. Additionally, collect the `mma.sync` and `ldmatrix`/`ld.shared`
   // operations and separate them into kgroups. The information is helpful in
   // generating an optimal *finer-grained* instruction interleaving of global
@@ -479,15 +481,21 @@ static void getNvidiaAmpereTensorCorePipeline(
   // Analyze the main loop and obtain information for coarse-grained pipelining
   // and fine-grained instruction scheduling.
   MainLoopInfo mainloop(forOp);
+  LDBG("Start getNvidiaAmpereTensorCorePipeline");
 
   // If the mainloop is not schedulable, return an empty schedule.
-  if (!mainloop.isSchedulable) return;
+  if (!mainloop.isSchedulable) {
+    LDBG("--main loop is not schedulable");
+    return;
+  }
 
   // NVIDIA Ampere Tensor Core multi-staged pipeline requires at least 2 kgroups
   // and 3 software pipeline stages. If the conditions are not met, return an
   // empty schedule.
   int numKgroups = mainloop.getNumberOfKgroups();
   if (numKgroups < 2 || numStages < 3) {
+    LDBG("--numKgroups=" << numKgroups << "(< 2) or numStages=" << numStages
+                         << "(< 3) -> BAIL");
     return;
   }
 
@@ -499,6 +507,7 @@ static void getNvidiaAmpereTensorCorePipeline(
   if (!(mainloop.asyncCreateGroupOp.size() == 1) ||
       !(mainloop.asyncWaitOps.size() == 1) ||
       !(mainloop.barrierOps.size() == 2)) {
+    LDBG("--failed prereqs: 1 async_create, 1 async_wait, 2 barriers -> BAIL");
     return;
   }
 
