@@ -42,6 +42,22 @@ iree_compiler_cc_library(
     ],
 )
 
+iree_gentbl_cc_library(
+    name = "CHLODecompositionPatterns",
+    tbl_outs = [
+        (
+            ["--gen-rewriters"],
+            "CHLODecompositionPatterns.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "CHLODecompositionPatterns.td",
+    deps = [
+        "@mlir-hlo//stablehlo:chlo_ops_td_files",
+        "@mlir-hlo//stablehlo:stablehlo_ops_td_files",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
@@ -66,6 +82,7 @@ iree_compiler_cc_library(
         "VerifyCompilerInputLegality.cpp",
     ],
     deps = [
+        ":CHLODecompositionPatterns",
         ":PassHeaders",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
