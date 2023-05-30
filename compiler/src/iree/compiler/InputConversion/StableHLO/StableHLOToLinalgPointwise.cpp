@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Implements logic for lowering StableHLO/CHLO pointwise ops to Linalg dialect.
+// Implements logic for lowering StableHLO pointwise ops to Linalg dialect.
 // These patterns are separated out to their own file to save on the compilation
 // times, given that we instantiate a large number of class templates here.
 
