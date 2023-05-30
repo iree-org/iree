@@ -106,6 +106,28 @@ std::optional<llvm::Triple> getTargetTriple(
   return llvm::Triple(triple.value().str());
 }
 
+const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
+  if (triple.isX86()) {
+    return triple.isArch64Bit() ? "x86_64" : "x86_32";
+  }
+  if (triple.isWasm()) {
+    return triple.isArch64Bit() ? "wasm_64" : "wasm_32";
+  }
+  if (triple.isAArch64()) {
+    return "arm_64";
+  }
+  if (triple.isARM()) {
+    return "arm_32";
+  }
+  if (triple.isRISCV64()) {
+    return "riscv_64";
+  }
+  if (triple.isRISCV32()) {
+    return "riscv_32";
+  }
+  return "unknown";
+}
+
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
 }

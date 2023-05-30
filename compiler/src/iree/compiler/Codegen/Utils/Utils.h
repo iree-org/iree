@@ -63,6 +63,10 @@ std::optional<BoolAttr> getConfigBoolAttr(
 std::optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Returns the target architecture name, in IREE_ARCH convention, from the
+/// given target triple.
+const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
+
 /// Methods to get target information.
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
