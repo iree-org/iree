@@ -637,3 +637,53 @@ hal.executable private @odd_reduction_dimension_size_2809 {
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     lowering_config = #[[$CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
+hal.executable private @broadcast {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+        subgroup_size = 32>>
+    }> {
+    hal.executable.export public @broadcast ordinal(0) layout(#pipeline_layout)
+    builtin.module {
+      func.func @broadcast() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 1.000000e-10 : f32
+        %cst_0 = arith.constant -1.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<f32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x1x1x1xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
+        %3 = tensor.empty() : tensor<2048x1x1x1xf32>
+        %4 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1, d2, d3) -> ()>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+          iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+        } ins(%2 : tensor<f32>) outs(%3 : tensor<2048x1x1x1xf32>) {
+        ^bb0(%in: f32, %out: f32):
+          %5 = arith.maxf %in, %cst : f32
+          %6 = arith.divf %cst_0, %5 : f32
+          linalg.yield %6 : f32
+        } -> tensor<2048x1x1x1xf32>
+        flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [2048, 1, 1, 1], strides = [1, 1, 1, 1] : tensor<2048x1x1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<2048x1x1x1xf32>>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 1, 1, 1]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
+// CHECK-LABEL: hal.executable.export public @broadcast
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]

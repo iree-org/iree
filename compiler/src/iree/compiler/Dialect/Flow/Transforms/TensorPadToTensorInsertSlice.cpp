@@ -87,7 +87,7 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
       unsigned numSymbols = 0;
       auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          e = e + attr.cast<IntegerAttr>().getInt();
+          e = e + llvm::cast<IntegerAttr>(attr).getInt();
           return e;
         }
         e = e + rewriter.getAffineSymbolExpr(numSymbols++);

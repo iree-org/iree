@@ -205,6 +205,39 @@ func.func @compare_folds()
 
 // -----
 
+// CHECK-LABEL: func.func @select
+// CHECK-SAME:   ([[ARG0:%.+]]: tensor<2xi32>, [[ARG1:%.+]]: tensor<2xi32>, [[ARGC:%.+]]: tensor<2xi1>)
+func.func @select(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>, %argC: tensor<2xi1>)
+  -> (tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<4xi32>) {
+  %c0 = stablehlo.constant dense<false> : tensor<i1>
+  %c1 = stablehlo.constant dense<true> : tensor<i1>
+
+  %c0x2 = stablehlo.constant dense<false> : tensor<2xi1>
+  %c1x2 = stablehlo.constant dense<true> : tensor<2xi1>
+
+  %cond = stablehlo.constant dense<[false, true, false, true]> : tensor<4xi1>
+  %foo = stablehlo.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+  %bar = stablehlo.constant dense<[5, 6, 7, 8]> : tensor<4xi32>
+
+  %0 = stablehlo.select %argC, %arg0, %arg0 : (tensor<2xi1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  %1 = stablehlo.select %c0, %arg0, %arg1 : (tensor<i1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  %2 = stablehlo.select %c1, %arg0, %arg1 : (tensor<i1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  %3 = stablehlo.select %c0x2, %arg0, %arg1 : (tensor<2xi1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  %4 = stablehlo.select %c1x2, %arg0, %arg1 : (tensor<2xi1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  %5 = stablehlo.select %argC, %arg0, %arg1 : (tensor<2xi1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+
+  %6 = stablehlo.select %cond, %foo, %bar : (tensor<4xi1>, tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
+
+  // CHECK-DAG:  [[R0:%.+]] = stablehlo.select [[ARGC]], [[ARG0]], [[ARG1]]
+  // CHECK-DAG:  [[C0:%.+]] = stablehlo.constant dense<[5, 2, 7, 4]> : tensor<4xi32>
+
+  // CHECK-NEXT: return [[ARG0]], [[ARG1]], [[ARG0]], [[ARG1]], [[ARG0]], [[R0]], [[C0]]
+  return %0, %1, %2, %3, %4, %5, %6 :
+         tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<4xi32>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @broadcast_in_dim
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<3x3xi32>)
 func.func @broadcast_in_dim(%arg0: tensor<3x3xi32>)
@@ -380,4 +413,174 @@ func.func @transpose(%arg0: tensor<2xf32>, %arg1: tensor<1x2xf32>, %arg2: tensor
   // CHECK-NEXT: [[X:%.+]] = stablehlo.transpose [[ARG1]], dims = [1, 0]
   // CHECK-NEXT: return [[ARG0]], [[ARG1]], [[X]], [[ARG2]]
   return %a, %b, %c, %d : tensor<2xf32>, tensor<1x2xf32>, tensor<2x1xf32>, tensor<f32>
+}
+
+// -----
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic(%arg0: tensor<4xf32>, %arg1: tensor<2xi64>) -> tensor<5x4xf32> {
+  // CHECK: %[[RESULT:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [1] : (tensor<4xf32>) -> tensor<5x4xf32>
+  %0 = stablehlo.dynamic_broadcast_in_dim %arg0, %arg1, dims = [1] : (tensor<4xf32>, tensor<2xi64>) -> tensor<5x4xf32>
+  // CHECK: return %[[RESULT]] : tensor<5x4xf32>
+  func.return %0 : tensor<5x4xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_shape
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_shape(%arg0: tensor<i32>) -> tensor<4x32xi32> {
+  %0 = mhlo.constant dense<[4, 32]> : tensor<2xi32>
+  // CHECK: %[[RESULT:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [] : (tensor<i32>) -> tensor<4x32xi32>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [] : (tensor<i32>, tensor<2xi32>) -> tensor<?x32xi32>
+  %2 = stablehlo.dynamic_reshape %1, %0 : (tensor<?x32xi32>, tensor<2xi32>) -> tensor<4x32xi32>
+  // CHECK: return %[[RESULT]] : tensor<4x32xi32>
+  func.return %2 : tensor<4x32xi32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_index_shape
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_index_shape(%arg0: tensor<f32>) -> tensor<4x32xf32> {
+  %0 = shape.const_shape [4, 32] : tensor<2xindex>
+  // CHECK: %[[RESULT:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [] : (tensor<f32>) -> tensor<4x32xf32>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [] : (tensor<f32>, tensor<2xindex>) -> tensor<?x32xf32>
+  %2 = stablehlo.dynamic_reshape %1, %0 : (tensor<?x32xf32>, tensor<2xindex>) -> tensor<4x32xf32>
+  // CHECK: return %[[RESULT]] : tensor<4x32xf32>
+  func.return %2 : tensor<4x32xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_requires_cast
+func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_requires_cast(%arg0: tensor<f32>) -> tensor<?x?xf32> {
+  %0 = shape.const_shape [4, 32] : tensor<2xindex>
+  // CHECK: %[[BCAST:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [] : (tensor<f32>) -> tensor<4x32xf32>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [] : (tensor<f32>, tensor<2xindex>) -> tensor<?x?xf32>
+  // CHECK: %[[RESULT:.*]] = tensor.cast %[[BCAST]] : tensor<4x32xf32> to tensor<?x?xf32>
+  // CHECK: return %[[RESULT]] : tensor<?x?xf32>
+  func.return %1 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic
+func.func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<2xi64>) -> tensor<5x4xf32> {
+  // CHECK: %[[RESULT:.+]] = stablehlo.dynamic_broadcast_in_dim %arg0, %arg1, dims = [1] : (tensor<?xf32>, tensor<2xi64>) -> tensor<5x4xf32>
+  %0 = stablehlo.dynamic_broadcast_in_dim %arg0, %arg1, dims = [1] : (tensor<?xf32>, tensor<2xi64>) -> tensor<5x4xf32>
+  // CHECK: return %[[RESULT]] : tensor<5x4xf32>
+  func.return %0 : tensor<5x4xf32>
+}
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_all_dims_non_expanding
+func.func @dynamic_broadcast_in_dim_all_dims_non_expanding(%arg0: tensor<*xf32>, %arg1: tensor<1xindex>) -> tensor<?xf32> {
+  // CHECK-SAME: %[[ARG:.*]]: tensor<*xf32>
+  %1 = "stablehlo.dynamic_broadcast_in_dim"(%arg0, %arg1) {
+    broadcast_dimensions = dense<0> : tensor<1xi64>,
+    known_expanding_dimensions = dense<> : tensor<0xi64>,
+    known_nonexpanding_dimensions = dense<0> : tensor<1xi64>
+  } : (tensor<*xf32>, tensor<1xindex>) -> tensor<?xf32>
+  // CHECK: %[[RES:.*]] = tensor.cast %[[ARG]] : tensor<*xf32> to tensor<?xf32>
+  // CHECK: return %[[RES]] : tensor<?xf32>
+  func.return %1 : tensor<?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @gather_to_slice
+func.func @gather_to_slice(%arg0: tensor<5x6x7xf32>) -> tensor<3x6x5xf32> {
+  %0 = arith.constant dense<[1, 2]> : tensor<2xi32>
+  %1 = "stablehlo.gather"(%arg0, %0) {
+    dimension_numbers = #stablehlo.gather<
+      index_vector_dim = 0,
+      offset_dims = [0, 1, 2],
+      start_index_map = [0, 2],
+    >,
+    indices_are_sorted = false,
+    slice_sizes = dense<[3, 6, 5]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6x5xf32>
+  return %1 : tensor<3x6x5xf32>
+  // CHECK:      %[[RET:.*]] = "stablehlo.slice"(%arg0)
+  // CHECK-SAME:   {limit_indices = dense<[4, 6, 7]> : tensor<3xi64>,
+  // CHECK-SAME:    start_indices = dense<[1, 0, 2]> : tensor<3xi64>,
+  // CHECK-SAME:    strides = dense<1> : tensor<3xi64>} : (tensor<5x6x7xf32>) -> tensor<3x6x5xf32>
+  // CHECK-NEXT: return %[[RET]] : tensor<3x6x5xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @gather_scalar_index_to_slice
+func.func @gather_scalar_index_to_slice(%arg0: tensor<5x6x7xf32>) -> tensor<5x6x4xf32> {
+  %0 = arith.constant dense<1> : tensor<i32>
+  %1 = "stablehlo.gather"(%arg0, %0) {
+    dimension_numbers = #stablehlo.gather<
+      index_vector_dim = 0,
+      offset_dims = [0, 1, 2],
+      start_index_map = [2],
+    >,
+    indices_are_sorted = false,
+    slice_sizes = dense<[5, 6, 4]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<i32>) -> tensor<5x6x4xf32>
+  return %1 : tensor<5x6x4xf32>
+  // CHECK:      %[[RET:.*]] = "stablehlo.slice"(%arg0)
+  // CHECK-SAME:   {limit_indices = dense<[5, 6, 5]> : tensor<3xi64>,
+  // CHECK-SAME:    start_indices = dense<[0, 0, 1]> : tensor<3xi64>,
+  // CHECK-SAME:    strides = dense<1> : tensor<3xi64>} : (tensor<5x6x7xf32>) -> tensor<5x6x4xf32>
+  // CHECK-NEXT: return %[[RET]] : tensor<5x6x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @gather_to_slice_reshape
+func.func @gather_to_slice_reshape(%arg0: tensor<5x6x7xf32>) -> tensor<3x6xf32> {
+  %0 = arith.constant dense<[1, 2]> : tensor<2xi32>
+  %1 = "stablehlo.gather"(%arg0, %0) {
+    dimension_numbers = #stablehlo.gather<
+      collapsed_slice_dims = [2],
+      index_vector_dim = 0,
+      offset_dims = [0, 1],
+      start_index_map = [0, 2],
+    >,
+    indices_are_sorted = false,
+    slice_sizes = dense<[3, 6, 1]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6xf32>
+  return %1 : tensor<3x6xf32>
+  // CHECK:      %[[V0:.*]] = "stablehlo.slice"(%arg0)
+  // CHECK-SAME:   {limit_indices = dense<[4, 6, 3]> : tensor<3xi64>,
+  // CHECK-SAME:    start_indices = dense<[1, 0, 2]> : tensor<3xi64>,
+  // CHECK-SAME:    strides = dense<1> : tensor<3xi64>} : (tensor<5x6x7xf32>) -> tensor<3x6x1xf32>
+  // CHECK-NEXT: %[[V1:.*]] = stablehlo.reshape %[[V0]] : (tensor<3x6x1xf32>) -> tensor<3x6xf32>
+  // CHECK-NEXT: return %[[V1]] : tensor<3x6xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @gather_to_slice_indices_clamp_upperbound
+func.func @gather_to_slice_indices_clamp_upperbound(%arg0 : tensor<4x2xui32>) -> tensor<2xui32> {
+  %0 = arith.constant dense<4> : tensor<1xi32>
+  %1 = "stablehlo.gather"(%arg0, %0) {
+    dimension_numbers = #stablehlo.gather<
+      offset_dims = [0],
+      index_vector_dim = 0,
+      collapsed_slice_dims = [0],
+      start_index_map = [0]
+    >, indices_are_sorted = true,
+    slice_sizes = dense<[1, 2]> : tensor<2xi64>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
+  return %1 : tensor<2xui32>
+  // CHECK:      %[[V0:.*]] = "stablehlo.slice"(%arg0)
+  // CHECK-SAME:   {limit_indices = dense<[4, 2]> : tensor<2xi64>,
+  // CHECK-SAME:    start_indices = dense<[3, 0]> : tensor<2xi64>,
+  // CHECK-SAME:    strides = dense<1> : tensor<2xi64>} : (tensor<4x2xui32>) -> tensor<1x2xui32>
+  // CHECK-NEXT: %[[V1:.*]] = stablehlo.reshape %[[V0]] : (tensor<1x2xui32>) -> tensor<2xui32>
+  // CHECK-NEXT: return %[[V1]] : tensor<2xui32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @gather_to_slice_indices_clamp_lowerbound
+func.func @gather_to_slice_indices_clamp_lowerbound(%arg0 : tensor<4x2xui32>) -> tensor<2xui32> {
+  %0 = arith.constant dense<-1> : tensor<1xi32>
+  %1 = "stablehlo.gather"(%arg0, %0) {
+    dimension_numbers = #stablehlo.gather<
+      offset_dims = [0],
+      index_vector_dim = 0,
+      collapsed_slice_dims = [0],
+      start_index_map = [0]
+    >, indices_are_sorted = true,
+    slice_sizes = dense<[1, 2]> : tensor<2xi64>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
+  return %1 : tensor<2xui32>
+  // CHECK:      %[[V0:.*]] = "stablehlo.slice"(%arg0)
+  // CHECK-SAME:   {limit_indices = dense<[1, 2]> : tensor<2xi64>,
+  // CHECK-SAME:    start_indices = dense<0> : tensor<2xi64>,
+  // CHECK-SAME:    strides = dense<1> : tensor<2xi64>} : (tensor<4x2xui32>) -> tensor<1x2xui32>
+  // CHECK-NEXT: %[[V1:.*]] = stablehlo.reshape %[[V0]] : (tensor<1x2xui32>) -> tensor<2xui32>
+  // CHECK-NEXT: return %[[V1]] : tensor<2xui32>
 }

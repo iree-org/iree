@@ -19,6 +19,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-pipelining"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
@@ -37,11 +39,11 @@ static const StringLiteral kPipeliningExtraBarrier =
 static bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
   Attribute addrSpace = memrefType.getMemorySpace();
   if (!addrSpace) return true;
-  auto intAttr = addrSpace.dyn_cast<IntegerAttr>();
+  auto intAttr = llvm::dyn_cast<IntegerAttr>(addrSpace);
   // Accept both default numeric address space and HAL descriptor type address
   // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
   if (intAttr && intAttr.getInt() == 0) return true;
-  return addrSpace.isa<IREE::HAL::DescriptorTypeAttr>();
+  return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
 }
 
 /// Returns a new predicated operation to support unpeeled epilogue. Unpeeled
@@ -64,7 +66,7 @@ static Operation* replaceOpWithPredicatedOp(RewriterBase& rewriter,
       return op;
     // Return/execute the op if it is a shared memory load.
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
-      auto loadBaseType = loadOp.getBase().getType().cast<MemRefType>();
+      auto loadBaseType = llvm::cast<MemRefType>(loadOp.getBase().getType());
       if (hasSharedMemoryAddressSpace(loadBaseType)) return op;
     }
     if (auto loadOp = dyn_cast<memref::LoadOp>(op)) {
@@ -208,11 +210,11 @@ static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
     }
     auto ld = dyn_cast<vector::TransferReadOp>(op);
     if (!ld) continue;
-    auto ldSrcType = ld.getSource().getType().cast<MemRefType>();
+    auto ldSrcType = llvm::cast<MemRefType>(ld.getSource().getType());
     if (!hasDefaultOrHALAddressSpace(ldSrcType) || !ld->hasOneUse()) continue;
     auto st = dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
     if (!st) continue;
-    auto stSrcType = st.getSource().getType().cast<MemRefType>();
+    auto stSrcType = llvm::cast<MemRefType>(st.getSource().getType());
     if (!hasSharedMemoryAddressSpace(stSrcType)) continue;
     copyToWorkgroupMemory = true;
     ld->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
@@ -340,7 +342,7 @@ struct MainLoopInfo {
 
   // Iterate through the mainloop and collect `cp.async`, `cp.commit_group`,
   // `cp.wait_group`, and `barrier` operations. These operations are used to
-  // pipeline the mainloop and cheorograph asyncroncy for a *coarse-grained*
+  // pipeline the mainloop and choreograph asyncroncy for a *coarse-grained*
   // schedule. Additionally, collect the `mma.sync` and `ldmatrix`/`ld.shared`
   // operations and separate them into kgroups. The information is helpful in
   // generating an optimal *finer-grained* instruction interleaving of global
@@ -479,15 +481,21 @@ static void getNvidiaAmpereTensorCorePipeline(
   // Analyze the main loop and obtain information for coarse-grained pipelining
   // and fine-grained instruction scheduling.
   MainLoopInfo mainloop(forOp);
+  LDBG("Start getNvidiaAmpereTensorCorePipeline");
 
   // If the mainloop is not schedulable, return an empty schedule.
-  if (!mainloop.isSchedulable) return;
+  if (!mainloop.isSchedulable) {
+    LDBG("--main loop is not schedulable");
+    return;
+  }
 
   // NVIDIA Ampere Tensor Core multi-staged pipeline requires at least 2 kgroups
   // and 3 software pipeline stages. If the conditions are not met, return an
   // empty schedule.
   int numKgroups = mainloop.getNumberOfKgroups();
   if (numKgroups < 2 || numStages < 3) {
+    LDBG("--numKgroups=" << numKgroups << "(< 2) or numStages=" << numStages
+                         << "(< 3) -> BAIL");
     return;
   }
 
@@ -499,6 +507,7 @@ static void getNvidiaAmpereTensorCorePipeline(
   if (!(mainloop.asyncCreateGroupOp.size() == 1) ||
       !(mainloop.asyncWaitOps.size() == 1) ||
       !(mainloop.barrierOps.size() == 2)) {
+    LDBG("--failed prereqs: 1 async_create, 1 async_wait, 2 barriers -> BAIL");
     return;
   }
 

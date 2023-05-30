@@ -38,7 +38,7 @@ hal.executable @matmul_1x4096x9216 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 256], [1, 4], [0, 0, 32]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 256, 32]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 1>
 //      CHECK: hal.executable.export public @matmul_1x4096x9216
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -94,7 +94,7 @@ hal.executable private @multi_reduction_transposed_b_matmul {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128], [4, 4], [0, 0, 1, 32]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 1, 32]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 1>
 //      CHECK: hal.executable.export public @multi_reduction_transposed_b_matmul
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]

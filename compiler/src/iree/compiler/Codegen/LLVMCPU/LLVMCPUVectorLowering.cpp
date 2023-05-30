@@ -85,7 +85,8 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
         patterns, vectorTransformOptions,
         /*benefit=*/1,
         /*disableOuterProductLowering=*/false);
-    vector::populateScalarVectorTransferLoweringPatterns(patterns);
+    vector::populateScalarVectorTransferLoweringPatterns(
+        patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
     vector::populateVectorMultiReductionLoweringPatterns(
         patterns, vectorMultiReductionLowering);

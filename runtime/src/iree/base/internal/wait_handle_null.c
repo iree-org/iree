@@ -45,6 +45,8 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
 
 void iree_wait_set_free(iree_wait_set_t* set) {}
 
+bool iree_wait_set_is_empty(const iree_wait_set_t* set) { return true; }
+
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle) {
   return iree_make_status(IREE_STATUS_UNAVAILABLE,

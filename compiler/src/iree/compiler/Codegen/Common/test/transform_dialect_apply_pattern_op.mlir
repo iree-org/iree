@@ -9,11 +9,11 @@ func.func @select_cmp_eq_select(%arg0: i64, %arg1: i64) -> i64 {
 }
 
 transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  transform.sequence %arg0 : !pdl.operation failures(propagate) {
-  ^bb1(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.iree.apply_patterns %0 { canonicalization } : (!pdl.operation) -> ()
+^bb0(%arg0: !transform.any_op):
+  transform.sequence %arg0 : !transform.any_op failures(propagate) {
+  ^bb1(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.iree.apply_patterns %0 { canonicalization } : (!transform.any_op) -> ()
   }
 }
 
@@ -53,9 +53,9 @@ func.func @promote() -> (tensor<16x128xf32>) {
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["scf.forall"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %1 = transform.cast %0 : !pdl.operation to !transform.op<"scf.forall">
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["scf.forall"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  %1 = transform.cast %0 : !transform.any_op to !transform.op<"scf.forall">
   transform.iree.share_forall_operands %1 share_operands = [0] : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
 }
 
@@ -85,9 +85,9 @@ func.func @bubble_up(%arg0: tensor<32x64xf32>) -> tensor<32x2x32xf32> {
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %0 { bubble_expand } : (!pdl.operation) -> ()
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %0 { bubble_expand } : (!transform.any_op) -> ()
 }
 
 // -----
@@ -113,9 +113,9 @@ func.func @pad_fill_to_fill(%arg0: tensor<31x62xf32>) -> tensor<32x64xf32> {
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
 }
 
 // -----
@@ -142,9 +142,9 @@ func.func @pad_fill_different_ssa_value_but_same_cst(%arg0: tensor<31x62xf32>) -
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
 }
 
 // -----
@@ -172,9 +172,9 @@ func.func @pad_extract_fill_to_fill(%arg0: tensor<31x62xf32>,
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
 }
 
 // -----
@@ -204,9 +204,9 @@ func.func @pad_extract_extract_fill_to_fill(%arg0: tensor<31x62xf32>,
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
 }
 
 // -----
@@ -234,7 +234,7 @@ func.func @pad_extract_bigger_fill_to_fill(%arg0: tensor<253x123xf32>,
 }
 
 transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
 }

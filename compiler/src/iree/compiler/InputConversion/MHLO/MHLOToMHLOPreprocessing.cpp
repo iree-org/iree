@@ -70,7 +70,7 @@ class ReorderConvOpInputDimensions
   using OpRewritePattern<mhlo::ConvolutionOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(mhlo::ConvolutionOp op,
                                 PatternRewriter &rewriter) const override {
-    auto lhsType = op.getLhs().getType().cast<ShapedType>();
+    auto lhsType = llvm::cast<ShapedType>(op.getLhs().getType());
     auto lhsShape = lhsType.getShape();
     if (!lhsType.hasRank()) {
       return failure();
@@ -131,7 +131,7 @@ struct ReorderConvOpKernelDimensions
   LogicalResult matchAndRewrite(mhlo::ConvolutionOp op,
                                 PatternRewriter &rewriter) const override {
     auto kernel = op.getRhs();
-    auto kernelType = kernel.getType().cast<ShapedType>();
+    auto kernelType = llvm::cast<ShapedType>(kernel.getType());
     if (!kernelType.hasRank()) return failure();
     auto kernelShape = kernelType.getShape();
 
@@ -196,7 +196,7 @@ class ReorderConvOpOutputDimensions
   using OpRewritePattern<mhlo::ConvolutionOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(mhlo::ConvolutionOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.getType().cast<ShapedType>();
+    auto resultType = llvm::cast<ShapedType>(op.getType());
     auto resultShape = resultType.getShape();
     if (!resultType.hasRank()) {
       return failure();
@@ -282,7 +282,7 @@ class TransposeReshapeGenericDotGeneral
   Value TransposeIfNonConsecutive(OpBuilder &b, Location loc, Value src,
                                   ArrayRef<int64_t> targetOrder) const {
     if (isConsecutive(targetOrder)) return src;
-    auto type = src.getType().cast<RankedTensorType>();
+    auto type = llvm::cast<RankedTensorType>(src.getType());
     SmallVector<int64_t, 4> transposeShape;
     for (auto i : targetOrder) {
       transposeShape.push_back(type.getDimSize(i));
@@ -294,7 +294,7 @@ class TransposeReshapeGenericDotGeneral
 
   Value ReshapeIfNonStandard(OpBuilder &b, Location loc, Value src,
                              size_t dimsBorder0, size_t dimsBorder1) const {
-    auto type = src.getType().cast<RankedTensorType>();
+    auto type = llvm::cast<RankedTensorType>(src.getType());
     auto shape = type.getShape();
     if (dimsBorder0 <= 1 && dimsBorder1 - dimsBorder0 <= 1 &&
         shape.size() - dimsBorder1 <= 1)
@@ -313,9 +313,10 @@ class TransposeReshapeGenericDotGeneral
 
   LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
-    auto lhsShapeType = op.getLhs().getType().dyn_cast<RankedTensorType>();
-    auto rhsShapeType = op.getRhs().getType().dyn_cast<RankedTensorType>();
-    auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
+    auto lhsShapeType = llvm::dyn_cast<RankedTensorType>(op.getLhs().getType());
+    auto rhsShapeType = llvm::dyn_cast<RankedTensorType>(op.getRhs().getType());
+    auto resultType =
+        llvm::dyn_cast<RankedTensorType>(op.getResult().getType());
     if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
 
     // TODO(jpienaar): This pattern is not safe for dynamic shapes and seems to
@@ -401,10 +402,10 @@ class TransposeReshapeGenericDotGeneral
         rewriter.getContext(), /*lhsBatchingDimensions=*/0,
         /*rhsBatchingDimensions=*/0,
         /*lhsContractingDimensions=*/
-        lhs.getType().cast<ShapedType>().getRank() - 1,
+        llvm::cast<ShapedType>(lhs.getType()).getRank() - 1,
         /*rhsContractingDimensions=*/1);
-    auto lhsNewType = lhs.getType().cast<RankedTensorType>();
-    auto rhsNewType = rhs.getType().cast<RankedTensorType>();
+    auto lhsNewType = llvm::cast<RankedTensorType>(lhs.getType());
+    auto rhsNewType = llvm::cast<RankedTensorType>(rhs.getType());
 
     // if lhs's shape or rhs's shape has collapsed, we need reshape the result
     bool needReshapeResult = lhsNewType.getRank() < lhsShapeType.getRank() ||
@@ -491,7 +492,7 @@ struct ScatterImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     Value indices = op.getScatterIndices();
-    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
 
     // Check indices vector has an implicit dim.
     if (indexVectorDim != indicesTy.getRank()) {
@@ -531,7 +532,7 @@ struct ScatterImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
 
   static Value addUnitBatchDim(Location loc, Value value,
                                PatternRewriter &rewriter) {
-    ShapedType valueTy = value.getType().cast<ShapedType>();
+    ShapedType valueTy = llvm::cast<ShapedType>(value.getType());
     if (!valueTy.hasRank()) return nullptr;
 
     // Materialize the implicit indices dim.
@@ -555,8 +556,8 @@ struct ScatterImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
                                 PatternRewriter &rewriter) const final {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indices = op.getScatterIndices().cast<Value>();
-    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
+    auto indices = llvm::cast<Value>(op.getScatterIndices());
+    auto indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
 
     // Check whether indices has no batch dimension.
     if (!indicesTy) return failure();
@@ -609,7 +610,7 @@ struct ScatterCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
 
   static Value collapseBatchDims(Location loc, Value value, int64_t batchCount,
                                  PatternRewriter &rewriter) {
-    auto valueTy = value.getType().dyn_cast<ShapedType>();
+    auto valueTy = llvm::dyn_cast<ShapedType>(value.getType());
     if (!valueTy) return nullptr;
 
     SmallVector<ReassociationExprs, 4> reassociationMap(1);
@@ -638,8 +639,8 @@ struct ScatterCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
                                 PatternRewriter &rewriter) const final {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indices = op.getScatterIndices().cast<Value>();
-    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indices = llvm::cast<Value>(op.getScatterIndices());
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
     auto updatedWindowDims = dimNumbers.getUpdateWindowDims();
 
     if (!indicesTy.hasRank()) {
@@ -714,7 +715,7 @@ struct ScatterBatchFirst : public OpRewritePattern<mhlo::ScatterOp> {
     // If the index vector dim is not implicitly or explicitly at the end
     // we need to transpose the batch dimensions to the start.
     Value indices = op.getScatterIndices();
-    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     if (indexVectorDim < indicesTy.getRank() - 1) {
       llvm::SmallVector<int64_t> perm;
@@ -730,7 +731,7 @@ struct ScatterBatchFirst : public OpRewritePattern<mhlo::ScatterOp> {
 
       indices = builder.create<mhlo::TransposeOp>(
           indicesTy.clone(newShape), indices, builder.getI64TensorAttr(perm));
-      indicesTy = indices.getType().cast<RankedTensorType>();
+      indicesTy = llvm::cast<RankedTensorType>(indices.getType());
       indexVectorDim = indicesTy.getRank() - 1;
     }
 
@@ -738,7 +739,7 @@ struct ScatterBatchFirst : public OpRewritePattern<mhlo::ScatterOp> {
     // the beginning.
     auto updates = op.getUpdates();
     auto updates0 = updates.front();
-    auto updates0Ty = updates0.getType().cast<ShapedType>();
+    auto updates0Ty = llvm::cast<ShapedType>(updates0.getType());
     auto updatedWindowDims = dimNumbers.getUpdateWindowDims();
 
     // Determine which dimensions are batch dimensions.
@@ -765,7 +766,7 @@ struct ScatterBatchFirst : public OpRewritePattern<mhlo::ScatterOp> {
     llvm::SmallVector<Value> newUpdates(updates.begin(), updates.end());
     if (updatesChanged) {
       for (Value &update : newUpdates) {
-        auto updateTy = update.getType().cast<ShapedType>();
+        auto updateTy = llvm::cast<ShapedType>(update.getType());
         llvm::SmallVector<int64_t> newShape;
         newShape.reserve(updateTy.getRank());
         for (int i = 0, s = updatePerm.size(); i < s; i++)
@@ -832,8 +833,8 @@ struct ScatterMaterializeInsertedDim
                                 PatternRewriter &rewriter) const final {
     auto indices = op.getScatterIndices();
     auto operand = op.getInputs().front();
-    auto indicesTy = indices.getType().cast<ShapedType>();
-    auto operandTy = operand.getType().cast<ShapedType>();
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
+    auto operandTy = llvm::cast<ShapedType>(operand.getType());
 
     if (!operandTy.hasRank() || !indicesTy.hasRank()) {
       return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
@@ -894,7 +895,7 @@ struct ScatterMaterializeInsertedDim
 
     llvm::SmallVector<Value> expandedUpdates;
     for (auto update : op.getUpdates()) {
-      auto updatesTy = update.getType().cast<ShapedType>();
+      auto updatesTy = llvm::cast<ShapedType>(update.getType());
 
       llvm::SmallVector<int64_t> newShape;
       for (int i = 0, s = reassociationMap.size(); i < s; ++i) {
@@ -940,7 +941,7 @@ bool isFromBool(Value val) {
     if (!op) return false;
 
     if (auto convertOp = dyn_cast<mhlo::ConvertOp>(op)) {
-      auto inTy = convertOp.getOperand().getType().cast<ShapedType>();
+      auto inTy = llvm::cast<ShapedType>(convertOp.getOperand().getType());
       if (inTy.getElementType().isInteger(1)) {
         return true;
       }
@@ -966,8 +967,8 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
 
   LogicalResult matchAndRewrite(mhlo::MulOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultTy = op.getType().cast<ShapedType>();
-    if (!resultTy.getElementType().isa<FloatType>()) return failure();
+    auto resultTy = llvm::cast<ShapedType>(op.getType());
+    if (!llvm::isa<FloatType>(resultTy.getElementType())) return failure();
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
     bool lhsIsBool = isFromBool(lhs);
@@ -977,7 +978,7 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
     if (rhsIsBool) std::swap(lhs, rhs);
 
     Type eType = resultTy.getElementType();
-    auto lhsTy = lhs.getType().cast<ShapedType>();
+    auto lhsTy = llvm::cast<ShapedType>(lhs.getType());
     Value lhsBool = rewriter.create<mhlo::ConvertOp>(
         op.getLoc(), lhsTy.clone(rewriter.getIntegerType(1)), lhs);
     Value zero = rewriter.create<mhlo::ConstantOp>(
@@ -990,7 +991,7 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
 
     int64_t resultRank = resultTy.getRank();
     auto broadcast = [&](Value value) -> Value {
-      auto valueTy = value.getType().cast<ShapedType>();
+      auto valueTy = llvm::cast<ShapedType>(value.getType());
       auto newTy =
           RankedTensorType::get(resultTy.getShape(), valueTy.getElementType());
       if (valueTy == newTy) return value;
@@ -1020,7 +1021,7 @@ class ExpandRngNormal : public OpRewritePattern<mhlo::RngOp> {
     if (op.getRngDistribution() != mhlo::RngDistribution::NORMAL)
       return failure();
 
-    auto resTy = op.getType().dyn_cast<RankedTensorType>();
+    auto resTy = llvm::dyn_cast<RankedTensorType>(op.getType());
     // We can support static shapes, but it's easier to implement Box-Muller
     // transform if we know the number of elements.
     if (!resTy || !resTy.hasStaticShape()) return failure();
@@ -1133,11 +1134,11 @@ class ReorderBroadcastInDimOpAndElementwiseOp
     // Verify if all operands of BroadcastInDimOp are of same type and have
     // static shape.
     auto bcastOperandType =
-        bcastOps[0].getOperand().getType().template dyn_cast<ShapedType>();
+        llvm::dyn_cast<ShapedType>(bcastOps[0].getOperand().getType());
     llvm::SmallVector<Value, 2> bcastOperands;
     for (auto bcastOp : bcastOps) {
       auto bcastOperand = bcastOp.getOperand();
-      auto type = bcastOperand.getType().template dyn_cast<ShapedType>();
+      auto type = llvm::dyn_cast<ShapedType>(bcastOperand.getType());
       if (!type || !type.hasStaticShape() || type != bcastOperandType) {
         return failure();
       }
@@ -1183,9 +1184,10 @@ struct FuseWidenOperands : public OpRewritePattern<Op> {
       if (convertOp) {
         auto inputType = getElementTypeOrSelf(convertOp.getOperand().getType());
         auto castedType = getElementTypeOrSelf(convertOp.getResult().getType());
-        bool isSameCast =
-            (inputType.isa<IntegerType>() && castedType.isa<IntegerType>()) ||
-            (inputType.isa<FloatType>() && castedType.isa<FloatType>());
+        bool isSameCast = (llvm::isa<IntegerType>(inputType) &&
+                           llvm::isa<IntegerType>(castedType)) ||
+                          (llvm::isa<FloatType>(inputType) &&
+                           llvm::isa<FloatType>(castedType));
         if (isSameCast && inputType.getIntOrFloatBitWidth() <
                               castedType.getIntOrFloatBitWidth()) {
           operands.push_back(convertOp.getOperand());
@@ -1213,9 +1215,9 @@ struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
                                 PatternRewriter &rewriter) const override {
     auto lhs = op.getLhs();
     auto rhs = op.getRhs();
-    auto lhsTy = lhs.getType().dyn_cast<RankedTensorType>();
-    auto rhsTy = rhs.getType().dyn_cast<RankedTensorType>();
-    auto resultTy = op.getType().cast<RankedTensorType>();
+    auto lhsTy = llvm::dyn_cast<RankedTensorType>(lhs.getType());
+    auto rhsTy = llvm::dyn_cast<RankedTensorType>(rhs.getType());
+    auto resultTy = llvm::cast<RankedTensorType>(op.getType());
 
     if (!lhsTy || !rhsTy) {
       return rewriter.notifyMatchFailure(op, "lhs and rhs must be ranked");
@@ -1280,11 +1282,11 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
 
   LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
-    auto lhs = op.getLhs().cast<Value>();
-    auto rhs = op.getRhs().cast<Value>();
-    auto lhsTy = lhs.getType().dyn_cast<RankedTensorType>();
-    auto rhsTy = rhs.getType().dyn_cast<RankedTensorType>();
-    auto resultTy = op.getType().dyn_cast<RankedTensorType>();
+    auto lhs = llvm::cast<Value>(op.getLhs());
+    auto rhs = llvm::cast<Value>(op.getRhs());
+    auto lhsTy = llvm::dyn_cast<RankedTensorType>(lhs.getType());
+    auto rhsTy = llvm::dyn_cast<RankedTensorType>(rhs.getType());
+    auto resultTy = llvm::dyn_cast<RankedTensorType>(op.getType());
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
 
     if (!lhsTy || !rhsTy || !resultTy) return failure();
@@ -1337,12 +1339,12 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
     lhs = builder.create<mhlo::TransposeOp>(
         RankedTensorType::get(lhsTransposeShape, lhsTy.getElementType()), lhs,
         builder.getI64TensorAttr(permLhs));
-    lhsTy = lhs.getType().cast<RankedTensorType>();
+    lhsTy = llvm::cast<RankedTensorType>(lhs.getType());
 
     rhs = builder.create<mhlo::TransposeOp>(
         RankedTensorType::get(rhsTransposeShape, rhsTy.getElementType()), rhs,
         builder.getI64TensorAttr(permRhs));
-    rhsTy = rhs.getType().cast<RankedTensorType>();
+    rhsTy = llvm::cast<RankedTensorType>(rhs.getType());
 
     auto dimI32Ty = RankedTensorType::get({1}, builder.getI32Type());
 

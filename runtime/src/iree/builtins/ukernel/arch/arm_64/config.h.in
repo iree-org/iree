@@ -1,2 +1,0 @@
-#cmakedefine IREE_UK_BUILD_ARM_64_DOTPROD
-#cmakedefine IREE_UK_BUILD_ARM_64_I8MM

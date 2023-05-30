@@ -27,7 +27,7 @@ namespace Stream {
 
 // Returns true if |value| is worth outlining (large, etc).
 static bool isOutlinableValue(Attribute value) {
-  if (auto elementsAttr = value.dyn_cast<DenseElementsAttr>()) {
+  if (auto elementsAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
     // Don't outline splats - we want those fused.
     return !elementsAttr.isSplat();
   }
@@ -53,7 +53,7 @@ static SmallVector<ConstantDef> findConstantsInModule(mlir::ModuleOp moduleOp) {
             results.push_back(ConstantDef{
                 constantOp,
                 constantOp.getType(),
-                constantOp.getValue().cast<ElementsAttr>(),
+                llvm::cast<ElementsAttr>(constantOp.getValue()),
             });
           }
         }

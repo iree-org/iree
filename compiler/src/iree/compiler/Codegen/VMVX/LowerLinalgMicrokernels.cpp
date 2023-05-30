@@ -167,7 +167,7 @@ class StridedBufferAnalysis {
   bool isValid() { return true; }
 
   // Gets the type of the buffer being analyzed.
-  MemRefType getType() { return buffer.getType().cast<MemRefType>(); }
+  MemRefType getType() { return llvm::cast<MemRefType>(buffer.getType()); }
 
   // Gets the rank of the buffer being analyzed.
   unsigned getRank() { return getType().getRank(); }
@@ -187,7 +187,7 @@ class StridedBufferAnalysis {
 
     Location loc = buffer.getLoc();
     desc = StridedBufferDescriptor();
-    desc->memRefType = buffer.getType().cast<MemRefType>();
+    desc->memRefType = llvm::cast<MemRefType>(buffer.getType());
 
     int rank = getType().getRank();
     SmallVector<Type> sizeStrideTypes;
@@ -543,9 +543,9 @@ struct LinalgBinaryGenericConversion
       return failure();
     }
     BlockArgument operandScalar0 =
-        binaryOp->getOperands()[0].dyn_cast<BlockArgument>();
+        llvm::dyn_cast<BlockArgument>(binaryOp->getOperands()[0]);
     BlockArgument operandScalar1 =
-        binaryOp->getOperands()[1].dyn_cast<BlockArgument>();
+        llvm::dyn_cast<BlockArgument>(binaryOp->getOperands()[1]);
     if (!operandScalar0 || !operandScalar1) return failure();
 
     // Construct the emitter and start lowering.
@@ -718,7 +718,7 @@ struct LinalgUnaryGenericConversion
       return failure();
     }
     BlockArgument operandScalar0 =
-        unaryOp->getOperands()[0].dyn_cast<BlockArgument>();
+        llvm::dyn_cast<BlockArgument>(unaryOp->getOperands()[0]);
     if (!operandScalar0) return failure();
 
     // Construct the emitter and start lowering.
@@ -831,7 +831,7 @@ struct LinalgTrivialGenericConversion
     Operation &yieldOp = children.front();
     for (auto [outputIndex, yieldOperand] :
          llvm::enumerate(yieldOp.getOperands())) {
-      if (auto blockArg = yieldOperand.dyn_cast<BlockArgument>()) {
+      if (auto blockArg = llvm::dyn_cast<BlockArgument>(yieldOperand)) {
         unsigned inputIndex = blockArg.getArgNumber();
         OpOperand *input = op.getDpsInputOperand(inputIndex);
         OpOperand *output = op.getDpsInitOperand(outputIndex);

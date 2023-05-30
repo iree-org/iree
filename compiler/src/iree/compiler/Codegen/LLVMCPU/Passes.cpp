@@ -468,12 +468,20 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     }
   }
 
-  // Run SplitReductionPass before the final reduction Fuse pass, because
-  // SplitReductionPass takes care of banked-tiling.
+  // Apply vector level of tiling on the ops. We firstly tile the reduction
+  // ops, and then handle the consumer ops. There are no differences between
+  // LLVMCPUTile and LLVMCPUTileAndFuse if we have a single consumer op. They
+  // will just tile the consumer op. But it's important if there is a consumer
+  // ops chain, e.g., reduction + broadcast + tensor.pack/pad ops. We want to
+  // tile and fuse `boadcast + pack` ops.
+  // SplitReductionPass is run before the final reduction Fuse pass, because it
+  // takes care of banked-tiling.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
+      tilingConfig.getReductionVectorIdx(), /*reductionOnly=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
+      createLLVMCPUTileAndFusePass(tilingConfig.getReductionVectorIdx()));
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFuseTensorPadWithConsumerPass());
@@ -599,8 +607,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   if (!enableMicrokernels) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUMmt4dVectorLoweringPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createOptimizeVectorTransferPass(/*flatten=*/true));
   }
 }
 

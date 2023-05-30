@@ -321,7 +321,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
               "--- the transform is not applied";
   }
 
-  int64_t workgroupSizeX = (*maybeAttr)[0].cast<IntegerAttr>().getInt();
+  int64_t workgroupSizeX = llvm::cast<IntegerAttr>((*maybeAttr)[0]).getInt();
   int64_t warpSize = getWarpSize();
   if (workgroupSizeX % warpSize != 0) {
     // Return a silenceable failure and set the expected 1 result to
@@ -380,7 +380,7 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   MemRefType memrefType;
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  if (auto vectorType = type.dyn_cast<VectorType>()) {
+  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
     memrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType(),
                         MemRefLayoutAttrInterface{}, addressSpaceAttr);
@@ -518,7 +518,7 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
 
 static AffineMap simpleDistributionFunction(Value val) {
   AffineMap map = AffineMap::get(val.getContext());
-  auto vecType = val.getType().dyn_cast<VectorType>();
+  auto vecType = llvm::dyn_cast<VectorType>(val.getType());
   if (!vecType) return map;
   // Create a map (d0, d1) -> (d1) to distribute along the inner
   // dimension. Once we support n-d distribution we can add more

@@ -27,18 +27,12 @@ class Convert1x1FilterConvToMatmul : public OpRewritePattern<Conv2DOpType> {
 
   LogicalResult matchAndRewrite(Conv2DOpType convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputShapeType = convOp.getDpsInputOperand(0)
-                              ->get()
-                              .getType()
-                              .template dyn_cast<RankedTensorType>();
-    auto filterShapeType = convOp.getDpsInputOperand(1)
-                               ->get()
-                               .getType()
-                               .template dyn_cast<RankedTensorType>();
-    auto outputShapeType = convOp.getDpsInitOperand(0)
-                               ->get()
-                               .getType()
-                               .template dyn_cast<RankedTensorType>();
+    auto inputShapeType = llvm::dyn_cast<RankedTensorType>(
+        convOp.getDpsInputOperand(0)->get().getType());
+    auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
+        convOp.getDpsInputOperand(1)->get().getType());
+    auto outputShapeType = llvm::dyn_cast<RankedTensorType>(
+        convOp.getDpsInitOperand(0)->get().getType());
 
     const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(convOp);
     const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(convOp);

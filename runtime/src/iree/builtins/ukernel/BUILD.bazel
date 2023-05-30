@@ -46,7 +46,6 @@ iree_runtime_cc_library(
         ":exported_bits",
         ":static_assert",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/builtins/ukernel/arch:config",
     ],
 )
 
@@ -69,7 +68,6 @@ iree_runtime_cc_library(
         ":exported_bits",
         ":static_assert",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/builtins/ukernel/arch:config",
         "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
     ],
 )
@@ -121,18 +119,9 @@ BITCODE_COPTS = [
     "-c",
     "-emit-llvm",
 
-    # Force the library into standalone mode (not depending on build-directory
-    # configuration).
-    "-DIREE_UK_STANDALONE=1",
-
-    # Force configure for X86_64 with own Clang
+    # Force configure for X86_64.
     "-target",
     "x86_64-unknown-unknown-eabi-elf",
-    "-DIREE_UK_ARCH_X86_64",
-    "-DIREE_UK_POINTER_SIZE=8",
-    "-DIREE_UK_BUILD_X86_64_AVX2_FMA",
-    "-DIREE_UK_BUILD_X86_64_AVX512_BASE",
-    "-DIREE_UK_BUILD_X86_64_AVX512_VNNI",
 ]
 
 UKERNEL_BASE_SRCS = [

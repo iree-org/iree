@@ -122,8 +122,25 @@ benchmark suites as the tool collects information from its build log.
 
 ### Show Execution / Compilation Benchmark Results
 
-See
-[Generating Benchmark Report](/build_tools/benchmarks/README.md#generating-benchmark-report).
+If you want to generate a comparison report locally, you can use
+[diff_local_benchmarks.py](/build_tools/benchmarks/diff_local_benchmarks.py)
+script to compare two result json files and generate the report. For example:
+
+```sh
+build_tools/benchmarks/diff_local_benchmarks.py \
+  --base "${E2E_TEST_ARTIFACTS_DIR?}/before_benchmark_results.json" \
+  --target "${E2E_TEST_ARTIFACTS_DIR?}/after_benchmark_results.json" \
+  > report.md
+```
+
+An example that compares compilation statistics:
+
+```sh
+build_tools/benchmarks/diff_local_benchmarks.py \
+  --base-compile-stats "${E2E_TEST_ARTIFACTS_DIR?}/before_compile_stats_results.json" \
+  --target-compile-stats "${E2E_TEST_ARTIFACTS_DIR?}/after_compile_stats_results.json" \
+  > report.md
+```
 
 ### Find Compile and Run Commands to Reproduce Benchmarks
 

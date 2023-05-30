@@ -81,5 +81,6 @@ transform.sequence failures(propagate) {
   transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!pdl.operation) -> ()
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
+    : (!transform.any_op) -> !transform.any_op
   transform.iree.vector.warp_distribute %end_func
 }

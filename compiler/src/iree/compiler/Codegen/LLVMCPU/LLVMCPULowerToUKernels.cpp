@@ -82,9 +82,9 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value out = op.getDpsInitOperand(0)->get();
-  auto lhsType = lhs.getType().cast<ShapedType>();
-  auto rhsType = rhs.getType().cast<ShapedType>();
-  auto outType = out.getType().cast<ShapedType>();
+  auto lhsType = llvm::cast<ShapedType>(lhs.getType());
+  auto rhsType = llvm::cast<ShapedType>(rhs.getType());
+  auto outType = llvm::cast<ShapedType>(out.getType());
   Type lhsElemType = lhsType.getElementType();
   Type rhsElemType = rhsType.getElementType();
   Type outElemType = outType.getElementType();
@@ -142,8 +142,8 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, tensor::PackOp op) {
   Value in = op.getSource();
   Value out = op.getDest();
-  auto inType = in.getType().cast<ShapedType>();
-  auto outType = out.getType().cast<ShapedType>();
+  auto inType = llvm::cast<ShapedType>(in.getType());
+  auto outType = llvm::cast<ShapedType>(out.getType());
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
   uint32_t flags = 0;
@@ -254,8 +254,8 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, tensor::UnPackOp op) {
   Value in = op.getSource();
   Value out = op.getDest();
-  auto inType = in.getType().cast<ShapedType>();
-  auto outType = out.getType().cast<ShapedType>();
+  auto inType = llvm::cast<ShapedType>(in.getType());
+  auto outType = llvm::cast<ShapedType>(out.getType());
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
   uint32_t flags = 0;

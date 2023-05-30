@@ -22,7 +22,7 @@
 namespace mlir::iree_compiler::stablehlo {
 namespace {
 bool hasIntegralShapeType(Operation* op) {
-  auto stp = op->getOperand(0).getType().dyn_cast<ShapedType>();
+  auto stp = llvm::dyn_cast<ShapedType>(op->getOperand(0).getType());
   return stp && stp.getElementType().isIntOrIndex();
 }
 
@@ -43,17 +43,17 @@ SmallVector<utils::IteratorType, 3> getNParallelLoopsAttrs(
 
 Value getEmptySparseTensor(OpBuilder& b, Location loc, ShapedType type,
                            ArrayRef<Value> dynSizes) {
-  return b.create<bufferization::AllocTensorOp>(loc, type.cast<TensorType>(),
-                                                dynSizes,
-                                                /*copy=*/Value(),
-                                                /*memory_space=*/IntegerAttr());
+  return b.create<bufferization::AllocTensorOp>(
+      loc, llvm::cast<TensorType>(type), dynSizes,
+      /*copy=*/Value(),
+      /*memory_space=*/IntegerAttr());
 }
 
 Value getEmptyTensor(OpBuilder& b, Location loc, ShapedType type,
                      ArrayRef<Value> dynSizes) {
-  return b.create<tensor::EmptyOp>(loc, type.getShape(), type.getElementType(),
-                                   dynSizes,
-                                   type.cast<RankedTensorType>().getEncoding());
+  return b.create<tensor::EmptyOp>(
+      loc, type.getShape(), type.getElementType(), dynSizes,
+      llvm::cast<RankedTensorType>(type).getEncoding());
 }
 
 Value getEmptyTensorFor(OpBuilder& b, Location loc, ShapedType resultType,
@@ -100,7 +100,7 @@ Value fillTensorWithZeros(OpBuilder& builder, Location loc, Value tensor) {
   auto type = cast<ShapedType>(tensor.getType());
   Value zero;
   // Complex numbers are a special case.
-  if (auto complexType = type.getElementType().dyn_cast<ComplexType>()) {
+  if (auto complexType = llvm::dyn_cast<ComplexType>(type.getElementType())) {
     auto zeroElement = builder.getZeroAttr(complexType.getElementType());
     auto zeroAttr = builder.getArrayAttr({zeroElement, zeroElement});
     zero = builder.create<complex::ConstantOp>(loc, complexType, zeroAttr);
@@ -148,7 +148,7 @@ Value postSparsify(Operation* op, Value semiring, Value result, OpBuilder* b) {
 
 bool allOperandsAreScalarTensors(Operation* op) {
   return llvm::all_of(op->getOperands(), [](Value operand) {
-    auto operandTy = operand.getType().dyn_cast<ShapedType>();
+    auto operandTy = llvm::dyn_cast<ShapedType>(operand.getType());
     return operandTy && operandTy.getRank() == 0;
   });
 }

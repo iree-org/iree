@@ -203,12 +203,6 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   auto tileToForeachOp = b.create<TileToForallOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
 
-  // TODO: remove this hack once all IREE transform ops no longer hardcode PDL.
-  static_cast<Value>(tileToForeachOp.getForallOp())
-      .setType(pdl::OperationType::get(b.getContext()));
-  static_cast<Value>(tileToForeachOp.getTiledOp())
-      .setType(pdl::OperationType::get(b.getContext()));
-
   result.forallH = tileToForeachOp.getForallOp();
   result.tiledOpH = tileToForeachOp.getTiledOp();
 
@@ -290,6 +284,7 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
   // spurious allocations.
   ApplyPatternsOpPatterns configuration;
   configuration.foldReassociativeReshapes = true;
+  configuration.foldVectorTransferTensorSlice = true;
   variantH =
       buildCanonicalizationAndEnablingTransforms(b, configuration, variantH);
   b.create<IREEEliminateEmptyTensorsOp>(variantH);

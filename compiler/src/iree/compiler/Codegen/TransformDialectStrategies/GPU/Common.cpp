@@ -42,7 +42,7 @@ using namespace mlir;
 llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy",
     llvm::cl::desc("activate the matmul tensorcore strategy"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
@@ -190,8 +190,6 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
     OpBuilder::InsertionGuard guard(b);
     b.createBlock(&sequence.getBody(), sequence.getBody().begin(),
                   pdl::OperationType::get(b.getContext()), b.getLoc());
-    // TODO: remove this once all IREE transform ops no longer hardcode PDL.
-    ifH = b.create<transform::CastOp>(b.getType<pdl::OperationType>(), ifH);
     ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
     b.create<transform::YieldOp>();
   }

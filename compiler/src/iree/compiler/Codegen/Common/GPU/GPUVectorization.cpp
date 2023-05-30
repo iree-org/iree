@@ -48,7 +48,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
     if (!linalgOp) return success();
     int64_t maxFlatVecSize = 1;
     for (OpOperand &operand : linalgOp->getOpOperands()) {
-      auto type = operand.get().getType().dyn_cast<ShapedType>();
+      auto type = llvm::dyn_cast<ShapedType>(operand.get().getType());
       if (!type) continue;
       if (!type.hasStaticShape()) return failure();
       maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());

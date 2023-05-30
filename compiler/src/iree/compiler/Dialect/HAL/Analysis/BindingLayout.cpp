@@ -81,7 +81,7 @@ static PipelineLayout deriveExportLayout(
   unsigned operandCount = 0;
   unsigned bindingCount = 0;
   for (auto arg : funcOp.getArgumentTypes()) {
-    if (arg.isa<IREE::Stream::BindingType>()) {
+    if (llvm::isa<IREE::Stream::BindingType>(arg)) {
       ++bindingCount;
     } else {
       ++operandCount;
@@ -94,8 +94,8 @@ static PipelineLayout deriveExportLayout(
     auto resourceAccessesAttrs = dispatchOp.getResourceAccesses().getValue();
     for (unsigned i = 0; i < bindingCount; ++i) {
       auto resourceAccessAttr =
-          resourceAccessesAttrs[i]
-              .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+          llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+              resourceAccessesAttrs[i]);
       auto resourceAccess = static_cast<IREE::Stream::ResourceAccessBitfield>(
           resourceAccessAttr.getInt());
       if (!bitEnumContainsAll(resourceAccess,

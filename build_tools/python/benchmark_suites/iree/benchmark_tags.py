@@ -11,8 +11,11 @@ COMPILE_STATS = "compile-stats"
 # Tag for long-running benchmarks.
 LONG_RUNNING = "long-running"
 
-# Tag for CUDA benchamrks.
+# Tag for CUDA benchmarks.
 CUDA = "cuda"
 
 # Tag for Vulkan NVIDIA benchamrks.
 VULKAN_NVIDIA = "vulkan-nvidia"
+
+# Tag for x86_64 benchmarks.
+X86_64 = "x86_64"

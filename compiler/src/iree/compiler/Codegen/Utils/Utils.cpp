@@ -127,9 +127,8 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSource()); })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.getSource()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
+            return llvm::cast<IREE::Flow::DispatchTensorType>(
+                       loadOp.getSource().getType())
                        .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
           })
       .Default([&](Operation *op) { return false; });
@@ -523,8 +522,8 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 /// memref::CopyOp.
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = from.getType().dyn_cast<MemRefType>();
-  auto memrefTypeTo = to.getType().dyn_cast<MemRefType>();
+  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
+  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
   if (!memrefTypeFrom || !memrefTypeTo ||
       memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
     mlir::emitError(
@@ -652,8 +651,9 @@ static std::optional<SmallVector<Value>> replaceNonTrivialUse(
   });
 
   if (auto castOp = dyn_cast<memref::CastOp>(user)) {
-    auto replacementType = replacement.getType().cast<MemRefType>();
-    auto currentResultType = castOp.getResult().getType().cast<MemRefType>();
+    auto replacementType = llvm::cast<MemRefType>(replacement.getType());
+    auto currentResultType =
+        llvm::cast<MemRefType>(castOp.getResult().getType());
     if (replacementType == currentResultType) {
       // Cast is a no op, just return the replacement.
       return SmallVector<Value>{replacement};
@@ -673,17 +673,18 @@ static std::optional<SmallVector<Value>> replaceNonTrivialUse(
                               newCastOp->result_end());
   }
   if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
-    auto currResultType = subviewOp.getResult().getType().cast<MemRefType>();
-    auto newSourceType = replacement.getType().cast<MemRefType>();
+    auto currResultType =
+        llvm::cast<MemRefType>(subviewOp.getResult().getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
     SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
     SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
     SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
     MemRefType newResultType =
         (currResultType.getRank() != newSourceType.getRank()
-             ? memref::SubViewOp::inferRankReducedResultType(
-                   currResultType.getShape(), newSourceType, offsets, sizes,
-                   strides)
-                   .cast<MemRefType>()
+             ? llvm::cast<MemRefType>(
+                   memref::SubViewOp::inferRankReducedResultType(
+                       currResultType.getShape(), newSourceType, offsets, sizes,
+                       strides))
              : nullptr);
     auto newSubviewOp = rewriter.create<memref::SubViewOp>(
         loc, newResultType, replacement, offsets, sizes, strides);

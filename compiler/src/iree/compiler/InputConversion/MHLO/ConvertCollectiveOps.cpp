@@ -164,7 +164,7 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
   Value noColor = indexSet.get(-1);
   if (!groups) return std::make_pair(noColor, noColor);
 
-  auto groupsType = groups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(groups.getType());
   assert(groupsType.getRank() == 2);
   int64_t rows = groupsType.getShape()[0];
   int64_t cols = groupsType.getShape()[1];
@@ -216,7 +216,7 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
     return replicaGroups;
   }
 
-  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(replicaGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -250,7 +250,7 @@ static DenseIntElementsAttr convertToRankGroupsByCrossPartition(
     return partitionGroups;
   }
 
-  auto groupsType = partitionGroups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(partitionGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -288,7 +288,7 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplicaAndPartition(
     return replicaGroups;
   }
 
-  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  auto groupsType = llvm::cast<RankedTensorType>(replicaGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -484,7 +484,8 @@ struct PartitionIdOpConversion
                                                   /*value=*/numPartitions);
       value = rewriter.create<arith::RemUIOp>(loc, rank, cst);
     }
-    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto resultType =
+        llvm::cast<RankedTensorType>(op.getType());  // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, value);
@@ -517,7 +518,8 @@ struct ReplicaIdOpConversion : public OpConversionPattern<mhlo::ReplicaIdOp> {
       rank = rewriter.create<arith::DivUIOp>(loc, rank, cst);
     }
 
-    auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
+    auto resultType =
+        llvm::cast<RankedTensorType>(op.getType());  // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, rank);
@@ -551,7 +553,7 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
         op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
-    auto resultType = op.getResult().getType().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResult().getType());
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
         getCollectiveElementTypeAttr(op.getContext(), resultType);
     if (!elementTypeAttr) {
@@ -643,7 +645,7 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
     auto reductionOpAttr =
         IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
 
-    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
+    auto inputType = llvm::cast<RankedTensorType>(op.getOperand().getType());
 
     // Get the collective element type attribute.
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
@@ -669,7 +671,7 @@ static Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
                                        uint64_t splitDim, uint64_t concatDim,
                                        uint64_t splitCount) {
   // Helper function to rearrange data after all-to-all.
-  auto inputType = input.getType().cast<RankedTensorType>();
+  auto inputType = llvm::cast<RankedTensorType>(input.getType());
   ArrayRef<int64_t> inputShape = inputType.getShape();
 
   // Reshape
@@ -732,7 +734,7 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
         op.getReplicaGroups(), /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
     // Get the collective element type attribute.
-    auto resultType = op.getResult(0).getType().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResult(0).getType());
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
         getCollectiveElementTypeAttr(op.getContext(), resultType);
     if (!elementTypeAttr) {
@@ -847,7 +849,7 @@ struct ReduceScatterOpConversion
         op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
-    auto resultType = op.getResult().getType().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResult().getType());
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
         getCollectiveElementTypeAttr(op.getContext(), resultType);
     if (!elementTypeAttr) {
@@ -857,7 +859,7 @@ struct ReduceScatterOpConversion
     // When scatter_dimension != 0, we need to transpose between 0 and
     // scatter_dimension before and after the flow reduce_scatter op.
     uint64_t scatterDim = op.getScatterDimension();
-    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
+    auto inputType = llvm::cast<RankedTensorType>(op.getOperand().getType());
     SmallVector<int64_t> reduceInputShape(inputType.getShape());
     Value reduceInput = op.getOperand();
     DenseIntElementsAttr permutationAttr;
@@ -933,7 +935,7 @@ struct CollectivePermuteOpConversion
         loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
         replicaGroupsAttr, /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
-    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
+    auto inputType = llvm::cast<RankedTensorType>(op.getOperand().getType());
 
     // Get the collective element type attribute.
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =

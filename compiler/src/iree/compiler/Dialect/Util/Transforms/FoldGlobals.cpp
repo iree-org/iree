@@ -262,7 +262,7 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
     return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(attr));
   } else if (mlir::func::ConstantOp::isBuildableWith(attr, type)) {
     return builder.create<mlir::func::ConstantOp>(
-        loc, type, attr.cast<FlatSymbolRefAttr>());
+        loc, type, llvm::cast<FlatSymbolRefAttr>(attr));
   }
   // Fallback that asks a dialect to materialize things. This may fail!
   auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
@@ -279,7 +279,8 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
     if (global.op->hasAttr("noinline")) return GlobalAction::PRESERVE;
     if (!global.op.getGlobalInitialValue()) return GlobalAction::PRESERVE;
 
-    if (global.op.getGlobalType().isa<IREE::Util::ReferenceTypeInterface>()) {
+    if (llvm::isa<IREE::Util::ReferenceTypeInterface>(
+            global.op.getGlobalType())) {
       // We only inline value types; reference types have meaning as globals.
       return GlobalAction::PRESERVE;
     }

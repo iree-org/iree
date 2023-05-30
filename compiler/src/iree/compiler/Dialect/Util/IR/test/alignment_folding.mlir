@@ -94,6 +94,22 @@ func.func @foldAddAlignmentConstant(%lhs: index) -> index {
 
 // -----
 
+// CHECK-LABEL: @foldConstantAlign
+func.func @foldConstantAlign() -> (index, index, index) {
+  %c0 = arith.constant 0 : index
+  %c7 = arith.constant 7 : index
+  %c8 = arith.constant 8 : index
+  %c9 = arith.constant 9 : index
+  %c64 = arith.constant 64 : index
+  %0 = util.align %c0, %c64 : index
+  %1 = util.align %c7, %c8 : index
+  %2 = util.align %c9, %c8 : index
+  // CHECK: return %c0, %c8, %c16
+  return %0, %1, %2 : index, index, index
+}
+
+// -----
+
 // CHECK-LABEL: @sizeofWholeInt
 func.func @sizeofWholeInt() -> index {
   // CHECK: = arith.constant 4 : index

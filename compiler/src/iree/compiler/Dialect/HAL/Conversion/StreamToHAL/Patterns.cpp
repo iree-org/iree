@@ -38,7 +38,8 @@ static Value buildQueueAffinityMaskFor(Operation *op, Value device,
   // its parent regions.
   auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
   if (auto queueAffinityAttr =
-          affinityAttr.dyn_cast_or_null<IREE::HAL::AffinityQueueAttr>()) {
+          llvm::dyn_cast_if_present<IREE::HAL::AffinityQueueAttr>(
+              affinityAttr)) {
     return builder.create<arith::ConstantIntOp>(
         op->getLoc(), queueAffinityAttr.getMask(), 64);
   }
@@ -92,7 +93,8 @@ static Value consumeBoundFence(Value timepoint,
   if (!chainOp) return nullptr;  // non-export use
   assert(!chainOp.getExternalValues().empty());
   auto fence = chainOp.getExternalValues().front();
-  if (!fence || !fence.getType().isa<IREE::HAL::FenceType>()) return nullptr;
+  if (!fence || !llvm::isa<IREE::HAL::FenceType>(fence.getType()))
+    return nullptr;
 
   // Try really hard to figure out if the fence can be used. A larger analysis
   // pass running prior to conversion that did some code motion could help
@@ -306,7 +308,7 @@ struct ResourceAllocOpPattern
     for (auto [resourceResult, storageSize] :
          llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
       auto resourceType =
-          resourceResult.getType().cast<IREE::Stream::ResourceType>();
+          llvm::cast<IREE::Stream::ResourceType>(resourceResult.getType());
 
       auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
       auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
@@ -435,7 +437,7 @@ struct ResourceTryMapOpPattern
       ConversionPatternRewriter &rewriter) const override {
     auto allocator = lookupAllocatorFor(tryMapOp, rewriter);
     auto resourceType =
-        tryMapOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+        llvm::cast<IREE::Stream::ResourceType>(tryMapOp.getResult().getType());
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
@@ -551,7 +553,7 @@ struct TensorImportBufferOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!importOp.getSource().getType().isa<IREE::HAL::BufferType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(importOp.getSource().getType())) {
       return failure();
     }
 
@@ -565,7 +567,7 @@ struct TensorImportBufferOpPattern
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        importOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+        llvm::cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
     if (failed(buildStorageAssertions(
             importOp.getLoc(), adaptor.getSource(), message, targetAllocator,
             adaptor.getResultSize(), resourceType, rewriter))) {
@@ -583,8 +585,8 @@ struct TensorImportBufferViewOpPattern
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = importOp.getSource().getType();
-    if (!sourceType.isa<IREE::HAL::BufferViewType>() &&
-        !sourceType.isa<TensorType>()) {
+    if (!llvm::isa<IREE::HAL::BufferViewType>(sourceType) &&
+        !llvm::isa<TensorType>(sourceType)) {
       return failure();
     }
 
@@ -601,7 +603,7 @@ struct TensorImportBufferViewOpPattern
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        importOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+        llvm::cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
     if (failed(buildStorageAssertions(loc, bufferOp.getResult(), message,
                                       targetAllocator, adaptor.getResultSize(),
                                       resourceType, rewriter))) {
@@ -618,7 +620,7 @@ struct TensorExportBufferOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!exportOp.getResult().getType().isa<IREE::HAL::BufferType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(exportOp.getResult().getType())) {
       return failure();
     }
     rewriter.replaceOp(exportOp, adaptor.getSource());
@@ -633,13 +635,13 @@ struct TensorExportBufferViewOpPattern
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto targetType = exportOp.getResult().getType();
-    if (!targetType.isa<IREE::HAL::BufferViewType>() &&
-        !targetType.isa<TensorType>()) {
+    if (!llvm::isa<IREE::HAL::BufferViewType>(targetType) &&
+        !llvm::isa<TensorType>(targetType)) {
       return failure();
     }
 
     auto loc = exportOp.getLoc();
-    auto tensorType = adaptor.getSourceEncoding().cast<RankedTensorType>();
+    auto tensorType = llvm::cast<RankedTensorType>(adaptor.getSourceEncoding());
     auto dynamicDims = adaptor.getSourceEncodingDims();
 
     // NOTE: we should have verified supported encodings/types at entry into the
@@ -903,8 +905,8 @@ struct CmdDispatchOpPattern
     }
 
     // TODO(benvanik): typed accessors for bindings.
-    auto bindingAttrs = dispatchOp->getAttr("hal.interface.bindings")
-                            .dyn_cast_or_null<ArrayAttr>();
+    auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
+        dispatchOp->getAttr("hal.interface.bindings"));
     assert(bindingAttrs &&
            "interface materialization must annotate dispatch sites");
 
@@ -918,7 +920,7 @@ struct CmdDispatchOpPattern
     };
     for (unsigned i = 0; i < adaptor.getResources().size(); ++i) {
       auto bindingAttr =
-          bindingAttrs[i].cast<IREE::HAL::InterfaceBindingAttr>();
+          llvm::cast<IREE::HAL::InterfaceBindingAttr>(bindingAttrs[i]);
       int64_t set = bindingAttr.getSet();
       if (currentSet != -1 && currentSet != set) flushSet();
       currentSet = set;
@@ -978,7 +980,7 @@ struct CmdCallOpPattern
     size_t resourceIndex = 0;
     for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
              callOp.getResourceOperands(), adaptor.getResourceOperands())) {
-      if (originalOperand.getType().isa<IREE::Stream::ResourceType>()) {
+      if (llvm::isa<IREE::Stream::ResourceType>(originalOperand.getType())) {
         // Resource type, add offset/length.
         operands.push_back(convertedOperand);
         operands.push_back(adaptor.getResourceOperandOffsets()[resourceIndex]);
@@ -1152,7 +1154,7 @@ struct TimepointImportOpPattern
     // Only handle imports from HAL semaphores _or_ fences.
     auto operands = adaptor.getOperands();
     if (operands.size() == 1 &&
-        operands[0].getType().isa<IREE::HAL::FenceType>()) {
+        llvm::isa<IREE::HAL::FenceType>(operands[0].getType())) {
       rewriter.replaceOp(importOp, operands[0]);
       return success();
     } else {
@@ -1170,7 +1172,7 @@ struct TimepointExportOpPattern
       ConversionPatternRewriter &rewriter) const override {
     // Only handle exports into HAL fences.
     if (exportOp.getNumResults() != 1 ||
-        !exportOp.getResult(0).getType().isa<IREE::HAL::FenceType>()) {
+        !llvm::isa<IREE::HAL::FenceType>(exportOp.getResult(0).getType())) {
       return rewriter.notifyMatchFailure(
           exportOp, "only exports to HAL fences are supported");
     }
@@ -1188,7 +1190,7 @@ struct TimepointChainExternalOpPattern
     // Only handle exports into HAL fences.
     auto externalValues = exportOp.getExternalValues();
     if (externalValues.size() != 1 ||
-        !externalValues[0].getType().isa<IREE::HAL::FenceType>()) {
+        !llvm::isa<IREE::HAL::FenceType>(externalValues[0].getType())) {
       return rewriter.notifyMatchFailure(
           exportOp, "only exports to HAL fences are supported");
     }
@@ -1376,7 +1378,8 @@ struct GlobalTimepointConversionPattern
       ConversionPatternRewriter &rewriter) const override {
     auto initialValue = op.getInitialValue();
     if (!initialValue.has_value()) return failure();
-    if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
+    if (!llvm::isa<IREE::Stream::TimepointAttr>(*initialValue))
+      return failure();
     rewriter.updateRootInPlace(op, [&]() { op.removeInitialValueAttr(); });
     return success();
   }

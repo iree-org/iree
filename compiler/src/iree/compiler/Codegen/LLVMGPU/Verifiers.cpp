@@ -107,8 +107,8 @@ LogicalResult verifyGPUMatmulPipeline(
          "supported yet in IREE Codegen.");
 
   // Get lhs and rhs shapes.
-  ArrayRef<int64_t> lhsShape = lhsType.cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape = rhsType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> lhsShape = llvm::cast<ShapedType>(lhsType).getShape();
+  ArrayRef<int64_t> rhsShape = llvm::cast<ShapedType>(rhsType).getShape();
 
   // Tile shapes in number of elements.
   SmallVector<int64_t> tileShape =
@@ -199,9 +199,9 @@ LogicalResult verifyGPUMatmulPipeline(
 
   // Instruction shape in number of elements in M, N, and K dim.
   SmallVector<int64_t> instructionShape;
-  if (failed(getInstructionShape(op, pipeline,
-                                 lhsType.cast<ShapedType>().getElementType(),
-                                 instructionShape))) {
+  if (failed(getInstructionShape(
+          op, pipeline, llvm::cast<ShapedType>(lhsType).getElementType(),
+          instructionShape))) {
     return failure();
   }
 

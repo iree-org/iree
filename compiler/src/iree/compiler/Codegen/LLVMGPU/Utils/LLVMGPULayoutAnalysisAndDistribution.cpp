@@ -255,9 +255,9 @@ static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
                          Value dMatrix, DenseMap<Value, Layout> &layoutMap,
                          Operation *op, IRRewriter &rewriter) {
   // First determine which variant of MMA this op is most suitable for
-  auto aType = aMatrix.getType().cast<ShapedType>();
-  auto bType = aMatrix.getType().cast<ShapedType>();
-  auto cType = aMatrix.getType().cast<ShapedType>();
+  auto aType = llvm::cast<ShapedType>(aMatrix.getType());
+  auto bType = llvm::cast<ShapedType>(aMatrix.getType());
+  auto cType = llvm::cast<ShapedType>(aMatrix.getType());
   ArrayRef<int64_t> aShape = aType.getShape();
   ArrayRef<int64_t> bShape = bType.getShape();
   ArrayRef<int64_t> cShape = cType.getShape();
@@ -273,7 +273,8 @@ static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
     std::array<int, 2> canonicalShape =
         getMMACanonicalShape(mmaType, matrixType);
     Layout layout(dimOrder, canonicalShape);
-    ArrayRef<int64_t> shape = matrix.getType().cast<ShapedType>().getShape();
+    ArrayRef<int64_t> shape =
+        llvm::cast<ShapedType>(matrix.getType()).getShape();
     layout.updateBatchDims(shape[0], shape[1]);
     if (layoutMap.count(matrix) && (layout != layoutMap.at(matrix))) {
       createLayoutConflictOp(matrix, layout, layoutMap, op, rewriter);
@@ -308,16 +309,16 @@ static void propagateLayoutToReduceBroadcastTranspose(
   Value broadcastSource = broadcastOp.getSource();
   Value broadcastResult = broadcastOp.getResult();
   int64_t broadcastSourceRank =
-      broadcastSource.getType().cast<VectorType>().getRank();
+      llvm::cast<VectorType>(broadcastSource.getType()).getRank();
   int64_t broadcastResultRank =
-      broadcastResult.getType().cast<VectorType>().getRank();
+      llvm::cast<VectorType>(broadcastResult.getType()).getRank();
   int64_t rankDiff = broadcastResultRank - broadcastSourceRank;
   llvm::SetVector<int64_t> broadcastedDims;
   for (int64_t i = 0; i < rankDiff; i++) broadcastedDims.insert(i);
   ArrayRef<int64_t> broadcastShape =
-      broadcastResult.getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(broadcastResult.getType()).getShape();
   ArrayRef<int64_t> srcShape =
-      reductionSrc.getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(reductionSrc.getType()).getShape();
   // Check that the same number of dims are reduced and broadcasted
   if (reductionDims.size() != broadcastedDims.size()) return;
   // Check that transpose(reductionDim) == broadcastDim
@@ -447,7 +448,7 @@ static bool isLdMatrixCompatible(vector::TransferReadOp readOp,
                                  const Layout &layout) {
   // ldMatrix requires loading from shared memory.
   if (!hasSharedMemoryAddressSpace(
-          readOp.getSource().getType().cast<MemRefType>()))
+          llvm::cast<MemRefType>(readOp.getSource().getType())))
     return false;
   // TODO: Can be any 16bits type.
   if (!readOp.getVectorType().getElementType().isF16()) return false;
@@ -527,7 +528,7 @@ static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
         loc, laneOffsets[laneDim++], newIndices[pos]);
   }
   Type vecType = VectorType::get(
-      {1, 2}, memrefValue.getType().cast<MemRefType>().getElementType());
+      {1, 2}, llvm::cast<MemRefType>(memrefValue.getType()).getElementType());
   Value el = rewriter.create<nvgpu::LdMatrixOp>(loc, vecType, memrefValue,
                                                 newIndices, transpose, 1);
   return el;
@@ -545,7 +546,7 @@ static void distributeTransferReads(vector::TransferReadOp readOp,
   Value source = readOp.getSource();
   Location loc = readOp.getLoc();
   SmallVector<Value> indices = readOp.getIndices();
-  Type elementType = source.getType().cast<ShapedType>().getElementType();
+  Type elementType = llvm::cast<ShapedType>(source.getType()).getElementType();
   std::array<Value, 3> threadIds = {
       rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::x),
       rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::y),
@@ -612,7 +613,7 @@ static void distributeContracts(vector::ContractionOp contractOp,
   Value lhs = contractOp.getLhs();
   if (!layoutMap.count(lhs)) return;
   if (!simdToSimtMap.count(lhs)) return;
-  Type elementType = lhs.getType().cast<ShapedType>().getElementType();
+  Type elementType = llvm::cast<ShapedType>(lhs.getType()).getElementType();
   Value rhs = contractOp.getRhs();
   if (!layoutMap.count(rhs)) return;
   if (!simdToSimtMap.count(rhs)) return;
@@ -789,7 +790,7 @@ static void distributeReductionBroadcastTranspose(
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(reductionOp);
   Value source = reductionOp.getSource();
-  Type elementType = source.getType().cast<ShapedType>().getElementType();
+  Type elementType = llvm::cast<ShapedType>(source.getType()).getElementType();
   if (!layoutMap.count(source)) return;
   if (!simdToSimtMap.count(source)) return;
   if (!broadcastOp) return;
@@ -832,7 +833,7 @@ static void distributeReductionBroadcastTranspose(
 
   bodyType loopBody = [&](std::array<int, DimType::NumDims> &state) {
     Value vector = simdToSimtMap.at(source);
-    VectorType vectorType = vector.getType().cast<VectorType>();
+    VectorType vectorType = llvm::cast<VectorType>(vector.getType());
     Type elementType = vectorType.getElementType();
     bool isFP32 = elementType.isF32();
     Value mask;
@@ -869,7 +870,7 @@ static void distributeReductionBroadcastTranspose(
             loc, packed, i, warpSize, gpu::ShuffleMode::XOR);
         Value unpacked =
             unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
-                           result.getType().cast<VectorType>());
+                           llvm::cast<VectorType>(result.getType()));
         result = makeArithReduction(rewriter, loc, combiningKind, unpacked,
                                     result, mask);
       }
@@ -1023,11 +1024,12 @@ static void distributeConstants(arith::ConstantOp constantOp,
   rewriter.setInsertionPoint(constantOp);
   Value constant = constantOp.getResult();
   if (!layoutMap.count(constant)) return;
-  auto attr = constantOp.getValue().cast<DenseElementsAttr>();
+  auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
   // Only handle splat values for now
   if (!attr.isSplat()) return;
   Layout layout = layoutMap.at(constant);
-  Type elementType = constant.getType().cast<VectorType>().getElementType();
+  Type elementType =
+      llvm::cast<VectorType>(constant.getType()).getElementType();
   auto vType = VectorType::get(
       {layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
        layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
@@ -1067,7 +1069,7 @@ static Value resolveBatchConflict(SmallVectorImpl<int> &mismatchedDims,
                                   IRRewriter &rewriter, Location loc) {
   assert(mismatchedDims.size() == 1);
   int batchDim = mismatchedDims[0];
-  VectorType vectorType = vector.getType().cast<VectorType>();
+  VectorType vectorType = llvm::cast<VectorType>(vector.getType());
   ArrayRef<int64_t> vectorShape = vectorType.getShape();
   SmallVector<int64_t> offsets(vectorShape.size(), 0);
   SmallVector<int64_t> strides(vectorShape.size(), 1);
@@ -1128,7 +1130,7 @@ static Value resolveBatchVectorConflict(SmallVectorImpl<int> &mismatchedDims,
       targetLayout.shape[DimType::Batch0], targetLayout.shape[DimType::Batch1],
       targetLayout.shape[DimType::VecIdZ] * targetLayout.shape[DimType::VecIdY],
       targetLayout.shape[DimType::VecIdX]};
-  Type elementType = vector.getType().cast<VectorType>().getElementType();
+  Type elementType = llvm::cast<VectorType>(vector.getType()).getElementType();
   auto vecType = VectorType::get(vecShape, elementType);
   Value newVector = rewriter.create<arith::ConstantOp>(
       loc, vecType, rewriter.getZeroAttr(vecType));

@@ -44,11 +44,6 @@ namespace iree_compiler {
 /// changed/modified at any time.
 /// TODO: Find a way to plumb this through to not rely on these flags.
 
-static llvm::cl::opt<int> clNativeVectorSizeInBytes(
-    "iree-codegen-llvm-vector-size-in-bytes",
-    llvm::cl::desc("native vector size to use on the hardware"),
-    llvm::cl::init(16));
-
 static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     "iree-codegen-llvm-number-of-threads",
     llvm::cl::desc("number of threads that are used at runtime if codegen "
@@ -250,26 +245,32 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
 /// looked up from this op.
-static std::optional<int64_t> getNativeVectorSizeInBytes(
-    func::FuncOp entryPointFn) {
+static int64_t getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto nativeVectorSizeAttr =
       getConfigIntegerAttr(targetAttr, "native_vector_size");
-  if (!nativeVectorSizeAttr) return std::nullopt;
-  int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
-  if (!nativeVectorSizeVal) return std::nullopt;
-  return nativeVectorSizeVal;
+  if (nativeVectorSizeAttr) {
+    int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
+    if (nativeVectorSizeVal) {
+      return nativeVectorSizeVal;
+    }
+  }
+
+  // TODO(dcaballe): Remove this workaround for VMVX.
+  if (isVMVXBackend(targetAttr)) {
+    constexpr int64_t defaultNativeVectorSizeforVMVX = 16;
+    return defaultNativeVectorSizeforVMVX;
+  }
+
+  assert(0 && "Missing 'native_vector_size' attribute");
+  return 0;
 }
 
 /// For a given `shapedType` or (`byteWidth` of element type) return the number
 /// of elements that correspond to the native vector size. Returns 1 as the
 /// fallback.
 static int64_t getVectorSize(func::FuncOp entryPointFn, unsigned byteWidth) {
-  if (std::optional<int64_t> nativeVectorSize =
-          getNativeVectorSizeInBytes(entryPointFn)) {
-    return nativeVectorSize.value() / byteWidth;
-  }
-  return clNativeVectorSizeInBytes / byteWidth;
+  return getNativeVectorSizeInBytes(entryPointFn) / byteWidth;
 }
 static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   Type elementType = shapedType.getElementType();
@@ -302,7 +303,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
 
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
-        inputOutputOpOperands[index].get().getType().cast<ShapedType>();
+        llvm::cast<ShapedType>(inputOutputOpOperands[index].get().getType());
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
     minTileSizes[fastestVaryingDim] =
@@ -817,7 +818,7 @@ static LogicalResult setMatmulPadRootConfig(
   // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
   // if the dim size is small (e.g., K=24).
   SmallVector<int64_t> reductionTileSizes(numTiledDims - 1, 0);
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
   int64_t K = lhsShapedType.getShape().back();
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
@@ -926,7 +927,7 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
                              workgroupTileSizes[index], vectorSize));
   }
 
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
   int64_t K = lhsShapedType.getShape().back();
   parallelTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
@@ -1030,10 +1031,10 @@ static LogicalResult setRootConfig(
 
   // Consider all element types and use the smallest vector size. The tiling
   // sizes are chosen based on the vector size.
-  auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
-  auto rhsShapedType = contractionOp.rhs().getType().cast<ShapedType>();
+  auto lhsShapedType = llvm::cast<ShapedType>(contractionOp.lhs().getType());
+  auto rhsShapedType = llvm::cast<ShapedType>(contractionOp.rhs().getType());
   auto resShapedType =
-      linalgOp.getDpsInitOperand(0)->get().getType().cast<ShapedType>();
+      llvm::cast<ShapedType>(linalgOp.getDpsInitOperand(0)->get().getType());
   int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, rhsShapedType));
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
@@ -1140,9 +1141,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
   auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
     auto lhsShape =
-        mmt4dOp.getInputs()[0].getType().cast<ShapedType>().getShape();
+        llvm::cast<ShapedType>(mmt4dOp.getInputs()[0].getType()).getShape();
     auto rhsShape =
-        mmt4dOp.getInputs()[1].getType().cast<ShapedType>().getShape();
+        llvm::cast<ShapedType>(mmt4dOp.getInputs()[1].getType()).getShape();
     int M0 = lhsShape[2];
     int N0 = rhsShape[2];
     int K0 = lhsShape[3];
@@ -1552,10 +1553,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
   // the cases are f32 and i32, so we divide it by 4.
-  auto nativeVecSize = getNativeVectorSizeInBytes(entryPointFn);
-  int64_t vecSize =
-      nativeVecSize ? nativeVecSize.value() : clNativeVectorSizeInBytes;
-  vecSize /= 4;
+  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
   SmallVector<int64_t> vecTileSizes(minTileSizes.begin(), minTileSizes.end());
   for (auto &i : vecTileSizes) {
     i = roundUpToPow2(std::min(i, vecSize),
@@ -1716,9 +1714,9 @@ static SmallVector<int64_t> getNhwcConvWorkgroupSizes(
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   if (isX86(targetAttr)) {
-    if (is2DConvOp(op)) return {1, 1, 8, vectorSize * 2, 1, 1, 8};
-    if (is2DDepthConvOp(op)) return {1, 1, 8, vectorSize * 2, 1, 3};
-    if (is2DPoolingOp(op)) return {1, 1, 8, vectorSize * 2, 1, 8};
+    if (is2DConvOp(op)) return {1, 1, 8, vectorSize, 1, 1, 8};
+    if (is2DDepthConvOp(op)) return {1, 1, 8, vectorSize, 1, 3};
+    if (is2DPoolingOp(op)) return {1, 1, 8, vectorSize, 1, 8};
     llvm_unreachable("unsupported conv");
   }
   if (isRISCV(targetAttr)) {
@@ -1999,23 +1997,14 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     // Multiple pack ops case is not supported.
     if (hasChanged) return WalkResult::interrupt();
 
-    // TODO(hanchung): Support chain cases. It needs following use-def chain
-    // until rootOp.
-    if (packOp.getSource().getDefiningOp() != rootOp) {
-      return WalkResult::advance();
-    }
     hasChanged = true;
-    OpResult result = packOp.getSource().cast<OpResult>();
-    auto idxMap = linalgOp.getMatchingIndexingMap(
-        linalgOp.getDpsInitOperand(result.getResultNumber()));
-    (void)idxMap;
-    LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n"
-                         << "The corresponding indexing map is: " << idxMap
-                         << "\n");
-    assert(idxMap.isIdentity() && "unexpected codegen input");
+    LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n");
 
-    for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
-      SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+    // Only adjust tile sizes for distribution and TileAndFuse, which are the
+    // first two tile lists.
+    for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e; ++i) {
+      auto &tileSizes = tileSizesList[i];
+      ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
       ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
       for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
         if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;

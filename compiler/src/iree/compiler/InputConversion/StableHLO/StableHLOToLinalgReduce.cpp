@@ -367,7 +367,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
     llvm::SmallVector<Value> broadcastValues;
     for (uint64_t i = 0, s = initValues.size(); i < s; i++) {
       Value initValue = initValues[i];
-      auto resultTy = resultTypes[i].cast<ShapedType>();
+      auto resultTy = llvm::cast<ShapedType>(resultTypes[i]);
       if (!resultTy.hasStaticShape()) return failure();
 
       auto broadcastSizes = rewriter.getI64TensorAttr(resultTy.getShape());
@@ -465,8 +465,8 @@ struct ReduceWindowOpConversion final
         cast<mlir::stablehlo::ReturnOp>(op.getBody().front().getTerminator());
     Operation *computeOp = returnOp.getResults()[resultIndex].getDefiningOp();
     if (computeOp->getNumOperands() != 2) return nullptr;
-    auto arg0 = computeOp->getOperand(0).dyn_cast<BlockArgument>();
-    auto arg1 = computeOp->getOperand(1).dyn_cast<BlockArgument>();
+    auto arg0 = llvm::dyn_cast<BlockArgument>(computeOp->getOperand(0));
+    auto arg1 = llvm::dyn_cast<BlockArgument>(computeOp->getOperand(1));
     if (!arg0 || !arg1) return nullptr;
     int64_t arg0Num = arg0.getArgNumber();
     int64_t arg1Num = arg1.getArgNumber();
@@ -493,8 +493,8 @@ struct ReduceWindowOpConversion final
 
   static PoolingType getPoolingType(mlir::stablehlo::ReduceWindowOp reduceOp,
                                     int resultIndex) {
-    auto rank =
-        reduceOp.getResultTypes()[resultIndex].cast<ShapedType>().getRank();
+    auto rank = llvm::cast<ShapedType>(reduceOp.getResultTypes()[resultIndex])
+                    .getRank();
     if (Operation *op = getReductionOp(reduceOp, resultIndex)) {
       if (isa<mlir::stablehlo::MinOp>(*op) && rank == 4)
         return PoolingType::k2DMin;
@@ -516,7 +516,7 @@ struct ReduceWindowOpConversion final
       mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    int rank = op.getResultTypes()[0].cast<ShapedType>().getRank();
+    int rank = llvm::cast<ShapedType>(op.getResultTypes()[0]).getRank();
     if (rank != 4 && rank != 5) {
       return rewriter.notifyMatchFailure(
           op, "expected NHWC/NDHWC pooling-based op");
@@ -601,9 +601,9 @@ struct ReduceWindowOpConversion final
         } else {
           auto i = en.index() - 1;
           auto stride =
-              strides.cast<DenseIntElementsAttr>().getValues<int64_t>()[i];
-          auto dilation =
-              dilations.cast<DenseIntElementsAttr>().getValues<int64_t>()[i];
+              llvm::cast<DenseIntElementsAttr>(strides).getValues<int64_t>()[i];
+          auto dilation = llvm::cast<DenseIntElementsAttr>(dilations)
+                              .getValues<int64_t>()[i];
           // let j = i * stride
           // output[i] = reduce( input[j, j + window_size * dilation) )
           Value offset = rewriter.create<arith::ConstantIndexOp>(

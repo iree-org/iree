@@ -34,7 +34,6 @@
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @GMNGeoffrey @stellaraccident
 /experimental/remoting/ @stellaraccident
-/experimental/rocm/ @ThomasRaoux
 /experimental/web/ @ScottTodd
 
 # Infra Top-Level Directories
@@ -62,7 +61,7 @@
 /compiler/src/iree/compiler/ @benvanik
 /compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @dcaballe @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
+/compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/Sandbox/ @dcaballe @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
 /compiler/src/iree/compiler/ConstEval/ @stellaraccident
@@ -75,5 +74,4 @@
 # Runtime
 /runtime/src/iree/ @benvanik
 /runtime/src/iree/hal/cts/ @ScottTodd
-/runtime/src/iree/hal/drivers/cuda/ @ThomasRaoux
 /runtime/src/iree/hal/drivers/vulkan/ @antiagainst @ScottTodd

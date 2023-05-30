@@ -6,10 +6,10 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
-#include <iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h>
-
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -148,7 +148,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
       // unnecessary for IREEs use case. For now avoid this assert by bailing if
       // any operands are block arguments.
       if (llvm::any_of(op->getOperands(),
-                       [](Value v) { return v.isa<BlockArgument>(); })) {
+                       [](Value v) { return llvm::isa<BlockArgument>(v); })) {
         auto parentOp = op->getParentOp();
         if (parentOp->getNumRegions() != 1 ||
             parentOp->getRegion(0).getBlocks().size() != 1) {
@@ -172,7 +172,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
 /// These is the legacy path for workgroup count calculation that
 /// arent handled by the current default.
 static void createWorkgroupCountFromDagRootRegion(
-    RewriterBase &rewriter, Location loc, Flow::DispatchRegionOp &regionOp,
+    RewriterBase &rewriter, Flow::DispatchRegionOp &regionOp,
     TypeRange workloadTypes, ArrayRef<Location> workloadLocs) {
   Region &countRegion = regionOp.getWorkgroupCount();
   if (!countRegion.empty()) return;
@@ -181,6 +181,7 @@ static void createWorkgroupCountFromDagRootRegion(
   auto args = body->getArguments();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(body);
+  Location loc = regionOp.getLoc();
   auto countOp =
       rewriter.create<Flow::DispatchWorkgroupCountFromDagRootOp>(loc, args);
   rewriter.create<Flow::ReturnOp>(loc, countOp->getResults());
@@ -189,7 +190,7 @@ static void createWorkgroupCountFromDagRootRegion(
 /// Return `true` if the given type is a ShapedType and has at least one
 /// dynamic dimension.
 static bool hasDynamicShape(Type t) {
-  auto shapedType = t.dyn_cast<ShapedType>();
+  auto shapedType = llvm::dyn_cast<ShapedType>(t);
   if (!shapedType) return false;
   return !shapedType.hasStaticShape();
 }
@@ -203,7 +204,7 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   if (!hasDynamicShape(value.getType())) return success();
 
   // There is at least one dynamic dimension, continue...
-  ShapedType shapedType = value.getType().cast<ShapedType>();
+  ShapedType shapedType = llvm::cast<ShapedType>(value.getType());
 
   // Helper function that generates tensor.dim ops.
   auto emitTensorDimOps = [&]() {
@@ -216,7 +217,7 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   };
 
   // Case 2: Value is a block argument.
-  if (auto bbArg = value.dyn_cast<BlockArgument>()) {
+  if (auto bbArg = llvm::dyn_cast<BlockArgument>(value)) {
     b.setInsertionPointToStart(bbArg.getOwner());
     emitTensorDimOps();
     return success();
@@ -224,7 +225,7 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
 
   // Value is an OpResult.
   Operation *op = value.getDefiningOp();
-  OpResult opResult = value.cast<OpResult>();
+  OpResult opResult = llvm::cast<OpResult>(value);
   b.setInsertionPoint(op);
 
   // Case 3: Value is tied. Reify the dimensions of the tied operand.
@@ -263,43 +264,56 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
 
 // Append a result to the given DispatchRegionOp. The newly created
 // DispatchRegionOp is returned.
-FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result,
-    const SmallVector<Value> &dynamicDims) {
-#ifndef NDEBUG
-  auto tensorType = result.getType().cast<RankedTensorType>();
-  assert(tensorType.getNumDynamicDims() == dynamicDims.size() &&
-         "incorrect number of dynamicDims provided");
-#endif  // NDEBUG
+FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResults(
+    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp,
+    ArrayRef<Value> results, ArrayRef<SmallVector<Value>> dynamicDims) {
+  if (results.empty()) {
+    return regionOp;
+  }
+  assert(results.size() == dynamicDims.size() &&
+         "expected as many dynamic dims list as the number of results");
 
-  OpBuilder::InsertionGuard guard(rewriter);
-
-  // Determine dynamic result dims.
-  rewriter.setInsertionPoint(regionOp);
+  // Collect the current region dynamic dims, and result types.
   SmallVector<Value> regionDynamicDims(regionOp.getResultDims().begin(),
                                        regionOp.getResultDims().end());
-  regionDynamicDims.append(dynamicDims);
-
-  // Determine result types of new RegionOp.
   SmallVector<Type> resultTypes(regionOp.getResultTypes().begin(),
                                 regionOp.getResultTypes().end());
-  resultTypes.push_back(result.getType());
+
+  // Collect the current dispatch yielded values.
+  auto returnOp =
+      cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+  SmallVector<Value> returnedValues(returnOp.getOperands().begin(),
+                                    returnOp.getOperands().end());
+
+  for (auto [index, result] : llvm::enumerate(results)) {
+#ifndef NDEBUG
+    auto tensorType = result.getType().cast<RankedTensorType>();
+    assert(tensorType.getNumDynamicDims() == dynamicDims[index].size() &&
+           "incorrect number of dynamicDims provided");
+#endif  // NDEBUG
+    resultTypes.push_back(result.getType());
+    regionDynamicDims.append(dynamicDims[index]);
+    returnedValues.push_back(result);
+  }
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(regionOp);
 
   // Create new DispatchRegionOp and move over the body.
   auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
       regionOp->getLoc(), resultTypes, regionDynamicDims,
       regionOp.getWorkload());
-  newRegionOp.getBody().takeBody(regionOp.getBody());
+  rewriter.inlineRegionBefore(regionOp.getBody(), newRegionOp.getBody(),
+                              newRegionOp.getBody().begin());
   rewriter.replaceOp(
       regionOp, newRegionOp.getResults().take_front(regionOp->getNumResults()));
 
   // Update terminator.
-  Flow::ReturnOp returnOp =
+  auto newRegionReturnOp =
       cast<Flow::ReturnOp>(newRegionOp.getBody().front().getTerminator());
-  SmallVector<Value> returnedValues(returnOp.getOperands().begin(),
-                                    returnOp.getOperands().end());
-  returnedValues.push_back(result);
-  returnOp.getOperandsMutable().assign(returnedValues);
+  rewriter.setInsertionPoint(newRegionReturnOp);
+  rewriter.replaceOpWithNewOp<Flow::ReturnOp>(newRegionReturnOp,
+                                              returnedValues);
 
   return newRegionOp;
 }
@@ -341,7 +355,7 @@ FailureOr<Operation *> Flow::clonePrecedingOpIntoDispatchRegion(
   for (OpOperand *use : usesInsideOfRegion) {
     rewriter.updateRootInPlace(use->getOwner(), [&]() {
       use->set(newTargetOp->getResult(
-          use->get().cast<OpResult>().getResultNumber()));
+          llvm::cast<OpResult>(use->get()).getResultNumber()));
     });
   }
 
@@ -350,66 +364,73 @@ FailureOr<Operation *> Flow::clonePrecedingOpIntoDispatchRegion(
 
 // Move a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target,
+FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpsIntoDispatchRegion(
+    RewriterBase &rewriter, ArrayRef<Operation *> targets,
     Flow::DispatchRegionOp regionOp) {
-#ifndef NDEBUG
-  DominanceInfo domInfo;
-  for (OpOperand &use : target->getUses()) {
-    Operation *user = use.getOwner();
-    if (regionOp->isProperAncestor(user) || isa<tensor::DimOp>(user)) {
-      continue;
-    }
-    assert(domInfo.properlyDominates(regionOp, user) &&
-           "found use that does not post-dominate target");
-  }
-#endif  // NDEBUG
+  // Values replaced by moving the `targets` into the dispatch region.
+  SmallVector<Value> replacedValues;
+
+  // List of dynamic dimensions for each new results added to the dispatch
+  // region.
+  SmallVector<SmallVector<Value>> dispatchOpNewResultsDynamicDims;
+
+  // New values that are yielded from dispatch.
+  SmallVector<Value> yieldedResults;
+
+  llvm::SetVector<Operation *> targetSet;
+  targetSet.insert(targets.begin(), targets.end());
 
   Block &body = regionOp.getBody().front();
+  for (Operation *target : llvm::reverse(targets)) {
+    // Clone op into dispatch region.
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(&body);
+    Operation *clonedTarget = rewriter.clone(*target);
 
-  // Gather all uses of `target`.
-  SmallVector<OpOperand *> usesOutsideOfRegion;
-  for (OpOperand &use : target->getUses())
-    if (!regionOp->isProperAncestor(use.getOwner()))
-      usesOutsideOfRegion.push_back(&use);
-
-  // Compute dynamic result dims.
-  SmallVector<SmallVector<Value>> dynamicDims;
-  for (Value v : target->getResults()) {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(target);
-    SmallVector<Value> &dims = dynamicDims.emplace_back();
-    if (failed(reifyDynamicResultDims(rewriter, v, dims))) return failure();
-  }
-
-  // Move op into dispatch region.
-  target->moveBefore(&body.front());
-
-  // Replace all uses outside of the dispatch region.
-  if (!usesOutsideOfRegion.empty()) {
-    unsigned previousNumResults = regionOp->getNumResults();
-
-    // Note: Appending results one-by-one here so that this can be extended to
-    // specific results in the future. Many ops have just one result, so this
-    // should not be a large overhead.
-    for (const auto &it : llvm::enumerate(target->getResults())) {
-      auto newRegionOp = appendDispatchRegionResult(
-          rewriter, regionOp, it.value(), dynamicDims[it.index()]);
-      if (failed(newRegionOp)) return failure();
-      regionOp = *newRegionOp;
+    // Gather all uses of `target`.
+    for (auto [index, result] : llvm::enumerate(target->getResults())) {
+      bool hasUsesOutsideOfRegion =
+          llvm::any_of(result.getUses(), [&](OpOperand &use) {
+            Operation *user = use.getOwner();
+            // The use is not in
+            // 1. the current dispatch
+            // 2. Not in one of the targets.
+            return !regionOp->isProperAncestor(user) && !targetSet.count(user);
+          });
+      if (hasUsesOutsideOfRegion) {
+        replacedValues.push_back(result);
+        yieldedResults.push_back(clonedTarget->getResult(index));
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPoint(target);
+        SmallVector<Value> &dims =
+            dispatchOpNewResultsDynamicDims.emplace_back();
+        if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
+          return target->emitOpError(
+              "failed to reify dynamic dims of result to be yielded from "
+              "dispatch region");
+        }
+      }
     }
 
-    // Replace uses of `target` after the dispatch region.
-    for (OpOperand *use : usesOutsideOfRegion) {
-      rewriter.updateRootInPlace(use->getOwner(), [&]() {
-        use->set(
-            regionOp->getResult(previousNumResults +
-                                use->get().cast<OpResult>().getResultNumber()));
-      });
-    }
+    rewriter.replaceOpWithinBlock(target, clonedTarget->getResults(), &body);
   }
 
-  return regionOp;
+  FailureOr<Flow::DispatchRegionOp> newRegionOp = appendDispatchRegionResults(
+      rewriter, regionOp, yieldedResults, dispatchOpNewResultsDynamicDims);
+
+  if (failed(newRegionOp)) {
+    return regionOp->emitOpError("failed to append results to op");
+  }
+
+  ValueRange replacements =
+      newRegionOp->getResults().take_back(replacedValues.size());
+  for (auto [index, replacedVal] : llvm::enumerate(replacedValues)) {
+    rewriter.replaceAllUsesWith(replacedVal, replacements[index]);
+  }
+  for (auto target : llvm::reverse(targets)) {
+    rewriter.eraseOp(target);
+  }
+  return newRegionOp.value();
 }
 
 FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
@@ -428,7 +449,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
       Flow::makeEmptyDispatchRegion(rewriter, op->getLoc(), workload);
 
   // Move the op into the dispatch region.
-  auto newRegionOp = movePrecedingOpIntoDispatchRegion(rewriter, op, regionOp);
+  auto newRegionOp = movePrecedingOpsIntoDispatchRegion(rewriter, op, regionOp);
 
   if (succeeded(newRegionOp) && useWorkloadCountFromDagRootMode) {
     auto newWorkload = newRegionOp->getWorkload();
@@ -436,12 +457,13 @@ FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
         llvm::map_range(newWorkload, [](Value v) { return v.getType(); }));
     auto workloadLocs = llvm::to_vector(
         llvm::map_range(newWorkload, [](Value v) { return v.getLoc(); }));
-    createWorkgroupCountFromDagRootRegion(rewriter, op->getLoc(), *newRegionOp,
-                                          workloadTypes, workloadLocs);
+    createWorkgroupCountFromDagRootRegion(rewriter, *newRegionOp, workloadTypes,
+                                          workloadLocs);
   }
 
   return newRegionOp;
 }
+
 //===---------------------------------------------------------------------===//
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
@@ -461,13 +483,14 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
     if (clInlineConstantByteLength == 0) return false;
     auto constantValueAttr = constantOp.getValue();
     auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
+    if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
       return true;
     } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      auto shapedType = constantOp.getType().cast<ShapedType>();
+                   llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
+      auto shapedType = llvm::cast<ShapedType>(constantOp.getType());
       uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
+          (shapedType.getNumElements() *
+           IREE::Util::getTypeBitWidth(shapedType.getElementType())) /
           8;
       return denseAttr.isSplat() ||
              estimatedByteLength <= clInlineConstantByteLength;

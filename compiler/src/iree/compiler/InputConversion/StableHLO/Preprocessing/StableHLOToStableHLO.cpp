@@ -194,7 +194,7 @@ struct ReorderConvOpOutputDimensions final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ConvolutionOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.getType().cast<ShapedType>();
+    auto resultType = llvm::cast<ShapedType>(op.getType());
     auto resultShape = resultType.getShape();
     if (!resultType.hasRank()) {
       return failure();
@@ -501,7 +501,7 @@ struct ScatterImplicitIndex final
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     Value indices = op.getScatterIndices();
-    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
 
     // Check indices vector has an implicit dim.
     if (indexVectorDim != indicesTy.getRank()) {
@@ -566,8 +566,8 @@ struct ScatterImplicitBatch final
                                 PatternRewriter &rewriter) const override {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indices = op.getScatterIndices().cast<Value>();
-    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
+    auto indices = llvm::cast<Value>(op.getScatterIndices());
+    auto indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
 
     // Check whether indices has no batch dimension.
     if (!indicesTy) return failure();
@@ -650,8 +650,8 @@ struct ScatterCollapseBatch final
                                 PatternRewriter &rewriter) const override {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indices = op.getScatterIndices().cast<Value>();
-    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indices = llvm::cast<Value>(op.getScatterIndices());
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
     auto updatedWindowDims = dimNumbers.getUpdateWindowDims();
 
     if (!indicesTy.hasRank()) {
@@ -726,7 +726,7 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
     // If the index vector dim is not implicitly or explicitly at the end
     // we need to transpose the batch dimensions to the start.
     Value indices = op.getScatterIndices();
-    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     if (indexVectorDim < indicesTy.getRank() - 1) {
       llvm::SmallVector<int64_t> perm;
@@ -744,7 +744,7 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
 
       indices = builder.create<mlir::stablehlo::TransposeOp>(
           indicesTy.clone(newShape), indices, builder.getI64TensorAttr(perm));
-      indicesTy = indices.getType().cast<RankedTensorType>();
+      indicesTy = llvm::cast<RankedTensorType>(indices.getType());
       indexVectorDim = indicesTy.getRank() - 1;
     }
 
@@ -752,7 +752,7 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
     // the beginning.
     auto updates = op.getUpdates();
     auto updates0 = updates.front();
-    auto updates0Ty = updates0.getType().cast<ShapedType>();
+    auto updates0Ty = llvm::cast<ShapedType>(updates0.getType());
     auto updatedWindowDims = dimNumbers.getUpdateWindowDims();
 
     // Determine which dimensions are batch dimensions.
@@ -779,7 +779,7 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
     llvm::SmallVector<Value> newUpdates(updates.begin(), updates.end());
     if (updatesChanged) {
       for (Value &update : newUpdates) {
-        auto updateTy = update.getType().cast<ShapedType>();
+        auto updateTy = llvm::cast<ShapedType>(update.getType());
         llvm::SmallVector<int64_t> newShape;
         newShape.reserve(updateTy.getRank());
         for (int i = 0, s = updatePerm.size(); i < s; i++)
@@ -846,8 +846,8 @@ struct ScatterMaterializeInsertedDim final
                                 PatternRewriter &rewriter) const override {
     auto indices = op.getScatterIndices();
     auto operand = op.getInputs().front();
-    auto indicesTy = indices.getType().cast<ShapedType>();
-    auto operandTy = operand.getType().cast<ShapedType>();
+    auto indicesTy = llvm::cast<ShapedType>(indices.getType());
+    auto operandTy = llvm::cast<ShapedType>(operand.getType());
 
     if (!operandTy.hasRank() || !indicesTy.hasRank()) {
       return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
@@ -908,7 +908,7 @@ struct ScatterMaterializeInsertedDim final
 
     llvm::SmallVector<Value> expandedUpdates;
     for (auto update : op.getUpdates()) {
-      auto updatesTy = update.getType().cast<ShapedType>();
+      auto updatesTy = llvm::cast<ShapedType>(update.getType());
 
       llvm::SmallVector<int64_t> newShape;
       for (int i = 0, s = reassociationMap.size(); i < s; ++i) {
@@ -954,7 +954,7 @@ bool isFromBool(Value val) {
     if (!op) return false;
 
     if (auto convertOp = dyn_cast<mlir::stablehlo::ConvertOp>(op)) {
-      auto inTy = convertOp.getOperand().getType().cast<ShapedType>();
+      auto inTy = llvm::cast<ShapedType>(convertOp.getOperand().getType());
       if (inTy.getElementType().isInteger(1)) {
         return true;
       }
@@ -1355,12 +1355,12 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
     lhs = builder.create<mlir::stablehlo::TransposeOp>(
         RankedTensorType::get(lhsTransposeShape, lhsTy.getElementType()), lhs,
         builder.getI64TensorAttr(permLhs));
-    lhsTy = lhs.getType().cast<RankedTensorType>();
+    lhsTy = llvm::cast<RankedTensorType>(lhs.getType());
 
     rhs = builder.create<mlir::stablehlo::TransposeOp>(
         RankedTensorType::get(rhsTransposeShape, rhsTy.getElementType()), rhs,
         builder.getI64TensorAttr(permRhs));
-    rhsTy = rhs.getType().cast<RankedTensorType>();
+    rhsTy = llvm::cast<RankedTensorType>(rhs.getType());
 
     auto dimI32Ty = RankedTensorType::get({1}, builder.getI32Type());
 

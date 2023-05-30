@@ -70,11 +70,11 @@ static SmallVector<Value> expandResourceOperands(
   SmallVector<Value> expandedOperands;
   expandedOperands.reserve(operands.size());
   for (auto operand : operands) {
-    if (operand.getType().isa<TensorType>()) {
+    if (llvm::isa<TensorType>(operand.getType())) {
       auto value = consumeTensorOperand(loc, operand, rewriter);
       expandedOperands.push_back(value.resource);
       expandedOperands.push_back(value.resourceSize);
-    } else if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+    } else if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
       expandedOperands.push_back(operand);
       expandedOperands.push_back(
           rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(loc, operand));
@@ -124,7 +124,7 @@ struct CallOpConversion : public OpConversionPattern<mlir::func::CallOp> {
     // original op.
     SmallVector<Value> results;
     for (auto result : resultMap) {
-      if (result.newType.isa<IREE::Stream::ResourceType>()) {
+      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
         auto oldType = op.getResult(result.originalIndex).getType();
         auto resource = callOp.getResult(result.newIndex + 0);
         auto resourceSize = callOp.getResult(result.newIndex + 1);
@@ -194,7 +194,7 @@ struct SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
       mlir::arith::SelectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
-    if (!op.getTrueValue().getType().isa<TensorType>()) return failure();
+    if (!llvm::isa<TensorType>(op.getTrueValue().getType())) return failure();
     auto trueOperand =
         consumeTensorOperand(op.getLoc(), adaptor.getTrueValue(), rewriter);
     auto falseOperand =

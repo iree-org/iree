@@ -426,42 +426,6 @@ jobs:
               ./build_tools/scripts/check_vulkan.sh
               build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
-  ######################## Community Model Coverage ############################
-  # Jobs that test IREE behavior on a set of models.
-  ##############################################################################
-  # TODO(#11263): Drop this job once the IREE_BUILD_LEGACY_BENCHMARKS is removed.
-  test_build_benchmark_suites:
-    needs: [setup, build_all]
-    if: fromJson(needs.setup.outputs.should-run)
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      BUILD_BENCHMARKS_DIR: build-benchmarks
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Building benchmarks"
-        id: build
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
-            --env "IREE_BUILD_BENCHMARKS_DIR=${BUILD_BENCHMARKS_DIR}" \
-            gcr.io/iree-oss/frontends@sha256:da48ff70cc3b956ba22465a3bef285711b66dfcd605ccba605db2278b96dbc5c \
-            build_tools/cmake/build_benchmarks.sh
-
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
@@ -1017,9 +981,6 @@ jobs:
       # Tensorflow
       - test_tf_integrations
       - test_tf_integrations_gpu
-
-      # Model Coverage
-      - test_build_benchmark_suites
 
       # Configurations
       - python_release_packages

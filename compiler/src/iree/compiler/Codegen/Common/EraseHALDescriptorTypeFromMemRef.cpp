@@ -39,11 +39,11 @@ struct MemRefTypeConverter final : public TypeConverter {
       // Expect #hal.descriptor_type memory spaces.
       Attribute spaceAttr = memRefType.getMemorySpace();
       if (!spaceAttr) return std::nullopt;
-      auto dtAttr = spaceAttr.dyn_cast<IREE::HAL::DescriptorTypeAttr>();
+      auto dtAttr = llvm::dyn_cast<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
       if (!dtAttr) return std::nullopt;
 
       // Erase the #hal.descriptor_type memory space.
-      if (auto rankedType = memRefType.dyn_cast<MemRefType>()) {
+      if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
         return MemRefType::get(memRefType.getShape(),
                                memRefType.getElementType(),
                                rankedType.getLayout());
@@ -60,9 +60,9 @@ struct MemRefTypeConverter final : public TypeConverter {
 
 /// Returns true if the given `type` is considered as legal.
 static bool isLegalType(Type type) {
-  if (auto memRefType = type.dyn_cast<BaseMemRefType>()) {
+  if (auto memRefType = llvm::dyn_cast<BaseMemRefType>(type)) {
     Attribute spaceAttr = memRefType.getMemorySpace();
-    return !spaceAttr || !spaceAttr.isa<IREE::HAL::DescriptorTypeAttr>();
+    return !spaceAttr || !llvm::isa<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
   }
   return true;
 }

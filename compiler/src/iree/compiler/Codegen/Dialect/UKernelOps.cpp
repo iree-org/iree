@@ -148,7 +148,7 @@ static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
   }
   SmallVector<Type> callResultTypes;
   for (auto resultType : op->getResultTypes()) {
-    if (resultType.isa<ShapedType>()) {
+    if (llvm::isa<ShapedType>(resultType)) {
       return rewriter.notifyMatchFailure(
           op, "cannot lower a `ShapedType` return value to function call");
     }
@@ -212,7 +212,7 @@ struct UKernelOpsBufferizationInterface
     // Replace all `tensor` operands with corresponding `memref` operands.
     for (auto [index, operand] : llvm::enumerate(op->getOperands())) {
       // For `tensor` type operands, replace with `memref` type operand.
-      if (operand.getType().template isa<RankedTensorType>()) {
+      if (llvm::isa<RankedTensorType>(operand.getType())) {
         FailureOr<Value> memrefOperand = getBuffer(rewriter, operand, options);
         if (failed(memrefOperand)) {
           return op->emitOpError(
@@ -229,7 +229,7 @@ struct UKernelOpsBufferizationInterface
     // Ignore all result types that are tensor types.
     SmallVector<Type> resultTypes;
     for (auto resultType : op->getResultTypes()) {
-      if (resultType.isa<RankedTensorType>()) continue;
+      if (llvm::isa<RankedTensorType>(resultType)) continue;
       resultTypes.push_back(resultType);
     }
 

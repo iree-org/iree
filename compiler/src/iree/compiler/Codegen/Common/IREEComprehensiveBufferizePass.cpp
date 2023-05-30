@@ -97,7 +97,7 @@ class IREEComprehensiveBufferizePass
 };
 }  // namespace
 
-static bool isaTensor(Type t) { return t.isa<TensorType>(); };
+static bool isaTensor(Type t) { return llvm::isa<TensorType>(t); };
 
 // Default allocation functions.
 static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
@@ -110,7 +110,7 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
     // type memory space; that's runtime allocations. So erase and fallback to
     // the default 0 memory space. It is fine given this is just the default
     // allocator; backends are expected to control by themselves.
-    if (storage.isa<IREE::HAL::DescriptorTypeAttr>())
+    if (llvm::isa<IREE::HAL::DescriptorTypeAttr>(storage))
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
   }
@@ -140,7 +140,7 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
   // memref type can be inferred from the context.
   options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = value.getType().cast<TensorType>();
+    auto tensorType = llvm::cast<TensorType>(value.getType());
 
     // Special rule for ConstantOps: These always lower to some memref with a
     // static identity layout.

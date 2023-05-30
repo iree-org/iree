@@ -140,14 +140,14 @@ int main(int argc, char** argv) {
   // close to memory-bound.
   iree_uk_benchmark_register_memcpy(FLAG_working_set_size);
 
-#if defined(IREE_UK_ARCH_ARM_64)
+#if defined(IREE_ARCH_ARM_64)
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, "");
   // Tile size selected with cpu feature "dotprod".
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 4, "");
   // Tile size selected with cpu feature "i8mm".
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 8, "");
-#elif defined(IREE_UK_ARCH_X86_64)
+#elif defined(IREE_ARCH_X86_64)
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1,
                                   "avx2_fma");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 1,
@@ -164,12 +164,12 @@ int main(int argc, char** argv) {
                                   "avx2_fma");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 16, 16,
                                   "avx512_base");
-#else   // defined(IREE_UK_ARCH_ARM_64)
+#else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, "");
-#endif  // defined(IREE_UK_ARCH_ARM_64)
+#endif  // defined(IREE_ARCH_ARM_64)
 
   iree_uk_benchmark_run_and_cleanup();
 }

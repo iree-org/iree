@@ -26,7 +26,7 @@ Type convertInteger(IntegerType intType) {
 }
 
 Type convertShapedType(ShapedType shapedType) {
-  if (auto intType = shapedType.getElementType().dyn_cast<IntegerType>())
+  if (auto intType = llvm::dyn_cast<IntegerType>(shapedType.getElementType()))
     return shapedType.clone(convertInteger(intType));
   return shapedType;
 }
@@ -59,7 +59,7 @@ std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
 std::optional<Value> scalarToTensor(OpBuilder& builder, Type /*type*/,
                                     ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
-  if (inputs.front().getType().isa<ShapedType>()) {
+  if (llvm::isa<ShapedType>(inputs.front().getType())) {
     return std::nullopt;
   }
   return builder

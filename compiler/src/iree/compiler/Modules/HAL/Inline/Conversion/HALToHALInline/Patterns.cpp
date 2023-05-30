@@ -204,7 +204,7 @@ void populateHALToHALInlinePatterns(MLIRContext *context,
       [](OpBuilder &builder, IREE::Util::BufferType type, ValueRange inputs,
          Location loc) -> Value {
         assert(inputs.size() == 1);
-        if (inputs[0].getType().isa<IREE::HAL::BufferType>()) {
+        if (llvm::isa<IREE::HAL::BufferType>(inputs[0].getType())) {
           return builder.createOrFold<IREE::HAL::Inline::BufferStorageOp>(
               loc, inputs[0]);
         } else {

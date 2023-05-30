@@ -182,6 +182,15 @@ void ireeCompilerEnumerateRegisteredHALTargetBackends(
   __ireeCompilerEnumerateRegisteredHALTargetBackends(callback, userData);
 }
 
+void ireeCompilerEnumeratePlugins(void (*callback)(const char *pluginName,
+                                                   void *userData),
+                                  void *userData) {
+  assertLoaded();
+  if (__ireeCompilerEnumeratePlugins) {
+    __ireeCompilerEnumeratePlugins(callback, userData);
+  }
+}
+
 iree_compiler_session_t *ireeCompilerSessionCreate() {
   assertLoaded();
   return __ireeCompilerSessionCreate();

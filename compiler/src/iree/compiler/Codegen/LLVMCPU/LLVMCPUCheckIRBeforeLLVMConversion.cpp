@@ -51,7 +51,7 @@ static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
           "function");
     }
     int allocaSize = 1;
-    auto allocaType = allocaOp.getType().cast<ShapedType>();
+    auto allocaType = llvm::cast<ShapedType>(allocaOp.getType());
     for (auto dimSize : allocaType.getShape()) {
       if (ShapedType::isDynamic(dimSize)) continue;
       allocaSize *= dimSize;

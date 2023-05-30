@@ -38,7 +38,7 @@ static bool contractOpFilter(Operation *op) {
   // Check if the shape is tile-distributable. The leading dimension must be a
   // multiple of the target vector size, which is 128b / the element bit width.
   auto isTileDistributable = [&](OpOperand *v) {
-    ShapedType ty = v->get().getType().cast<ShapedType>();
+    ShapedType ty = llvm::cast<ShapedType>(v->get().getType());
     unsigned bitWidth = ty.getElementTypeBitWidth();
     int targetVectorSize = copyVectorNumBits / bitWidth;
     return ty.getShape().back() % targetVectorSize == 0;

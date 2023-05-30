@@ -66,8 +66,8 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       // TODO(benvanik): typed accessors for bindings.
-      auto bindingAttrs = dispatchOp->getAttr("hal.interface.bindings")
-                              .dyn_cast_or_null<ArrayAttr>();
+      auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
+          dispatchOp->getAttr("hal.interface.bindings"));
       assert(bindingAttrs &&
              "interface materialization must annotate dispatch sites");
 

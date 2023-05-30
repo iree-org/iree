@@ -48,6 +48,16 @@ static llvm::cl::opt<bool> clEnableCPUMicrokernels(
         "Enables microkernel lowering for llvmcpu backend (experimental)"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
+    "iree-llvmcpu-native-vector-width-in-bytes",
+    llvm::cl::desc("sets the native vector register width of the hardware. It "
+                   "overrides any inferred vector register width"),
+    llvm::cl::init(0));
+
+// Default native vector width when target or specific native vector width are
+// not provided.
+constexpr unsigned defaultNativeVectorWidth = 16;
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -195,7 +205,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     auto configAttr = variantOp.getTarget().getConfiguration();
     auto tryAttrLookup = [&](StringRef name, StringRef fallback) {
       if (!configAttr) return fallback.str();
-      auto value = configAttr.get(name).dyn_cast_or_null<StringAttr>();
+      auto value = llvm::dyn_cast_if_present<StringAttr>(configAttr.get(name));
       if (!value) return fallback.str();
       return value.str();
     };
@@ -304,8 +314,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     if (auto importsAttr =
             variantOp->getAttrOfType<ArrayAttr>(importsAttrName)) {
       for (auto importAttr : importsAttr.getAsValueRange<ArrayAttr>()) {
-        auto nameAttr = importAttr[0].cast<StringAttr>();
-        auto weakAttr = importAttr[1].cast<BoolAttr>();
+        auto nameAttr = llvm::cast<StringAttr>(importAttr[0]);
+        auto weakAttr = llvm::cast<BoolAttr>(importAttr[1]);
         libraryBuilder.addImport(nameAttr.getValue(), weakAttr.getValue());
       }
       variantOp->removeAttr(importsAttrName);
@@ -532,7 +542,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
                                                    {".o", ".obj", ".a", ".lib"},
                                                    linkerObjectAttrs);
     for (auto [index, attr] : llvm::enumerate(linkerObjectAttrs)) {
-      auto objectAttr = attr.cast<IREE::HAL::ExecutableObjectAttr>();
+      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(attr);
       if (auto dataAttr = objectAttr.getData()) {
         objectFiles.push_back(Artifact::createTemporary(
             objectFiles.front().path + "_object_" + std::to_string(index),
@@ -819,17 +829,34 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     llvm::Function *dummyFunc = llvm::Function::Create(
         llvm::FunctionType::get(voidType, false),
         llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
+
+    // If target supports AVX-512, enforce 512-bit vector registers.
+    llvm::StringRef targetFeatures = targetMachine->getTargetFeatureString();
+    if (targetFeatures.contains("avx512")) {
+      dummyFunc->addFnAttr("prefer-vector-width", "512");
+    }
+
     llvm::TargetTransformInfo tti =
         targetMachine->getTargetTransformInfo(*dummyFunc);
-    config_.vectorSize = tti.getRegisterBitWidth(
-                             llvm::TargetTransformInfo::RGK_FixedWidthVector) /
-                         8;
+
+    // Set the native vector width. We prioritize user-specified widths over
+    // widths provided by TTI.
+    if (clNativeVectorWidthInBytes) {
+      config_.vectorSize = clNativeVectorWidthInBytes;
+    } else {
+      unsigned ttiVectorWidth =
+          tti.getRegisterBitWidth(
+              llvm::TargetTransformInfo::RGK_FixedWidthVector) /
+          8;
+      config_.vectorSize =
+          ttiVectorWidth > 1 ? ttiVectorWidth : defaultNativeVectorWidth;
+    }
+
     LLVM_DEBUG({
       llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
       llvm::dbgs() << "Target Triple : "
                    << targetMachine->getTargetTriple().normalize() << "\n";
-      llvm::dbgs() << "Target Feature string : "
-                   << targetMachine->getTargetFeatureString() << "\n";
+      llvm::dbgs() << "Target Feature string : " << targetFeatures << "\n";
       llvm::dbgs() << "Data Layout : " << config_.dataLayoutStr << "\n";
       llvm::dbgs() << "Vector Width : " << config_.vectorSize << "\n";
     });

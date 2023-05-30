@@ -219,8 +219,9 @@ struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
     });
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+        getEntryPoint(funcOp)->getWorkgroupSize().value(), [&](Attribute attr) {
+          return llvm::cast<IntegerAttr>(attr).getInt();
+        }));
     if (failed(tileParallelDims(funcOp, workgroupSize, distributeToWarp))) {
       return signalPassFailure();
     }

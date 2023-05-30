@@ -91,7 +91,7 @@ struct WavePartitionBuilder {
     operandTypes.reserve(partition->ins.size());
     operandSizes.reserve(partition->ins.size());
     for (auto in : partition->ins) {
-      if (!in.getType().isa<IREE::Stream::ResourceType>()) continue;
+      if (!llvm::isa<IREE::Stream::ResourceType>(in.getType())) continue;
       operands.push_back(in);
       operandTypes.push_back(in.getType());
       auto operandSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(

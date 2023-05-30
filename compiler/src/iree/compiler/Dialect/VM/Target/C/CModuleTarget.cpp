@@ -67,8 +67,8 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
   std::string moduleName = moduleOp.getName().str();
 
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-    auto value =
-        rodataOp.getValue().dyn_cast<IREE::Util::SerializableAttrInterface>();
+    auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
+        rodataOp.getValue());
     assert(value && "expected a serializable rodata value");
     SmallVector<char> byteBuffer;
     if (failed(value.serializeToVector(llvm::support::endianness::little,
@@ -109,10 +109,9 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   // interior of structs (just VLA at the tail).
   auto countOrEmpty = [](uint32_t count) { return count ? count : 1; };
 
-  const int64_t numTypes = moduleOp.getOperation()
-                               ->getAttr("vm.num_types")
-                               .cast<IntegerAttr>()
-                               .getInt();
+  const int64_t numTypes =
+      llvm::cast<IntegerAttr>(moduleOp.getOperation()->getAttr("vm.num_types"))
+          .getInt();
 
   output << "struct " << moduleName << "_t {\n";
   output << "iree_allocator_t allocator;\n";
@@ -210,7 +209,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     }
   }
   auto extractExportName = [](func::FuncOp funcOp) {
-    return funcOp.getOperation()->getAttr("vm.export_name").cast<StringAttr>();
+    return llvm::cast<StringAttr>(
+        funcOp.getOperation()->getAttr("vm.export_name"));
   };
   std::string exportName = moduleName + "_exports_";
   output << "static const iree_vm_native_export_descriptor_t " << exportName
@@ -225,9 +225,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     });
     for (auto funcOp : exportedFunctions) {
       StringAttr exportName = extractExportName(funcOp);
-      StringAttr callingConvention = funcOp.getOperation()
-                                         ->getAttr("vm.calling_convention")
-                                         .cast<StringAttr>();
+      StringAttr callingConvention = llvm::cast<StringAttr>(
+          funcOp.getOperation()->getAttr("vm.calling_convention"));
       if (!callingConvention) {
         return funcOp.emitError("Couldn't find calling convention attribute");
       }

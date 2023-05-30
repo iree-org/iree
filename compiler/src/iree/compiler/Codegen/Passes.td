@@ -528,7 +528,9 @@ def LLVMCPUTile : Pass<"iree-llvmcpu-tile", "func::FuncOp"> {
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
       "Use default tiling level used to retrieve the configuration from lowering_config">,
     ListOption<"tileSizes", "tile-sizes", "int64_t",
-               "Use list of tile sizes for tiling">
+               "Use list of tile sizes for tiling">,
+    Option<"reductionOnly", "reduction-only", "bool", /*default=*/"false",
+      "Only reduction ops are tiled if the option is true">,
   ];
   let dependentDialects = [
       "arith::ArithDialect", "affine::AffineDialect", "linalg::LinalgDialect",

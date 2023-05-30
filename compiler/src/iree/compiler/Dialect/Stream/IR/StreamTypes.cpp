@@ -28,7 +28,7 @@ namespace Stream {
 static llvm::cl::opt<Favor> clPartitioningFavor(
     "iree-stream-partitioning-favor",
     llvm::cl::desc("Default stream partitioning favor configuration."),
-    llvm::cl::init(Favor::MaxConcurrency),
+    llvm::cl::init(Favor::MinPeakMemory),
     llvm::cl::values(
         clEnumValN(Favor::Debug, "debug",
                    "Force debug partitioning (no concurrency or pipelining)."),
@@ -323,12 +323,12 @@ void ResourceType::print(AsmPrinter &p) const {
 }
 
 bool ResourceType::isAccessStorageCompatible(Type accessType) const {
-  if (auto resourceType = accessType.dyn_cast<ResourceType>()) {
+  if (auto resourceType = llvm::dyn_cast<ResourceType>(accessType)) {
     // We could allow widening loads or stores here but today we require
     // transfers to accomplish that.
     return accessType == resourceType;
   }
-  return accessType.isa<ShapedType>();
+  return llvm::isa<ShapedType>(accessType);
 }
 
 Value ResourceType::inferSizeFromValue(Location loc, Value value,

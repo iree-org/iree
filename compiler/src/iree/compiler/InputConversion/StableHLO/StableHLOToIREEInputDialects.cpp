@@ -14,6 +14,7 @@
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
+#include "iree/compiler/InputConversion/StableHLO/Preprocessing/Rewriters.h"
 #include "iree/compiler/InputConversion/StableHLO/Rewriters.h"
 #include "iree/compiler/InputConversion/StableHLO/TypeConversion.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
@@ -141,7 +142,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
   Value zeroTensor =
       b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
 
-  switch (lhs.getType().cast<RankedTensorType>().getRank()) {
+  switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
     case 1:
       return b
           .create<linalg::VecmatOp>(loc, TypeRange{resultType},
@@ -185,9 +186,9 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     Location loc = op.getLoc();
     auto matrixType =
         RankedTensorType::get({n, fftLength}, inputType.getElementType());
-    auto resultType =
-        RankedTensorType::get(op.getType().cast<RankedTensorType>().getShape(),
-                              inputType.getElementType());
+    auto resultType = RankedTensorType::get(
+        llvm::cast<RankedTensorType>(op.getType()).getShape(),
+        inputType.getElementType());
 
     Value realMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
@@ -268,7 +269,7 @@ static void rewriteFuncAttrs(func::FuncOp funcOp) {
         newAttrs.push_back({
             abiOutputName,
             IntegerAttr::get(indexType,
-                             attr.getValue().cast<IntegerAttr>().getInt()),
+                             llvm::cast<IntegerAttr>(attr.getValue()).getInt()),
         });
       } else {
         newAttrs.push_back(attr);
@@ -427,7 +428,9 @@ struct ConvertStableHloToIreeInputDialects final
         createStableHloToLinalgTypeConverter();
     typeConverter->addArgumentMaterialization(scalarToTensor);
 
-    // TODO(#12678): Handle chlo lowering.
+    // Run stablehlo canonicalization patterns with a high benefit to avoid some
+    // expensive expansions.
+    populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
     populateStableHloToLinalgOnTensorsConversionPatterns(
         context, *typeConverter, &patterns);

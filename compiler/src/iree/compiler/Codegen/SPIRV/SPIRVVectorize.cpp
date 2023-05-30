@@ -227,7 +227,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::GatherOp op) {
 std::optional<SmallVector<int64_t>> getNativeVectorShape(
     Operation *op, bool targetSupportsDotProd) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
+    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
       nativeSize.back() = getComputeVectorSize(vecType.getShape().back());
       return nativeSize;
@@ -246,14 +246,16 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(
 
 /// Add patterns to vectorize any supported Linalg ops.
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  IREE::LinalgExt::LinalgTransformationFilter f;
-  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
+  IREE::LinalgExt::LinalgTransformationFilter filter;
+  IREE::LinalgExt::LinalgVectorizationOptions options;
+  // Enable vectorizing tensor.extract in Linalg ops.
+  options.vectorizeGatherAccesses = true;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, vectorizationOptions, f);
+      patterns, options, filter);
   linalg::populateConvolutionVectorizationPatterns(patterns);
   patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), vectorizationOptions,
-      f.addOpFilter<linalg::ContractionOpInterface>());
+      patterns.getContext(), options,
+      filter.addOpFilter<linalg::ContractionOpInterface>());
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
@@ -324,6 +326,20 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    {
+      auto result = funcOp.walk([&](linalg::LinalgOp op) {
+        // linalg.generic ops for copy are fine to not vectorize; they will be
+        // handled in later steps.
+        if (isa<linalg::YieldOp>(op.getBlock()->begin())) {
+          return WalkResult::advance();
+        }
+        // Other ones should error out.
+        op.emitOpError("should not remain after vectorization");
+        return WalkResult::interrupt();
+      });
+      if (result.wasInterrupted()) return signalPassFailure();
+    }
+
     // Special peephole optimizations to clean up IR before further processing.
     {
       RewritePatternSet patterns(context);
@@ -376,6 +392,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      vector::populateVectorTransferTensorSliceTransforms(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -524,6 +541,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      vector::populateVectorTransferTensorSliceTransforms(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -613,6 +631,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      vector::populateVectorTransferTensorSliceTransforms(patterns);
       vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
       scf::IfOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

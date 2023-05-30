@@ -195,7 +195,7 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
     auto signatureAttr = srcOp->getAttrOfType<TypeAttr>("vm.signature");
     if (signatureAttr) {
       // Directly use the signature from the user.
-      newSignature = signatureAttr.getValue().dyn_cast<FunctionType>();
+      newSignature = llvm::dyn_cast<FunctionType>(signatureAttr.getValue());
       if (!newSignature) {
         return rewriter.notifyMatchFailure(srcOp, "invalid vm.signature");
       }
@@ -282,7 +282,7 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
         if (auto signatureAttr =
                 funcOp->getAttrOfType<TypeAttr>("vm.signature")) {
           if (auto importSignature =
-                  signatureAttr.getValue().dyn_cast<FunctionType>()) {
+                  llvm::dyn_cast<FunctionType>(signatureAttr.getValue())) {
             convertedSignature = importSignature;
           }
         }
@@ -426,8 +426,8 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
       return srcOp.emitError() << "could not convert type: " << srcOp.getType()
                                << " (check -iree-vm-target-* options)";
     }
-    if (targetType.isa<IntegerType>()) {
-      auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
+    if (llvm::isa<IntegerType>(targetType)) {
+      auto integerAttr = llvm::dyn_cast<IntegerAttr>(srcOp.getValue());
       if (!integerAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -454,8 +454,8 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
           return srcOp.emitRemark()
                  << "unsupported const integer bit width for dialect";
       }
-    } else if (targetType.isa<FloatType>()) {
-      auto floatAttr = srcOp.getValue().dyn_cast<FloatAttr>();
+    } else if (llvm::isa<FloatType>(targetType)) {
+      auto floatAttr = llvm::dyn_cast<FloatAttr>(srcOp.getValue());
       if (!floatAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -1014,7 +1014,7 @@ class SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
           srcOp, valueType, adaptor.getCondition(), adaptor.getTrueValue(),
           adaptor.getFalseValue());
       return success();
-    } else if (valueType.isa<IREE::VM::RefType>()) {
+    } else if (llvm::isa<IREE::VM::RefType>(valueType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::SelectRefOp>(
           srcOp, valueType, adaptor.getCondition(), adaptor.getTrueValue(),
           adaptor.getFalseValue());

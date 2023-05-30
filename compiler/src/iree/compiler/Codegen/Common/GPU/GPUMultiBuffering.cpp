@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -25,7 +26,27 @@ struct GPUMultiBufferingPass
 
   void runOnOperation() override {
     auto funcOp = getOperation();
+
+    // First hoist all shared memory allocations to the entry block of the
+    // function. We can see memref.alloc in loops after bufferizing scf.forall
+    // with promoted shared memory usage inside.
+
     SmallVector<memref::AllocOp> allocs;
+    // Collect all the alloc operations.
+    funcOp.walk([&](memref::AllocOp allocOp) {
+      if (hasSharedMemoryAddressSpace(allocOp.getType()))
+        allocs.push_back(allocOp);
+    });
+
+    assert(funcOp.getBlocks().size() == 1);
+    for (memref::AllocOp allocOp : allocs) {
+      if (allocOp->getParentOp() != funcOp)
+        allocOp->moveBefore(&*funcOp.begin()->begin());
+    }
+
+    // Then perform multibuffering transformations.
+
+    allocs.clear();
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
       // Skip allocations not used in a loop.
@@ -38,10 +59,12 @@ struct GPUMultiBufferingPass
     });
     // Apply multi-buffering to all of them.
     for (memref::AllocOp alloc : allocs) {
-      if (failed(memref::multiBuffer(alloc, numBuffers)))
-        // Stop if any buffer cannot be multi buffered as pipelining will assume
-        // this happened.
+      if (failed(memref::multiBuffer(alloc, numBuffers))) {
+        // Error out and stop if any buffer cannot be multi buffered, as future
+        // software pipelining transformations will assume this happened.
+        alloc.emitOpError("cannot be multi-buffered");
         return signalPassFailure();
+      }
     }
   }
 

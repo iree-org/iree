@@ -22,27 +22,6 @@ iree_experimental_system_plugin(
     iree::builtins::ukernel
 )
 
-set(IREE_UK_COMMON_COPTS
-  "-DIREE_UK_ENABLE_INLINE_ASM"
-)
-
-set(IREE_UK_X86_64_COPTS
-  ${IREE_UK_COMMON_COPTS}
-  "-DIREE_UK_ARCH_X86_64"
-  "-DIREE_UK_POINTER_SIZE=8"
-  "-DIREE_UK_BUILD_X86_64_AVX2_FMA"
-  "-DIREE_UK_BUILD_X86_64_AVX512_BASE"
-  "-DIREE_UK_BUILD_X86_64_AVX512_VNNI"
-)
-
-set(IREE_UK_ARM_64_COPTS
-  ${IREE_UK_COMMON_COPTS}
-  "-DIREE_UK_ARCH_ARM_64"
-  "-DIREE_UK_POINTER_SIZE=8"
-  "-DIREE_UK_BUILD_ARM_64_DOTPROD"
-  "-DIREE_UK_BUILD_ARM_64_I8MM"
-)
-
 set(IREE_UK_X86_64_AVX2_FMA_COPTS
  "-mavx2"
  "-mfma"
@@ -74,17 +53,12 @@ iree_experimental_standalone_plugin(
   NAME
     builtin_ukernel_standalone_plugin
   ARCHS
-    "x86_64:IREE_UK_X86_64_COPTS"
-    "arm_64:IREE_UK_ARM_64_COPTS"
+    "x86_64"
+    "arm_64"
   SRCS
     plugin.c
-    runtime/src/iree/builtins/ukernel/mmt4d.c
-    runtime/src/iree/builtins/ukernel/mmt4d_tile.c
-    runtime/src/iree/builtins/ukernel/unpack_tile.c
-    runtime/src/iree/builtins/ukernel/pack.c
-    runtime/src/iree/builtins/ukernel/query_tile_sizes.c
-    runtime/src/iree/builtins/ukernel/unpack.c
-    runtime/src/iree/builtins/ukernel/pack_tile.c
+    # ukernel/arch/ file come before ukernel/ (non-arch) files because they
+    # contains symbols that should override weak symbols in ukernel/weak.c.
     "x86_64:runtime/src/iree/builtins/ukernel/arch/x86_64/query_tile_sizes_x86_64.c"
     "x86_64:runtime/src/iree/builtins/ukernel/arch/x86_64/unpack_x86_64.c"
     "x86_64:runtime/src/iree/builtins/ukernel/arch/x86_64/pack_x86_64.c"
@@ -102,4 +76,12 @@ iree_experimental_standalone_plugin(
     "arm_64:runtime/src/iree/builtins/ukernel/arch/arm_64/unpack_arm_64.c"
     "arm_64:runtime/src/iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_dotprod.c:IREE_UK_ARM_64_DOTPROD_COPTS"
     "arm_64:runtime/src/iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_i8mm.c:IREE_UK_ARM_64_I8MM_COPTS"
+    runtime/src/iree/builtins/ukernel/mmt4d.c
+    runtime/src/iree/builtins/ukernel/mmt4d_tile.c
+    runtime/src/iree/builtins/ukernel/unpack_tile.c
+    runtime/src/iree/builtins/ukernel/pack.c
+    runtime/src/iree/builtins/ukernel/query_tile_sizes.c
+    runtime/src/iree/builtins/ukernel/unpack.c
+    runtime/src/iree/builtins/ukernel/pack_tile.c
+    runtime/src/iree/builtins/ukernel/weak.c
 )
