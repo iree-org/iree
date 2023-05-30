@@ -150,9 +150,10 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
   // Look for all the copy that can be converted to async copy ops.
   funcOp.walk([&](Operation* writeOp) {
     if (!isContiguousStore(writeOp)) {
+      LDBG("--not a contiguous store: " << *writeOp);
       return WalkResult::advance();
     }
-    LDBG("--candidate writeOp: " << writeOp);
+    LDBG("--candidate writeOp: " << *writeOp);
     Value vectorVal = getValueStored(writeOp);
     if (llvm::cast<VectorType>(vectorVal.getType()).getRank() != 1) {
       LDBG("----writeOp is not an inbounds 1-D minor identity -> Skip");
@@ -166,10 +167,11 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
     }
     Operation* readOp = vectorVal.getDefiningOp();
     if (readOp == nullptr || !isContiguousRead(readOp)) {
-      LDBG("----no readOp defining the writeOp -> Skip");
+      LDBG("----no contiguous readOp defining the writeOp -> Skip");
       return WalkResult::advance();
     }
 
+    LDBG("--candidate readOp: " << *readOp);
     if (auto transferRead = dyn_cast<vector::TransferReadOp>(readOp)) {
       if (transferRead.getMask()) {
         auto paddingCst =
@@ -203,6 +205,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
   while (!copyToSharedMem.empty()) {
     SmallVector<Operation*> group;
     Operation* writeOp = *copyToSharedMem.begin();
+    LDBG("--START a group from: " << *writeOp);
     // Start a group with the first write.
     copyToSharedMem.remove(writeOp);
     group.push_back(writeOp);
@@ -230,6 +233,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
         continue;
       }
       // If the op is something else stop the accumulating op in the group.
+      LDBG("----> STOP accumulating into group due to: " << *nextNode);
       break;
     }
     // emit the group.
