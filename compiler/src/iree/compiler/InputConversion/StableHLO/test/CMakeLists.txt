@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "convert_collectives.mlir"
+    "legalize_chlo_decomposition.mlir"
     "legalize_chlo_no_broadcast.mlir"
     "legalize_chlo_with_broadcast.mlir"
     "legalize_control_flow.mlir"

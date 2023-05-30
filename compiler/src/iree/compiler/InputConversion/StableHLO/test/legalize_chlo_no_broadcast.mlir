@@ -4,18 +4,6 @@
 // Check the non-broadcast case for each registered op, then just check a
 // representative op for detailed broadcast semantics.
 
-// CHECK-LABEL: @constants
-func.func @constants() -> (tensor<4xi32>, tensor<2x2xf32>) {
-  %0 = chlo.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
-  %1 = chlo.constant dense<0.0> : tensor<2x2xf32>
-
-  // CHECK-DAG: stablehlo.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
-  // CHECK-DAG: stablehlo.constant dense<0.000000e+00> : tensor<2x2xf32>
-  func.return %0, %1 : tensor<4xi32>, tensor<2x2xf32>
-}
-
-// -----
-
 // CHECK-LABEL: @addWithoutBroadcast
 func.func @addWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: stablehlo.add %arg0, %arg1
@@ -347,4 +335,38 @@ func.func @xorWithoutBroadcast(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tens
   // CHECK: stablehlo.xor %arg0, %arg1
   %0 = chlo.broadcast_xor %arg0, %arg1 : (tensor<4xi1>, tensor<4xi1>) -> tensor<4xi1>
   func.return %0 : tensor<4xi1>
+}
+
+// -----
+// CHECK-LABEL: @NextAfterWithoutBroadcast
+func.func @NextAfterWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // CHECK-NOT: chlo.broadcast_next_after
+  %0 = chlo.broadcast_next_after %arg0, %arg1
+      : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  func.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @PolygammaWithoutBroadcast
+func.func @PolygammaWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // CHECK-NOT: chlo.broadcast_polygamma
+  // CHECK-NOT: chlo.polygamma
+  %0 = chlo.broadcast_polygamma %arg0, %arg1
+      : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  func.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @ZetaWithoutBroadcast
+func.func @ZetaWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // CHECK-NOT: chlo.broadcast_zeta
+  // CHECK-NOT: chlo.zeta
+  %0 = chlo.broadcast_zeta %arg0, %arg1
+      : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  func.return %0 : tensor<4xf32>
 }
