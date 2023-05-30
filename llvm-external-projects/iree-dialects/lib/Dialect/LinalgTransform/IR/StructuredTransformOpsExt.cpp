@@ -601,6 +601,47 @@ testValueMatcherCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+static DiagnosedSilenceableFailure testShapedValueMatcherCallback(
+    transform_ext::MatchCallbackResult &res, Location loc,
+    const mlir::transform::TransformState &state, ValueRange handles) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
+
+  int64_t rank;
+  SmallVector<int64_t> dims;
+  transform_ext::MatcherContext matcherContext;
+  auto &value = transform_ext::m_ShapedValue(matcherContext);
+  value.rank(transform_ext::CaptureRank(rank))
+      .dim(transform_ext::AllDims(), transform_ext::CaptureDims(dims));
+  auto &opMatcher =
+      transform_ext::m_Operation<linalg::GenericOp>(matcherContext);
+  opMatcher.result(0, value);
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    opMatcher.resetCapture();
+    if (!matchPattern(op, opMatcher))
+      return WalkResult::advance();
+
+    op->emitRemark() << "rank: " << rank;
+    std::string message;
+    llvm::raw_string_ostream os(message);
+    llvm::interleaveComma(dims, os);
+    os.flush();
+    op->emitRemark() << "dimensions: " << message;
+
+    res.addPayloadGroup({opMatcher.getCaptured()});
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
 /// Match callback for a reduction with optional leading and trailing
 /// elementwise operations. Matches *the first* occurrence of such a reduction
 /// within an op associated with the given handle.
@@ -791,6 +832,8 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
                             testRepeatedMatcherUseCallback);
   registry.registerCallback("_test_value_matcher_callback",
                             testValueMatcherCallback);
+  registry.registerCallback("_test_shaped_value_matcher_callback",
+                            testShapedValueMatcherCallback);
   registry.registerCallback("reduction", reductionCallback);
   registry.registerCallback("convolution", convolutionCallback);
   registry.registerCallback("matmul", matmulCallback);

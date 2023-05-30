@@ -149,6 +149,7 @@ struct IsIdentity {};
 /// Predicate tag indicating that the operand is a special float constant.
 struct ConstantFloatMinOrMinusInf {};
 struct ConstantFloatZero {};
+struct ConstantFloatOne {};
 
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
@@ -161,12 +162,8 @@ struct OptionalMatch : public SingleValuePredicateParam<bool> {
 /// operation.
 struct SingleCombinerReduction {};
 
-namespace detail {
-template <typename T>
-using has_reset_capture_t = decltype(std::declval<T>().resetCapture());
-template <typename T>
-using has_get_capture_t = decltype(std::declval<T>().getCaptured());
-} // namespace detail
+class CapturingOpMatcher;
+class CapturingValueMatcher;
 
 /// Base class for capturing matchers that can be owned by the context.
 class CapturingMatcherBase {
@@ -175,6 +172,33 @@ public:
   // TODO: if efficiency is a problem, consider disallowing non-trivial
   // destructors for subclasses.
   virtual ~CapturingMatcherBase() = default;
+
+protected:
+  /// Informs the matcher that it has another, nested matcher. Derived classes
+  /// must call this to keep track of nested matchers for capture resetting
+  /// purposes.
+  template <typename T>
+  void recordNestedMatcher(T &nested) {
+    if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
+      nestedCapturingMatchers.push_back(&nested);
+    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>)
+      nestedCapturingValueMatchers.push_back(&nested);
+  }
+
+  /// Appends all nested capturing matchers of a certain kind, excluding this
+  /// one, to `nested`.
+  void getAllNested(SmallVectorImpl<CapturingOpMatcher *> &nested);
+  void
+  getAllNestedValueMatchers(SmallVectorImpl<CapturingValueMatcher *> &nested);
+
+  /// Resets nested capturing matchers but does NOT reset the current one.
+  void resetCapture();
+
+private:
+  /// A list of (recursively) nested capturing matchers that should be reset
+  /// when the current matcher is.
+  SmallVector<CapturingOpMatcher *, 2> nestedCapturingMatchers;
+  SmallVector<CapturingValueMatcher *, 2> nestedCapturingValueMatchers;
 };
 
 /// A context object holding capturing matchers, must outlive any individual
@@ -202,34 +226,41 @@ private:
   SmallVector<std::unique_ptr<CapturingMatcherBase>> ownedMatchers;
 };
 
-/// Base class for value matchers that capture the matched value.
+/// Base class for value matchers that capture the matched value. Stores a list
+/// of predicates and requires all of them to match for the value to match. Once
+/// a value matched, any repeated use just verifies that equality of the value.
 class CapturingValueMatcher : public CapturingMatcherBase {
-  friend class CapturingOpMatcher;
+  friend class CapturingMatcherBase;
+  friend class MatcherContext;
+
+  using PredicateFn = std::function<bool(Value)>;
 
 public:
   /// Resets the captured value to null. This should be called if the same
   /// pattern needs to be applied more than once as it may keep captured values
   /// for optional nested predicates from the previous application.
-  void resetCapture() { captured = nullptr; }
+  void resetCapture() {
+    captured = nullptr;
+    CapturingMatcherBase::resetCapture();
+  }
 
   /// Returns the matched value if the match was successful.
   Value getCaptured() const { return captured; }
 
-protected:
-  Value captured = nullptr;
-};
-
-/// Matcher for a value, stores a list of predicates and requires all of them to
-/// match for the value to match. Once a value matched, any repeated use just
-/// verifies that equality of the value.
-class ValueMatcher : public CapturingValueMatcher {
-  using PredicateFn = std::function<bool(Value)>;
-  friend class MatcherContext;
-  ValueMatcher() = default;
-
-public:
   /// Matches the given value, hook for `matchPattern`.
   bool match(Value value);
+
+protected:
+  CapturingValueMatcher() = default;
+
+  /// Adds a predicate to the end of the predicate list for this value matcher.
+  template <typename Fn>
+  void addPredicate(Fn &&predicate) {
+    predicates.emplace_back(std::forward<Fn>(predicate));
+  }
+
+  /// The captured value.
+  Value captured = nullptr;
 
 private:
   /// Additional predicates to be checked on the value.
@@ -237,97 +268,177 @@ private:
 };
 
 /// Creates a matcher of an arbitrary value.
-inline ValueMatcher &m_Value(MatcherContext &context) {
-  return context.allocate<ValueMatcher>();
+inline CapturingValueMatcher &m_Value(MatcherContext &context) {
+  return context.allocate<CapturingValueMatcher>();
 }
 
-/// Base class for op matchers that capture the matched operation.
-class CapturingOpMatcher : public CapturingMatcherBase {
+/// Matcher for typed values whose type implements the `ShapedType` interface.
+/// Allows for matching the components of the shaped type such as rank and
+/// dimensions.
+class ShapedValueMatcher : public CapturingValueMatcher {
+  friend class MatcherContext;
+
+  ShapedValueMatcher();
+
 public:
-  /// Resets the captured value to null. This should be called if the same
-  /// pattern needs to be applied more than once as it may keep captured values
-  /// for optional nested predicates from the previous application.
-  void resetCapture() {
-    captured = nullptr;
-    SmallVector<CapturingOpMatcher *> nested;
-    getAllNested(nested);
-    for (CapturingOpMatcher *matcher : nested) {
-      matcher->captured = nullptr;
-    }
-    SmallVector<CapturingValueMatcher *> nestedValue;
-    getAllNestedValueMatchers(nestedValue);
-    for (CapturingValueMatcher *matcher : nestedValue) {
-      matcher->captured = nullptr;
-    }
-  }
+  /// Add an always-succeeding matcher predicate capturing the rank.
+  ShapedValueMatcher &rank(CaptureRank capture);
 
-  /// Returns the matched operation if the match was successful.
-  Operation *getCaptured() const { return captured; }
+  /// Add an always-succeeding matcher predicate capturing the size of the
+  /// dimension identified by the first argument.
+  ShapedValueMatcher &dim(int64_t dimension, CaptureDim capture);
 
-protected:
-  /// Informs the matcher that it has another, nested matcher. Derived classes
-  /// must call this to keep track of nested matchers for capture resetting
-  /// purposes.
-  template <typename T>
-  void recordNestedMatcher(T &nested) {
-    if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
-      nestedCapturingMatchers.push_back(&nested);
-    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>)
-      nestedCapturingValueMatchers.push_back(&nested);
-  }
-
-  /// Appends all nested capturing matchers, excluding this one, to `nested`.
-  void getAllNested(SmallVectorImpl<CapturingOpMatcher *> &nested);
-  void
-  getAllNestedValueMatchers(SmallVectorImpl<CapturingValueMatcher *> &nested);
-
-private:
-  /// A list of (recursively) nested capturing matchers that should be reset
-  /// when the current matcher is.
-  SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
-  SmallVector<CapturingValueMatcher *> nestedCapturingValueMatchers;
-
-protected:
-  /// Matched value.
-  linalg::LinalgOp captured = nullptr;
+  /// Add an always-succeeding matcher predicate capturing the sizes of all
+  /// dimensions in order of appearance.
+  ShapedValueMatcher &dim(AllDims tag, CaptureDims captures);
 };
 
-/// Structured op matcher with additional predicates attachable through the
+/// Construct a new matcher of a value whose type is a `ShapedType`, owned by
+/// the given context.
+inline ShapedValueMatcher &m_ShapedValue(MatcherContext &context) {
+  return context.allocate<ShapedValueMatcher>();
+}
+
+/// Matcher for operations with additional predicates attachable through the
 /// fluent, a.k.a. chainable, API. Note that public API must *not* accept
 /// additional callbacks even; new predicates should be added instead when
 /// necessary. Not only this decreases the depth of the callback stack and
 /// increases readability, it also allows us to port the matcher to a
 /// declarative format using PDL and/or Transform dialect in the future. The
 /// latter will become impossible with arbitrary C++ callbacks.
+class CapturingOpMatcher : public CapturingMatcherBase {
+  friend class CapturingMatcherBase;
+  friend class MatcherContext;
+
+  template <typename... OpTy>
+  friend CapturingOpMatcher &m_Operation(MatcherContext &matcherContext);
+
+public:
+  using PredicateFn = std::function<bool(Operation *)>;
+
+  /// Matches the given operation, hook for `matchPattern`.
+  bool match(Operation *op);
+
+  /// Resets the captured value to null. This should be called if the same
+  /// pattern needs to be applied more than once as it may keep captured values
+  /// for optional nested predicates from the previous application.
+  void resetCapture() {
+    captured = nullptr;
+    CapturingMatcherBase::resetCapture();
+  }
+
+  /// Returns the matched operation if the match was successful.
+  Operation *getCaptured() const { return captured; }
+
+  /// Adds alternative paths for predicates. In practice, this is just a
+  /// predicate that is satisfied when either the first or the second matcher is
+  /// satisfied. The alternative satisfaction is eager and short-cutting, i.e.,
+  /// the second alternative will not be processed, and therefore will not
+  /// capture values, if the first alternative succeeded.
+  CapturingOpMatcher &alternatives(CapturingOpMatcher &first,
+                                   CapturingOpMatcher &second);
+
+  //-------------------------------------------------------------------------//
+  // Predicates for operands and results.
+  //-------------------------------------------------------------------------//
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of operands.
+  CapturingOpMatcher &operand(NumEqualsTo num);
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by an operation that satisfies the given matcher.
+  CapturingOpMatcher &operand(int64_t pos, CapturingOpMatcher &nested);
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation
+  /// satisfies the given value matcher.
+  CapturingOpMatcher &operand(int64_t pos, CapturingValueMatcher &nested);
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by `arith.constant` with the value 1.0.
+  // TODO: better matching for attributes.
+  CapturingOpMatcher &operand(int64_t pos, ConstantFloatOne);
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of results.
+  CapturingOpMatcher &result(NumEqualsTo num);
+
+  /// Adds a predicate checking that the `pos`-th result of the operation
+  /// satisfies the given value matcher.
+  CapturingOpMatcher &result(int64_t pos, CapturingValueMatcher &nested);
+
+protected:
+  /// Constructs a default operation matcher accepting any operation.
+  CapturingOpMatcher() = default;
+
+  /// Adds a predicate for the matched operation to satisfy.
+  template <typename Fn>
+  void addPredicate(Fn &&predicate) {
+    predicates.emplace_back(std::forward<Fn>(predicate));
+  }
+
+  /// Produce the debug output for `create` method in a non-templated way.
+  static void debugOutputForCreate(ArrayRef<StringRef> opNames);
+
+private:
+  /// A list of additional conditions for the operation to match.
+  SmallVector<PredicateFn> predicates;
+
+  /// Creates a matcher for an operation with one of the given types.
+  template <typename... OpType>
+  static CapturingOpMatcher create() {
+    CapturingOpMatcher matcher;
+    matcher.addPredicate([](Operation *op) {
+      debugOutputForCreate(ArrayRef<StringRef>{OpType::getOperationName()...});
+      return isa<OpType...>(op);
+    });
+    return matcher;
+  }
+
+  /// Common util for constant matcher.
+  CapturingOpMatcher &operand(int64_t position,
+                              std::function<bool(llvm::APFloat)> floatValueFn);
+
+protected:
+  /// Matched value.
+  Operation *captured = nullptr;
+};
+
+/// Creates a default operation matcher in the given context that accepts any
+/// operation.
+inline CapturingOpMatcher &m_Operation(MatcherContext &matcherContext) {
+  return matcherContext.allocate<CapturingOpMatcher>();
+}
+
+/// Creates an operation matcher in the given context that accepts only
+/// operations of the kinds provided as template arguments.
+template <typename... OpTy>
+inline CapturingOpMatcher &m_Operation(MatcherContext &matcherContext) {
+  return matcherContext.allocate<CapturingOpMatcher>(
+      CapturingOpMatcher::create<OpTy...>());
+}
+
+/// Matcher for structured aka Linalg operations. Extensions must follow the
+/// same conditions as the base class.
 class StructuredOpMatcher : public CapturingOpMatcher {
   friend class MatcherContext;
 
-  using PredicateFn = std::function<bool(linalg::LinalgOp)>;
-  using CaptureResetFn = std::function<void()>;
-  using GetCapturedFn = std::function<Operation *()>;
-
-  StructuredOpMatcher() = default;
-
-  /// Matches a structured operation if the given predicate is satisfied.
-  StructuredOpMatcher(PredicateFn &&firstPredicate) {
-    predicates.push_back(std::move(firstPredicate));
-  }
+  StructuredOpMatcher();
 
 public:
   /// Creates a matcher for a structured operation with one of the given types.
   template <typename... OpType>
   static StructuredOpMatcher create() {
-    return StructuredOpMatcher([](linalg::LinalgOp op) {
+    StructuredOpMatcher matcher;
+    matcher.addPredicate([](Operation *op) {
       debugOutputForCreate(ArrayRef<StringRef>{OpType::getOperationName()...});
-      return isa<OpType...>(op.getOperation());
+      return isa<linalg::LinalgOp>(op) && isa<OpType...>(op);
     });
+    return matcher;
   }
 
   /// Matches a structured operation if either patterns A or B match.
   StructuredOpMatcher(StructuredOpMatcher &A, StructuredOpMatcher &B);
-
-  /// Matches the given operation, hook for `matchPattern`.
-  bool match(Operation *op);
 
   //===-------------------------------------------------------------------===//
   // Constraints on op rank and dims.
@@ -474,7 +585,7 @@ public:
     SmallVector<CapturingOpMatcher *> copy;
     copy.push_back(this);
     getAllNested(copy);
-    predicates.push_back([copy = std::move(copy)](linalg::LinalgOp linalgOp) {
+    addPredicate([copy = std::move(copy)](linalg::LinalgOp linalgOp) {
       Operation *parent = linalgOp->getParentOfType<OpTy>();
       return checkAllTilableMatched(parent, linalgOp, copy);
     });
@@ -595,14 +706,22 @@ public:
   StructuredOpMatcher &passThroughOp();
 
 private:
+  /// Adds a predicate for the matched operation to satisfy.
+  void addPredicate(std::function<bool(linalg::LinalgOp)> predicate) {
+    // Check that the operation implements the LinalgOp interface and dispatch
+    // to the predicate.
+    CapturingOpMatcher::addPredicate(
+        [inner = std::move(predicate)](Operation *op) {
+          auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+          return linalgOp && inner(linalgOp);
+        });
+  }
+
   /// Checks that `matchers` captured all tilable ops nested in `parent` except
   /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
   static bool checkAllTilableMatched(Operation *parent,
                                      linalg::LinalgOp linalgOp,
                                      ArrayRef<CapturingOpMatcher *> matchers);
-
-  /// Produce the debug output for `create` method in a non-templated way.
-  static void debugOutputForCreate(ArrayRef<StringRef> opNames);
 
   /// Non-template implementations of nested predicate builders for inputs,
   /// outputs and results. Should not be called directly.
@@ -621,9 +740,6 @@ private:
   // Common util for constant matcher.
   StructuredOpMatcher &input(int64_t position,
                              std::function<bool(llvm::APFloat)> floatValueFn);
-
-  /// Additional predicates to be checked on the structured op.
-  SmallVector<PredicateFn> predicates;
 };
 
 /// Creates a matcher of an arbitrary structured op.
