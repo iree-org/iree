@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -48,8 +47,7 @@ struct ExpandF16MaxFToF32Pattern : public OpRewritePattern<arith::MaxFOp> {
 };
 
 struct ExpandF16MaxFToF32Pass
-    : public ExpandArithF16ToF32Base<
-          ExpandF16MaxFToF32Pass> {
+    : public ExpandArithF16ToF32Base<ExpandF16MaxFToF32Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
