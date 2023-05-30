@@ -1,6 +1,5 @@
 // RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
 
-
 // CHECK-LABEL: func @matmul_tensors
 // CHECK-NOT: linalg
 // CHECK: llvm
