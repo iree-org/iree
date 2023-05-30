@@ -27,6 +27,9 @@ macro(iree_llvm_configure_bundled)
   # Disable LLVM's warnings.
   set(LLVM_ENABLE_WARNINGS OFF)
 
+  # Disable unsafe optimizations on 'llvm_unreachable'.
+  set(LLVM_UNREACHABLE_OPTIMIZE OFF)
+
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
