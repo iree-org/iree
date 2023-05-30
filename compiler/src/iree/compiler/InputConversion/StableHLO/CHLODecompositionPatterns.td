@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// This is the legalization pattern definition file for CHLO to MHLO.
-// These are included in the PopulateDecomposeChloPatterns factory
+// This is the legalization pattern definition file for CHLO to StableHLO.
+// These are included in the populateDecompositionPatterns factory
 // and should only include canonical expansions which are not actually
 // ambiguous/different for various backends. Avoid patterns that are actually
 // lowering to non-canonical forms.
