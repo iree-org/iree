@@ -10,7 +10,6 @@
 #include "iree/builtins/ukernel/unpack.h"
 
 typedef enum iree_uk_unpack_type_t {
-  iree_uk_unpack_type_none = 0,
   iree_uk_unpack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
   iree_uk_unpack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),
 } iree_uk_unpack_type_t;
@@ -23,7 +22,7 @@ static inline iree_uk_unpack_type_t iree_uk_unpack_type(
     case IREE_UK_FLAG_UNPACK_TYPE_I32I32:
       return iree_uk_unpack_type_i32i32;
     default:
-      return iree_uk_unpack_type_none;
+      IREE_UK_ASSUME_UNREACHABLE;
   }
 }
 

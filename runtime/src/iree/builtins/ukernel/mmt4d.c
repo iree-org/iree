@@ -14,8 +14,9 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
                                     IREE_UK_FLAG_MMT4D_ACCUMULATE |
                                     IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
-  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
-  IREE_UK_ASSERT(mmt4d_type != iree_uk_mmt4d_type_none);
+  iree_uk_uint32_t flags_type = params->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK;
+  IREE_UK_ASSERT(flags_type == IREE_UK_FLAG_MMT4D_TYPE_F32F32F32 ||
+                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_I8I8I32);
   // Some implementations may wish to avoid supporting absurdly wide types. For
   // instance, K is the innermost (i.e. hottest) loop bound, so some 32bit
   // targets may benefit from K being int32, not int64. We still let K be of
@@ -29,6 +30,7 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
   IREE_UK_ASSERT(IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(params->N0, 15));
   IREE_UK_ASSERT(IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(params->K0, 15));
   // Ensure iree_uk_mmt4d_tile_generic_max_bytes large enough for this tile.
+  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
   IREE_UK_ASSERT(params->M0 * params->N0 *
                      iree_uk_type_size(iree_uk_mmt4d_out_type(mmt4d_type)) <=
                  iree_uk_mmt4d_tile_generic_max_bytes);
