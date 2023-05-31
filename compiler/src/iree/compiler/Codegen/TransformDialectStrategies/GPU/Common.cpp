@@ -770,7 +770,7 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
       StagedReductionStrategy strategy(captures, reductionConfig);
       return buildStagedReductionStrategy(b, variant, strategy);
     } else {
-      return llvm_unreachable("Unknown strategy");
+      llvm_unreachable("Unknown strategy");
     }
   };
 
