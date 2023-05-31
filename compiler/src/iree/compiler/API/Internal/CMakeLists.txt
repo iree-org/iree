@@ -27,7 +27,6 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::API::MLIRInteropHeaders
     iree::compiler::ConstEval
-    iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Target::init_targets
@@ -80,6 +79,7 @@ iree_cc_library(
     MLIROptLib
     MLIRPass
     MLIRSupport
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
