@@ -862,6 +862,10 @@ LogicalResult TensorEmptyOp::verify() {
   return success();
 }
 
+bool TensorEmptyOp::isMetadata() { return true; }
+
+bool TensorEmptyOp::preferCloneToConsumers() { return true; }
+
 //===----------------------------------------------------------------------===//
 // stream.tensor.constant
 //===----------------------------------------------------------------------===//
@@ -892,6 +896,8 @@ LogicalResult TensorSplatOp::verify() {
   }
   return success();
 }
+
+bool TensorSplatOp::preferCloneToConsumers() { return true; }
 
 //===----------------------------------------------------------------------===//
 // stream.tensor.clone
