@@ -221,16 +221,6 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return;
   }
 
-  auto iterTypes = consumerOp.getLoopIteratorTypes();
-  for (auto [idx, size] : llvm::enumerate(tilingSizes)) {
-    if (size == 0) continue;
-    if (iterTypes[idx] == utils::IteratorType::reduction) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "----- skip, can't tile and fuse reduction dims -----\n");
-      return;
-    }
-  }
-
   auto options = scf::SCFTilingOptions().setTileSizes(tilingSizes);
   IRRewriter rewriter(context);
   if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
