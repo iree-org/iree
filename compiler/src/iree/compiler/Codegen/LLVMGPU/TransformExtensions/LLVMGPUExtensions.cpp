@@ -91,7 +91,6 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
-  Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
   ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
@@ -100,13 +99,12 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getWarpDims(),
           true);
-  if (diag.succeeded()) {
-    auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
-    rewriter.startRootUpdate(exportOp);
-    exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
-    rewriter.finalizeRootUpdate(exportOp);
-  }
-  return listener.check(loc, std::move(diag));
+  if (!diag.succeeded()) return diag;
+  auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
+  rewriter.startRootUpdate(exportOp);
+  exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
+  rewriter.finalizeRootUpdate(exportOp);
+  return listener.checkAndResetError();
 }
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::getEffects(
@@ -346,15 +344,14 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
     // Return a silenceable failure and set the expected 1 result to
     // nullptr.
     results.assign(1, nullptr);
-    return listener.check(
-        loc, emitDefaultSilenceableFailure(target)
-                 << "scf::ifOp needs to be predicated on threadIdx.x == 0 "
-                    "--- the "
-                    "transform is not applied");
+    return mlir::emitSilenceableFailure(
+        target,
+        "scf::ifOp needs to be predicated on threadIdx.x == 0 "
+        "--- the transform is not applied");
   }
 
   results.push_back(vectorDistributionResult->warpOp);
-  return listener.check(loc);
+  return listener.checkAndResetError();
 }
 
 //===---------------------------------------------------------------------===//
@@ -611,7 +608,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   auto checkErrors = llvm::make_scope_exit([&]() {
     // The TrackingListener API makes checking for errors mandatory. It is safe
     // to drop payload ops during this transform, so we can ignore all errors.
-    (void)listener.checkErrorState();
+    (void)listener.checkAndResetError();
   });
   GreedyRewriteConfig config;
   config.listener = &listener;
@@ -694,30 +691,30 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     return emitDefaultDefiniteFailure(target);
   }
 
-  Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
   rewriter.setListener(&listener);
   auto diag = DiagnosedSilenceableFailure::success();
   if (getUseWmma()) {
     if (failed(convertVectorToMMAOps(rewriter, target)))
-      diag = emitDefiniteFailure("vector to wmma patterns failed to apply");
-    return listener.check(loc, std::move(diag));
+      return mlir::emitDefiniteFailure(
+          target, "vector to wmma patterns failed to apply");
+    return listener.checkAndResetError();
   }
 
-  if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp))) {
-    target->emitOpError("vector to mma patterns failed to apply");
-    return listener.check(loc, emitDefaultDefiniteFailure(target));
-  }
+  if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp)))
+    return mlir::emitDefiniteFailure(target,
+                                     "vector to mma patterns failed to apply");
+
   // Using TF32 for Float.
   RewritePatternSet f32ToTF32patterns(funcOp.getContext());
   nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                           nvgpu::MmaSyncF32Lowering::TF32);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(f32ToTF32patterns),
-                                          config))) {
-    target->emitOpError("vector to mma F32ToTF32 patterns failed to apply");
-    return listener.check(loc, emitDefaultDefiniteFailure(target));
-  }
-  return listener.check(loc, std::move(diag));
+                                          config)))
+    return mlir::emitDefiniteFailure(
+        target, "vector to mma F32ToTF32 patterns failed to apply");
+
+  return listener.checkAndResetError();
 }
 
 //===----------------------------------------------------------------------===//
@@ -784,13 +781,12 @@ void transform_dialect::CreateAsyncGroupsOp::getEffects(
 DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
   ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   iree_compiler::createAsyncGroups(rewriter, cast<func::FuncOp>(target),
                                    getUseMmaSync());
-  return listener.check(loc);
+  return listener.checkAndResetError();
 }
 
 //===---------------------------------------------------------------------===//

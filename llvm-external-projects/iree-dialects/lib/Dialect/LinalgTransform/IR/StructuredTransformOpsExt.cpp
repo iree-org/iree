@@ -357,10 +357,11 @@ void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
     return;
   }
 
-  hadErrors = true;
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-  errorStateChecked = false;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
+  status = emitSilenceableFailure(
+      getTransformOp(), "tracking listener failed to find replacement op");
+  status.attachNote(op->getLoc()) << "replaced op";
+  for (Value v : values)
+    status.attachNote(v.getLoc()) << "replacement value";
 }
 
 //===----------------------------------------------------------------------===//
