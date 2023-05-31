@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/Dialect/Transform/IR/TransformTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OpDefinition.h"
 
@@ -36,7 +37,7 @@ template <int N, typename... MatchingArgs>
 auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
                                    StringRef callbackName,
                                    MatchingArgs... args) {
-  SmallVector<Type> matchedTypes(N, pdl::OperationType::get(b.getContext()));
+  SmallVector<Type> matchedTypes(N, transform::AnyOpType::get(b.getContext()));
   auto matchOp = b.create<transform_ext::MatchCallbackOp>(
       matchedTypes, callbackName, std::forward<decltype(args)>(args)...);
   assert(matchOp->getNumResults() == N && "Unexpected number of results");

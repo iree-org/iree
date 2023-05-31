@@ -532,6 +532,7 @@ EXPORTS
   mlirTransformAnyOpTypeGet
   mlirTransformOperationTypeGet
   mlirTransformOperationTypeGetOperationName
+  mlirTransformOperationTypeGetTypeID
   mlirTupleTypeGet
   mlirTupleTypeGetNumTypes
   mlirTupleTypeGetType
@@ -541,6 +542,7 @@ EXPORTS
   mlirTypeDump
   mlirTypeEqual
   mlirTypeGetContext
+  mlirTypeGetDialect
   mlirTypeGetTypeID
   mlirTypeIDAllocatorAllocateTypeID
   mlirTypeIDAllocatorCreate

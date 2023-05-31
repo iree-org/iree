@@ -8,13 +8,10 @@ func.func @select_cmp_eq_select(%arg0: i64, %arg1: i64) -> i64 {
   return %1 : i64
 }
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !transform.any_op):
-  transform.sequence %arg0 : !transform.any_op failures(propagate) {
-  ^bb1(%arg1: !transform.any_op):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-    transform.iree.apply_patterns %0 { canonicalization } : (!transform.any_op) -> ()
-  }
+transform.sequence failures(propagate) {
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_patterns %0 { canonicalization } : (!transform.any_op) -> ()
 }
 
 // -----

@@ -95,10 +95,10 @@ void mlir::iree_compiler::createTransformRegion(
   auto topLevelTransformModule = b.create<ModuleOp>(loc);
   Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
   b.setInsertionPointToStart(&topLevelTransformRegion.front());
-  auto pdlOperationType = pdl::OperationType::get(b.getContext());
+  auto anyOpType = transform::AnyOpType::get(b.getContext());
   auto sequence = b.create<transform::SequenceOp>(
-      loc, TypeRange{}, transform::FailurePropagationMode::Propagate,
-      pdlOperationType, [&](OpBuilder &b, Location loc, Value variantH) {
+      loc, TypeRange{}, transform::FailurePropagationMode::Propagate, anyOpType,
+      [&](OpBuilder &b, Location loc, Value variantH) {
         ImplicitLocOpBuilder ib(loc, b);
         buildStrategy(ib, variantH);
         b.create<transform::YieldOp>(loc);
@@ -147,8 +147,8 @@ Value mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
 /// This can be thought of as a control-flow -> data-dependent conversion.
 std::pair<Value, Value> mlir::iree_compiler::buildSelectFirstNonEmpty(
     ImplicitLocOpBuilder &b, Value handle1, Value handle2) {
-  auto pdlOperation = pdl::OperationType::get(b.getContext());
-  auto selector = b.create<TakeFirstOp>(pdlOperation, pdlOperation,
+  auto anyOpType = transform::AnyOpType::get(b.getContext());
+  auto selector = b.create<TakeFirstOp>(anyOpType, anyOpType,
                                         ArrayRef<Value>{handle1, handle2});
   return std::make_pair(selector.getFirst(), selector.getRest());
 }
@@ -217,10 +217,11 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   if (opsHToFuse.size() > 1) {
     Value mergedOpsH =
         b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
-    b.create<FuseIntoContainingOp>(mergedOpsH, result.forallH);
+    b.create<FuseIntoContainingOp>(mergedOpsH, result.forallH).getFusedOp();
   } else if (opsHToFuse.size() == 1) {
     Value fusedH =
-        b.create<FuseIntoContainingOp>(opsHToFuse.front(), result.forallH);
+        b.create<FuseIntoContainingOp>(opsHToFuse.front(), result.forallH)
+            .getFusedOp();
     result.resultingFusedOpsHandles.push_back(fusedH);
   }
   return result;
@@ -297,10 +298,10 @@ Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
     ImplicitLocOpBuilder &b, Value containingOpH) {
   // TODO: not a functional style op to avoid invalidating artificially.
   containingOpH = b.create<transform::LowerMasksOp>(
-      pdl::OperationType::get(b.getContext()), containingOpH);
+      transform::AnyOpType::get(b.getContext()), containingOpH);
   // TODO: not a functional style op to avoid invalidating artificially.
   containingOpH = b.create<transform::MaterializeMasksOp>(
-      pdl::OperationType::get(b.getContext()), containingOpH);
+      transform::AnyOpType::get(b.getContext()), containingOpH);
   {
     ApplyPatternsOpPatterns config;
     config.foldMemrefAliases = true;
@@ -414,7 +415,8 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
   Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
   // Fuse the fill and elementwise to privatize them.
   blockParallelFillH =
-      b.create<FuseIntoContainingOp>(blockParallelFillH, blockParallelForallOp);
+      b.create<FuseIntoContainingOp>(blockParallelFillH, blockParallelForallOp)
+          .getFusedOp();
   return std::make_tuple(blockParallelForallOp, blockParallelFillH,
                          blockCombinerOpH);
 }
@@ -450,9 +452,11 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
   b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
       tileResult.forallH);
 
-  fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.forallH);
+  fillH =
+      b.create<FuseIntoContainingOp>(fillH, tileResult.forallH).getFusedOp();
   maybeLeadingH =
-      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH);
+      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH)
+          .getFusedOp();
 
   // Perform a pass of canonicalization + enabling after fusion.
   ApplyPatternsOpPatterns configuration;

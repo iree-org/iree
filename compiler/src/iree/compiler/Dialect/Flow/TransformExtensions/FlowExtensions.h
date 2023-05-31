@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS_H_
 
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 

@@ -16,9 +16,9 @@ transform.sequence failures(propagate) {
   transform.structured.tile_to_forall_op %matmul1 tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
-  transform.structured.fuse_into_containing_op %fill1 into %forall_grid : (!transform.any_op, !transform.any_op) -> !transform.any_op
-  transform.structured.fuse_into_containing_op %matmul0 into %forall_grid : (!transform.any_op, !transform.any_op) -> !transform.any_op
-  transform.structured.fuse_into_containing_op %fill0 into %forall_grid : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %fill1 into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+  transform.structured.fuse_into_containing_op %matmul0 into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+  transform.structured.fuse_into_containing_op %fill0 into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Step 3. Vectorize
   // ===========================================================================

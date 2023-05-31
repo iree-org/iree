@@ -20,6 +20,7 @@ add_mlir_library(IREELinalgTransformDialect
   MLIRPDLDialect
   MLIRRewrite
   MLIRTransformDialect
+  MLIRTransformPDLExtension
 
   # Transforms
   MLIRAffineToStandard

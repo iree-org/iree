@@ -20,7 +20,7 @@ transform.sequence failures(propagate) {
        : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
   %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op : !transform.any_op
-  transform.structured.fuse_into_containing_op %not_combiner into %forall_grid : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %not_combiner into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Step 3. Second level of tiling + fusion parallelizes to threads.
   // ===========================================================================
@@ -30,7 +30,7 @@ transform.sequence failures(propagate) {
     transform.structured.tile_to_forall_op %grid_combiner_op tile_sizes [1] 
     ( mapping = [#gpu.thread<z>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-  transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -45,7 +45,7 @@ transform.sequence failures(propagate) {
     transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================

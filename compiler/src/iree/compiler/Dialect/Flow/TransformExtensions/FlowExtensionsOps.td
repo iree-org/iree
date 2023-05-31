@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -28,7 +27,7 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.forall
 
     If any rewrite fails, the transform definitely fails.
 
-    If all the operations referred to by the `target` PDLOperation generalize
+    If all the operations referred to by the `target` operand generalize
     properly, the transform succeeds. Otherwise the transform silently fails.
 
     The return handle points to only the subset of successfully produced
