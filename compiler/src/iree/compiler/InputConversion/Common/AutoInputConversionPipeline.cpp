@@ -27,10 +27,11 @@
 #endif  // IREE_HAVE_TORCH_INPUT
 
 namespace mlir::iree_compiler {
-
+namespace {
 struct AutoInputConversionPipelinePass
     : public AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   void runOnOperation() override;
+  void getDependentDialects(DialectRegistry& registry) const override;
 };
 
 // All the features seen that should be handled during input conversion.
@@ -165,6 +166,35 @@ void AutoInputConversionPipelinePass::runOnOperation() {
     signalPassFailure();
   }
 }
+
+void AutoInputConversionPipelinePass::getDependentDialects(
+    DialectRegistry& registry) const {
+  auto appendPipelineDialects =
+      [&registry](function_ref<void(OpPassManager&)> buildFn) {
+        OpPassManager pm;
+        buildFn(pm);
+        pm.getDependentDialects(registry);
+      };
+
+#ifdef IREE_HAVE_MHLO_INPUT
+  appendPipelineDialects([](OpPassManager& pm) {
+    MHLO::buildMHLOInputConversionPassPipeline(pm);
+  });
+  appendPipelineDialects(
+      [](OpPassManager& pm) { MHLO::buildXLAInputConversionPassPipeline(pm); });
+#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_TOSA_INPUT
+  appendPipelineDialects(
+      [](OpPassManager& pm) { buildTOSAInputConversionPassPipeline(pm); });
+#endif  // IREE_HAVE_TOSA_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
+  appendPipelineDialects([](OpPassManager& pm) {
+    pm.addNestedPass<func::FuncOp>(
+        TMTensor::createConvertTMTensorToLinalgExtPass());
+  });
+#endif  // IREE_HAVE_TORCH_INPUT
+}
+}  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass() {
