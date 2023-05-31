@@ -13,6 +13,7 @@
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/iree_helpers.h"
 #include "iree/integrations/pjrt/common/tensor_utils.h"
+#include "xla/pjrt/compile_options.pb.h"
 
 using iree::vm::retain_ref;
 
@@ -990,7 +991,16 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     // work on that.
     auto* client = ClientInstance::Unwrap(args->client);
     LoadedExecutableInstance* executable;
-    auto* error = client->Compile(args->program, &executable);
+
+    // Read compilation options.
+    xla::CompileOptionsProto options;
+    if (!options.ParseFromArray(args->compile_options,
+                                args->compile_options_size)) {
+      return MakeError(iree_make_status(IREE_STATUS_INTERNAL,
+                                        "could not parse compilation options"));
+    }
+
+    auto* error = client->Compile(args->program, options, &executable);
     if (error) return error;
     args->executable = *executable;
     return nullptr;
@@ -1070,6 +1080,7 @@ iree_status_t ClientInstance::PopulateDevices() {
 }
 
 PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
+                                    xla::CompileOptionsProto options,
                                     LoadedExecutableInstance** out_executable) {
   std::unique_ptr<ArtifactDumper::Transaction> artifact_tx;
   if (platform().artifact_dumper().enabled()) {
@@ -1106,7 +1117,12 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
       job->EnableCrashDumps(artifact_tx.get());
     }
 
-    // TODO: Set flags (like num partitions).
+    // Set flags.
+    int num_partitions = options.executable_build_options().num_partitions();
+    job->SetFlag(absl::StrCat("--openxla-partitioner-gspmd-num-partitions=",
+                              num_partitions)
+                     .c_str());
+
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"partitioner_flags", /*extension=*/"txt", /*index=*/-1,
