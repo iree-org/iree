@@ -65,7 +65,7 @@ iree_check_single_backend_test_suite(
         "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir",
     ] + BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -88,7 +88,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "layernorm.mlir",
     ] + BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "local-task",
     target_backend = "vmvx",
 )
@@ -97,7 +97,7 @@ iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
     srcs = BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -108,7 +108,7 @@ iree_check_single_backend_test_suite(
         "large_reduction.mlir",
         "layernorm.mlir",
     ] + BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.

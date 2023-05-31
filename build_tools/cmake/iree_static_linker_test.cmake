@@ -40,7 +40,7 @@
 #     FUNCTION_INPUTS
 #       "1x128x128xf32"
 #     COMPILER_FLAGS
-#       "--iree-input-type=mhlo"
+#       "--iree-input-type=stablehlo"
 #   )
 function(iree_static_linker_test)
   if(NOT IREE_BUILD_TESTS)

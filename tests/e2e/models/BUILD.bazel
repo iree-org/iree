@@ -54,7 +54,7 @@ iree_lit_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = CHECK_FRAMEWORK_TESTS,
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -71,7 +71,7 @@ iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     timeout = "long",
     srcs = CHECK_FRAMEWORK_TESTS,
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -80,7 +80,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda_cuda",
     timeout = "long",
     srcs = CHECK_FRAMEWORK_TESTS,
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.

@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir --Xcompiler,iree-input-type=mhlo --Xcompiler,iree-hal-target-backends=vmvx %s | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --Xcompiler,iree-input-type=mhlo --Xcompiler,iree-hal-target-backends=vulkan-spirv %s | FileCheck %s)
+// RUN: iree-run-mlir --Xcompiler,iree-input-type=mhlo_legacy --Xcompiler,iree-hal-target-backends=vmvx %s | FileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --Xcompiler,iree-input-type=mhlo_legacy --Xcompiler,iree-hal-target-backends=vulkan-spirv %s | FileCheck %s)
 
 module {
   ml_program.global private mutable @counter(dense<2.0> : tensor<f32>): tensor<f32>

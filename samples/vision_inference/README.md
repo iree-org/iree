@@ -20,7 +20,7 @@ From this directory:
 # Compile the MNIST program.
 iree-compile \
     ../models/mnist.mlir \
-    --iree-input-type=mhlo \
+    --iree-input-type=mhlo_legacy \
     --iree-hal-target-backends=llvm-cpu \
     -o /tmp/mnist_cpu.vmfb
 

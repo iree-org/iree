@@ -97,7 +97,7 @@ INPUT_FILE_PATH="/path/to/program.mlirbc"
 TMP_DIR="../iree-tmp"
 
 declare -a COMPILER_FLAGS=(
-  "--iree-input-type=mhlo"
+  "--iree-input-type=stablehlo"
   "--iree-hal-target-backends=cuda"
   "--iree-hal-cuda-llvm-target-arch=sm_80"
 )

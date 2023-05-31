@@ -58,17 +58,17 @@ void buildIREEVMTransformPassPipeline(
       passManager.addPass(createAutoInputConversionPipelinePass());
       break;
 #ifdef IREE_HAVE_MHLO_INPUT
-    case InputDialectOptions::Type::mhlo:
-      MHLO::buildMHLOInputConversionPassPipeline(passManager);
-      break;
-    case InputDialectOptions::Type::xla:
-      MHLO::buildXLAInputConversionPassPipeline(passManager);
-      break;
     case InputDialectOptions::Type::stablehlo:
       stablehlo::buildStableHLOInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::stablehlo_xla:
       stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager);
+      break;
+    case InputDialectOptions::Type::mhlo_legacy:
+      MHLO::buildMHLOInputConversionPassPipeline(passManager);
+      break;
+    case InputDialectOptions::Type::xla_legacy:
+      MHLO::buildXLAInputConversionPassPipeline(passManager);
       break;
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT

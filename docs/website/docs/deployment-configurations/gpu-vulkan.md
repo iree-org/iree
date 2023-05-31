@@ -152,7 +152,7 @@ import tool):
 iree-compile \
     --iree-hal-target-backends=vulkan-spirv \
     --iree-vulkan-target-triple=<...> \
-    --iree-input-type=mhlo \
+    --iree-input-type=stablehlo \
     iree_input.mlir -o mobilenet-vulkan.vmfb
 ```
 
