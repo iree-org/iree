@@ -173,7 +173,7 @@ static void getBoundsFromRange(ArrayRef<Range> loopRange,
                                SmallVector<int64_t> &lb,
                                SmallVector<int64_t> &ub) {
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
-    Optional<int64_t> intVal = getConstantIntValue(ofr);
+    std::optional<int64_t> intVal = getConstantIntValue(ofr);
     if (!intVal) return ShapedType::kDynamic;
     return intVal.value();
   };

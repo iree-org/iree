@@ -311,7 +311,7 @@ std::optional<Value> createVmTypeDefPtr(
 
     Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
     Type typeRefArrayType = emitc::PointerType::get(typeRefType);
-    Optional<size_t> typeIndex = typeConverter.lookupType(objType);
+    std::optional<size_t> typeIndex = typeConverter.lookupType(objType);
     if (!typeIndex.has_value()) {
       moduleOp.emitError("type index lookup failed");
       return std::nullopt;

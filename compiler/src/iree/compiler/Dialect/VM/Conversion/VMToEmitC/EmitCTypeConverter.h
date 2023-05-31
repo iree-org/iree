@@ -42,7 +42,7 @@ class EmitCTypeConverter : public mlir::TypeConverter {
     typeTable = buildTypeTable(module);
   }
   void mapType(Type type, size_t index) { typeOrdinalMap[type] = index; }
-  Optional<size_t> lookupType(Type type) {
+  std::optional<size_t> lookupType(Type type) {
     auto ptr = typeOrdinalMap.find(type);
     if (ptr == typeOrdinalMap.end()) {
       return std::nullopt;
