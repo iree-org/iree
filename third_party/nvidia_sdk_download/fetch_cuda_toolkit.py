@@ -19,7 +19,7 @@ import shutil
 import subprocess
 import sys
 
-VERSION = "11.6.2"
+VERSION = "12.1.1"
 PRODUCT = "cuda"
 COMPONENTS = ["cuda_nvcc", "cuda_cudart"]
 
