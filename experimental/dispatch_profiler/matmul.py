@@ -498,8 +498,6 @@ class CudaMatmulGenerator:
     n_list = get_cmd_line_argument_list(self.args.problem_n)
     k_list = get_cmd_line_argument_list(self.args.problem_k)
 
-
-
     # If any of the command line matmul problem shapes are provided,
     # set the default shapes to empty problem dimension.
     if len(m_list) == 0 and len(n_list) == 0 and len(k_list) == 0:
@@ -596,7 +594,7 @@ class CudaMatmulGenerator:
     self._append_matmul_dispatch_collection(self.matmul_shapes, data_type,
                                             configuration_list)
 
-  def _cuda_matmul_tensor_cores_mixed_precision(self):
+  def _cuda_matmul_tensor_cores_mixed_precision_f16(self):
     """Appends dispatches for TensorCore with F16 input, F32 accum, F32 output."""
     configuration_list = self._get_matmul_custom_compilation_info_list(
         self.tile_descriptions_tensor_cores_f16, self.translation_infos,
@@ -605,9 +603,19 @@ class CudaMatmulGenerator:
     self._append_matmul_dispatch_collection(self.matmul_shapes, data_type,
                                             configuration_list)
 
+  def _cuda_matmul_tensor_cores_mixed_precision_bf16(self):
+    """Appends dispatches for TensorCore with BF16 input, F32 accum, F32 output."""
+    configuration_list = self._get_matmul_custom_compilation_info_list(
+        self.tile_descriptions_tensor_cores_f16, self.translation_infos,
+        OperationKind.Matmul)
+    data_type = [DataType.bf16, DataType.bf16, DataType.f32]
+    self._append_matmul_dispatch_collection(self.matmul_shapes, data_type,
+                                            configuration_list)
+
   def generate(self):
     """Generates a list of matmul operations."""
     self._cuda_matmul_tensor_cores_f16()
-    self._cuda_matmul_tensor_cores_f32()
-    self._cuda_matmul_tensor_cores_mixed_precision()
+    #self._cuda_matmul_tensor_cores_f32()
+    self._cuda_matmul_tensor_cores_mixed_precision_f16()
+    self._cuda_matmul_tensor_cores_mixed_precision_bf16()
     return self.dispatches_collection_list
