@@ -16,7 +16,9 @@
 // Dialect specific
 #ifdef IREE_HAVE_MHLO_INPUT
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #include "mhlo/IR/hlo_ops.h"
+#include "stablehlo/dialect/StablehloOps.h"
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
@@ -28,17 +30,17 @@
 
 namespace mlir::iree_compiler {
 namespace {
-struct AutoInputConversionPipelinePass
-    : public AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
+struct AutoInputConversionPipelinePass final
+    : AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   void runOnOperation() override;
   void getDependentDialects(DialectRegistry& registry) const override;
 };
 
 // All the features seen that should be handled during input conversion.
 struct InputFeatures {
-  // MHLO features.
-  bool hasMHLO = false;
+  // HLO features.
   bool hasStableHLO = false;
+  bool hasMHLO = false;
   // - XLA import features.
   bool hasTuples = false;
 
@@ -50,7 +52,6 @@ struct InputFeatures {
 };
 
 static void populateHloFeatures(Operation* op, InputFeatures& features) {
-  features.hasMHLO = true;
   if (features.hasTuples) {
     return;
   }
@@ -86,12 +87,18 @@ static void populateHloFeatures(Operation* op, InputFeatures& features) {
   }
 }
 
-static void populateFeatures(Operation* op, const Dialect* mhloDialect,
+static void populateFeatures(Operation* op, const Dialect* stablehloDialect,
+                             const Dialect* mhloDialect,
                              const Dialect* tmTensorDialect,
                              const Dialect* tosaDialect,
                              InputFeatures& features) {
   Dialect* d = op->getDialect();
+  if (d == stablehloDialect) {
+    features.hasStableHLO = true;
+    return populateHloFeatures(op, features);
+  }
   if (d == mhloDialect) {
+    features.hasMHLO = true;
     return populateHloFeatures(op, features);
   }
   if (d == tosaDialect) {
@@ -109,20 +116,23 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   MLIRContext* ctxt = &getContext();
 
   InputFeatures features;
+  const Dialect* stablehloDialect = ctxt->getLoadedDialect("stablehlo");
   const Dialect* mhloDialect = ctxt->getLoadedDialect("mhlo");
   const Dialect* tosaDialect = ctxt->getLoadedDialect("tosa");
   const Dialect* tmTensorDialect = ctxt->getLoadedDialect("tm_tensor");
-  if (!mhloDialect && !tosaDialect && !tmTensorDialect) {
+  if (!stablehloDialect && !mhloDialect && !tosaDialect && !tmTensorDialect) {
     return;
   }
 
   auto res = module.walk([&](Operation* op) {
-    populateFeatures(op, mhloDialect, tmTensorDialect, tosaDialect, features);
-    if (features.hasMHLO && features.hasTOSA) {
+    populateFeatures(op, stablehloDialect, mhloDialect, tmTensorDialect,
+                     tosaDialect, features);
+    bool hasAnyHLO = features.hasStableHLO || features.hasMHLO;
+    if (hasAnyHLO && features.hasTOSA) {
       module.emitError("not yet implemented mixture of *HLO and TOSA");
       return WalkResult::interrupt();
     }
-    if (features.hasMHLO && features.hasTmTensor) {
+    if (hasAnyHLO && features.hasTmTensor) {
       module.emitError("not yet implemented mixture of *HLO and TM Tensor");
       return WalkResult::interrupt();
     }
@@ -135,13 +145,21 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   if (res.wasInterrupted()) {
     return signalPassFailure();
   }
-  if (!features.hasMHLO && !features.hasTOSA && !features.hasTmTensor) {
+  if (!features.hasStableHLO && !features.hasMHLO && !features.hasTOSA &&
+      !features.hasTmTensor) {
     return;
   }
 
   OpPassManager pm(ModuleOp::getOperationName(),
                    OpPassManager::Nesting::Explicit);
 #ifdef IREE_HAVE_MHLO_INPUT
+  if (features.hasStableHLO && !features.hasMHLO) {
+    if (features.hasTuples) {
+      stablehlo::buildStableHLOXLAInputConversionPassPipeline(pm);
+    } else {
+      stablehlo::buildStableHLOInputConversionPassPipeline(pm);
+    }
+  }
   if (features.hasMHLO) {
     if (features.hasTuples) {
       MHLO::buildXLAInputConversionPassPipeline(pm);
@@ -183,6 +201,10 @@ void AutoInputConversionPipelinePass::getDependentDialects(
       };
 
 #ifdef IREE_HAVE_MHLO_INPUT
+  appendPipelineDialects(stablehlo::buildStableHLOInputConversionPassPipeline);
+  appendPipelineDialects(
+      stablehlo::buildStableHLOXLAInputConversionPassPipeline);
+
   appendPipelineDialects(MHLO::buildMHLOInputConversionPassPipeline);
   appendPipelineDialects(MHLO::buildXLAInputConversionPassPipeline);
 #endif  // IREE_HAVE_MHLO_INPUT
