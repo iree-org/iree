@@ -313,6 +313,38 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
   }
 };
 
+// Clones ops that prefer to be cloned directly.
+// This prevents us from splatting out a value and then cloning that (keeping
+// the memory live/etc) instead of just splatting it again on-demand.
+//
+// Example:
+//  %0 = stream.async.splat %c123_i32
+//  %1 = stream.async.clone %0
+// ->
+//  %1 = stream.async.splat %c123_i32
+template <typename Op>
+struct PropagateClonableOps : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op cloneOp,
+                                PatternRewriter &rewriter) const override {
+    if (cloneOp.use_empty()) return failure();
+    auto sourceOp =
+        cloneOp.getSource()
+            .template getDefiningOp<IREE::Stream::StreamableOpInterface>();
+    if (!sourceOp || !sourceOp.preferCloneToConsumers()) return failure();
+    for (auto &use :
+         llvm::make_early_inc_range(cloneOp.getResult().getUses())) {
+      rewriter.setInsertionPoint(use.getOwner());
+      auto clonedOp = rewriter.clone(*sourceOp);
+      use.set(clonedOp->getResult(0));
+    }
+    if (cloneOp.use_empty()) {
+      rewriter.eraseOp(cloneOp);
+    }
+    return success();
+  }
+};
+
 // Materialize copy-on-write (🐄) ops where required for |rootValue|.
 // Only valid in tensor/async ops - don't use with stream.cmd.*.
 static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
@@ -1121,11 +1153,11 @@ struct ElideUnneededTensorClones : public OpRewritePattern<TensorCloneOp> {
 
 void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  // TODO(benvanik): splat -> clone duplicates splat.
   // TODO(benvanik): some way to reduce deep clone->clone->clone chains.
   // TODO(benvanik): clone + slice => slice.
   // TODO(benvanik): if both operand and result are used once then elide.
   //                 (if not tied block/fn arguments)
+  results.insert<PropagateClonableOps<TensorCloneOp>>(context);
   results.insert<ElideUnneededTensorClones>(context);
 }
 
@@ -1326,44 +1358,10 @@ OpFoldResult AsyncCloneOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-namespace {
-
-// Clones ops that prefer to be cloned directly.
-// This prevents us from splatting out a value and then cloning that (keeping
-// the memory live/etc) instead of just splatting it again on-demand.
-//
-// Example:
-//  %0 = stream.async.splat %c123_i32
-//  %1 = stream.async.clone %0
-// ->
-//  %1 = stream.async.splat %c123_i32
-struct PropagateClonableOps : public OpRewritePattern<AsyncCloneOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(AsyncCloneOp cloneOp,
-                                PatternRewriter &rewriter) const override {
-    if (cloneOp.use_empty()) return failure();
-    auto sourceOp = cloneOp.getSource()
-                        .getDefiningOp<IREE::Stream::StreamableOpInterface>();
-    if (!sourceOp || !sourceOp.preferCloneToConsumers()) return failure();
-    for (auto &use :
-         llvm::make_early_inc_range(cloneOp.getResult().getUses())) {
-      rewriter.setInsertionPoint(use.getOwner());
-      auto clonedOp = rewriter.clone(*sourceOp);
-      use.set(clonedOp->getResult(0));
-    }
-    if (cloneOp.use_empty()) {
-      rewriter.eraseOp(cloneOp);
-    }
-    return success();
-  }
-};
-
-}  // namespace
-
 void AsyncCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   // TODO(benvanik): some way to reduce deep clone->clone->clone chains.
-  results.insert<PropagateClonableOps>(context);
+  results.insert<PropagateClonableOps<AsyncCloneOp>>(context);
   results.insert<ElideUnusedOp<AsyncCloneOp>>(context);
 }
 
