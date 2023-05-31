@@ -29,7 +29,7 @@ TargetBackendRegistration::TargetBackendRegistration(llvm::StringRef name,
     : initFn(std::move(fn)) {
   if (registerStaticGlobal) {
     auto &registry = getMutableTargetRegistry();
-    if (registry.registrations.count(name) > 0) {
+    if (registry.registrations.contains(name)) {
       llvm::report_fatal_error(
           "Attempting to overwrite an existing translation backend");
     }
@@ -45,7 +45,7 @@ std::shared_ptr<TargetBackend> TargetBackendRegistration::acquire() {
 
 void TargetBackendRegistry::mergeFrom(const TargetBackendList &targets) {
   for (auto &it : targets.entries) {
-    if (registrations.count(it.first) > 0) {
+    if (registrations.contains(it.first)) {
       llvm::report_fatal_error(
           "Attempting to overwrite an existing translation backend");
     }
@@ -58,7 +58,7 @@ void TargetBackendRegistry::mergeFrom(const TargetBackendList &targets) {
 
 void TargetBackendRegistry::mergeFrom(const TargetBackendRegistry &registry) {
   for (auto &it : registry.registrations) {
-    if (registrations.count(it.first()) > 0) {
+    if (registrations.contains(it.first())) {
       llvm::report_fatal_error(
           "Attempting to overwrite an existing translation backend");
     }

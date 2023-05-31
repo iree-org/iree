@@ -7,7 +7,6 @@
 #include "./LLVMPasses.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -73,7 +72,7 @@ struct CUDAOptions {
                             llvm::cl::desc("LLVM target chip."));
 
     binder.opt<std::string>("iree-hal-cuda-llvm-target-feature",
-                            llvm::cl::cat(category),
+                            clTargetFeature, llvm::cl::cat(category),
                             llvm::cl::desc("Use to set PTX version."));
 
     binder.opt<bool>(
@@ -593,7 +592,7 @@ class CUDATargetBackend final : public TargetBackend {
                      variantOp.getName(), ".ptx", ptxImage);
     }
 
-    std::string gpuImage = produceGpuImage(ptxImage);
+    std::string gpuImage = produceGpuImage(options, ptxImage);
     auto gpuImageRef =
         flatbuffers_string_create(builder, gpuImage.c_str(), gpuImage.size());
     iree_hal_cuda_BlockSizeDef_vec_start(builder);
