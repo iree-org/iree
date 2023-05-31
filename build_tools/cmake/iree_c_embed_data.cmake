@@ -61,11 +61,7 @@ function(iree_c_embed_data)
   cmake_path(RELATIVE_PATH _RELATIVE_BINARY_DIR BASE_DIRECTORY "${IREE_BINARY_DIR}")
 
   foreach(_SRC ${_RULE_SRCS})
-    if(_SRC MATCHES "^/")
-      # _SRC is a Unix-style absolute path (starts with `/`).
-      list(APPEND _RESOLVED_SRCS "${_SRC}")
-    elseif(_SRC MATCHES "^[a-zA-Z]:/")
-      # _SRC is a Windows-style absolute path (starts with `X:/`).
+    if(IS_ABSOLUTE "${_SRC}")
       list(APPEND _RESOLVED_SRCS "${_SRC}")
     elseif(_SRC MATCHES "^[$]<")
       # _SRC is a CMake generator expression (starts with `$<`).
