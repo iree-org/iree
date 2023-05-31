@@ -34,7 +34,7 @@ iree_compiler_cc_library(
         # TODO: Should depend on a generated target in @iree_plugins which
         # generates its deps from the environment.
         # For now, we just hard include all in-tree plugins.
-        "//compiler/plugins/target/CUDA:hal_target_cuda",
+        "//compiler/plugins/target/CUDA",
         "//samples/compiler_plugins/example:registration",
         "//samples/compiler_plugins/simple_io_sample:registration",
     ],
