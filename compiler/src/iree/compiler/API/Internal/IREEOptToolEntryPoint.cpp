@@ -8,6 +8,7 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_passes.h"
@@ -28,6 +29,9 @@
 
 using namespace llvm;
 using namespace mlir;
+
+using mlir::iree_compiler::IREE::HAL::TargetBackendList;
+using mlir::iree_compiler::IREE::HAL::TargetBackendRegistry;
 
 #if defined(_MSC_VER)
 #define fileno _fileno
@@ -89,6 +93,15 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
       pluginManager, localBinder, pluginManagerOptions);
   if (failed(pluginSession.initializePlugins())) return failure();
   pluginSession.registerDialects(registry);
+
+  // In the normal compiler flow, activated plugins maintain a scoped registry
+  // of target backends. However, no such layering exists for the opt tool.
+  // Since it tests passes that are default initialized, we just configure the
+  // global registry that such constructors depend on.
+  TargetBackendList pluginBackendList;
+  pluginSession.populateHALTargetBackends(pluginBackendList);
+  const_cast<TargetBackendRegistry &>(TargetBackendRegistry::getGlobal())
+      .mergeFrom(pluginBackendList);
 
   // When reading from stdin and the input is a tty, it is often a user mistake
   // and the process "appears to be stuck". Print a message to let the user know

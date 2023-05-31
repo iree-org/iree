@@ -109,7 +109,8 @@ class PluginManagerSession : public PipelineExtensions {
     }
   }
 
-  // Populates the given list of HAL target backends for all activated plugins.
+  // Populates the given list of HAL target backends for all initialized
+  // plugins.
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);
 
  private:
