@@ -20,7 +20,7 @@ transform.sequence failures(propagate) {
   %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-  transform.structured.vectorize %2 { vectorize_padding }
+  transform.structured.vectorize %2 { vectorize_padding } : (!pdl.operation) -> !pdl.operation
   %module_op1 = transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
     {bufferize_function_boundaries = true} : (!pdl.operation) -> !pdl.operation
   %3 = transform.structured.match ops{["func.func"]} in %module_op1
@@ -33,7 +33,7 @@ transform.sequence failures(propagate) {
     lowering_strategy = "outerproduct"
       : (!pdl.operation) -> !pdl.operation
   %func_e_3 = transform.vector.lower_transpose %func_e_2
-    lowering_strategy = "shuffle"
+    lowering_strategy = "shuffle_1d"
       : (!pdl.operation) -> !pdl.operation
 
   lower_to_llvm %module_op1 : (!pdl.operation) -> !pdl.operation

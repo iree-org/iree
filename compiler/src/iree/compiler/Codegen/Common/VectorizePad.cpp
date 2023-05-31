@@ -4,13 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -34,7 +36,7 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
     if (val.getType().isIndex()) return val;
     matchPattern(val, m_Constant(&attr));
   } else {
-    attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+    attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
   }
   return builder.createOrFold<arith::ConstantIndexOp>(loc, attr.getInt());
 }
@@ -96,7 +98,7 @@ struct VectorizePadWithConditions final
     /// Return true if the given `attrOrValue` is a constant zero.
     auto isConstantZero = [](OpFoldResult attrOrValue) {
       if (attrOrValue.is<Attribute>()) {
-        auto attr = attrOrValue.get<Attribute>().dyn_cast<IntegerAttr>();
+        auto attr = llvm::dyn_cast<IntegerAttr>(attrOrValue.get<Attribute>());
         return attr && attr.getValue().getZExtValue() == 0;
       }
       IntegerAttr attr;

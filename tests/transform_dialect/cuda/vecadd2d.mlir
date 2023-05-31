@@ -62,21 +62,21 @@ func.func @vecadd2d() -> (!type2) {
 // RUN: FileCheck %s --check-prefix=EXEC
 
 //     CHECK:  hal.executable.export
-//     CHECK:  bb0(%[[DEV:.*]]: !hal.device, %[[A1:.*]]: index, %[[A2:.*]]: index):
-//     CHECK:  %[[Dim2:.*]] = arith.constant 1 : index
-//     CHECK:  %[[Dim3:.*]] = affine.apply #map()[%[[A1]]]
-//     CHECK:  %[[Dim1:.*]] = affine.apply #map1()[%[[A2]]]
-//     CHECK:  hal.return %[[Dim1]], %[[Dim2]], %[[Dim3]] : index, index, index
+//     CHECK:  bb0(%[[DEV:.*]]: !hal.device):
+//     CHECK:  %[[C171:.*]] = arith.constant 171 : index
+//     CHECK:  %[[C1:.*]] = arith.constant 1 : index
+//     CHECK:  %[[C2:.*]] = arith.constant 2 : index
+//     CHECK:  hal.return %[[C171]], %[[C1]], %[[C2]] : index, index, index
 
 //     CHECK:  %[[BLKZ:.*]] = hal.interface.workgroup.id[2] : index
 //     CHECK:  %[[BLKX:.*]] = hal.interface.workgroup.id[0] : index
 //     CHECK:  memref.subview %0[%[[BLKZ:.*]], %[[BLKX:.*]]]
 
 //     CHECK-PARTIAL-TILE:  hal.executable.export
-//     CHECK-PARTIAL-TILE:  bb0(%[[DEV:.*]]: !hal.device, %[[A1:.*]]: index, %[[A2:.*]]: index):
-//     CHECK-PARTIAL-TILE:  %[[c1:.*]] = arith.constant 1 : index
-//     CHECK-PARTIAL-TILE:  %[[dim:.*]] = affine.apply #map()[%[[A2]]]
-//     CHECK-PARTIAL-TILE:  hal.return %[[c1]], %[[c1]], %[[dim]] : index, index, index
+//     CHECK-PARTIAL-TILE:  bb0(%[[DEV:.*]]: !hal.device):
+//     CHECK-PARTIAL-TILE:  %[[C1:.*]] = arith.constant 1 : index
+//     CHECK-PARTIAL-TILE:  %[[C171:.*]] = arith.constant 171 : index
+//     CHECK-PARTIAL-TILE:  hal.return %[[C1]], %[[C1]], %[[C171]] : index, index, index
 
 //      EXEC: EXEC @vecadd2d
 //      EXEC: result[0]: hal.buffer_view

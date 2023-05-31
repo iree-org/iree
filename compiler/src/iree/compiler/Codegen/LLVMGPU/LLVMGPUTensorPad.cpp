@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -99,7 +99,8 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   paddedSubviewResults.reserve(paddedOp->getNumResults());
   for (const auto &[resultNumber, paddedResult] :
        llvm::enumerate(paddedOp->getResults())) {
-    int64_t rank = paddedResult.getType().cast<RankedTensorType>().getRank();
+    int64_t rank =
+        llvm::cast<RankedTensorType>(paddedResult.getType()).getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> sizes;
     for (OpFoldResult v : reifiedResultShapes[resultNumber]) sizes.push_back(v);

@@ -68,8 +68,8 @@ struct ConcatenateOpConversion
   LogicalResult matchAndRewrite(
       mhlo::ConcatenateOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = this->typeConverter->convertType(op.getResult().getType())
-                          .dyn_cast<RankedTensorType>();
+    auto resultType = llvm::dyn_cast<RankedTensorType>(
+        this->typeConverter->convertType(op.getResult().getType()));
     if (!resultType || !resultType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(op,
                                          "expected static shape for output");
@@ -156,7 +156,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
   Value zeroTensor =
       b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
 
-  switch (lhs.getType().cast<RankedTensorType>().getRank()) {
+  switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
     case 1:
       return b
           .create<linalg::VecmatOp>(loc, TypeRange{resultType},
@@ -188,7 +188,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     }
 
     auto inputType =
-        adaptor.getOperand().getType().dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
     if (!inputType || !inputType.hasStaticShape() || inputType.getRank() > 2) {
       return rewriter.notifyMatchFailure(op, "only static 1D or 2D dft ops");
     }
@@ -201,9 +201,9 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     Location loc = op.getLoc();
     auto matrixType =
         RankedTensorType::get({n, fftLength}, inputType.getElementType());
-    auto resultType =
-        RankedTensorType::get(op.getType().cast<RankedTensorType>().getShape(),
-                              inputType.getElementType());
+    auto resultType = RankedTensorType::get(
+        llvm::cast<RankedTensorType>(op.getType()).getShape(),
+        inputType.getElementType());
 
     auto realMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
@@ -240,6 +240,67 @@ struct OptimizationBarrierOpConversion
   }
 };
 
+// Returns true if all attributes in the given dictionary are valid for IREE
+// input dialects.
+static bool isValidFuncAttr(DictionaryAttr attrs) {
+  // TODO: switch to using a dialect-based exclusion list or some other way that
+  // is not a big string table.
+  for (auto attr : attrs) {
+    if (attr.getName() == "tf.aliasing_output") return false;
+  }
+  return true;
+}
+
+// Adds iree.abi.encoding attributes for arguments and results when they have
+// had their type changed during conversion.
+static void setFuncEncodings(func::FuncOp funcOp, FunctionType oldFuncType,
+                             FunctionType newFuncType) {
+  auto encodingName = StringAttr::get(funcOp.getContext(), "iree.abi.encoding");
+  for (auto [i, oldType, newType] :
+       llvm::enumerate(oldFuncType.getInputs(), newFuncType.getInputs())) {
+    if (oldType != newType)
+      funcOp.setArgAttr(i, encodingName, TypeAttr::get(oldType));
+  }
+  for (auto [i, oldType, newType] :
+       llvm::enumerate(oldFuncType.getResults(), newFuncType.getResults())) {
+    if (oldType != newType)
+      funcOp.setResultAttr(i, encodingName, TypeAttr::get(oldType));
+  }
+}
+
+// Rewrites attributes on the function from ones coming from HLO-based frontends
+// to the IREE supported versions.
+static void rewriteFuncAttrs(func::FuncOp funcOp) {
+  auto *context = funcOp.getContext();
+  auto indexType = IndexType::get(context);
+  auto abiOutputName = StringAttr::get(context, "iree.abi.output");
+  auto aliasingOutputName = StringAttr::get(context, "tf.aliasing_output");
+  auto rewriteAttrs = [&](DictionaryAttr &allAttrs) {
+    SmallVector<NamedAttribute> newAttrs;
+    newAttrs.reserve(allAttrs.size());
+    for (auto attr : allAttrs) {
+      if (attr.getName() == aliasingOutputName) {
+        newAttrs.push_back({
+            abiOutputName,
+            IntegerAttr::get(indexType,
+                             llvm::cast<IntegerAttr>(attr.getValue()).getInt()),
+        });
+      } else {
+        newAttrs.push_back(attr);
+      }
+    }
+    allAttrs = DictionaryAttr::get(context, newAttrs);
+  };
+  SmallVector<DictionaryAttr> argAttrs;
+  funcOp.getAllArgAttrs(argAttrs);
+  llvm::for_each(argAttrs, rewriteAttrs);
+  funcOp.setAllArgAttrs(argAttrs);
+  SmallVector<DictionaryAttr> resultAttrs;
+  funcOp.getAllResultAttrs(resultAttrs);
+  llvm::for_each(resultAttrs, rewriteAttrs);
+  funcOp.setAllResultAttrs(resultAttrs);
+}
+
 // We need to convert func ops in order to convert types.
 class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
@@ -266,6 +327,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     }
 
     // Create new function with converted argument and result types.
+    auto oldFuncType = srcOp.getFunctionType();
     auto newFuncType = mlir::FunctionType::get(
         srcOp.getContext(), signatureConversion.getConvertedTypes(),
         convertedResultTypes);
@@ -273,6 +335,8 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     // Update the function in place.
     rewriter.startRootUpdate(srcOp);
     srcOp.setType(newFuncType);
+    rewriteFuncAttrs(srcOp);
+    setFuncEncodings(srcOp, oldFuncType, newFuncType);
 
     // Tell the rewriter to convert the region signature.
     TypeConverter &typeConverter = *getTypeConverter();
@@ -347,7 +411,7 @@ class GenericTypeConvert : public ConversionPattern {
 std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
                                     ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
-  if (inputs.front().getType().isa<ShapedType>()) {
+  if (llvm::isa<ShapedType>(inputs.front().getType())) {
     return std::nullopt;
   }
   return builder
@@ -355,6 +419,29 @@ std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
           loc, RankedTensorType::get({}, inputs.front().getType()),
           inputs.front())
       .getResult();
+}
+
+std::optional<Value> materializeCastFromIllegal(OpBuilder &builder, Type type,
+                                                ValueRange inputs,
+                                                Location loc) {
+  Type fromType = getElementTypeOrSelf(inputs[0].getType());
+  Type toType = getElementTypeOrSelf(type);
+  if ((!fromType.isSignedInteger() && !fromType.isUnsignedInteger()) ||
+      !toType.isSignlessInteger())
+    return std::nullopt;
+  // Use bitcast to do signless->signful conversions.
+  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])->getResult(0);
+}
+
+std::optional<Value> materializeCastToIllegal(OpBuilder &builder, Type type,
+                                              ValueRange inputs, Location loc) {
+  Type fromType = getElementTypeOrSelf(inputs[0].getType());
+  Type toType = getElementTypeOrSelf(type);
+  if (!fromType.isSignlessInteger() ||
+      (!toType.isSignedInteger() && !toType.isUnsignedInteger()))
+    return std::nullopt;
+  // Use bitcast to do signless->signful conversions.
+  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])->getResult(0);
 }
 
 struct ConvertMHLOToLinalgOnTensorsPass
@@ -373,6 +460,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     auto typeConverter = mhlo::createHloToLinalgTypeConverter();
     typeConverter->addArgumentMaterialization(scalarToTensor);
+    typeConverter->addArgumentMaterialization(materializeCastFromIllegal);
+    typeConverter->addTargetMaterialization(materializeCastFromIllegal);
+    typeConverter->addSourceMaterialization(materializeCastToIllegal);
     // NOTE: not using corresponding setupMHLOToFlowPatterns because the entire
     // MHLO dialects are marked illegal by this pass.
     // TODO: Collapse/rework all of these patterns once the consolidation
@@ -434,6 +524,18 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     // Functions must have legal types.
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
+      if (auto attrs = funcOp.getAllArgAttrs()) {
+        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
+                          isValidFuncAttr)) {
+          return false;
+        }
+      }
+      if (auto attrs = funcOp.getAllResultAttrs()) {
+        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
+                          isValidFuncAttr)) {
+          return false;
+        }
+      }
       for (Type type : funcOp.getFunctionType().getInputs()) {
         if (isIllegalType(type)) return false;
       }
@@ -447,6 +549,22 @@ struct ConvertMHLOToLinalgOnTensorsPass
       }
       return true;
     });
+    target.addDynamicallyLegalOp<func::ReturnOp>([&](func::ReturnOp op) {
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalType(type); });
+    });
+    target.addDynamicallyLegalOp<func::CallOp>([&](func::CallOp op) {
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalType(type); });
+    });
+    target.addDynamicallyLegalOp<cf::CondBranchOp>([&](cf::CondBranchOp op) {
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalType(type); });
+    });
+    target.addDynamicallyLegalOp<cf::BranchOp>([&](cf::BranchOp op) {
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalType(type); });
+    });
     target.addDynamicallyLegalOp<ml_program::GlobalOp>(
         [&](ml_program::GlobalOp op) {
           return typeConverter->isLegal(op.getType());
@@ -455,6 +573,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
     target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect>();
+    target.addLegalOp<tensor::BitcastOp>();
     target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
     if (failed(applyPartialConversion(getOperation(), target,

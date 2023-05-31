@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Implements logic for lowering StableHLO/CHLO pointwise ops to Linalg dialect.
+// Implements logic for lowering StableHLO pointwise ops to Linalg dialect.
 // These patterns are separated out to their own file to save on the compilation
 // times, given that we instantiate a large number of class templates here.
 
@@ -120,7 +120,7 @@ struct PointwiseToLinalgMapConverter final : OpConversionPattern<OpTy> {
       if (getRank(input) == maxRank) {
         mappedInputs.push_back(coerceTensorShape(
             rewriter, loc, cast<TypedValue<ShapedType>>(input),
-            emptyTensor.getType()));
+            cast<ShapedType>(emptyTensor.getType())));
         scalarInputs.push_back(nullptr);
       } else {
         scalarInputs.push_back(rewriter.create<tensor::ExtractOp>(loc, input));

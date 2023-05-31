@@ -17,6 +17,8 @@ void populateHALChannelToVMPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::ChannelCreateOp>>(
       context, importSymbols, typeConverter, "hal.channel.create");
+  patterns.insert<VMImportOpConversion<IREE::HAL::ChannelSplitOp>>(
+      context, importSymbols, typeConverter, "hal.channel.split");
   patterns.insert<VMImportOpConversion<IREE::HAL::ChannelRankAndCountOp>>(
       context, importSymbols, typeConverter, "hal.channel.rank_and_count");
 }

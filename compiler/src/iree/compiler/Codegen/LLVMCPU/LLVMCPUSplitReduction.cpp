@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -124,8 +124,8 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
 
   // 2) Apply splitReduction on the single vector-length array.
   // splitReduction already replaces the op.
-  FailureOr<linalg::SplitReductionResult> splitRes =
-      splitReduction(rewriter, tileResFirst->tiledOps.back(), fn);
+  FailureOr<linalg::SplitReductionResult> splitRes = splitReduction(
+      rewriter, cast<linalg::LinalgOp>(tileResFirst->tiledOps.back()), fn);
   if (failed(splitRes)) {
     LLVM_DEBUG(llvm::dbgs() << "failed on step 2 (SplitReduction)\n");
     return success();

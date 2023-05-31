@@ -38,9 +38,9 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     Value rhs = linalgOp.getDpsInputOperand(1)->get();
     Value result = linalgOp.getDpsInitOperand(0)->get();
 
-    auto lhsType = lhs.getType().dyn_cast<RankedTensorType>();
-    auto rhsType = rhs.getType().dyn_cast<RankedTensorType>();
-    auto resultType = result.getType().dyn_cast<RankedTensorType>();
+    auto lhsType = llvm::dyn_cast<RankedTensorType>(lhs.getType());
+    auto rhsType = llvm::dyn_cast<RankedTensorType>(rhs.getType());
+    auto resultType = llvm::dyn_cast<RankedTensorType>(result.getType());
 
     if (!lhsType || !rhsType) return failure();
 

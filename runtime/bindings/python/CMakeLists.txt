@@ -54,6 +54,7 @@ iree_pyext_module(
     iree::hal::drivers
     iree::hal::utils::allocators
     iree::modules::hal
+    iree::tooling::modules
     iree::vm
     iree::vm::bytecode::module
 )

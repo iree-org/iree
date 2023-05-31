@@ -29,6 +29,8 @@ iree_cc_library(
     "buffer_view_util.h"
     "channel.c"
     "channel.h"
+    "channel_provider.c"
+    "channel_provider.h"
     "command_buffer.c"
     "command_buffer.h"
     "command_buffer_validation.c"

@@ -126,21 +126,23 @@ static iree_status_t IREE_API_PTR iree_vm_dynamic_module_get_function_attr(
 
 static iree_status_t IREE_API_PTR iree_vm_dynamic_module_lookup_function(
     void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+    const iree_vm_function_signature_t* expected_signature,
     iree_vm_function_t* out_function) {
   iree_vm_dynamic_module_t* module = (iree_vm_dynamic_module_t*)self;
   IREE_RETURN_IF_ERROR(module->user_module->lookup_function(
-      module->user_module->self, linkage, name, out_function));
+      module->user_module->self, linkage, name, expected_signature,
+      out_function));
   out_function->module = (iree_vm_module_t*)self;
   return iree_ok_status();
 }
 
 static iree_status_t IREE_API_PTR
 iree_vm_dynamic_module_resolve_source_location(
-    void* self, iree_vm_stack_frame_t* frame,
+    void* self, iree_vm_function_t function, iree_vm_source_offset_t pc,
     iree_vm_source_location_t* out_source_location) {
   iree_vm_dynamic_module_t* module = (iree_vm_dynamic_module_t*)self;
   return module->user_module->resolve_source_location(
-      module->user_module->self, frame, out_source_location);
+      module->user_module->self, function, pc, out_source_location);
 }
 
 static iree_status_t IREE_API_PTR

@@ -24,6 +24,10 @@ void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
                                        TypeConverter &typeConverter,
                                        RewritePatternSet &patterns);
+void populateUtilAssignmentToVMPatterns(MLIRContext *context,
+                                        ConversionTarget &conversionTarget,
+                                        TypeConverter &typeConverter,
+                                        RewritePatternSet &patterns);
 void populateUtilBufferToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
@@ -68,7 +72,7 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
       IREE::Util::CmpEQOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getLhs().getType();
-    if (operandType.isa<IREE::VM::RefType>()) {
+    if (llvm::isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpEQRefOp>(
           op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
       return success();
@@ -109,6 +113,8 @@ void populateUtilToVMPatterns(MLIRContext *context,
 
   populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
                                     patterns);
+  populateUtilAssignmentToVMPatterns(context, conversionTarget, typeConverter,
+                                     patterns);
   populateUtilBufferToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
   populateUtilGlobalToVMPatterns(context, conversionTarget, typeConverter,

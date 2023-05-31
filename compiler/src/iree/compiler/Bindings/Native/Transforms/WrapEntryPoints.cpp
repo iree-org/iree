@@ -38,10 +38,26 @@ static IREE::ABI::InvocationModel getInvocationModel(
 
 // Maps a source type to the native ABI type.
 static Type mapToABIType(Type type) {
-  if (type.isa<TensorType>()) {
+  if (llvm::isa<TensorType>(type)) {
     return IREE::HAL::BufferViewType::get(type.getContext());
   }
   return type;
+}
+
+// Removes all ABI attrs handled by this pass from all dictionaries.
+static void stripABIAttrs(SmallVectorImpl<DictionaryAttr> &allAttrs) {
+  for (auto &attrDict : allAttrs) {
+    SmallVector<NamedAttribute> attrs;
+    attrs.reserve(attrDict.size());
+    for (auto attr : attrDict) {
+      // TODO(benvanik): faster lookup.
+      if (attr.getName() != "iree.abi.output" &&
+          attr.getName() != "iree.abi.encoding") {
+        attrs.push_back(attr);
+      }
+    }
+    attrDict = DictionaryAttr::get(attrDict.getContext(), attrs);
+  }
 }
 
 // Creates the corresponding wrapper function for the given import function.
@@ -56,11 +72,13 @@ static func::FuncOp createImportWrapperFunc(
 
   // Copy arg/result attrs from the import op to the wrapper function.
   // We may want to remove them from the import but would need to filter.
-  SmallVector<DictionaryAttr, 4> argAttrDict;
+  SmallVector<DictionaryAttr> argAttrDict;
   importOp.getAllArgAttrs(argAttrDict);
+  stripABIAttrs(argAttrDict);
   wrapperOp.setAllArgAttrs(argAttrDict);
-  SmallVector<DictionaryAttr, 4> resultAttrDict;
+  SmallVector<DictionaryAttr> resultAttrDict;
   importOp.getAllResultAttrs(resultAttrDict);
+  stripABIAttrs(resultAttrDict);
   wrapperOp.setAllResultAttrs(resultAttrDict);
   switch (invocationModel) {
     default:
@@ -88,7 +106,7 @@ static func::FuncOp createImportWrapperFunc(
   SmallVector<Value> tensorArgs;
   for (auto [argIndex, arg] : llvm::enumerate(entryArgs)) {
     auto oldType = oldImportType.getInput(argIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       tensorArgIndices.push_back(argIndex);
       tensorArgs.push_back(arg);
     }
@@ -141,7 +159,7 @@ static func::FuncOp createImportWrapperFunc(
       // want to allow for async work using fences that's not device-related.
       const bool haveTensorResults =
           llvm::any_of(oldImportType.getResults(),
-                       [](Type type) { return type.isa<TensorType>(); });
+                       [](Type type) { return llvm::isa<TensorType>(type); });
       if (!haveTensorResults && !hasSideEffects) {
         // No tensors returned from import - pass in an immediate signal.
         signalFence = entryBuilder.create<IREE::Util::NullOp>(
@@ -160,15 +178,17 @@ static func::FuncOp createImportWrapperFunc(
   for (auto [argIndex, arg] : llvm::enumerate(entryArgs)) {
     auto oldType = oldImportType.getInput(argIndex);
     auto newType = newImportType.getInput(argIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       // This is where we could perform type casting or in-place storage binding
       // if the user had any attrs specifying it.
       // NOTE: we insert a barrier on this above if needed so that the wait
       // fence will be signaled when the tensor is ready for consumption by the
       // import.
-      auto argLoc = arg.getLoc();
+      auto encoding =
+          importOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
       auto exportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
-          argLoc, newType, arg, /*name=*/nullptr);
+          arg.getLoc(), newType, arg,
+          encoding ? encoding : TypeAttr::get(oldType), /*name=*/nullptr);
       arguments.push_back(exportOp.getTarget());
     } else {
       arguments.push_back(arg);
@@ -196,12 +216,15 @@ static func::FuncOp createImportWrapperFunc(
   SmallVector<Value> results;
   for (auto [resultIndex, result] : llvm::enumerate(callOp.getResults())) {
     auto oldType = oldImportType.getResult(resultIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
       // NOTE: we set the import pending on the signal fence from the import
       // indicating when the returned tensor is ready for consumption by the
       // program.
+      auto encoding = importOp.getResultAttrOfType<TypeAttr>(
+          resultIndex, "iree.abi.encoding");
       results.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
-          importOp.getLoc(), oldType, result, signalFence,
+          importOp.getLoc(), oldType, result,
+          encoding ? encoding : TypeAttr::get(oldType), signalFence,
           /*name=*/nullptr));
     } else {
       results.push_back(result);
@@ -326,8 +349,10 @@ static func::FuncOp createExportWrapperFunc(
   // We may want to remove them from the export but would need to filter.
   SmallVector<DictionaryAttr, 4> argAttrDict;
   exportOp.getAllArgAttrs(argAttrDict);
+  stripABIAttrs(argAttrDict);
   SmallVector<DictionaryAttr, 4> resultAttrDict;
   exportOp.getAllResultAttrs(resultAttrDict);
+  stripABIAttrs(resultAttrDict);
 
   // Convert argument types to those required by the binding ABI.
   //
@@ -383,7 +408,8 @@ static func::FuncOp createExportWrapperFunc(
     // Today all outputs need to be a !hal.buffer - we could change this
     // in the future to be something more generalized.
     auto storageArg = entryBlock->getArgument(i);
-    if (!storageArg.getType().isa<IREE::HAL::BufferType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(storageArg.getType()) &&
+        !llvm::isa<IREE::HAL::BufferViewType>(storageArg.getType())) {
       exportOp.emitError() << "storage argument " << i
                            << " has an invalid type " << storageArg.getType()
                            << "; must be a !hal.buffer";
@@ -413,10 +439,12 @@ static func::FuncOp createExportWrapperFunc(
   for (auto [argIndex, arg] : llvm::enumerate(
            entryBlock->getArguments().slice(0, oldExportType.getNumInputs()))) {
     auto oldType = oldExportType.getInput(argIndex);
-    if (oldType.isa<TensorType>()) {
-      auto argLoc = arg.getLoc();
+    if (llvm::isa<TensorType>(oldType)) {
+      auto encoding =
+          exportOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
       auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
-          argLoc, oldType, arg, waitFence,
+          arg.getLoc(), oldType, arg,
+          encoding ? encoding : TypeAttr::get(oldType), waitFence,
           inferArgumentName(argIndex, argAttrDict, entryBuilder));
       arguments.push_back(importOp.getTarget());
     } else {
@@ -435,7 +463,8 @@ static func::FuncOp createExportWrapperFunc(
   if (signalFence) {
     SmallVector<Value> asyncTensors;
     for (auto result : asyncResults) {
-      if (result.getType().isa<TensorType>()) asyncTensors.push_back(result);
+      if (llvm::isa<TensorType>(result.getType()))
+        asyncTensors.push_back(result);
     }
     if (asyncTensors.empty()) {
       // TODO(benvanik): maybe use a global timeline? global stores may not
@@ -454,12 +483,16 @@ static func::FuncOp createExportWrapperFunc(
   for (auto [resultIndex, result] : llvm::enumerate(asyncResults)) {
     auto oldType = oldExportType.getResult(resultIndex);
     auto newType = newExportType.getResult(resultIndex);
-    if (oldType.isa<TensorType>()) {
+    if (llvm::isa<TensorType>(oldType)) {
+      auto encoding = exportOp.getResultAttrOfType<TypeAttr>(
+          resultIndex, "iree.abi.encoding");
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           result.getLoc(), result, entryBuilder);
+      auto resultStorage = resultStorages[resultIndex];
       results.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
-          result.getLoc(), newType, result, TypeAttr::get(result.getType()),
-          dynamicDims, resultStorages[resultIndex],
+          result.getLoc(), newType, result,
+          encoding ? encoding : TypeAttr::get(result.getType()), dynamicDims,
+          resultStorage,
           inferResultName(resultIndex, resultAttrDict, entryBuilder)));
     } else {
       results.push_back(result);

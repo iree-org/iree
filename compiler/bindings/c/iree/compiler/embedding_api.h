@@ -17,6 +17,7 @@
 #ifndef IREE_COMPILER_EMBEDDING_API_H
 #define IREE_COMPILER_EMBEDDING_API_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -119,6 +120,11 @@ IREE_EMBED_EXPORTED void ireeCompilerGlobalShutdown();
 // Invokes a callback with each registered HAL target backend.
 IREE_EMBED_EXPORTED void ireeCompilerEnumerateRegisteredHALTargetBackends(
     void (*callback)(const char *backend, void *userData), void *userData);
+
+// Enumerates all plugins that are linked into the compiler.
+// Available since: 1.2
+IREE_EMBED_EXPORTED void ireeCompilerEnumeratePlugins(
+    void (*callback)(const char *pluginName, void *userData), void *userData);
 
 //===----------------------------------------------------------------------===//
 // Session management.

@@ -7,7 +7,6 @@
 # End-to-end matrix multiplication tests.
 
 load("//build_tools/bazel:iree_trace_runner_test.bzl", "iree_generated_trace_runner_test")
-load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
     features = ["layering_check"],
@@ -160,12 +159,42 @@ py_binary(
     "f32",
 ]]
 
+# Test x86_64+ukernel, mmt4d, with target CPU features variants relevant to each
+# lhs_rhs_type.
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_mmt4d_%s_small_ukernel_x86" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-llvmcpu-enable-microkernels",
+        "--iree-flow-enable-data-tiling",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=small",
+    ],
+    tags = [
+        "hostonly",
+        "x86_64_only",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = [
+        "default",
+        "x86_64:+avx,+avx2,+fma",
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for lhs_rhs_type in [
+    "i8",
+    "f32",
+]]
+
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_%s" % compilation_info,
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -194,7 +223,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -213,6 +242,30 @@ py_binary(
     "LLVMGPUMatmulTensorCore",
 ]]
 
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f32_gpu_large_unaligned",
+    compiler_flags = [
+        "--iree-hal-cuda-llvm-target-arch=sm_80",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--shapes=gpu_large",
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+)
+
 # MMA.SYNC TensorCore(F32): mma.sync.1688.f32.t32
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_mma_sync_%s" % compilation_info,
@@ -222,7 +275,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -250,7 +303,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -278,7 +331,7 @@ py_binary(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large",
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
@@ -327,18 +380,22 @@ py_binary(
 ]]
 
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_gpu_large_%s" % vulkan_target_and_pipeline[0],
+    name = "e2e_matmul_direct_{0}_gpu_large_{1}".format(
+        lhs_rhs_type,
+        vulkan_target_and_pipeline[0],
+    ),
     compiler_flags = [
         "--iree-vulkan-target-triple=%s" % vulkan_target_and_pipeline[0],
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
-        "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=gpu_large_aligned",
         "--compilation_info=%s" % vulkan_target_and_pipeline[1],
     ],
     tags = [
         "requires-gpu-nvidia",
+        "vulkan_uses_vk_khr_shader_float16_int8",
     ],
     target_backends_and_drivers = [
         ("vulkan-spirv", "vulkan"),
@@ -347,27 +404,11 @@ py_binary(
 ) for vulkan_target_and_pipeline in [
     ("valhall-unknown-android31", "SPIRVVectorizeMali"),
     ("ampere-unknown-linux", "SPIRVVectorizeNVIDIA"),
+] for lhs_rhs_type in [
+    "i8",
+    "f16",
+    "f32",
 ]]
-
-# Check tests
-iree_check_single_backend_test_suite(
-    name = "check_cuda",
-    srcs =
-        [
-            # currently only enabled on cuda as it can be slow on other backends.
-            "large_linalg_matmul.mlir",
-        ],
-    driver = "cuda",
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-    ],
-    target_backend = "cuda",
-)
 
 iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_small_no_padding",

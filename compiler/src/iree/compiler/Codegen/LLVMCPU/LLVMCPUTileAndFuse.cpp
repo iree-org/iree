@@ -4,11 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -45,6 +46,35 @@ static void collectTiledAndFusedOps(Operation *rootOp,
   }
 }
 
+/// Tiling of `tensor.pad` operation generates
+///
+/// ```mlir
+/// scf.if {
+///   ...
+/// } else {
+///    tensor.pad
+/// }
+/// ```
+///
+/// For IREEs use case we dont need this. So this folds away the `if` condition.
+/// Note this is a fairly hacky workaround, but the current pad operation
+/// semantics force us down this path.
+static FailureOr<tensor::PadOp> foldIfGeneratedFromPadding(
+    RewriterBase &rewriter, tensor::PadOp untiledPadOp,
+    tensor::PadOp tiledPadOp) {
+  auto ifOp = dyn_cast<scf::IfOp>(tiledPadOp->getParentOp());
+  if (!ifOp) {
+    return failure();
+  };
+  Block *block = tiledPadOp->getBlock();
+  Operation *terminator = block->getTerminator();
+  ValueRange results = terminator->getOperands();
+  rewriter.inlineBlockBefore(block, ifOp, /*blockArgs=*/{});
+  rewriter.replaceOp(ifOp, results);
+  rewriter.eraseOp(terminator);
+  return tiledPadOp;
+}
+
 /// This pass starts with the last TilingInterface operation, tiles the op and
 /// fuses its producers recursively. The `tilingLevel` must be specified. It
 /// picks the `tilingLevel`-th list as tiling sizes from lowering_config.
@@ -77,12 +107,23 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   SmallVector<OpResult> yieldedValuesToOrigValues;
   SmallVector<Operation *> tiledOps;
   FailureOr<scf::SCFTilingResult> tilingResult =
-      scf::tileUsingSCFForOp(rewriter, rootOp, options);
+      scf::tileUsingSCFForOp(rewriter, cast<TilingInterface>(rootOp), options);
   if (failed(tilingResult)) {
     return failure();
   }
   yieldedValuesToOrigValues.append(rootOp->result_begin(),
                                    rootOp->result_end());
+
+  // WAR for `if` ops generating `scf.if` operations.
+  if (auto rootPadOp = dyn_cast<tensor::PadOp>(rootOp)) {
+    assert(tilingResult->tiledOps.size() == 1 &&
+           "expected tiling of `pad` op to return only one operation");
+    FailureOr<Operation *> replacementTiledOp = foldIfGeneratedFromPadding(
+        rewriter, rootPadOp, cast<tensor::PadOp>(tilingResult->tiledOps[0]));
+    if (!failed(replacementTiledOp)) {
+      tilingResult->tiledOps[0] = replacementTiledOp.value();
+    }
+  }
   tiledOps.append(tilingResult->tiledOps);
 
   // 2. Tiling each operation results in generation of slices. The source of
@@ -178,6 +219,16 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   if (llvm::all_of(tilingSizes, [&](int64_t size) { return size == 0; })) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
     return;
+  }
+
+  auto iterTypes = consumerOp.getLoopIteratorTypes();
+  for (auto [idx, size] : llvm::enumerate(tilingSizes)) {
+    if (size == 0) continue;
+    if (iterTypes[idx] == utils::IteratorType::reduction) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "----- skip, can't tile and fuse reduction dims -----\n");
+      return;
+    }
   }
 
   auto options = scf::SCFTilingOptions().setTileSizes(tilingSizes);

@@ -8,8 +8,8 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
@@ -18,6 +18,8 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -47,7 +49,8 @@ class SPIRVLowerExecutableTargetPass
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
                 bufferization::BufferizationDialect, scf::SCFDialect,
-                spirv::SPIRVDialect, vector::VectorDialect>();
+                spirv::SPIRVDialect, transform::TransformDialect,
+                vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -95,7 +98,7 @@ static LogicalResult verifyEntryPoint(
 
   std::array<int64_t, 3> workgroupSizes;
   for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSizes[index] = attr.cast<IntegerAttr>().getInt();
+    workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
   }
 
   switch (translationInfo.getDispatchLoweringPassPipeline()) {

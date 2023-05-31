@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -59,21 +60,15 @@ class EliminateEmptyTensorsPass
 class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
-  // TODO(#12933): Because of regressions in CUDA backend, there is an
-  // option to keep a legacy mode of not representing the offset in the
-  // type. Remove once the bug is fixed.
   explicit IREEComprehensiveBufferizePass(
       std::optional<BufferizationOptions::AllocationFn> allocationFn =
           std::nullopt,
       std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
           std::nullopt,
-      std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
-      bool embedSubspanOffsetIntoMemRefType = true)
+      std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
       : allocationFn(allocationFn),
         deallocationFn(deallocationFn),
-        memCpyFn(memCpyFn) {
-    this->embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
-  }
+        memCpyFn(memCpyFn) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -102,7 +97,7 @@ class IREEComprehensiveBufferizePass
 };
 }  // namespace
 
-static bool isaTensor(Type t) { return t.isa<TensorType>(); };
+static bool isaTensor(Type t) { return llvm::isa<TensorType>(t); };
 
 // Default allocation functions.
 static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
@@ -115,7 +110,7 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
     // type memory space; that's runtime allocations. So erase and fallback to
     // the default 0 memory space. It is fine given this is just the default
     // allocator; backends are expected to control by themselves.
-    if (storage.isa<IREE::HAL::DescriptorTypeAttr>())
+    if (llvm::isa<IREE::HAL::DescriptorTypeAttr>(storage))
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
   }
@@ -145,7 +140,7 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
   // memref type can be inferred from the context.
   options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = value.getType().cast<TensorType>();
+    auto tensorType = llvm::cast<TensorType>(value.getType());
 
     // Special rule for ConstantOps: These always lower to some memref with a
     // static identity layout.
@@ -181,6 +176,19 @@ LogicalResult eliminateEmptyTensors(
 
 void EliminateEmptyTensorsPass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
+  MLIRContext *context = &getContext();
+
+  // Run the convert to destination style patterns.
+  {
+    RewritePatternSet patterns(context);
+    linalg::populateConvertToDestinationStylePatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+      moduleOp->emitOpError(
+          "Failed in conversion to destination style patterns");
+      return signalPassFailure();
+    }
+  }
+
   OneShotBufferizationOptions options = getBufferizationOptions();
 
   IRRewriter rewriter(moduleOp->getContext());
@@ -207,7 +215,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
-  options.embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
 
   if (failed(runIREEOneShotBufferize(moduleOp, options))) {
     return signalPassFailure();
@@ -230,13 +237,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
-    bool embedSubspanOffsetIntoMemRefType) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   if (!allocationFn) allocationFn = defaultAllocationFn;
   if (!deallocationFn) deallocationFn = defaultDeallocationFn;
   if (!memCpyFn) memCpyFn = defaultMemCpyFn;
   return std::make_unique<IREEComprehensiveBufferizePass>(
-      allocationFn, deallocationFn, memCpyFn, embedSubspanOffsetIntoMemRefType);
+      allocationFn, deallocationFn, memCpyFn);
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &passManager) {
@@ -254,13 +260,11 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
-    bool embedSubspanOffsetIntoMemRefType) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   passManager.addPass(createEliminateEmptyTensorsPass());
   passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(
-      allocationFn, deallocationFn, memCpyFn,
-      embedSubspanOffsetIntoMemRefType));
+      allocationFn, deallocationFn, memCpyFn));
   addIREEPostBufferizationPasses(passManager);
 }
 

@@ -54,8 +54,6 @@ ALL_DEVICE_SPECS = [
     pixel_6_pro_specs.BIG_CORES,
     pixel_6_pro_specs.GPU,
     # Moto Edge X30
-    moto_edge_x30_specs.LITTLE_CORES,
-    moto_edge_x30_specs.BIG_CORES,
     moto_edge_x30_specs.GPU,
     # GCP machines
     gcp_specs.GCP_C2_STANDARD_16,

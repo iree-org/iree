@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -23,7 +23,6 @@
 #include "mlir/Dialect/Affine/Analysis/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/AffineCanonicalizationUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -42,7 +41,7 @@ namespace iree_compiler {
 static Value getAsValue(OpFoldResult attrOrValue, OpBuilder &builder,
                         Location loc) {
   if (Value val = attrOrValue.dyn_cast<Value>()) return val;
-  auto attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+  auto attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
   return builder.create<arith::ConstantIndexOp>(loc, attr.getInt());
 }
 

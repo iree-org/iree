@@ -95,7 +95,7 @@ class CommandBufferFillBufferOpConversion
 
     // Record the original pattern length then extend it to a 32 bit integer.
     auto originalPatternType = op.getPattern().getType();
-    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
+    unsigned patternBitWidth = IREE::Util::getTypeBitWidth(originalPatternType);
     // The pattern length (in bytes) will be used at runtime to issue the fill
     // command. While the pattern itself will be stored in a 32 bit integer,
     // the fill operation will use this length to slice a potentially smaller
@@ -275,7 +275,7 @@ class CommandBufferPushDescriptorSetOpConversion
       callOperands.push_back(
           castToImportType(adaptor.getBindingOrdinals()[i], i32Type, rewriter));
       auto bindingBuffer = adaptor.getBindingBuffers()[i];
-      if (bindingBuffer.getType().isa<IREE::VM::RefType>()) {
+      if (llvm::isa<IREE::VM::RefType>(bindingBuffer.getType())) {
         // Buffer binding; pass 0 for table slot.
         callOperands.push_back(getI32Zero());
         callOperands.push_back(bindingBuffer);

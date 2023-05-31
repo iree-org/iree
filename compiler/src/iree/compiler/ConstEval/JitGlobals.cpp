@@ -238,7 +238,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       }
 
       modified = true;
-      targetGlobal.setInitialValueAttr(value);
+      targetGlobal.setInitialValueAttr(cast<TypedAttr>(value));
     }
 
     // Delete any ops noted for pruning.

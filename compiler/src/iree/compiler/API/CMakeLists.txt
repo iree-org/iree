@@ -17,6 +17,7 @@ iree_cc_library(
     "MLIRInterop.h"
   DEPS
     IREELLVMIncludeSetup
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 
@@ -36,7 +37,6 @@ iree_cc_library(
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API::Internal::IREEOptToolEntryPoint
     iree::compiler::API::Internal::LLDToolEntryPoint
-    iree::compiler::API::Internal::MLIRInterop
   PUBLIC
 )
 

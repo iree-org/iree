@@ -31,6 +31,7 @@ set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
 # to be fixed to capture the correct include directories in that macro.
 include_directories(
   "${IREE_SOURCE_DIR}/compiler/src"
+  "${IREE_SOURCE_DIR}/compiler/bindings/c"
   "${IREE_SOURCE_DIR}/llvm-external-projects/iree-dialects/include"
   "${IREE_SOURCE_DIR}/third_party/llvm-project/mlir/include"
   "${IREE_SOURCE_DIR}/third_party/mlir-hlo/include"
@@ -49,13 +50,6 @@ set(CMAKE_PLATFORM_NO_VERSIONED_SONAME 1)
 # Sources
 ################################################################################
 
-declare_mlir_python_sources(IREECompilerAPIPythonSources
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
-  SOURCES
-    transforms/ireec.py
-)
-declare_mlir_python_sources(IREECompilerAPIPythonExtensions)
-
 declare_mlir_python_sources(IREECompilerAPIPythonTools
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
@@ -71,13 +65,15 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
 # Extensions
 ################################################################################
 
-declare_mlir_python_extension(IREECompilerAPIPythonExtensions.IREECTransforms
-  MODULE_NAME _ireecTransforms
-  ADD_TO_PARENT IREECompilerAPIPythonExtensions
+declare_mlir_python_sources(IREECompilerPythonExtensions)
+
+declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
+  MODULE_NAME _site_initialize_0
+  ADD_TO_PARENT IREECompilerPythonExtensions
   SOURCES
-    IREECTransforms.cpp
+    IREECompilerRegistration.cpp
   EMBED_CAPI_LINK_LIBS
-    IREECompilerCAPILib
+    iree_compiler_API_SharedImpl
   PRIVATE_LINK_LIBS
     LLVMSupport
 )
@@ -88,9 +84,8 @@ declare_mlir_python_extension(IREECompilerAPIPythonExtensions.IREECTransforms
 
 set(_SOURCE_COMPONENTS
   # Local sources.
-  IREECompilerAPIPythonSources
-  IREECompilerAPIPythonExtensions
   IREECompilerAPIPythonTools
+  IREECompilerPythonExtensions
 
   MLIRPythonSources.Core
 
@@ -110,11 +105,6 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.tosa
   MLIRPythonSources.Dialects.transform
   MLIRPythonSources.Dialects.vector
-
-  # mhlo project.
-  # TODO: Consider re-enabling these. They have been broken for some time.
-  # MLIRHLOPythonSources
-  # MLIRHLOPythonExtensions
 
   # iree-dialects project.
   IREEDialectsPythonSources

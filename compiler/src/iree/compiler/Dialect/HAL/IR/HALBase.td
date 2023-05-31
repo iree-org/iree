@@ -236,20 +236,24 @@ def HAL_AccessScopeBitfieldAttr :
 
 def HAL_CollectiveKind_AllGather : I32EnumAttrCase<"AllGather", 0, "all_gather">;
 def HAL_CollectiveKind_AllReduce : I32EnumAttrCase<"AllReduce", 1, "all_reduce">;
-def HAL_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 2, "broadcast">;
-def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 3, "reduce">;
-def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 4, "reduce_scatter">;
-def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 5, "send">;
-def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 6, "recv">;
+def HAL_CollectiveKind_AllToAll : I32EnumAttrCase<"AllToAll", 2, "all_to_all">;
+def HAL_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 3, "broadcast">;
+def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 4, "reduce">;
+def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 5, "reduce_scatter">;
+def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 6, "send">;
+def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 7, "recv">;
+def HAL_CollectiveKind_SendRecv: I32EnumAttrCase<"SendRecv", 8, "send_recv">;
 def HAL_CollectiveKindAttr :
     I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
       HAL_CollectiveKind_AllGather,
       HAL_CollectiveKind_AllReduce,
+      HAL_CollectiveKind_AllToAll,
       HAL_CollectiveKind_Broadcast,
       HAL_CollectiveKind_Reduce,
       HAL_CollectiveKind_ReduceScatter,
       HAL_CollectiveKind_Send,
       HAL_CollectiveKind_Recv,
+      HAL_CollectiveKind_SendRecv,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
@@ -299,6 +303,18 @@ def HAL_CollectiveElementTypeAttr :
       HAL_CollectiveElementType_Float64,
       HAL_CollectiveElementType_BFloat16,
     ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_CallingConvention_Default : I32EnumAttrCase<"Default", 0>;
+def HAL_CallingConvention_ParameterStruct : I32EnumAttrCase<"ParameterStruct", 1>;
+def HAL_CallingConventionAttr :
+    I32EnumAttr<
+        "CallingConvention",
+        "Calling conversions for linked functions",[
+          HAL_CallingConvention_Default,
+          HAL_CallingConvention_ParameterStruct,
+        ]>{
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
@@ -465,7 +481,7 @@ def HAL_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 
 def HAL_TimelineValue : TypeAlias<I64>;
 
-def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
+def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat, AnyComplex]>;
 def HAL_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
 
 def HAL_GlobalRefAttr : Util_AliasedSymbolRefAttr;

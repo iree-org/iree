@@ -182,7 +182,7 @@ class GlobalInitializationPass
     for (auto &op : moduleOp.getBlock().getOperations()) {
       if (auto globalOp = dyn_cast<IREE::VM::GlobalRefOp>(op)) {
       } else if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-        if (globalOp.getGlobalType().isa<IREE::VM::RefType>()) {
+        if (llvm::isa<IREE::VM::RefType>(globalOp.getGlobalType())) {
           if (failed(appendRefInitialization(globalOp, initBuilder))) {
             globalOp.emitOpError()
                 << "ref-type global unable to be initialized";
@@ -250,7 +250,7 @@ class GlobalInitializationPass
   // Returns {} if the constant is zero.
   std::pair<LogicalResult, Value> createConst(Location loc, Attribute value,
                                               OpBuilder &builder) {
-    if (auto integerAttr = value.dyn_cast<IntegerAttr>()) {
+    if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(value)) {
       if (integerAttr.getValue().isZero()) {
         // Globals are zero-initialized by default.
         return {success(), {}};
@@ -265,7 +265,7 @@ class GlobalInitializationPass
         default:
           return {failure(), {}};
       }
-    } else if (auto floatAttr = value.dyn_cast<FloatAttr>()) {
+    } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(value)) {
       if (floatAttr.getValue().isZero()) {
         // Globals are zero-initialized by default.
         return {success(), {}};
@@ -287,7 +287,7 @@ class GlobalInitializationPass
   // Stores a value to a global; the global must be mutable.
   LogicalResult storePrimitiveGlobal(Location loc, StringRef symName,
                                      Value value, OpBuilder &builder) {
-    if (auto integerType = value.getType().dyn_cast<IntegerType>()) {
+    if (auto integerType = llvm::dyn_cast<IntegerType>(value.getType())) {
       switch (integerType.getIntOrFloatBitWidth()) {
         case 32:
           builder.create<IREE::VM::GlobalStoreI32Op>(loc, value, symName);
@@ -298,7 +298,7 @@ class GlobalInitializationPass
         default:
           return failure();
       }
-    } else if (auto floatType = value.getType().dyn_cast<FloatType>()) {
+    } else if (auto floatType = llvm::dyn_cast<FloatType>(value.getType())) {
       switch (floatType.getIntOrFloatBitWidth()) {
         case 32:
           builder.create<IREE::VM::GlobalStoreF32Op>(loc, value, symName);

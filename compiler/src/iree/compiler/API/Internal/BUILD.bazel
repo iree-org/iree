@@ -23,6 +23,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:MLIRInteropHeaders",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
@@ -37,6 +38,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
+        "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Support",
@@ -104,27 +106,5 @@ iree_compiler_cc_library(
         "@llvm-project//lld:Wasm",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TargetParser",
-    ],
-)
-
-iree_compiler_cc_library(
-    name = "MLIRInterop",
-    srcs = [
-        "MLIRInterop.cpp",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/API:MLIRInteropHeaders",
-        "//compiler/src/iree/compiler/ConstEval",
-        "//compiler/src/iree/compiler/Dialect/VM/IR",
-        "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
-        "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
-        "//compiler/src/iree/compiler/Pipelines",
-        "//compiler/src/iree/compiler/Tools:init_llvmir_translations",
-        "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
-        "//compiler/src/iree/compiler/Tools:init_targets",
-        "//compiler/src/iree/compiler/Utils",
-        "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
-        "@llvm-project//mlir:CAPIIR",
-        "@llvm-project//mlir:IR",
     ],
 )

@@ -111,19 +111,17 @@ class BuildFileFunctions(object):
     return self._convert_string_arg_block(name, target, quote=False)
 
   def _convert_srcs_block(self, srcs):
-    if srcs is None:
+    if not srcs:
       return ""
-    generated_srcs = [src for src in srcs if src.startswith(":")]
-    srcs = [src for src in srcs if src not in generated_srcs]
-    sets = []
-    if srcs:
-      sets.append(self._convert_string_list_block("SRCS", srcs, sort=True))
-    if generated_srcs:
-      sets.append(
-          self._convert_string_list_block("GENERATED_SRCS",
-                                          [src[1:] for src in generated_srcs],
-                                          sort=True))
-    return "\n".join(sets)
+    # Bazel allows srcs to reference targets in the current package (leading
+    # ':') or in other packages (leading '//'). We map that to paths by:
+    # - dropping any leading ':' as in:
+    #      ':generated.c' -> 'generated.c'
+    # - dropping any leading '//', and internal ':' by '/', as in:
+    #      '//path/to/package:generated.c' ->  'path/to/package/generated.c'
+    srcs = [s.lstrip('//').lstrip(':').replace(':', '/') for s in srcs]
+
+    return self._convert_string_list_block("SRCS", srcs, sort=True)
 
   def _convert_td_file_block(self, td_file):
     if td_file.startswith("//iree"):
@@ -253,11 +251,13 @@ class BuildFileFunctions(object):
     pass
 
   def filegroup(self, name, **kwargs):
-    # Not implemented yet. Might be a no-op, or may want to evaluate the srcs
-    # attribute and pass them along to any targets that depend on the filegroup.
+    # Not implemented, but allowed for Bazel-only uses, such as declaring internal
+    # headers and other kinds of files that Bazel enforces but CMake doesn't care
+    # about. If we ever need to implement this, this might be a no-op, or may
+    # want to evaluate the srcs attribute and pass them along to any targets
+    # that depend on the filegroup.
     # Cross-package dependencies and complicated globs could be hard to handle.
-
-    self._convert_unimplemented_function("filegroup", name)
+    pass
 
   def sh_binary(self, name, **kwargs):
     if self._should_skip_target(**kwargs):
@@ -485,35 +485,30 @@ class BuildFileFunctions(object):
   def iree_bitcode_library(self,
                            name,
                            srcs,
-                           hdrs=None,
+                           internal_hdrs=None,
                            copts=None,
-                           defines=None,
-                           data=None,
-                           clang_tool=None,
-                           builtin_headers=None,
-                           testonly=None):
+                           arch=None):
     name_block = self._convert_string_arg_block("NAME", name, quote=False)
     srcs_block = self._convert_srcs_block(srcs)
-    hdrs_block = self._convert_string_list_block("HDRS", hdrs, sort=True)
     copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
-    defines_block = self._convert_string_list_block("DEFINES", defines)
-    data_block = self._convert_target_list_block("DATA", data)
-    clang_tool_block = self._convert_target_block("CLANG_TOOL", clang_tool)
-    builtin_headers_block = self._convert_target_list_block(
-        "BUILTIN_HEADERS", builtin_headers)
-    testonly_block = self._convert_option_block("TESTONLY", testonly)
+    arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
 
     self._converter.body += (f"iree_bitcode_library(\n"
                              f"{name_block}"
                              f"{srcs_block}"
-                             f"{hdrs_block}"
                              f"{copts_block}"
-                             f"{defines_block}"
-                             f"{data_block}"
-                             f"{clang_tool_block}"
-                             f"{builtin_headers_block}"
-                             f"{testonly_block}"
-                             f"  PUBLIC\n)\n\n")
+                             f"{arch_block}"
+                             f")\n\n")
+
+  def iree_link_bitcode(self, name, bitcode_files):
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    bitcode_files_block = self._convert_srcs_block(
+        [f.replace(":", "/") for f in bitcode_files])
+
+    self._converter.body += (f"iree_link_bitcode(\n"
+                             f"{name_block}"
+                             f"{bitcode_files_block}"
+                             f"\n)\n\n")
 
   def iree_bytecode_module(self,
                            name,

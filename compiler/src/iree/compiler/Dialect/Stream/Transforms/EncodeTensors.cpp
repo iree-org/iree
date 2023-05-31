@@ -16,7 +16,10 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/ElementPackingUtils.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -43,7 +46,7 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
                                    ValueRange encodingDims,
                                    PatternRewriter &rewriter) {
   auto encoding = encodingType.getEncoding();
-  if (encoding && !encoding.isa<IREE::LinalgExt::EncodingAttr>()) {
+  if (encoding && !llvm::isa<IREE::LinalgExt::EncodingAttr>(encoding)) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
       d << "unsupported tensor encoding: " << encodingType;
     });
@@ -51,57 +54,13 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
   return success();
 }
 
-// Aligns an element type to a byte-aligned power of 2 bit width.
-//
-// Examples:
-//   i1  -> i8
-//   i4  -> i8
-//   i11 -> i16
-//   i33 -> i64
-static Type alignElementType(Type originalType) {
-  // Only handle integers; floats (today) in MLIR all have aligned widths.
-  auto elementType = originalType.dyn_cast<IntegerType>();
-  if (!elementType) return originalType;
-
-  // Align the element type to a power of two byte size.
-  auto alignedBitWidth =
-      IREE::Util::getRoundedElementByteWidth(elementType) * 8;
-  if (elementType.getIntOrFloatBitWidth() == alignedBitWidth) {
-    // Already aligned.
-    return originalType;
-  }
-  return IntegerType::get(elementType.getContext(), alignedBitWidth,
-                          elementType.getSignedness());
-}
-
 // Aligns the element type of a tensor<> to a byte-aligned power of 2 bit width.
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
-  auto elementType = originalType.getElementType();
-  auto alignedType = alignElementType(elementType);
+  Type elementType = originalType.getElementType();
+  Type alignedType = legalizeStorageElementType(elementType);
   if (alignedType == elementType) return originalType;
   return RankedTensorType::get(originalType.getShape(), alignedType,
                                originalType.getEncoding());
-}
-
-// Returns the element count of a tensor with optional dynamic dimensions.
-// Many of these will be static and since this is used _a lot_ we do a bit of
-// work to try to avoid a bunch of trivially foldable ops.
-static Value calculateElementCount(Location loc, RankedTensorType tensorType,
-                                   ValueRange dynamicDims, int64_t multiplier,
-                                   PatternRewriter &rewriter) {
-  // Calculate all static dims first, if any.
-  int64_t staticCount = multiplier;
-  for (unsigned i = 0; i < tensorType.getRank(); ++i) {
-    if (!tensorType.isDynamicDim(i)) staticCount *= tensorType.getDimSize(i);
-  }
-
-  // Scale by dynamic dims, if present.
-  auto value =
-      rewriter.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
-  for (auto dim : dynamicDims) {
-    value = rewriter.createOrFold<arith::MulIOp>(loc, value, dim);
-  }
-  return value;
 }
 
 // Returns a ConstantIndexOp with the value of the given dimension.
@@ -147,12 +106,10 @@ static Value calculateElementByteOffset(Location loc,
                                         ValueRange dynamicDims,
                                         ValueRange indices,
                                         PatternRewriter &rewriter) {
-  return rewriter.createOrFold<arith::MulIOp>(
-      loc,
-      calculateElementOffset(loc, tensorType, dynamicDims, indices, rewriter),
-      rewriter.create<arith::ConstantIndexOp>(
-          loc,
-          IREE::Util::getRoundedElementByteWidth(tensorType.getElementType())));
+  Value linearizedIndex =
+      calculateElementOffset(loc, tensorType, dynamicDims, indices, rewriter);
+  return calculateStorageElementOffsetInBytes(loc, tensorType, linearizedIndex,
+                                              rewriter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -164,7 +121,7 @@ struct EncodeTensorImportOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorImportOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -187,7 +144,7 @@ struct EncodeTensorExportOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorExportOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
@@ -210,17 +167,19 @@ struct EncodeTensorSizeOfOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSizeOfOp op,
                                 PatternRewriter &rewriter) const override {
-    auto encodingType = op.getEncoding().cast<RankedTensorType>();
+    auto encodingType = llvm::cast<RankedTensorType>(op.getEncoding());
     auto encodingDims = op.getEncodingDims();
     if (failed(checkEncoding(op, encodingType, encodingDims, rewriter))) {
       return failure();
     }
 
     // Dense: element count * element size.
-    auto elementByteSize =
-        IREE::Util::getRoundedElementByteWidth(encodingType.getElementType());
-    auto totalSize = calculateElementCount(
-        op.getLoc(), encodingType, encodingDims, elementByteSize, rewriter);
+    Value totalSize = calculateStorageElementCountInBytes(
+        op.getLoc(), encodingType, encodingDims, rewriter);
+    if (!totalSize) {
+      return op.emitOpError("failed to calculate total byte count: ")
+             << encodingType << " does not have integral number of total bytes";
+    }
     rewriter.replaceOp(op, totalSize);
 
     return success();
@@ -236,7 +195,7 @@ struct EncodeTensorEmptyOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorEmptyOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -259,7 +218,7 @@ struct EncodeTensorConstantOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -278,13 +237,13 @@ struct EncodeTensorConstantOp
     // can make the tradeoff for minimizing file size vs minimizing startup
     // cost.
 
-    // Sub-byte aligned constants need to be expanded to a power of 2
-    // byte-aligned width. This is unfortunate: it's wasted bits in the final
-    // binary that we could otherwise use productively.
-    auto alignedType = alignTensorType(resultType);
+    // Sub-byte aligned constants, if not explicitly allowed, need to be
+    // expanded to a power of 2 byte-aligned width. This is unfortunate: it's
+    // wasted bits in the final binary that we could otherwise use productively.
+    RankedTensorType alignedType = alignTensorType(resultType);
     ElementsAttr encodedAttr = op.getValue();
     if (alignedType != resultType) {
-      if (auto sourceAttr = encodedAttr.dyn_cast<DenseIntElementsAttr>()) {
+      if (auto sourceAttr = llvm::dyn_cast<DenseIntElementsAttr>(encodedAttr)) {
         auto alignedBitWidth = alignedType.getElementTypeBitWidth();
         encodedAttr = sourceAttr.mapValues(
             alignedType.getElementType(), [=](APInt sourceValue) {
@@ -297,10 +256,12 @@ struct EncodeTensorConstantOp
     }
 
     // Dense:
-    auto resultSize = calculateElementCount(
-        op.getLoc(), alignedType, resultDims,
-        IREE::Util::getRoundedElementByteWidth(alignedType.getElementType()),
-        rewriter);
+    Value resultSize = calculateStorageElementCountInBytes(
+        op.getLoc(), alignedType, resultDims, rewriter);
+    if (!resultSize) {
+      return op.emitOpError("failed to calculate total byte count: ")
+             << alignedType << " does not have integral number of total bytes";
+    }
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncConstantOp>(
         op, op.getResult().getType(), encodedAttr, resultSize,
         op.getAffinityAttr());
@@ -335,10 +296,31 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
 
   // Get floats into integer form.
   auto patternType = pattern.getType();
-  unsigned bitWidth = patternType.getIntOrFloatBitWidth();
-  if (patternType.isa<FloatType>()) {
+  unsigned elementBitWidth = IREE::Util::getTypeBitWidth(patternType);
+  elementBitWidth =
+      (isa<ComplexType>(patternType) ? elementBitWidth / 2 : elementBitWidth);
+  if (llvm::isa<FloatType>(patternType)) {
     pattern = rewriter.createOrFold<arith::BitcastOp>(
-        loc, rewriter.getIntegerType(bitWidth), pattern);
+        loc, rewriter.getIntegerType(elementBitWidth), pattern);
+  }
+
+  if (isa<ComplexType>(patternType)) {
+    int64_t complexBitWidth = elementBitWidth;
+    Type bwElemType = rewriter.getIntegerType(elementBitWidth);
+    Type bwType = rewriter.getIntegerType(elementBitWidth * 2);
+    Value shiftAmount = rewriter.create<arith::ConstantOp>(
+        loc, bwType, rewriter.getIntegerAttr(bwType, complexBitWidth));
+
+    Value real = rewriter.create<mlir::complex::ReOp>(loc, pattern);
+    Value realInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, real);
+    Value imag = rewriter.create<mlir::complex::ImOp>(loc, pattern);
+    Value imagInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, imag);
+    realInt = rewriter.create<arith::IndexCastOp>(loc, bwType, realInt);
+    imagInt = rewriter.create<arith::IndexCastOp>(loc, bwType, imagInt);
+    Value shiftReal =
+        rewriter.create<arith::ShLIOp>(loc, bwType, realInt, shiftAmount);
+    Value orImag = rewriter.create<arith::OrIOp>(loc, shiftReal, imagInt);
+    return orImag;
   }
 
   // HACK: extend i1 to i8. This is really not something we should be doing here
@@ -346,7 +328,30 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
   if (patternType.isInteger(1)) {
     return rewriter.createOrFold<arith::ExtUIOp>(loc, rewriter.getI8Type(),
                                                  pattern);
-  } else if ((bitWidth % 8) != 0) {
+  }
+  // For packed sub-byte patterns, duplicate the sub-byte parts into a full
+  // byte. We first extend the sub-byte parts into full bytes, and then keep
+  // shifting left and bitwise or the sub-byte parts. For example, to create an
+  // i8 pattern from i2 parts, we generate the following sequence:
+  //   %i8_val = arith.extui %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  if (needToPackSubByteElementBitWidth(elementBitWidth)) {
+    Type i8Type = rewriter.getI8Type();
+    Value bitwidth = rewriter.createOrFold<arith::ConstantOp>(
+        loc, i8Type, rewriter.getIntegerAttr(i8Type, elementBitWidth));
+    Value subByteVal =
+        rewriter.createOrFold<arith::ExtUIOp>(loc, i8Type, pattern);
+    Value i8Val = subByteVal;
+    for (unsigned i = 1, e = 8 / elementBitWidth; i < e; ++i) {
+      Value shifted =
+          rewriter.createOrFold<arith::ShLIOp>(loc, i8Val, bitwidth);
+      i8Val = rewriter.createOrFold<arith::OrIOp>(loc, shifted, subByteVal);
+    }
+    return i8Val;
+  }
+  if ((elementBitWidth % 8) != 0) {
     // We'd need some policy to determine how to handle non-byte-aligned widths.
     return {};
   }
@@ -360,7 +365,7 @@ struct EncodeTensorSplatOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSplatOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -371,9 +376,17 @@ struct EncodeTensorSplatOp
     // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
     auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
     if (!pattern) {
+      Type patternType = op.getValue().getType();
+      unsigned bitwdith = IREE::Util::getTypeBitWidth(patternType);
       return rewriter.notifyMatchFailure(
-          op, "unsupported pattern width; encoding policy required");
-    } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+          op, llvm::formatv(
+                  "unsupported pattern type {} with non-byte-aligned bitwidth "
+                  "{}; need to update encoding policy for such case",
+                  patternType, bitwdith));
+    }
+
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
+    if (bitWidth > 32) {
       // We emulate 64-bit support with a stream.builtin.splat.i64.
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinSplatI64Op>(
           op, op.getResult().getType(), pattern, op.getResultSize(),
@@ -397,12 +410,12 @@ struct EncodeTensorCloneOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorCloneOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
-    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -426,12 +439,12 @@ struct EncodeTensorSliceOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSliceOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
-    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -459,10 +472,21 @@ struct EncodeTensorFillOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorFillOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = op.getTargetEncoding().cast<RankedTensorType>();
+    auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
     auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
+    }
+
+    auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
+    if (!pattern) {
+      Type patternType = op.getValue().getType();
+      unsigned bitwdith = IREE::Util::getTypeBitWidth(patternType);
+      return rewriter.notifyMatchFailure(
+          op, llvm::formatv(
+                  "unsupported pattern type {} with non-byte-aligned bitwidth "
+                  "{}; need to update encoding policy for such case",
+                  patternType, bitwdith));
     }
 
     // Dense:
@@ -474,11 +498,17 @@ struct EncodeTensorFillOp
         op.getLoc(), targetOffset, targetLength);
 
     // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
-    auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
-    if (!pattern) {
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
+    if (bitWidth > 64) {
+      // This happens mostly when complex<f64> is used as a input type for
+      // splat. complex<type> is broken down into a 2xtype value with the real
+      // field occupying the sizeof(type) MSB bits and the imaginary field
+      // occupying the rest. At this moment, splats with size > 64 is not
+      // implemented so we error out here.
       return rewriter.notifyMatchFailure(
-          op, "unsupported pattern width; encoding policy required");
-    } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+          op, "unsupported bitWidth greater than 64; encoding policy required");
+    }
+    if (bitWidth > 32) {
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinFillI64Op>(
           op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
           targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());
@@ -501,12 +531,12 @@ struct EncodeTensorUpdateOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
-    auto updateType = op.getUpdateEncoding().cast<RankedTensorType>();
+    auto updateType = llvm::cast<RankedTensorType>(op.getUpdateEncoding());
     auto updateDims = op.getUpdateEncodingDims();
     if (failed(checkEncoding(op, updateType, updateDims, rewriter))) {
       return failure();
     }
-    auto targetType = op.getTargetEncoding().cast<RankedTensorType>();
+    auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
     auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
@@ -535,10 +565,15 @@ struct EncodeTensorLoadOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
+    }
+
+    if (needToPackSubByteElements(sourceType)) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported load with sub-byte elements");
     }
 
     // Dense:
@@ -561,10 +596,15 @@ struct EncodeTensorStoreOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = op.getTargetEncoding().cast<RankedTensorType>();
+    auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
     auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
+    }
+
+    if (needToPackSubByteElements(targetType)) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported store with sub-byte elements");
     }
 
     // Dense:
@@ -614,8 +654,8 @@ class EncodeHostTensorsPass
 // of 2 bit width.
 static IREE::Flow::DispatchTensorType alignDispatchTensorType(
     IREE::Flow::DispatchTensorType originalType) {
-  auto elementType = originalType.getBoundElementType();
-  auto alignedType = alignElementType(elementType);
+  Type elementType = originalType.getBoundElementType();
+  Type alignedType = legalizeStorageElementType(elementType);
   if (alignedType == elementType) return originalType;
   return IREE::Flow::DispatchTensorType::get(
       originalType.getAccess(), originalType.getShape(), alignedType);
@@ -633,14 +673,15 @@ struct EncodeBindingSubspanOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::BindingSubspanOp op,
                                 PatternRewriter &rewriter) const override {
-    auto originalType =
-        op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+    auto originalType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+        op.getResult().getType());
     if (!originalType) {
       return rewriter.notifyMatchFailure(op, "binding type not supported");
     }
 
     // Align the element type, if needed.
-    auto alignedType = alignDispatchTensorType(originalType);
+    IREE::Flow::DispatchTensorType alignedType =
+        alignDispatchTensorType(originalType);
     if (originalType == alignedType) return failure();  // already aligned.
 
     // Directly swap the type with the one, changing all uses in the IR.
@@ -661,10 +702,10 @@ struct EncodeDispatchTensorLoadOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = op.getResult().getType().cast<RankedTensorType>();
+    auto targetType = llvm::cast<RankedTensorType>(op.getResult().getType());
 
     // Align the element type, if needed.
-    auto alignedType = alignTensorType(targetType);
+    RankedTensorType alignedType = alignTensorType(targetType);
     if (targetType == alignedType) return failure();  // already aligned.
 
     // Loads always truncate from an byte aligned type to a sub-byte one.
@@ -694,10 +735,10 @@ struct EncodeDispatchTensorStoreOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.getValue().getType().cast<RankedTensorType>();
+    auto sourceType = llvm::cast<RankedTensorType>(op.getValue().getType());
 
     // Align the element type, if needed.
-    auto alignedType = alignTensorType(sourceType);
+    RankedTensorType alignedType = alignTensorType(sourceType);
     if (sourceType == alignedType) return failure();  // already aligned.
 
     // Stores always extend from a sub-byte aligned type to a byte aligned one.

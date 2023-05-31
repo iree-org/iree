@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -16,14 +16,18 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-vectorization"
+#define VEC_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
 /// Returns the op that contains lowering config. Checks whether the provided op
 /// contains the lowering config and returns it. Otherwise, tries to find the
 /// lowering config across the function. If there are multiple ops with the same
@@ -107,10 +111,75 @@ static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
   return canonicalVectorShape;
 }
 
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
+/// Returns failure if vector sizes can't be inferred.
+static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
+    linalg::LinalgOp linalgOp) {
+  LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
+
+  SmallVector<int64_t> vectorSizes;
+  unsigned numDims = linalgOp.getNumLoops();
+
+  for (int dim = 0; dim < numDims; ++dim) {
+    // Map dimension `dim` to an operand dimension that we will use to
+    // traverse the U-D chain to get `dim` vector size information.
+    SmallVector<std::pair<Value, unsigned>> operandDimPairs;
+    linalgOp.mapIterationSpaceDimToAllOperandDims(dim, operandDimPairs);
+    if (operandDimPairs.empty()) {
+      return failure();
+    }
+
+    Value firstOperand = operandDimPairs[0].first;
+    unsigned firstOperandDim = operandDimPairs[0].second;
+
+    // Trivial case: `dim` size is available in the operand type.
+    int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
+                          .getShape()[firstOperandDim];
+    if (!ShapedType::isDynamic(dimSize)) {
+      vectorSizes.push_back(dimSize);
+      LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize
+                            << "' for dimension '" << dim << "'\n");
+      continue;
+    }
+
+    // Use ValueBounds analysis to infer `dim` size upper bound.
+    FailureOr<int64_t> maybeDimBound;
+    for (auto operandDimPair : operandDimPairs) {
+      Value operand = operandDimPair.first;
+      unsigned operandDim = operandDimPair.second;
+      maybeDimBound = ValueBoundsConstraintSet::computeConstantBound(
+          presburger::BoundType::UB, operand, operandDim,
+          /*stopCondition=*/nullptr, /*closedUB=*/true);
+
+      if (succeeded(maybeDimBound)) {
+        break;
+      }
+    }
+
+    if (failed(maybeDimBound)) {
+      return failure();
+    }
+
+    dimSize = maybeDimBound.value();
+    vectorSizes.push_back(dimSize);
+    LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize
+                          << "' for dimension '" << dim << "'\n");
+  }
+
+  return vectorSizes;
+}
+
 // Give the canonical vector shape of a dispatch, returns the vector sizes for a
 // particular linalg op within that dispatch.
 static SmallVector<int64_t> getVectorSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
+  // Try to infer the vector sizes from the IR. If it fails, try to get them
+  // from the lowering config.
+  auto inferredVectorSizes = inferVectorSizesFromIR(linalgOp);
+  if (succeeded(inferredVectorSizes)) {
+    return *inferredVectorSizes;
+  }
+
   FailureOr<Operation *> rootOp = getRootOp(linalgOp);
   if (failed(rootOp)) {
     return {};
@@ -166,16 +235,26 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   }
 
   IRRewriter rewriter(context);
-  SmallVector<linalg::LinalgOp> candidates;
-  funcOp.walk(
-      [&](linalg::LinalgOp linalgOp) { candidates.push_back(linalgOp); });
-  for (auto linalgOp : candidates) {
+  SmallVector<Operation *> candidates;
+  funcOp.walk([&](Operation *op) {
+    if (isa<linalg::LinalgOp>(op)) candidates.push_back(op);
+    if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
+      candidates.push_back(op);
+  });
+  for (auto op : candidates) {
     SmallVector<int64_t> vectorSizes;
     if (enableVectorMasking) {
-      vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
+      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+        vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
+      } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
+        auto ty = padOp.getResultType();
+        // TODO(hanchung): Infer the vector sizes for pad op after
+        // maskedVectorize method allows dynamic result shapes.
+        if (!ty.hasStaticShape()) continue;
+        vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
+      }
     }
-    (void)linalg::vectorize(rewriter, linalgOp, vectorSizes,
-                            vectorizeGatherAccesses);
+    (void)linalg::vectorize(rewriter, op, vectorSizes, vectorizeGatherAccesses);
   };
 
   // TODO: Move this down the pipeline once we have the ODM-based masking
@@ -193,6 +272,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                                                       funcOp.getContext());
   vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                        funcOp.getContext());
+  vector::populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the

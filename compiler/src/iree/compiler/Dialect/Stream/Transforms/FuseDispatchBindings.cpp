@@ -40,8 +40,8 @@ struct BindingRange {
   BindingRange() = default;
   BindingRange(IREE::Stream::CmdDispatchOp dispatchOp, unsigned idx)
       : idx(idx),
-        access(dispatchOp.getResourceAccesses()[idx]
-                   .cast<IREE::Stream::ResourceAccessBitfieldAttr>()
+        access(llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+                   dispatchOp.getResourceAccesses()[idx])
                    .getValue()),
         resource(dispatchOp.getResources()[idx]),
         resourceSize(dispatchOp.getResourceSizes()[idx]),
@@ -92,7 +92,8 @@ static SmallVector<Binding> findCorrelatedBindings(
       // If the resource is mutable and we were told not to alias mutable
       // bindings we always put the resource into its own class.
       auto resourceAccess =
-          resourceAccessAttr.cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+          llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+              resourceAccessAttr);
       if (!aliasMutableBindings &&
           bitEnumContainsAll(resourceAccess.getValue(),
                              IREE::Stream::ResourceAccessBitfield::Write)) {
@@ -178,7 +179,7 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
   // Gather old bindings (in order).
   SmallVector<BlockArgument> oldBindingArgs;
   for (auto arg : entryBlock.getArguments()) {
-    if (arg.getType().isa<IREE::Stream::BindingType>()) {
+    if (llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
       oldBindingArgs.push_back(arg);
     }
   }

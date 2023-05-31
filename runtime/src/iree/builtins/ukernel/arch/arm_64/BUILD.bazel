@@ -17,6 +17,7 @@ iree_runtime_cc_library(
     hdrs = [
         "mmt4d_arm_64.h",
     ],
+    deps = ["//runtime/src/iree/builtins/ukernel:internal_headers"],
 )
 
 iree_runtime_cc_library(
@@ -24,6 +25,7 @@ iree_runtime_cc_library(
     hdrs = [
         "pack_arm_64.h",
     ],
+    deps = ["//runtime/src/iree/builtins/ukernel:internal_headers"],
 )
 
 iree_runtime_cc_library(
@@ -31,6 +33,7 @@ iree_runtime_cc_library(
     hdrs = [
         "query_tile_sizes_arm_64.h",
     ],
+    deps = ["//runtime/src/iree/builtins/ukernel:internal_headers"],
 )
 
 iree_runtime_cc_library(
@@ -38,4 +41,5 @@ iree_runtime_cc_library(
     hdrs = [
         "unpack_arm_64.h",
     ],
+    deps = ["//runtime/src/iree/builtins/ukernel:internal_headers"],
 )

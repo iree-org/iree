@@ -47,6 +47,6 @@ hal.executable private @mmt4d_ukernel {
     }
   }
 }
-// CHECK: func private @vmvx.mmt4d.i8i8i32(
+// CHECK: func private @vmvx.mmt4d(
 // CHECK: func @mmt4d_i8()
-// CHECK:   func.call @vmvx.mmt4d.i8i8i32(
+// CHECK:   func.call @vmvx.mmt4d(

@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "DispatchABI.h"
     "KernelDispatch.h"
+    "LLVMCPUPasses.h"
     "TargetMLTransformInfo.h"
     "Utils.h"
   SRCS
@@ -106,6 +107,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::TransformDialectStrategies::CPU::TransformDialectStrategies
     iree::compiler::Codegen::Transforms
@@ -118,6 +120,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
+    iree::schemas::cpu_data
     iree::schemas::instruments
   PUBLIC
 )

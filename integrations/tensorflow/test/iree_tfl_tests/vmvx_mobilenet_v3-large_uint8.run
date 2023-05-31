@@ -1,0 +1,4 @@
+# REQUIRES: vmvx
+# RUN: %PYTHON -m iree_tfl_tests.mobilenet_v3-large_uint8_test --target_backend=vmvx --artifacts_dir=%t
+# TODO(#10514): Address vmvx numerical mismatch issue.
+# XFAIL: vmvx

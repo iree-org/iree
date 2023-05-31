@@ -4,13 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/mmt4d_tile.h"
-
-#if defined(IREE_UK_ARCH_ARM_64)
-#include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64.h"
-#elif defined(IREE_UK_ARCH_X86_64)
-#include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64.h"
-#endif
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 // Generic implementation of matmul tile, i8*i8->i32 case.
 static void iree_uk_mmt4d_tile_i8i8i32_generic(
@@ -25,7 +19,7 @@ static void iree_uk_mmt4d_tile_i8i8i32_generic(
   iree_uk_int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
   iree_uk_int32_t acc[iree_uk_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
-  if (flags & IREE_UK_FLAG_ACCUMULATE) {
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = out_tile[i];
   } else {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
@@ -61,7 +55,7 @@ static void iree_uk_mmt4d_tile_f32f32f32_generic(
   iree_uk_int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
   float acc[iree_uk_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
-  if (flags & IREE_UK_FLAG_ACCUMULATE) {
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = out_tile[i];
   } else {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
@@ -86,7 +80,7 @@ static void iree_uk_mmt4d_tile_f32f32f32_generic(
 
 static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
     const iree_uk_mmt4d_params_t* params) {
-  switch (params->type) {
+  switch (iree_uk_mmt4d_type(params->flags)) {
     case iree_uk_mmt4d_type_f32f32f32:
       return iree_uk_mmt4d_tile_f32f32f32_generic;
     case iree_uk_mmt4d_type_i8i8i32:
@@ -96,16 +90,6 @@ static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
       IREE_UK_ASSUME_UNREACHABLE;
       return 0;
   }
-}
-
-static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
-    const iree_uk_mmt4d_params_t* params) {
-#if defined(IREE_UK_ARCH_ARM_64)
-  return iree_uk_mmt4d_select_tile_func_arm_64(params);
-#elif defined(IREE_UK_ARCH_X86_64)
-  return iree_uk_mmt4d_select_tile_func_x86_64(params);
-#endif
-  return 0;
 }
 
 iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func(

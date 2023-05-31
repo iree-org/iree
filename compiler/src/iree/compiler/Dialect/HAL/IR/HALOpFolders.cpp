@@ -29,6 +29,29 @@ namespace IREE {
 namespace HAL {
 
 //===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Erases an op if it has no uses.
+// This is to support ops that are "pure" but can't be marked as such because
+// the MLIR CSE pass would deduplicate them.
+template <typename Op>
+struct ElideUnusedOp : public OpRewritePattern<Op> {
+  explicit ElideUnusedOp(MLIRContext *context)
+      : OpRewritePattern<Op>(context, /*benefit=*/1000) {}
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.use_empty()) return failure();
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+}  // namespace
+
+//===----------------------------------------------------------------------===//
 // hal.tensor.import/export
 //===----------------------------------------------------------------------===//
 
@@ -109,7 +132,7 @@ struct FoldBufferViewCreateSubspan
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = op.getSourceOffset().cast<Value>();
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
@@ -161,6 +184,24 @@ void BufferViewBufferOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// hal.channel.create
+//===----------------------------------------------------------------------===//
+
+void ChannelCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelCreateOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.command_buffer.*
 //===----------------------------------------------------------------------===//
 
@@ -203,7 +244,7 @@ struct FoldCommandBufferFillBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = op.getTargetOffset().cast<Value>();
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
@@ -242,7 +283,7 @@ struct FoldCommandBufferCopyBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = op.getSourceOffset().cast<Value>();
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
@@ -252,7 +293,7 @@ struct FoldCommandBufferCopyBufferSubspans
       needsUpdate = true;
     }
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = op.getTargetOffset().cast<Value>();
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
@@ -847,27 +888,9 @@ void ExecutableConstantBlockOp::getCanonicalizationPatterns(
 // hal.fence.create
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// Replaces a fence with no timepoints with a null value.
-struct ElideUnusedFenceCreate : public OpRewritePattern<FenceCreateOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(FenceCreateOp op,
-                                PatternRewriter &rewriter) const override {
-    if (op.use_empty()) {
-      rewriter.eraseOp(op);
-      return success();
-    } else {
-      return failure();
-    }
-  }
-};
-
-}  // namespace
-
 void FenceCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  results.insert<ElideUnusedFenceCreate>(context);
+  results.insert<ElideUnusedOp<FenceCreateOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//

@@ -49,9 +49,9 @@ struct ConstantSlice {
   // padding.
   uint64_t getStorageSize() const {
     if (auto serializableAttr =
-            value.dyn_cast<IREE::Util::SerializableAttrInterface>()) {
+            llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(value)) {
       return serializableAttr.getStorageSize();
-    } else if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
+    } else if (auto denseAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
       return denseAttr.getRawData().size();
     } else {
       assert(false && "invalid constant attr type");
@@ -432,7 +432,8 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   for (auto [result, resultSize, value] :
        llvm::zip_equal(constantsOp.getResults(), constantsOp.getResultSizes(),
                        constantsOp.getValues())) {
-    auto resourceType = result.getType().cast<IREE::Stream::ResourceType>();
+    auto resourceType =
+        llvm::cast<IREE::Stream::ResourceType>(result.getType());
     if (resourceType.getLifetime() != lifetime) continue;
     slices.push_back(ConstantSlice{
         result,
@@ -463,7 +464,8 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   // fast-path where we directly map the constant memory. If producing
   // variables then we always need to stage and clone.
   auto anyResult = slices.front().result;
-  auto resourceType = anyResult.getType().cast<IREE::Stream::ResourceType>();
+  auto resourceType =
+      llvm::cast<IREE::Stream::ResourceType>(anyResult.getType());
   UploadResult uploadResult;
   if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
     uploadResult = buildTryMapConstantResources(

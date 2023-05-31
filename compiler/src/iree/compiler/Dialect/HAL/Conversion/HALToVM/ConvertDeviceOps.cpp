@@ -37,8 +37,8 @@ class DeviceQueryIntCastOpConversion
     auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
         op.getLoc(), rewriter.getI1Type(), rewriter.getI64Type(),
         adaptor.getDevice(), op.getCategoryAttr(), op.getKeyAttr(),
-        Attribute{});
-    auto ok = queryOp.getOk().cast<Value>();
+        TypedAttr{});
+    auto ok = llvm::cast<Value>(queryOp.getOk());
     auto value = queryOp.getValue();
 
     // Truncate or extend based on the target type.
@@ -46,7 +46,7 @@ class DeviceQueryIntCastOpConversion
       // i64 -> index cast.
       value = rewriter.createOrFold<arith::IndexCastOp>(op.getLoc(), targetType,
                                                         value);
-    } else if (targetType.isa<IntegerType>()) {
+    } else if (llvm::isa<IntegerType>(targetType)) {
       // i64 -> {integer} cast.
       if (targetType.getIntOrFloatBitWidth() <
           value.getType().getIntOrFloatBitWidth()) {

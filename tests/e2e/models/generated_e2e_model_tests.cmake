@@ -28,8 +28,6 @@ iree_benchmark_suite_module_test(
   EXPECTED_OUTPUT
     "efficientnet_int8_expected_output.txt"
   MODULES
-    "riscv_32-Linux=iree_EfficientNet_int8_module_f963d812114af925e0a4b110ee83aeb0e3b41d49fad19b3f449b6a9ccba43b8d/module.vmfb"
-    "riscv_64-Linux=iree_EfficientNet_int8_module_e850fce2d36ddb09ccc34471641adb77418b93c0949d22ab75806d7cfc489ae3/module.vmfb"
     "x86_64-Linux=iree_EfficientNet_int8_module_3926415c1504dfc277674fee17bdfbd68090634b8b52620d8d5755082a89a16d/module.vmfb"
   RUNNER_ARGS
     "--function=main"
@@ -46,7 +44,6 @@ iree_benchmark_suite_module_test(
     "deeplab_v3_fp32_input_0_expected_output.npy"
   MODULES
     "arm_64-Android=iree_DeepLabV3_fp32_module_f06fff09f8cebc27d1674045712aaa60afe7aef388c4bc505897f55c3a0d8abb/module.vmfb"
-    "riscv_64-Linux=iree_DeepLabV3_fp32_module_68f0eb37bb72d0d6605ecdf42691c64125960e122844b0beeae350871a445b1c/module.vmfb"
     "x86_64-Linux=iree_DeepLabV3_fp32_module_87aead729018ce5f114501cecefb6315086eb2a21ae1b30984b1794f619871c6/module.vmfb"
   RUNNER_ARGS
     "--function=main"

@@ -45,10 +45,10 @@ In which
 * `--iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
 * `--iree-llvmcpu-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
-    [elf_module library](https://github.com/openxla/iree/tree/main/iree/hal/local/elf)
+    [elf_module library](https://github.com/openxla/iree/tree/main/runtime/src/iree/hal/local/elf)
 * `--iree-llvmcpu-debug-symbols=false`: To reduce the artifact size
 
-See [generate.sh](https://github.com/openxla/iree/blob/main/iree/hal/local/elf/testdata/generate.sh)
+See [generate.sh](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/local/elf/testdata/generate.sh)
 for example command-line instructions of some common architectures
 
 You can replace the MLIR file with the other MLIR model files, following the

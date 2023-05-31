@@ -2532,12 +2532,14 @@ LogicalResult AttentionOp::verify() {
   ArrayRef<int64_t> keyShape = keyType.getShape();
   ArrayRef<int64_t> valueShape = valueType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
-  if (failed(verifyCompatibleShape(queryShape, keyShape)))
-    return op->emitOpError("incompatible key shape");
-  if (failed(verifyCompatibleShape(queryShape, valueShape)))
+  if (failed(verifyCompatibleShape(keyShape, valueShape)))
     return op->emitOpError("incompatible value shape");
   if (failed(verifyCompatibleShape(queryShape, outputShape)))
     return op->emitOpError("incompatible output shape");
+  if (keyShape[0] != queryShape[0])
+    return op->emitOpError("query and key batch mismatch");
+  if (keyShape[2] != queryShape[2])
+    return op->emitOpError("query and key head dimension mismatch");
   return success();
 }
 

@@ -278,21 +278,24 @@ struct ConvertChannelDefaultOp
   LogicalResult matchAndRewrite(
       IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Stream::AffinityAttr affinityAttr;
-    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelDefaultOp>(
-        op, adaptor.getGroupAttr(), affinityAttr);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCreateOp>(
+        op, /*id=*/Value{},
+        /*group=*/adaptor.getGroupAttr(),
+        /*rank=*/Value{},
+        /*count=*/Value{}, affinityAttr);
     return success();
   }
 };
 
-struct ConvertChannelCountOp
-    : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
+struct ConvertChannelSplitOp
+    : public OpConversionPattern<IREE::Flow::ChannelSplitOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+      IREE::Flow::ChannelSplitOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
-        op, adaptor.getOperands());
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelSplitOp>(
+        op, adaptor.getChannel(), adaptor.getColor(), adaptor.getKey());
     return success();
   }
 };
@@ -309,13 +312,25 @@ struct ConvertChannelRankOp
   }
 };
 
+struct ConvertChannelCountOp
+    : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
 struct ConvertAllGatherOp
     : public OpConversionPattern<IREE::Flow::CollectiveAllGatherOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveAllGatherOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getSource().getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getSource().getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllGather,
         /*reduction=*/std::nullopt,
@@ -350,10 +365,45 @@ struct ConvertAllReduceOp
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveAllReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllReduce,
         static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
+        static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
+
+    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
+        op.getLoc(), shape.getNumElements());
+    auto newTargetCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
+    auto newSourceCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
+        op, collectiveAttr, adaptor.getTarget(),
+        /*target_size=*/newTargetCast.resourceSize,
+        /*target_offset=*/zeroOffset,
+        /*target_end=*/newTargetCast.resourceSize,
+        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*source_size=*/newSourceCast.resourceSize,
+        /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
+        /*source_length=*/newSourceCast.resourceSize, elementCount,
+        adaptor.getChannel(),
+        /*param=*/mlir::Value(), getAffinityFor(op));
+    return success();
+  }
+};
+
+struct ConvertAllToAllOp
+    : public OpConversionPattern<IREE::Flow::CollectiveAllToAllOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::CollectiveAllToAllOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto shape = llvm::cast<ShapedType>(op.getSource().getType());
+    auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
+        op.getContext(), IREE::Stream::CollectiveKind::AllToAll,
+        /*reduction=*/std::nullopt,
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
@@ -385,7 +435,7 @@ struct ConvertReduceScatterOp
   LogicalResult matchAndRewrite(
       IREE::Flow::CollectiveReduceScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto shape = op.getType().cast<ShapedType>();
+    auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::ReduceScatter,
         static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
@@ -414,6 +464,55 @@ struct ConvertReduceScatterOp
   }
 };
 
+struct ConvertCollectiveSendRecvOp
+    : public OpConversionPattern<IREE::Flow::CollectiveSendRecvOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::CollectiveSendRecvOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto shape = llvm::cast<ShapedType>(op.getType());
+    auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
+        op.getContext(), IREE::Stream::CollectiveKind::SendRecv,
+        /*reduction=*/std::nullopt,
+        static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
+
+    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
+        op.getLoc(), shape.getNumElements());
+    auto newTargetCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
+    auto newSourceCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+
+    // Pack send, recv into param. The values are checked to be within the
+    // 16-bit range during lowering to Flow dialect.
+    auto send = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getI32Type(), adaptor.getSend());
+    auto lo = rewriter.create<arith::AndIOp>(
+        op.getLoc(), send,
+        rewriter.create<arith::ConstantIntOp>(op.getLoc(), 0xFFFF, 32));
+    auto recv = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getI32Type(), adaptor.getRecv());
+    auto hi = rewriter.create<arith::ShLIOp>(
+        op.getLoc(), recv,
+        rewriter.create<arith::ConstantIntOp>(op.getLoc(), 16, 32));
+    auto param = rewriter.create<arith::OrIOp>(op.getLoc(), hi, lo);
+
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
+        op, collectiveAttr, adaptor.getTarget(),
+        /*target_size=*/newTargetCast.resourceSize,
+        /*target_offset=*/zeroOffset,
+        /*target_end=*/newTargetCast.resourceSize,
+        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*source_size=*/newSourceCast.resourceSize,
+        /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
+        /*source_length=*/newSourceCast.resourceSize, elementCount,
+        adaptor.getChannel(),
+        /*param=*/param, getAffinityFor(op));
+    return success();
+  }
+};
+
 struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -431,7 +530,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     SmallVector<Value> operandSizes;
     for (auto [oldOperand, newOperand] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
-      if (oldOperand.getType().isa<ShapedType>()) {
+      if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             consumeTensorOperand(op.getLoc(), newOperand, rewriter);
         newOperand = newOperandCast.resource;
@@ -453,7 +552,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!oldResultType.isa<ShapedType>()) {
+      if (!llvm::isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         continue;
       }
@@ -487,7 +586,7 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
       IREE::Flow::FuncOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto convertType = [&](Type type) -> Type {
-      if (type.isa<TensorType>()) {
+      if (llvm::isa<TensorType>(type)) {
         // Tensors become resources without sizes. The default type converter
         // adds the size so we bypass that here. We may want to allow the user
         // to override the lifetime with attributes, too.
@@ -535,7 +634,7 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
     SmallVector<Value> operandSizes;
     for (auto [oldOperand, newOperand] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
-      if (oldOperand.getType().isa<ShapedType>()) {
+      if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             consumeTensorOperand(op.getLoc(), newOperand, rewriter);
         newOperand = newOperandCast.resource;
@@ -557,7 +656,7 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!oldResultType.isa<ShapedType>()) {
+      if (!llvm::isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         continue;
       }
@@ -705,7 +804,7 @@ struct ConvertExecutableOp
       for (auto arg : funcOp.front().getArguments()) {
         auto oldType = arg.getType();
         if (auto tensorType =
-                oldType.dyn_cast<IREE::Flow::DispatchTensorType>()) {
+                llvm::dyn_cast<IREE::Flow::DispatchTensorType>(oldType)) {
           // Now a binding - insert the stream.binding.subspan op to slice it.
           auto newType = rewriter.getType<IREE::Stream::BindingType>();
           newTypes.push_back(newType);
@@ -755,11 +854,13 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
               ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
               ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter,
                                                           context);
-  patterns.insert<ConvertChannelCountOp, ConvertChannelDefaultOp,
-                  ConvertChannelRankOp>(typeConverter, context);
+  patterns.insert<ConvertChannelDefaultOp, ConvertChannelSplitOp,
+                  ConvertChannelRankOp, ConvertChannelCountOp>(typeConverter,
+                                                               context);
   patterns
-      .insert<ConvertAllGatherOp, ConvertAllReduceOp, ConvertReduceScatterOp>(
-          typeConverter, context);
+      .insert<ConvertAllGatherOp, ConvertAllReduceOp, ConvertReduceScatterOp,
+              ConvertAllToAllOp, ConvertCollectiveSendRecvOp>(typeConverter,
+                                                              context);
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertFuncOp, ConvertCallOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);

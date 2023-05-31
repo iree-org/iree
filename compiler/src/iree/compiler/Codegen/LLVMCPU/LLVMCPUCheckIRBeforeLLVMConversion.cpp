@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
@@ -51,7 +51,7 @@ static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
           "function");
     }
     int allocaSize = 1;
-    auto allocaType = allocaOp.getType().cast<ShapedType>();
+    auto allocaType = llvm::cast<ShapedType>(allocaOp.getType());
     for (auto dimSize : allocaType.getShape()) {
       if (ShapedType::isDynamic(dimSize)) continue;
       allocaSize *= dimSize;

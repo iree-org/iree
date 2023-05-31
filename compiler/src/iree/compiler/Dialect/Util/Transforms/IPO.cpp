@@ -209,7 +209,7 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
 
       // If the result value is an argument track that here.
       // We'll only use this value if all return sites are uniform.
-      if (auto arg = value.dyn_cast<BlockArgument>()) {
+      if (auto arg = llvm::dyn_cast<BlockArgument>(value)) {
         if (arg.getParentBlock()->isEntryBlock()) {
           analysis.passthroughResultArgs[i] =
               static_cast<int>(arg.getArgNumber());
@@ -363,8 +363,9 @@ static void replaceValueWithConstant(Value value, LocAttr constantValue,
   // themselves.
   if (arith::ConstantOp::isBuildableWith(constantValue.attr,
                                          constantValue.type)) {
-    op = builder.create<arith::ConstantOp>(
-        constantValue.loc.value(), constantValue.attr, constantValue.type);
+    op = builder.create<arith::ConstantOp>(constantValue.loc.value(),
+                                           constantValue.type,
+                                           cast<TypedAttr>(constantValue.attr));
   }
 
   // Try the attr and type dialects to see if they can materialize.

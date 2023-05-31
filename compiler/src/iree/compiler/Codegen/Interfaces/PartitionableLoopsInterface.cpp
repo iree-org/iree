@@ -53,7 +53,7 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
 static llvm::SmallVector<utils::IteratorType> getIteratorTypesFromAttr(
     ArrayAttr iteratorTypesAttr) {
   return llvm::to_vector(llvm::map_range(iteratorTypesAttr, [](Attribute attr) {
-    return utils::symbolizeIteratorType(attr.cast<StringAttr>().getValue())
+    return utils::symbolizeIteratorType(llvm::cast<StringAttr>(attr).getValue())
         .value();
   }));
 }
@@ -239,6 +239,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PackOp::attachInterface<
         OuterParallelAsPartitionableLoops<tensor::PackOp>>(*ctx);
+    tensor::PadOp::attachInterface<
+        OuterParallelAsPartitionableLoops<tensor::PadOp>>(*ctx);
     tensor::UnPackOp::attachInterface<
         OuterParallelAsPartitionableLoops<tensor::UnPackOp>>(*ctx);
   });

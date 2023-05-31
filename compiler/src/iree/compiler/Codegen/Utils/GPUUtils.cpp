@@ -81,7 +81,7 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   assert(workgroupSizeAttr.has_value());
   for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
     workgroupSize[index] =
-        attr.cast<mlir::IntegerAttr>().getValue().getZExtValue();
+        llvm::cast<mlir::IntegerAttr>(attr).getValue().getZExtValue();
   }
   return workgroupSize;
 }
@@ -347,7 +347,7 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
                            uint32_t numLaneToReduce) {
-  VectorType unpackedType = input.getType().dyn_cast<VectorType>();
+  VectorType unpackedType = llvm::dyn_cast<VectorType>(input.getType());
   Value laneVal = input;
   assert(llvm::isPowerOf2_32(numLaneToReduce));
   // Parallel reduction using butterfly shuffles.
@@ -385,7 +385,7 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
 
 // List of identity elements by operation.
 // https://en.wikipedia.org/wiki/Identity_element
-static Attribute getCombiningKindIdentity(OpBuilder &builder,
+static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
                                           vector::CombiningKind combiningKind,
                                           Type type) {
   switch (combiningKind) {
@@ -410,16 +410,16 @@ static Attribute getCombiningKindIdentity(OpBuilder &builder,
       return builder.getZeroAttr(type);
     case vector::CombiningKind::MINF: {
       auto posInfApFloat = APFloat::getInf(
-          type.cast<FloatType>().getFloatSemantics(), /*Negative=*/false);
+          llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
       return builder.getFloatAttr(type, posInfApFloat);
     }
     case vector::CombiningKind::MAXF: {
       auto negInfApFloat = APFloat::getInf(
-          type.cast<FloatType>().getFloatSemantics(), /*Negative=*/true);
+          llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);
       return builder.getFloatAttr(type, negInfApFloat);
     }
   }
-  return Attribute();
+  return TypedAttr();
 }
 
 /// Compute the value on a single thread to get per lane reduction value.
@@ -428,7 +428,7 @@ static Attribute getCombiningKindIdentity(OpBuilder &builder,
 /// width for shuffles.
 static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
                                     Value input, vector::CombiningKind kind) {
-  auto vecType = input.getType().cast<VectorType>();
+  auto vecType = llvm::cast<VectorType>(input.getType());
   Type elementType = vecType.getElementType();
   int64_t vecSize = vecType.getDimSize(0);
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
@@ -463,11 +463,11 @@ static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
   } else {
     // In cases where vecSize < unrollCount, we would pad the vector
     // with identity elements until it's total bit size is 32.
-    Attribute identityAttr =
+    TypedAttr identityAttr =
         getCombiningKindIdentity(builder, kind, elementType);
     identityAttr = DenseElementsAttr::get(unrolledLaneValType, identityAttr);
-    Value identity = builder.create<arith::ConstantOp>(loc, identityAttr,
-                                                       unrolledLaneValType);
+    Value identity = builder.create<arith::ConstantOp>(loc, unrolledLaneValType,
+                                                       identityAttr);
     perLaneReduction = builder.create<vector::InsertStridedSliceOp>(
         loc, input, identity, /*offsets=*/ArrayRef<int64_t>{0},
         /*strides=*/ArrayRef<int64_t>{1});
@@ -479,18 +479,18 @@ static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
 static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
                                        vector::CombiningKind kind,
                                        Type identityType) {
-  auto vectorType = identityType.dyn_cast<VectorType>();
+  auto vectorType = llvm::dyn_cast<VectorType>(identityType);
   Type elementType = identityType;
   if (vectorType) {
     elementType = vectorType.getElementType();
   }
-  Attribute identityAttr = getCombiningKindIdentity(builder, kind, elementType);
+  TypedAttr identityAttr = getCombiningKindIdentity(builder, kind, elementType);
   if (vectorType) {
     identityAttr = DenseElementsAttr::get(vectorType, identityAttr);
   }
   assert(identityAttr && "Unknown identity value for the reduction");
   Value identity =
-      builder.create<arith::ConstantOp>(loc, identityAttr, identityType);
+      builder.create<arith::ConstantOp>(loc, identityType, identityAttr);
   return identity;
 }
 
@@ -550,7 +550,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
   }
   // Handles cases for sub-32bit precision where output is still in vector form.
-  if (laneVal.getType().isa<VectorType>()) {
+  if (llvm::isa<VectorType>(laneVal.getType())) {
     laneVal = builder.create<vector::ReductionOp>(loc, kind, laneVal);
   }
   return laneVal;
@@ -579,14 +579,33 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     for (Operation *users : op->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
       if (!extract) return std::nullopt;
-      auto vecType = extract.getResult().getType().cast<VectorType>();
+      auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
     return llvm::to_vector(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
+    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
+      // TODO: The condition for unrolling elementwise should be restricted
+      // only to operations that need unrolling (connected to the contract).
+      if (vecType.getRank() < 2) return std::nullopt;
+
+      // First check whether there is a slice to infer the shape from. This is
+      // required for cases where the accumulator type differs from the input
+      // types, in which case we will see an `arith.ext_` between the contract
+      // and transfer_read which needs to be unrolled.
+      VectorType sliceType;
+      for (Operation *users : op->getUsers()) {
+        auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
+        if (!extract) return std::nullopt;
+        auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
+        if (sliceType && sliceType != vecType) return std::nullopt;
+        sliceType = vecType;
+      }
+      if (sliceType) return llvm::to_vector(sliceType.getShape());
+
+      // Else unroll for trailing elementwise.
       SmallVector<int64_t> nativeSize(vecType.getRank() - 2, 1);
       // Map elementwise ops to the output shape.
       nativeSize.append({m, n});
@@ -673,7 +692,8 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
   // Shape of warp-level vector read (load) operation.
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-    auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
+    auto resultVectorType =
+        llvm::cast<VectorType>(readOp.getVector().getType());
     Type resultElementType = resultVectorType.getElementType();
 
     std::optional<int> operandId =
@@ -743,7 +763,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         for (Operation *users : op->getUsers()) {
           auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
           if (!extract) return std::nullopt;
-          auto vecType = extract.getResult().getType().cast<VectorType>();
+          auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
           if (sliceType && sliceType != vecType) return std::nullopt;
           sliceType = vecType;
         }
@@ -755,10 +775,28 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 }
 
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
-  auto addrSpace =
-      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+  auto addrSpace = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(
+      memrefType.getMemorySpace());
   return addrSpace &&
          addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
+}
+
+//===----------------------------------------------------------------------===//
+// GPU CodeGen op filter
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem.
+bool sharedMemTransposeFilter(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace iree_compiler

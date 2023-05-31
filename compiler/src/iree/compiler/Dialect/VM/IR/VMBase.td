@@ -115,7 +115,7 @@ class VM_EncType<string expr> : VM_EncEncodeExpr<
 class VM_EncTypeOf<string name> : VM_EncEncodeExpr<
     "e.encodeType({0}())", [name]>;
 class VM_EncPrimitiveAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodePrimitiveAttr(getOperation()->getAttrOfType<Attribute>(\"" # name # "\"))"> {
+    "e.encodePrimitiveAttr(getOperation()->getAttrOfType<TypedAttr>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncPrimitiveArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
@@ -208,6 +208,13 @@ class VM_Op<string mnemonic, list<Trait> traits = []> :
 // Operations with this trait are pseudo-ops that must be converted to other ops
 // prior to serialization. There are no runtime equivalents of the op.
 def VM_PseudoOp : NativeOpTrait<"IREE::VM::PseudoOp">;
+
+// Operations with this trait are assignment ops that are not serialized into
+// bytecode but do survive to keep valid MLIR typing up until serialization.
+// Ops must take and return the same number of operands/results but their types
+// may differ. During serialization all operand registers will be directly
+// reused for all result registers.
+def VM_AssignmentOp : NativeOpTrait<"IREE::VM::AssignmentOp">;
 
 // Operations with this trait will be stripped in builds where
 // debugging-related operations are not needed (such as release builds).

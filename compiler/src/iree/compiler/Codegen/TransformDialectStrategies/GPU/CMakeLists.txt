@@ -14,7 +14,7 @@ iree_cc_library(
   NAME
     TransformDialectStrategies
   HDRS
-    "AbstractReductionStrategy.h"
+    "AbstractGemmLikeStrategy.h"
     "Common.h"
     "MatmulTensorCoreStrategy.h"
     "SmallReductionStrategy.h"
@@ -39,7 +39,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRLLVMDialect
     MLIRLinalgDialect
@@ -63,7 +63,6 @@ iree_cc_library(
     MLIRVectorTransformOps
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::TransformDialectStrategies::Common::TransformDialectStrategies
   PUBLIC
 )

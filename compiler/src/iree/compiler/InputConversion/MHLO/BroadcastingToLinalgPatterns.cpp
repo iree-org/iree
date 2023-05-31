@@ -33,7 +33,7 @@ namespace {
 // -----------------------------------------------------------------------------
 
 /// Whether an element type is legal for codegen via linalg on IREE.
-bool isElementTypeLegalForCodegen(Type t) { return !t.isa<ComplexType>(); }
+bool isElementTypeLegalForCodegen(Type t) { return !llvm::isa<ComplexType>(t); }
 
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
@@ -91,7 +91,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 Value broadcast(OpBuilder &builder, Location loc, Value operand,
                 SmallVectorImpl<Extent> &resultExtents,
                 SmallVectorImpl<bool> &isExpansion) {
-  auto operandType = operand.getType().cast<RankedTensorType>();
+  auto operandType = llvm::cast<RankedTensorType>(operand.getType());
   SmallVector<int64_t> resultShape;
   SmallVector<Value> dynDims;
   for (Extent &dim : resultExtents) {
@@ -318,7 +318,7 @@ struct ConvertConstantLikeOp
   LogicalResult matchAndRewrite(
       chlo::ConstantLikeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultTy = op.getType().cast<RankedTensorType>();
+    auto resultTy = llvm::cast<RankedTensorType>(op.getType());
     if (!resultTy.hasRank())
       return rewriter.notifyMatchFailure(op, "only supports ranked");
     // Lower to MHLO constant if statically shaped.
@@ -461,8 +461,8 @@ struct ConvertRankedBroadcastBinaryOp : public ConversionPattern {
     auto bcastOperands = bcastAdaptor.getFromBroadcastValues(op, operands);
     Value lhs = bcastOperands.first;
     Value rhs = bcastOperands.second;
-    auto lhsType = lhs.getType().template dyn_cast<RankedTensorType>();
-    auto rhsType = rhs.getType().template dyn_cast<RankedTensorType>();
+    auto lhsType = llvm::dyn_cast<RankedTensorType>(lhs.getType());
+    auto rhsType = llvm::dyn_cast<RankedTensorType>(rhs.getType());
     if (!lhsType || !rhsType)
       return rewriter.notifyMatchFailure(op, "not ranked tensors");
 
@@ -553,9 +553,9 @@ struct ConvertTrivialNonBroadcastBinaryOp : public ConversionPattern {
     // Only rewrite for statically determinable non-broadcasting cases.
     auto bcastOperands = bcastAdaptor.getFromBroadcastValues(op, operands);
     auto lhsType =
-        bcastOperands.first.getType().template dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(bcastOperands.first.getType());
     auto rhsType =
-        bcastOperands.second.getType().template dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(bcastOperands.second.getType());
     if (!lhsType || !rhsType)
       return rewriter.notifyMatchFailure(op, "not ranked tensors");
     if (!isElementTypeLegalForCodegen(lhsType.getElementType()) ||
@@ -614,10 +614,11 @@ struct ConvertSelectOp : public OpConversionPattern<chlo::BroadcastSelectOp> {
     Value pred = adaptor.getPred();
     Value thenValue = adaptor.getOnTrue();
     Value elseValue = adaptor.getOnFalse();
-    auto predType = pred.getType().dyn_cast<RankedTensorType>();
-    auto thenType = thenValue.getType().dyn_cast<RankedTensorType>();
-    auto elseType = elseValue.getType().dyn_cast<RankedTensorType>();
-    auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
+    auto predType = llvm::dyn_cast<RankedTensorType>(pred.getType());
+    auto thenType = llvm::dyn_cast<RankedTensorType>(thenValue.getType());
+    auto elseType = llvm::dyn_cast<RankedTensorType>(elseValue.getType());
+    auto resultType =
+        llvm::dyn_cast<RankedTensorType>(op.getResult().getType());
     if (!predType || !thenType || !elseType || !resultType) {
       return rewriter.notifyMatchFailure(op, "cannot convert unranked tensors");
     }
@@ -727,9 +728,10 @@ struct ConvertDynamicReshapeOp
     Location loc = op.getLoc();
     Value input = adaptor.getOperand();
     Value outputShape = adaptor.getOutputShape();
-    auto outputShapeType = outputShape.getType().dyn_cast<RankedTensorType>();
-    auto resultType = typeConverter->convertType(op.getType())
-                          .dyn_cast_or_null<RankedTensorType>();
+    auto outputShapeType =
+        llvm::dyn_cast<RankedTensorType>(outputShape.getType());
+    auto resultType = llvm::dyn_cast_if_present<RankedTensorType>(
+        typeConverter->convertType(op.getType()));
     if (!outputShapeType || !resultType) {
       return rewriter.notifyMatchFailure(op, "not ranked");
     }
@@ -746,7 +748,7 @@ struct ConvertDynamicReshapeOp
 
     SmallVector<Value> castedTargetDims;
     for (Value dim : targetDims) {
-      if (dim.getType().isa<IntegerType>()) {
+      if (llvm::isa<IntegerType>(dim.getType())) {
         dim = rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(),
                                                   dim);
       }

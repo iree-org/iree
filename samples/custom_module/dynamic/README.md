@@ -39,7 +39,7 @@ dynamic modules should be carefully considered.
     ```
     # This simple sample doesn't use tensors and can be compiled in host-only
     # mode to avoid the need for the HAL.
-    iree-compile --iree-execution-model=host-only samples/custom_module/basic/test/example.mlir -o=/tmp/example.vmfb
+    iree-compile --iree-hal-target-backends=vmvx samples/custom_module/dynamic/test/example.mlir -o=/tmp/example.vmfb
     ```
 
 3. Build the `iree_samples_custom_module_dynamic_module` CMake target :

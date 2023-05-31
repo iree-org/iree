@@ -1,4 +1,8 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vmvx --iree-flow-trace-dispatch-tensors %s 2>&1 | FileCheck %s
+// RUN: iree-run-mlir \
+// RUN:   --Xcompiler,iree-input-type=mhlo \
+// RUN:   --Xcompiler,iree-hal-target-backends=vmvx \
+// RUN:   --Xcompiler,iree-flow-trace-dispatch-tensors \
+// RUN:   %s 2>&1 | FileCheck %s
 
 func.func @two_dispatch() -> (tensor<5x5xf32>, tensor<3x5xf32>) {
   %0 = util.unfoldable_constant dense<1.0> : tensor<5x3xf32>

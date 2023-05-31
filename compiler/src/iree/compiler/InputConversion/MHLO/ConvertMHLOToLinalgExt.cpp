@@ -45,14 +45,14 @@ static std::optional<Type> convertRank0TensorToScalar(
     RankedTensorType tensorType) {
   if (tensorType.getRank() != 0) return std::nullopt;
   Type elementType = tensorType.getElementType();
-  if (auto intType = elementType.dyn_cast<IntegerType>()) {
+  if (auto intType = llvm::dyn_cast<IntegerType>(elementType)) {
     elementType = convertIntegerToSignless(intType);
   }
   return elementType;
 }
 
 static Type convertShapedToSignless(ShapedType shapedType) {
-  if (auto intType = shapedType.getElementType().dyn_cast<IntegerType>())
+  if (auto intType = llvm::dyn_cast<IntegerType>(shapedType.getElementType()))
     return shapedType.clone(convertIntegerToSignless(intType));
   return shapedType;
 }
@@ -61,18 +61,18 @@ static std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
                                             ValueRange inputs, Location loc) {
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
-  auto fromType = fromValue.getType().dyn_cast<RankedTensorType>();
+  auto fromType = llvm::dyn_cast<RankedTensorType>(fromValue.getType());
   if (!fromType) return std::nullopt;
 
-  if (auto intFromType = fromType.getElementType().dyn_cast<IntegerType>()) {
+  if (auto intFromType =
+          llvm::dyn_cast<IntegerType>(fromType.getElementType())) {
     Type castType = getElementTypeOrSelf(toType);
-    if (auto shapedType = fromType.dyn_cast<ShapedType>())
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(fromType))
       castType = shapedType.clone(castType);
 
     if (castType != fromType)
-      fromValue =
-          builder.create<UnrealizedConversionCastOp>(loc, castType, fromValue)
-              ->getResult(0);
+      fromValue = builder.create<tensor::BitcastOp>(loc, castType, fromValue)
+                      ->getResult(0);
   }
 
   if (fromType.getRank() != 0) return fromValue;
@@ -120,7 +120,7 @@ struct LinalgExtRegionHLOOpConversion : public OpConversionPattern<OpTy> {
       OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!isInBodyOfLinalgExtOps(op)) return failure();
-    TensorType origRetType = op.getType().template dyn_cast<TensorType>();
+    TensorType origRetType = llvm::dyn_cast<TensorType>(op.getType());
     if (!origRetType) return failure();
     SmallVector<Value> scalarArgs;
     Type newRetType = getElementTypeOrSelf(
@@ -202,7 +202,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
   /// * Update window dims order: (d + 1, ... , m)
   static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
     auto dimNumbers = op.getScatterDimensionNumbers();
-    auto indicesType = op.getScatterIndices().getType().cast<ShapedType>();
+    auto indicesType = llvm::cast<ShapedType>(op.getScatterIndices().getType());
     auto indicesRank = indicesType.getRank();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     auto indexDepth = indicesType.getShape().back();
@@ -292,7 +292,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 
   static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
                                                 Value real, int fftLength) {
-    auto realType = real.getType().cast<ShapedType>();
+    auto realType = llvm::cast<ShapedType>(real.getType());
     auto rank = realType.getRank();
 
     SmallVector<OpFoldResult> mixedSizes =
@@ -320,11 +320,11 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
           b.create<linalg::YieldOp>(
               loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
         });
-    return {
-        genericOp.getResult(0),
-        b.create<arith::ConstantOp>(
-            realType, DenseFPElementsAttr::get(
-                          realType, b.getF32FloatAttr(0.0).cast<Attribute>()))};
+    return {genericOp.getResult(0),
+            b.create<arith::ConstantOp>(
+                realType,
+                DenseFPElementsAttr::get(
+                    realType, llvm::cast<Attribute>(b.getF32FloatAttr(0.0))))};
   }
 
   static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
@@ -350,7 +350,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
       ConversionPatternRewriter &rewriter) const final {
     // Only handle 2^n fft length.
     auto operandType =
-        adaptor.getOperand().getType().dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
     if (!operandType || !operandType.hasStaticShape()) {
       return failure();
     }
@@ -402,7 +402,8 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
   LogicalResult matchAndRewrite(
       mhlo::ReverseOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
-    auto ty = adaptor.getOperands()[0].getType().dyn_cast<RankedTensorType>();
+    auto ty =
+        llvm::dyn_cast<RankedTensorType>(adaptor.getOperands()[0].getType());
     if (!ty) return failure();
 
     Location loc = op.getLoc();
@@ -411,8 +412,8 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
     Value emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, mixedSizes, ty.getElementType());
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
-        op, op->getResultTypes(), adaptor.getOperands(), emptyTensor,
-        op.getDimensions());
+        op, typeConverter->convertType(op.getType()), adaptor.getOperands(),
+        emptyTensor, op.getDimensions());
     return success();
   }
 };
@@ -429,9 +430,11 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     Location loc = op.getLoc();
     Value operand = adaptor.getOperand();
 
-    auto inputValuesType = operand.getType().dyn_cast<ShapedType>();
-    auto outputValuesType = op.getValues().getType().dyn_cast<ShapedType>();
-    auto outputIndicesType = op.getIndices().getType().dyn_cast<ShapedType>();
+    auto inputValuesType = llvm::dyn_cast<ShapedType>(operand.getType());
+    auto outputValuesType =
+        llvm::dyn_cast<ShapedType>(op.getValues().getType());
+    auto outputIndicesType =
+        llvm::dyn_cast<ShapedType>(op.getIndices().getType());
     if (!inputValuesType || !outputValuesType || !outputIndicesType) {
       return rewriter.notifyMatchFailure(
           op, "Input and output must be of ShapedType");
@@ -440,7 +443,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     Type valueElementType = outputValuesType.getElementType();
     Type indicesElementType = outputIndicesType.getElementType();
     // Only handle integer types for indicies. Index type is not supported.
-    if (!indicesElementType.isa<IntegerType>()) {
+    if (!llvm::isa<IntegerType>(indicesElementType)) {
       return rewriter.notifyMatchFailure(
           op, "Output indices must be of integer type.");
     }
@@ -455,18 +458,18 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
         loc, mixedSizes, indicesElementType);
     // Initialize indices to 0 and values to negative infinity
-    Attribute negInfAttr;
-    if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
+    TypedAttr negInfAttr;
+    if (auto intType = llvm::dyn_cast<IntegerType>(valueElementType)) {
       negInfAttr = rewriter.getIntegerAttr(
           intType, APInt::getSignedMinValue(intType.getWidth()));
     } else {
       auto negApFloat = APFloat::getInf(
-          valueElementType.cast<FloatType>().getFloatSemantics(),
+          llvm::cast<FloatType>(valueElementType).getFloatSemantics(),
           /*Negative=*/true);
       negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
     }
     Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
-    Attribute posInfAttr = rewriter.getIntegerAttr(
+    TypedAttr posInfAttr = rewriter.getIntegerAttr(
         indicesElementType, APInt::getSignedMaxValue(32));
     Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
     Value negInfTensor =
@@ -493,7 +496,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
       Value lhs = block->getArgument(0);
       Value rhs = block->getArgument(1);
       Value condition;
-      if (valueElementType.isa<IntegerType>()) {
+      if (llvm::isa<IntegerType>(valueElementType)) {
         condition = rewriter.create<arith::CmpIOp>(
             loc, arith::CmpIPredicate::sge, lhs, rhs);
       } else {
@@ -595,9 +598,6 @@ struct ConvertMHLOToLinalgExtPass
         [](mhlo::ComplexOp complexOp) {
           return !isInBodyOfLinalgExtOps(complexOp);
         });
-    // We deliberately allow unrealized casts to persist. These should fall away
-    // when the rest of MHLO is converted.
-    target.addLegalOp<UnrealizedConversionCastOp>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

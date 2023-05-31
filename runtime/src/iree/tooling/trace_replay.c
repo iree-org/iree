@@ -438,14 +438,14 @@ static void iree_trace_replay_get_min_max_for_element_type(
 static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
     iree_hal_element_type_t element_type, iree_byte_span_t span,
     uint32_t seed) {
+  int32_t min = 0;
+  int32_t max = 0;
+  iree_trace_replay_get_min_max_for_element_type(element_type, &min, &max);
+  uint32_t range = (max - min + 1);
   iree_host_size_t element_byte_count =
       iree_hal_element_dense_byte_count(element_type);
   uint8_t* data_end = span.data + span.data_length;
   uint32_t state = seed;
-  uint32_t range;
-  int32_t min, max;
-  iree_trace_replay_get_min_max_for_element_type(element_type, &min, &max);
-  range = (max - min + 1);
   for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
     // Generate "uniform" integer-valued numbers in the range [min, max].
     int32_t value =

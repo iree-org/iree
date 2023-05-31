@@ -9,6 +9,7 @@
 from dataclasses import dataclass
 from enum import Enum
 import logging
+import os
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
@@ -28,11 +29,11 @@ _IMPORT_TOOL = "iree-import-tflite"
 
 
 def is_available():
-  """Determine if the XLA frontend is available."""
+  """Determine if the TFLite frontend is available."""
   try:
-    find_tool(_IMPORT_TOOL)
-  except ValueError:
-    logging.warning("Unable to find IREE tool %s", _IMPORT_TOOL)
+    import iree.tools.tflite.scripts.iree_import_tflite.__main__
+  except ModuleNotFoundError:
+    logging.warning("Unable to find IREE tool iree-import-tflite")
     return False
   return True
 
@@ -68,67 +69,6 @@ class ImportOptions(CompilerOptions):
   input_type: Optional[str] = "tosa"
 
 
-def build_import_command_line(input_path: str, tfs: TempFileSaver,
-                              options: ImportOptions) -> List[str]:
-  """Builds a command line for invoking the import stage.
-
-  Args:
-    input_path: The input path.
-    tfs: TempFileSaver.
-    options: Import options.
-  Returns:
-    List of strings of command line.
-  """
-  import_tool = find_tool(_IMPORT_TOOL)
-  cl = [
-      import_tool,
-      input_path,
-  ]
-
-  if options.import_only and options.output_file:
-    # Import stage directly outputs.
-    output_file = tfs.alloc_optional("tflite-output.mlir",
-                                     export_as=options.output_file)
-    cl.append(f"-o={options.output_file}")
-
-  # Input arrays.
-  if options.input_arrays:
-    for input_array in options.input_arrays:
-      cl.append(f"--input-array={input_array}")
-    for output_array in options.output_arrays:
-      cl.append(f"--output-array={output_array}")
-
-  # MLIR flags.
-  if options.output_mlir_debuginfo:
-    cl.append("--mlir-print-debuginfo")
-  if options.output_generic_mlir:
-    cl.append("--mlir-print-op-generic")
-
-  # Save temps flags.
-  tfl_input = tfs.alloc_optional("tflite-input.mlir",
-                                 export_as=options.save_temp_tfl_input)
-  if tfl_input:
-    cl.append(f"--save-temp-tfl-input={tfl_input}")
-  iree_input = tfs.alloc_optional("tflite-iree-input.mlir",
-                                  export_as=options.save_temp_iree_input)
-  if iree_input:
-    cl.append(f"--save-temp-iree-input={iree_input}")
-
-  # Crash reproducer (locally qualified).
-  requested_crash_reproducer_path = options.crash_reproducer_path
-  if requested_crash_reproducer_path:
-    requested_crash_reproducer_path = (requested_crash_reproducer_path +
-                                       ".import-tflite")
-  crash_reproducer_path = tfs.alloc_optional(
-      "tflite-reproducer.mlir", export_as=requested_crash_reproducer_path)
-  if crash_reproducer_path:
-    cl.append(f"--mlir-pass-pipeline-crash-reproducer={crash_reproducer_path}")
-
-  # Extra args.
-  cl.extend(options.import_extra_args)
-  return cl
-
-
 def compile_file(fb_path: str, **kwargs):
   """Compiles a TFLite FlatBuffer file to an IREE binary.
 
@@ -139,19 +79,36 @@ def compile_file(fb_path: str, **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
+  from iree.tools.tflite.scripts.iree_import_tflite import __main__
   with TempFileSaver.implicit() as tfs:
     options = ImportOptions(**kwargs)
-    import_cl = build_import_command_line(fb_path, tfs, options)
+
+  with TempFileSaver.implicit() as tfs, tempfile.TemporaryDirectory() as tmpdir:
+    if options.import_only and options.output_file:
+      # Importing to a file and stopping, write to that file directly.
+      tfl_iree_input = options.output_file
+    elif options.save_temp_iree_input:
+      # Saving the file, use tfs.
+      tfl_iree_input = tfs.alloc_optional(
+          "tfl-iree-input.mlir", export_as=options.save_temp_iree_input)
+    else:
+      # Not saving the file, so generate a loose temp file without tfs.
+      tfl_iree_input = os.path.join(tmpdir, 'tfl-iree-input.mlir')
+
+    __main__.tflite_to_tosa(flatbuffer=fb_path,
+                            bytecode=tfl_iree_input,
+                            ordered_input_arrays=options.input_arrays,
+                            ordered_output_arrays=options.output_arrays)
+
     if options.import_only:
-      # One stage tool pipeline.
-      result = invoke_immediate(import_cl)
       if options.output_file:
         return None
-      return result
+      with open(tfl_iree_input, "r") as f:
+        return f.read()
 
-    # Full compilation pipeline.
-    compile_cl = build_compile_command_line("-", tfs, options)
-    result = invoke_pipeline([import_cl, compile_cl])
+    # Run IREE compilation pipeline
+    compile_cl = build_compile_command_line(tfl_iree_input, tfs, options)
+    result = invoke_pipeline([compile_cl])
     if options.output_file:
       return None
     return result
@@ -169,22 +126,7 @@ def compile_str(input_bytes: bytes, **kwargs):
   """
   input_bytes = input_bytes.encode("utf-8") if isinstance(input_bytes,
                                                           str) else input_bytes
-  with TempFileSaver.implicit() as tfs:
-    options = ImportOptions(**kwargs)
-    import_cl = build_import_command_line("-", tfs, options)
-    if options.import_only:
-      # One stage tool pipeline.
-
-      result = invoke_immediate(import_cl, immediate_input=input_bytes)
-      if options.output_file:
-        return None
-      result = result.decode("utf-8")
-      return result
-
-    # Full compilation pipeline.
-    compile_cl = build_compile_command_line("-", tfs, options)
-    result = invoke_pipeline([import_cl, compile_cl],
-                             immediate_input=input_bytes)
-    if options.output_file:
-      return None
-    return result.decode("utf-8") if result is not None else result
+  with tempfile.NamedTemporaryFile(mode="w") as temp_file:
+    tempfile.write(input_bytes)
+    tempfile.close()
+    return compile_file(tempfile.name, **kwargs)

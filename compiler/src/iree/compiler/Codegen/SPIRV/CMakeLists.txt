@@ -15,6 +15,7 @@ iree_cc_library(
     SPIRV
   HDRS
     "KernelConfig.h"
+    "SPIRVPasses.h"
     "Utils.h"
   SRCS
     "AMDConfig.cpp"
@@ -65,7 +66,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRFuncTransforms
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUToSPIRV
     MLIRGPUTransforms
     MLIRIR
@@ -93,6 +94,7 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTosaDialect
     MLIRTosaToArith
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorInterfaces
@@ -100,6 +102,8 @@ iree_cc_library(
     MLIRVectorToSPIRV
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CommonPasses
+    iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
@@ -108,6 +112,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
   PUBLIC
 )
 

@@ -19,10 +19,10 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuses the producers for the operands to fuse.}];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$operands_to_fuse);
-  let results = (outs PDL_Operation:$transformed,
-                      Variadic<PDL_Operation>:$fused_ops);
+  let results = (outs TransformHandleTypeInterface:$transformed,
+                      Variadic<TransformHandleTypeInterface>:$fused_ops);
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
@@ -51,10 +51,10 @@ def RewriteForallToAsyncOp :
     The returned handle points to only the subset of successfully produced
     async operations, which can all be empty.
   }];
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let extraClassDeclaration = [{
@@ -87,10 +87,10 @@ def RewriteForallToScfForOp :
     The returned handle points to only the subset of successfully produced
     scf.for operations, which can all be empty.
   }];
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let extraClassDeclaration = [{
@@ -112,11 +112,11 @@ def TileAndDecomposeAttentionOp : Op<Transform_Dialect, "tile_and_decompose_atte
   }];
 
   let arguments = (
-      ins PDL_Operation:$target
+      ins TransformHandleTypeInterface:$target
   );
-  let results = (outs Variadic<PDL_Operation>:$result);
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
-  let assemblyFormat = "attr-dict $target";
+  let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let builders = [

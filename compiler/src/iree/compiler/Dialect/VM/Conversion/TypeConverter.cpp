@@ -22,8 +22,12 @@ namespace VM {
 
 TypeConverter::TypeConverter(TargetOptions targetOptions)
     : targetOptions_(targetOptions) {
-  // Variant means opaque in VM.
+  addConversion([](IREE::Util::ObjectType type) {
+    // Objects are always opaque ref types.
+    return IREE::VM::RefType::get(IREE::VM::OpaqueType::get(type.getContext()));
+  });
   addConversion([](IREE::Util::VariantType type) {
+    // Variant means opaque in VM.
     return IREE::VM::OpaqueType::get(type.getContext());
   });
 
@@ -32,8 +36,8 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
 
   // Wrap ref types.
   addConversion([](Type type) -> std::optional<Type> {
-    if (RefType::isCompatible(type)) {
-      return RefType::get(type);
+    if (IREE::VM::RefType::isCompatible(type)) {
+      return IREE::VM::RefType::get(type);
     }
     return std::nullopt;
   });
@@ -105,7 +109,8 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
 
   addSourceMaterialization([](OpBuilder &builder, IndexType type,
                               ValueRange inputs, Location loc) -> Value {
-    if (inputs.size() != 1 || !inputs.front().getType().isa<IntegerType>()) {
+    if (inputs.size() != 1 ||
+        !llvm::isa<IntegerType>(inputs.front().getType())) {
       return nullptr;
     }
     return builder.create<arith::IndexCastOp>(loc, type, inputs.front());

@@ -9,6 +9,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import os
 import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
@@ -89,11 +90,6 @@ class ImportOptions(CompilerOptions):
     import_type: Type of import to perform. See ImportType enum.
     saved_model_tags: Set of tags to export (signature def/v1 saved models
       only).
-    import_extra_args: Extra arguments to pass to the iree-import-tf tool.
-    save_temp_tf_input: Optionally save the IR that is input to the
-      TensorFlow pipeline.
-    save_temp_mid_level_input: Optionally save the IR that is input to the
-      mid level IR.
     save_temp_iree_input: Optionally save the IR that is the result of the
       import (ready to be passed to IREE).
   """
@@ -103,11 +99,7 @@ class ImportOptions(CompilerOptions):
   import_type: ImportType = ImportType.OBJECT_GRAPH
   input_type: Union[InputType, str] = InputType.XLA
   saved_model_tags: Set[str] = field(default_factory=set)
-  import_extra_args: Sequence[str] = ()
-  save_temp_tf_input: Optional[str] = None
-  save_temp_mid_level_input: Optional[str] = None
   save_temp_iree_input: Optional[str] = None
-  use_tosa: bool = False
 
   def __post_init__(self):
     self.import_type = ImportType.parse(self.import_type)
@@ -124,19 +116,35 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
     was specified.
   """
   from iree.tools.tf.scripts.iree_import_tf import __main__
-  with TempFileSaver.implicit() as tfs:
+
+  with TempFileSaver.implicit() as tfs, tempfile.TemporaryDirectory() as tmpdir:
     options = ImportOptions(**kwargs)
 
-  with tempfile.NamedTemporaryFile(mode="w") as temp_file:
-    # Generate MLIR
-    __main__.import_saved_model(output_path=temp_file.name,
+    if options.import_only and options.output_file:
+      # Importing to a file and stopping, write to that file directly.
+      tf_iree_input = options.output_file
+    elif options.save_temp_iree_input:
+      # Saving the file, use tfs.
+      tf_iree_input = tfs.alloc_optional("tf-iree-input.mlir",
+                                         export_as=options.save_temp_iree_input)
+    else:
+      # Not saving the file, so generate a loose temp file without tfs.
+      tf_iree_input = os.path.join(tmpdir, 'tf-iree-input.mlir')
+
+    __main__.import_saved_model(output_path=tf_iree_input,
                                 saved_model_dir=saved_model_dir,
                                 exported_names=",".join(options.exported_names),
                                 import_type=options.import_type.value,
                                 tags=",".join(options.saved_model_tags))
 
-    # Full compilation pipeline.
-    compile_cl = build_compile_command_line(temp_file.name, tfs, options)
+    if options.import_only:
+      if options.output_file:
+        return None
+      with open(tf_iree_input, "r") as f:
+        return f.read()
+
+    # Run IREE compilation pipeline
+    compile_cl = build_compile_command_line(tf_iree_input, tfs, options)
     result = invoke_pipeline([compile_cl])
     if options.output_file:
       return None

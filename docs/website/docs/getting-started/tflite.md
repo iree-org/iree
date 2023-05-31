@@ -6,6 +6,13 @@ imported into an IREE-compatible format then compiled to a series of backends.
 
 ## Prerequisites
 
+Install TensorFlow by following the
+[official documentation](https://www.tensorflow.org/install):
+
+```shell
+python -m pip install tf-nightly
+```
+
 Install TensorFlow-Lite specific dependencies using pip:
 
 ```shell

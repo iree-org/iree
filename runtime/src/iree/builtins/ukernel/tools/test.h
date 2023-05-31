@@ -28,18 +28,18 @@ void iree_uk_test(const char* name,
                   const void* params, const char* cpu_features);
 
 // Fail the current test.
-// This is currently always a fatal error: that is generally the most useful
-// way to fail ukernel tests. It would be possible to implement non-fatal errors
-// in the future, but fatal should probably remain the default.
 #define IREE_UK_TEST_FAIL(test) iree_uk_test_fail(test, __FILE__, __LINE__)
 
 // Implementation of IREE_UK_TEST_FAIL.
-void iree_uk_test_fail(const iree_uk_test_t* test, const char* file, int line);
+void iree_uk_test_fail(iree_uk_test_t* test, const char* file, int line);
 
 // Used by test functions to get a random engine.
 iree_uk_random_engine_t* iree_uk_test_random_engine(const iree_uk_test_t* test);
 
 // Used by test functions to get CPU data.
 const iree_uk_uint64_t* iree_uk_test_cpu_data(const iree_uk_test_t* test);
+
+// Must be called by the test `main` function to provide its return value.
+int iree_uk_test_exit_status(void);
 
 #endif  // IREE_BUILTINS_UKERNEL_TOOLS_TEST_H_

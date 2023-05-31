@@ -101,6 +101,14 @@ Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
 Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
                      VectorType targetVecType);
 
+//===----------------------------------------------------------------------===//
+// GPU CodeGen op filter
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the index map represents a transpose that benefits from
+/// using shared memory when CodeGen towards the GPU.
+bool sharedMemTransposeFilter(AffineMap indexMap);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

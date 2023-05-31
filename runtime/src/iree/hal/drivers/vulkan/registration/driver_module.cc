@@ -39,7 +39,7 @@ IREE_FLAG(
     "Use a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch workloads.");
 IREE_FLAG(
     int64_t, vulkan_large_heap_block_size, 0,
-    "Preferred allocator block size for large allocations in bytes. Sets the "
+    "Preferred allocator block size for large allocations in bytes. Sets the\n"
     "minimum bound on memory consumption.");
 
 static iree_status_t iree_hal_vulkan_create_driver_with_flags(

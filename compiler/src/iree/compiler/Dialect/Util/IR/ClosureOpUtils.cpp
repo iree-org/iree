@@ -53,9 +53,9 @@ void excludeClosureOperandsAndResults(
   for (auto it : llvm::enumerate(oldOperandValues)) {
     unsigned numDynamicDims = 0;
     auto type = it.value().getType();
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       numDynamicDims = shapedType.getNumDynamicDims();
-    } else if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+    } else if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       numDynamicDims = 1;
     }
     if (!llvm::count(excludedOperandIndices, it.index())) {
@@ -75,9 +75,9 @@ void excludeClosureOperandsAndResults(
   for (auto it : llvm::enumerate(oldResultTypes)) {
     unsigned numDynamicDims = 0;
     auto type = it.value();
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       numDynamicDims = shapedType.getNumDynamicDims();
-    } else if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+    } else if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       numDynamicDims = 1;
     }
     if (!llvm::count(excludedResultIndices, it.index())) {
@@ -131,14 +131,15 @@ static bool isConstantInlinable(const ClosureOptimizationOptions &options,
 
   auto constantValueAttr = constantOp.getValue();
   auto constantType = constantOp.getType();
-  if (constantValueAttr.isa<SplatElementsAttr>()) {
+  if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
     // Splats are always small and can often have special handling when we
     // know they are a splat - which is why it's so important we inline them
     // here so we know when they are used that's the case.
     return true;
-  } else if (auto denseAttr = constantValueAttr.dyn_cast<DenseElementsAttr>()) {
+  } else if (auto denseAttr =
+                 llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
     // Smallish constants are worth moving inside.
-    auto shapedType = constantType.cast<ShapedType>();
+    auto shapedType = llvm::cast<ShapedType>(constantType);
     uint64_t estimatedByteLength =
         shapedType.getNumElements() *
         getRoundedElementByteWidth(shapedType.getElementType());

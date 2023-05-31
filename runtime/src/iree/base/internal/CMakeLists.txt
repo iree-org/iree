@@ -336,6 +336,7 @@ iree_cc_library(
     "wait_handle.h"
   SRCS
     "wait_handle.c"
+    "wait_handle_emscripten.c"
     "wait_handle_epoll.c"
     "wait_handle_impl.h"
     "wait_handle_inproc.c"
@@ -423,3 +424,12 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(EMSCRIPTEN)
+  iree_link_js_library(
+    TARGET
+      ::wait_handle
+    SRCS
+      "wait_handle_emscripten.js"
+  )
+endif()

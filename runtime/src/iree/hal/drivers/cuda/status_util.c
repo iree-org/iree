@@ -68,19 +68,3 @@ iree_status_t iree_hal_nccl_result_to_status(
                                         result,
                                         syms->ncclGetErrorString(result));
 }
-
-iree_status_t iree_hal_mpi_result_to_status(
-    iree_hal_cuda_dynamic_symbols_t* syms, int result, const char* file,
-    uint32_t line) {
-  iree_status_code_t code;
-
-  switch (result) {
-    case 0:  // MPI_SUCCESS
-      return iree_ok_status();
-    default:
-      code = IREE_STATUS_INTERNAL;
-      break;
-  }
-  return iree_make_status_with_location(file, line, code, "MPI error %d",
-                                        result);
-}

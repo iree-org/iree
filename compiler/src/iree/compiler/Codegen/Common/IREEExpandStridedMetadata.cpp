@@ -6,10 +6,10 @@
 
 #define DEBUG_TYPE "iree-codegen-expand-strided-metadata"
 
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -63,7 +63,7 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
 static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
     IREE::HAL::InterfaceBindingSubspanOp binding, RewriterBase &rewriter,
     Location loc) {
-  auto memRefType = binding.getResult().getType().template cast<MemRefType>();
+  auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
   int rank = memRefType.getRank();
   DescriptorInfo resultDescriptor;
 
@@ -130,7 +130,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
         op.getSource()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!binding) return failure();
-    auto memRefType = binding.getResult().getType().template cast<MemRefType>();
+    auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
     if (memRefType.getRank() < 1) return failure();
 
     auto loc = op.getLoc();
@@ -193,7 +193,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
 
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() + 2);
-    auto baseBufferType = op.getBaseBuffer().getType().cast<MemRefType>();
+    auto baseBufferType = llvm::cast<MemRefType>(op.getBaseBuffer().getType());
     if (newBufferType == baseBufferType) {
       results.push_back(linearInterfaceBinding);
     } else {

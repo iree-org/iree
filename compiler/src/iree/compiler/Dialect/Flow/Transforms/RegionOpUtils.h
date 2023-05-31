@@ -32,13 +32,13 @@ LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
 
 /// Append a result to the given DispatchRegionOp. The newly created
 /// DispatchRegionOp is returned.
-FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result,
-    const SmallVector<Value> &dynamicDims);
+FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResults(
+    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp,
+    ArrayRef<Value> results, ArrayRef<SmallVector<Value>> dynamicDims);
 
-/// Create an DispatchRegionOp with workload
-Flow::DispatchRegionOp makeDispatchRegionWithWorkload(
-    OpBuilder &builder, Location loc, SmallVector<Value> workload = {});
+/// Create an empty DispatchRegionOp.
+Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder, Location loc,
+                                               ValueRange workload);
 
 /// Clone a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.
@@ -74,13 +74,13 @@ FailureOr<Operation *> clonePrecedingOpIntoDispatchRegion(
 ///   flow.return %1 : tensor<?xf32>
 /// }
 /// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp);
+FailureOr<Flow::DispatchRegionOp> movePrecedingOpsIntoDispatchRegion(
+    RewriterBase &rewriter, ArrayRef<Operation *> targets,
+    Flow::DispatchRegionOp regionOp);
 
 /// Wrap the given op in a new dispatch region op.
-FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(
-    RewriterBase &rewriter, Operation *op,
-    std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt);
+FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
+                                                         Operation *op);
 
 /// Decide whether the given op should be cloned and fused into a dispatch
 /// region using heuristics.

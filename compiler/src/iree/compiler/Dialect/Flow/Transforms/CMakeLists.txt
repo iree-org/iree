@@ -51,6 +51,7 @@ iree_cc_library(
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
+    "InsertDispatchDebugTargets.cpp"
     "InterchangeGenericOps.cpp"
     "InterchangeTransposeGenericOps.cpp"
     "OptimizeNumerics.cpp"
@@ -74,7 +75,6 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgExtUtils
     IREELinalgTransformDialect
-    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis
@@ -101,6 +101,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTosaDialect
     MLIRTransformDialect
+    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow

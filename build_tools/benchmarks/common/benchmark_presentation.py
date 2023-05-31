@@ -6,7 +6,8 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import (Any, Callable, Dict, Generic, List, Optional, Sequence,
+                    Tuple, TypeVar, Union)
 import pathlib
 import dataclasses
 import json
@@ -14,8 +15,12 @@ import urllib.parse
 import markdown_strings as md
 import math
 
-from common import benchmark_definition
-from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_ARTIFACT_SIZE_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
+from common import benchmark_definition, benchmark_thresholds
+from common.benchmark_thresholds import (BENCHMARK_THRESHOLDS,
+                                         COMPILATION_TIME_THRESHOLDS,
+                                         TOTAL_ARTIFACT_SIZE_THRESHOLDS,
+                                         TOTAL_DISPATCH_SIZE_THRESHOLDS,
+                                         BenchmarkThreshold, ThresholdUnit)
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
 
@@ -34,6 +39,8 @@ TOTAL_DISPATCH_SIZE_METRIC_ID = "9e15f7e6-383c-47ec-bd38-ecba55a5f10a"
 TOTAL_DISPATCH_SIZE_SERIES_SUFFIX = "compilation:module:component-size:total-dispatch-size"
 TOTAL_ARTIFACT_SIZE_METRIC_ID = "2c8a9198-c01c-45b9-a7da-69c82cf749f7"
 TOTAL_ARTIFACT_SIZE_SERIES_SUFFIX = "compilation:module:total-artifact-size"
+STREAM_IR_DISPATCH_COUNT_METRIC_ID = "7b72cd9e-43ed-4078-b6d3-20b810f9e4ad"
+STREAM_IR_DISPATCH_COUNT_SERIES_SUFFIX = "compilation:ir:stream-dispatch-count"
 
 
 @dataclass
@@ -59,9 +66,11 @@ class CompilationMetrics:
   compilation_time_ms: int
   total_dispatch_component_bytes: int
   total_artifact_bytes: int
+  stream_ir_dispatch_count: int
   base_compilation_time_ms: Optional[int] = None
   base_total_artifact_bytes: Optional[int] = None
   base_total_dispatch_component_bytes: Optional[int] = None
+  base_stream_ir_dispatch_count: Optional[int] = None
 
   def __str__(self) -> str:
     return self.name
@@ -231,11 +240,46 @@ class TotalArtifactSizeToTable(MetricsToTableMapper[CompilationMetrics]):
     return "Total Artifact Sizes"
 
 
+class StreamIRDispatchCountToTable(MetricsToTableMapper[CompilationMetrics]):
+  """Helper to map CompilationMetrics to Stream IR Dispatch Count column."""
+
+  def update_base_value(self, compile_metrics: CompilationMetrics,
+                        base_value: Any) -> CompilationMetrics:
+    return dataclasses.replace(compile_metrics,
+                               base_stream_ir_dispatch_count=base_value)
+
+  def get_current_and_base_value(
+      self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:
+    return (compile_metrics.stream_ir_dispatch_count,
+            compile_metrics.base_stream_ir_dispatch_count)
+
+  def get_metric_id(self) -> str:
+    return STREAM_IR_DISPATCH_COUNT_METRIC_ID
+
+  def get_series_name(self, name: str) -> str:
+    return f"{name} [{STREAM_IR_DISPATCH_COUNT_SERIES_SUFFIX}]"
+
+  def get_unit(self) -> str:
+    return "number"
+
+  def get_table_header(self) -> str:
+    return f"Stream IR Dispatch Count (# of cmd.dispatch ops)"
+
+  @staticmethod
+  def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
+    return benchmark_thresholds.STREAM_IR_DISPATCH_COUNT_THRESHOLDS
+
+  @staticmethod
+  def get_table_title() -> str:
+    return "Stream IR Dispatch Count (# of cmd.dispatch ops)"
+
+
 COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
     MetricsToTableMapper[CompilationMetrics]] = [
         CompilationTimeToTable(),
         TotalDispatchSizeToTable(),
         TotalArtifactSizeToTable(),
+        StreamIRDispatchCountToTable(),
     ]
 
 
@@ -265,33 +309,28 @@ def aggregate_all_benchmarks(
       raise ValueError("Inconsistent pull request commit")
 
     for benchmark_index in range(len(file_results.benchmarks)):
-      benchmark_case = file_results.benchmarks[benchmark_index]
+      benchmark_run = file_results.benchmarks[benchmark_index]
 
-      series_name = str(benchmark_case.benchmark_info)
+      series_name = str(benchmark_run.info)
       # Make sure each benchmark has a unique name.
       if series_name in benchmark_names:
         raise ValueError(f"Duplicated benchmark name: {series_name}")
       benchmark_names.add(series_name)
 
       # TODO(#11076): Remove legacy path.
-      series_id = benchmark_case.benchmark_info.run_config_id
+      series_id = benchmark_run.info.run_config_id
       if series_id is None:
         series_id = series_name
 
       if series_id in aggregate_results:
         raise ValueError(f"Duplicated benchmark id: {series_id}")
 
-      # Now scan all benchmark iterations and find the aggregate results.
-      mean_time = file_results.get_aggregate_time(benchmark_index, "mean")
-      median_time = file_results.get_aggregate_time(benchmark_index, "median")
-      stddev_time = file_results.get_aggregate_time(benchmark_index, "stddev")
-
       aggregate_results[series_id] = AggregateBenchmarkLatency(
           name=series_name,
-          benchmark_info=benchmark_case.benchmark_info,
-          mean_time=mean_time,
-          median_time=median_time,
-          stddev_time=stddev_time)
+          benchmark_info=benchmark_run.info,
+          mean_time=benchmark_run.metrics.real_time.mean,
+          median_time=benchmark_run.metrics.real_time.median,
+          stddev_time=benchmark_run.metrics.real_time.stddev)
 
   return aggregate_results
 
@@ -322,6 +361,7 @@ def collect_all_compilation_metrics(
 
     for compile_stats in file_results.compilation_statistics:
       component_sizes = compile_stats.module_component_sizes
+      stream_dispatch_count = compile_stats.ir_stats.stream_dispatch_count
 
       target_name = str(compile_stats.compilation_info)
       if target_name in target_names:
@@ -342,7 +382,8 @@ def collect_all_compilation_metrics(
           compilation_time_ms=compile_stats.compilation_time_ms,
           total_artifact_bytes=component_sizes.file_bytes,
           total_dispatch_component_bytes=component_sizes.
-          total_dispatch_component_bytes)
+          total_dispatch_component_bytes,
+          stream_ir_dispatch_count=stream_dispatch_count)
 
   return compile_metrics
 

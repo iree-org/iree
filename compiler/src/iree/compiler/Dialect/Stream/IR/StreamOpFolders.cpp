@@ -41,6 +41,140 @@ namespace Stream {
 // Utilities shared across patterns
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Returns an integer with a bit width as small as possible to represent the
+// input |pattern|, aligned to 8-bits.
+//
+// Examples:
+//            0 : i64 ->    0 : i8
+//            1 : i32 ->    1 : i8
+//          123 : i32 ->  123 : i8
+//         1234 : i32 -> 1234 : i16
+//   0xCDCDCDCD : i32 -> 0xCD : i8
+static APInt computeRequiredPatternBits(APInt pattern) {
+  // Special case for well-known constant values.
+  if (pattern.isZero()) return APInt(8, 0u);
+  if (pattern.isAllOnes()) return APInt(8, 0xFF);
+
+  // Extend up to a power of two bit width. This makes the value easier to work
+  // with as we'll be dealing with one of 4 sizes (1/2/4/8b).
+  uint64_t bitWidth = llvm::PowerOf2Ceil(pattern.getBitWidth());
+  if (bitWidth != pattern.getBitWidth()) {
+    // Extending as we operate - that's not good: users should have taken care
+    // of this earier.
+    return pattern;
+  }
+
+  uint64_t byteWidth = bitWidth / 8;
+  uint64_t value = pattern.getZExtValue();
+  switch (byteWidth) {
+    case 1:
+      // Can't go smaller than 1 byte.
+      return pattern;
+    case 2: {
+      uint64_t b0 = value & 0xFF;
+      uint64_t b1 = (value >> 8) & 0xFF;
+      if (b0 == b1) {
+        // 0xAAAA : i16 => 0xAA : i8
+        return APInt(8, value & 0xFF);
+      }
+      return pattern;
+    }
+    case 4: {
+      uint64_t b0 = value & 0xFF;
+      uint64_t b1 = (value >> 8) & 0xFF;
+      uint64_t b2 = (value >> 16) & 0xFF;
+      uint64_t b3 = (value >> 24) & 0xFF;
+      if (b0 == b1 && b0 == b2 && b0 == b3) {
+        // 0xAAAAAAAA : i32 => 0xAA : i8
+        return APInt(8, b0);
+      } else if (b0 == b2 && b1 == b3) {
+        // 0xAABBAABB : i32 => 0xAABB : i16
+        return APInt(16, b0 | (b1 << 8));
+      }
+      return pattern;
+    }
+    case 8: {
+      uint64_t b0 = value & 0xFF;
+      uint64_t b1 = (value >> 8) & 0xFF;
+      uint64_t b2 = (value >> 16) & 0xFF;
+      uint64_t b3 = (value >> 24) & 0xFF;
+      uint64_t b4 = (value >> 32) & 0xFF;
+      uint64_t b5 = (value >> 40) & 0xFF;
+      uint64_t b6 = (value >> 48) & 0xFF;
+      uint64_t b7 = (value >> 56) & 0xFF;
+      if (b0 == b1 && b0 == b2 && b0 == b3 && b0 == b4 && b0 == b5 &&
+          b0 == b6 && b0 == b7) {
+        // 0xAAAAAAAAAAAAAAAA : i64 => 0xAA : i8
+        return APInt(8, b0);
+      } else if ((b0 == b2 && b0 == b4 && b0 == b6) &&
+                 (b1 == b3 && b1 == b5 && b1 == b7)) {
+        // 0xAABBAABBAABBAABB : i64 => 0xAABB : i16
+        return APInt(16, b0 | (b1 << 8));
+      } else if (b0 == b4 && b1 == b5 && b2 == b6 && b3 == b7) {
+        // 0xAABBCCDDAABBCCDD : i64 => 0xAABBCCDD : i32
+        return APInt(32, b0 | (b1 << 8) | (b2 << 16) | (b3 << 32));
+      }
+      return pattern;
+    }
+    default:
+      // Unhandled bit width.
+      return pattern;
+  }
+}
+
+// Narrows the bit width of a splat/fill pattern when known safe to do so.
+// Target HAL implementations don't support 64-bit and a real 64-bit splat needs
+// to be emulated - if we can avoid that here that's a big win. Some HAL
+// implementations (such as Metal) only support 8-bit fills and anything larger
+// needs to be implemented as well.
+static TypedAttr tryNarrowPatternBits(TypedAttr patternAttr) {
+  // Get the old pattern bitcast to an APInt. Splats are bitwise operations
+  // and we don't care what the value originally was.
+  APInt oldPattern;
+  if (auto floatAttr = patternAttr.dyn_cast<FloatAttr>()) {
+    oldPattern = floatAttr.getValue().bitcastToAPInt();
+  } else if (auto intAttr = patternAttr.dyn_cast<IntegerAttr>()) {
+    oldPattern = intAttr.getValue();
+  } else {
+    // Can't handle today.
+    return patternAttr;
+  }
+
+  // Try narrowing the pattern.
+  auto newPattern = computeRequiredPatternBits(oldPattern);
+  if (newPattern.getBitWidth() == oldPattern.getBitWidth()) return patternAttr;
+
+  // Wrap the result in an attribute - note that it is always an integer.
+  return IntegerAttr::get(
+      IntegerType::get(patternAttr.getContext(), newPattern.getBitWidth()),
+      newPattern);
+}
+
+// Tries to narrow constant splat/fill patterns to a smaller bit width.
+template <typename Op>
+struct NarrowFillPattern : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op fillOp,
+                                PatternRewriter &rewriter) const override {
+    // Try narrowing the pattern.
+    TypedAttr oldPatternAttr;
+    if (!matchPattern(fillOp.getValue(), m_Constant(&oldPatternAttr))) {
+      return failure();
+    }
+    auto newPatternAttr = tryNarrowPatternBits(oldPatternAttr);
+    if (newPatternAttr == oldPatternAttr) return failure();
+
+    // Replace the pattern on the op with the new one.
+    auto narrowValue =
+        rewriter.create<arith::ConstantOp>(fillOp.getLoc(), newPatternAttr);
+    rewriter.updateRootInPlace(
+        fillOp, [&]() { fillOp.getValueMutable().assign(narrowValue); });
+    return success();
+  }
+};
+
 // Returns the stream.yield op in |block| if it is the only op.
 //
 // Example:
@@ -164,14 +298,13 @@ static void setInsertionPointToParentExecutionScope(Operation *op,
   }
 }
 
-namespace {
-
 // Erases an op if it has no uses.
 // This is to support ops that are "pure" but can't be marked as such because
 // the MLIR CSE pass would deduplicate them.
 template <typename Op>
 struct ElideUnusedOp : public OpRewritePattern<Op> {
-  using OpRewritePattern<Op>::OpRewritePattern;
+  explicit ElideUnusedOp(MLIRContext *context)
+      : OpRewritePattern<Op>(context, /*benefit=*/1000) {}
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     if (!op.use_empty()) return failure();
@@ -183,7 +316,8 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
 // Materialize copy-on-write (🐄) ops where required for |rootValue|.
 // Only valid in tensor/async ops - don't use with stream.cmd.*.
 static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
-  auto valueType = rootValue.getType().dyn_cast<IREE::Stream::ResourceType>();
+  auto valueType =
+      llvm::dyn_cast<IREE::Stream::ResourceType>(rootValue.getType());
   if (!valueType) return false;
 
   // If our rootValue is a constant then we need to ensure that we aren't
@@ -234,8 +368,7 @@ static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
     builder.setInsertionPoint(tiedUse.user);
 
     auto sizeAwareType =
-        tiedUse.value.getType()
-            .template cast<IREE::Util::SizeAwareTypeInterface>();
+        llvm::cast<IREE::Util::SizeAwareTypeInterface>(tiedUse.value.getType());
     auto targetSize =
         sizeAwareType.queryValueSize(cloneLoc, tiedUse.value, builder);
 
@@ -302,7 +435,7 @@ struct TieRegionResults : public OpRewritePattern<Op> {
         }
         auto baseValue =
             IREE::Util::TiedOpInterface::findTiedBaseValue(result.value());
-        if (auto blockArg = baseValue.template dyn_cast<BlockArgument>()) {
+        if (auto blockArg = llvm::dyn_cast<BlockArgument>(baseValue)) {
           unsigned operandIndex = blockArg.getArgNumber();
           rewriter.updateRootInPlace(op, [&]() {
             op.setTiedResultOperandIndex(result.index(), operandIndex);
@@ -440,7 +573,7 @@ void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult ResourceSizeOp::fold(FoldAdaptor operands) {
   auto sizeAwareType =
-      getOperand().getType().cast<IREE::Util::SizeAwareTypeInterface>();
+      llvm::cast<IREE::Util::SizeAwareTypeInterface>(getOperand().getType());
   Operation *op = this->getOperation();
   return sizeAwareType.findSizeValue(getOperand(), op->getBlock(),
                                      Block::iterator(op));
@@ -777,7 +910,7 @@ struct SinkSubviewAcrossSelectOps
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getType().isa<IREE::Stream::ResourceType>()) return failure();
+    if (!llvm::isa<IREE::Stream::ResourceType>(op.getType())) return failure();
     auto trueSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
         op.getTrueValue().getDefiningOp());
     auto falseSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
@@ -868,7 +1001,8 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto shapedType = constantOp.getResultEncoding().dyn_cast<ShapedType>();
+    auto shapedType =
+        llvm::dyn_cast<ShapedType>(constantOp.getResultEncoding());
     if (!shapedType) return failure();
 
     // See if any dim (including dynamic ones) is known zero.
@@ -908,7 +1042,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatAttr = constantOp.getValue().dyn_cast<SplatElementsAttr>();
+    auto splatAttr = llvm::dyn_cast<SplatElementsAttr>(constantOp.getValue());
     if (!splatAttr || !splatAttr.isSplat()) {
       return rewriter.notifyMatchFailure(
           constantOp,
@@ -949,145 +1083,10 @@ void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.splat
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-// Returns an integer with a bit width as small as possible to represent the
-// input |pattern|, aligned to 8-bits.
-//
-// Examples:
-//            0 : i64 ->    0 : i8
-//            1 : i32 ->    1 : i8
-//          123 : i32 ->  123 : i8
-//         1234 : i32 -> 1234 : i16
-//   0xCDCDCDCD : i32 -> 0xCD : i8
-static APInt computeRequiredPatternBits(APInt pattern) {
-  // Special case for well-known constant values.
-  if (pattern.isZero()) return APInt(8, 0u);
-  if (pattern.isAllOnes()) return APInt(8, 0xFF);
-
-  // Extend up to a power of two bit width. This makes the value easier to work
-  // with as we'll be dealing with one of 4 sizes (1/2/4/8b).
-  uint64_t bitWidth = llvm::PowerOf2Ceil(pattern.getBitWidth());
-  if (bitWidth != pattern.getBitWidth()) {
-    // Extending as we operate - that's not good: users should have taken care
-    // of this earier.
-    return pattern;
-  }
-
-  uint64_t byteWidth = bitWidth / 8;
-  uint64_t value = pattern.getZExtValue();
-  switch (byteWidth) {
-    case 1:
-      // Can't go smaller than 1 byte.
-      return pattern;
-    case 2: {
-      uint64_t b0 = value & 0xFF;
-      uint64_t b1 = (value >> 8) & 0xFF;
-      if (b0 == b1) {
-        // 0xAAAA : i16 => 0xAA : i8
-        return APInt(8, value & 0xFF);
-      }
-      return pattern;
-    }
-    case 4: {
-      uint64_t b0 = value & 0xFF;
-      uint64_t b1 = (value >> 8) & 0xFF;
-      uint64_t b2 = (value >> 16) & 0xFF;
-      uint64_t b3 = (value >> 24) & 0xFF;
-      if (b0 == b1 && b0 == b2 && b0 == b3) {
-        // 0xAAAAAAAA : i32 => 0xAA : i8
-        return APInt(8, b0);
-      } else if (b0 == b2 && b1 == b3) {
-        // 0xAABBAABB : i32 => 0xAABB : i16
-        return APInt(16, b0 | (b1 << 8));
-      }
-      return pattern;
-    }
-    case 8: {
-      uint64_t b0 = value & 0xFF;
-      uint64_t b1 = (value >> 8) & 0xFF;
-      uint64_t b2 = (value >> 16) & 0xFF;
-      uint64_t b3 = (value >> 24) & 0xFF;
-      uint64_t b4 = (value >> 32) & 0xFF;
-      uint64_t b5 = (value >> 40) & 0xFF;
-      uint64_t b6 = (value >> 48) & 0xFF;
-      uint64_t b7 = (value >> 56) & 0xFF;
-      if (b0 == b1 && b0 == b2 && b0 == b3 && b0 == b4 && b0 == b5 &&
-          b0 == b6 && b0 == b7) {
-        // 0xAAAAAAAAAAAAAAAA : i64 => 0xAA : i8
-        return APInt(8, b0);
-      } else if ((b0 == b2 && b0 == b4 && b0 == b6) &&
-                 (b1 == b3 && b1 == b5 && b1 == b7)) {
-        // 0xAABBAABBAABBAABB : i64 => 0xAABB : i16
-        return APInt(16, b0 | (b1 << 8));
-      } else if (b0 == b4 && b1 == b5 && b2 == b6 && b3 == b7) {
-        // 0xAABBCCDDAABBCCDD : i64 => 0xAABBCCDD : i32
-        return APInt(32, b0 | (b1 << 8) | (b2 << 16) | (b3 << 32));
-      }
-      return pattern;
-    }
-    default:
-      // Unhandled bit width.
-      return pattern;
-  }
-}
-
-// Narrows the bit width of a splat/fill pattern when known safe to do so.
-// Target HAL implementations don't support 64-bit and a real 64-bit splat needs
-// to be emulated - if we can avoid that here that's a big win. Some HAL
-// implementations (such as Metal) only support 8-bit fills and anything larger
-// needs to be implemented as well.
-static Attribute tryNarrowPatternBits(Attribute patternAttr) {
-  // Get the old pattern bitcast to an APInt. Splats are bitwise operations
-  // and we don't care what the value originally was.
-  APInt oldPattern;
-  if (auto floatAttr = patternAttr.dyn_cast<FloatAttr>()) {
-    oldPattern = floatAttr.getValue().bitcastToAPInt();
-  } else if (auto intAttr = patternAttr.dyn_cast<IntegerAttr>()) {
-    oldPattern = intAttr.getValue();
-  } else {
-    // Can't handle today.
-    return patternAttr;
-  }
-
-  // Try narrowing the pattern.
-  auto newPattern = computeRequiredPatternBits(oldPattern);
-  if (newPattern.getBitWidth() == oldPattern.getBitWidth()) return patternAttr;
-
-  // Wrap the result in an attribute - note that it is always an integer.
-  return IntegerAttr::get(
-      IntegerType::get(patternAttr.getContext(), newPattern.getBitWidth()),
-      newPattern);
-}
-
-// Tries to narrow constant splat patterns to a smaller bit width.
-struct NarrowSplatPattern : public OpRewritePattern<TensorSplatOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(TensorSplatOp splatOp,
-                                PatternRewriter &rewriter) const override {
-    // Try narrowing the pattern.
-    Attribute oldPatternAttr;
-    if (!matchPattern(splatOp.getValue(), m_Constant(&oldPatternAttr))) {
-      return failure();
-    }
-    auto newPatternAttr = tryNarrowPatternBits(oldPatternAttr);
-    if (newPatternAttr == oldPatternAttr) return failure();
-
-    // Replace the pattern on the op with the new one.
-    auto narrowValue =
-        rewriter.create<arith::ConstantOp>(splatOp.getLoc(), newPatternAttr);
-    rewriter.updateRootInPlace(
-        splatOp, [&]() { splatOp.getValueMutable().assign(narrowValue); });
-    return success();
-  }
-};
-
-}  // namespace
-
 void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
+  results.insert<NarrowFillPattern<TensorSplatOp>>(context);
   results.insert<ElideUnusedOp<TensorSplatOp>>(context);
-  results.insert<NarrowSplatPattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1151,36 +1150,10 @@ void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.fill
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-// Tries to narrow constant fill patterns to a smaller bit width.
-struct NarrowFillPattern : public OpRewritePattern<TensorFillOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(TensorFillOp fillOp,
-                                PatternRewriter &rewriter) const override {
-    // Try narrowing the pattern.
-    Attribute oldPatternAttr;
-    if (!matchPattern(fillOp.getValue(), m_Constant(&oldPatternAttr))) {
-      return failure();
-    }
-    auto newPatternAttr = tryNarrowPatternBits(oldPatternAttr);
-    if (newPatternAttr == oldPatternAttr) return failure();
-
-    // Replace the pattern on the op with the new one.
-    auto narrowValue =
-        rewriter.create<arith::ConstantOp>(fillOp.getLoc(), newPatternAttr);
-    rewriter.updateRootInPlace(
-        fillOp, [&]() { fillOp.getValueMutable().assign(narrowValue); });
-    return success();
-  }
-};
-
-}  // namespace
-
 void TensorFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   // TODO(benvanik): if target_size == sizeof(value) turn into splat.
-  results.insert<NarrowFillPattern>(context);
+  results.insert<NarrowFillPattern<TensorFillOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1310,7 +1283,7 @@ struct ConvertSplatConstantsIntoSplats
     if (!value.isSplat()) return failure();
 
     auto splatElementAttr =
-        value.dyn_cast<SplatElementsAttr>().getSplatValue<TypedAttr>();
+        llvm::dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
     auto splatValue = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
@@ -1339,6 +1312,7 @@ void AsyncSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
   // TODO(#6972): find splat+update-into and turn into alloca+fill+update.
   // TODO(#6972): find splat+copy-into and turn into alloca+fill+copy.
   // TODO(#6972): clone instead of sinking to common dominator.
+  results.insert<NarrowFillPattern<AsyncSplatOp>>(context);
   results.insert<SinkAllocaLikeOpToConsumers<AsyncSplatOp>>(context);
   results.insert<ElideUnusedOp<AsyncSplatOp>>(context);
 }
@@ -1468,11 +1442,116 @@ struct FlattenFullFillToSplat : public OpRewritePattern<AsyncFillOp> {
   }
 };
 
+// Elides fills that are trivially redundant, such as when they are filling
+// a splatted value.
+//
+// This only checks for simple cases of splat + fill with more complex cases
+// left to be handled by iree-stream-elide-async-writes.
+//
+// Example:
+//  %0 = stream.async.splat %c123
+//  %1 = stream.async.fill %c123, %0[...]
+struct ElideRedundantFill : public OpRewritePattern<AsyncFillOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncFillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    auto splatOp = dyn_cast_or_null<IREE::Stream::AsyncSplatOp>(
+        fillOp.getTarget().getDefiningOp());
+    if (!splatOp) return failure();
+    if (splatOp.getValue() != fillOp.getValue()) {
+      return rewriter.notifyMatchFailure(fillOp,
+                                         "fill patterns are not compatible");
+    }
+    rewriter.replaceOp(fillOp, splatOp.getResult());
+    return success();
+  }
+};
+
+// Coalesces multiple fills that are adjacent in the target tensor if they
+// share a compatible value. Note that we only care about the filled byte
+// pattern and not the original bit width of the fill value - so a fill of i8=0
+// and i32=0 can be coalesced as could a fill of i8=1 and i32=01010101h.
+//
+// This only checks for simple cases of immediately adjacent fills with
+// more complex cases such as overwriting left to be handled by
+// iree-stream-elide-async-writes.
+//
+// Example:
+//  %0 = stream.async.fill %c123, %...[%a to %b for %l0]
+//  %1 = stream.async.fill %c123, %0[%b to %c for %l1]
+// ->
+//  %0 = stream.async.fill %c123, %...[%a to %c for %l0plus1]
+struct CoalesceAdjacentFills : public OpRewritePattern<AsyncFillOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncFillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp = dyn_cast_or_null<IREE::Stream::AsyncFillOp>(
+        fillOp.getTarget().getDefiningOp());
+    if (!sourceOp) return failure();
+    if (!sourceOp.getResult().hasOneUse()) {
+      // Note that hazard analysis could make this work if we can guarantee that
+      // the source result is only ever sliced out to a range that doesn't
+      // overlap with the fill we are trying to coalesce. That's something
+      // better done in a pass, though.
+      return rewriter.notifyMatchFailure(
+          fillOp, "source fill has multiple users and cannot be modified");
+    }
+    if (sourceOp.getValue() != fillOp.getValue()) {
+      return rewriter.notifyMatchFailure(fillOp,
+                                         "fill patterns are not compatible");
+    }
+    if (sourceOp.getTargetEnd() != fillOp.getTargetOffset() &&
+        sourceOp.getTargetOffset() != fillOp.getTargetEnd()) {
+      return rewriter.notifyMatchFailure(fillOp, "source fill is not adjacent");
+    }
+
+    if (!IREE::Util::isValueUsableForOp(fillOp.getTargetOffset(), sourceOp) ||
+        !IREE::Util::isValueUsableForOp(fillOp.getTargetLength(), sourceOp)) {
+      // TODO(benvanik): use tryMoveProducerBefore in a way compatible with the
+      // rewriter. Not sure how to do that safely.
+      return rewriter.notifyMatchFailure(
+          fillOp, "fill range not usable by source op; needs hoisting");
+    }
+
+    auto fusedLoc = rewriter.getFusedLoc({sourceOp.getLoc(), fillOp.getLoc()});
+    rewriter.setInsertionPoint(sourceOp);
+    Value newOffset;
+    Value newEnd;
+    Value newLength;
+    if (sourceOp.getTargetEnd() == fillOp.getTargetOffset()) {
+      // Extending source op to fill toward the end: [sourceOp][fillOp]
+      newOffset = sourceOp.getTargetOffset();
+      newEnd = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, sourceOp.getTargetEnd(), fillOp.getTargetLength());
+      newLength = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, sourceOp.getTargetLength(), fillOp.getTargetLength());
+    } else {
+      // Extending source op to fill toward the beginning: [fillOp][sourceOp]
+      newOffset = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, fillOp.getTargetOffset(), sourceOp.getTargetOffset());
+      newEnd = sourceOp.getTargetEnd();
+      newLength = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, fillOp.getTargetLength(), sourceOp.getTargetLength());
+    }
+
+    rewriter.updateRootInPlace(fillOp, [&]() {
+      sourceOp.getTargetOffsetMutable().assign(newOffset);
+      sourceOp.getTargetEndMutable().assign(newEnd);
+      sourceOp.getTargetLengthMutable().assign(newLength);
+    });
+    rewriter.replaceOp(fillOp, sourceOp.getResult());
+    return success();
+  }
+};
+
 }  // namespace
 
 void AsyncFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
+  results.insert<NarrowFillPattern<AsyncFillOp>>(context);
   results.insert<FlattenFullFillToSplat>(context);
+  results.insert<ElideRedundantFill>(context);
+  results.insert<CoalesceAdjacentFills>(context);
   results.insert<ElideUnusedOp<AsyncFillOp>>(context);
 }
 
@@ -1648,12 +1727,37 @@ struct RedundantTransferElision : public OpRewritePattern<AsyncTransferOp> {
   }
 };
 
+// Collapses chains of transfers that have no use.
+struct IntermediateTransferElision : public OpRewritePattern<AsyncTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
+                                PatternRewriter &rewriter) const override {
+    // Walk up the transfer chain to the first non-transfer op.
+    AsyncTransferOp originTransferOp = transferOp;
+    while (true) {
+      auto source = originTransferOp.getSource();
+      auto previousTransferOp =
+          dyn_cast_or_null<AsyncTransferOp>(source.getDefiningOp());
+      if (!previousTransferOp) break;
+      originTransferOp = previousTransferOp;
+    }
+    if (originTransferOp == transferOp) return failure();
+    rewriter.replaceOpWithNewOp<AsyncTransferOp>(
+        transferOp, transferOp.getResult().getType(),
+        originTransferOp.getSource(), originTransferOp.getSourceSize(),
+        transferOp.getResultSize(), originTransferOp.getSourceAffinityAttr(),
+        transferOp.getResultAffinityAttr());
+    return success();
+  }
+};
+
 }  // namespace
 
 void AsyncTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   // TODO(benvanik): staging propagation (fill of staging -> fill on device).
   results.insert<RedundantTransferElision>(context);
+  results.insert<IntermediateTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
 }
 
@@ -1822,7 +1926,7 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
     }
     SmallVector<Value> newResults;
     for (auto operand : yieldOp->getResourceOperands()) {
-      auto arg = operand.cast<BlockArgument>();
+      auto arg = llvm::cast<BlockArgument>(operand);
       auto capture = op.getResourceOperands()[arg.getArgNumber()];
       assert(arg.getType() == capture.getType() &&
              "expect 1:1 types on captures to results");
@@ -2171,7 +2275,7 @@ struct FoldSubviewsIntoCmdCallOp : public OpRewritePattern<CmdCallOp> {
     bool anySubviewOps = false;
     for (auto [operandIndex, operand] :
          llvm::enumerate(op.getResourceOperands())) {
-      if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+      if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
         auto subviewOp = ResourceSubviewOp::findSubviewOp(operand);
         if (subviewOp) anySubviewOps = true;
         resourceSubviewOps.push_back({operandIndex, subviewOp});
@@ -2821,8 +2925,9 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       auto awaitOp = dyn_cast<TimepointAwaitOp>(use.getOwner());
       if (!awaitOp ||
           !AffinityAttr::areCompatible(
-              op.getAffinityAttr().dyn_cast_or_null<AffinityAttr>(),
-              awaitOp.getAffinityAttr().dyn_cast_or_null<AffinityAttr>())) {
+              llvm::dyn_cast_if_present<AffinityAttr>(op.getAffinityAttr()),
+              llvm::dyn_cast_if_present<AffinityAttr>(
+                  awaitOp.getAffinityAttr()))) {
         // Can't combine if the affinities differ as the wait semantics are
         // load-bearing. Probably. They really shouldn't be.
         // TODO(benvanik): remove affinity from stream.timepoint.await.
@@ -2929,6 +3034,48 @@ void TimepointAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<GroupAwaitsByTimepoint>(context);
   results.insert<FoldDuplicateAwaitResources>(context);
   results.insert<ElideUnusedOp<TimepointAwaitOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.create
+//===----------------------------------------------------------------------===//
+
+void ChannelCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelCreateOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.rank
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ChannelRankOp::fold(FoldAdaptor operands) {
+  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+          getChannel().getDefiningOp())) {
+    return createOp.getRank();
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.channel.count
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ChannelCountOp::fold(FoldAdaptor operands) {
+  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+          getChannel().getDefiningOp())) {
+    return createOp.getCount();
+  }
+  return {};
 }
 
 }  // namespace Stream

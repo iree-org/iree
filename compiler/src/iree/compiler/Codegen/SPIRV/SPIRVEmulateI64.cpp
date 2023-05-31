@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -74,7 +74,7 @@ struct ConvertHalInterfaceBindingSubspan final
 
 // Tries to flatten `type` to a 1-D vector type. Returns `nullptr` on failure.
 static VectorType flattenVectorType(Type type) {
-  auto vecTy = type.dyn_cast<VectorType>();
+  auto vecTy = llvm::dyn_cast<VectorType>(type);
   if (!vecTy) return nullptr;
 
   if (vecTy.isScalable() || vecTy.getRank() <= 1) return nullptr;

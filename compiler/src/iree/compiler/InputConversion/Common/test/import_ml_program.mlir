@@ -73,3 +73,33 @@ builtin.module @global_store {
     return
   }
 }
+
+// -----
+// CHECK-LABEL: module @globals_extern
+builtin.module @globals_extern {
+  ml_program.global public @global_pub(#ml_program.extern<i32>) : i32
+  ml_program.global public @global_pab(#ml_program.extern<i32>) : i32
+  ml_program.global private mutable @global_privmut(#ml_program.extern<i32>) : i32
+  ml_program.global private @global_priv(#ml_program.extern<i32>) : i32
+}
+
+// CHECK-DAG: util.global private mutable @global_pub : i32
+// CHECK-DAG: util.global private mutable @global_pab : i32
+// CHECK-DAG: util.global private mutable @global_privmut : i32
+// CHECK-DAG: util.global private mutable @global_priv : i32
+
+// CHECK-LABEL: func.func @ireeMlProgramGlobalsInit(
+// CHECK-SAME:    %[[VAL_0:.*]]: !util.list<?>
+// CHECK:  %[[VAL_1:.*]] = arith.constant 0 : index
+// CHECK:  %[[VAL_2:.*]] = util.list.get %[[VAL_0]]{{\[}}%[[VAL_1]]] : !util.list<?> -> i32
+// CHECK:  util.global.store %[[VAL_2]], @global_pab : i32
+// CHECK:  %[[VAL_3:.*]] = arith.constant 1 : index
+// CHECK:  %[[VAL_4:.*]] = util.list.get %[[VAL_0]]{{\[}}%[[VAL_3]]] : !util.list<?> -> i32
+// CHECK:  util.global.store %[[VAL_4]], @global_priv : i32
+// CHECK:  %[[VAL_5:.*]] = arith.constant 2 : index
+// CHECK:  %[[VAL_6:.*]] = util.list.get %[[VAL_0]]{{\[}}%[[VAL_5]]] : !util.list<?> -> i32
+// CHECK:  util.global.store %[[VAL_6]], @global_privmut : i32
+// CHECK:  %[[VAL_7:.*]] = arith.constant 3 : index
+// CHECK:  %[[VAL_8:.*]] = util.list.get %[[VAL_0]]{{\[}}%[[VAL_7]]] : !util.list<?> -> i32
+// CHECK:  util.global.store %[[VAL_8]], @global_pub : i32
+

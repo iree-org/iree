@@ -78,7 +78,8 @@ static IREE::Util::GlobalOp createBufferLikeGlobalOp(
       loc, tensorType, zeroOp, /*result_dims=*/ValueRange{});
   // hal.tensor.export
   auto bufferExportOp = initializerBuilder.create<IREE::HAL::TensorExportOp>(
-      loc, globalOp.getType(), splatOp.getResult(), /*name=*/nullptr);
+      loc, globalOp.getType(), splatOp.getResult(),
+      TypeAttr::get(splatOp.getType()), /*name=*/nullptr);
   // util.optimization_barrier (try to prevent optimizations across the export)
   auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
       loc, bufferExportOp.getTarget());
@@ -116,7 +117,7 @@ static IREE::Util::GlobalOp createImportBufferViewGlobalOp(
 
   // Extract the type, which must be a static tensor.
   auto targetType = importOp.getTarget().getType();
-  auto tensorType = targetType.dyn_cast<RankedTensorType>();
+  auto tensorType = llvm::dyn_cast<RankedTensorType>(targetType);
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view import tensor type on "
                          << arg << " used as " << targetType;
@@ -133,7 +134,7 @@ static IREE::Util::GlobalOp createImportBufferViewGlobalOp(
 // op.
 //
 // Example:
-//  %1 = hal.tensor.export %0 into %storage : tensor<4xi32> -> !hal.buffer_view
+//  %1 = hal.tensor.export %0 into(%storage) : tensor<4xi32> -> !hal.buffer_view
 // ->
 //  util.global @some_fn_arg0 : !hal.buffer
 //  util.initializer { ... }
@@ -157,7 +158,7 @@ static IREE::Util::GlobalOp createExportBufferGlobalOp(std::string name,
 
   // Extract the type, which must be a static tensor.
   auto sourceType = exportOp.getSourceEncoding();
-  auto tensorType = sourceType.dyn_cast<RankedTensorType>();
+  auto tensorType = llvm::dyn_cast<RankedTensorType>(sourceType);
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view export tensor type on "
                          << arg << " used as " << sourceType;

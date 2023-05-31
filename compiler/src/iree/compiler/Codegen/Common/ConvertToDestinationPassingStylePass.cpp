@@ -14,8 +14,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -32,6 +32,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -78,7 +79,8 @@ static Value getTensorLoadOpForTensorStoreOp(
   // Clone the offset, size and stride values. They will be CSE-ed later.
   SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      storeOp.getLoc(), storeOp.getValue().getType().cast<RankedTensorType>(),
+      storeOp.getLoc(),
+      llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
       storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
       clonedVals.sizes, clonedVals.strides);
   return tensorLoadOp;
@@ -254,7 +256,7 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
   auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
       [&](tensor::EmptyOp emptyOp) -> WalkResult {
         for (auto result : emptyOp->getResults()) {
-          if (!result.getType().isa<RankedTensorType>()) continue;
+          if (!llvm::isa<RankedTensorType>(result.getType())) continue;
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
           }
@@ -309,8 +311,8 @@ static bool canUseInOperandAsInitOperand(
   }
 
   if (auto producerOp = inOperand->get().getDefiningOp<linalg::LinalgOp>()) {
-    if (succeeded(linalg::vectorizeLinalgOpPrecondition(linalgOp)) &&
-        succeeded(linalg::vectorizeLinalgOpPrecondition(producerOp))) {
+    if (succeeded(linalg::vectorizeOpPrecondition(linalgOp)) &&
+        succeeded(linalg::vectorizeOpPrecondition(producerOp))) {
       return false;
     }
   }
@@ -503,9 +505,9 @@ struct RemoveCstOutsDependency
       DenseElementsAttr attr;
       if (!matchPattern(opOperand->get(), m_Constant(&attr))) continue;
       if (!attr.isSplat()) continue;
-      auto type = attr.getType().dyn_cast<RankedTensorType>();
+      auto type = llvm::dyn_cast<RankedTensorType>(attr.getType());
       if (!type) continue;
-      Attribute scalarAttr = attr.getValues<Attribute>()[0];
+      TypedAttr scalarAttr = attr.getValues<TypedAttr>()[0];
 
       modifiedOutput = true;
       Value emptyTensor = rewriter.create<tensor::EmptyOp>(
@@ -560,7 +562,8 @@ struct SwitchStoreOfIfResultValue
                                          "store source is not an if statement");
     }
 
-    auto resultNumber = storeOp.getValue().cast<OpResult>().getResultNumber();
+    auto resultNumber =
+        llvm::cast<OpResult>(storeOp.getValue()).getResultNumber();
     auto moveStoreInsideBody = [&](Block *body) {
       OpBuilder::InsertionGuard guard(rewriter);
       auto yieldOp = cast<scf::YieldOp>(body->getTerminator());

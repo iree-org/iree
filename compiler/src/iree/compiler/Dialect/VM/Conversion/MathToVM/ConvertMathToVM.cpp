@@ -32,8 +32,7 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
-    if (srcOp.getResult().getType().template isa<VectorType>())
-      return failure();
+    if (llvm::isa<VectorType>(srcOp.getResult().getType())) return failure();
 
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
       case 32:
@@ -59,8 +58,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
-    if (srcOp.getResult().getType().template isa<VectorType>())
-      return failure();
+    if (llvm::isa<VectorType>(srcOp.getResult().getType())) return failure();
 
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
       case 32:
@@ -94,6 +92,8 @@ void populateMathToVMPatterns(MLIRContext *context,
                                   IREE::VM::FloorF64Op>,
       UnaryArithmeticOpConversion<math::RoundOp, IREE::VM::RoundF32Op,
                                   IREE::VM::RoundF64Op>,
+      UnaryArithmeticOpConversion<math::RoundEvenOp, IREE::VM::RoundF32EvenOp,
+                                  IREE::VM::RoundF64EvenOp>,
       UnaryArithmeticOpConversion<math::AtanOp, IREE::VM::AtanF32Op,
                                   IREE::VM::AtanF64Op>,
       BinaryArithmeticOpConversion<math::Atan2Op, IREE::VM::Atan2F32Op,

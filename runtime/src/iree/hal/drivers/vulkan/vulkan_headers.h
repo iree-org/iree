@@ -41,10 +41,10 @@
 #define VK_USE_PLATFORM_WIN32_KHR 1
 #endif  // IREE_PLATFORM_*
 
-#include <vulkan/vulkan.h>  // IWYU pragma: export
+#include "third_party/vulkan_headers/include/vulkan/vulkan.h"  // IWYU pragma: export
 
 #ifdef IREE_PLATFORM_APPLE
-#include <vulkan/vulkan_beta.h>  // IWYU pragma: export
+#include "third_party/vulkan_headers/include/vulkan/vulkan_beta.h"  // IWYU pragma: export
 #endif
 
 #endif  // IREE_HAL_DRIVERS_VULKAN_VULKAN_HEADERS_H_

@@ -23,7 +23,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRArithDialect
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRMathDialect
     MLIRMemRefDialect

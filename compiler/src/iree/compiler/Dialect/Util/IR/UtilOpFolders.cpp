@@ -28,6 +28,41 @@ namespace IREE {
 namespace Util {
 
 //===----------------------------------------------------------------------===//
+// util.cast
+//===----------------------------------------------------------------------===//
+
+OpFoldResult CastOp::fold(FoldAdaptor operands) {
+  if (auto castOp = dyn_cast_or_null<CastOp>(getOperand().getDefiningOp())) {
+    if (castOp.getOperand().getType() == getResult().getType()) {
+      return castOp.getOperand();
+    }
+  }
+  return {};
+}
+
+namespace {
+
+/// Folds cast ops into the result of other ops.
+/// Only safe to apply to ops that don't care about their types.
+struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
+  using OpRewritePattern<CastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    auto nullOp = dyn_cast_or_null<NullOp>(castOp.getOperand().getDefiningOp());
+    if (!nullOp) return failure();
+    rewriter.replaceOpWithNewOp<NullOp>(castOp, castOp.getResult().getType());
+    return success();
+  }
+};
+
+}  // namespace
+
+void CastOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                         MLIRContext *context) {
+  results.add<FoldCastIntoNullOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // util.cmp.eq
 //===----------------------------------------------------------------------===//
 
@@ -66,7 +101,7 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
   // If all operands are constant then fold into a constant.
   int64_t value = initialValue;
   for (auto operand : attrOperands) {
-    auto intValue = operand.dyn_cast_or_null<IntegerAttr>();
+    auto intValue = llvm::dyn_cast_if_present<IntegerAttr>(operand);
     if (!intValue) return {};
     value = expr(value, intValue.getValue().getSExtValue());
   }
@@ -138,9 +173,8 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
     }
     if (constantValue != initialValue) {
       operands.insert(rewriter.create<arith::ConstantOp>(
-          op.getLoc(),
-          rewriter.getIntegerAttr(op.getResult().getType(), constantValue),
-          op.getResult().getType()));
+          op.getLoc(), op.getResult().getType(),
+          rewriter.getIntegerAttr(op.getResult().getType(), constantValue)));
     }
     rewriter.replaceOpWithNewOp<OpT>(op, op.getResult().getType(),
                                      operands.takeVector());
@@ -176,7 +210,7 @@ static Value makeRangeEnd(Location loc, Value offset, Value length,
   return makeRangeEnd(
       loc, offset, length,
       builder.create<arith::ConstantOp>(
-          loc, builder.getIntegerAttr(offset.getType(), 1), offset.getType()),
+          loc, offset.getType(), builder.getIntegerAttr(offset.getType(), 1)),
       builder);
 }
 
@@ -224,14 +258,12 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
     // Min/max with constant ranges. This allows for normal folding to happen
     // downstream of the op.
     auto constantMinOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(),
-        rewriter.getIntegerAttr(op.getMin().getType(), constantMin),
-        op.getMin().getType());
+        op.getLoc(), op.getMin().getType(),
+        rewriter.getIntegerAttr(op.getMin().getType(), constantMin));
     auto constantMaxOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(),
+        op.getLoc(), op.getMax().getType(),
         rewriter.getIntegerAttr(op.getMax().getType(),
-                                constantMax - constantMin + 1),
-        op.getMax().getType());
+                                constantMax - constantMin + 1));
     min = min ? rewriter.create<arith::MinUIOp>(op.getLoc(), min, constantMinOp)
                     .getResult()
               : constantMinOp.getResult();
@@ -260,8 +292,8 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
       minValue = rewriter.create<arith::MinUIOp>(loc, op.getOffsets().front(),
                                                  op.getOffsets().back());
       auto one = rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIntegerAttr(op.getMin().getType(), 1),
-          op.getMin().getType());
+          loc, op.getMin().getType(),
+          rewriter.getIntegerAttr(op.getMin().getType(), 1));
       auto endLhs = makeRangeEnd(loc, op.getOffsets().front(),
                                  op.getLengths().front(), one, rewriter);
       auto endRhs = makeRangeEnd(loc, op.getOffsets().back(),
@@ -389,6 +421,16 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
   // If aligning an already-aligned value then fold if this is provably a
   // no-op. We can check this for equality even with dynamic alignments.
   if (isAlignedTo(getValue(), getAlignment())) return getValue();
+
+  // If values are static we can perform the alignment here.
+  APInt staticValue;
+  APInt staticAlignment;
+  if (matchPattern(getValue(), m_ConstantInt(&staticValue)) &&
+      matchPattern(getAlignment(), m_ConstantInt(&staticAlignment))) {
+    return IntegerAttr::get(getResult().getType(),
+                            align(staticValue.getZExtValue(), staticAlignment));
+  }
+
   return {};
 }
 
@@ -398,10 +440,41 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
 
 OpFoldResult SizeOfOp::fold(FoldAdaptor operands) {
   Type t = getSizedType();
-  if (t.isa<IntegerType>() || t.isa<FloatType>()) {
+  if (llvm::isa<IntegerType>(t) || llvm::isa<FloatType>(t)) {
     return IntegerAttr::get(IndexType::get(getContext()),
                             getRoundedElementByteWidth(t));
   }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// util.switch
+//===----------------------------------------------------------------------===//
+
+OpFoldResult SwitchOp::fold(FoldAdaptor operands) {
+  APInt indexValue;
+  if (matchPattern(getIndex(), m_ConstantInt(&indexValue))) {
+    // Index is constant and we can resolve immediately.
+    int64_t index = indexValue.getSExtValue();
+    if (index < 0 || index >= getValues().size()) {
+      return getDefaultValue();
+    }
+    return getValues()[index];
+  }
+
+  bool allValuesMatch = true;
+  for (auto value : getValues()) {
+    if (value != getDefaultValue()) {
+      allValuesMatch = false;
+      break;
+    }
+  }
+  if (allValuesMatch) {
+    // All values (and the default) are the same so just return it regardless of
+    // the provided index.
+    return getDefaultValue();
+  }
+
   return {};
 }
 
@@ -416,8 +489,8 @@ struct ExpandUnfoldableConstantOp
   using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto stdConst =
-        rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
+    auto stdConst = rewriter.create<arith::ConstantOp>(
+        op.getLoc(), cast<TypedAttr>(op.getValue()));
     rewriter.replaceOpWithNewOp<OptimizationBarrierOp>(op,
                                                        stdConst.getResult());
     return success();
@@ -670,7 +743,7 @@ struct SinkSubspanAcrossSelectOps
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getType().isa<IREE::Util::BufferType>()) return failure();
+    if (!llvm::isa<IREE::Util::BufferType>(op.getType())) return failure();
     auto trueSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
         op.getTrueValue().getDefiningOp());
     auto falseSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
@@ -710,8 +783,8 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   // During A->B->C dialect conversion, the type may not be legal so be
   // defensive.
   auto operand = getOperand();
-  if (auto sizeAwareType =
-          operand.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+  if (auto sizeAwareType = llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
+          operand.getType())) {
     Operation *op = this->getOperation();
     if (auto sizeValue = sizeAwareType.findSizeValue(operand, op->getBlock(),
                                                      Block::iterator(op))) {
@@ -723,8 +796,8 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   if (auto constantOp = dyn_cast_or_null<IREE::Util::BufferConstantOp>(
           operand.getDefiningOp())) {
     if (auto attr =
-            constantOp.getValue()
-                .dyn_cast_or_null<IREE::Util::SerializableAttrInterface>()) {
+            llvm::dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
+                constantOp.getValue())) {
       return IntegerAttr::get(IndexType::get(attr.getContext()),
                               attr.getStorageSize());
     }

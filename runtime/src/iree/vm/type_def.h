@@ -52,7 +52,8 @@ static_assert(
    iree_vm_type_def_as_ref(v) == IREE_VM_REF_TYPE_NULL)
 #define iree_vm_type_def_is_undefined(v) iree_vm_type_def_is_variant(v)
 
-static bool iree_vm_type_def_equal(iree_vm_type_def_t a, iree_vm_type_def_t b) {
+static inline bool iree_vm_type_def_equal(iree_vm_type_def_t a,
+                                          iree_vm_type_def_t b) {
   return a.value_type_bits == b.value_type_bits &&
          a.ref_type_bits == b.ref_type_bits;
 }

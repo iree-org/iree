@@ -33,6 +33,9 @@ typedef uint32_t iree_hal_channel_flags_t;
 #define IREE_HAL_CHANNEL_RANK_DEFAULT ((int32_t)-1)
 #define IREE_HAL_CHANNEL_COUNT_DEFAULT ((int32_t)-1)
 
+// Indicates that the rank will not be part of any group.
+#define IREE_HAL_CHANNEL_NO_COLOR ((int32_t)-1)
+
 // Parameters defining how a channel should be configured.
 typedef struct {
   // Flags controlling channel behavior.
@@ -79,6 +82,17 @@ IREE_API_EXPORT void iree_hal_channel_retain(iree_hal_channel_t* channel);
 // Releases the given |channel| from the caller.
 IREE_API_EXPORT void iree_hal_channel_release(iree_hal_channel_t* channel);
 
+// Splits |base_channel| into a subgroup based on |color| and |key|.
+// Returns a NULL channel if color is IREE_HAL_CHANNEL_NO_COLOR indicating that
+// the rank is not a participant in any subgroup.
+//
+// Equivalent to:
+//   MPI_Comm_split
+//   ncclCommSplit
+IREE_API_EXPORT iree_status_t iree_hal_channel_split(
+    iree_hal_channel_t* base_channel, int32_t color, int32_t key,
+    iree_hal_channel_flags_t flags, iree_hal_channel_t** out_split_channel);
+
 // Returns the rank the channel represents as a participant in a collective
 // group in `[0, count)` and the total participant count.
 IREE_API_EXPORT void iree_hal_channel_query_rank_and_count(
@@ -94,57 +108,16 @@ IREE_API_EXPORT int32_t
 iree_hal_channel_count(const iree_hal_channel_t* channel);
 
 //===----------------------------------------------------------------------===//
-// iree_hal_channel_provider_t
-//===----------------------------------------------------------------------===//
-
-// External channel creation and configuration provider.
-// Hosting applications can use this to either configure or completely replace
-// the default device channel creation logic.
-typedef struct iree_hal_channel_provider_t {
-  // Self pointer passed to each provider function.
-  // Must remain valid for as long as the device exists.
-  void* self;
-
-  // Requests the channel ID and other parameters to use during channel
-  // creation. Some fields may be populated from the caller and others may have
-  // their default values indicating they need to be set.
-  //
-  // The caller will provide adequate storage in |id_storage| and the
-  // implementation should do what it needs (ID exchange, etc) and return the
-  // valid ID by setting |params|->id to |id_storage|. Note that the ID may be
-  // assigned explicitly and not need setting.
-  //
-  // Example:
-  //  static iree_status_t my_query_group_params(...) {
-  //    if (params->rank == IREE_HAL_CHANNEL_RANK_DEFAULT) {
-  //      params->rank = find_rank();
-  //    }
-  //    if (params->count == IREE_HAL_CHANNEL_COUNT_DEFAULT) {
-  //      params->count = find_count();
-  //    }
-  //    if (params->rank == 0) {
-  //      my_id = make_new_root_id();
-  //    } else {
-  //      my_id = make_new_non_root_id();
-  //    }
-  //    memcpy(id_storage.data, &my_id, id_storage.data_length);
-  //    params->id = iree_const_cast_byte_span(id_storage);
-  //    return iree_ok_status();
-  //  }
-  //
-  // May be NULL if the provider cannot service default ID requests.
-  iree_status_t(IREE_API_PTR* query_group_params)(
-      void* self, iree_hal_device_t* device,
-      iree_hal_queue_affinity_t queue_affinity, iree_byte_span_t id_storage,
-      iree_hal_channel_params_t* params);
-} iree_hal_channel_provider_t;
-
-//===----------------------------------------------------------------------===//
 // iree_hal_channel_t implementation details
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_channel_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_channel_t* channel);
+
+  iree_status_t(IREE_API_PTR* split)(iree_hal_channel_t* base_channel,
+                                     int32_t color, int32_t key,
+                                     iree_hal_channel_flags_t flags,
+                                     iree_hal_channel_t** out_split_channel);
 
   void(IREE_API_PTR* query_rank_and_count)(const iree_hal_channel_t* channel,
                                            int32_t* out_rank,

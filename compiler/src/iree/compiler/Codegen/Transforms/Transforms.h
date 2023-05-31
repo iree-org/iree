@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -114,6 +115,34 @@ void analyseAllocsForPacking(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
 /// memory across alias groups.
 void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
+
+/// Lower the workgroup count region for the default code-generation path in
+/// IREE. Given the list `workgroupCount` (fastest varying dimension innermost)
+/// as computed within the `entryPointFn`, clones a backward slice of the
+/// computation starting at these values and ending with
+/// `flow.dispatch.constant_ordinal` into the workgroup count region on the
+/// `hal.executable.export` op corresponding to the `entryPointFn`. Also removes
+/// the `flow.dispatch.constant_ordinal` operations from within the
+/// `entryPointFn`. Expects the workgroup count region of the corresponding
+/// `hal.executable.export` to contain the
+/// `flow.dispatch.workgroup_count_default` operation as a placeholder for the
+/// computation to compute the number of workgroups. In absence of this
+/// operation, this method does nothing assuming that the workgroup count
+/// computation has already been resolved.
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter,
+    IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
+    func::FuncOp entryPointFn, ArrayRef<OpFoldResult> workgroupCount,
+    int maxWorkgroupParallelDims = kNumMaxParallelDims);
+
+/// Wrapper around `lowerWorkgroupCountFromSliceOp` method that
+/// takes the `flow.dispatch.workgroup_count_from_slice` op
+/// as an argument. Looks up the `hal.executable.export` operation
+/// and finds the `flow.dispatch.workgroup_count_from_slice` op to lower.
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter, func::FuncOp entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount,
+    int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
 }  // namespace iree_compiler
 }  // namespace mlir

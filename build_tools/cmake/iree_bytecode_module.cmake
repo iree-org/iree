@@ -158,7 +158,7 @@ function(iree_bytecode_module)
         "${_RULE_NAME}_c"
       IDENTIFIER
         "${_RULE_C_IDENTIFIER}"
-      GENERATED_SRCS
+      SRCS
         "${_RULE_NAME}.vmfb"
       C_FILE_OUTPUT
         "${_RULE_NAME}_c.c"

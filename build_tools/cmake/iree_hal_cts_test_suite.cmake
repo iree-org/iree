@@ -111,7 +111,7 @@ function(iree_hal_cts_test_suite)
       iree_c_embed_data(
         NAME
           ${_EXECUTABLES_TESTDATA_NAME}_c
-        GENERATED_SRCS
+        SRCS
           ${_EMBED_DATA_SOURCES}
         C_FILE_OUTPUT
           "${_EXECUTABLES_TESTDATA_NAME}_c.c"
@@ -180,6 +180,7 @@ function(iree_hal_cts_test_suite)
     set(IREE_CTS_DRIVER_REGISTRATION_FN "${_RULE_DRIVER_REGISTRATION_FN}")
     set(IREE_CTS_TEST_CLASS_NAME "${_TEST_NAME}_test")
     set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
+    set(IREE_CTS_TARGET_BACKEND "${_RULE_COMPILER_TARGET_BACKEND}")
 
     configure_file(
       "${IREE_ROOT_DIR}/runtime/src/iree/hal/cts/cts_test_template.cc.in"

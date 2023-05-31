@@ -32,25 +32,28 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    headers
+    internal_headers
   HDRS
     "common.h"
     "elementwise.h"
     "mmt4d.h"
+    "mmt4d_internal.h"
     "pack.h"
+    "pack_internal.h"
     "query_tile_sizes.h"
+    "query_tile_sizes_internal.h"
     "unpack.h"
+    "unpack_internal.h"
   DEPS
     ::exported_bits
     ::static_assert
     iree::base::core_headers
-    iree::builtins::ukernel::arch::config
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    ukernel
+    ukernel_noweak
   HDRS
     "api.h"
   SRCS
@@ -59,26 +62,81 @@ iree_cc_library(
     "elementwise.h"
     "mmt4d.c"
     "mmt4d.h"
+    "mmt4d_internal.h"
     "mmt4d_tile.c"
-    "mmt4d_tile.h"
     "pack.c"
     "pack.h"
+    "pack_internal.h"
     "pack_tile.c"
-    "pack_tile.h"
     "query_tile_sizes.c"
     "query_tile_sizes.h"
+    "query_tile_sizes_internal.h"
     "unpack.c"
     "unpack.h"
+    "unpack_internal.h"
     "unpack_tile.c"
-    "unpack_tile.h"
   DEPS
     ::exported_bits
-    ::headers
     ::static_assert
     iree::base::core_headers
-    iree::builtins::ukernel::arch::config
     iree::builtins::ukernel::arch::ukernel_arch
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    zzz_weak_linklast
+  SRCS
+    "weak.c"
+  DEPS
+    ::internal_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    ukernel
+  HDRS
+    "api.h"
+  DEPS
+    ::ukernel_noweak
+    ::zzz_weak_linklast
+  PUBLIC
+)
+
+if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
+
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_base
+  SRCS
+    "mmt4d.c"
+    "mmt4d_tile.c"
+    "pack.c"
+    "pack_tile.c"
+    "query_tile_sizes.c"
+    "unpack_tile.c"
+    "weak.c"
+)
+
+iree_c_embed_data(
+  NAME
+    embed_ukernel_bitcode
+  SRCS
+    "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
+    "ukernel_bitcode_base.bc"
+  DEPS
+
+  C_FILE_OUTPUT
+    "ukernel_bitcode.c"
+  H_FILE_OUTPUT
+    "ukernel_bitcode.h"
+  IDENTIFIER
+    "iree_ukernel_bitcode"
+  FLATTEN
+  PUBLIC
+)
+
+endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

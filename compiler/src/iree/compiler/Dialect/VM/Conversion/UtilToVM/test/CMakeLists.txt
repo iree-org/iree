@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "alignment_ops.mlir"
+    "assignment_ops.mlir"
     "buffer_ops.mlir"
     "global_ops.mlir"
     "hint_ops.mlir"

@@ -34,6 +34,20 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
+static llvm::cl::opt<std::string> clBreakOnDispatch(
+    "iree-flow-break-dispatch",
+    llvm::cl::desc(
+        "Enables inserting a break after a specified dispatch. Supports two "
+        "modes; breaking on the dispatch ordinal before deduplication "
+        "(@function_name:<index>) and breaking on the dispatch symbol."),
+    llvm::cl::init(""));
+static llvm::cl::opt<std::string> clTraceDispatch(
+    "iree-flow-trace-dispatch",
+    llvm::cl::desc("Enables tracing tensors at specified dispatches. Supports "
+                   "two modes; tracing the dispatch by ordinal before "
+                   "deduplication (@function_name:<index>) and tracing all "
+                   "occurrences of the dispatch symbol."),
+    llvm::cl::init(""));
 
 static llvm::cl::opt<bool> clDemoteI64ToI32(
     "iree-flow-demote-i64-to-i32",
@@ -61,57 +75,63 @@ static llvm::cl::opt<bool> clDemoteF64ToF32(
                    "unconditionally before main flow conversions."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clDetensoring(
+    "iree-flow-enable-detensoring",
+    llvm::cl::desc(
+        "Enable changing of tensor operations into scalar operations."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnablePadHandling(
     "iree-flow-enable-pad-handling",
-    llvm::cl::desc("Enable native handling of tensor.pad operations"),
+    llvm::cl::desc("Enable native handling of tensor.pad operations."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     "iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     "iree-flow-enable-fuse-padding-into-linalg-producer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFuseMultiUse(
-    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops"),
+    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
-    llvm::cl::desc("Generate the workload region"), llvm::cl::init(true));
+    llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clEnableDataTiling(
-    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
+    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
-    llvm::cl::desc("Enable normalizing input indexing map to identity"),
+    llvm::cl::desc("Enable normalizing input indexing map to identity."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDumpDispatchGraph(
     "iree-flow-dump-dispatch-graph",
-    llvm::cl::desc("Dump a dot graph for dispatches"), llvm::cl::init(false));
+    llvm::cl::desc("Dump a dot graph for dispatches."), llvm::cl::init(false));
 
 static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
     "iree-flow-dump-dispatch-graph-output-file",
-    llvm::cl::desc("Output file name for a dispatch graph dump"),
+    llvm::cl::desc("Output file name for a dispatch graph dump."),
     llvm::cl::init("dispatch.dot"));
 
 static llvm::cl::opt<std::string> clDispatchTransformFileName(
     "iree-flow-dispatch-use-transform-dialect",
-    llvm::cl::desc("mlir file containing a top-level module that specifies "
+    llvm::cl::desc("MLIR file containing a top-level module that specifies "
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
 
 static llvm::cl::opt<bool> clZeroFillEmptyTensors(
     "iree-flow-zero-fill-empty-tensors",
     llvm::cl::desc(
-        "Zero fill empty tensors instead of leaving them uninitialized"),
+        "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
 namespace mlir {
@@ -221,16 +241,16 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
       .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
+      .addPass(createCollapseDimsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
       .addPass(
           []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
-      .addPass(mlir::createLinalgDetensorizePass)
+      .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
-      .addPass(createCollapseDimsPass)
       // Split reduction operations into parallel and reduction.
       .addPass(createSplitReductionPass)
       // SplitReductionPass may create reduction dimension that are not the last
@@ -288,6 +308,21 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // wrapped in executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
+  // Trace/break dispatches by ordinal in the specified region. There is a
+  // similar version of the pass run both before and after deduplication
+  // depending on if the target is specified by ordinal or by symbol.
+  std::string dispatchBreakOrdinalStr =
+      !clBreakOnDispatch.empty() && clBreakOnDispatch[0] == '@'
+          ? clBreakOnDispatch
+          : std::string("");
+  std::string dispatchTraceOrdinalStr =
+      !clTraceDispatch.empty() && clTraceDispatch[0] == '@' ? clTraceDispatch
+                                                            : std::string("");
+  if (!dispatchBreakOrdinalStr.empty() || !dispatchTraceOrdinalStr.empty()) {
+    passManager.addPass(IREE::Flow::createInsertDebugTargetAtOrdinalPass(
+        dispatchBreakOrdinalStr, dispatchTraceOrdinalStr));
+  }
+
   // Strip assertions from executables. We could support them with a bunch of
   // work but our generated executables are designed to be safe in the face of
   // invalid values and it'd only be useful for debugging.
@@ -309,6 +344,20 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // resets, etc) is up to the author.
   if (clExportBenchmarkFuncs) {
     passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
+  }
+
+  // Trace/break dispatches by symbol. Symbols are partially matched against
+  // the exact string specified in the cli option.
+  std::string dispatchBreakSymbolStr =
+      !clBreakOnDispatch.empty() && clBreakOnDispatch[0] != '@'
+          ? clBreakOnDispatch
+          : std::string("");
+  std::string dispatchTraceSymbolStr =
+      !clTraceDispatch.empty() && clTraceDispatch[0] != '@' ? clTraceDispatch
+                                                            : std::string("");
+  if (!dispatchBreakSymbolStr.empty() || !dispatchTraceSymbolStr.empty()) {
+    passManager.addPass(IREE::Flow::createInsertDebugTargetAtSymbolPass(
+        dispatchBreakSymbolStr, dispatchTraceSymbolStr));
   }
 
   FunctionLikeNest(passManager)

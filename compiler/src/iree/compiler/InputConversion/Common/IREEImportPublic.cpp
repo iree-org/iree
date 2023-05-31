@@ -90,16 +90,16 @@ class BufferViewToTensorPattern
   LogicalResult matchAndRewrite(
       IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    TensorType resultType =
-        typeConverter->convertType(srcOp.getTarget().getType())
-            .dyn_cast_or_null<TensorType>();
+    TensorType resultType = llvm::dyn_cast_if_present<TensorType>(
+        typeConverter->convertType(srcOp.getTarget().getType()));
     if (!resultType) return failure();
     if (adaptor.getTargetDims().empty() && !resultType.hasStaticShape()) {
       // For the input dialect, we allow ops that don't have their dims
       // specified and we reify them here with the specific builder that does
       // the work.
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
-          srcOp, resultType, adaptor.getSource(), /*name=*/nullptr);
+          srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
+          /*name=*/nullptr);
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).
@@ -119,14 +119,15 @@ class TensorToBufferViewPattern
       IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type resultType = typeConverter->convertType(srcOp.getTarget().getType());
-    auto sourceType = adaptor.getSource().getType().dyn_cast<TensorType>();
+    auto sourceType = llvm::dyn_cast<TensorType>(adaptor.getSource().getType());
     if (!resultType || !sourceType) return failure();
     if (adaptor.getSourceDims().empty() && !sourceType.hasStaticShape()) {
       // For the input dialect, we allow ops that don't have their dims
       // specified and we reify them here with the specific builder that does
       // the work.
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
-          srcOp, resultType, adaptor.getSource(), /*name=*/nullptr);
+          srcOp, resultType, adaptor.getSource(),
+          TypeAttr::get(adaptor.getSource().getType()), /*name=*/nullptr);
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).

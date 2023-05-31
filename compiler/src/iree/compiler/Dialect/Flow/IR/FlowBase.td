@@ -79,7 +79,7 @@ class FLOW_Op<string mnemonic, list<Trait> traits = []> :
 // Flow dialect types
 //===----------------------------------------------------------------------===//
 
-def FLOW_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
+def FLOW_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat, AnyComplex]>;
 
 def FLOW_Dim : TypeAlias<Index>;
 def FLOW_ShapeDynamicDims : Variadic<FLOW_Dim>;

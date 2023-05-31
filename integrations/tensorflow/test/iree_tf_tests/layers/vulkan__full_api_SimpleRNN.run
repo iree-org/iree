@@ -1,3 +1,0 @@
-# REQUIRES: vulkan
-# RUN: %PYTHON -m iree_tf_tests.layers.layers_test --target_backends=iree_vulkan --dynamic_dims=false --training=false --test_default_kwargs_only=false --layer=SimpleRNN --artifacts_dir=%t
-# XFAIL: *

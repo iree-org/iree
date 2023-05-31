@@ -71,6 +71,9 @@ class PluginManager : public PluginRegistrar {
   // available plugins.
   void registerGlobalDialects(DialectRegistry &registry);
 
+  // Gets a list of all loaded plugin names.
+  llvm::SmallVector<std::string> getLoadedPlugins();
+
  private:
   friend class PluginManagerSession;
 };
@@ -89,6 +92,15 @@ class PluginManagerSession : public PipelineExtensions {
 
   // Activates plugins as configured.
   LogicalResult activatePlugins(MLIRContext *context);
+
+  // Forward pipeline extensions.
+  void extendInputConversionPreprocessingPassPipeline(
+      OpPassManager &passManager,
+      InputDialectOptions::Type inputType) override {
+    for (auto *s : initializedSessions) {
+      s->extendInputConversionPreprocessingPassPipeline(passManager, inputType);
+    }
+  }
 
   // Forward pipeline extensions.
   void extendPreprocessingPassPipeline(OpPassManager &passManager) override {

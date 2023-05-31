@@ -45,6 +45,7 @@ iree_compiler_cc_library(
     hdrs = [
         "DispatchABI.h",
         "KernelDispatch.h",
+        "LLVMCPUPasses.h",
         "TargetMLTransformInfo.h",
         "Utils.h",
     ],
@@ -54,6 +55,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common:CommonPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Interfaces:PartitionableLoopsInterface",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/TransformDialectStrategies/CPU:TransformDialectStrategies",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
@@ -70,6 +72,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectPasses",
         "//runtime/src/iree/builtins/ukernel:exported_bits",
+        "//runtime/src/iree/schemas:cpu_data",
         "//runtime/src/iree/schemas/instruments",
         "@llvm-project//llvm:BinaryFormat",
         "@llvm-project//llvm:Support",

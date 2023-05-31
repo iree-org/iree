@@ -45,16 +45,16 @@ hal.executable private @distribute {
       }
       module {
         transform.sequence failures(propagate) {
-        ^bb0(%variant_op: !pdl.operation):
+        ^bb0(%variant_op: !transform.any_op):
         %17 = transform.structured.match ops{["func.func"]} in %variant_op 
-          : (!pdl.operation) -> !pdl.operation
+          : (!transform.any_op) -> !transform.any_op
         transform.iree.map_nested_forall_to_gpu_threads %17 
-          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] : (!pdl.operation) -> ()
+          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] : (!transform.any_op) -> ()
 
         // Late canonicalizations to cleanup and pass the checks.
         // Needs to occur on the whole variant to perform cse on the workgroup_count region
         transform.iree.apply_patterns %variant_op
-          { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
+          { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
       }
     }
   }

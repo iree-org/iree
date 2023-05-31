@@ -15,11 +15,12 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Common/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -160,7 +161,7 @@ std::optional<SmallVector<int64_t>> getExtOpVectorShape(
   for (Operation *users : op->getUsers()) {
     auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
     if (!extract) return std::nullopt;
-    auto vecType = extract.getResult().getType().cast<VectorType>();
+    auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
     if (!llvm::equal(sliceType.getShape(), vecType.getShape()))
       return std::nullopt;
   }
@@ -179,7 +180,7 @@ std::optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
 
   // Unroll elementwise ops according to native cooperative matrix size.
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>())
+    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0]))
       return llvm::to_vector(nativeShape.drop_back());  // Drop K dim size
   }
 
@@ -217,7 +218,7 @@ std::optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
     for (Operation *users : sourceOp->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
       if (!extract) return std::nullopt;
-      auto vecType = extract.getResult().getType().cast<VectorType>();
+      auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }

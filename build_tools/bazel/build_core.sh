@@ -35,11 +35,15 @@ fi
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
   IREE_VULKAN_DISABLE=0
 fi
+if ! [[ -v IREE_NVIDIA_GPU_TESTS_DISABLE ]]; then
+  IREE_NVIDIA_GPU_TESTS_DISABLE=1
+fi
 
 declare -a test_env_args=(
   --test_env="LD_PRELOAD=libvulkan.so.1"
   --test_env="VK_ICD_FILENAMES=${VK_ICD_FILENAMES}"
   --test_env=IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE}"
+  --test_env=IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE}"
 )
 
 if ! [[ -n IREE_LLVM_SYSTEM_LINKER_PATH ]]; then
@@ -61,6 +65,9 @@ default_test_tag_filters+=("-driver=cuda")
 
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
+fi
+if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE?}" == 1 ]]; then
+  default_test_tag_filters+=("-requires-gpu-nvidia")
 fi
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.

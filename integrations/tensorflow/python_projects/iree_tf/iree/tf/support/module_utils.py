@@ -58,9 +58,6 @@ def _get_tf_import_output_kwargs(artifacts_dir: str,
   if needs_temp_saved_model_dir:
     kwargs["saved_model_dir"] = os.path.join(artifacts_dir,
                                              "tfmodule.saved_model")
-  kwargs["save_temp_tf_input"] = os.path.join(artifacts_dir, "tf_input.mlir")
-  kwargs["save_temp_mid_level_input"] = os.path.join(artifacts_dir,
-                                                     "tf_mid_level_input.mlir")
   kwargs["save_temp_iree_input"] = os.path.join(artifacts_dir,
                                                 "iree_input.mlir")
 

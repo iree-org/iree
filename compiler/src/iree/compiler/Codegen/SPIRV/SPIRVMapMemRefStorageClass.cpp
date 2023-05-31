@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
@@ -24,7 +24,8 @@ namespace {
 
 std::optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(
     Attribute attr) {
-  if (auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>()) {
+  if (auto dtAttr =
+          llvm::dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(attr)) {
     switch (dtAttr.getValue()) {
       case IREE::HAL::DescriptorType::UniformBuffer:
         return spirv::StorageClass::Uniform;
@@ -34,7 +35,7 @@ std::optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(
         return std::nullopt;
     }
   }
-  if (auto gpuAttr = attr.dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
+  if (auto gpuAttr = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(attr)) {
     switch (gpuAttr.getValue()) {
       case gpu::AddressSpace::Workgroup:
         return spirv::StorageClass::Workgroup;
@@ -47,7 +48,8 @@ std::optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(
 
 std::optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(
     Attribute attr) {
-  if (auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>()) {
+  if (auto dtAttr =
+          llvm::dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(attr)) {
     switch (dtAttr.getValue()) {
       case IREE::HAL::DescriptorType::UniformBuffer:
         return spirv::StorageClass::Uniform;
@@ -55,7 +57,7 @@ std::optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(
         return spirv::StorageClass::CrossWorkgroup;
     }
   }
-  if (auto gpuAttr = attr.dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
+  if (auto gpuAttr = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(attr)) {
     switch (gpuAttr.getValue()) {
       case gpu::AddressSpace::Workgroup:
         return spirv::StorageClass::Workgroup;

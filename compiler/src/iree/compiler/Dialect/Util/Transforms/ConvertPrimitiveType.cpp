@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -40,7 +41,7 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
@@ -57,7 +58,7 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
                            Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
   bool isUnsigned = eTy.isUnsignedInteger();
 
   int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();
@@ -320,6 +321,14 @@ struct ConvertArithTypesPass : public Base {
     // Operations are legal if they don't contain any illegal type.
     target.addDynamicallyLegalDialect<arith::ArithDialect>(checkOp);
     target.addDynamicallyLegalDialect<math::MathDialect>(checkOp);
+
+    // Some arithmetic operations exist in the vector dialect.
+    target
+        .addDynamicallyLegalOp<vector::ReductionOp, vector::MultiDimReductionOp,
+                               vector::MaskOp, vector::YieldOp>(checkOp);
+
+    // Some ops are always legal.
+    target.addLegalOp<arith::BitcastOp>();
 
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {

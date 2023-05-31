@@ -87,6 +87,23 @@ func.func @matmul_1x1x6(%lhs: tensor<1x6xf32>, %rhs: tensor<6x1xf32>, %init: ten
 
 // -----
 
+// Check that we can generate vector3 compute ops.
+
+func.func @matmul_1x3x6(%lhs: tensor<1x6xf32>, %rhs: tensor<6x3xf32>, %init: tensor<1x3xf32>) -> tensor<1x3xf32> {
+  %0 = linalg.matmul ins(%lhs, %rhs: tensor<1x6xf32>, tensor<6x3xf32>) outs(%init: tensor<1x3xf32>) -> tensor<1x3xf32>
+  return %0 : tensor<1x3xf32>
+}
+
+//     CHECK-LABEL: func.func @matmul_1x3x6
+
+//   CHECK-COUNT-3: vector.transfer_read {{.*}} : tensor<1x6xf32>, vector<2xf32>
+//  CHECK-COUNT-18: vector.transfer_read {{.*}} : tensor<6x3xf32>, vector<1xf32>
+//           CHECK: vector.transfer_read {{.*}} : tensor<1x3xf32>, vector<1xf32>
+//   CHECK-COUNT-6: vector.fma {{.*}} : vector<3xf32>
+//   CHECK-COUNT-3: vector.transfer_write {{.*}} : vector<1xf32>, tensor<1x3xf32>
+
+// -----
+
 func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b: tensor<8x8xf32>, %c: tensor<1x8xf32>, %bias: tensor<1xf32>) -> tensor<1x8xf32> {
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index

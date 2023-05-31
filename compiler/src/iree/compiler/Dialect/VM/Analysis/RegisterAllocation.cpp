@@ -258,6 +258,14 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
     }
 
     for (auto &op : block->getOperations()) {
+      if (op.hasTrait<OpTrait::IREE::VM::AssignmentOp>()) {
+        // Assignment ops reuse operand registers for result registers.
+        for (int i = 0; i < op.getNumOperands(); ++i) {
+          map_[op.getResult(i)] = map_[op.getOpOperand(i).get()];
+        }
+        continue;
+      }
+
       for (auto &operand : op.getOpOperands()) {
         if (liveness_.isLastValueUse(operand.get(), &op,
                                      operand.getOperandNumber())) {
@@ -267,8 +275,9 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
       for (auto result : op.getResults()) {
         auto reg = registerUsage.allocateRegister(result.getType());
         if (!reg.has_value()) {
-          return op.emitError() << "register allocation failed for result "
-                                << result.cast<OpResult>().getResultNumber();
+          return op.emitError()
+                 << "register allocation failed for result "
+                 << llvm::cast<OpResult>(result).getResultNumber();
         }
         map_[result] = reg.value();
         if (result.use_empty()) {

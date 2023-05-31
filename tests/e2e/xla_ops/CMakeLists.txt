@@ -31,6 +31,7 @@ iree_check_single_backend_test_suite(
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
+    "dot_bf16.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
@@ -107,6 +108,7 @@ iree_check_single_backend_test_suite(
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
+    "dot_bf16.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
@@ -321,6 +323,7 @@ iree_check_single_backend_test_suite(
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
+    "dot_bf16.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
@@ -502,7 +505,7 @@ iree_check_single_backend_test_suite(
     "tanh.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
-    "while.mlir"
+    # "while.mlir"  # TODO(#12509): WebGPU SPIR-V broken
   TARGET_BACKEND
     "webgpu"
   # Only test compilation for now, the WebGPU driver is not stable/tested yet.

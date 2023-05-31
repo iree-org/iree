@@ -58,7 +58,7 @@ struct UsageInfo {
   void analyze(mlir::ModuleOp moduleOp) {
     SymbolTable symbolTable(moduleOp);
     for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOp>()) {
-      if (globalOp.getType().isa<IREE::Stream::ResourceType>()) {
+      if (llvm::isa<IREE::Stream::ResourceType>(globalOp.getType())) {
         resourceGlobalOps[globalOp.getName()] = globalOp;
       }
     }
@@ -122,7 +122,7 @@ struct Statistics {
     // Globals:
     for (auto it : usageInfo.resourceGlobalOps) {
       auto globalType =
-          it.second.getType().dyn_cast<IREE::Stream::ResourceType>();
+          llvm::dyn_cast<IREE::Stream::ResourceType>(it.second.getType());
       if (!globalType) continue;
       // TODO(benvanik): analyze size in UsageInfo.
       switch (globalType.getLifetime()) {

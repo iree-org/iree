@@ -17,7 +17,7 @@
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -292,8 +292,8 @@ struct RemoveStaticDynamicCast final : public OpRewritePattern<memref::CastOp> {
 
   LogicalResult matchAndRewrite(memref::CastOp castOp,
                                 PatternRewriter &rewriter) const override {
-    auto srcType = castOp.getSource().getType().cast<MemRefType>();
-    auto dstType = castOp.getType().cast<MemRefType>();
+    auto srcType = llvm::cast<MemRefType>(castOp.getSource().getType());
+    auto dstType = llvm::cast<MemRefType>(castOp.getType());
     if (srcType.getRank() == 1 && dstType.getRank() == 1 &&
         srcType.hasStaticShape() != dstType.hasStaticShape()) {
       rewriter.replaceOp(castOp, castOp.getSource());

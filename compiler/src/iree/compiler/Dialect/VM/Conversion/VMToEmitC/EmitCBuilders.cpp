@@ -143,7 +143,7 @@ Value contentsOf(OpBuilder builder, Location location, Value operand) {
   return builder
       .create<emitc::ApplyOp>(
           /*location=*/location,
-          /*result=*/type.cast<emitc::PointerType>().getPointee(),
+          /*result=*/llvm::cast<emitc::PointerType>(type).getPointee(),
           /*applicableOperator=*/StringAttr::get(ctx, "*"),
           /*operand=*/operand)
       .getResult();

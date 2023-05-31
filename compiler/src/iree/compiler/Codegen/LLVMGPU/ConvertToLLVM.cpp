@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -101,7 +101,7 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
 
   LogicalResult matchAndRewrite(MathOpTy mathOp,
                                 PatternRewriter &rewriter) const override {
-    auto vecType = mathOp.getType().template dyn_cast<VectorType>();
+    auto vecType = llvm::dyn_cast<VectorType>(mathOp.getType());
     if (!vecType) return failure();
     Location loc = mathOp.getLoc();
     Value newVector = rewriter.create<arith::ConstantOp>(
@@ -147,9 +147,9 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     } else {
       // If no alignment specified align at least to the size of an element.
       Type elType = allocOp.getType().getElementType();
-      if (auto shapeType = elType.dyn_cast<ShapedType>())
+      if (auto shapeType = llvm::dyn_cast<ShapedType>(elType))
         alignement =
-            shapeType.getNumElements() * shapeType.getElementTypeBitWidth();
+            shapeType.getNumElements() * shapeType.getElementTypeBitWidth() / 8;
       else
         alignement = elType.getIntOrFloatBitWidth() / 8;
     }
@@ -333,7 +333,7 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(
         operands, op->getAttrDictionary());
     MemRefType memrefType =
-        subspanOp.getResult().getType().dyn_cast<MemRefType>();
+        llvm::dyn_cast<MemRefType>(subspanOp.getResult().getType());
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
         argMapping[SetBinding(subspanOp.getSet(), subspanOp.getBinding())]);
     // As a convention with HAL all the kernel argument pointers are 16Bytes
@@ -355,17 +355,6 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     }
     // Add the byte offset.
     Value llvmBufferBasePtr = llvmBufferArg;
-
-    // TODO(#12933): Because of regressions in CUDA backend the byte offsets
-    // of subspans are handled explicitly through a GEP (and subsequent memref
-    // having 0 offset). Once this issue is fixed. The `if` here should be
-    // removed.
-    if (adaptor.getByteOffset()) {
-      auto i8Type = typeConverter->convertType(rewriter.getI8Type());
-      llvmBufferBasePtr = rewriter.create<LLVM::GEPOp>(
-          loc, llvmBufferBasePtr.getType(), i8Type, llvmBufferBasePtr,
-          adaptor.getByteOffset());
-    }
 
     auto [strides, offset] = getStridesAndOffset(memrefType);
     if (memrefType.hasStaticShape() &&
@@ -389,13 +378,6 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
           typeConverter->convertType(IndexType::get(rewriter.getContext()));
       auto baseOffsetValue = adaptor.getByteOffset();
       if (ShapedType::isDynamic(offset)) {
-        // TODO(#12933): Because of regressions in CUDA backend the `memref`
-        // type of a subspan should never have dynamic offsets. Remove this
-        // assert once the issue is fixed.
-        assert(0 &&
-               "non-zero offset for result of subspan op is unexpected. See "
-               "#12933");
-
         int32_t elementWidth =
             IREE::Util::getRoundedElementByteWidth(memrefType.getElementType());
         Value elementWidthVal =

@@ -217,6 +217,15 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
+// Returns the bit-width of the scalar type. If the type is complex, it returns
+// the type of individual elements * 2 (1 for real and 1 for complex).
+static int64_t getTypeBitWidth(Type type) {
+  if (auto complexType = type.dyn_cast<ComplexType>()) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
+
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

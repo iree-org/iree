@@ -19,6 +19,7 @@ iree_cc_library(
     "Client.cpp"
   DEPS
     LLVMSupport
+    iree::compiler::Pipelines::Options
     iree::compiler::Utils
   PUBLIC
 )

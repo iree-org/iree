@@ -3,8 +3,8 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
@@ -35,6 +35,7 @@ class PolynomialApproximationPass
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
     } else {
       populateMathPolynomialApproximationPatterns(mathPatterns);
+      populateExpandRoundEvenPattern(mathPatterns);
     }
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(mathPatterns)))) {

@@ -160,14 +160,17 @@ LogicalResult ReturnOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, StringAttr name) {
-  build(builder, result, resultType, source, /*waitFence=*/Value{}, name);
+                           Type resultType, Value source,
+                           TypeAttr targetEncoding, StringAttr name) {
+  build(builder, result, resultType, source, targetEncoding,
+        /*waitFence=*/Value{}, name);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, Value waitFence,
+                           Type resultType, Value source,
+                           TypeAttr targetEncoding, Value waitFence,
                            StringAttr name) {
-  auto shapedType = resultType.cast<ShapedType>();
+  auto shapedType = llvm::cast<ShapedType>(resultType);
   assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
           shapedType.hasStaticShape()) &&
          "can only use this constructor for buffer views when shape "
@@ -179,8 +182,8 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         result.location, builder.getIndexType(), source,
         builder.getIndexAttr(i)));
   }
-  build(builder, result, resultType, source, TypeAttr::get(shapedType),
-        dynamicDims, waitFence, name);
+  build(builder, result, resultType, source, targetEncoding, dynamicDims,
+        waitFence, name);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
@@ -200,8 +203,8 @@ static LogicalResult verifyTypeStorageCompatibility(Operation *op,
                                                     Type encodingType,
                                                     Type storageType) {
   if (encodingType == storageType) return success();
-  auto encodingShapedType = encodingType.dyn_cast<ShapedType>();
-  auto storageShapedType = storageType.dyn_cast<ShapedType>();
+  auto encodingShapedType = llvm::dyn_cast<ShapedType>(encodingType);
+  auto storageShapedType = llvm::dyn_cast<ShapedType>(storageType);
   if (!encodingShapedType || !storageShapedType) return success();
 
   if (IREE::Util::getRoundedElementByteWidth(
@@ -244,7 +247,7 @@ static LogicalResult verifyTypeStorageCompatibility(Operation *op,
 
 LogicalResult TensorImportOp::verify() {
   TensorImportOp op = *this;
-  auto targetType = op.getTarget().getType().cast<TensorType>();
+  auto targetType = llvm::cast<TensorType>(op.getTarget().getType());
   if (targetType.getNumDynamicDims() != op.getTargetDims().size()) {
     return op->emitOpError() << "number of target_dims must match number of "
                                 "dynamic dims in target type";
@@ -253,11 +256,12 @@ LogicalResult TensorImportOp::verify() {
 }
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, StringAttr name) {
+                           Type resultType, Value source,
+                           TypeAttr sourceEncoding, StringAttr name) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
-  build(builder, result, resultType, source, TypeAttr::get(source.getType()),
-        dynamicDims, /*target_storage=*/nullptr, name);
+  build(builder, result, resultType, source, sourceEncoding, dynamicDims,
+        /*target_storage=*/nullptr, name);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
@@ -275,7 +279,7 @@ SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
 
 LogicalResult TensorExportOp::verify() {
   TensorExportOp op = *this;
-  auto sourceType = op.getSource().getType().cast<TensorType>();
+  auto sourceType = llvm::cast<TensorType>(op.getSource().getType());
   if (sourceType.getNumDynamicDims() != op.getSourceDims().size()) {
     return op->emitOpError() << "number of source_dims must match number of "
                                 "dynamic dims in source type";
@@ -419,13 +423,26 @@ void BufferViewBufferOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.channel.rank_and_count
+// hal.channel.create
 //===----------------------------------------------------------------------===//
 
 void ChannelCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel");
 }
+
+//===----------------------------------------------------------------------===//
+// hal.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "channel");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.channel.rank_and_count
+//===----------------------------------------------------------------------===//
 
 void ChannelRankAndCountOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -758,13 +775,14 @@ LogicalResult ExecutableExportOp::verify() {
   if (body->getNumArguments() == 0) {
     // Need at least a !hal.device.
     validArguments = false;
-  } else if (!body->getArgument(0).getType().isa<IREE::HAL::DeviceType>()) {
+  } else if (!llvm::isa<IREE::HAL::DeviceType>(
+                 body->getArgument(0).getType())) {
     // !hal.device must come first.
     validArguments = false;
   } else {
     // All remaining arguments need to be of type index (today).
     for (BlockArgument &blockArg : body->getArguments().drop_front(1)) {
-      if (!blockArg.getType().isa<IndexType>()) {
+      if (!llvm::isa<IndexType>(blockArg.getType())) {
         validArguments = false;
         break;
       }
@@ -996,7 +1014,8 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
   ArrayRef<Type> argTypes = getArgumentTypes();
   ArrayRef<Type> resultTypes = getResultTypes();
   mlir::function_interface_impl::printFunctionSignature(
-      p, op, argTypes, /*isVariadic=*/false, resultTypes);
+      p, cast<FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
+      resultTypes);
   p << " as ";
   if (resultTypes.size() != 1) p << '(';
   llvm::interleaveComma(getKeys().getValue(), p,
@@ -1015,7 +1034,7 @@ LogicalResult ExecutableConstantBlockOp::verify() {
   // Verify the function takes either nothing or a device.
   auto argTypes = op.getArgumentTypes();
   if (!argTypes.empty() &&
-      (argTypes.size() > 1 || !argTypes[0].isa<IREE::HAL::DeviceType>())) {
+      (argTypes.size() > 1 || !llvm::isa<IREE::HAL::DeviceType>(argTypes[0]))) {
     return op->emitOpError()
            << "initializer must take a !hal.device or nothing";
   }
@@ -1100,7 +1119,7 @@ void InterfaceBindingSubspanOp::build(
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;
-  if (ShapedType shapedType = op.getType().dyn_cast<ShapedType>()) {
+  if (ShapedType shapedType = llvm::dyn_cast<ShapedType>(op.getType())) {
     if (shapedType.getNumDynamicDims() != op.getDynamicDims().size()) {
       return op.emitOpError("result type ")
              << op.getType() << " has " << shapedType.getNumDynamicDims()
@@ -1125,7 +1144,7 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   // 4-byte aligned).
   llvm::Align naturalAlignment(1);
   auto resultType = getType();
-  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
     naturalAlignment = llvm::Align(
         IREE::Util::getRoundedElementByteWidth(shapedType.getElementType()));
   }

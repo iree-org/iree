@@ -10,7 +10,9 @@ import time
 from typing import List, Optional, Sequence, Set, Tuple
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
-from common.benchmark_definition import BenchmarkInfo, BenchmarkResults, BenchmarkRun, DeviceInfo
+from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
+                                         BenchmarkMetrics, BenchmarkRun,
+                                         DeviceInfo)
 
 
 class BenchmarkDriver(object):
@@ -35,12 +37,12 @@ class BenchmarkDriver(object):
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
-    """Runs the benchmark case and returns the results.
+    """Runs the benchmark case and serializes the results.
 
     Args:
       benchmark_case: the benchmark_case.
-      benchmark_results_filename: the path to store benchmark results.
-        Benchmarking is required if set.
+      benchmark_results_filename: the path to store the serialized
+        BenchmarkMetrics. Benchmarking is required if set.
       capture_filename: the path to store captured trace. Trace capturing is
         required if set.
 
@@ -64,8 +66,25 @@ class BenchmarkDriver(object):
       self.config.trace_capture_config.capture_tmp_dir.mkdir(parents=True,
                                                              exist_ok=True)
 
-    cpu_target_arch = self.device_info.get_iree_cpu_arch_name()
-    gpu_target_arch = self.device_info.get_iree_gpu_arch_name()
+    use_legacy_name = self.benchmark_suite.legacy_suite
+
+    cpu_target_arch = self.device_info.get_iree_cpu_arch_name(use_legacy_name)
+    gpu_target_arch = self.device_info.get_iree_gpu_arch_name(use_legacy_name)
+    detected_architectures = [
+        arch for arch in [cpu_target_arch, gpu_target_arch] if arch is not None
+    ]
+    if self.config.use_compatible_filter:
+      if cpu_target_arch is None:
+        print("INFO: Detected unsupported CPU architecture in"
+              f' "{self.device_info}", CPU benchmarking is disabled.')
+      if gpu_target_arch is None:
+        print("INFO: Detected unsupported GPU architecture in"
+              f' "{self.device_info}", GPU benchmarking is disabled.')
+      compatible_arch_filter = detected_architectures
+    else:
+      # No compatible filter on the target architectures.
+      compatible_arch_filter = None
+
     drivers, loaders = self.__get_available_drivers_and_loaders()
 
     for category, _ in self.benchmark_suite.list_categories():
@@ -73,8 +92,7 @@ class BenchmarkDriver(object):
           category=category,
           available_drivers=drivers,
           available_loaders=loaders,
-          cpu_target_arch_filter=f"^{cpu_target_arch}$",
-          gpu_target_arch_filter=f"^{gpu_target_arch}$",
+          target_architectures=compatible_arch_filter,
           driver_filter=self.config.driver_filter,
           mode_filter=self.config.mode_filter,
           model_name_filter=self.config.model_name_filter)
@@ -83,6 +101,12 @@ class BenchmarkDriver(object):
         benchmark_info = self.__get_benchmark_info_from_case(
             category=category, benchmark_case=benchmark_case)
         benchmark_name = str(benchmark_info)
+
+        if benchmark_case.target_arch not in detected_architectures:
+          print(f"WARNING: Benchmark '{benchmark_name}' may be incompatible"
+                f" with the detected architectures '{detected_architectures}'"
+                f" on the device. Pass --compatible-only to skip incompatible"
+                f" benchmarks.")
 
         # Sanity check for the uniqueness of benchmark names.
         if benchmark_name in self._seen_benchmark_names:
@@ -143,18 +167,18 @@ class BenchmarkDriver(object):
 
     finished_benchmarks = sorted(self.finished_benchmarks,
                                  key=lambda pair: str(pair[0]))
-    for benchmark_info, path in finished_benchmarks:
-      result_json_object = json.loads(path.read_text())
-      benchmark_run = BenchmarkRun(benchmark_info,
-                                   result_json_object["context"],
-                                   result_json_object["benchmarks"])
+    for info, path in finished_benchmarks:
+      benchmark_metrics_json_object = json.loads(path.read_text())
+      benchmark_run = BenchmarkRun(info=info,
+                                   metrics=BenchmarkMetrics.from_json_object(
+                                       benchmark_metrics_json_object))
       results.benchmarks.append(benchmark_run)
 
     return results
 
   def get_benchmark_result_filenames(self) -> Sequence[pathlib.Path]:
     """Returns the json file paths of finished benchmarks."""
-    return list(path for _, path in self.finished_benchmarks)
+    return [path for info, path in self.finished_benchmarks]
 
   def get_capture_filenames(self) -> Sequence[pathlib.Path]:
     """Returns the tracy file paths of finished captures."""

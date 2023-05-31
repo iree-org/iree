@@ -1,7 +1,6 @@
 // RUN: iree-opt %s --split-input-file --iree-transform-dialect-interpreter --verify-diagnostics 
 
 module {
-// expected-error @above {{transform dialect interpreter failed}}
   transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     // expected-error @below {{match registry not available}}
@@ -12,7 +11,6 @@ module {
 // -----
 
 module {
-// expected-error @above {{transform dialect interpreter failed}}
   transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
@@ -24,7 +22,6 @@ module {
 // -----
 
 module {
-// expected-error @above {{transform dialect interpreter failed}}
   transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
@@ -47,7 +44,6 @@ module {
 // -----
 
 module attributes {test.iree_transform_do_not_match} {
-// expected-error @above {{transform dialect interpreter failed}}
   transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks

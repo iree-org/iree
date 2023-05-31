@@ -8,8 +8,8 @@ The website is generated using [MkDocs](https://www.mkdocs.org/), with the
 
 ## How to edit this documentation
 
-Follow https://squidfunk.github.io/mkdocs-material/getting-started/ and read
-https://www.mkdocs.org/.
+Follow <https://squidfunk.github.io/mkdocs-material/getting-started/> and read
+<https://www.mkdocs.org/>.
 
 Develop (from this folder):
 

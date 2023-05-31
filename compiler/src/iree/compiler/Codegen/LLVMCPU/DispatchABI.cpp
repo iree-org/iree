@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 
+#include "iree/schemas/cpu_data.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -13,6 +14,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 
 static llvm::cl::opt<bool> clVerboseDebugInfo(
     "iree-codegen-llvm-verbose-debug-info",
@@ -21,6 +23,39 @@ static llvm::cl::opt<bool> clVerboseDebugInfo(
 
 namespace mlir {
 namespace iree_compiler {
+
+// List of all defined llvm feature-name to bit pattern used to represent it.
+// This is derived based on the schema in `runtime/src/iree/schemas/`.
+// TODO(ravishankarm): This link to the runtime schemas needs to be broken.
+// Instead we should use a reflection callback to resolve arch guarded features
+// directly in the compiler.
+
+// Struct to capture tuple of llvm feature-name to bit pattern used to represent
+// it.
+struct iree_llvm_name_and_bit_pattern_t {
+  const char *llvm_name;
+  unsigned long long bit_pattern;
+};
+
+#define IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name) \
+  IREE_CPU_DATA##field_index##_##arch##_##bit_name
+
+#define IREE_CPU_FEATURE_NAME_AND_BIT_PATTERN(arch, field_index, bit_name, \
+                                              llvm_name)                   \
+  {llvm_name, IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name)},
+
+static const struct iree_llvm_name_and_bit_pattern_t
+    iree_llvm_name_and_bit_pattern_list[] = {
+
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
+  IREE_CPU_FEATURE_NAME_AND_BIT_PATTERN(arch, field_index, bit_name, llvm_name)
+#include "iree/schemas/cpu_feature_bits.inl"
+#undef IREE_CPU_FEATURE_BIT
+
+};
+
+#undef IREE_CPU_FEATURE_NAME_AND_BIT_PATTERN
+#undef IREE_CPU_FEATURE_BIT_NAME
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI
@@ -56,10 +91,10 @@ namespace iree_compiler {
 
 // Returns the size, in bits, of |typeAttr|.
 static unsigned getDITypeSizeInBits(LLVM::DITypeAttr typeAttr) {
-  if (auto basicTypeAttr = typeAttr.dyn_cast<LLVM::DIBasicTypeAttr>()) {
+  if (auto basicTypeAttr = llvm::dyn_cast<LLVM::DIBasicTypeAttr>(typeAttr)) {
     return basicTypeAttr.getSizeInBits();
   } else if (auto derivedTypeAttr =
-                 typeAttr.dyn_cast<LLVM::DIDerivedTypeAttr>()) {
+                 llvm::dyn_cast<LLVM::DIDerivedTypeAttr>(typeAttr)) {
     if (unsigned derivedSize = derivedTypeAttr.getSizeInBits()) {
       return derivedSize;
     } else {
@@ -482,7 +517,7 @@ LLVM::DISubprogramAttr HALDispatchABI::buildScopeAttr(
   Builder builder(context);
 
   std::string inputFilePath("-");
-  if (auto fileLoc = moduleOp.getLoc().dyn_cast<mlir::FileLineColLoc>()) {
+  if (auto fileLoc = llvm::dyn_cast<mlir::FileLineColLoc>(moduleOp.getLoc())) {
     inputFilePath = fileLoc.getFilename().getValue();
   }
 
@@ -547,19 +582,19 @@ static StringRef getDimName(int32_t dim) {
 // the ops if MLIR or LLVM is likely to reject them.
 static bool isLocationValidForDI(Location loc) {
   // Unknown locations are passed as null and DI doesn't like that.
-  if (loc.isa<UnknownLoc>()) return false;
+  if (llvm::isa<UnknownLoc>(loc)) return false;
   // MLIR currently can't handle name-only locations. We do this check to ensure
   // there's at least one real location MLIR can pass along.
-  if (auto callLoc = loc.dyn_cast<CallSiteLoc>()) {
+  if (auto callLoc = llvm::dyn_cast<CallSiteLoc>(loc)) {
     return isLocationValidForDI(callLoc.getCaller()) &&
            isLocationValidForDI(callLoc.getCallee());
-  } else if (auto fileLoc = loc.dyn_cast<FileLineColLoc>()) {
+  } else if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
     return true;
-  } else if (auto fusedLoc = loc.dyn_cast<FusedLoc>()) {
+  } else if (auto fusedLoc = llvm::dyn_cast<FusedLoc>(loc)) {
     return llvm::all_of(fusedLoc.getLocations(), isLocationValidForDI);
-  } else if (auto namedLoc = loc.dyn_cast<NameLoc>()) {
+  } else if (auto namedLoc = llvm::dyn_cast<NameLoc>(loc)) {
     return isLocationValidForDI(namedLoc.getChildLoc());
-  } else if (auto opaqueLoc = loc.dyn_cast<OpaqueLoc>()) {
+  } else if (auto opaqueLoc = llvm::dyn_cast<OpaqueLoc>(loc)) {
     return isLocationValidForDI(opaqueLoc.getFallbackLocation());
   }
   return false;
@@ -823,11 +858,89 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   }
 }
 
+Type HALDispatchABI::getProcessorIDType() {
+  return getFieldType(WorkgroupStateField::processor_id);
+}
+
 Value HALDispatchABI::loadProcessorID(Operation *forOp, OpBuilder &builder) {
   auto resultValue =
       loadFieldValue(forOp, WorkgroupStateField::processor_id, builder);
   return buildValueDI(forOp, resultValue, "processor_id",
                       di.getBasicType(resultValue.getType()), builder);
+}
+
+Value HALDispatchABI::updateProcessorDataFromTargetAttr(
+    Operation *forOp, Value processorDataPtrValue, OpBuilder &builder) {
+  // Get the target attr.
+  IREE::HAL::ExecutableTargetAttr targetAttr =
+      IREE::HAL::ExecutableTargetAttr::lookup(forOp);
+  if (!targetAttr) {
+    return processorDataPtrValue;
+  }
+
+  // Lookup CPU features.
+  std::optional<NamedAttribute> cpuFeatures =
+      targetAttr.getConfiguration().getNamed("cpu_features");
+  if (!cpuFeatures) {
+    return processorDataPtrValue;
+  }
+
+  SmallVector<uint64_t> specifiedFeatureBitPatterns;
+  {
+    llvm::StringMap<uint64_t> featureToBitPattern;
+    for (auto [llvmName, bitPattern] : iree_llvm_name_and_bit_pattern_list) {
+      featureToBitPattern[llvmName] = bitPattern;
+    }
+    SmallVector<StringRef> cpuFeatureStrings;
+    llvm::cast<StringAttr>(cpuFeatures->getValue())
+        .getValue()
+        .split(cpuFeatureStrings, ',', /*MakeSplit=*/-1, /*KeepEmpty=*/false);
+    for (auto featureString : cpuFeatureStrings) {
+      if (featureToBitPattern.count(featureString.drop_front())) {
+        specifiedFeatureBitPatterns.push_back(
+            featureToBitPattern.lookup(featureString.drop_front()));
+      }
+    }
+  }
+  if (specifiedFeatureBitPatterns.empty()) {
+    return processorDataPtrValue;
+  }
+
+  // Create a new stack allocation for the bit pattern.
+  Location loc = forOp->getLoc();
+  MLIRContext *context = forOp->getContext();
+  auto ptrType = LLVM::LLVMPointerType::get(context);
+  auto i64Ty = builder.getI64Type();
+  Value arraySize = builder.create<LLVM::ConstantOp>(
+      loc, i64Ty, builder.getI64IntegerAttr(ProcessorDataCapacity));
+  Value alloca = builder.create<LLVM::AllocaOp>(loc, ptrType, i64Ty, arraySize,
+                                                /*alignment=*/sizeof(uint64_t));
+  // Load the 0-th value.
+  Value srcData0 =
+      builder.create<LLVM::LoadOp>(loc, i64Ty, processorDataPtrValue);
+  // Set the specified CPU arch data.
+  for (auto bitPattern : specifiedFeatureBitPatterns) {
+    Value bitPatternVal = builder.create<LLVM::ConstantOp>(
+        loc, i64Ty, builder.getI64IntegerAttr(bitPattern));
+    srcData0 = builder.create<LLVM::OrOp>(loc, srcData0, bitPatternVal);
+  }
+  builder.create<LLVM::StoreOp>(loc, srcData0, alloca);
+  // Copy over the rest.
+  for (int64_t i = 1, e = ProcessorDataCapacity; i < e; ++i) {
+    Value loadPtr = builder.create<LLVM::GEPOp>(
+        loc, processorDataPtrValue.getType(), i64Ty, processorDataPtrValue,
+        LLVM::GEPArg(int32_t(i)), /*inbounds =*/true);
+    Value loadVal = builder.create<LLVM::LoadOp>(loc, i64Ty, loadPtr);
+    Value storePtr = builder.create<LLVM::GEPOp>(
+        loc, alloca.getType(), i64Ty, alloca, LLVM::GEPArg(int32_t(i)),
+        /*inbounds =*/true);
+    builder.create<LLVM::StoreOp>(loc, loadVal, storePtr);
+  }
+  return alloca;
+}
+
+Type HALDispatchABI::getProcessorDataType() {
+  return LLVM::LLVMPointerType::get(processorType.getContext());
 }
 
 Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
@@ -848,7 +961,9 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
       LLVM::LLVMPointerType::get(processorType), processorPtrValue,
       LLVM::GEPArg(int32_t(ProcessorField::data)),
       /*inbounds=*/true);
-  return buildValueDI(forOp, processorDataPtrValue, "processor_data",
+  Value updatedProcessorData =
+      updateProcessorDataFromTargetAttr(forOp, processorDataPtrValue, builder);
+  return buildValueDI(forOp, updatedProcessorData, "processor_data",
                       di.getPtrOf(di.getConstOf(di.getArrayOf(
                           di.getUint64T(), ProcessorDataCapacity))),
                       builder);
@@ -986,66 +1101,214 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
                                    ValueRange{
                                        /*thunk_func_ptr=*/thunkPtrValue,
                                        /*import_func_ptr=*/importFunc.first,
-                                       /*context=*/importFunc.second,
                                        /*params=*/params,
+                                       /*context=*/importFunc.second,
                                        /*reserved=*/nullPtrValue,
                                    });
   return callOp.getResult();
 }
 
-SmallVector<Value> HALDispatchABI::wrapAndCallImport(
-    Operation *forOp, StringRef importName, bool weak, TypeRange resultTypes,
-    ValueRange args, ArrayRef<StringRef> extraFields, OpBuilder &builder) {
-  auto loc = forOp->getLoc();
-  auto context = builder.getContext();
-
+// static
+std::optional<Type> HALDispatchABI::getParameterStructType(
+    TypeRange resultTypes, ValueRange args, TypeRange extraFieldsTypes) {
   // Struct types are ordered [results..., args...].
   SmallVector<Type> types(resultTypes);
   types.reserve(resultTypes.size() + args.size());
   for (Value arg : args) {
     types.push_back(typeConverter->convertType(arg.getType()));
   }
+  types.append(extraFieldsTypes.begin(), extraFieldsTypes.end());
+
+  if (types.empty()) {
+    return std::nullopt;
+  }
+  return LLVM::LLVMStructType::getLiteral(context, types);
+}
+
+// static
+std::tuple<Type, Value> HALDispatchABI::packIntoParameterStruct(
+    Operation *forOp, TypeRange resultTypes, ValueRange args,
+    ValueRange extraFields, OpBuilder &builder) {
+  Location loc = forOp->getLoc();
+  MLIRContext *context = builder.getContext();
 
   // Query any extra fields that were requested and append them to the struct.
-  SmallVector<Value> extraFieldValues;
-  for (auto extraField : extraFields) {
-    auto extraFieldValue = getExtraField(forOp, extraField, builder);
-    extraFieldValues.push_back(extraFieldValue);
-    types.push_back(extraFieldValue.getType());
+  auto extraFieldsTypes = llvm::to_vector(
+      llvm::map_range(extraFields, [](Value v) { return v.getType(); }));
+
+  std::optional<Type> structType =
+      getParameterStructType(resultTypes, args, extraFieldsTypes);
+
+  if (!structType) {
+    Type voidPtrType = LLVM::LLVMPointerType::get(context);
+    return {voidPtrType,
+            builder.create<LLVM::UndefOp>(loc, voidPtrType).getResult()};
   }
 
-  // Pack parameter structure.
-  Type structType;
-  Value paramsPtr, voidPtr;
-  auto voidPtrTy = LLVM::LLVMPointerType::get(context);
-  if (!types.empty()) {
-    // TODO(benvanik): set specific layout to match runtime.
-    structType = LLVM::LLVMStructType::getLiteral(context, types);
-    auto ptrStructType = LLVM::LLVMPointerType::get(context);
-    Value one = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
-                                                 builder.getIndexAttr(1));
-    paramsPtr =
-        builder.create<LLVM::AllocaOp>(loc, ptrStructType, structType, one,
-                                       /*alignment=*/0);
-    Value structVal = builder.create<LLVM::UndefOp>(loc, structType);
-    for (int64_t i = 0, e = args.size(); i < e; ++i) {
-      structVal = builder.create<LLVM::InsertValueOp>(loc, structVal, args[i],
-                                                      i + resultTypes.size());
-    }
-    for (int64_t i = 0, e = extraFieldValues.size(); i < e; ++i) {
-      structVal = builder.create<LLVM::InsertValueOp>(
-          loc, structVal, extraFieldValues[i],
-          i + resultTypes.size() + args.size());
-    }
-    // Store into the alloca'ed descriptor.
-    builder.create<LLVM::StoreOp>(loc, structVal, paramsPtr);
-    voidPtr = builder.create<LLVM::BitcastOp>(loc, voidPtrTy, paramsPtr);
-  } else {
-    voidPtr = builder.create<LLVM::UndefOp>(loc, voidPtrTy);
+  auto ptrStructType = LLVM::LLVMPointerType::get(context);
+  Value one = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
+                                               builder.getIndexAttr(1));
+  Value paramsPtr =
+      builder.create<LLVM::AllocaOp>(loc, ptrStructType, *structType, one,
+                                     /*alignment=*/0);
+  Value structVal = builder.create<LLVM::UndefOp>(loc, *structType);
+  for (int64_t i = 0, e = args.size(); i < e; ++i) {
+    structVal = builder.create<LLVM::InsertValueOp>(loc, structVal, args[i],
+                                                    i + resultTypes.size());
   }
+  for (int64_t i = 0, e = extraFields.size(); i < e; ++i) {
+    structVal = builder.create<LLVM::InsertValueOp>(
+        loc, structVal, extraFields[i], i + resultTypes.size() + args.size());
+  }
+  // Store into the alloca'ed descriptor.
+  builder.create<LLVM::StoreOp>(loc, structVal, paramsPtr);
+  return {*structType, paramsPtr};
+}
+
+// static
+FailureOr<LLVM::LLVMFunctionType> HALDispatchABI::getABIFunctionType(
+    Operation *forOp, IREE::HAL::CallingConvention cConv, TypeRange resultTypes,
+    TypeRange argTypes, ArrayRef<StringRef> extraFields) {
+  MLIRContext *context = forOp->getContext();
+  SmallVector<Type> extraFieldsTypes = llvm::to_vector(llvm::map_range(
+      extraFields, [&](StringRef name) { return getExtraFieldType(name); }));
+
+  // Check for extra fields already added.
+  if (argTypes.size() >= extraFieldsTypes.size()) {
+    if (llvm::all_of(llvm::zip(argTypes.take_back(extraFieldsTypes.size()),
+                               extraFieldsTypes),
+                     [](auto it) {
+                       auto lhsType = std::get<0>(it);
+                       auto rhsType = std::get<1>(it);
+                       return (llvm::isa<LLVM::LLVMPointerType>(lhsType) &&
+                               llvm::isa<LLVM::LLVMPointerType>(rhsType)) ||
+                              std::get<0>(it) == std::get<1>(it);
+                     })) {
+      // Extra fields already added. Drop them.
+      extraFieldsTypes.clear();
+    }
+  }
+
+  switch (cConv) {
+    case IREE::HAL::CallingConvention::Default: {
+      if (resultTypes.size() > 1) {
+        return forOp->emitOpError(
+            "Cannot have multiple return values for function");
+      }
+      Type resultType = resultTypes.size() == 1
+                            ? resultTypes[0]
+                            : LLVM::LLVMVoidType::get(context);
+      SmallVector<Type> allArgTypes = argTypes;
+      allArgTypes.append(extraFieldsTypes.begin(), extraFieldsTypes.end());
+      return LLVM::LLVMFunctionType::get(resultType, allArgTypes);
+    }
+    case IREE::HAL::CallingConvention::ParameterStruct:
+      return LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(context),
+                                         LLVM::LLVMPointerType::get(context));
+  }
+}
+
+// static
+bool HALDispatchABI::hasCompatibleFunctionSignature(
+    MLIRContext *context, LLVM::LLVMFunctionType funcType,
+    TypeRange resultTypes, TypeRange paramTypes) {
+  TypeRange funcParamTypes = funcType.getParams();
+  if (funcParamTypes.size() != paramTypes.size()) {
+    return false;
+  }
+  if (!llvm::all_of(llvm::zip(funcParamTypes, paramTypes), [](auto it) {
+        auto lhsType = std::get<0>(it);
+        auto rhsType = std::get<1>(it);
+        return (llvm::isa<LLVM::LLVMPointerType>(lhsType) &&
+                llvm::isa<LLVM::LLVMPointerType>(rhsType)) ||
+               std::get<0>(it) == std::get<1>(it);
+      })) {
+    return false;
+  }
+  if (resultTypes.size() > 1) {
+    return false;
+  }
+  Type funcResultType = funcType.getReturnType();
+  if (resultTypes.empty() &&
+      funcResultType != LLVM::LLVMVoidType::get(context)) {
+    return false;
+  }
+  if (resultTypes.size() == 1 && resultTypes[0] != funcResultType) {
+    return false;
+  }
+  return true;
+}
+
+FailureOr<SmallVector<Value>> HALDispatchABI::materializeABI(
+    Operation *forOp, StringRef symbolName, IREE::HAL::CallingConvention cConv,
+    TypeRange resultTypes, ValueRange args, ArrayRef<StringRef> extraFields,
+    RewriterBase &rewriter) {
+  auto argTypes = llvm::to_vector(
+      llvm::map_range(args, [](Value v) { return v.getType(); }));
+  FailureOr<LLVM::LLVMFunctionType> abiFunctionType =
+      getABIFunctionType(forOp, cConv, resultTypes, argTypes, extraFields);
+  if (failed(abiFunctionType)) {
+    return forOp->emitOpError(
+        "failed to get function type for calling convention");
+  }
+  if (hasCompatibleFunctionSignature(rewriter.getContext(),
+                                     abiFunctionType.value(), resultTypes,
+                                     argTypes)) {
+    return rewriter.notifyMatchFailure(
+        forOp, "no change in function signature. skipping");
+  }
+
+  // Combined args list.
+  SmallVector<Value> allArgsList = llvm::to_vector(args);
+  SmallVector<Value> extraFieldVals =
+      llvm::to_vector(llvm::map_range(extraFields, [&](StringRef fieldName) {
+        return getExtraField(forOp, fieldName, rewriter);
+      }));
+  allArgsList.append(extraFieldVals);
+
+  Location loc = forOp->getLoc();
+  if (cConv == IREE::HAL::CallingConvention::Default) {
+    auto callOp = rewriter.create<LLVM::CallOp>(
+        loc, abiFunctionType->getReturnTypes(), allArgsList, forOp->getAttrs());
+    return llvm::to_vector(llvm::map_range(
+        callOp.getResults(), [](OpResult v) -> Value { return v; }));
+  }
+
+  if (cConv == IREE::HAL::CallingConvention::ParameterStruct) {
+    auto [structType, paramsStructPtr] = packIntoParameterStruct(
+        forOp, resultTypes, args, extraFieldVals, rewriter);
+    rewriter.create<LLVM::CallOp>(loc, TypeRange{}, paramsStructPtr,
+                                  forOp->getAttrs());
+    SmallVector<Value> results;
+    if (!resultTypes.empty()) {
+      results.reserve(resultTypes.size());
+      Value structVal =
+          rewriter.create<LLVM::LoadOp>(loc, structType, paramsStructPtr);
+      for (int64_t i = 0, e = resultTypes.size(); i < e; ++i) {
+        results.push_back(
+            rewriter.create<LLVM::ExtractValueOp>(loc, structVal, i));
+      }
+    }
+    return results;
+  }
+  return forOp->emitOpError("unhandled calling convention");
+}
+
+SmallVector<Value> HALDispatchABI::wrapAndCallImport(
+    Operation *forOp, StringRef importName, bool weak, TypeRange resultTypes,
+    ValueRange args, ArrayRef<StringRef> extraFields, OpBuilder &builder) {
+  auto loc = forOp->getLoc();
+
+  SmallVector<Value> extraFieldVals =
+      llvm::to_vector(llvm::map_range(extraFields, [&](StringRef fieldName) {
+        return getExtraField(forOp, fieldName, builder);
+      }));
+
+  auto [structType, paramsPtr] = packIntoParameterStruct(
+      forOp, resultTypes, args, extraFieldVals, builder);
 
   // Calls return 0 (success) or non-zero (failure).
-  auto callResult = callImport(forOp, importName, weak, voidPtr, builder);
+  auto callResult = callImport(forOp, importName, weak, paramsPtr, builder);
   Block *trueDest =
       builder.getInsertionBlock()->splitBlock(++builder.getInsertionPoint());
   Block *falseDest = builder.createBlock(trueDest);
@@ -1129,6 +1392,10 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, DispatchStateField field,
   return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
 }
 
+Type HALDispatchABI::getFieldType(WorkgroupStateField field) {
+  return workgroupStateType.getBody()[int64_t(field)];
+}
+
 Value HALDispatchABI::loadFieldValue(Operation *forOp,
                                      WorkgroupStateField field,
                                      OpBuilder &builder) {
@@ -1140,6 +1407,17 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp,
       builder.create<LLVM::LoadOp>(loc, workgroupStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
+}
+
+Type HALDispatchABI::getExtraFieldType(StringRef extraField) {
+  if (extraField == "processor_id") {
+    return getProcessorIDType();
+  }
+  if (extraField == "processor_data") {
+    return getProcessorDataType();
+  }
+  assert(false && "unhandled extra filed");
+  return {};
 }
 
 Value HALDispatchABI::getExtraField(Operation *forOp, StringRef extraField,

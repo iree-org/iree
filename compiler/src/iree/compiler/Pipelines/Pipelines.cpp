@@ -47,8 +47,15 @@ void buildIREEVMTransformPassPipeline(
   // After input processing, there should only be IREE legal types in
   // signatures.
   IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Input");
+  if (hooks.pipelineExtensions) {
+    hooks.pipelineExtensions->extendInputConversionPreprocessingPassPipeline(
+        passManager, inputOptions.type);
+  }
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
+      break;
+    case InputDialectOptions::Type::auto_detect:
+      passManager.addPass(createAutoInputConversionPipelinePass());
       break;
 #ifdef IREE_HAVE_MHLO_INPUT
     case InputDialectOptions::Type::mhlo:
@@ -57,8 +64,11 @@ void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::xla:
       MHLO::buildXLAInputConversionPassPipeline(passManager);
       break;
-    case InputDialectOptions::Type::stablehlo_experimental:
+    case InputDialectOptions::Type::stablehlo:
       stablehlo::buildStableHLOInputConversionPassPipeline(passManager);
+      break;
+    case InputDialectOptions::Type::stablehlo_xla:
+      stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager);
       break;
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT

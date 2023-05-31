@@ -39,9 +39,9 @@ static const iree_hal_local_executable_vtable_t
     iree_hal_static_executable_vtable;
 
 static int iree_hal_static_executable_import_thunk_v0(
-    iree_hal_executable_import_v0_t fn_ptr, void* context, void* params,
+    iree_hal_executable_import_v0_t fn_ptr, void* params, void* context,
     void* reserved) {
-  return fn_ptr(context, params, reserved);
+  return fn_ptr(params, context, reserved);
 }
 
 static iree_status_t iree_hal_static_executable_create(

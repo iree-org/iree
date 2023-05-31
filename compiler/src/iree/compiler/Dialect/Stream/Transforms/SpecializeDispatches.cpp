@@ -95,7 +95,7 @@ static ConstantTable buildConstantTable(
     SmallVector<TypedAttr> values;
     for (auto dispatchOp : dispatchOps) {
       auto operand = dispatchOp.getUniformOperands()[idx];
-      Attribute constantValue;
+      TypedAttr constantValue;
       matchPattern(operand, m_Constant(&constantValue));
       values.push_back(constantValue);
       set.locs.insert(operand.getLoc());
@@ -114,7 +114,7 @@ static ConstantTable buildConstantTable(
 // Builds a tensor<SITExOPERANDxTYPE> constant attribute.
 // This should probably be vector<> but that dialect has some issues with
 // expressing basic multi-dimension loads :/
-static Attribute buildConstantSetAttr(ConstantSet &set, OpBuilder &builder) {
+static TypedAttr buildConstantSetAttr(ConstantSet &set, OpBuilder &builder) {
   // TODO(benvanik): better definition of variable-width integers across HAL.
   // HACK: we can't handle index types in a few of the codegen backends (vulkan
   // at least); we convert index -> i32 here but we should probably have a
@@ -133,8 +133,8 @@ static Attribute buildConstantSetAttr(ConstantSet &set, OpBuilder &builder) {
     for (int64_t value = 0; value < valueCount; ++value) {
       auto valueAttr = set.values[value].second[site];
       if (storageType != valueAttr.getType()) {
-        valueAttr = IntegerAttr::get(storageType,
-                                     valueAttr.cast<IntegerAttr>().getInt());
+        valueAttr = IntegerAttr::get(
+            storageType, llvm::cast<IntegerAttr>(valueAttr).getInt());
       }
       flattenedAttrs.push_back(valueAttr);
     }

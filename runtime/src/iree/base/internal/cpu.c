@@ -11,6 +11,7 @@
 
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/schemas/cpu_data.h"
 
 //===----------------------------------------------------------------------===//
 // Platform-specific processor data queries

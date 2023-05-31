@@ -16,12 +16,14 @@ iree_cc_library(
   HDRS
     "EncodingInfo.h"
     "GPUUtils.h"
+    "LinalgOpInfo.h"
     "LinkingUtils.h"
     "MarkerUtils.h"
     "Utils.h"
   SRCS
     "EncodingInfo.cpp"
     "GPUUtils.cpp"
+    "LinalgOpInfo.cpp"
     "LinkingUtils.cpp"
     "MarkerUtils.cpp"
     "Utils.cpp"
@@ -34,7 +36,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
@@ -50,6 +52,7 @@ iree_cc_library(
     MLIRViewLikeInterface
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC

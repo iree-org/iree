@@ -9,7 +9,7 @@
 import re
 from typing import Optional, Sequence
 
-from .benchmark_definition import (execute_cmd_and_get_output, DeviceInfo,
+from .benchmark_definition import (execute_cmd_and_get_stdout, DeviceInfo,
                                    PlatformType)
 
 
@@ -29,7 +29,7 @@ def get_linux_cpu_features(lscpu_output: str) -> Sequence[str]:
 
 
 def canonicalize_gpu_name(gpu_name: str) -> str:
-  # Replace all consecutive non-word characters with a single hypen.
+  # Replace all consecutive non-word characters with a single hyphen.
   return re.sub(r"\W+", "-", gpu_name)
 
 
@@ -44,10 +44,10 @@ def get_linux_device_info(device_model: str = "Unknown",
     - cpu_uarch: the CPU microarchitecture, e.g., 'CascadeLake'
     - gpu_id: the target GPU ID, e.g., '0' or 'GPU-<UUID>'
   """
-  lscpu_output = execute_cmd_and_get_output(["lscpu"], verbose)
+  lscpu_output = execute_cmd_and_get_stdout(["lscpu"], verbose)
 
   try:
-    gpu_name = execute_cmd_and_get_output([
+    gpu_name = execute_cmd_and_get_stdout([
         "nvidia-smi", "--query-gpu=name", "--format=csv,noheader",
         f"--id={gpu_id}"
     ], verbose)

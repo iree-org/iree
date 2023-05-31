@@ -26,7 +26,8 @@ static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
                                           spirv::ResourceLimitsAttr limits) {
   const std::array<int64_t, 2> workgroupXY = {256, 1};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {4, 8, 8};
   } else {
@@ -56,7 +57,8 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
     if (bitwidth > 32) return failure();
     const int multipler = 32 / bitwidth;
     const int bestTilingFactor = 16 * multipler;
-    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
   }
 
   return failure();

@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -105,6 +106,28 @@ std::optional<llvm::Triple> getTargetTriple(
   return llvm::Triple(triple.value().str());
 }
 
+const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
+  if (triple.isX86()) {
+    return triple.isArch64Bit() ? "x86_64" : "x86_32";
+  }
+  if (triple.isWasm()) {
+    return triple.isArch64Bit() ? "wasm_64" : "wasm_32";
+  }
+  if (triple.isAArch64()) {
+    return "arm_64";
+  }
+  if (triple.isARM()) {
+    return "arm_32";
+  }
+  if (triple.isRISCV64()) {
+    return "riscv_64";
+  }
+  if (triple.isRISCV32()) {
+    return "riscv_32";
+  }
+  return "unknown";
+}
+
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
 }
@@ -126,9 +149,8 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSource()); })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.getSource()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
+            return llvm::cast<IREE::Flow::DispatchTensorType>(
+                       loadOp.getSource().getType())
                        .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
           })
       .Default([&](Operation *op) { return false; });
@@ -497,19 +519,12 @@ std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
 }
 
 SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
-  Block *body = &funcOp.getFunctionBody().front();
-  auto forOps = body->getOps<scf::ForOp>();
-  while (!forOps.empty()) {
-    assert(llvm::hasSingleElement(forOps) &&
-           "expected dispatch function with single block");
-    scf::ForOp forOp = *(forOps.begin());
-    body = forOp.getBody();
-    forOps = body->getOps<scf::ForOp>();
-  }
   SmallVector<Operation *> computeOps;
-  for (auto op : body->getOps<TilingInterface>()) {
-    computeOps.push_back(op);
-  }
+  funcOp.walk([&](Operation *op) {
+    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op)) {
+      computeOps.push_back(op);
+    }
+  });
   return computeOps;
 }
 
@@ -529,8 +544,8 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 /// memref::CopyOp.
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = from.getType().dyn_cast<MemRefType>();
-  auto memrefTypeTo = to.getType().dyn_cast<MemRefType>();
+  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
+  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
   if (!memrefTypeFrom || !memrefTypeTo ||
       memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
     mlir::emitError(
@@ -658,8 +673,9 @@ static std::optional<SmallVector<Value>> replaceNonTrivialUse(
   });
 
   if (auto castOp = dyn_cast<memref::CastOp>(user)) {
-    auto replacementType = replacement.getType().cast<MemRefType>();
-    auto currentResultType = castOp.getResult().getType().cast<MemRefType>();
+    auto replacementType = llvm::cast<MemRefType>(replacement.getType());
+    auto currentResultType =
+        llvm::cast<MemRefType>(castOp.getResult().getType());
     if (replacementType == currentResultType) {
       // Cast is a no op, just return the replacement.
       return SmallVector<Value>{replacement};
@@ -679,17 +695,18 @@ static std::optional<SmallVector<Value>> replaceNonTrivialUse(
                               newCastOp->result_end());
   }
   if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
-    auto currResultType = subviewOp.getResult().getType().cast<MemRefType>();
-    auto newSourceType = replacement.getType().cast<MemRefType>();
+    auto currResultType =
+        llvm::cast<MemRefType>(subviewOp.getResult().getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
     SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
     SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
     SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
     MemRefType newResultType =
         (currResultType.getRank() != newSourceType.getRank()
-             ? memref::SubViewOp::inferRankReducedResultType(
-                   currResultType.getShape(), newSourceType, offsets, sizes,
-                   strides)
-                   .cast<MemRefType>()
+             ? llvm::cast<MemRefType>(
+                   memref::SubViewOp::inferRankReducedResultType(
+                       currResultType.getShape(), newSourceType, offsets, sizes,
+                       strides))
              : nullptr);
     auto newSubviewOp = rewriter.create<memref::SubViewOp>(
         loc, newResultType, replacement, offsets, sizes, strides);

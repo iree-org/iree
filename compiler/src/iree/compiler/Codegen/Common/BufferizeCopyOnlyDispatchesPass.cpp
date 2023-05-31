@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -37,12 +37,8 @@ struct BufferizeCopyOnlyDispatchesPass
     : public BufferizeCopyOnlyDispatchesBase<BufferizeCopyOnlyDispatchesPass> {
   BufferizeCopyOnlyDispatchesPass() = default;
   BufferizeCopyOnlyDispatchesPass(const BufferizeCopyOnlyDispatchesPass &pass) {
-    this->embedSubspanOffsetIntoMemRefType =
-        pass.embedSubspanOffsetIntoMemRefType;
   }
-  BufferizeCopyOnlyDispatchesPass(bool embedSubspanOffsetIntoMemRefType) {
-    this->embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
-  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
@@ -109,8 +105,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   };
 
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
-                                      deallocationFn, memcpyFn,
-                                      this->embedSubspanOffsetIntoMemRefType);
+                                      deallocationFn, memcpyFn);
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }
@@ -125,10 +120,9 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createBufferizeCopyOnlyDispatchesPass(
-    bool embedSubspanOffsetIntoMemRefType) {
-  return std::make_unique<BufferizeCopyOnlyDispatchesPass>(
-      embedSubspanOffsetIntoMemRefType);
+std::unique_ptr<OperationPass<ModuleOp>>
+createBufferizeCopyOnlyDispatchesPass() {
+  return std::make_unique<BufferizeCopyOnlyDispatchesPass>();
 }
 
 }  // namespace iree_compiler

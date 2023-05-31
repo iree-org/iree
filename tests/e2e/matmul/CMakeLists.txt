@@ -250,12 +250,62 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
+    e2e_matmul_mmt4d_i8_small_ukernel_x86
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-enable-microkernels"
+    "--iree-flow-enable-data-tiling"
+  LABELS
+    "hostonly"
+    "x86_64_only"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:+avx,+avx2,+fma"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_f32_small_ukernel_x86
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-enable-microkernels"
+    "--iree-flow-enable-data-tiling"
+  LABELS
+    "hostonly"
+    "x86_64_only"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:+avx,+avx2,+fma"
+)
+
+iree_generated_trace_runner_test(
+  NAME
     e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulSimt"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -278,8 +328,32 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCore"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_gpu_large_unaligned
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large"
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -303,7 +377,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -328,7 +402,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCore"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -353,7 +427,7 @@ iree_generated_trace_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -400,12 +474,12 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_valhall-unknown-android31
+    e2e_matmul_direct_i8_gpu_large_valhall-unknown-android31
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--lhs_rhs_type=i8"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeMali"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -417,16 +491,61 @@ iree_generated_trace_runner_test(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
   LABELS
     "requires-gpu-nvidia"
+    "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_ampere-unknown-linux
+    e2e_matmul_direct_f16_gpu_large_valhall-unknown-android31
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=SPIRVVectorizeMali"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vulkan-spirv"
+  DRIVERS
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+  LABELS
+    "requires-gpu-nvidia"
+    "vulkan_uses_vk_khr_shader_float16_int8"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_gpu_large_valhall-unknown-android31
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=SPIRVVectorizeMali"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vulkan-spirv"
+  DRIVERS
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+  LABELS
+    "requires-gpu-nvidia"
+    "vulkan_uses_vk_khr_shader_float16_int8"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_i8_gpu_large_ampere-unknown-linux
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeNVIDIA"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -438,23 +557,51 @@ iree_generated_trace_runner_test(
     "--iree-vulkan-target-triple=ampere-unknown-linux"
   LABELS
     "requires-gpu-nvidia"
+    "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_check_single_backend_test_suite(
+iree_generated_trace_runner_test(
   NAME
-    check_cuda
-  SRCS
-    "large_linalg_matmul.mlir"
-  TARGET_BACKEND
-    "cuda"
-  DRIVER
-    "cuda"
+    e2e_matmul_direct_f16_gpu_large_ampere-unknown-linux
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=SPIRVVectorizeNVIDIA"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vulkan-spirv"
+  DRIVERS
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target-triple=ampere-unknown-linux"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
+    "vulkan_uses_vk_khr_shader_float16_int8"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_gpu_large_ampere-unknown-linux
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=SPIRVVectorizeNVIDIA"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vulkan-spirv"
+  DRIVERS
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target-triple=ampere-unknown-linux"
+  LABELS
+    "requires-gpu-nvidia"
+    "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
 iree_generated_trace_runner_test(

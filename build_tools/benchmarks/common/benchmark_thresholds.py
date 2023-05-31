@@ -78,6 +78,9 @@ BENCHMARK_THRESHOLDS = [
         re.compile(r"^MobileBertSquad.*int8.*full-inference.*GPU-Mali"), 10,
         ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
+        re.compile(r"^MobileBertSquad.*fp16.*full-inference.*GPU-Mali"), 10,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
         re.compile(r"^MobileNetV3Small.*full-inference.*GPU-Mali"), 2 * 10**6,
         ThresholdUnit.VALUE_NS),
 
@@ -85,7 +88,9 @@ BENCHMARK_THRESHOLDS = [
     # suitable anymore.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
-    BenchmarkThreshold(re.compile(r"^EfficientNet.*int8.*GPU-Mali"), 1 * 10**6,
+    BenchmarkThreshold(re.compile(r"^PersonDetect.*int8.*GPU-Mali"), 2 * 10**5,
+                       ThresholdUnit.VALUE_NS),
+    BenchmarkThreshold(re.compile(r"^EfficientNet.*int8.*GPU-Mali"), 15 * 10**5,
                        ThresholdUnit.VALUE_NS),
     BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
@@ -99,9 +104,9 @@ BENCHMARK_THRESHOLDS = [
 ]
 
 COMPILATION_TIME_THRESHOLDS = [
-    # Compilation time measurement is very stable right now. Use a large
-    # threshold until we make it stable.
-    BenchmarkThreshold(re.compile(r".*"), 50, ThresholdUnit.PERCENTAGE),
+    # TODO(#11922): Compilation time measurement is very unstable right now.
+    # Use a large threshold until we make it stable.
+    BenchmarkThreshold(re.compile(r".*"), 100, ThresholdUnit.PERCENTAGE),
 ]
 
 TOTAL_DISPATCH_SIZE_THRESHOLDS = [
@@ -112,4 +117,10 @@ TOTAL_DISPATCH_SIZE_THRESHOLDS = [
 TOTAL_ARTIFACT_SIZE_THRESHOLDS = [
     # Default threshold: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
+]
+
+STREAM_IR_DISPATCH_COUNT_THRESHOLDS = [
+    # Default threshold: 0%.
+    # Any change on dispatch count should be reported.
+    BenchmarkThreshold(re.compile(r".*"), 0, ThresholdUnit.PERCENTAGE),
 ]

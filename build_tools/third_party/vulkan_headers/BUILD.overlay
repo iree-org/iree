@@ -12,6 +12,6 @@ package(default_visibility = ["//visibility:public"])
 # headers to disable additional validation.
 cc_library(
     name = "vulkan_headers",
-    includes = ["include"],
-    textual_hdrs = glob(["include/vulkan/*.h"]),
+    hdrs = glob(["include/vulkan/*.h"]),
+    include_prefix = "third_party/vulkan_headers",
 )

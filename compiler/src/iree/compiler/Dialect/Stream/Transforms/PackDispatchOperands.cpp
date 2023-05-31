@@ -97,7 +97,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
     }
 
     // bf16 -> i16, f32 -> i32, f64 -> i64 ...
-    if (auto floatType = operand.getType().dyn_cast<FloatType>()) {
+    if (auto floatType = llvm::dyn_cast<FloatType>(operand.getType())) {
       // Floats need to be bitcast into opaque integers so that our handling
       // below can deal with simple fixed width ints (bf16->i16, etc).
       operand = builder.createOrFold<arith::BitcastOp>(
@@ -107,8 +107,8 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
 
     // i1-i31 -> i32 and i33-i63 -> i64
     // TODO(benvanik): don't extend here but instead pack as we can fit 4 i8's
-    // into a single i32 and save 4x our push constant capacity.
-    unsigned bitWidth = operand.getType().getIntOrFloatBitWidth();
+    // into a single i32 and save 4x our push constant capacity
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(operand.getType());
     if (bitWidth < 31) {
       operand = builder.createOrFold<arith::ExtUIOp>(loc, builder.getI32Type(),
                                                      operand);
@@ -177,7 +177,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
       // Pass through/no change.
       if (oldArgAttrs) {
         newArgAttrs.push_back(
-            oldArgAttrs[it.index()].dyn_cast_or_null<DictionaryAttr>());
+            llvm::dyn_cast_if_present<DictionaryAttr>(oldArgAttrs[it.index()]));
       } else {
         newArgAttrs.push_back(nullptr);
       }
@@ -222,7 +222,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
     // these attributes is really annoying.
     if (oldArgAttrs) {
       auto oldArgAttr =
-          oldArgAttrs[it.index()].dyn_cast_or_null<DictionaryAttr>();
+          llvm::dyn_cast_if_present<DictionaryAttr>(oldArgAttrs[it.index()]);
       if (auto alignmentAttr =
               oldArgAttr.getAs<IntegerAttr>(streamAlignmentAttr)) {
         argOp->setAttr(streamAlignmentAttr, alignmentAttr);
@@ -284,7 +284,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
     }
 
     // i16 -> bf16, i32 -> f32, i64 -> f64 ...
-    if (auto floatType = targetType.dyn_cast<FloatType>()) {
+    if (auto floatType = llvm::dyn_cast<FloatType>(targetType)) {
       auto bitcastOp = builder.create<arith::BitcastOp>(loc, targetType, value);
       value.replaceAllUsesExcept(bitcastOp.getResult(), bitcastOp);
       value = bitcastOp.getResult();

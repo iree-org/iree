@@ -23,7 +23,7 @@ namespace Flow {
 static SmallVector<Value, 4> filterTensorValues(ValueRange&& range) {
   SmallVector<Value, 4> result;
   for (auto value : range) {
-    if (value.getType().isa<TensorType>()) result.push_back(value);
+    if (llvm::isa<TensorType>(value.getType())) result.push_back(value);
   }
   return result;
 }

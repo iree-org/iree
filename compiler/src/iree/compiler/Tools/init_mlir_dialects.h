@@ -72,7 +72,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   shape::ShapeDialect>();
   // clang-format on
   tensor::registerInferTypeOpInterfaceExternalModels(registry);
-  tensor::registerTilingInterfaceExternalModelsForPackUnPackOps(registry);
+  tensor::registerTilingInterfaceExternalModels(registry);
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
   registry.insert<emitc::EmitCDialect>();

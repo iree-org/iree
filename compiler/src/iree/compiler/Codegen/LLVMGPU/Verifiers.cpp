@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 
@@ -107,8 +107,8 @@ LogicalResult verifyGPUMatmulPipeline(
          "supported yet in IREE Codegen.");
 
   // Get lhs and rhs shapes.
-  ArrayRef<int64_t> lhsShape = lhsType.cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape = rhsType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> lhsShape = llvm::cast<ShapedType>(lhsType).getShape();
+  ArrayRef<int64_t> rhsShape = llvm::cast<ShapedType>(rhsType).getShape();
 
   // Tile shapes in number of elements.
   SmallVector<int64_t> tileShape =
@@ -142,9 +142,6 @@ LogicalResult verifyGPUMatmulPipeline(
     lhsShape = lhsShape.drop_front();
     rhsShape = rhsShape.drop_front();
   }
-
-  // Number of software pipeline stages/depth.
-  int64_t softwarePipelineDepth = translationInfo.getSoftwarePipelineDepth();
 
   //
   // Begin verification for CUDA and Tensor Core pipelines.
@@ -202,22 +199,10 @@ LogicalResult verifyGPUMatmulPipeline(
 
   // Instruction shape in number of elements in M, N, and K dim.
   SmallVector<int64_t> instructionShape;
-  if (failed(getInstructionShape(op, pipeline,
-                                 lhsType.cast<ShapedType>().getElementType(),
-                                 instructionShape))) {
+  if (failed(getInstructionShape(
+          op, pipeline, llvm::cast<ShapedType>(lhsType).getElementType(),
+          instructionShape))) {
     return failure();
-  }
-
-  // Verify the matmul problem shape K has a multiple of thread block K tiles.
-  if (softwarePipelineDepth > 1 && threadBlockShape[kK] == matmulShape[kK]) {
-    return op->emitError("Matmul problem shape K ")
-           << matmulShape[kK]
-           << " is not in the multiple of thread block K tiles needed for "
-              "software pipelining ("
-           << threadBlockShape[kK] << ")"
-           << " * "
-           << "(" << softwarePipelineDepth << ")"
-           << " with compilation pipeline " << pipelineName;
   }
 
   // Verify that matmul problem shape can be tiled with the thread block shape.

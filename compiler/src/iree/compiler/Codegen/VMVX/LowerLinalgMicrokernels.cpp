@@ -7,7 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
@@ -167,7 +167,7 @@ class StridedBufferAnalysis {
   bool isValid() { return true; }
 
   // Gets the type of the buffer being analyzed.
-  MemRefType getType() { return buffer.getType().cast<MemRefType>(); }
+  MemRefType getType() { return llvm::cast<MemRefType>(buffer.getType()); }
 
   // Gets the rank of the buffer being analyzed.
   unsigned getRank() { return getType().getRank(); }
@@ -187,7 +187,7 @@ class StridedBufferAnalysis {
 
     Location loc = buffer.getLoc();
     desc = StridedBufferDescriptor();
-    desc->memRefType = buffer.getType().cast<MemRefType>();
+    desc->memRefType = llvm::cast<MemRefType>(buffer.getType());
 
     int rank = getType().getRank();
     SmallVector<Type> sizeStrideTypes;
@@ -543,9 +543,9 @@ struct LinalgBinaryGenericConversion
       return failure();
     }
     BlockArgument operandScalar0 =
-        binaryOp->getOperands()[0].dyn_cast<BlockArgument>();
+        llvm::dyn_cast<BlockArgument>(binaryOp->getOperands()[0]);
     BlockArgument operandScalar1 =
-        binaryOp->getOperands()[1].dyn_cast<BlockArgument>();
+        llvm::dyn_cast<BlockArgument>(binaryOp->getOperands()[1]);
     if (!operandScalar0 || !operandScalar1) return failure();
 
     // Construct the emitter and start lowering.
@@ -718,7 +718,7 @@ struct LinalgUnaryGenericConversion
       return failure();
     }
     BlockArgument operandScalar0 =
-        unaryOp->getOperands()[0].dyn_cast<BlockArgument>();
+        llvm::dyn_cast<BlockArgument>(unaryOp->getOperands()[0]);
     if (!operandScalar0) return failure();
 
     // Construct the emitter and start lowering.
@@ -831,7 +831,7 @@ struct LinalgTrivialGenericConversion
     Operation &yieldOp = children.front();
     for (auto [outputIndex, yieldOperand] :
          llvm::enumerate(yieldOp.getOperands())) {
-      if (auto blockArg = yieldOperand.dyn_cast<BlockArgument>()) {
+      if (auto blockArg = llvm::dyn_cast<BlockArgument>(yieldOperand)) {
         unsigned inputIndex = blockArg.getArgNumber();
         OpOperand *input = op.getDpsInputOperand(inputIndex);
         OpOperand *output = op.getDpsInitOperand(outputIndex);
@@ -884,6 +884,12 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
   }
 
   LogicalResult handle2DTile(OpInfo &info, PatternRewriter &rewriter) const {
+    Type scalarType = info.scalar.getType();
+    if (!scalarType.isIntOrFloat() ||
+        scalarType.getIntOrFloatBitWidth() != 32) {
+      return rewriter.notifyMatchFailure(info.op,
+                                         "handling only 32-bit scalar types");
+    }
     auto loc = info.op.getLoc();
     StridedBufferDescriptor &outDesc = info.outAnal.getDesc(rewriter);
     Value m = outDesc.sizes[0];

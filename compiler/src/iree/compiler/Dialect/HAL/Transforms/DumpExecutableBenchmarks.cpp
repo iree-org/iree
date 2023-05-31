@@ -49,7 +49,7 @@ struct DispatchParams {
   // Analyzed minimum binding sizes.
   SmallVector<Binding> bindings;
   // Push constant operands that are known constant. May be null if dynamic.
-  SmallVector<Attribute> uniformOperands;
+  SmallVector<TypedAttr> uniformOperands;
 };
 
 using DispatchParamsMap =
@@ -66,8 +66,8 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       // TODO(benvanik): typed accessors for bindings.
-      auto bindingAttrs = dispatchOp->getAttr("hal.interface.bindings")
-                              .dyn_cast_or_null<ArrayAttr>();
+      auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
+          dispatchOp->getAttr("hal.interface.bindings"));
       assert(bindingAttrs &&
              "interface materialization must annotate dispatch sites");
 
@@ -97,9 +97,9 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
                             resourceLengthInt.getSExtValue()});
       }
 
-      SmallVector<Attribute> uniformOperands;
+      SmallVector<TypedAttr> uniformOperands;
       for (auto operand : dispatchOp.getUniformOperands()) {
-        Attribute uniformOperand;
+        TypedAttr uniformOperand;
         if (!matchPattern(operand, m_Constant(&uniformOperand))) {
           // Non-constant uniform operand; skip the dispatch.
           // TODO(benvanik): extract information from the executable annotations
