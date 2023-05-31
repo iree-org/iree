@@ -172,6 +172,9 @@ void AutoInputConversionPipelinePass::getDependentDialects(
   // Register dialects from all possible pipelines, as we do not statically know
   // which pipeline will be selected, while dialect registration happens before
   // we run any detection on the input.
+  //
+  // TODO(kuhar): Find a better registration mechanism so that we do not have to
+  // build pipelines just to query dialects and discard them immediately after.
   auto appendPipelineDialects =
       [&registry](function_ref<void(OpPassManager&)> buildFn) {
         OpPassManager pm;
