@@ -461,8 +461,8 @@ def _get_google_benchmark_latencies(
     Returns:
       Real time and CPU time BenchmarkLatency.
     """
-  real_time_object = dict(unit="ns")
-  cpu_time_object = dict(unit="ns")
+  real_time_object: Dict[str, Any] = dict(unit="ns")
+  cpu_time_object: Dict[str, Any] = dict(unit="ns")
   metrics = ["mean", "median", "stddev"]
   for case in benchmark_json["benchmarks"]:
     if any(case["name"].endswith(f"real_time_{m}") for m in metrics):
@@ -491,7 +491,7 @@ class BenchmarkMemory:
     return dataclasses.asdict(self)
 
   @staticmethod
-  def from_json_object(json_object: Dict[str, int]):
+  def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkMemory(**json_object)
 
 
@@ -504,12 +504,15 @@ def _get_iree_memory_statistics(benchmark_stderr: str,
              r"\s*(?P<allocated>\d+)B allocated /"
              r"\s*(?P<freed>\d+)B freed /"
              r"\s*(?P<live>\d+)B live")
-  match_ = re.search(pattern, benchmark_stderr)
+  match = re.search(pattern, benchmark_stderr)
+  if match is None:
+    raise ValueError(
+        f"Unable to find memory statistics in '{benchmark_stderr}'")
   return BenchmarkMemory(
-      peak=int(match_["peak"]),
-      allocated=int(match_["allocated"]),
-      freed=int(match_["freed"]),
-      live=int(match_["live"]),
+      peak=int(match["peak"]),
+      allocated=int(match["allocated"]),
+      freed=int(match["freed"]),
+      live=int(match["live"]),
       unit="bytes",
   )
 
