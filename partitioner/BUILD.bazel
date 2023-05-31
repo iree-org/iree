@@ -84,6 +84,7 @@ cc_library(
     deps = [
         ":defs",
         ":support",
+        "@stablehlo//:register",
         "@xla//xla/hlo/transforms:hlo_constant_splitter",
         "@xla//xla/mlir_hlo:hlo_legalize_to_stablehlo",
         "@xla//xla/mlir_hlo:mhlo_passes",

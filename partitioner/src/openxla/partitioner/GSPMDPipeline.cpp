@@ -8,6 +8,7 @@
 
 #include "mhlo/transforms/passes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "stablehlo/dialect/Register.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/transforms/hlo_constant_splitter.h"
 #include "xla/service/algebraic_simplifier.h"
@@ -140,6 +141,10 @@ class RunGSPMDPartitionerPass
     : public PassWrapper<RunGSPMDPartitionerPass, OperationPass<ModuleOp>> {
  public:
   RunGSPMDPartitionerPass(GSPMDOptions options) : options(options) {}
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    stablehlo::registerAllDialects(registry);
+  }
 
  private:
   StringRef getArgument() const override { return "openxla-partitioner-gspmd"; }
