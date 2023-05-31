@@ -169,6 +169,9 @@ void AutoInputConversionPipelinePass::runOnOperation() {
 
 void AutoInputConversionPipelinePass::getDependentDialects(
     DialectRegistry& registry) const {
+  // Register dialects from all possible pipelines, as we do not statically know
+  // which pipeline will be selected, while dialect registration happens before
+  // we run any detection on the input.
   auto appendPipelineDialects =
       [&registry](function_ref<void(OpPassManager&)> buildFn) {
         OpPassManager pm;
@@ -177,16 +180,14 @@ void AutoInputConversionPipelinePass::getDependentDialects(
       };
 
 #ifdef IREE_HAVE_MHLO_INPUT
-  appendPipelineDialects([](OpPassManager& pm) {
-    MHLO::buildMHLOInputConversionPassPipeline(pm);
-  });
-  appendPipelineDialects(
-      [](OpPassManager& pm) { MHLO::buildXLAInputConversionPassPipeline(pm); });
+  appendPipelineDialects(MHLO::buildMHLOInputConversionPassPipeline);
+  appendPipelineDialects(MHLO::buildXLAInputConversionPassPipeline);
 #endif  // IREE_HAVE_MHLO_INPUT
+
 #ifdef IREE_HAVE_TOSA_INPUT
-  appendPipelineDialects(
-      [](OpPassManager& pm) { buildTOSAInputConversionPassPipeline(pm); });
+  appendPipelineDialects(buildTOSAInputConversionPassPipeline);
 #endif  // IREE_HAVE_TOSA_INPUT
+
 #ifdef IREE_HAVE_TORCH_INPUT
   appendPipelineDialects([](OpPassManager& pm) {
     pm.addNestedPass<func::FuncOp>(
