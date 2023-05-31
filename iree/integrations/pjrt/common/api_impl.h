@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/compiler.h"
 #include "iree/integrations/pjrt/common/platform.h"

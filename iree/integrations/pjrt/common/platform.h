@@ -13,7 +13,7 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/integrations/pjrt/common/compiler.h"
 #include "iree/integrations/pjrt/common/debugging.h"
 
