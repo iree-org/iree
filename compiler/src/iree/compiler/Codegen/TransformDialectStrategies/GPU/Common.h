@@ -73,14 +73,14 @@ int64_t adjustNumberOfWarpsForBlockShuffle(int64_t numWarpsToUse,
 /// Takes an optional `warpDims` argument to specify the number of warp
 /// dimensions to consider along various dimensions and avoid second-guessing
 /// how the mapping to warps should occur.
-Value buildMapToBlockAndThreads(ImplicitLocOpBuilder& b, Value funcH,
+Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
                                 ArrayRef<int64_t> blockSize,
                                 ArrayRef<int64_t> warpDims = {});
 
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-Value buildDistributeVectors(ImplicitLocOpBuilder& b, Value variantH,
+Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
                              Value funcH, int64_t warpSize = kCudaWarpSize);
 
 /// Take care of the last common steps in a GPU strategy (i.e. vectorize,
@@ -112,7 +112,7 @@ std::pair<Value, Value> buildCommonTrailingStrategy(
 // in schedule complexity and can be handled with simple padding of the
 // underlying allocation.
 void build1DSplittingStrategyWithOptionalThreadMapping(
-    ImplicitLocOpBuilder& b, Value isolatedParentOpH, Value opH, int64_t rank,
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value opH, int64_t rank,
     int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
     Attribute mappingAttr = Attribute(), int64_t maxVectorSize = 4);
 
@@ -125,19 +125,31 @@ Value buildHoistOutputPaddingOp(ImplicitLocOpBuilder &b, Value variantH,
                                 Value paddedMatmulOpH,
                                 int64_t numLoopsToHoist = 1);
 
-/// Helper function to distribute one pad or copy operation.
+/// Helper function to distribute one pad or copy operation with specified num
+/// threads.
 /// Note: When `foldIfBranch` is true, one must later perform masked
 /// vectorization of the result.
 /// This amounts to injecting knowledge about future transformations without
 /// adding leaky semantics.
-Value buildDistributeOnePadOrCopy(ImplicitLocOpBuilder &b, Value variantH,
-                                  Value copyOpH, ArrayRef<int64_t> numThreads,
-                                  ArrayRef<Attribute> threadDimMapping,
-                                  bool foldIfBranch = false);
+Value buildDistributeOnePadOrCopyWithNumThreads(
+    ImplicitLocOpBuilder &b, Value variantH, Value copyOpH,
+    ArrayRef<int64_t> numThreads, ArrayRef<Attribute> threadDimMapping,
+    bool foldIfBranch = false);
+
+/// Helper function to distribute one pad or copy operation with specified tile
+/// sizes.
+/// Note: When `foldIfBranch` is true, one must later perform masked
+/// vectorization of the result.
+/// This amounts to injecting knowledge about future transformations without
+/// adding leaky semantics.
+std::tuple<Value, Value> buildDistributeOnePadOrCopyWithTileSizes(
+    ImplicitLocOpBuilder &b, Value variantH, Value copyOpH,
+    ArrayRef<int64_t> tileSizes, ArrayRef<Attribute> threadDimMapping,
+    bool foldIfBranch = false);
 
 /// Distribute the explicit copies involved in a matmul operation
 /// `paddedMatmulOpH`.
-std::tuple<Value, Value, Value> buildDistributeCopies(
+std::tuple<Value, Value, Value> buildDistributeMatmulCopies(
     ImplicitLocOpBuilder &b, Value variantH, Value paddedMatmulOpH,
     const AbstractGemmLikeStrategy &strategy);
 
@@ -203,8 +215,8 @@ struct GPUModel {
 
 /// Try to find an exisiting transform dialect strategy for a given entry point.
 LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,
-                                           Operation* op,
-                                           const GPUModel& gpuModel);
+                                           Operation *op,
+                                           const GPUModel &gpuModel);
 
 }  // namespace gpu
 }  // namespace iree_compiler
