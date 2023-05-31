@@ -109,11 +109,18 @@ class PluginManagerSession : public PipelineExtensions {
     }
   }
 
+  // Populates the given list of HAL target backends for all initialized
+  // plugins.
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);
+
  private:
   PluginManagerOptions &options;
   // At construction, uninitialized plugin sessions are created for all
   // registered plugins so that CLI options can be set properly.
   llvm::StringMap<std::unique_ptr<AbstractPluginSession>> allPluginSessions;
+
+  // All sessions that have opted to be default activated.
+  llvm::StringMap<AbstractPluginSession *> defaultActivatedSessions;
 
   // Initialized list of plugins.
   llvm::SmallVector<AbstractPluginSession *> initializedSessions;

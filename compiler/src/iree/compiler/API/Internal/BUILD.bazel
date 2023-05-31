@@ -77,6 +77,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/PluginAPI:PluginManager",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",

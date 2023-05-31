@@ -214,6 +214,12 @@ struct Session {
         pluginSession.registerDialects(registry);
         context.appendDialectRegistry(registry);
         pluginActivationStatus = pluginSession.activatePlugins(&context);
+
+        // Initialize target registry, bootstrapping with the static globals.
+        targetRegistry.mergeFrom(IREE::HAL::TargetBackendRegistry::getGlobal());
+        IREE::HAL::TargetBackendList pluginTargetList;
+        pluginSession.populateHALTargetBackends(pluginTargetList);
+        targetRegistry.mergeFrom(pluginTargetList);
       }
     }
     return pluginActivationStatus;
@@ -226,6 +232,10 @@ struct Session {
   // it.
   PluginManagerOptions pluginManagerOptions;
   PluginManagerSession pluginSession;
+
+  // We initialize the TargetBackendRegistry lazily with the plugins.
+  IREE::HAL::TargetBackendRegistry targetRegistry;
+
   // We lazily activate plugins on the first invocation. This allows plugin
   // activation to be configured at the session level via the API, if
   // desired.
@@ -656,7 +666,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       }
 
       buildIREEVMTransformPassPipeline(
-          session.bindingOptions, session.inputOptions,
+          session.targetRegistry, session.bindingOptions, session.inputOptions,
           session.preprocessingOptions, session.highLevelOptimizationOptions,
           session.schedulingOptions, session.halTargetOptions,
           session.vmTargetOptions, pipelineHooks, passManager, *compileToPhase);
@@ -676,8 +686,8 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
                "op";
         return false;
       }
-      IREE::HAL::buildHALTransformPassPipeline(passManager,
-                                               session.halTargetOptions);
+      IREE::HAL::buildHALTransformPassPipeline(
+          passManager, session.targetRegistry, session.halTargetOptions);
       break;
     }
     default:
@@ -843,8 +853,11 @@ iree_compiler_output_t *wrap(Output *output) {
 
 void ireeCompilerEnumerateRegisteredHALTargetBackends(
     void (*callback)(const char *backend, void *userData), void *userData) {
+  // TODO: Replace this entry point with one on the invocation where we can
+  // reliably enumerate all targets.
   auto registeredTargetBackends =
-      mlir::iree_compiler::IREE::HAL::getRegisteredTargetBackends();
+      mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal()
+          .getRegisteredTargetBackends();
   for (auto &b : registeredTargetBackends) {
     callback(b.c_str(), userData);
   }

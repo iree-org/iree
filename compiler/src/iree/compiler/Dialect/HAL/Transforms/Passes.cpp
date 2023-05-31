@@ -136,8 +136,9 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   passManager.addPass(IREE::Util::createFuseGlobalsPass());
 }
 
-void buildHALConfigurationPassPipeline(OpPassManager &passManager,
-                                       const TargetOptions &targetOptions) {
+void buildHALConfigurationPassPipeline(
+    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    const TargetOptions &targetOptions) {
   //----------------------------------------------------------------------------
   // Input cleanup and simplification
   //----------------------------------------------------------------------------
@@ -158,9 +159,10 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
     // Today we just assign devices from parameters but we should instead be
     // performing analysis at the flow level and then doing magic device
     // database lookups here.
-    passManager.addPass(createAssignTargetDevicesPass(targetOptions.targets));
+    passManager.addPass(
+        createAssignTargetDevicesPass(targetRegistry, targetOptions.targets));
   }
-  passManager.addPass(createVerifyTargetEnvironmentPass());
+  passManager.addPass(createVerifyTargetEnvironmentPass(targetRegistry));
 
   // Add dispatch instrumentation prior to materializing interfaces so we can
   // more easily mutate the stream dispatch ops and exports.
@@ -207,6 +209,7 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
 }
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
+                                   const TargetBackendRegistry &targetRegistry,
                                    const TargetOptions &targetOptions,
                                    const TransformOptions &transformOptions,
                                    PipelinePhase compileTo) {
@@ -214,7 +217,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
-  buildHALConfigurationPassPipeline(passManager, targetOptions);
+  buildHALConfigurationPassPipeline(passManager, targetRegistry, targetOptions);
 
   //----------------------------------------------------------------------------
   // Executable translation
@@ -240,7 +243,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // After this point the executables are opaque blobs and we cannot change
   // their interfaces.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      createTranslateExecutablesPass());
+      createTranslateExecutablesPass(targetRegistry));
 
   if (compileTo == PipelinePhase::ExecutableTargets) return;
 
@@ -284,7 +287,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // the LLVM AOT backend may combine all executable targets for the same
   // architecture into a single executable and link it as a shared library.
   if (transformOptions.linkExecutables) {
-    passManager.addPass(createLinkExecutablesPass());
+    passManager.addPass(createLinkExecutablesPass(targetRegistry));
   }
 
   // Resolve export ordinals from nested symbol references prior to
@@ -340,7 +343,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   if (transformOptions.serializeExecutables) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(
         createSerializeExecutablesPass(
-            targetOptions.debugLevel, targetOptions.executableIntermediatesPath,
+            targetRegistry, targetOptions.debugLevel,
+            targetOptions.executableIntermediatesPath,
             targetOptions.executableBinariesPath));
 
     // NOTE: symbol DCE will destroy executable target contents, so only run it
@@ -376,11 +380,12 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 }
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
+                                   const TargetBackendRegistry &targetRegistry,
                                    const TargetOptions &targetOptions,
                                    PipelinePhase compileTo) {
   TransformOptions transformOptions;
-  buildHALTransformPassPipeline(passManager, targetOptions, transformOptions,
-                                compileTo);
+  buildHALTransformPassPipeline(passManager, targetRegistry, targetOptions,
+                                transformOptions, compileTo);
 }
 
 void registerHALConfigurationPassPipeline() {
@@ -389,6 +394,7 @@ void registerHALConfigurationPassPipeline() {
                              [](OpPassManager &passManager) {
                                buildHALConfigurationPassPipeline(
                                    passManager,
+                                   TargetBackendRegistry::getGlobal(),
                                    TargetOptions::FromFlags::get());
                              });
 }
@@ -399,6 +405,7 @@ void registerHALTransformPassPipeline() {
       "Runs the full IREE HAL dialect transformation pipeline",
       [](OpPassManager &passManager, const TransformOptions &transformOptions) {
         buildHALTransformPassPipeline(passManager,
+                                      TargetBackendRegistry::getGlobal(),
                                       TargetOptions::FromFlags::get(),
                                       transformOptions, PipelinePhase::End);
       });

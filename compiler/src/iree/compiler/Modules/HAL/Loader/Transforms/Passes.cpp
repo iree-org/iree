@@ -49,12 +49,14 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 
 void buildHALInlineDynamicTransformPassPipeline(
-    OpPassManager &passManager, const TargetOptions &targetOptions) {
+    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    const TargetOptions &targetOptions) {
   //----------------------------------------------------------------------------
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
-  IREE::HAL::buildHALConfigurationPassPipeline(passManager, targetOptions);
+  IREE::HAL::buildHALConfigurationPassPipeline(passManager, targetRegistry,
+                                               targetOptions);
 
   //----------------------------------------------------------------------------
   // Executable translation
@@ -67,7 +69,7 @@ void buildHALInlineDynamicTransformPassPipeline(
   // After this point the executables are opaque blobs and we cannot change
   // their interfaces.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createTranslateExecutablesPass());
+      IREE::HAL::createTranslateExecutablesPass(targetRegistry));
 
   //----------------------------------------------------------------------------
   // Conversion
@@ -81,7 +83,7 @@ void buildHALInlineDynamicTransformPassPipeline(
   //----------------------------------------------------------------------------
 
   // Link executables together.
-  passManager.addPass(IREE::HAL::createLinkExecutablesPass());
+  passManager.addPass(IREE::HAL::createLinkExecutablesPass(targetRegistry));
 
   // Resolve export ordinals from nested symbol references prior to
   // serialization.
@@ -90,7 +92,8 @@ void buildHALInlineDynamicTransformPassPipeline(
   // Serialize executables to their binary forms.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       IREE::HAL::createSerializeExecutablesPass(
-          targetOptions.debugLevel, targetOptions.executableIntermediatesPath,
+          targetRegistry, targetOptions.debugLevel,
+          targetOptions.executableIntermediatesPath,
           targetOptions.executableBinariesPath));
 
   // NOTE: symbol DCE will destroy executable target contents.
@@ -124,7 +127,8 @@ void registerHALLoaderPasses() {
       "Runs the inline HAL executable loader dialect transformation pipeline",
       [](OpPassManager &passManager) {
         buildHALInlineDynamicTransformPassPipeline(
-            passManager, TargetOptions::FromFlags::get());
+            passManager, TargetBackendRegistry::getGlobal(),
+            TargetOptions::FromFlags::get());
       });
 }
 

@@ -22,6 +22,12 @@ class OpPassManager;
 
 namespace mlir::iree_compiler {
 
+namespace IREE::HAL {
+// Forward declared only from Dialect/HAL/Target/TargetRegistry.h so as to avoid
+// bringing full dependencies into the plugin API.
+class TargetBackendList;
+}  // namespace IREE::HAL
+
 class AbstractPluginSession;
 class PluginRegistrar;
 
@@ -49,6 +55,19 @@ class PipelineExtensions {
   virtual void extendPreprocessingPassPipeline(OpPassManager &passManager) {}
 };
 
+// Policy for how to activate the plugin.
+enum class PluginActivationPolicy {
+  // The plugin must be activated explicitly by the user (i.e. via command
+  // line flag, etc).
+  Explicit,
+
+  // The plugin is activated by default unless if explicitly suppressed.
+  // Such plugins must not alter the default behavior of the compiler and
+  // can only be used to register strictly opt-in features (i.e. HAL target
+  // backends, dialects, etc).
+  DefaultActivated,
+};
+
 // Abstract class representing a plugin registration. It is responsible for
 // various global initialization and creation of plugin sessions that mirror
 // the lifetime of and |iree_compiler_session_t| for when the plugin is
@@ -64,6 +83,9 @@ class AbstractPluginRegistration {
 
   // Gets the plugin id. Valid for the life of the registration.
   std::string_view getPluginId() { return pluginId; }
+
+  // The activation policy for the plugin.
+  virtual PluginActivationPolicy getActivationPolicy() = 0;
 
   // Performs once-only global initialization. This is called prior to any
   // sessions being created and affects everything in the process. It is
@@ -129,6 +151,11 @@ class AbstractPluginSession : public PipelineExtensions {
   // it should emit an appropriate diagnostic.
   LogicalResult activate(MLIRContext *context);
 
+  // If the plugin contributes HAL target backends, then it must return a
+  // pointer to the plugin session-owned registry here. Otherwise, nullptr.
+  virtual void populateHALTargetBackends(
+      IREE::HAL::TargetBackendList &targets) {}
+
  protected:
   // Called from registerDialects() prior to initializing the context and
   // prior to onActivate().
@@ -141,7 +168,9 @@ class AbstractPluginSession : public PipelineExtensions {
   MLIRContext *context = nullptr;
 };
 
-template <typename DerivedTy, typename OptionsTy = EmptyPluginOptions>
+template <typename DerivedTy, typename OptionsTy = EmptyPluginOptions,
+          PluginActivationPolicy activationPolicy =
+              PluginActivationPolicy::Explicit>
 class PluginSession : public AbstractPluginSession {
  public:
   using Options = OptionsTy;
@@ -155,6 +184,9 @@ class PluginSession : public AbstractPluginSession {
 
   struct Registration : public AbstractPluginRegistration {
     using AbstractPluginRegistration::AbstractPluginRegistration;
+    PluginActivationPolicy getActivationPolicy() override {
+      return activationPolicy;
+    }
     void globalInitialize() override {
       // Forward to the CRTP derived type.
       DerivedTy::globalInitialize();

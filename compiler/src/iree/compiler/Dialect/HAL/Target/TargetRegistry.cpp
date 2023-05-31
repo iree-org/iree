@@ -14,22 +14,28 @@ namespace IREE {
 namespace HAL {
 
 // Returns the static registry of translator names to translation functions.
-static llvm::StringMap<TargetBackendRegistration *>
-    &getMutableTargetRegistry() {
-  static llvm::StringMap<TargetBackendRegistration *> registry;
-  return registry;
+static TargetBackendRegistry &getMutableTargetRegistry() {
+  static TargetBackendRegistry global;
+  return global;
+}
+
+const TargetBackendRegistry &TargetBackendRegistry::getGlobal() {
+  return getMutableTargetRegistry();
 }
 
 TargetBackendRegistration::TargetBackendRegistration(llvm::StringRef name,
-                                                     CreateTargetBackendFn fn)
+                                                     CreateTargetBackendFn fn,
+                                                     bool registerStaticGlobal)
     : initFn(std::move(fn)) {
-  auto &registry = getMutableTargetRegistry();
-  if (registry.count(name) > 0) {
-    llvm::report_fatal_error(
-        "Attempting to overwrite an existing translation backend");
+  if (registerStaticGlobal) {
+    auto &registry = getMutableTargetRegistry();
+    if (registry.registrations.contains(name)) {
+      llvm::report_fatal_error(
+          "Attempting to overwrite an existing translation backend");
+    }
+    assert(initFn && "Attempting to register an empty translation function");
+    registry.registrations[name] = this;
   }
-  assert(initFn && "Attempting to register an empty translation function");
-  registry[name] = this;
 }
 
 std::shared_ptr<TargetBackend> TargetBackendRegistration::acquire() {
@@ -37,13 +43,33 @@ std::shared_ptr<TargetBackend> TargetBackendRegistration::acquire() {
   return cachedValue;
 }
 
-const llvm::StringMap<TargetBackendRegistration *> &getTargetRegistry() {
-  return getMutableTargetRegistry();
+void TargetBackendRegistry::mergeFrom(const TargetBackendList &targets) {
+  for (auto &it : targets.entries) {
+    if (registrations.contains(it.first)) {
+      llvm::report_fatal_error(
+          "Attempting to overwrite an existing translation backend");
+    }
+    auto registration = std::make_unique<TargetBackendRegistration>(
+        it.first, it.second, /*registerStaticGlobal=*/false);
+    registrations[it.first] = registration.get();
+    ownedRegistrations.push_back(std::move(registration));
+  }
 }
 
-std::vector<std::string> getRegisteredTargetBackends() {
+void TargetBackendRegistry::mergeFrom(const TargetBackendRegistry &registry) {
+  for (auto &it : registry.registrations) {
+    if (registrations.contains(it.first())) {
+      llvm::report_fatal_error(
+          "Attempting to overwrite an existing translation backend");
+    }
+    registrations[it.first()] = it.second;
+  }
+}
+
+std::vector<std::string> TargetBackendRegistry::getRegisteredTargetBackends()
+    const {
   std::vector<std::string> result;
-  for (auto &entry : getTargetRegistry()) {
+  for (auto &entry : registrations) {
     result.push_back(entry.getKey().str());
   }
   std::sort(result.begin(), result.end(),
@@ -51,8 +77,9 @@ std::vector<std::string> getRegisteredTargetBackends() {
   return result;
 }
 
-std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) {
-  for (auto &entry : getTargetRegistry()) {
+std::shared_ptr<TargetBackend> TargetBackendRegistry::getTargetBackend(
+    StringRef targetName) const {
+  for (auto &entry : registrations) {
     if (entry.getKey() == targetName) {
       return entry.getValue()->acquire();
     }
@@ -60,8 +87,9 @@ std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) {
   return {};
 }
 
-SmallVector<std::shared_ptr<TargetBackend>> getTargetBackends(
-    ArrayRef<std::string> targetNames) {
+SmallVector<std::shared_ptr<TargetBackend>>
+TargetBackendRegistry::getTargetBackends(
+    ArrayRef<std::string> targetNames) const {
   SmallVector<std::shared_ptr<TargetBackend>> matches;
   for (auto targetName : targetNames) {
     auto targetBackend = getTargetBackend(targetName);
