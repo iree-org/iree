@@ -206,6 +206,9 @@ void buildGSPMDPipeline(mlir::PassManager &passManager,
                         const GSPMDOptions &options) {
   // To MHLO.
   passManager.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+        mlir::mhlo::createChloLegalizeToHloPass(
+            /*legalizeBroadcasts=*/true, /*expandCompositions=*/true));
 
   passManager.addPass(std::make_unique<RunGSPMDPartitionerPass>(options));
 
