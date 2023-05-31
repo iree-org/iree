@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "llvm/ADT/None.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"

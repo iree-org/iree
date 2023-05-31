@@ -8,10 +8,10 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_SPIRVTOMSL_H_
 
 #include <array>
+#include <optional>
 #include <string>
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Support/LLVM.h"
 

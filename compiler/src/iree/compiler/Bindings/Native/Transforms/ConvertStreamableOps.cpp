@@ -82,7 +82,7 @@ static LogicalResult verifyResultDimsFunc(FunctionType functionType,
 
 // Converts a func.func with the iree.abi.streamable attribute into a flow.func
 // and fixes all func.call ops to be flow.call across the module.
-static Optional<StreamableFunc> convertStreamableFunc(
+static std::optional<StreamableFunc> convertStreamableFunc(
     mlir::ModuleOp moduleOp, func::FuncOp funcOp, SymbolTable &symbolTable) {
   OpBuilder moduleBuilder(funcOp);
   auto functionType = funcOp.getFunctionType();

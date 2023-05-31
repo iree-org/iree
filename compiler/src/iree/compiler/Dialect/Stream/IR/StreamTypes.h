@@ -7,10 +7,11 @@
 #ifndef IREE_COMPILER_DIALECT_STREAM_IR_STREAMTYPES_H_
 #define IREE_COMPILER_DIALECT_STREAM_IR_STREAMTYPES_H_
 
+#include <optional>
+
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/BuiltinTypes.h"

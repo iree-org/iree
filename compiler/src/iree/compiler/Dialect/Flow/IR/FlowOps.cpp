@@ -1790,7 +1790,7 @@ Value CollectiveAllToAllOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> CollectiveAllToAllOp::getTiedResultOperandIndex(
+std::optional<unsigned> CollectiveAllToAllOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
@@ -1846,7 +1846,7 @@ Value CollectiveSendRecvOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> CollectiveSendRecvOp::getTiedResultOperandIndex(
+std::optional<unsigned> CollectiveSendRecvOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
