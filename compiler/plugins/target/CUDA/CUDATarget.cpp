@@ -515,7 +515,7 @@ class CUDATargetBackend final : public TargetBackend {
         setMetadataValueI32("maxntidz", workgroupSize[2]);
 
         // Optional source location information for debugging/profiling.
-        if (options.debugLevel >= 1) {
+        if (serOptions.debugLevel >= 1) {
           if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
             auto filenameRef = builder.createString(loc->getFilename());
             sourceLocationRefs.push_back(iree_hal_cuda_FileLineLocDef_create(
