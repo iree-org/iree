@@ -179,6 +179,10 @@ py_binary(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
+    target_cpu_features_variants = [
+        "default",
+        "x86_64:+avx,+avx2,+fma",
+    ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
