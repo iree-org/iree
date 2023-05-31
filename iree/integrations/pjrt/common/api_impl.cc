@@ -1163,7 +1163,10 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     // TODO: This should be done as part of session setup from a named pool.
     // TODO: The HAL backends and other flags should come from the assigned
     // devices.
-    if (!job->SetFlag("--iree-input-type=mhlo")) {
+    // The input here should be stablehlo if coming from JAX and xla if
+    // importing from XLA HLO. Set to xla for now as it merely runs an
+    // additional pass. We can flip to auto post more testing.
+    if (!job->SetFlag("--iree-input-type=xla")) {
       return MakeCompilerError(*job);
     }
     if (!job->SetFlag("--iree-execution-model=async-external")) {
