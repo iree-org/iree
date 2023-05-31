@@ -27,10 +27,11 @@
 #endif  // IREE_HAVE_TORCH_INPUT
 
 namespace mlir::iree_compiler {
-
+namespace {
 struct AutoInputConversionPipelinePass
     : public AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   void runOnOperation() override;
+  void getDependentDialects(DialectRegistry& registry) const override;
 };
 
 // All the features seen that should be handled during input conversion.
@@ -165,6 +166,39 @@ void AutoInputConversionPipelinePass::runOnOperation() {
     signalPassFailure();
   }
 }
+
+void AutoInputConversionPipelinePass::getDependentDialects(
+    DialectRegistry& registry) const {
+  // Register dialects from all possible pipelines, as we do not statically know
+  // which pipeline will be selected, while dialect registration happens before
+  // we run any detection on the input.
+  //
+  // TODO(kuhar): Find a better registration mechanism so that we do not have to
+  // build pipelines just to query dialects and discard them immediately after.
+  auto appendPipelineDialects =
+      [&registry](function_ref<void(OpPassManager&)> buildFn) {
+        OpPassManager pm;
+        buildFn(pm);
+        pm.getDependentDialects(registry);
+      };
+
+#ifdef IREE_HAVE_MHLO_INPUT
+  appendPipelineDialects(MHLO::buildMHLOInputConversionPassPipeline);
+  appendPipelineDialects(MHLO::buildXLAInputConversionPassPipeline);
+#endif  // IREE_HAVE_MHLO_INPUT
+
+#ifdef IREE_HAVE_TOSA_INPUT
+  appendPipelineDialects(buildTOSAInputConversionPassPipeline);
+#endif  // IREE_HAVE_TOSA_INPUT
+
+#ifdef IREE_HAVE_TORCH_INPUT
+  appendPipelineDialects([](OpPassManager& pm) {
+    pm.addNestedPass<func::FuncOp>(
+        TMTensor::createConvertTMTensorToLinalgExtPass());
+  });
+#endif  // IREE_HAVE_TORCH_INPUT
+}
+}  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass() {
