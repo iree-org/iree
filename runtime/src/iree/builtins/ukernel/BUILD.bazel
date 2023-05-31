@@ -119,19 +119,23 @@ filegroup(
     ],
 )
 
-iree_bitcode_library(
-    name = "ukernel_bitcode_base",
+[iree_bitcode_library(
+    name = "ukernel_bitcode_%sbit_base" % bitness,
     srcs = UKERNEL_BASE_SRCS,
+    arch = "wasm_%s" % bitness,
     internal_hdrs = [
         ":bitcode_internal_headers",
-        "//runtime/src/iree/builtins/ukernel/arch/x86_64:bitcode_internal_headers",
     ],
-)
+) for bitness in [
+    "32",
+    "64",
+]]
 
 c_embed_data(
     name = "embed_ukernel_bitcode",
     srcs = [
-        ":ukernel_bitcode_base.bc",
+        ":ukernel_bitcode_32bit_base.bc",
+        ":ukernel_bitcode_64bit_base.bc",
         "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64.bc",
     ],
     c_file_output = "ukernel_bitcode.c",

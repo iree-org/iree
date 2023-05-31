@@ -16,14 +16,14 @@ extern "C" {
 // Parameters for a query_tile_sizes operation.
 typedef struct iree_uk_query_tile_sizes_2d_params_t {
   iree_uk_uint32_t flags;
-  iree_uk_ssize_t size0;
-  iree_uk_ssize_t size1;
+  iree_uk_index_t size0;
+  iree_uk_index_t size1;
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_query_tile_sizes_2d_params_t;
 
 typedef struct iree_uk_query_tile_sizes_2d_out_params_t {
-  iree_uk_ssize_t tile_size0;
-  iree_uk_ssize_t tile_size1;
+  iree_uk_index_t tile_size0;
+  iree_uk_index_t tile_size1;
 } iree_uk_query_tile_sizes_2d_out_params_t;
 
 IREE_UK_EXPORT int iree_uk_query_tile_sizes_2d(

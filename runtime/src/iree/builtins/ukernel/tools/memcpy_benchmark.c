@@ -28,10 +28,10 @@ static iree_status_t iree_uk_benchmark_memcpy(
       benchmark_def->user_data;
 
   int64_t total_iterations = 0;
-  iree_uk_ssize_t buffer_size = user_data->working_set_size / 2;
+  iree_uk_index_t buffer_size = user_data->working_set_size / 2;
   uint8_t* in_buffer = malloc(buffer_size);
   uint8_t* out_buffer = malloc(buffer_size);
-  for (iree_uk_ssize_t i = 0; i < buffer_size; ++i) in_buffer[i] = (i & 0xFF);
+  for (iree_uk_index_t i = 0; i < buffer_size; ++i) in_buffer[i] = (i & 0xFF);
   int64_t batch_count = 1;
   while (iree_benchmark_keep_running(benchmark_state, batch_count)) {
     for (int i = 0; i < batch_count; ++i) {

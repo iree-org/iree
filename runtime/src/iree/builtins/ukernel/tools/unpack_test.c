@@ -14,35 +14,35 @@ static void iree_unpack_reference(const iree_uk_unpack_params_t* params) {
   iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
   // For now, the input and output element types are always the same.
   iree_uk_type_t elem_type = iree_uk_unpack_in_type(unpack_type);
-  iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
-  iree_uk_ssize_t outer_size0 = params->in_size0;
-  iree_uk_ssize_t outer_size1 = params->in_size1;
-  iree_uk_ssize_t tile_size0 = params->in_size2;
-  iree_uk_ssize_t tile_size1 = params->in_size3;
-  iree_uk_ssize_t in_stride_outer0 = params->in_stride0;
-  iree_uk_ssize_t in_stride_outer1 = params->in_size3 * params->in_size2;
-  iree_uk_ssize_t in_stride_tile0 = params->in_size3;
-  iree_uk_ssize_t in_stride_tile1 = 1;
+  iree_uk_index_t elem_size = iree_uk_type_size(elem_type);
+  iree_uk_index_t outer_size0 = params->in_size0;
+  iree_uk_index_t outer_size1 = params->in_size1;
+  iree_uk_index_t tile_size0 = params->in_size2;
+  iree_uk_index_t tile_size1 = params->in_size3;
+  iree_uk_index_t in_stride_outer0 = params->in_stride0;
+  iree_uk_index_t in_stride_outer1 = params->in_size3 * params->in_size2;
+  iree_uk_index_t in_stride_tile0 = params->in_size3;
+  iree_uk_index_t in_stride_tile1 = 1;
   if (params->flags & IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER) {
-    iree_uk_ssize_swap(&outer_size0, &outer_size1);
-    iree_uk_ssize_swap(&in_stride_outer0, &in_stride_outer1);
+    iree_uk_index_swap(&outer_size0, &outer_size1);
+    iree_uk_index_swap(&in_stride_outer0, &in_stride_outer1);
   }
   if (params->flags & IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER) {
-    iree_uk_ssize_swap(&tile_size0, &tile_size1);
-    iree_uk_ssize_swap(&in_stride_tile0, &in_stride_tile1);
+    iree_uk_index_swap(&tile_size0, &tile_size1);
+    iree_uk_index_swap(&in_stride_tile0, &in_stride_tile1);
   }
-  for (iree_uk_ssize_t outer_i0 = 0; outer_i0 < outer_size0; ++outer_i0) {
-    for (iree_uk_ssize_t outer_i1 = 0; outer_i1 < outer_size1; ++outer_i1) {
-      for (iree_uk_ssize_t tile_i0 = 0; tile_i0 < tile_size0; ++tile_i0) {
-        for (iree_uk_ssize_t tile_i1 = 0; tile_i1 < tile_size1; ++tile_i1) {
-          iree_uk_ssize_t in_offset =
+  for (iree_uk_index_t outer_i0 = 0; outer_i0 < outer_size0; ++outer_i0) {
+    for (iree_uk_index_t outer_i1 = 0; outer_i1 < outer_size1; ++outer_i1) {
+      for (iree_uk_index_t tile_i0 = 0; tile_i0 < tile_size0; ++tile_i0) {
+        for (iree_uk_index_t tile_i1 = 0; tile_i1 < tile_size1; ++tile_i1) {
+          iree_uk_index_t in_offset =
               params->in_offset + outer_i0 * in_stride_outer0 +
               tile_i0 * in_stride_tile0 + outer_i1 * in_stride_outer1 +
               tile_i1 * in_stride_tile1;
-          iree_uk_ssize_t i0 = outer_i0 * tile_size0 + tile_i0;
-          iree_uk_ssize_t i1 = outer_i1 * tile_size1 + tile_i1;
+          iree_uk_index_t i0 = outer_i0 * tile_size0 + tile_i0;
+          iree_uk_index_t i1 = outer_i1 * tile_size1 + tile_i1;
           if (!(i0 >= params->out_size0 || i1 >= params->out_size1)) {
-            iree_uk_ssize_t out_offset =
+            iree_uk_index_t out_offset =
                 params->out_offset + i1 + i0 * params->out_stride0;
             const char* in_ptr =
                 ((char*)params->in_buffer) + in_offset * elem_size;
@@ -68,7 +68,7 @@ static void iree_uk_test_unpack_for_shape_params(
                       iree_uk_random_engine_get_0_1(engine);
   iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params.flags);
   iree_uk_type_t in_type = iree_uk_unpack_in_type(unpack_type);
-  iree_uk_ssize_t in_buffer_size =
+  iree_uk_index_t in_buffer_size =
       iree_uk_2d_buffer_length(in_type, params.in_size0, params.in_stride0);
   void* in_buffer = malloc(in_buffer_size);
   iree_uk_write_random_buffer(in_buffer, in_buffer_size, in_type, engine);
@@ -80,7 +80,7 @@ static void iree_uk_test_unpack_for_shape_params(
   iree_uk_unpack_params_t reference_params;
   memcpy(&reference_params, &params, sizeof reference_params);
   iree_uk_type_t out_type = iree_uk_unpack_out_type(unpack_type);
-  iree_uk_ssize_t out_buffer_size =
+  iree_uk_index_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.out_size0, params.out_stride0);
   void* reference_out_buffer = malloc(out_buffer_size);
   iree_uk_write_random_buffer(reference_out_buffer, out_buffer_size, out_type,
@@ -139,31 +139,31 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
           memcpy(&params, src_params, sizeof params);
           params.cpu_data = iree_uk_test_cpu_data(test);
           outer_shape_t outer_shape = outer_shapes[i];
-          iree_uk_ssize_t in_size0 = outer_shape.size0;
-          iree_uk_ssize_t in_size1 = outer_shape.size1;
+          iree_uk_index_t in_size0 = outer_shape.size0;
+          iree_uk_index_t in_size1 = outer_shape.size1;
           params.in_size0 = in_size0;
           params.in_size1 = in_size1;
           if (pad == pad_a_lot) {
             params.in_size0 += 16;
             params.in_size1 += 16;
           }
-          iree_uk_ssize_t tile_size0 = params.in_size2;
-          iree_uk_ssize_t tile_size1 = params.in_size3;
+          iree_uk_index_t tile_size0 = params.in_size2;
+          iree_uk_index_t tile_size1 = params.in_size3;
           if (transpose_outer) {
             params.flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
-            iree_uk_ssize_swap(&in_size0, &in_size1);
+            iree_uk_index_swap(&in_size0, &in_size1);
           }
           if (transpose_inner) {
             params.flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER;
-            iree_uk_ssize_swap(&tile_size0, &tile_size1);
+            iree_uk_index_swap(&tile_size0, &tile_size1);
           }
           params.out_size0 = in_size0 * tile_size0;
           params.out_size1 = in_size1 * tile_size1;
           if (pad == pad_one_incomplete_tile) {
             iree_uk_random_engine_t* engine = iree_uk_test_random_engine(test);
-            iree_uk_ssize_t pad_size0 =
+            iree_uk_index_t pad_size0 =
                 iree_uk_random_engine_get_0_65535(engine) % tile_size0;
-            iree_uk_ssize_t pad_size1 =
+            iree_uk_index_t pad_size1 =
                 iree_uk_random_engine_get_0_65535(engine) % tile_size1;
             params.out_size0 = params.out_size0 - pad_size0;
             if (params.out_size0 < 0) params.out_size0 = 0;

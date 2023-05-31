@@ -44,7 +44,12 @@ function(iree_bitcode_library)
   # override this but it should be harmless.
   set(_BUILTIN_HEADERS_PATH "${IREE_BINARY_DIR}/llvm-project/lib/clang/${_CLANG_VERSION_MAJOR}/include/")
 
+  iree_arch_to_llvm_arch(_LLVM_ARCH "${_RULE_ARCH}")
+
   set(_COPTS
+    # Target architecture.
+    "-target" "${_LLVM_ARCH}"
+
     # C17 with no system deps.
     "-std=c17"
     "-nostdinc"
@@ -74,21 +79,11 @@ function(iree_bitcode_library)
   list(APPEND _COPTS "-I" "${IREE_BINARY_DIR}/runtime/src")
   list(APPEND _COPTS "${_RULE_COPTS}")
 
-  if(_RULE_ARCH)
-    # Compile to the specified target architecture.
-    iree_arch_to_llvm_arch(_LLVM_ARCH "${_RULE_ARCH}")
-    list(APPEND _COPTS "-target" "${_LLVM_ARCH}")
-  else()
-    # Output text rather than binary serialization of LLVM IR for processing.
-    list(APPEND _COPTS "-S")
-    # Strip target information from generated LLVM IR.
-    set(_LLVMIR_PROCESSING_TOOL "${IREE_SOURCE_DIR}/build_tools/scripts/strip_target_info.py")
-  endif()
-
   set(_BITCODE_FILES)
   foreach(_SRC ${_RULE_SRCS})
     get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
     set(_BITCODE_FILE "${_RULE_NAME}_${_SRC}.bc")
+    list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
     add_custom_command(
       OUTPUT
         "${_BITCODE_FILE}"
@@ -106,28 +101,6 @@ function(iree_bitcode_library)
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM
     )
-
-    if(_LLVMIR_PROCESSING_TOOL)
-      set(_PROCESSED_BITCODE_FILE "${_RULE_NAME}_${_SRC}.processed.bc")
-      list(APPEND _BITCODE_FILES ${_PROCESSED_BITCODE_FILE})
-      add_custom_command(
-        OUTPUT
-          "${_PROCESSED_BITCODE_FILE}"
-        COMMAND
-          "python3"
-          "${_LLVMIR_PROCESSING_TOOL}"
-          < "${_BITCODE_FILE}"
-          > "${_PROCESSED_BITCODE_FILE}"
-        DEPENDS
-          "${_BITCODE_FILE}"
-          "${_LLVMIR_PROCESSING_TOOL}"
-        COMMENT
-          "Processing ${_BITCODE_FILE} into ${_PROCESSED_BITCODE_FILE} using ${_LLVMIR_PROCESSING_TOOL}"
-        VERBATIM
-      )
-    else()  # _LLVMIR_PROCESSING_TOOL
-      list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
-    endif()  # _LLVMIR_PROCESSING_TOOL
   endforeach()
 
   add_custom_command(

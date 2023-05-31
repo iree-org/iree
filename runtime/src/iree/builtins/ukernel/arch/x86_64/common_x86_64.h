@@ -71,8 +71,8 @@ static inline void iree_uk_avx_storeu_2x128(void* dst0, void* dst1,
 
 static inline void iree_uk_copy_8x32xi8_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   for (int i = 0; i < 8; ++i) {
     iree_uk_memcpy(out_ptr + i * out_stride, in_ptr + i * in_stride, 32);
   }
@@ -80,22 +80,22 @@ static inline void iree_uk_copy_8x32xi8_strided_to_strided(
 
 static inline void iree_uk_copy_16x64xi8_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   for (int i = 0; i < 16; ++i) {
     iree_uk_memcpy(out_ptr + i * out_stride, in_ptr + i * in_stride, 64);
   }
 }
 
 static inline __m256i iree_uk_avx2_load_8x4xi8_strided(
-    const iree_uk_int8_t* src, iree_uk_ssize_t stride) {
+    const iree_uk_int8_t* src, iree_uk_index_t stride) {
   __m256i indices = _mm256_mullo_epi32(
       _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7), _mm256_set1_epi32(stride));
   return _mm256_i32gather_epi32(src, indices, 1);
 }
 
 static inline __m128i iree_uk_avx2_load_8x2xi8_strided(
-    const iree_uk_int8_t* src, iree_uk_ssize_t stride) {
+    const iree_uk_int8_t* src, iree_uk_index_t stride) {
   __m128i result = _mm_setzero_si128();
   const iree_uk_int16_t* src_i16 = (const iree_uk_int16_t*)src;
   result =
@@ -118,7 +118,7 @@ static inline __m128i iree_uk_avx2_load_8x2xi8_strided(
 }
 
 static inline __m256i iree_uk_avx2_load_16x2xi8_strided(
-    const iree_uk_int8_t* src, iree_uk_ssize_t stride) {
+    const iree_uk_int8_t* src, iree_uk_index_t stride) {
   __m256i result = _mm256_setzero_si256();
   const iree_uk_int16_t* src_i16 = (const iree_uk_int16_t*)src;
   result = _mm256_insert_epi16(result,
@@ -158,21 +158,21 @@ static inline __m256i iree_uk_avx2_load_16x2xi8_strided(
 
 static inline void iree_uk_avx2_copy_8x4xi8_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   __m256i in = iree_uk_avx2_load_8x4xi8_strided(in_ptr, in_stride);
   _mm256_storeu_si256((__m256i*)out_ptr, in);
 }
 
 static inline void iree_uk_avx2_copy_8x2xi8_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   __m128i in = iree_uk_avx2_load_8x2xi8_strided(in_ptr, in_stride);
   _mm_storeu_si128((__m128i*)out_ptr, in);
 }
 
 static inline void iree_uk_avx2_copy_16x2xi8_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   __m256i in = iree_uk_avx2_load_16x2xi8_strided(in_ptr, in_stride);
   _mm256_storeu_si256((__m256i*)out_ptr, in);
 }
@@ -180,8 +180,8 @@ static inline void iree_uk_avx2_copy_16x2xi8_strided_to_unstrided(
 static inline void
 iree_uk_avx2_copy_8x16xi8_tiled_1x4_transpose_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   __m256i r00004444 =
       iree_uk_avx_loadu_2x128(in_ptr + 0 * in_stride, in_ptr + 4 * in_stride);
   __m256i r11115555 =
@@ -211,8 +211,8 @@ iree_uk_avx2_copy_8x16xi8_tiled_1x4_transpose_strided_to_strided(
 static inline void
 iree_uk_avx2_copy_8x16xi8_tiled_1x2_transpose_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   __m256i r0000000044444444 =
       iree_uk_avx_loadu_2x128(in_ptr + 0 * in_stride, in_ptr + 4 * in_stride);
   __m256i r1111111155555555 =
@@ -313,7 +313,7 @@ static inline void iree_uk_avx512_storeu_4x128_to_16x16xi32(
 }
 
 static inline __m512i iree_uk_avx512_load_16x4xi8_strided(
-    const iree_uk_int8_t* src, iree_uk_ssize_t stride) {
+    const iree_uk_int8_t* src, iree_uk_index_t stride) {
   __m512i indices = _mm512_mullo_epi32(
       _mm512_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
       _mm512_set1_epi32(stride));
@@ -322,7 +322,7 @@ static inline __m512i iree_uk_avx512_load_16x4xi8_strided(
 
 static inline void iree_uk_avx512_copy_16x4xi8_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   __m512i in = iree_uk_avx512_load_16x4xi8_strided(in_ptr, in_stride);
   _mm512_storeu_si512((__m512i*)out_ptr, in);
 }
@@ -330,8 +330,8 @@ static inline void iree_uk_avx512_copy_16x4xi8_strided_to_unstrided(
 static inline void
 iree_uk_avx512_copy_16x16xi8_tiled_1x4_transpose_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   __m512i r000044448888CCCC = iree_uk_avx512_loadu_4x128(
       in_ptr + 0 * in_stride, in_ptr + 4 * in_stride, in_ptr + 8 * in_stride,
       in_ptr + 12 * in_stride);
@@ -381,8 +381,8 @@ iree_uk_avx512_copy_16x16xi8_tiled_1x4_transpose_strided_to_strided(
 static inline void
 iree_uk_avx512_copy_16x16xi8_tiled_1x2_transpose_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   __m512i r000044448888CCCC = iree_uk_avx512_loadu_4x128(
       in_ptr + 0 * in_stride, in_ptr + 4 * in_stride, in_ptr + 8 * in_stride,
       in_ptr + 12 * in_stride);

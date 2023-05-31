@@ -259,51 +259,94 @@ static inline bool iree_uk_all_bits_set(const iree_uk_uint64_t val,
 }
 
 //===----------------------------------------------------------------------===//
-// iree_uk_ssize_t: signed size/index type.
+// Architecture detection (copied from target_platorm.h)
 //===----------------------------------------------------------------------===//
 
-// Don't think of this as "pointer-size" -- there's a reason why this is called
-// ssize_t, not ptrdiff_t.
-//
-// The typical compilation path for this ukernel code is to LLVM bitcode, i.e.
-// LLVM IR. There, there is an opaque pointer type, `ptr`, so pointers don't
-// even have a "size". Size/index types, on the other hand, are explicitly sized
-// integers such as i32 or i64. We have to pick one here.
-//
-// As outer parts of ukernel code (all what's outside of the arch/ subdir) is
-// compiled once to LLVM bitcode that's reused on all architectures, we have to
-// pick one type that will be used across all architectures. In the future, if
-// we care more about optimizing for 32-bit architectures, we could consider
-// revisiting that by having two separate builds of the non-arch/ ukernel code,
-// one for 64-bit and one for 32-bit architectures.
-//
-// For now, it seems reasonable to just use int64 everywhere. Our current focus
-// is on 64-bit architectures anyway, the expected overhead on 32-bit
-// architectures should be marginal, and this buys us simplicity and uniformity
-// (ukernels having the exact same semantics across architectures) that we would
-// lose the moment we allowed iree_uk_ssize_t to vary across architectures.
-typedef iree_uk_int64_t iree_uk_ssize_t;
+#if defined(__arm64) || defined(__aarch64__) || defined(_M_ARM64) || \
+    defined(_M_ARM64EC)
+#define IREE_UK_ARCH_ARM_64 1
+#elif defined(__arm__) || defined(__thumb__) || defined(__TARGET_ARCH_ARM) || \
+    defined(__TARGET_ARCH_THUMB) || defined(_M_ARM)
+#define IREE_UK_ARCH_ARM_32 1
+#endif  // ARM
 
-static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
-  iree_uk_ssize_t t = *a;
+#if defined(__riscv) && (__riscv_xlen == 32)
+#define IREE_UK_ARCH_RISCV_32 1
+#elif defined(__riscv) && (__riscv_xlen == 64)
+#define IREE_UK_ARCH_RISCV_64 1
+#endif  // RISCV
+
+#if defined(__wasm32__)
+#define IREE_UK_ARCH_WASM_32 1
+#elif defined(__wasm64__)
+#define IREE_UK_ARCH_WASM_64 1
+#endif  // WASM
+
+#if defined(__i386__) || defined(__i486__) || defined(__i586__) || \
+    defined(__i686__) || defined(__i386) || defined(_M_IX86) || defined(_X86_)
+#define IREE_UK_ARCH_X86_32 1
+#elif defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || \
+    defined(__amd64) || defined(_M_X64)
+#define IREE_UK_ARCH_X86_64 1
+#endif  // X86
+
+//===----------------------------------------------------------------------===//
+// Architecture bitness
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_UK_ARCH_ARM_64) || defined(IREE_UK_ARCH_RISCV_64) || \
+    defined(IREE_UK_ARCH_WASM_64) || defined(IREE_UK_ARCH_X86_64)
+#define IREE_UK_ARCH_IS_64_BIT
+#elif defined(IREE_UK_ARCH_ARM_32) || defined(IREE_UK_ARCH_RISCV_32) || \
+    defined(IREE_UK_ARCH_WASM_32) || defined(IREE_UK_ARCH_X86_32)
+#define IREE_UK_ARCH_IS_32_BIT
+#else
+#error Unknown architecture
+#endif
+
+//===----------------------------------------------------------------------===//
+// iree_uk_index_t: signed integer type, same size as MLIR `index`.
+//===----------------------------------------------------------------------===//
+
+// When ukernels are built as bitcode to embed in the compiler, the requirement
+// here is that the size of iree_uk_index_t equals the size of the compiler's
+// `index` type.
+//
+// So when here we define iree_uk_index_t as a pointer-sized type, there is an
+// implicit assumption about how this ukernel code is built. When building as
+// bitcode to embed in the compiler, this code must be built twice, once for
+// some 32-bit-pointers architecture and once for some 64-bit-pointers
+// architecture. Then the compiler must select the bitcode module that matches
+// the size of the `index` type.
+
+#if defined(IREE_UK_ARCH_IS_64_BIT)
+typedef iree_uk_int64_t iree_uk_index_t;
+#elif defined(IREE_UK_ARCH_IS_32_BIT)
+typedef iree_uk_int32_t iree_uk_index_t;
+#else
+#error Unknown architecture
+#endif
+
+static inline void iree_uk_index_swap(iree_uk_index_t* a, iree_uk_index_t* b) {
+  iree_uk_index_t t = *a;
   *a = *b;
   *b = t;
 }
 
-static inline iree_uk_ssize_t iree_uk_ssize_min(iree_uk_ssize_t a,
-                                                iree_uk_ssize_t b) {
+static inline iree_uk_index_t iree_uk_index_min(iree_uk_index_t a,
+                                                iree_uk_index_t b) {
   return a <= b ? a : b;
 }
 
-static inline iree_uk_ssize_t iree_uk_ssize_max(iree_uk_ssize_t a,
-                                                iree_uk_ssize_t b) {
+static inline iree_uk_index_t iree_uk_index_max(iree_uk_index_t a,
+                                                iree_uk_index_t b) {
   return a >= b ? a : b;
 }
 
-static inline iree_uk_ssize_t iree_uk_ssize_clamp(iree_uk_ssize_t val,
-                                                  iree_uk_ssize_t min,
-                                                  iree_uk_ssize_t max) {
-  return iree_uk_ssize_min(max, iree_uk_ssize_max(min, val));
+static inline iree_uk_index_t iree_uk_index_clamp(iree_uk_index_t val,
+                                                  iree_uk_index_t min,
+                                                  iree_uk_index_t max) {
+  return iree_uk_index_min(max, iree_uk_index_max(min, val));
 }
 
 //===----------------------------------------------------------------------===//
@@ -502,14 +545,14 @@ static inline iree_uk_type_t iree_uk_untie_type(int pos,
 // as a memcpy call.
 static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
                                   const void* IREE_UK_RESTRICT src,
-                                  iree_uk_ssize_t size) {
-  for (iree_uk_ssize_t i = 0; i < size; ++i)
+                                  iree_uk_index_t size) {
+  for (iree_uk_index_t i = 0; i < size; ++i)
     ((char*)dst)[i] = ((const char*)src)[i];
 }
 
-static inline void iree_uk_memset(void* buf, int val, iree_uk_ssize_t n) {
+static inline void iree_uk_memset(void* buf, int val, iree_uk_index_t n) {
   // This naive loop is lifted to a memset by both clang and gcc on ARM64.
-  for (iree_uk_ssize_t i = 0; i < n; ++i) ((char*)buf)[i] = val;
+  for (iree_uk_index_t i = 0; i < n; ++i) ((char*)buf)[i] = val;
 }
 
 //===----------------------------------------------------------------------===//

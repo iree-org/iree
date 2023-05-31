@@ -15,17 +15,17 @@ extern "C" {
 
 typedef struct iree_uk_pack_params_t {
   const void* in_buffer;
-  iree_uk_ssize_t in_offset;
-  iree_uk_ssize_t in_stride0;
+  iree_uk_index_t in_offset;
+  iree_uk_index_t in_stride0;
   void* out_buffer;
-  iree_uk_ssize_t out_offset;
-  iree_uk_ssize_t out_stride0;
-  iree_uk_ssize_t in_size0;
-  iree_uk_ssize_t in_size1;
-  iree_uk_ssize_t out_size0;
-  iree_uk_ssize_t out_size1;
-  iree_uk_ssize_t out_size2;
-  iree_uk_ssize_t out_size3;
+  iree_uk_index_t out_offset;
+  iree_uk_index_t out_stride0;
+  iree_uk_index_t in_size0;
+  iree_uk_index_t in_size1;
+  iree_uk_index_t out_size0;
+  iree_uk_index_t out_size1;
+  iree_uk_index_t out_size2;
+  iree_uk_index_t out_size3;
   // The least significant bits of `padding_value`, up to element size, are used
   // for padding. As this is based solely on bit-significance and not on byte
   // addresses, this is independent of endianness.

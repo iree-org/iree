@@ -38,18 +38,18 @@ static inline iree_uk_type_t iree_uk_unpack_out_type(
 
 typedef void (*iree_uk_unpack_tile_func_t)(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride0, iree_uk_ssize_t in_stride1,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1);
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride0, iree_uk_index_t in_stride1,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1);
 
 // Tile kernel declarations. Prototype matches iree_uk_unpack_tile_func_t.
 #define IREE_UK_UNPACK_TILE_FUNC_DECL(NAME)                           \
   void NAME(void* IREE_UK_RESTRICT out_tile_ptr,                      \
             const void* IREE_UK_RESTRICT in_tile_ptr,                 \
-            iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride0, \
-            iree_uk_ssize_t in_stride1, iree_uk_ssize_t elem_size,    \
-            iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1);
+            iree_uk_index_t outer_size1, iree_uk_index_t out_stride0, \
+            iree_uk_index_t in_stride1, iree_uk_index_t elem_size,    \
+            iree_uk_index_t tile_size0, iree_uk_index_t tile_size1);
 
 // Returns the tile function to use for the unpack op with the given params.
 iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func(
