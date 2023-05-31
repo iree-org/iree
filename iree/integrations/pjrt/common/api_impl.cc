@@ -546,7 +546,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
     // If there is an allocated buffer we need to copy to the destinaton.
     if (copy_data->alloc) {
       std::memcpy(copy_data->dst, copy_data->aligned, copy_data->size);
-      delete static_cast<char*>(copy_data->alloc);
+      delete[] static_cast<char*>(copy_data->alloc);
     }
     copy_data->event->ExternalSignalReady(iree_ok_status());
     delete copy_data;
