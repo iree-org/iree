@@ -162,6 +162,16 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
   }
+
+  // 'vector.shape_cast' are very expensive operations that are even generated
+  // by some of the lowerings above (e.g., flatten transfer ops). There are
+  // chances to cancel them out if they are not lowered too early so we lower
+  // them at the very end of the pass.
+  {
+    RewritePatternSet patterns(&getContext());
+    vector::populateVectorShapeCastLoweringPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
