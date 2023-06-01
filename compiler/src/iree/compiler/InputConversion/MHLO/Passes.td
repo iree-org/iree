@@ -46,7 +46,7 @@ def VerifyCompilerMHLOInputLegality :
 }
 
 def ConvertMHLOToStableHLOPass : Pass<"iree-convert-mhlo-to-stablehlo", "ModuleOp"> {
-  let summary = "Convert MHLO to StableHLO, to aid in transiton to StableHLO.";
+  let summary = "Convert MHLO to StableHLO, to aid in transition to StableHLO.";
   let constructor = "mlir::iree_compiler::MHLO::createConvertMHLOToStableHLOPass()";
 }
 
