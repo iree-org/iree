@@ -1709,15 +1709,15 @@ iree_bytecode_module(
   NAME
     "iree-module-9f427ef22efcf4736dda3c87b30a8af80f3071eaba07f6d5e9795c2631effc4e"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8_Resnet50fp16PT16Batch8.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8_Resnet50fp16PTBatch8.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50fp16PT16Batch8_module_9f427ef22efcf4736dda3c87b30a8af80f3071eaba07f6d5e9795c2631effc4e/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50fp16PTBatch8_module_9f427ef22efcf4736dda3c87b30a8af80f3071eaba07f6d5e9795c2631effc4e/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "Resnet50fp16PT16Batch8(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "Resnet50fp16PTBatch8(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -2029,15 +2029,15 @@ iree_bytecode_module(
   NAME
     "iree-module-22c17848ebc029e64b86ac50b5fb28b7198c0ef3b3f7f03ed111d189328ba147"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024_BertLargeJAXBatch1024.mlirbc"
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024_BERT_LARGE_JAX_384XI32_BATCH1024.mlirbc"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargeJAXBatch1024_module_22c17848ebc029e64b86ac50b5fb28b7198c0ef3b3f7f03ed111d189328ba147/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BERT_LARGE_JAX_384XI32_BATCH1024_module_22c17848ebc029e64b86ac50b5fb28b7198c0ef3b3f7f03ed111d189328ba147/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeJAXBatch1024(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BERT_LARGE_JAX_384XI32_BATCH1024(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -2045,15 +2045,15 @@ iree_bytecode_module(
   NAME
     "iree-module-a28fb3589ad3175aced5b87acb35b791bb71ce005c58f9c3fbadb2df907d7ba6"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280_BertLargeJAXBatch1280.mlirbc"
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280_BERT_LARGE_JAX_384XI32_BATCH1280.mlirbc"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargeJAXBatch1280_module_a28fb3589ad3175aced5b87acb35b791bb71ce005c58f9c3fbadb2df907d7ba6/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BERT_LARGE_JAX_384XI32_BATCH1280_module_a28fb3589ad3175aced5b87acb35b791bb71ce005c58f9c3fbadb2df907d7ba6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeJAXBatch1280(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BERT_LARGE_JAX_384XI32_BATCH1280(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -5623,9 +5623,9 @@ iree_bytecode_module(
   NAME
     "iree-module-371a2c6fa2e0b6ae8aecaac605ed5e6bc16202b5bf5c12d3d47d270eac205de6"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8_Resnet50fp16PT16Batch8.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8_Resnet50fp16PTBatch8.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50fp16PT16Batch8_module_371a2c6fa2e0b6ae8aecaac605ed5e6bc16202b5bf5c12d3d47d270eac205de6/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50fp16PTBatch8_module_371a2c6fa2e0b6ae8aecaac605ed5e6bc16202b5bf5c12d3d47d270eac205de6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
@@ -5633,9 +5633,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50fp16PT16Batch8_module_371a2c6fa2e0b6ae8aecaac605ed5e6bc16202b5bf5c12d3d47d270eac205de6/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50fp16PTBatch8_module_371a2c6fa2e0b6ae8aecaac605ed5e6bc16202b5bf5c12d3d47d270eac205de6/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50fp16PT16Batch8(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "Resnet50fp16PTBatch8(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -6023,9 +6023,9 @@ iree_bytecode_module(
   NAME
     "iree-module-cf5560593dbc526d065894226429652670c5f24a8fb0828bd298921d137a17d4"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024_BertLargeJAXBatch1024.mlirbc"
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024_BERT_LARGE_JAX_384XI32_BATCH1024.mlirbc"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargeJAXBatch1024_module_cf5560593dbc526d065894226429652670c5f24a8fb0828bd298921d137a17d4/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BERT_LARGE_JAX_384XI32_BATCH1024_module_cf5560593dbc526d065894226429652670c5f24a8fb0828bd298921d137a17d4/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=stablehlo"
@@ -6033,9 +6033,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeJAXBatch1024_module_cf5560593dbc526d065894226429652670c5f24a8fb0828bd298921d137a17d4/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BERT_LARGE_JAX_384XI32_BATCH1024_module_cf5560593dbc526d065894226429652670c5f24a8fb0828bd298921d137a17d4/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeJAXBatch1024(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BERT_LARGE_JAX_384XI32_BATCH1024(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -6043,9 +6043,9 @@ iree_bytecode_module(
   NAME
     "iree-module-dde92ea004e3c30ffbe82139e2cdf371c9bf78d05660fd952720ddb110bd9724"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280_BertLargeJAXBatch1280.mlirbc"
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280_BERT_LARGE_JAX_384XI32_BATCH1280.mlirbc"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_BertLargeJAXBatch1280_module_dde92ea004e3c30ffbe82139e2cdf371c9bf78d05660fd952720ddb110bd9724/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_BERT_LARGE_JAX_384XI32_BATCH1280_module_dde92ea004e3c30ffbe82139e2cdf371c9bf78d05660fd952720ddb110bd9724/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=stablehlo"
@@ -6053,9 +6053,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeJAXBatch1280_module_dde92ea004e3c30ffbe82139e2cdf371c9bf78d05660fd952720ddb110bd9724/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BERT_LARGE_JAX_384XI32_BATCH1280_module_dde92ea004e3c30ffbe82139e2cdf371c9bf78d05660fd952720ddb110bd9724/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeJAXBatch1280(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BERT_LARGE_JAX_384XI32_BATCH1280(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
