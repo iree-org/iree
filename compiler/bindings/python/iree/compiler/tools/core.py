@@ -41,7 +41,7 @@ class InputType(Enum):
   `CompilerOptions.input_type`.
   """
   NONE = "none"
-  AUTO= "auto"
+  AUTO = "auto"
   STABLEHLO = "stablehlo"
   STABLEHLO_XLA = "stablehlo_xla"
   TOSA = "tosa"
