@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/schemas/cpu_data.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/Support/CommandLine.h"
@@ -23,39 +24,6 @@ static llvm::cl::opt<bool> clVerboseDebugInfo(
 
 namespace mlir {
 namespace iree_compiler {
-
-// List of all defined llvm feature-name to bit pattern used to represent it.
-// This is derived based on the schema in `runtime/src/iree/schemas/`.
-// TODO(ravishankarm): This link to the runtime schemas needs to be broken.
-// Instead we should use a reflection callback to resolve arch guarded features
-// directly in the compiler.
-
-// Struct to capture tuple of llvm feature-name to bit pattern used to represent
-// it.
-struct iree_llvm_name_and_bit_pattern_t {
-  const char *llvm_name;
-  unsigned long long bit_pattern;
-};
-
-#define IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name) \
-  IREE_CPU_DATA##field_index##_##arch##_##bit_name
-
-#define IREE_CPU_FEATURE_NAME_AND_BIT_PATTERN(arch, field_index, bit_name, \
-                                              llvm_name)                   \
-  {llvm_name, IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name)},
-
-static const struct iree_llvm_name_and_bit_pattern_t
-    iree_llvm_name_and_bit_pattern_list[] = {
-
-#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
-  IREE_CPU_FEATURE_NAME_AND_BIT_PATTERN(arch, field_index, bit_name, llvm_name)
-#include "iree/schemas/cpu_feature_bits.inl"
-#undef IREE_CPU_FEATURE_BIT
-
-};
-
-#undef IREE_CPU_FEATURE_NAME_AND_BIT_PATTERN
-#undef IREE_CPU_FEATURE_BIT_NAME
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI
@@ -885,24 +853,47 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
     return processorDataPtrValue;
   }
 
-  SmallVector<uint64_t> specifiedFeatureBitPatterns;
+  // Currently requiring all CPU feature bits to be in field 0. Generalize as
+  // needed when other CPU feature fields start to be used.
+  uint64_t specifiedCpuDataField0 = 0;
   {
+    // Map llvm feature-name to bit used to represent it in IREE_CPUDATA_FIELD0.
+    //
+    // TODO(ravishankarm): This link to the runtime schemas needs to be broken.
+    // Instead we should use a reflection callback to resolve arch guarded
+    // features directly in the compiler.
     llvm::StringMap<uint64_t> featureToBitPattern;
-    for (auto [llvmName, bitPattern] : iree_llvm_name_and_bit_pattern_list) {
-      featureToBitPattern[llvmName] = bitPattern;
+    auto targetTriple = getTargetTriple(targetAttr);
+    if (!targetTriple) {
+      return processorDataPtrValue;
     }
+    std::string targetArchUppercase =
+        StringRef(getIreeArchNameForTargetTriple(targetTriple.value())).upper();
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
+  if (targetArchUppercase == #arch) {                                         \
+    assert(field_index == 0);                                                 \
+    featureToBitPattern[llvm_name] = 1ull << bit_pos;                         \
+  }
+#include "iree/schemas/cpu_feature_bits.inl"
+#undef IREE_CPU_FEATURE_BIT
+
+    // Find CPU features in featureToBitPattern
     SmallVector<StringRef> cpuFeatureStrings;
     llvm::cast<StringAttr>(cpuFeatures->getValue())
         .getValue()
         .split(cpuFeatureStrings, ',', /*MakeSplit=*/-1, /*KeepEmpty=*/false);
     for (auto featureString : cpuFeatureStrings) {
-      if (featureToBitPattern.count(featureString.drop_front())) {
-        specifiedFeatureBitPatterns.push_back(
-            featureToBitPattern.lookup(featureString.drop_front()));
+      // CPU features are typically prefixed with a +, e.g. +avx,+avx2,+fma.
+      featureString.consume_front("+");
+      // Silently skip unknown CPU features, more flexible for now. Note that
+      // some featurs occurring here are not standard CPU features but internal
+      // things such as the "+reserve-x18" that we add on arm64.
+      if (featureToBitPattern.count(featureString)) {
+        specifiedCpuDataField0 |= featureToBitPattern.lookup(featureString);
       }
     }
   }
-  if (specifiedFeatureBitPatterns.empty()) {
+  if (specifiedCpuDataField0 == 0) {
     return processorDataPtrValue;
   }
 
@@ -919,11 +910,9 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   Value srcData0 =
       builder.create<LLVM::LoadOp>(loc, i64Ty, processorDataPtrValue);
   // Set the specified CPU arch data.
-  for (auto bitPattern : specifiedFeatureBitPatterns) {
-    Value bitPatternVal = builder.create<LLVM::ConstantOp>(
-        loc, i64Ty, builder.getI64IntegerAttr(bitPattern));
-    srcData0 = builder.create<LLVM::OrOp>(loc, srcData0, bitPatternVal);
-  }
+  Value bitPatternVal = builder.create<LLVM::ConstantOp>(
+      loc, i64Ty, builder.getI64IntegerAttr(specifiedCpuDataField0));
+  srcData0 = builder.create<LLVM::OrOp>(loc, srcData0, bitPatternVal);
   builder.create<LLVM::StoreOp>(loc, srcData0, alloca);
   // Copy over the rest.
   for (int64_t i = 1, e = ProcessorDataCapacity; i < e; ++i) {
