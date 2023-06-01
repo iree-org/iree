@@ -129,7 +129,7 @@ class TileConsumerAndFuseInputProducer final
     // Fuse the candidate immeidate operands into the tiled loop.
     OpBuilder::InsertionGuard guard(rewriter);
     while (!candidates.empty()) {
-      tensor::ExtractSliceOp sliceOp = candidates.front();
+      tensor::ExtractSliceOp sliceOp = candidates.back();
       candidates.pop_back();
       tileAndFuseProducerOfSlice(rewriter, sliceOp, tilingResult->loops);
     }

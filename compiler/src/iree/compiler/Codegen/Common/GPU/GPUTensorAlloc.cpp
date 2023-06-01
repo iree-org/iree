@@ -106,7 +106,7 @@ namespace {
 /// %val = linalg ... ins(...) outs(%alloc)
 /// ```
 struct SwapAllocTensorPattern final
-    : public OpRewritePattern<bufferization::AllocTensorOp> {
+    : OpRewritePattern<bufferization::AllocTensorOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(bufferization::AllocTensorOp allocOp,

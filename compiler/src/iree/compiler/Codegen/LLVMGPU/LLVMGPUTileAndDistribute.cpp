@@ -71,7 +71,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                                                    filter);
 }
 
-LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
+static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
