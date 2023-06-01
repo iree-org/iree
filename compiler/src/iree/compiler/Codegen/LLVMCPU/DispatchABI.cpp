@@ -871,7 +871,7 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
         StringRef(getIreeArchNameForTargetTriple(targetTriple.value())).upper();
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
   if (targetArchUppercase == #arch) {                                         \
-    assert(field_index == 0);                                 \
+    assert(field_index == 0);                                                 \
     featureToBitPattern[llvm_name] = 1ull << bit_pos;                         \
   }
 #include "iree/schemas/cpu_feature_bits.inl"
