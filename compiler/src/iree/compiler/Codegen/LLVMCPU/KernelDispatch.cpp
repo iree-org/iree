@@ -779,14 +779,15 @@ static LogicalResult setDefaultRootConfig(
 }
 
 static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  SmallVector<int64_t> noCacheLevelTiling = {0, 0, 0};
+  unsigned numLoops = op.getNumLoops();
+  SmallVector<int64_t> noCacheLevelTiling(numLoops, 0);
 
   // Cache-level tiling is only supported for 2-D matmuls.
-  if (op.getNumLoops() != 3) {
+  if (numLoops < 3) {
     return noCacheLevelTiling;
   }
 
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
     // 'I' should be equal to the number of accumulators. Increasing it further
     // wouldn't contribute to spacial locality. 'K' should be at least the
@@ -796,7 +797,8 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
     // if there are enough elements in that dimension modulo cache conflicts.
     // Current configuration is ~12.5KB. That should hopefully leave enough room
     // for fused consumers assuming a 32KB cache.
-    SmallVector<int64_t> defaultCacheTileSizes = {8, 128, 16};
+    SmallVector<int64_t> defaultCacheTileSizes(numLoops - 3, 0);
+    defaultCacheTileSizes.append({8, 128, 16});
 
     // We apply cache-level tiling if at least one of the dimensions is dynamic
     // or one of the static dimensions is larger than the cache tile size for
@@ -1112,10 +1114,7 @@ static LogicalResult setRootConfig(
     }
 
     // Compute cache-level tile sizes.
-    SmallVector<int64_t> defaultCacheTileSizes =
-        getDefaultMatmulCacheSizes(linalgOp);
-    cacheTileSizes.append(defaultCacheTileSizes.end() - numLoops,
-                          defaultCacheTileSizes.end());
+    cacheTileSizes = getDefaultMatmulCacheSizes(linalgOp);
 
     // Choose the next non-zero tile size immediately after distribution to help
     // compute the distribution tile sizes.
