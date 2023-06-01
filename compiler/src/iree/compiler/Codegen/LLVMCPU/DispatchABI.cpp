@@ -862,7 +862,6 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
     // TODO(ravishankarm): This link to the runtime schemas needs to be broken.
     // Instead we should use a reflection callback to resolve arch guarded
     // features directly in the compiler.
-    bool areAllBitsInField0 = true;
     llvm::StringMap<uint64_t> featureToBitPattern;
     auto targetTriple = getTargetTriple(targetAttr);
     if (!targetTriple) {
@@ -872,14 +871,11 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
         StringRef(getIreeArchNameForTargetTriple(targetTriple.value())).upper();
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
   if (targetArchUppercase == #arch) {                                         \
-    areAllBitsInField0 &= (field_index == 0);                                 \
+    assert(field_index == 0);                                 \
     featureToBitPattern[llvm_name] = 1ull << bit_pos;                         \
   }
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT
-    assert(areAllBitsInField0 &&
-           "TODO: support CPU feature bits in other CPU data fields than field "
-           "0.");
 
     // Find CPU features in featureToBitPattern
     SmallVector<StringRef> cpuFeatureStrings;
