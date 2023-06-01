@@ -334,7 +334,7 @@ Got: ${_TARGET_CPU_FEATURES}.")
     endif()
     # Generate the target cpu features suffix string with underscores ('_')
     # separating the features.
-    string(REPLACE "+" "_" _TARGET_CPU_FEATURES_SUFFIX_LOCAL "${_TARGET_CPU_FEATURES}")
+    string(REGEX REPLACE "[+,]+" "_" _TARGET_CPU_FEATURES_SUFFIX_LOCAL "${_TARGET_CPU_FEATURES}")
     set(_TARGET_CPU_FEATURES_SUFFIX "${_TARGET_CPU_FEATURES_SUFFIX_LOCAL}" PARENT_SCOPE)
   else()
     set(_ENABLED "FALSE" PARENT_SCOPE)

@@ -114,7 +114,7 @@ inspect the IR to find the proper way to call their kernels.
 
 ```
 iree-compile \
-    --iree-input-type=mhlo \
+    --iree-input-type=stablehlo \
     iree/samples/simple_embedding/simple_embedding_test.mlir \
     -o=module.vmfb \
     --iree-hal-target-backends=llvm-cpu \

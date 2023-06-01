@@ -52,18 +52,6 @@ function download_wheels() {
   gh release download "${RELEASE}" --repo openxla/iree --pattern "*.whl"
 }
 
-# For some reason auditwheel detects these as not manylinux compliant even
-# though they are (we think). Use repair to fix the platform
-function repair_wheels() {
-  echo ""
-  echo "Repairing tool wheels"
-  for f in iree_tools_*linux_x86_64*; do
-    auditwheel repair --plat manylinux_2_17_x86_64 --wheel-dir . "$f"
-    echo "Deleting non-compliant wheel '$f'"
-    rm "$f"
-  done
-}
-
 function upload_wheels() {
   twine upload --verbose -u google-iree-pypi-deploy *
 }
@@ -81,7 +69,6 @@ function main() {
   fi
 
   download_wheels
-  repair_wheels
   upload_wheels
 }
 

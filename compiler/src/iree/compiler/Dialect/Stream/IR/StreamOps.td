@@ -26,12 +26,13 @@ class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
 // Generic resource ops
 //===----------------------------------------------------------------------===//
 
-def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
+def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
   ]>,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a persistent value with undefined contents}];
@@ -79,13 +80,14 @@ def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
+def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
   ]>,
   Stream_TimelineOp,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a transient value with undefined contents}];
@@ -747,7 +749,10 @@ def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
 
 def Stream_TensorEmptyOp : Stream_PureOp<"tensor.empty", [
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "isMetadata",
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -836,7 +841,9 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
 
 def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -1331,7 +1338,7 @@ def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
 // Resource transfer ops
 //===----------------------------------------------------------------------===//
 
-def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
+def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
@@ -1342,6 +1349,7 @@ def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
     "preferCloneToConsumers",
   ]>,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a transient value with undefined contents}];

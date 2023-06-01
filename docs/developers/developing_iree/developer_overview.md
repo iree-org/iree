@@ -144,7 +144,7 @@ runner for the IREE [check framework](./testing_guide.md#end-to-end-tests).
 
 ```shell
 $ ../iree-build/tools/iree-compile \
-  --iree-input-type=mhlo \
+  --iree-input-type=stablehlo \
   --iree-hal-target-backends=vmvx \
   $PWD/tests/e2e/xla_ops/abs.mlir \
   -o /tmp/abs.vmfb

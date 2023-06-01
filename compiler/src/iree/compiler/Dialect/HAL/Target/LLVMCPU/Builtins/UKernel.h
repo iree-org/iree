@@ -15,7 +15,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-std::optional<std::unique_ptr<llvm::Module>> loadUKernelBitcode(
+std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
+    llvm::LLVMContext &context);
+
+std::unique_ptr<llvm::Module> loadUKernelArchBitcode(
     llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
 
 }  // namespace HAL

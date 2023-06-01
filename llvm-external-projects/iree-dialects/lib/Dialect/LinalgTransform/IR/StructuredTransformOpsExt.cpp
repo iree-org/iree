@@ -37,6 +37,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
@@ -54,12 +55,16 @@ using namespace mlir;
 // Additional constraints for PDLMatchOp.
 //===----------------------------------------------------------------------===//
 
-/// Hook for PDL driver to check if an operation (`values[0]`) is directly
+/// Hook for PDL driver to check if an operation (`pdlValues[0]`) is directly
 /// nested in a function with the name provided by an attribute
-/// (`values[1]`).
+/// (`pdlValues[1]`).
 /// TODO: PDL needs user-defined "questions".
 static LogicalResult nestedInFunc(PatternRewriter &rewriter,
-                                  Operation *operation, Attribute attr) {
+                                  ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  Operation *operation = pdlValues[0].cast<Operation *>();
+  Attribute attr = pdlValues[1].cast<Attribute>();
+
   auto func = operation->getParentOfType<func::FuncOp>();
   if (!func)
     return rewriter.notifyMatchFailure(operation, "not nested in a function");
@@ -152,23 +157,26 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
   return haveEquivalentBodies(linalgOp, linalgModelOp, rewriter);
 }
 
-/// Check whether the unique Operation* stored in `values[0]` (assumed) is
-/// equivalent to the unique StringRefAttr passed in `values[1]` (assumed).
+/// Check whether the unique Operation* stored in `pdlValues[0]` (assumed) is
+/// equivalent to the unique StringRefAttr passed in `pdlValues[1]` (assumed).
 /// Equivalence is achieved when either:
-///   1. `values[0]` has the name stored in `values[1]`.
-///   2. `values[0]` and `values[1]` are both linalg ops and their structured
-///      interfaces as well as their bodies are equivalent.
+///   1. `pdlValues[0]` has the name stored in `pdlValues[1]`.
+///   2. `pdlValues[0]` and `pdlValues[1]` are both linalg ops and their
+///      structured interfaces as well as their bodies are equivalent.
 ///      Structured interfaces equivalence is a simple attribute level check.
 ///      Body equivalence is more involved and currently limited:
 ///        a. the current impl constructs an instance of the op whose name is
-///           specified in `values[1]` and checks for exact body equality.
+///           specified in `pdlValues[1]` and checks for exact body equality.
 ///        b. a more advanced version would "subtract" the bodies and fold, cse
 ///           and canonicalize to fixed point. If the result is "all zeros",
 ///           then the bodies would be equivalent (really isomorphic).
 ///   3. other cases TBD (e.g. vector.generic when available).
 static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
-                                      Operation *operation,
-                                      Attribute attribute) {
+                                      ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  Operation *operation = pdlValues[0].cast<Operation *>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto modelOpNameAttr = attribute.dyn_cast<StringAttr>();
   if (!modelOpNameAttr)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -196,15 +204,19 @@ static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
 }
 
 /// Assume that:
-///   1. `values[0]` is an operands range
-///   2. `values[1]` contains a DictAttr with `operand_number`, `dim` and
+///   1. `pdlValues[0]` is an operands range
+///   2. `pdlValues[1]` contains a DictAttr with `operand_number`, `dim` and
 ///      `divisor` IntegerAttr entries.
 /// Succeed if `operands`[`operand_number`] is a ranked type whose `dim` is a
 /// multiple of `divisor`.
 /// Note: 0 is the convention to express "do not tile", it is considered to
 /// divide everything.
 static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
-                                     ValueRange operands, Attribute attribute) {
+                                     ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  ValueRange operands = pdlValues[0].cast<ValueRange>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -237,13 +249,17 @@ static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
 }
 
 /// Assume that:
-///   1. `values[0]` is an operands range
-///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
+///   1. `pdlValues[0]` is an operands range
+///   2. `pdlValues[1]` contains a DictAttr with `operand_number` and `dim`
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
-static LogicalResult isDimStatic(PatternRewriter &rewriter, ValueRange operands,
-                                 Attribute attribute) {
+static LogicalResult isDimStatic(PatternRewriter &rewriter,
+                                 ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  ValueRange operands = pdlValues[0].cast<ValueRange>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -267,13 +283,17 @@ static LogicalResult isDimStatic(PatternRewriter &rewriter, ValueRange operands,
 }
 
 /// Assume that:
-///   1. `values[0]` is an operands range
-///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
+///   1. `pdlValues[0]` is an operands range
+///   2. `pdlValues[1]` contains a DictAttr with `operand_number` and `dim`
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
 static LogicalResult isDimDynamic(PatternRewriter &rewriter,
-                                  ValueRange operands, Attribute attribute) {
+                                  ArrayRef<PDLValue> pdlValues) {
+  assert(pdlValues.size() == 2 && "expected 2 PDL values");
+  ValueRange operands = pdlValues[0].cast<ValueRange>();
+  Attribute attribute = pdlValues[1].cast<Attribute>();
+
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -307,11 +327,16 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.cpp.inc"
       >();
 
-  registerPDLMatchConstraintFn("nestedInFunc", nestedInFunc);
-  registerPDLMatchConstraintFn("isDimDynamic", isDimDynamic);
-  registerPDLMatchConstraintFn("isDimMultipleOf", isDimMultipleOf);
-  registerPDLMatchConstraintFn("isDimStatic", isDimStatic);
-  registerPDLMatchConstraintFn("isEquivalentToOp", isEquivalentToOp);
+  addDialectDataInitializer<transform::PDLMatchHooks>(
+      [&](transform::PDLMatchHooks &hooks) {
+        llvm::StringMap<PDLConstraintFunction> constraints;
+        constraints.try_emplace("nestedInFunc", nestedInFunc);
+        constraints.try_emplace("isDimDynamic", isDimDynamic);
+        constraints.try_emplace("isDimMultipleOf", isDimMultipleOf);
+        constraints.try_emplace("isDimStatic", isDimStatic);
+        constraints.try_emplace("isEquivalentToOp", isEquivalentToOp);
+        hooks.mergeInPDLMatchHooks(std::move(constraints));
+      });
 
   declareDependentDialect<bufferization::BufferizationDialect>();
   declareDependentDialect<vector::VectorDialect>();
@@ -332,10 +357,11 @@ void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
     return;
   }
 
-  hadErrors = true;
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-  errorStateChecked = false;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
+  status = emitSilenceableFailure(
+      getTransformOp(), "tracking listener failed to find replacement op");
+  status.attachNote(op->getLoc()) << "replaced op";
+  for (Value v : values)
+    status.attachNote(v.getLoc()) << "replacement value";
 }
 
 //===----------------------------------------------------------------------===//
@@ -601,6 +627,47 @@ testValueMatcherCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+static DiagnosedSilenceableFailure testShapedValueMatcherCallback(
+    transform_ext::MatchCallbackResult &res, Location loc,
+    const mlir::transform::TransformState &state, ValueRange handles) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
+
+  int64_t rank;
+  SmallVector<int64_t> dims;
+  transform_ext::MatcherContext matcherContext;
+  auto &value = transform_ext::m_ShapedValue(matcherContext);
+  value.rank(transform_ext::CaptureRank(rank))
+      .dim(transform_ext::AllDims(), transform_ext::CaptureDims(dims));
+  auto &opMatcher =
+      transform_ext::m_Operation<linalg::GenericOp>(matcherContext);
+  opMatcher.result(0, value);
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    opMatcher.resetCapture();
+    if (!matchPattern(op, opMatcher))
+      return WalkResult::advance();
+
+    op->emitRemark() << "rank: " << rank;
+    std::string message;
+    llvm::raw_string_ostream os(message);
+    llvm::interleaveComma(dims, os);
+    os.flush();
+    op->emitRemark() << "dimensions: " << message;
+
+    res.addPayloadGroup({opMatcher.getCaptured()});
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
 /// Match callback for a reduction with optional leading and trailing
 /// elementwise operations. Matches *the first* occurrence of such a reduction
 /// within an op associated with the given handle.
@@ -791,6 +858,8 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
                             testRepeatedMatcherUseCallback);
   registry.registerCallback("_test_value_matcher_callback",
                             testValueMatcherCallback);
+  registry.registerCallback("_test_shaped_value_matcher_callback",
+                            testShapedValueMatcherCallback);
   registry.registerCallback("reduction", reductionCallback);
   registry.registerCallback("convolution", convolutionCallback);
   registry.registerCallback("matmul", matmulCallback);

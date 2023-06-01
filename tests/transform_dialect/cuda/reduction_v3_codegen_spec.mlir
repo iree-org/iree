@@ -15,7 +15,7 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
-  transform.structured.fuse_into_containing_op %fill into %forall_grid : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  transform.structured.fuse_into_containing_op %fill into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -31,7 +31,7 @@ transform.sequence failures(propagate) {
 
   // Fuse the fill and pointwise to privatize them.
   transform.structured.fuse_into_containing_op %block_more_parallel_fill_op_2
-    into %forall : (!transform.any_op, !transform.any_op) -> !transform.any_op
+    into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
   // map the 1-dim to threadIdx.y to trigger mapping of the reduction to

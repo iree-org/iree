@@ -15,7 +15,7 @@ iree_microbenchmark_suite(
     "mhlo_fft_abs.mlir"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
     "--iree-llvmcpu-target-cpu-features=host"
 )
 
@@ -28,6 +28,6 @@ if(IREE_TARGET_BACKEND_CUDA)
       "linalg_transpose.mlir"
     FLAGS
       "--iree-hal-target-backends=cuda"
-      "--iree-input-type=mhlo"
+      "--iree-input-type=mhlo_legacy"
   )
 endif()

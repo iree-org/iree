@@ -21,7 +21,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
   LABELS
     "manual"
@@ -39,7 +39,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
 )
 
@@ -54,7 +54,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
     "--iree-mhlo-demote-i64-to-i32=false"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
   LABELS

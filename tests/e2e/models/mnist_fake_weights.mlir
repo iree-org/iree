@@ -1,8 +1,8 @@
 // MNIST model with placeholder weights, for testing.
 
-// RUN: iree-run-mlir --Xcompiler,iree-input-type=mhlo --Xcompiler,iree-hal-target-backends=vmvx %s --input=1x28x28x1xf32 | FileCheck %s
-// RUN: iree-run-mlir --Xcompiler,iree-input-type=mhlo --Xcompiler,iree-hal-target-backends=llvm-cpu %s --input=1x28x28x1xf32 | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --Xcompiler,iree-input-type=mhlo --Xcompiler,iree-hal-target-backends=vulkan-spirv %s --input=1x28x28x1xf32 | FileCheck %s)
+// RUN: iree-run-mlir --Xcompiler,iree-input-type=mhlo_legacy --Xcompiler,iree-hal-target-backends=vmvx %s --input=1x28x28x1xf32 | FileCheck %s
+// RUN: iree-run-mlir --Xcompiler,iree-input-type=mhlo_legacy --Xcompiler,iree-hal-target-backends=llvm-cpu %s --input=1x28x28x1xf32 | FileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --Xcompiler,iree-input-type=mhlo_legacy --Xcompiler,iree-hal-target-backends=vulkan-spirv %s --input=1x28x28x1xf32 | FileCheck %s)
 
 module {
   util.global private @"__iree_flow___sm_node17__model.layer-1.kernel" {noinline} = dense<1.000000e+00> : tensor<784x128xf32>

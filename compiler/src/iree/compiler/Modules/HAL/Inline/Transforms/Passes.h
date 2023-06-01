@@ -8,6 +8,7 @@
 #define IREE_COMPILER_MODULES_HAL_INLINE_TRANSFORMS_PASSES_H_
 
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -36,7 +37,8 @@ namespace Inline {
 //   buildHALInlineTransformPassPipeline & run
 //   <serialize VM module>
 void buildHALInlineStaticTransformPassPipeline(
-    OpPassManager &passManager, const TargetOptions &targetOptions);
+    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    const TargetOptions &targetOptions);
 
 //===----------------------------------------------------------------------===//
 // Passes

@@ -34,7 +34,7 @@ static bool manipulateFlags(iree_compiler_session_t *session) {
     printf("FLAG GET ERROR. Abort\n");
     return 1;
   }
-  const char *flag1 = "--iree-input-type=mhlo";
+  const char *flag1 = "--iree-input-type=stablehlo";
   const char *badFlag1 = "--iree-non-existing-flag=foobar";
   const char *flagArgv[] = {
       flag1,

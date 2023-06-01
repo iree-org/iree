@@ -85,8 +85,14 @@ PluginManagerSession::PluginManagerSession(PluginManager &pluginManager,
                                            PluginManagerOptions &options)
     : options(options) {
   for (auto &kv : pluginManager.registrations) {
-    allPluginSessions.insert(std::make_pair(
-        kv.first(), kv.second->createUninitializedSession(binder)));
+    std::unique_ptr<AbstractPluginSession> session =
+        kv.second->createUninitializedSession(binder);
+    if (kv.second->getActivationPolicy() ==
+        PluginActivationPolicy::DefaultActivated) {
+      defaultActivatedSessions.insert(
+          std::make_pair(kv.first(), session.get()));
+    }
+    allPluginSessions.insert(std::make_pair(kv.first(), std::move(session)));
   }
 }
 
@@ -108,10 +114,48 @@ LogicalResult PluginManagerSession::initializePlugins() {
     llvm::errs() << "\n";
   }
 
+  // Loop through listed plugins and any that start with "-" go in the
+  // set of disabled ids. This will be used to disable default activations.
+  llvm::StringSet<> disabledIds;
+  for (auto &pluginId : options.plugins) {
+    if (llvm::StringRef(pluginId).starts_with("-")) {
+      disabledIds.insert(llvm::StringRef(pluginId).substr(1));
+    }
+  }
+
+  // Process default activated plugins.
+  llvm::StringSet<> initializedIds;
+  for (auto &it : defaultActivatedSessions) {
+    if (disabledIds.contains(it.first())) {
+      if (options.printPluginInfo) {
+        llvm::errs() << "[IREE plugins]: Skipping disabled default '"
+                     << it.first() << "'\n";
+      }
+      continue;
+    }
+
+    // Skip if already initialized.
+    if (!initializedIds.insert(it.first()).second) continue;
+
+    if (options.printPluginInfo) {
+      llvm::errs() << "[IREE plugins]: Initializing default '" << it.first()
+                   << "'\n";
+    }
+    initializedSessions.push_back(it.second);
+  }
+
   // Process activations.
   // In the future, we may make this smarter by allowing dependencies and
   // sorting accordingly. For now, what you say is what you get.
   for (auto &pluginId : options.plugins) {
+    if (llvm::StringRef(pluginId).starts_with("-")) {
+      // Skip: It has already been added to disabledIds.
+      continue;
+    }
+
+    // Skip if already initialized.
+    if (!initializedIds.insert(pluginId).second) continue;
+
     if (options.printPluginInfo) {
       llvm::errs() << "[IREE plugins]: Initializing plugin '" << pluginId
                    << "'\n";
@@ -143,6 +187,13 @@ LogicalResult PluginManagerSession::activatePlugins(MLIRContext *context) {
     if (failed(s->activate(context))) return failure();
   }
   return success();
+}
+
+void PluginManagerSession::populateHALTargetBackends(
+    IREE::HAL::TargetBackendList &list) {
+  for (auto *s : initializedSessions) {
+    s->populateHALTargetBackends(list);
+  }
 }
 
 }  // namespace mlir::iree_compiler

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_register_plugin")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,12 +12,9 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT IREE_TARGET_BACKEND_CUDA)
-  return()
-endif()
-""",
+iree_compiler_register_plugin(
+    plugin_id = "hal_target_cuda",
+    target = ":CUDA",
 )
 
 iree_compiler_cc_library(
@@ -27,7 +24,6 @@ iree_compiler_cc_library(
         "SetBlockIdsRangePass.cpp",
     ],
     hdrs = [
-        "CUDATarget.h",
         "LLVMPasses.h",
     ],
     deps = [
@@ -36,6 +32,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/LLVMGPU",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/HAL/Target:LLVMLinkerUtils",
+        "//compiler/src/iree/compiler/PluginAPI",
         "//compiler/src/iree/compiler/Utils",
         "//runtime/src/iree/base/internal/flatcc:building",
         "//runtime/src/iree/schemas:cuda_executable_def_c_fbs",

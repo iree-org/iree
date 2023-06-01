@@ -58,6 +58,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:VectorTransforms",
+        "@llvm-project//mlir:VectorTransformOps",
         # Other Stuff
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",

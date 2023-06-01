@@ -36,7 +36,7 @@ using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::buildBufferize;
 using iree_compiler::gpu::buildConvertToAsyncCopies;
 using iree_compiler::gpu::buildConvertToTensorCoreOp;
-using iree_compiler::gpu::buildDistributeCopies;
+using iree_compiler::gpu::buildDistributeMatmulCopies;
 using iree_compiler::gpu::buildHoistOutputPaddingOp;
 using iree_compiler::gpu::buildMatmulVectorization;
 using iree_compiler::gpu::buildMultiBuffering;
@@ -239,7 +239,7 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   // Step 4. Distribute pad and copies: SIMT programming model.
   auto [lhsCopyOpH, rhsCopyOpH, copyBackOpH] =
-      buildDistributeCopies(b, variantH, paddedMatmulOpH, strategy);
+      buildDistributeMatmulCopies(b, variantH, paddedMatmulOpH, strategy);
 
   // Step 5. Distribute to warps: SIMD programming model.
   // TODO: get the number of warps from strategy.
@@ -263,7 +263,6 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // Step 8. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, needs hardening.
-  // TODO: extract info from strategy.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
                                     strategy.numWarps);
@@ -285,15 +284,5 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   }
 
   // Step 13. Late lowerings and cleanups.
-  // TODO: not a functional style op to avoid invalidating artificially.
-  funcH = b.create<transform::LowerMasksOp>(
-      pdl::OperationType::get(b.getContext()), funcH);
-  // TODO: not a functional style op to avoid invalidating artificially.
-  funcH = b.create<transform::MaterializeMasksOp>(
-      pdl::OperationType::get(b.getContext()), funcH);
-  {
-    ApplyPatternsOpPatterns config;
-    config.foldMemrefAliases = true;
-    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config, funcH);
-  }
+  buildLowerVectorMasksAndCleanup(b, funcH);
 }

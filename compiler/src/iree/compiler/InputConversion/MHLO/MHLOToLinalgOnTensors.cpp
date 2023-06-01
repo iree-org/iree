@@ -448,10 +448,10 @@ struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
           ConvertMHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect,
-                    linalg::LinalgDialect, mhlo::MhloDialect,
-                    shape::ShapeDialect, math::MathDialect,
-                    memref::MemRefDialect, complex::ComplexDialect>();
+    registry.insert<
+        IREE::Flow::FlowDialect, IREE::Util::UtilDialect, linalg::LinalgDialect,
+        mhlo::MhloDialect, shape::ShapeDialect, tensor::TensorDialect,
+        math::MathDialect, memref::MemRefDialect, complex::ComplexDialect>();
   }
 
   void runOnOperation() override {

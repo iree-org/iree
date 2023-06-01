@@ -30,6 +30,7 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/PDLExtension/PDLExtension.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
@@ -98,6 +99,9 @@ int main(int argc, char **argv) {
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::scf::registerTransformDialectExtension(registry);
   mlir::vector::registerTransformDialectExtension(registry);
+
+  // Dialect extensions.
+  transform::registerPDLExtension(registry);
 
   return mlir::asMainReturnCode(mlir::MlirOptMain(
       argc, argv, "MLIR modular optimizer driver\n", registry));

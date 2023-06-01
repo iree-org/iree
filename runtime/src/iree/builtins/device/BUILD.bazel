@@ -50,41 +50,19 @@ endif()
 )
 
 # TODO(benvanik): rule for building a matrix of bitcode files.
-# TODO(benvanik): make some of these flags inside of iree_bitcode_library; maybe
-# via an iree_cpu_bitcode_library so that we can have an
-# iree_cuda_bitcode_library that can differ.
-
-BITCODE_COPTS = [
-    # C17 with no system deps.
-    "-std=c17",
-    "-nostdinc",
-    "-ffreestanding",
-
-    # Optimized and unstamped.
-    "-O3",
-    "-fno-ident",
-    "-fdiscard-value-names",
-
-    # Object file only in bitcode format:
-    "-c",
-    "-emit-llvm",
-
-    # Force the library into standalone mode (not linking into hosting apps).
-    "-DIREE_DEVICE_STANDALONE=1",
-]
 
 iree_bitcode_library(
     name = "libdevice_wasm32_generic",
     srcs = BITCODE_SRCS,
-    hdrs = BITCODE_HDRS,
-    copts = BITCODE_COPTS + ["--target=wasm32"],
+    arch = "wasm_32",
+    internal_hdrs = BITCODE_HDRS,
 )
 
 iree_bitcode_library(
     name = "libdevice_wasm64_generic",
     srcs = BITCODE_SRCS,
-    hdrs = BITCODE_HDRS,
-    copts = BITCODE_COPTS + ["--target=wasm64"],
+    arch = "wasm_64",
+    internal_hdrs = BITCODE_HDRS,
 )
 
 c_embed_data(

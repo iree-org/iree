@@ -20,6 +20,7 @@ genrule(
     # For now, just enumerate all in-tree plugins.
     cmd = (
         "echo '" +
+        "HANDLE_PLUGIN_ID(hal_target_cuda)\n" +
         "HANDLE_PLUGIN_ID(example)\n" +
         "HANDLE_PLUGIN_ID(simple_io_sample)\n" +
         "' > $@"
@@ -33,6 +34,7 @@ iree_compiler_cc_library(
         # TODO: Should depend on a generated target in @iree_plugins which
         # generates its deps from the environment.
         # For now, we just hard include all in-tree plugins.
+        "//compiler/plugins/target/CUDA",
         "//samples/compiler_plugins/example:registration",
         "//samples/compiler_plugins/simple_io_sample:registration",
     ],

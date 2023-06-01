@@ -41,10 +41,12 @@ class InputType(Enum):
   `CompilerOptions.input_type`.
   """
   NONE = "none"
-  MHLO = "mhlo"
+  STABLEHLO = "stablehlo"
+  STABLEHLO_XLA = "stablehlo_xla"
   TOSA = "tosa"
   TM_TENSOR = "tm_tensor"
-  XLA = "xla"
+  MHLO_LEGACY = "mhlo_legacy"
+  XLA_LEGACY = "xla_legacy"
 
   @staticmethod
   def parse(spec: Union[str, InputType]) -> InputType:
@@ -63,6 +65,9 @@ class InputType(Enum):
       raise ValueError(f"For input_type= argument, expected one of: "
                        f"{', '.join(InputType.__members__.keys())}")
     return InputType[spec]
+
+  def __str__(self):
+    return self.value
 
 
 class OutputFormat(Enum):
@@ -88,6 +93,9 @@ class OutputFormat(Enum):
       raise ValueError(f"For output_format= argument, expected one of: "
                        f"{', '.join(OutputFormat.__members__.keys())}")
     return OutputFormat[spec]
+
+  def __str__(self):
+    return self.value
 
 
 @dataclass
@@ -167,8 +175,8 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
   cl = [
       iree_compile,
       input_file,
-      f"--iree-input-type={options.input_type.value}",
-      f"--iree-vm-bytecode-module-output-format={options.output_format.value}",
+      f"--iree-input-type={options.input_type!s}",
+      f"--iree-vm-bytecode-module-output-format={options.output_format!s}",
   ]
   for target_backend in options.target_backends:
     cl.append(f"--iree-hal-target-backends={target_backend}")

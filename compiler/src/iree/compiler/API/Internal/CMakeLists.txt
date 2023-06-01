@@ -79,6 +79,7 @@ iree_cc_library(
     MLIROptLib
     MLIRPass
     MLIRSupport
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets

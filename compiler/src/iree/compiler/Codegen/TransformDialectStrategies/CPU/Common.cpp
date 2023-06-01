@@ -60,25 +60,25 @@ using vector::VectorContractLoweringAttr;
 static Value buildDefaultVectorLoweringStrategy(
     ImplicitLocOpBuilder &b, Value funcH,
     const vector::LowerVectorsOptions &lowerVectorsOpts) {
-  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  auto anyOpType = transform::AnyOpType::get(b.getContext());
   funcH = b.create<LowerContractionOp>(
-      pdlOperation, funcH,
+      anyOpType, funcH,
       /*loweringStrategy*/ lowerVectorsOpts.vectorContractLowering);
-  funcH = b.create<ApplyTransferPermutationPatternsOp>(pdlOperation, funcH);
+  funcH = b.create<ApplyTransferPermutationPatternsOp>(anyOpType, funcH);
   funcH = b.create<LowerMultiReductionOp>(
-      pdlOperation, funcH,
+      anyOpType, funcH,
       /*loweringStrategy=*/lowerVectorsOpts.vectorMultiReductionLowering);
   funcH = b.create<SplitTransferFullPartialOp>(
-      pdlOperation, funcH,
+      anyOpType, funcH,
       /*splitTransferStrategy=*/lowerVectorsOpts.vectorTransferSplit);
   funcH = b.create<TransferToScfOp>(
-      pdlOperation, funcH,
+      anyOpType, funcH,
       /*maxTransferRank=*/1,
       /*fullUnroll=*/lowerVectorsOpts.unrollVectorTransfers);
-  funcH = b.create<LowerTransferOp>(pdlOperation, funcH, /*maxTransferRank=*/1);
-  funcH = b.create<LowerShapeCastOp>(pdlOperation, funcH);
+  funcH = b.create<LowerTransferOp>(anyOpType, funcH, /*maxTransferRank=*/1);
+  funcH = b.create<LowerShapeCastOp>(anyOpType, funcH);
   funcH = b.create<LowerTransposeOp>(
-      pdlOperation, funcH,
+      anyOpType, funcH,
       /*loweringStrategy=*/lowerVectorsOpts.vectorTransposeLowering,
       /*avx2LoweringStrategy=*/lowerVectorsOpts.transposeAVX2Lowering);
   return funcH;

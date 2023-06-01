@@ -15,11 +15,8 @@ func.func @store_to_load(%arg: vector<4xf32>) -> vector<4xf32> {
   return %r : vector<4xf32>
 }
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !transform.any_op):
-  transform.sequence %arg0 : !transform.any_op failures(propagate) {
-  ^bb1(%arg1: !transform.any_op):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-    transform.iree.apply_buffer_optimizations %0 : (!transform.any_op) -> ()
-  }
+transform.sequence failures(propagate) {
+^bb1(%arg1: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_buffer_optimizations %0 : (!transform.any_op) -> ()
 }

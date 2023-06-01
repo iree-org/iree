@@ -86,7 +86,7 @@ iree_check_single_backend_test_suite(
             "fft.mlir",  # TODO(#9583)
         ],
     ),
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "cuda",
     runner_args = ["--cuda_use_streams=false"],
     tags = [
@@ -169,7 +169,7 @@ iree_check_single_backend_test_suite(
             "fft.mlir",  # TODO(#9583)
         ],
     ),
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "cuda",
     runner_args = ["--cuda_use_streams=true"],
     tags = [
@@ -249,7 +249,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -322,7 +322,7 @@ iree_check_single_backend_test_suite(
             "exponential_fp16.mlir",
         ],
     ),
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "local-task",
     target_backend = "vmvx",
 )
@@ -395,7 +395,7 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
         ],
     ),
-    compiler_flags = ["--iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo_legacy"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -468,7 +468,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
     ),
     compiler_flags = [
-        "--iree-input-type=mhlo",
+        "--iree-input-type=mhlo_legacy",
         "--iree-llvmcpu-target-cpu-features=host",
     ],
     driver = "local-task",

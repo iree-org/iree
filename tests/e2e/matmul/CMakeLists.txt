@@ -222,6 +222,9 @@ iree_generated_trace_runner_test(
   LABELS
     "hostonly"
     "x86_64_only"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:+avx,+avx2,+fma"
 )
 
 iree_generated_trace_runner_test(
@@ -244,6 +247,9 @@ iree_generated_trace_runner_test(
   LABELS
     "hostonly"
     "x86_64_only"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:+avx,+avx2,+fma"
 )
 
 iree_generated_trace_runner_test(

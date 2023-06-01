@@ -107,6 +107,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:Transforms",
         "@mlir-hlo//:mlir_hlo",
+        "@mlir-hlo//stablehlo:stablehlo_ops",
         "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )

@@ -31,20 +31,8 @@ iree_bitcode_library(
     libdevice_wasm32_generic
   SRCS
     "device_generic.c"
-  HDRS
-    "device.h"
-  COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-c"
-    "-emit-llvm"
-    "-DIREE_DEVICE_STANDALONE=1"
-    "--target=wasm32"
-  PUBLIC
+  ARCH
+    wasm_32
 )
 
 iree_bitcode_library(
@@ -52,20 +40,8 @@ iree_bitcode_library(
     libdevice_wasm64_generic
   SRCS
     "device_generic.c"
-  HDRS
-    "device.h"
-  COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-c"
-    "-emit-llvm"
-    "-DIREE_DEVICE_STANDALONE=1"
-    "--target=wasm64"
-  PUBLIC
+  ARCH
+    wasm_64
 )
 
 iree_c_embed_data(

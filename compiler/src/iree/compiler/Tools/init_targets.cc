@@ -8,9 +8,6 @@
 
 #include <functional>
 
-#ifdef IREE_HAVE_CUDA_TARGET
-#include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
-#endif  // IREE_HAVE_CUDA_TARGET
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.h"
 #endif  // IREE_HAVE_LLVM_CPU_TARGET
@@ -40,9 +37,6 @@ namespace iree_compiler {
 void registerHALTargetBackends() {
   static bool init_once = []() {
 
-#ifdef IREE_HAVE_CUDA_TARGET
-    IREE::HAL::registerCUDATargetBackends();
-#endif  // IREE_HAVE_CUDA_TARGET
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
     IREE::HAL::registerLLVMCPUTargetBackends(
         []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });

@@ -29,7 +29,7 @@ transform.sequence failures(propagate) {
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %grid_loop : (!transform.any_op) -> ()
   %not_eltwise = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op, %combiner_op
     : !transform.any_op
-  transform.structured.fuse_into_containing_op %not_eltwise into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op)
+  transform.structured.fuse_into_containing_op %not_eltwise into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -47,7 +47,7 @@ transform.sequence failures(propagate) {
     attributes {iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
       : (!transform.any_op) -> !transform.any_op
   %combined_and_fill = transform.merge_handles %fill_1d, %block_combiner_op : !transform.any_op
-  transform.structured.fuse_into_containing_op %combined_and_fill into %eltwise_block_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op)
+  transform.structured.fuse_into_containing_op %combined_and_fill into %eltwise_block_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
@@ -62,7 +62,7 @@ transform.sequence failures(propagate) {
     transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op)
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op

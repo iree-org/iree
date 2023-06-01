@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Implements IREE-specific logic for lowering StableHLO/CHLO dialects to
+// Implements IREE-specific logic for lowering StableHLO dialect to
 // IREE dialects: Linalg, Arith, Math, Tensor, Util, ML Program, etc.
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"

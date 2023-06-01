@@ -7,10 +7,10 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_WEBGPU_SPIRVTOWGSL_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_WEBGPU_SPIRVTOWGSL_H_
 
+#include <optional>
 #include <string>
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 
 namespace mlir {
 namespace iree_compiler {

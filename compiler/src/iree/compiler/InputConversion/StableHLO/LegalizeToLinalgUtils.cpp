@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Implements utilities for lowering StableHLO/CHLO dialect to Linalg dialect.
+// Implements utilities for lowering StableHLO dialect to Linalg dialect.
 
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 

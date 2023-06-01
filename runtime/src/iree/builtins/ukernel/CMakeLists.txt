@@ -116,64 +116,23 @@ iree_bitcode_library(
     "pack_tile.c"
     "query_tile_sizes.c"
     "unpack_tile.c"
-  HDRS
-    "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h"
-    "//runtime/src/iree/builtins/ukernel:api.h"
-    "//runtime/src/iree/builtins/ukernel:common.h"
-    "//runtime/src/iree/builtins/ukernel:elementwise.h"
-    "//runtime/src/iree/builtins/ukernel:exported_bits.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d.h"
-    "//runtime/src/iree/builtins/ukernel:mmt4d_internal.h"
-    "//runtime/src/iree/builtins/ukernel:pack.h"
-    "//runtime/src/iree/builtins/ukernel:pack_internal.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes.h"
-    "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h"
-    "//runtime/src/iree/builtins/ukernel:static_assert.h"
-    "//runtime/src/iree/builtins/ukernel:unpack.h"
-    "//runtime/src/iree/builtins/ukernel:unpack_internal.h"
-    "//runtime/src/iree/schemas:cpu_data.h"
-    "//runtime/src/iree/schemas:cpu_feature_bits.inl"
-  COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-DNDEBUG"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-fno-short-wchar"
-    "-c"
-    "-emit-llvm"
-    "-target"
-    "x86_64-unknown-unknown-eabi-elf"
-  PUBLIC
-)
-
-iree_link_bitcode(
-  NAME
-    ukernel_bitcode
-  SRCS
-    "arch/x86_64/ukernel_bitcode_x86_64_avx2_fma.bc"
-    "arch/x86_64/ukernel_bitcode_x86_64_avx512_base.bc"
-    "arch/x86_64/ukernel_bitcode_x86_64_avx512_vnni.bc"
-    "arch/x86_64/ukernel_bitcode_x86_64_base.bc"
-    "ukernel_bitcode_base.bc"
-  PUBLIC
+    "weak.c"
 )
 
 iree_c_embed_data(
   NAME
-    libukernel_bitcode
+    embed_ukernel_bitcode
   SRCS
-    "ukernel_bitcode.bc"
+    "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
+    "ukernel_bitcode_base.bc"
   DEPS
 
   C_FILE_OUTPUT
-    "libukernel.c"
+    "ukernel_bitcode.c"
   H_FILE_OUTPUT
-    "libukernel.h"
+    "ukernel_bitcode.h"
   IDENTIFIER
-    "iree_builtins_libukernel"
+    "iree_ukernel_bitcode"
   FLATTEN
   PUBLIC
 )

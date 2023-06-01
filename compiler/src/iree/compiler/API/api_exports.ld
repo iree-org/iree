@@ -533,6 +533,7 @@ VER_0 {
     mlirTransformAnyOpTypeGet;
     mlirTransformOperationTypeGet;
     mlirTransformOperationTypeGetOperationName;
+    mlirTransformOperationTypeGetTypeID;
     mlirTupleTypeGet;
     mlirTupleTypeGetNumTypes;
     mlirTupleTypeGetType;
@@ -542,6 +543,7 @@ VER_0 {
     mlirTypeDump;
     mlirTypeEqual;
     mlirTypeGetContext;
+    mlirTypeGetDialect;
     mlirTypeGetTypeID;
     mlirTypeIDAllocatorAllocateTypeID;
     mlirTypeIDAllocatorCreate;

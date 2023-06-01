@@ -34,6 +34,7 @@ namespace mlir {
 namespace iree_compiler {
 
 void buildIREEVMTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
@@ -57,17 +58,17 @@ void buildIREEVMTransformPassPipeline(
       passManager.addPass(createAutoInputConversionPipelinePass());
       break;
 #ifdef IREE_HAVE_MHLO_INPUT
-    case InputDialectOptions::Type::mhlo:
-      MHLO::buildMHLOInputConversionPassPipeline(passManager);
-      break;
-    case InputDialectOptions::Type::xla:
-      MHLO::buildXLAInputConversionPassPipeline(passManager);
-      break;
     case InputDialectOptions::Type::stablehlo:
       stablehlo::buildStableHLOInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::stablehlo_xla:
       stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager);
+      break;
+    case InputDialectOptions::Type::mhlo_legacy:
+      MHLO::buildMHLOInputConversionPassPipeline(passManager);
+      break;
+    case InputDialectOptions::Type::xla_legacy:
+      MHLO::buildXLAInputConversionPassPipeline(passManager);
       break;
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
@@ -180,16 +181,16 @@ void buildIREEVMTransformPassPipeline(
     default:
     case SchedulingOptions::ExecutionModel::AsyncInternal:
     case SchedulingOptions::ExecutionModel::AsyncExternal:
-      IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions,
-                                               halCompileTo);
+      IREE::HAL::buildHALTransformPassPipeline(passManager, targetRegistry,
+                                               executableOptions, halCompileTo);
       break;
     case SchedulingOptions::ExecutionModel::InlineStatic:
       IREE::HAL::Inline::buildHALInlineStaticTransformPassPipeline(
-          passManager, executableOptions);
+          passManager, targetRegistry, executableOptions);
       break;
     case SchedulingOptions::ExecutionModel::InlineDynamic:
       IREE::HAL::Loader::buildHALInlineDynamicTransformPassPipeline(
-          passManager, executableOptions);
+          passManager, targetRegistry, executableOptions);
       break;
   }
   IREE_TRACE_ADD_END_FRAME_PASS(passManager, "HAL");
@@ -219,6 +220,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   highLevelOptimizations.constEval = false;
 
   buildIREEVMTransformPassPipeline(
+      IREE::HAL::TargetBackendRegistry::getGlobal(),
       BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
       PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
       SchedulingOptions::FromFlags::get(),
