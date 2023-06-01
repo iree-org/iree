@@ -119,19 +119,19 @@ def _deserialize(data,
   if deserialize_func is not None:
     return deserialize_func(data, keyed_obj_map, obj_cache)
 
-  elif _get_type_origin(obj_type) == list:
-    subtype, = _get_type_args(obj_type)
+  elif typing.get_origin(obj_type) == list:
+    subtype, = typing.get_args(obj_type)
     return [
         _deserialize(item, subtype, keyed_obj_map, obj_cache) for item in data
     ]
 
-  elif _get_type_origin(obj_type) == dict:
-    _, value_type = _get_type_args(obj_type)
+  elif typing.get_origin(obj_type) == dict:
+    _, value_type = typing.get_args(obj_type)
     return dict((key, _deserialize(value, value_type, keyed_obj_map, obj_cache))
                 for key, value in data.items())
 
-  elif _get_type_origin(obj_type) == Union:
-    subtypes = _get_type_args(obj_type)
+  elif typing.get_origin(obj_type) == Union:
+    subtypes = typing.get_args(obj_type)
     if len(subtypes) != 2 or NONE_TYPE not in subtypes:
       raise ValueError(f"Unsupported union type: {obj_type}.")
     subtype = subtypes[0] if subtypes[1] == NONE_TYPE else subtypes[1]
@@ -144,24 +144,6 @@ def _deserialize(data,
     raise ValueError(f"Member {data} not found in the enum {obj_type}.")
 
   return data
-
-
-def _get_type_origin(tp):
-  """Get the unsubscripted type. Returns None is unsupported.
-
-  This is similar to typing.get_origin, but only exists after Python 3.8.
-  TODO(#11087): Replace with typing.get_origin after upgrading to 3.8.
-  """
-  return getattr(tp, "__origin__", None)
-
-
-def _get_type_args(tp) -> Tuple:
-  """Get the type arguments.
-
-  This is similar to typing.get_args, but only exists after Python 3.8.
-  TODO(#11087): Replace with typing.get_origin after upgrading to 3.8.
-  """
-  return getattr(tp, "__args__", ())
 
 
 def serializable(cls=None,
