@@ -1,40 +1,45 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+//===----------------------------------------------------------------------===//
+//
+// This file implements a pass to emulate 16-bit brain float arithmetic
+// operations with float 32 equivalents.
+//
+//===----------------------------------------------------------------------===//
+
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Util {
+
 namespace {
 
 Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
@@ -49,31 +54,6 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
 
   if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
     return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
-  }
-
-  return nullptr;
-};
-
-Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
-                           Location loc) {
-  Type eTy = getElementTypeOrSelf(type);
-  Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
-  bool isUnsigned = eTy.isUnsignedInteger();
-
-  int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();
-  int64_t outBitwidth = eTy.getIntOrFloatBitWidth();
-
-  if (inBitwidth > outBitwidth) {
-    return builder.create<arith::TruncIOp>(loc, type, inputs[0]);
-  }
-
-  if (inBitwidth < outBitwidth && isUnsigned) {
-    return builder.create<arith::ExtUIOp>(loc, type, inputs[0]);
-  }
-
-  if (inBitwidth < outBitwidth && !isUnsigned) {
-    return builder.create<arith::ExtSIOp>(loc, type, inputs[0]);
   }
 
   return nullptr;
@@ -126,16 +106,6 @@ struct FloatTypeConverter
   }
 };
 
-template <typename SourceType, typename TargetType>
-struct IntegerTypeConverter
-    : public PrimitiveTypeConverter<SourceType, TargetType> {
-  explicit IntegerTypeConverter() {
-    this->addArgumentMaterialization(convertRankedInteger);
-    this->addSourceMaterialization(convertRankedInteger);
-    this->addTargetMaterialization(convertRankedInteger);
-  }
-};
-
 // Tries to completely convert a generic Operation.
 // This will process attributes, result types, and nested regions.
 struct GenericTypeConversionPattern : public ConversionPattern {
@@ -184,6 +154,9 @@ struct GenericTypeConversionPattern : public ConversionPattern {
   }
 };
 
+// Handles constructing the appropriate ext/trunc operations that depend on
+// element type. This could be for floating point, signed integers, and
+// unsigned integer values.
 template <typename OpTy, typename TypeTy,
           typename OperandToResultWidthLegalityRelation>
 struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
@@ -193,8 +166,7 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
       ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         this->getTypeConverter()->convertType(op.getResult().getType());
-    auto operandType =
-        this->getTypeConverter()->convertType(op.getOperand().getType());
+    auto operandType = adaptor.getIn().getType();
 
     auto resultEType = cast<TypeTy>(getElementTypeOrSelf(resultType));
     auto operandEType = cast<TypeTy>(getElementTypeOrSelf(operandType));
@@ -219,9 +191,51 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   }
 };
 
-template <typename Base, typename Converter>
-struct ConvertTypesPass : public Base {
-  using Base::Base;
+// This is required due to https://github.com/openxla/iree/issues/13891.
+// We are not able to execute `arith.extf` or `arith.truncf` on a scalar
+// vector type. To handle materializing `vector<bf16>` to `vector<f32>`
+// we should propagate into the source operation by constant propagation
+// instead.
+template <typename SrcOp>
+class PropagateCastF : public OpRewritePattern<SrcOp> {
+  using OpRewritePattern<SrcOp>::OpRewritePattern;
+
+ public:
+  LogicalResult matchAndRewrite(SrcOp op,
+                                PatternRewriter &rewriter) const override {
+    auto operand = op.getOperand();
+    auto ty = dyn_cast<VectorType>(operand.getType());
+    auto resultTy = dyn_cast<VectorType>(op.getType());
+
+    if (!ty || ty.getRank() != 0) {
+      return rewriter.notifyMatchFailure(op, "Not casting from vector-scalar");
+    }
+
+    mlir::DenseElementsAttr vectorCst;
+    if (!matchPattern(operand, m_Constant(&vectorCst))) {
+      return failure();
+    }
+
+    mlir::FloatAttr val = vectorCst.getSplatValue<mlir::FloatAttr>();
+    auto newVal = FloatAttr::get(resultTy.getElementType(),
+                                 val.getValue().convertToDouble());
+    auto vectorVal = DenseElementsAttr::get(resultTy, newVal);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, resultTy, vectorVal);
+    return success();
+  }
+};
+
+// Converts BF16s to F32s.
+struct PromoteBF16ToF32Converter
+    : public FloatTypeConverter<BFloat16Type, Float32Type> {
+  Type getTargetType(BFloat16Type type) override {
+    return Float32Type::get(type.getContext());
+  }
+};
+
+struct ConvertBf16ArithToF32Pass
+    : public ConvertBf16ArithToF32Base<ConvertBf16ArithToF32Pass> {
+  using ConvertBf16ArithToF32Base::ConvertBf16ArithToF32Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
@@ -242,22 +256,9 @@ struct ConvertTypesPass : public Base {
                                                     std::less<unsigned>>>(
         typeConverter, context);
     ConversionTarget target(*context);
+    target.markUnknownOpDynamicallyLegal([](Operation *op) { return true; });
 
-    populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
-        patterns, typeConverter);
-
-    // Operations are legal if they don't contain any illegal type.
-    target.markUnknownOpDynamicallyLegal([&](Operation *op) {
-      if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-        return typeConverter.isLegal(globalOp.getGlobalType());
-      } else if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
-        for (Type type : funcOp.getFunctionType().getInputs()) {
-          if (!typeConverter.isLegal(type)) return false;
-        }
-        for (Type type : funcOp.getFunctionType().getResults()) {
-          if (!typeConverter.isLegal(type)) return false;
-        }
-      }
+    auto checkOp = [&](Operation *op) {
       for (Type type : op->getResultTypes()) {
         if (!typeConverter.isLegal(type)) return false;
       }
@@ -268,101 +269,48 @@ struct ConvertTypesPass : public Base {
         if (!typeConverter.isLegal(&region)) return false;
       }
       return true;
-    });
+    };
 
-    // Note that this will fail if we can't convert any types.
+    // Operations are legal if they don't contain any illegal type.
+    target.addDynamicallyLegalDialect<arith::ArithDialect>(checkOp);
+    target.addDynamicallyLegalDialect<math::MathDialect>(checkOp);
+
+    // Some arithmetic operations exist in the vector dialect.
+    target
+        .addDynamicallyLegalOp<vector::ReductionOp, vector::MultiDimReductionOp,
+                               vector::MaskOp, vector::YieldOp>(checkOp);
+
+    // Some ops are always legal.
+    target.addLegalOp<arith::BitcastOp>();
+
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
       return this->signalPassFailure();
     }
+
+    // This is due to arith.extf and arith.truncf validation failing on
+    // rank-0 vectors. These can only be generated by arith.constant so
+    // in these cases we just propagate the type.
+    RewritePatternSet cleanupPatterns(context);
+    cleanupPatterns
+        .insert<PropagateCastF<arith::TruncFOp>, PropagateCastF<arith::ExtFOp>>(
+            context);
+    if (applyPatternsAndFoldGreedily(this->getOperation(),
+                                     std::move(cleanupPatterns))
+            .failed()) {
+      return this->signalPassFailure();
+    }
   }
 
-  Converter typeConverter;
+  PromoteBF16ToF32Converter typeConverter;
 };
+
 }  // namespace
 
-namespace {
-struct DemoteI64ToI32Converter
-    : public PrimitiveTypeConverter<IntegerType, IntegerType> {
-  bool isSourceType(IntegerType type) override { return type.isInteger(64); }
-  Type getTargetType(IntegerType type) override {
-    return IntegerType::get(type.getContext(), 32, type.getSignedness());
-  }
-};
-struct DemoteI64ToI32Pass
-    : public ConvertTypesPass<DemoteI64ToI32Base<DemoteI64ToI32Pass>,
-                              DemoteI64ToI32Converter> {};
-}  // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass() {
-  return std::make_unique<DemoteI64ToI32Pass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createConvertBf16ArithToF32Pass() {
+  return std::make_unique<ConvertBf16ArithToF32Pass>();
 }
 
-namespace {
-struct DemoteF32ToF16Converter
-    : public PrimitiveTypeConverter<Float32Type, Float16Type> {
-  Type getTargetType(Float32Type type) override {
-    return Float16Type::get(type.getContext());
-  }
-};
-struct DemoteF32ToF16Pass
-    : public ConvertTypesPass<DemoteF32ToF16Base<DemoteF32ToF16Pass>,
-                              DemoteF32ToF16Converter> {};
-}  // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass() {
-  return std::make_unique<DemoteF32ToF16Pass>();
-}
-
-namespace {
-struct PromoteF16ToF32Converter
-    : public PrimitiveTypeConverter<Float16Type, Float32Type> {
-  Type getTargetType(Float16Type type) override {
-    return Float32Type::get(type.getContext());
-  }
-};
-struct PromoteF16ToF32Pass
-    : public ConvertTypesPass<PromoteF16ToF32Base<PromoteF16ToF32Pass>,
-                              PromoteF16ToF32Converter> {};
-}  // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
-  return std::make_unique<PromoteF16ToF32Pass>();
-}
-
-namespace {
-struct PromoteBF16ToF32Converter
-    : public FloatTypeConverter<BFloat16Type, Float32Type> {
-  Type getTargetType(BFloat16Type type) override {
-    return Float32Type::get(type.getContext());
-  }
-};
-struct PromoteBF16ToF32Pass
-    : public ConvertTypesPass<PromoteBF16ToF32Base<PromoteBF16ToF32Pass>,
-                              PromoteBF16ToF32Converter> {};
-}  // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
-  return std::make_unique<PromoteBF16ToF32Pass>();
-}
-
-namespace {
-struct DemoteF64ToF32Converter
-    : public PrimitiveTypeConverter<Float64Type, Float32Type> {
-  Type getTargetType(Float64Type type) override {
-    return Float32Type::get(type.getContext());
-  }
-};
-struct DemoteF64ToF32Pass
-    : public ConvertTypesPass<DemoteF64ToF32Base<DemoteF64ToF32Pass>,
-                              DemoteF64ToF32Converter> {};
-}  // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass() {
-  return std::make_unique<DemoteF64ToF32Pass>();
-}
-
-}  // namespace Util
-}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

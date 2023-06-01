@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-promote-arith-bf16-to-f32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-convert-bf16-arith-to-f32 %s | FileCheck %s
 
 func.func @addf_bf16(%arg0 : tensor<128xbf16>) -> tensor<128xbf16> {
   %0 = tensor.empty() : tensor<128xbf16>
@@ -65,3 +65,57 @@ func.func @bitcast_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> vecto
 // CHECK-DAG: %[[XOR:.+]] = arith.xori %[[BITCAST0]], %[[BITCAST1]]
 // CHECK-DAG: %[[BITCAST2:.+]] = arith.bitcast %[[XOR]]
 // CHECK: return %[[BITCAST2]]
+
+// -----
+
+func.func @truncf_vector(%arg0 : vector<4xbf16>) -> vector<4xbf16> {
+  %0 = arith.constant dense<1.0> : vector<bf16>
+  %1 = vector.broadcast %0 : vector<bf16> to vector<4xbf16>
+  %2 = arith.addf %1, %arg0 : vector<4xbf16>
+  return %2 : vector<4xbf16>
+}
+
+// CHECK-LABEL: @truncf_vector
+// CHECK: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<4xbf16>
+// CHECK: %[[VAL0:.+]] = arith.extf %arg0 : vector<4xbf16> to vector<4xf32>
+// CHECK: %[[VAL1:.+]] = arith.extf %[[CST]] : vector<4xbf16> to vector<4xf32>
+// CHECK: %[[VAL2:.+]] = arith.addf %[[VAL1]], %[[VAL0]] : vector<4xf32>
+// CHECK: %[[VAL3:.+]] = arith.truncf %[[VAL2]] : vector<4xf32> to vector<4xbf16>
+// CHECK: return %[[VAL3]] : vector<4xbf16>
+
+// -----
+
+func.func @extf_scalar_noop(%arg0 : vector<bf16>) -> vector<bf16> {
+  %0 = arith.constant dense<1.0> : vector<bf16>
+  return %0 : vector<bf16>
+}
+
+// CHECK-LABEL: @extf_scalar_noop
+// CHECK: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<bf16>
+// CHECK: return %[[CST]]
+
+// -----
+
+func.func @store_reduction_bf16(%arg0 : vector<3xbf16>, %arg1 : vector<3xbf16>, %arg2 : memref<bf16>) {
+  %cst = arith.constant dense<1.000000e+00> : vector<bf16>
+  %5 = vector.extractelement %cst[] : vector<bf16>
+  %6 = arith.mulf %arg0, %arg1 : vector<3xbf16>
+  %7 = vector.reduction <add>, %6, %5 : vector<3xbf16> into bf16
+  %8 = vector.broadcast %7 : bf16 to vector<bf16>
+  %9 = vector.extractelement %8[] : vector<bf16>
+  memref.store %9, %arg2[] : memref<bf16>
+  return
+}
+
+// CHECK-LABEL: @store_reduction_bf16
+// CHECK:  %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<bf16>
+// CHECK:  %[[VAL0:.+]] = arith.extf %arg0 : vector<3xbf16> to vector<3xf32>
+// CHECK:  %[[VAL1:.+]] = arith.extf %arg1 : vector<3xbf16> to vector<3xf32>
+// CHECK:  %[[VAL2:.+]] = vector.extractelement %[[CST]][] : vector<bf16>
+// CHECK:  %[[VAL3:.+]] = arith.extf %[[VAL2]] : bf16 to f32
+// CHECK:  %[[VAL4:.+]] = arith.mulf %[[VAL0]], %[[VAL1]] : vector<3xf32>
+// CHECK:  %[[VAL5:.+]] = vector.reduction <add>, %[[VAL4]], %[[VAL3]] : vector<3xf32> into f32
+// CHECK:  %[[VAL6:.+]] = arith.truncf %[[VAL5]] : f32 to bf16
+// CHECK:  %[[VAL7:.+]] = vector.broadcast %[[VAL6]] : bf16 to vector<bf16>
+// CHECK:  %[[VAL8:.+]] = vector.extractelement %[[VAL7]][] : vector<bf16>
+// CHECK:  memref.store %[[VAL8]], %arg2[] : memref<bf16>

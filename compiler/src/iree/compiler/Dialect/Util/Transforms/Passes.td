@@ -140,13 +140,6 @@ def PromoteBF16ToF32 : Pass<"iree-util-promote-bf16-to-f32", "mlir::ModuleOp"> {
   }];
 }
 
-def PromoteArithBF16ToF32 : Pass<"iree-util-promote-arith-bf16-to-f32", "mlir::ModuleOp"> {
-  let summary = "Promotes bf16 arith operations to f32 ops with ext/trunc.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Util::createPromoteArithBF16ToF32Pass()
-  }];
-}
-
 //===----------------------------------------------------------------------===//
 // Debug/test passes
 //===----------------------------------------------------------------------===//

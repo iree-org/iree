@@ -518,7 +518,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createConvertComplexToStandardPass());
 
   // Convert BF16 operations to occur as F32.
-  pm.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
+  pm.addPass(createConvertBf16ArithToF32Pass());
   pm.addPass(createConvertBf16ToUInt16BuffersPass());
 
   pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
