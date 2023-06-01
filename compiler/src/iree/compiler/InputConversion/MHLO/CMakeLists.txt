@@ -91,6 +91,7 @@ iree_cc_library(
     MhloToStablehlo
     MhloToStandard
     StablehloBroadcastUtils
+    StablehloOps
     StablehloToMhlo
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
