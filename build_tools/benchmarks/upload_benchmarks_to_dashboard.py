@@ -25,8 +25,8 @@ import argparse
 import json
 import os
 import requests
-
-from typing import Any, Dict, Optional, Union
+import typing
+from typing import Any, Dict, List, Optional, Union, Sequence
 
 from common.common_arguments import expand_and_check_file_paths
 from common import benchmark_definition, benchmark_presentation, benchmark_thresholds
@@ -34,6 +34,8 @@ from common import benchmark_definition, benchmark_presentation, benchmark_thres
 IREE_DASHBOARD_URL = "https://perf.iree.dev"
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/openxla/iree/commit'
 IREE_PROJECT_ID = 'IREE'
+# Maximum number of payloads in one batch API call.
+PAYLOAD_MAX_BATCH_SIZE = 100
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
 COMMON_DESCRIPTION = """
@@ -213,31 +215,6 @@ def post_to_dashboard(url: str,
         f'Failed to post to dashboard server with {code} - {response.text}')
 
 
-def add_new_iree_series(series_id: str,
-                        series_unit: str,
-                        series_name: str,
-                        series_description: Optional[str] = None,
-                        average_range: Optional[Union[str, int]] = None,
-                        override: bool = False,
-                        dry_run: bool = False,
-                        verbose: bool = False):
-  """Posts a new series to the dashboard."""
-  if average_range is None:
-    raise ValueError(f"no matched threshold setting for benchmark: {series_id}")
-
-  payload = compose_series_payload(IREE_PROJECT_ID,
-                                   series_id,
-                                   series_unit,
-                                   series_name,
-                                   series_description,
-                                   average_range=average_range,
-                                   override=override)
-  post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSerie',
-                    payload,
-                    dry_run=dry_run,
-                    verbose=verbose)
-
-
 def add_new_iree_build(build_id: int,
                        commit: str,
                        override: bool = False,
@@ -253,20 +230,16 @@ def add_new_iree_build(build_id: int,
                     verbose=verbose)
 
 
-def add_new_sample(series_id: str,
-                   build_id: int,
-                   sample_unit: str,
-                   sample_value: int,
-                   override: bool = False,
-                   dry_run: bool = False,
-                   verbose: bool = False):
-  """Posts a new sample to the dashboard."""
-  payload = compose_sample_payload(IREE_PROJECT_ID, series_id, build_id,
-                                   sample_unit, sample_value, override)
-  post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSample',
-                    payload,
-                    dry_run=dry_run,
-                    verbose=verbose)
+T = typing.TypeVar("T")
+
+
+def _split_list_into_chunks(data_list: Sequence[T],
+                            chunk_size: int) -> List[List[T]]:
+  """Split list into a list of chunks."""
+  chunks = []
+  for start in range(0, len(data_list), chunk_size):
+    chunks.append(list(data_list[start:start + chunk_size]))
+  return chunks
 
 
 def parse_arguments():
@@ -329,6 +302,9 @@ def main(args):
                      dry_run=args.dry_run,
                      verbose=args.verbose)
 
+  add_series_payloads = []
+  add_sample_payloads = []
+
   # Upload benchmark results to the dashboard.
   for series_id, benchmark_latency in aggregate_results.items():
     series_name = benchmark_latency.name
@@ -342,24 +318,27 @@ def main(args):
     threshold = next(
         (threshold for threshold in benchmark_thresholds.BENCHMARK_THRESHOLDS
          if threshold.regex.match(series_name)), None)
-    average_range = (threshold.get_threshold_str()
-                     if threshold is not None else None)
-
+    if threshold is None:
+      raise ValueError(
+          f"no matched threshold setting for benchmark: {series_id}")
     # Override by default to allow updates to the series.
-    add_new_iree_series(series_id=series_id,
-                        series_unit="ns",
-                        series_name=benchmark_latency.name,
-                        series_description=description,
-                        average_range=average_range,
-                        override=True,
-                        dry_run=args.dry_run,
-                        verbose=args.verbose)
-    add_new_sample(series_id=series_id,
-                   build_id=commit_count,
-                   sample_unit="ns",
-                   sample_value=benchmark_latency.mean_time,
-                   dry_run=args.dry_run,
-                   verbose=args.verbose)
+    payload = compose_series_payload(
+        IREE_PROJECT_ID,
+        series_id,
+        series_unit="ns",
+        series_name=benchmark_latency.name,
+        series_description=description,
+        average_range=threshold.get_threshold_str(),
+        override=True)
+    add_series_payloads.append(payload)
+
+    payload = compose_sample_payload(IREE_PROJECT_ID,
+                                     series_id=series_id,
+                                     build_id=commit_count,
+                                     sample_unit="ns",
+                                     sample_value=benchmark_latency.mean_time,
+                                     override=False)
+    add_sample_payloads.append(payload)
 
   for target_id, compile_metrics in all_compilation_metrics.items():
     description = get_model_description(
@@ -378,24 +357,42 @@ def main(args):
       threshold = next(
           (threshold for threshold in mapper.get_metric_thresholds()
            if threshold.regex.match(series_name)), None)
-      average_range = (threshold.get_threshold_str()
-                       if threshold is not None else None)
+      if threshold is None:
+        raise ValueError(
+            f"no matched threshold setting for benchmark: {series_id}")
 
       # Override by default to allow updates to the series.
-      add_new_iree_series(series_id=series_id,
-                          series_unit=series_unit,
-                          series_name=series_name,
-                          series_description=description,
-                          average_range=average_range,
-                          override=True,
-                          dry_run=args.dry_run,
-                          verbose=args.verbose)
-      add_new_sample(series_id=series_id,
-                     build_id=commit_count,
-                     sample_unit=series_unit,
-                     sample_value=sample_value,
-                     dry_run=args.dry_run,
-                     verbose=args.verbose)
+      payload = compose_series_payload(
+          IREE_PROJECT_ID,
+          series_id=series_id,
+          series_unit=series_unit,
+          series_name=series_name,
+          series_description=description,
+          average_range=threshold.get_threshold_str(),
+          override=True)
+      add_series_payloads.append(payload)
+
+      payload = compose_sample_payload(IREE_PROJECT_ID,
+                                       series_id=series_id,
+                                       build_id=commit_count,
+                                       sample_unit=series_unit,
+                                       sample_value=sample_value,
+                                       override=False)
+      add_sample_payloads.append(payload)
+
+  for payloads in _split_list_into_chunks(add_series_payloads,
+                                          chunk_size=PAYLOAD_MAX_BATCH_SIZE):
+    post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSeries',
+                      {"series": payloads},
+                      dry_run=args.dry_run,
+                      verbose=args.verbose)
+
+  for payloads in _split_list_into_chunks(add_sample_payloads,
+                                          chunk_size=PAYLOAD_MAX_BATCH_SIZE):
+    post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSamples',
+                      {"samples": payloads},
+                      dry_run=args.dry_run,
+                      verbose=args.verbose)
 
 
 if __name__ == "__main__":
