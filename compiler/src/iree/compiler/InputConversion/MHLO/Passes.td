@@ -45,6 +45,11 @@ def VerifyCompilerMHLOInputLegality :
   let constructor = "mlir::iree_compiler::MHLO::createVerifyCompilerMHLOInputLegality()";
 }
 
+def ConvertMHLOToStableHLOPass : Pass<"iree-convert-mhlo-to-stablehlo", "ModuleOp"> {
+  let summary = "Convert MHLO to StableHLO, to aid in transition to StableHLO.";
+  let constructor = "mlir::iree_compiler::MHLO::createConvertMHLOToStableHLOPass()";
+}
+
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------
@@ -54,6 +59,5 @@ def TestMHLOConvertComplexToReal :
   let summary = "Test pass that does an MHLO->MHLO conversion of just complex arithmetic ops.";
   let constructor = "mlir::iree_compiler::MHLO::createTestMHLOConvertComplexToRealPass()";
 }
-
 
 #endif // IREE_COMPILER_INPUTCONVERSION_MHLO_PASSES

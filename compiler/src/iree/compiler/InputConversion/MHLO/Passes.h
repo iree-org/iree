@@ -58,6 +58,12 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyCompilerMHLOInputLegality();
 
 //------------------------------------------------------------------------------
+// Passes to aid in the MHLO to StableHLO transition
+//------------------------------------------------------------------------------
+
+std::unique_ptr<OperationPass<ModuleOp>> createConvertMHLOToStableHLOPass();
+
+//------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------
 
