@@ -473,9 +473,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
       createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileAndFusePass(tilingConfig.getReductionVectorIdx()));
-      createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFuseTensorPadWithConsumerPass());
