@@ -14,15 +14,17 @@ from e2e_test_framework.definitions import common_definitions
 def generate_batch_models(
     id_template: str, name_template: str, tags: Sequence[str],
     source_type: common_definitions.ModelSourceType, source_url_template: str,
-    entry_function: str, batch_sizes: Sequence[int],
-    input_type_templates: Sequence[str]) -> Dict[int, common_definitions.Model]:
-  """Generate models with multiple batch sizes by substituting ${BATCH_SIZE}
-  from the template strings.
+    entry_function: str, input_type_templates: Sequence[str],
+    batch_sizes: Sequence[int]) -> Dict[int, common_definitions.Model]:
+  """Generate model definitions for different batch sizes by substituting
+  ${BATCH_SIZE}` in the template strings.
+
+  Only `*_template` parameters will be treated as templates and substituted. A
+  `batch-<batch size>` tag will be appended to the tags in each returned model.
 
   Returns:
     Map of batch size to model.
   """
-
   model_map = {}
   for batch_size in batch_sizes:
     substituted_input_types = [
