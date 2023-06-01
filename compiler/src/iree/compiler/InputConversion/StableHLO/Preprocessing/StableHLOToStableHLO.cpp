@@ -1198,11 +1198,8 @@ struct FuseWidenOperands final : OpRewritePattern<Op> {
       if (convertOp) {
         auto inputType = getElementTypeOrSelf(convertOp.getOperand().getType());
         auto castedType = getElementTypeOrSelf(convertOp.getResult().getType());
-        bool isSameCast =
-            (isa<IntegerType>(inputType) && isa<IntegerType>(castedType)) ||
-            (isa<FloatType>(inputType) && isa<FloatType>(castedType));
-        if (isSameCast && inputType.getIntOrFloatBitWidth() <
-                              castedType.getIntOrFloatBitWidth()) {
+        if (inputType.getIntOrFloatBitWidth() <
+            castedType.getIntOrFloatBitWidth()) {
           operands.push_back(convertOp.getOperand());
           continue;
         }
