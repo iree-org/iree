@@ -1569,7 +1569,7 @@ import tool):</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-vulkan.vmfb
 </code></pre></div>
 <p>where <code>iree_input.mlir</code> is the imported program.</p>

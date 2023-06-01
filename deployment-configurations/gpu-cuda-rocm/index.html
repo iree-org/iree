@@ -1478,7 +1478,7 @@ following command:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-hal-cuda-llvm-target-arch<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-cuda.vmfb
 </code></pre></div>
 <p>Note that a cuda target architecture(<code>iree-hal-cuda-llvm-target-arch</code>) of
@@ -1519,7 +1519,7 @@ architecture. If no architecture is specified then we will default to
 </span><span class="hll"><span class="w">    </span>--iree-rocm-target-chip<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-rocm-link-bc<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-rocm-bc-dir<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-rocm.vmfb
 </code></pre></div>
 <p>Note ROCm Bitcode Dir(<code>iree-rocm-bc-dir</code>) path is required. If the system
