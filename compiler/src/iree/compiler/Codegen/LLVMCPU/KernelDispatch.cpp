@@ -488,6 +488,8 @@ static int64_t roundUpToPow2(int64_t size, bool predicate) {
 static int64_t getMaxDistributionTileSize(int64_t lb, int64_t ub,
                                           int64_t maxSize, int64_t vectorSize,
                                           bool allowIncompleteTile = false) {
+  assert(vectorSize > 0 && "Unexpected zero vector size");
+
   if (ub == ShapedType::kDynamic || lb == ShapedType::kDynamic) {
     return maxSize;
   }
@@ -1109,13 +1111,24 @@ static LogicalResult setRootConfig(
       maxTileSizes[1] = 128;
     }
 
+    // Compute cache-level tile sizes.
     SmallVector<int64_t> defaultCacheTileSizes =
         getDefaultMatmulCacheSizes(linalgOp);
     cacheTileSizes.append(defaultCacheTileSizes.end() - numLoops,
                           defaultCacheTileSizes.end());
 
+    // Choose the next non-zero tiling level after distribution to help compute
+    // the distribution tile sizes.
+    SmallVector<int64_t> minTileSizes;
+    if (llvm::all_of(cacheTileSizes,
+                     [](int64_t tileSize) { return tileSize == 0; })) {
+      minTileSizes.append(workgroupTileSizes.begin(), workgroupTileSizes.end());
+    } else {
+      minTileSizes.append(cacheTileSizes.begin(), cacheTileSizes.end());
+    }
+
     flowTileSizes = getDefaultDistributedLevelTileSizes(
-        linalgOp, cacheTileSizes, maxTileSizes,
+        linalgOp, minTileSizes, maxTileSizes,
         /*allowIncompleteTile=*/true);
   } else {
     flowTileSizes = getDefaultDistributedLevelTileSizes(
