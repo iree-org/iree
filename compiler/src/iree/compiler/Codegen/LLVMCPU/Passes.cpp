@@ -459,14 +459,15 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   }
 
   {
+    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createDecomposePackUnPackOpsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
+    options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
