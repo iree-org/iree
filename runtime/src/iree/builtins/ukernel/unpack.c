@@ -42,8 +42,9 @@ static void iree_uk_unpack_validate(const iree_uk_unpack_params_t* params) {
                                     IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER |
                                     IREE_UK_FLAG_UNPACK_TYPE_MASK;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
-  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
-  IREE_UK_ASSERT(unpack_type != iree_uk_unpack_type_none);
+  iree_uk_uint32_t flags_type = params->flags & IREE_UK_FLAG_UNPACK_TYPE_MASK;
+  IREE_UK_ASSERT(flags_type == IREE_UK_FLAG_UNPACK_TYPE_F32F32 ||
+                 flags_type == IREE_UK_FLAG_UNPACK_TYPE_I32I32);
   IREE_UK_ASSERT(params->in_stride0 >= 0);
   IREE_UK_ASSERT(params->out_stride0 >= 0);
   IREE_UK_ASSERT(params->out_size0 >= 0);
@@ -76,6 +77,7 @@ static void iree_uk_unpack_validate(const iree_uk_unpack_params_t* params) {
   // in the validation function so that the subsequent ukernel code can be
   // treated as infallible.
   iree_uk_unpack_tmpbuf_helper_t helper;
+  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
   iree_uk_type_t elem_type = iree_uk_unpack_in_type(unpack_type);
   iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
   iree_uk_unpack_tmpbuf_helper_init(tile_size0, tile_size1, elem_size, &helper);
