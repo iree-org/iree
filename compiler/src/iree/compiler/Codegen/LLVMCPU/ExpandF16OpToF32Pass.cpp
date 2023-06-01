@@ -17,6 +17,10 @@ namespace iree_compiler {
 
 namespace {
 
+/// A pattern that expands floating-point arithmetic operations with f16
+/// operands to f32 operands. It performs the expansion by extending the 
+/// f16 operands to f32, performing the arithmetic operation on the extended
+/// operands, and then truncating the result back to f16.
 template<typename Op>
 struct ExpandF16OpToF32Pattern : public OpRewritePattern<Op> {
   public:
