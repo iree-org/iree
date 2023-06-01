@@ -50,12 +50,14 @@ iree_cc_library(
     MLIRPDLDialect
     MLIRPass
     MLIRSCFDialect
+    MLIRSideEffectInterfaces
     MLIRTensorTransformOps
     MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorTransforms
+    MLIRViewLikeInterface
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::LLVMGPU::Utils
