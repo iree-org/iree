@@ -104,6 +104,7 @@ class TargetConverter:
             "MhloPasses",
             "MhloShapeOpsToStandard",
             "MhloToLinalg",
+            "MhloToStablehlo",
             "MhloToStandard",
             "StablehloToMhlo",
             # Note: We deliberately omit some passes that we do not use in IREE,
