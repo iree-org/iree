@@ -41,20 +41,17 @@ def iree_arch_to_llvm_arch(
 
 def iree_bitcode_library(
         name,
+        arch,
         srcs,
         internal_hdrs = [],
         copts = [],
         out = None,
-        arch = None,
         **kwargs):
     """Builds an LLVM bitcode library from an input file via clang.
 
     Args:
         name: Name of the target.
-        arch: Target architecture to compile for, in IREE_ARCH format. If left
-              empty, will produce architecture-independent bitcode by stripping
-              target triple and target attributes; that only makes sense if the
-              sources being compiled are truly architecture-independent.
+        arch: Target architecture to compile for, in IREE_ARCH format.
         srcs: source files to pass to clang.
         internal_hdrs: all headers transitively included by the source files.
                        Unlike typical Bazel `hdrs`, these are not exposed as
@@ -73,6 +70,10 @@ def iree_bitcode_library(
     builtin_headers_path = "external/llvm-project/clang/staging/include/"
 
     base_copts = [
+        # Target architecture
+        "-target",
+        iree_arch_to_llvm_arch(arch),
+
         # C17 with no system deps.
         "-std=c17",
         "-nostdinc",
@@ -97,20 +98,10 @@ def iree_bitcode_library(
         "-DIREE_DEVICE_STANDALONE=1",
     ]
 
-    llvmir_processing_tool = None
-    if arch:
-        # Compile to the specified target architecture.
-        base_copts.extend(["-target", iree_arch_to_llvm_arch(arch)])
-    else:
-        # Output text rather than binary serialization of LLVM IR for processing
-        base_copts.append("-S")
-
-        # Strip target information from generated LLVM IR.
-        llvmir_processing_tool = "//build_tools/scripts:strip_target_info"
-
     bitcode_files = []
     for src in srcs:
         bitcode_out = "%s_%s.bc" % (name, src)
+        bitcode_files.append(bitcode_out)
         native.genrule(
             name = "gen_%s" % (bitcode_out),
             srcs = [src, builtin_headers_dep] + internal_hdrs,
@@ -133,28 +124,6 @@ def iree_bitcode_library(
             output_to_bindir = 1,
             **kwargs
         )
-
-        if llvmir_processing_tool:
-            processed_bitcode_out = "%s_%s.processed.bc" % (name, src)
-            native.genrule(
-                name = "gen_%s" % (processed_bitcode_out),
-                srcs = [bitcode_out],
-                outs = [processed_bitcode_out],
-                cmd = " ".join([
-                    "$(location %s)" % (llvmir_processing_tool),
-                    "< $(location %s)" % bitcode_out,
-                    "> $(location %s)" % processed_bitcode_out,
-                ]),
-                tools = [
-                    llvmir_processing_tool,
-                ],
-                message = "Processing %s into %s using %s..." % (bitcode_out, processed_bitcode_out, llvmir_processing_tool),
-                output_to_bindir = 1,
-                **kwargs
-            )
-            bitcode_files.append(processed_bitcode_out)
-        else:
-            bitcode_files.append(bitcode_out)
 
     if not out:
         out = "%s.bc" % (name)

@@ -34,10 +34,29 @@ static std::unique_ptr<llvm::Module> loadUKernelBitcodeFile(
 }
 
 std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
-    llvm::LLVMContext& context) {
+    llvm::TargetMachine* targetMachine, llvm::LLVMContext& context) {
+  llvm::Triple triple = targetMachine->getTargetTriple();
+  StringRef filename;
+  if (triple.isArch64Bit()) {
+    filename = "ukernel_bitcode_64bit_base.bc";
+  } else if (triple.isArch32Bit()) {
+    filename = "ukernel_bitcode_32bit_base.bc";
+  } else {
+    return nullptr;
+  }
   std::unique_ptr<llvm::Module> baseBitcode =
-      loadUKernelBitcodeFile("ukernel_bitcode_base.bc", context);
+      loadUKernelBitcodeFile(filename, context);
   assert(baseBitcode && "base ukernel bitcode file not found");
+
+  // Copied from Device.cpp - TODO: move this to a shared utility.
+  // Clang adds its own per-function attributes that we need to strip so that
+  // our current executable variant target is used instead.
+  for (auto& func : baseBitcode->functions()) {
+    func.removeFnAttr("target-cpu");
+    func.removeFnAttr("tune-cpu");
+    func.removeFnAttr("target-features");
+  }
+
   return baseBitcode;
 }
 

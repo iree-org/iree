@@ -108,7 +108,24 @@ if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_base
+    ukernel_bitcode_32bit_base
+  ARCH
+    wasm_32
+  SRCS
+    "mmt4d.c"
+    "mmt4d_tile.c"
+    "pack.c"
+    "pack_tile.c"
+    "query_tile_sizes.c"
+    "unpack_tile.c"
+    "weak.c"
+)
+
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_64bit_base
+  ARCH
+    wasm_64
   SRCS
     "mmt4d.c"
     "mmt4d_tile.c"
@@ -124,7 +141,8 @@ iree_c_embed_data(
     embed_ukernel_bitcode
   SRCS
     "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
-    "ukernel_bitcode_base.bc"
+    "ukernel_bitcode_32bit_base.bc"
+    "ukernel_bitcode_64bit_base.bc"
   DEPS
 
   C_FILE_OUTPUT

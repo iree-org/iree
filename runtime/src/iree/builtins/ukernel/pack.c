@@ -20,8 +20,8 @@ typedef struct iree_uk_pack_tmpbuf_helper_t {
 } iree_uk_pack_tmpbuf_helper_t;
 
 // Return x/y for x>=0 and y>0, with a fast path for when y is a power of two.
-static iree_uk_ssize_t iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
-    iree_uk_ssize_t x, iree_uk_int32_t y) {
+static iree_uk_index_t iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
+    iree_uk_index_t x, iree_uk_int32_t y) {
   IREE_UK_ASSERT(x >= 0);
   IREE_UK_ASSERT(y > 0);
   return IREE_UK_LIKELY(iree_uk_is_po2_u32(y)) ? (x >> iree_uk_po2_log2_u32(y))
@@ -46,8 +46,8 @@ static bool iree_uk_is_single_byte_pattern(iree_uk_uint64_t bytes01234567) {
 // Initializes a `iree_uk_pack_tmpbuf_helper_t`. Asserts if the temporary buffer
 // is smaller than one tile.
 static void iree_uk_pack_tmpbuf_helper_t_init(
-    iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
-    iree_uk_ssize_t elem_size, iree_uk_uint64_t padding_value,
+    iree_uk_index_t tile_size0, iree_uk_index_t tile_size1,
+    iree_uk_index_t elem_size, iree_uk_uint64_t padding_value,
     iree_uk_pack_tmpbuf_helper_t* helper) {
   helper->max_tiles_in_tmp_buf = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
       iree_uk_pack_tmp_buf_size, tile_size0 * tile_size1 * elem_size);
@@ -76,15 +76,15 @@ static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
   IREE_UK_ASSERT(params->out_size3 >= 0);
   // Check that the input and output shapes match, give or take padding that
   // must not exceed the inner tile size.s
-  iree_uk_ssize_t outer_size0 = params->out_size0;
-  iree_uk_ssize_t outer_size1 = params->out_size1;
-  iree_uk_ssize_t tile_size0 = params->out_size2;
-  iree_uk_ssize_t tile_size1 = params->out_size3;
+  iree_uk_index_t outer_size0 = params->out_size0;
+  iree_uk_index_t outer_size1 = params->out_size1;
+  iree_uk_index_t tile_size0 = params->out_size2;
+  iree_uk_index_t tile_size1 = params->out_size3;
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_OUTER) {
-    iree_uk_ssize_swap(&outer_size0, &outer_size1);
+    iree_uk_index_swap(&outer_size0, &outer_size1);
   }
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER) {
-    iree_uk_ssize_swap(&tile_size0, &tile_size1);
+    iree_uk_index_swap(&tile_size0, &tile_size1);
   }
   IREE_UK_ASSERT(outer_size0 * tile_size0 >= params->in_size0);
   IREE_UK_ASSERT(outer_size1 * tile_size1 >= params->in_size1);
@@ -100,7 +100,7 @@ static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
   iree_uk_pack_tmpbuf_helper_t padding_helper;
   iree_uk_pack_type_t pack_type = iree_uk_pack_type(params->flags);
   iree_uk_type_t elem_type = iree_uk_pack_in_type(pack_type);
-  iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
+  iree_uk_index_t elem_size = iree_uk_type_size(elem_type);
   iree_uk_pack_tmpbuf_helper_t_init(tile_size0, tile_size1, elem_size,
                                     params->padding_value, &padding_helper);
 #endif  // IREE_UK_ENABLE_ASSERTS
@@ -115,8 +115,8 @@ static bool iree_uk_pack_early(const iree_uk_pack_params_t* params) {
 // Fills `buf` with `num_elems` times the `pattern` of size `elem_size`.
 // If this pattern's `elem_size` bytes are all equal, then it is legal to pass
 // `is_single_byte_pattern=true`, which allows the impl to use memset.
-static void iree_uk_fill(char* IREE_UK_RESTRICT buf, iree_uk_ssize_t num_elems,
-                         iree_uk_ssize_t elem_size,
+static void iree_uk_fill(char* IREE_UK_RESTRICT buf, iree_uk_index_t num_elems,
+                         iree_uk_index_t elem_size,
                          iree_uk_uint64_t padding_value,
                          bool is_padding_single_byte) {
   if (is_padding_single_byte) {
@@ -124,20 +124,20 @@ static void iree_uk_fill(char* IREE_UK_RESTRICT buf, iree_uk_ssize_t num_elems,
   } else if (elem_size == 2) {
     iree_uk_uint16_t padding_value_uint16 = padding_value;
     iree_uk_uint16_t* IREE_UK_RESTRICT buf_uint16 = (iree_uk_uint16_t*)buf;
-    for (iree_uk_ssize_t i = 0; i < num_elems; ++i) {
+    for (iree_uk_index_t i = 0; i < num_elems; ++i) {
       buf_uint16[i] = padding_value_uint16;
     }
   } else if (elem_size == 4) {
     iree_uk_uint32_t padding_value_uint32 = padding_value;
     iree_uk_uint32_t* IREE_UK_RESTRICT buf_uint32 = (iree_uk_uint32_t*)buf;
-    for (iree_uk_ssize_t i = 0; i < num_elems; ++i) {
+    for (iree_uk_index_t i = 0; i < num_elems; ++i) {
       buf_uint32[i] = padding_value_uint32;
     }
   } else {  // elem_size >= 8
     // While arbitrary large elem_size is allowed, padding_value remains a
     // uint64, so elem_size >= 16 only support a repeating 8-byte pattern.
     iree_uk_uint64_t* IREE_UK_RESTRICT buf_uint64 = (iree_uk_uint64_t*)buf;
-    for (iree_uk_ssize_t i = 0; i < num_elems * elem_size / 8; ++i) {
+    for (iree_uk_index_t i = 0; i < num_elems * elem_size / 8; ++i) {
       buf_uint64[i] = padding_value;
     }
   }
@@ -146,14 +146,14 @@ static void iree_uk_fill(char* IREE_UK_RESTRICT buf, iree_uk_ssize_t num_elems,
 // Copy from a source 2D buffer to a destination 2D buffer, padding to the
 // destination size.
 static void iree_uk_copy_and_pad(
-    iree_uk_ssize_t src_size0, iree_uk_ssize_t src_size1,
-    iree_uk_ssize_t src_stride0, const char* src_buf, iree_uk_ssize_t dst_size0,
-    iree_uk_ssize_t dst_size1, iree_uk_ssize_t dst_stride0, char* dst_buf,
-    iree_uk_ssize_t elem_size, iree_uk_uint64_t padding_value,
+    iree_uk_index_t src_size0, iree_uk_index_t src_size1,
+    iree_uk_index_t src_stride0, const char* src_buf, iree_uk_index_t dst_size0,
+    iree_uk_index_t dst_size1, iree_uk_index_t dst_stride0, char* dst_buf,
+    iree_uk_index_t elem_size, iree_uk_uint64_t padding_value,
     bool is_padding_single_byte) {
   iree_uk_fill(dst_buf, dst_size1 + (dst_size0 - 1) * dst_stride0, elem_size,
                padding_value, is_padding_single_byte);
-  for (iree_uk_ssize_t in_i0 = 0; in_i0 < src_size0; in_i0++) {
+  for (iree_uk_index_t in_i0 = 0; in_i0 < src_size0; in_i0++) {
     iree_uk_memcpy(dst_buf, src_buf, src_size1 * elem_size);
     dst_buf += dst_stride0 * elem_size;
     src_buf += src_stride0 * elem_size;
@@ -163,20 +163,20 @@ static void iree_uk_copy_and_pad(
 // Pads and packs an entire row. In cases that are known not to require padding,
 // it is more efficient to call tile_func directly.
 static void iree_uk_pad_and_pack_row_using_tile_func(
-    iree_uk_pack_tile_func_t tile_func, iree_uk_ssize_t dim1_tile_start,
-    iree_uk_ssize_t dim1_tile_end, iree_uk_ssize_t dim0_src_read_size,
-    iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t in_size1,
-    iree_uk_ssize_t in_stride0, iree_uk_ssize_t out_stride1,
+    iree_uk_pack_tile_func_t tile_func, iree_uk_index_t dim1_tile_start,
+    iree_uk_index_t dim1_tile_end, iree_uk_index_t dim0_src_read_size,
+    iree_uk_index_t tile_size0, iree_uk_index_t tile_size1,
+    iree_uk_index_t elem_size, iree_uk_index_t in_size1,
+    iree_uk_index_t in_stride0, iree_uk_index_t out_stride1,
     iree_uk_uint64_t padding_value, iree_uk_pack_tmpbuf_helper_t* helper,
     const char* in_buf, char* out_buf) {
-  iree_uk_ssize_t dim1_tile = dim1_tile_start;
+  iree_uk_index_t dim1_tile = dim1_tile_start;
   while (dim1_tile < dim1_tile_end) {
-    iree_uk_ssize_t dim1_chunk_tiles = iree_uk_ssize_clamp(
+    iree_uk_index_t dim1_chunk_tiles = iree_uk_index_clamp(
         dim1_tile_end - dim1_tile, 0, helper->max_tiles_in_tmp_buf);
-    iree_uk_ssize_t dim1_chunk_src_width = dim1_chunk_tiles * tile_size1;
-    iree_uk_ssize_t dim1_chunk_src_pos = dim1_tile * tile_size1;
-    iree_uk_ssize_t i1_read_size = iree_uk_ssize_clamp(
+    iree_uk_index_t dim1_chunk_src_width = dim1_chunk_tiles * tile_size1;
+    iree_uk_index_t dim1_chunk_src_pos = dim1_tile * tile_size1;
+    iree_uk_index_t i1_read_size = iree_uk_index_clamp(
         in_size1 - dim1_chunk_src_pos, 0, dim1_chunk_src_width);
     iree_uk_copy_and_pad(dim0_src_read_size, i1_read_size, in_stride0,
                          in_buf + dim1_chunk_src_pos * elem_size, tile_size0,
@@ -195,19 +195,19 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   // For now, the input and output element types are always the same.
   iree_uk_pack_type_t pack_type = iree_uk_pack_type(params->flags);
   iree_uk_type_t elem_type = iree_uk_pack_in_type(pack_type);
-  iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
-  iree_uk_ssize_t outer_size0 = params->out_size0;
-  iree_uk_ssize_t outer_size1 = params->out_size1;
-  iree_uk_ssize_t tile_size0 = params->out_size2;
-  iree_uk_ssize_t tile_size1 = params->out_size3;
-  iree_uk_ssize_t out_stride_l0 = params->out_stride0;
-  iree_uk_ssize_t out_stride1 = params->out_size3 * params->out_size2;
+  iree_uk_index_t elem_size = iree_uk_type_size(elem_type);
+  iree_uk_index_t outer_size0 = params->out_size0;
+  iree_uk_index_t outer_size1 = params->out_size1;
+  iree_uk_index_t tile_size0 = params->out_size2;
+  iree_uk_index_t tile_size1 = params->out_size3;
+  iree_uk_index_t out_stride_l0 = params->out_stride0;
+  iree_uk_index_t out_stride1 = params->out_size3 * params->out_size2;
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_OUTER) {
-    iree_uk_ssize_swap(&outer_size0, &outer_size1);
-    iree_uk_ssize_swap(&out_stride_l0, &out_stride1);
+    iree_uk_index_swap(&outer_size0, &outer_size1);
+    iree_uk_index_swap(&out_stride_l0, &out_stride1);
   }
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER) {
-    iree_uk_ssize_swap(&tile_size0, &tile_size1);
+    iree_uk_index_swap(&tile_size0, &tile_size1);
   }
   const char* in_buf =
       (const char*)params->in_buffer + (params->in_offset * elem_size);
@@ -223,7 +223,7 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   // source buffer's boundaries.
   int dim1_full_tiles = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
       params->in_size1, tile_size1);
-  iree_uk_ssize_t i0 = 0;
+  iree_uk_index_t i0 = 0;
   for (; i0 <= params->in_size0 - tile_size0; i0 += tile_size0) {
     // Pack whole tiles that do not require padding (entirely within the source
     // buffer's boundaries).
@@ -239,8 +239,8 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   }
   // Bottom-padding.
   for (; i0 < outer_size0 * tile_size0; i0 += tile_size0) {
-    iree_uk_ssize_t dim0_src_read_size =
-        iree_uk_ssize_clamp(params->in_size0 - i0, 0, tile_size0);
+    iree_uk_index_t dim0_src_read_size =
+        iree_uk_index_clamp(params->in_size0 - i0, 0, tile_size0);
     iree_uk_pad_and_pack_row_using_tile_func(
         tile_func, 0, outer_size1, dim0_src_read_size, tile_size0, tile_size1,
         elem_size, params->in_size1, params->in_stride0, out_stride1,

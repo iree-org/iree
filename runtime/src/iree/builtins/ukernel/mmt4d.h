@@ -15,17 +15,17 @@ extern "C" {
 
 typedef struct iree_uk_mmt4d_params_t {
   const void* lhs_buffer;
-  iree_uk_ssize_t lhs_offset;
-  iree_uk_ssize_t lhs_stride0;
+  iree_uk_index_t lhs_offset;
+  iree_uk_index_t lhs_stride0;
   const void* rhs_buffer;
-  iree_uk_ssize_t rhs_offset;
-  iree_uk_ssize_t rhs_stride0;
+  iree_uk_index_t rhs_offset;
+  iree_uk_index_t rhs_stride0;
   void* out_buffer;
-  iree_uk_ssize_t out_offset;
-  iree_uk_ssize_t out_stride0;
-  iree_uk_ssize_t M;
-  iree_uk_ssize_t N;
-  iree_uk_ssize_t K;
+  iree_uk_index_t out_offset;
+  iree_uk_index_t out_stride0;
+  iree_uk_index_t M;
+  iree_uk_index_t N;
+  iree_uk_index_t K;
   iree_uk_int32_t M0;
   iree_uk_int32_t N0;
   iree_uk_int32_t K0;

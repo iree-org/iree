@@ -484,20 +484,20 @@ class BuildFileFunctions(object):
 
   def iree_bitcode_library(self,
                            name,
+                           arch,
                            srcs,
                            internal_hdrs=None,
-                           copts=None,
-                           arch=None):
+                           copts=None):
     name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
     srcs_block = self._convert_srcs_block(srcs)
     copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
-    arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
 
     self._converter.body += (f"iree_bitcode_library(\n"
                              f"{name_block}"
+                             f"{arch_block}"
                              f"{srcs_block}"
                              f"{copts_block}"
-                             f"{arch_block}"
                              f")\n\n")
 
   def iree_link_bitcode(self, name, bitcode_files):

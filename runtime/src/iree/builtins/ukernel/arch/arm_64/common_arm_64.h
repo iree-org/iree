@@ -30,7 +30,7 @@ static inline bool iree_uk_cpu_supports_i8mm(const iree_uk_uint64_t* cpu_data) {
 #endif
 
 static inline int8x16x2_t iree_uk_neon_load_8x4xi8_strided(
-    const iree_uk_int8_t* src, iree_uk_ssize_t stride) {
+    const iree_uk_int8_t* src, iree_uk_index_t stride) {
   int32x4_t v0_i32 = vdupq_n_s32(0);
   int32x4_t v1_i32 = vdupq_n_s32(0);
   v0_i32 =
@@ -56,7 +56,7 @@ static inline int8x16x2_t iree_uk_neon_load_8x4xi8_strided(
 }
 
 static inline int8x16x4_t iree_uk_neon_load_8x8xi8_strided_permute(
-    const iree_uk_int8_t* src, iree_uk_ssize_t stride, int p0, int p1, int p2,
+    const iree_uk_int8_t* src, iree_uk_index_t stride, int p0, int p1, int p2,
     int p3, int p4, int p5, int p6, int p7) {
   int8x8_t row0 = vld1_s8(src + p0 * stride);
   int8x8_t row1 = vld1_s8(src + p1 * stride);
@@ -75,7 +75,7 @@ static inline int8x16x4_t iree_uk_neon_load_8x8xi8_strided_permute(
 }
 
 static inline int8x16x4_t iree_uk_neon_load_8x8xi8_strided(
-    const iree_uk_int8_t* src, iree_uk_ssize_t stride) {
+    const iree_uk_int8_t* src, iree_uk_index_t stride) {
   return iree_uk_neon_load_8x8xi8_strided_permute(src, stride, 0, 1, 2, 3, 4, 5,
                                                   6, 7);
 }
@@ -109,7 +109,7 @@ static inline int64x2x2_t iree_uk_neon_zip_4xi32_as_2xi64(int32x4_t a,
 
 static inline void iree_uk_neon_copy_8x1xi8_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   int8x8_t v = vdup_n_s8(0);
   v = vld1_lane_s8(in_ptr + 0 * in_stride, v, 0);
   v = vld1_lane_s8(in_ptr + 1 * in_stride, v, 1);
@@ -124,7 +124,7 @@ static inline void iree_uk_neon_copy_8x1xi8_strided_to_unstrided(
 
 static inline void iree_uk_neon_copy_8x4xi8_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   int8x16x2_t in = iree_uk_neon_load_8x4xi8_strided(in_ptr, in_stride);
   vst1q_s8(out_ptr + 0, in.val[0]);
   vst1q_s8(out_ptr + 16, in.val[1]);
@@ -132,7 +132,7 @@ static inline void iree_uk_neon_copy_8x4xi8_strided_to_unstrided(
 
 static inline void iree_uk_neon_copy_8x8xi8_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   int8x16x4_t in = iree_uk_neon_load_8x8xi8_strided(in_ptr, in_stride);
   vst1q_s8(out_ptr + 0, in.val[0]);
   vst1q_s8(out_ptr + 16, in.val[1]);
@@ -143,8 +143,8 @@ static inline void iree_uk_neon_copy_8x8xi8_strided_to_unstrided(
 static inline void
 iree_uk_neon_copy_8x8xi8_tiled_1x4_transpose_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   int8x16x4_t in = iree_uk_neon_load_8x8xi8_strided_permute(
       in_ptr, in_stride, 0, 2, 1, 3, 4, 6, 5, 7);
   int32x4x2_t c0 = vtrnq_s32(vreinterpretq_s32_s8(in.val[0]),
@@ -159,8 +159,8 @@ iree_uk_neon_copy_8x8xi8_tiled_1x4_transpose_strided_to_strided(
 
 static inline void iree_uk_neon_copy_8x32xi8_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   for (int i = 0; i < 8; ++i) {
     iree_uk_memcpy(out_ptr + i * out_stride, in_ptr + i * in_stride, 32);
   }
@@ -168,8 +168,8 @@ static inline void iree_uk_neon_copy_8x32xi8_strided_to_strided(
 
 static inline void iree_uk_neon_copy_8x8xi8_transpose_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t out_stride,
+    iree_uk_index_t in_stride) {
   int8x16x4_t in = iree_uk_neon_load_8x8xi8_strided_permute(
       in_ptr, in_stride, 0, 4, 1, 5, 2, 6, 3, 7);
   int16x8x2_t zip_i16_0 = iree_uk_neon_zip_16xi8_as_8xi16(in.val[0], in.val[1]);
@@ -199,7 +199,7 @@ static inline void iree_uk_neon_copy_8x8xi8_transpose_strided_to_strided(
 
 static inline void iree_uk_neon_copy_8x8xi8_transpose_strided_to_unstrided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t in_stride) {
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_index_t in_stride) {
   // Clang (Android NDK r25) actually produces worse code when this code is
   // specialized for out_stride==8 using longer contiguous stores!
   iree_uk_neon_copy_8x8xi8_transpose_strided_to_strided(out_ptr, in_ptr, 8,

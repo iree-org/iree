@@ -476,7 +476,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       // The baseBitcode module contains weak symbols for fallbacks.
       // So we link it after the archBitcode and with LinkOnlyNeeded.
       std::unique_ptr<llvm::Module> baseBitcode =
-          loadUKernelBaseBitcode(context);
+          loadUKernelBaseBitcode(targetMachine.get(), context);
       // Sequence that access before we std::move(baseBitcode)!
       StringRef baseBitcodeName = baseBitcode->getName();
       if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,

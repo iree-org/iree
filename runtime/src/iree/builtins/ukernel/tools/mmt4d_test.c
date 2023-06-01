@@ -14,8 +14,8 @@ static void iree_mmt4d_reference_innerloop_f32f32f32(
     float* out_ptr, const float* lhs_ptr, const float* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   float acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0.f;
-  for (iree_uk_ssize_t k = 0; k < params->K; ++k) {
-    for (iree_uk_ssize_t k0 = 0; k0 < params->K0; ++k0) {
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
       float lhs_val = lhs_ptr[k * params->M0 * params->K0 + k0];
       float rhs_val = rhs_ptr[k * params->N0 * params->K0 + k0];
       acc += lhs_val * rhs_val;
@@ -28,8 +28,8 @@ static void iree_mmt4d_reference_innerloop_i8i8i32(
     int32_t* out_ptr, const int8_t* lhs_ptr, const int8_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
-  for (iree_uk_ssize_t k = 0; k < params->K; ++k) {
-    for (iree_uk_ssize_t k0 = 0; k0 < params->K0; ++k0) {
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
       int32_t lhs_val = lhs_ptr[k * params->M0 * params->K0 + k0];
       int32_t rhs_val = rhs_ptr[k * params->N0 * params->K0 + k0];
       acc += lhs_val * rhs_val;
@@ -40,14 +40,14 @@ static void iree_mmt4d_reference_innerloop_i8i8i32(
 
 static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
-  iree_uk_ssize_t lhs_elem_size =
+  iree_uk_index_t lhs_elem_size =
       iree_uk_type_size(iree_uk_mmt4d_lhs_type(mmt4d_type));
-  iree_uk_ssize_t rhs_elem_size =
+  iree_uk_index_t rhs_elem_size =
       iree_uk_type_size(iree_uk_mmt4d_rhs_type(mmt4d_type));
-  iree_uk_ssize_t out_elem_size =
+  iree_uk_index_t out_elem_size =
       iree_uk_type_size(iree_uk_mmt4d_out_type(mmt4d_type));
-  for (iree_uk_ssize_t i = 0; i < params->M; ++i) {
-    for (iree_uk_ssize_t j = 0; j < params->N; ++j) {
+  for (iree_uk_index_t i = 0; i < params->M; ++i) {
+    for (iree_uk_index_t j = 0; j < params->N; ++j) {
       void* out_tile_ptr = ((char*)params->out_buffer) +
                            (params->out_offset + i * params->out_stride0 +
                             j * params->M0 * params->N0) *
@@ -58,8 +58,8 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
       const void* rhs_panel_ptr =
           ((const char*)params->rhs_buffer) +
           (params->rhs_offset + j * params->rhs_stride0) * rhs_elem_size;
-      for (iree_uk_ssize_t i0 = 0; i0 < params->M0; ++i0) {
-        for (iree_uk_ssize_t j0 = 0; j0 < params->N0; ++j0) {
+      for (iree_uk_index_t i0 = 0; i0 < params->M0; ++i0) {
+        for (iree_uk_index_t j0 = 0; j0 < params->N0; ++j0) {
           void* out_ptr =
               ((char*)out_tile_ptr) + (i0 * params->N0 + j0) * out_elem_size;
           const void* lhs_ptr =
@@ -104,9 +104,9 @@ static void iree_uk_test_mmt4d_for_shape_params(
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(mmt4d_type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(mmt4d_type);
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
-  iree_uk_ssize_t lhs_buffer_size =
+  iree_uk_index_t lhs_buffer_size =
       iree_uk_2d_buffer_length(lhs_type, params.M, params.lhs_stride0);
-  iree_uk_ssize_t rhs_buffer_size =
+  iree_uk_index_t rhs_buffer_size =
       iree_uk_2d_buffer_length(rhs_type, params.N, params.rhs_stride0);
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(rhs_buffer_size);
@@ -122,7 +122,7 @@ static void iree_uk_test_mmt4d_for_shape_params(
 
   iree_uk_mmt4d_params_t reference_params;
   memcpy(&reference_params, &params, sizeof params);
-  iree_uk_ssize_t out_buffer_size =
+  iree_uk_index_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.M, params.out_stride0);
   void* reference_out_buffer = malloc(out_buffer_size);
   iree_uk_write_random_buffer(reference_out_buffer, out_buffer_size, out_type,

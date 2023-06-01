@@ -69,13 +69,13 @@ typedef enum {
 // Corresponds to the header macro DECLARE_UKERNEL_BINARY_2D.
 #define DISPATCH_UKERNEL_BINARY_2D(opcode, opcode_t, dtype, category)         \
   IREE_UK_EXPORT int iree_uk_##category##_##opcode##_2d(                      \
-      const dtype* lhs, iree_uk_ssize_t lhs_offset,                           \
-      iree_uk_ssize_t lhs_stride0, iree_uk_ssize_t lhs_stride1,               \
-      const dtype* rhs, iree_uk_ssize_t rhs_offset,                           \
-      iree_uk_ssize_t rhs_stride0, iree_uk_ssize_t rhs_stride1,               \
-      dtype* IREE_UK_RESTRICT out, iree_uk_ssize_t out_offset,                \
-      iree_uk_ssize_t out_stride0, iree_uk_ssize_t out_stride1,               \
-      iree_uk_ssize_t size0, iree_uk_ssize_t size1) {                         \
+      const dtype* lhs, iree_uk_index_t lhs_offset,                           \
+      iree_uk_index_t lhs_stride0, iree_uk_index_t lhs_stride1,               \
+      const dtype* rhs, iree_uk_index_t rhs_offset,                           \
+      iree_uk_index_t rhs_stride0, iree_uk_index_t rhs_stride1,               \
+      dtype* IREE_UK_RESTRICT out, iree_uk_index_t out_offset,                \
+      iree_uk_index_t out_stride0, iree_uk_index_t out_stride1,               \
+      iree_uk_index_t size0, iree_uk_index_t size1) {                         \
     return iree_uk_generic_##category##_2d(                                   \
         opcode_t, lhs, lhs_offset, lhs_stride0, lhs_stride1, rhs, rhs_offset, \
         rhs_stride0, rhs_stride1, out, out_offset, out_stride0, out_stride1,  \
@@ -87,11 +87,11 @@ typedef enum {
 // Corresponds to the header macro DECLARE_UKERNEL_BINARY_2D.
 #define DISPATCH_UKERNEL_UNARY_2D(opcode, opcode_t, dtype, category)          \
   IREE_UK_EXPORT int iree_uk_##category##_##opcode##_2d(                      \
-      const dtype* in, iree_uk_ssize_t in_offset, iree_uk_ssize_t in_stride0, \
-      iree_uk_ssize_t in_stride1, dtype* IREE_UK_RESTRICT out,                \
-      iree_uk_ssize_t out_offset, iree_uk_ssize_t out_stride0,                \
-      iree_uk_ssize_t out_stride1, iree_uk_ssize_t size0,                     \
-      iree_uk_ssize_t size1) {                                                \
+      const dtype* in, iree_uk_index_t in_offset, iree_uk_index_t in_stride0, \
+      iree_uk_index_t in_stride1, dtype* IREE_UK_RESTRICT out,                \
+      iree_uk_index_t out_offset, iree_uk_index_t out_stride0,                \
+      iree_uk_index_t out_stride1, iree_uk_index_t size0,                     \
+      iree_uk_index_t size1) {                                                \
     return iree_uk_generic_##category##_2d(                                   \
         opcode_t, in, in_offset, in_stride0, in_stride1, out, out_offset,     \
         out_stride0, out_stride1, size0, size1);                              \
@@ -203,20 +203,20 @@ static void iree_uk_generic_x32u_op(iree_uk_x32u_opcode_t opcode,
 IREE_UK_ATTRIBUTE_NOINLINE static int iree_uk_generic_x32b_2d(
     iree_uk_x32b_opcode_t opcode,
     // LHS.
-    const iree_uk_uint32_t* lhs, iree_uk_ssize_t lhs_offset,
-    iree_uk_ssize_t lhs_stride0, iree_uk_ssize_t lhs_stride1,
+    const iree_uk_uint32_t* lhs, iree_uk_index_t lhs_offset,
+    iree_uk_index_t lhs_stride0, iree_uk_index_t lhs_stride1,
     // RHS
-    const iree_uk_uint32_t* rhs, iree_uk_ssize_t rhs_offset,
-    iree_uk_ssize_t rhs_stride0, iree_uk_ssize_t rhs_stride1,
+    const iree_uk_uint32_t* rhs, iree_uk_index_t rhs_offset,
+    iree_uk_index_t rhs_stride0, iree_uk_index_t rhs_stride1,
     // OUT.
-    iree_uk_uint32_t* IREE_UK_RESTRICT out, iree_uk_ssize_t out_offset,
-    iree_uk_ssize_t out_stride0, iree_uk_ssize_t out_stride1,
+    iree_uk_uint32_t* IREE_UK_RESTRICT out, iree_uk_index_t out_offset,
+    iree_uk_index_t out_stride0, iree_uk_index_t out_stride1,
     // Sizes.
-    iree_uk_ssize_t size0, iree_uk_ssize_t size1) {
+    iree_uk_index_t size0, iree_uk_index_t size1) {
   int result_code = 0;
   // TODO: Manually unroll to x4 to trigger vectorization.
-  for (iree_uk_ssize_t i = 0; i < size0; ++i) {
-    for (iree_uk_ssize_t j = 0; j < size1; ++j) {
+  for (iree_uk_index_t i = 0; i < size0; ++i) {
+    for (iree_uk_index_t j = 0; j < size1; ++j) {
       iree_uk_generic_x32b_op(opcode, &result_code,
                               &lhs[i * lhs_stride0 + j * lhs_stride1],
                               &rhs[i * rhs_stride0 + j * rhs_stride1],
@@ -230,17 +230,17 @@ IREE_UK_ATTRIBUTE_NOINLINE static int iree_uk_generic_x32b_2d(
 IREE_UK_ATTRIBUTE_NOINLINE static int iree_uk_generic_x32u_2d(
     iree_uk_x32u_opcode_t opcode,
     // IN.
-    const iree_uk_uint32_t* in, iree_uk_ssize_t in_offset,
-    iree_uk_ssize_t in_stride0, iree_uk_ssize_t in_stride1,
+    const iree_uk_uint32_t* in, iree_uk_index_t in_offset,
+    iree_uk_index_t in_stride0, iree_uk_index_t in_stride1,
     // OUT.
-    iree_uk_uint32_t* IREE_UK_RESTRICT out, iree_uk_ssize_t out_offset,
-    iree_uk_ssize_t out_stride0, iree_uk_ssize_t out_stride1,
+    iree_uk_uint32_t* IREE_UK_RESTRICT out, iree_uk_index_t out_offset,
+    iree_uk_index_t out_stride0, iree_uk_index_t out_stride1,
     // Sizes.
-    iree_uk_ssize_t size0, iree_uk_ssize_t size1) {
+    iree_uk_index_t size0, iree_uk_index_t size1) {
   int result_code = 0;
   // TODO: Manually unroll to x4 to trigger vectorization.
-  for (iree_uk_ssize_t i = 0; i < size0; ++i) {
-    for (iree_uk_ssize_t j = 0; j < size1; ++j) {
+  for (iree_uk_index_t i = 0; i < size0; ++i) {
+    for (iree_uk_index_t j = 0; j < size1; ++j) {
       iree_uk_generic_x32u_op(opcode, &result_code,
                               &in[i * in_stride0 + j * in_stride1],
                               &out[i * out_stride0 + j * out_stride1]);

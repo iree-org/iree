@@ -16,7 +16,7 @@ namespace IREE {
 namespace HAL {
 
 std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
-    llvm::LLVMContext &context);
+    llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
 
 std::unique_ptr<llvm::Module> loadUKernelArchBitcode(
     llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);

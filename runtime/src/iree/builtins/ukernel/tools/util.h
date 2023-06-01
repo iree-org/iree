@@ -10,13 +10,13 @@
 #include "iree/builtins/ukernel/api.h"
 
 // Helper to determine the length of test buffers to allocate.
-iree_uk_ssize_t iree_uk_2d_buffer_length(iree_uk_type_t type,
-                                         iree_uk_ssize_t size0,
-                                         iree_uk_ssize_t size1);
+iree_uk_index_t iree_uk_2d_buffer_length(iree_uk_type_t type,
+                                         iree_uk_index_t size0,
+                                         iree_uk_index_t size1);
 
 bool iree_uk_2d_buffers_equal(const void* buf1, const void* buf2,
-                              iree_uk_type_t type, iree_uk_ssize_t size0,
-                              iree_uk_ssize_t size1, iree_uk_ssize_t stride0);
+                              iree_uk_type_t type, iree_uk_index_t size0,
+                              iree_uk_index_t size1, iree_uk_index_t stride0);
 
 // Simple deterministic pseudorandom generator. Same as C++'s std::minstd_rand.
 typedef struct iree_uk_random_engine_t {
@@ -32,7 +32,7 @@ iree_uk_uint64_t iree_uk_random_engine_get_uint64(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_65535(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_1(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_minus16_plus15(iree_uk_random_engine_t* e);
-void iree_uk_write_random_buffer(void* buffer, iree_uk_ssize_t size_in_bytes,
+void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
                                  iree_uk_type_t type,
                                  iree_uk_random_engine_t* engine);
 
