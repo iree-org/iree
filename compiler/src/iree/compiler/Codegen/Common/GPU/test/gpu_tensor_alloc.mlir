@@ -75,12 +75,12 @@ func.func @matmul_multi_uses() {
 
 // test corner case where the promoted value has multiple uses.
 //    CHECK-LABEL: func.func @matmul_multi_uses
-//         CHECK:    %[[C:.*]] = flow.dispatch.tensor.load
-//         CHECK:    %[[A:.*]] = flow.dispatch.tensor.load
-//         CHECK:    %[[B:.*]] = flow.dispatch.tensor.load
+//         CHECK:    %[[C:.*]] = flow.dispatch.tensor.load {{.+}} -> tensor<32x128xf32>
+//         CHECK:    %[[A:.*]] = flow.dispatch.tensor.load {{.+}} -> tensor<32x1024xf32>
+//         CHECK:    %[[B:.*]] = flow.dispatch.tensor.load {{.+}} -> tensor<1024x128xf32>
 //         CHECK:    %[[PA:.*]] = bufferization.alloc_tensor() copy(%[[A]]) {bufferization.escape = [false]} : tensor<32x1024xf32>
 //         CHECK:    %[[PB:.*]] = bufferization.alloc_tensor() copy(%[[B]]) {bufferization.escape = [false]} : tensor<1024x128xf32>
-//         CHECK:    %[[M:.*]] = linalg.matmul {{.*}} ins(%[[PA]], %[[PB]] : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%{{.*}} : tensor<32x128xf32>) -> tensor<32x128xf32>
+//         CHECK:    %[[M:.*]] = linalg.matmul ins(%[[PA]], %[[PB]] : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%{{.*}} : tensor<32x128xf32>) -> tensor<32x128xf32>
 //         CHECK:    "some_use"(%[[A]]) : (tensor<32x1024xf32>) -> ()
 
 // -----
@@ -129,3 +129,68 @@ func.func @matmul_multi_uses() {
 // CHECK-LABEL: func.func @matmul_33x33x903168_f32
 // CHECK-NOT: bufferization.alloc_tensor()
 
+// -----
+
+func.func @weight_dequant_matmul() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<86x128x2048xi4>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<86x2048xf32>>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<86x2048xi4>>
+  %3 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xf32>>
+  %4 = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096x2048xf32>>
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %6 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
+  %7 = flow.dispatch.tensor.load %4, offsets = [%5, %6], sizes = [32, 128], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<4096x2048xf32>> -> tensor<32x128xf32>
+  %8 = flow.dispatch.tensor.load %3, offsets = [%5, 0, 0], sizes = [32, 86, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86x128xf32>> -> tensor<32x86x128xf32>
+  %9 = flow.dispatch.tensor.load %0, offsets = [0, 0, %6], sizes = [86, 128, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<86x128x2048xi4>> -> tensor<86x128x128xi4>
+  %10 = flow.dispatch.tensor.load %1, offsets = [0, %6], sizes = [86, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<86x2048xf32>> -> tensor<86x128xf32>
+  %11 = flow.dispatch.tensor.load %2, offsets = [0, %6], sizes = [86, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<86x2048xi4>> -> tensor<86x128xi4>
+  %12 = tensor.empty() : tensor<86x128x128xf32>
+  %13 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%9, %10, %11 : tensor<86x128x128xi4>, tensor<86x128xf32>, tensor<86x128xi4>) outs(%12 : tensor<86x128x128xf32>) {
+  ^bb0(%in: i4, %in_0: f32, %in_1: i4, %out: f32):
+    %16 = arith.extsi %in : i4 to i32
+    %17 = arith.extsi %in_1 : i4 to i32
+    %18 = arith.subi %16, %17 : i32
+    %19 = arith.sitofp %18 : i32 to f32
+    %20 = arith.mulf %19, %in_0 : f32
+    linalg.yield %20 : f32
+  } -> tensor<86x128x128xf32>
+  %14 = linalg.fill ins(%cst : f32) outs(%7 : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %15 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d2, d3, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+  } ins(%8, %13 : tensor<32x86x128xf32>, tensor<86x128x128xf32>) outs(%14 : tensor<32x128xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 1, 32]]>} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %16 = arith.mulf %in, %in_0 : f32
+    %17 = arith.addf %out, %16 : f32
+    linalg.yield %17 : f32
+  } -> tensor<32x128xf32>
+  flow.dispatch.tensor.store %15, %4, offsets = [%5, %6], sizes = [32, 128], strides = [1, 1] : tensor<32x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096x2048xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @weight_dequant_matmul()
+//       CHECK:   %[[LHS_LD:.+]] = flow.dispatch.tensor.load {{.+}} : !flow.dispatch.tensor<readonly:tensor<4096x86x128xf32>> -> tensor<32x86x128xf32>
+// Check that the linalg.fill as the matmul initial result is not fused in the serial loops.
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+// Check that two serial loops are materialized for reductions.
+//       CHECK:   scf.for %{{.+}} = %c0 to %c86 step %c1 iter_args(%[[ARG1:.+]] = %[[FILL]]) -> (tensor<32x128xf32>)
+//       CHECK:     scf.for %{{.+}} = %c0 to %c128 step %c32 iter_args(%[[ARG2:.+]] = %[[ARG1]]) -> (tensor<32x128xf32>)
+//       CHECK:       %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS_LD]]
+// Check that we have a bufferization.alloc_tensor() for in-place bufferization later.
+//       CHECK:       %[[RHS_ALLOC:.+]] = bufferization.alloc_tensor() {bufferization.escape = [false]} : tensor<1x32x128xf32>
+// Check that the weight dequant linalg.generic is fused inside the serial loops.
+//       CHECK:       %[[RHS:.+]] = linalg.generic
+//  CHECK-SAME:        outs(%[[RHS_ALLOC]] : tensor<1x32x128xf32>)
+//       CHECK:       %[[LHS_ALLOC:.+]] = bufferization.alloc_tensor() copy(%[[LHS_SLICE]]) {bufferization.escape = [false]} : tensor<32x1x32xf32>
+//       CHECK:       linalg.generic
+//  CHECK-SAME:         ins(%[[LHS_ALLOC]], %[[RHS]] : tensor<32x1x32xf32>, tensor<1x32x128xf32>)
+//  CHECK-SAME:         outs(%[[ARG2]] : tensor<32x128xf32>)
+//       CHECK:       scf.yield
+//       CHECK:     scf.yield

@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -40,8 +41,7 @@ namespace iree_compiler {
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
 static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
-  auto tileSizesFn = [&](OpBuilder &builder,
-                         Operation *op) -> SmallVector<Value, 4> {
+  auto tileSizesFn = [](OpBuilder &builder, Operation *op) {
     auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
@@ -65,8 +65,38 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
-  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
-                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
+  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp, linalg::GenericOp,
+                 linalg::Conv2DNhwcHwcfOp,
+                 linalg::Conv2DNchwFchwOp>::insert(patterns, tilingOptions,
+                                                   filter);
+}
+
+static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
+  {
+    // Tile again at the workgroup level since redution dimension were
+    // ignored. Dimensions already tiled will be ignore since we tile to the
+    // same size.
+    RewritePatternSet wgTilingPatterns(funcOp.getContext());
+    populateTilingReductionPatterns(wgTilingPatterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(wgTilingPatterns)))) {
+      return failure();
+    }
+  }
+
+  {
+    RewritePatternSet wgTilingCanonicalizationPatterns =
+        linalg::getLinalgTilingCanonicalizationPatterns(funcOp.getContext());
+    populateAffineMinSCFCanonicalizationPattern(
+        wgTilingCanonicalizationPatterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(
+        wgTilingCanonicalizationPatterns);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(wgTilingCanonicalizationPatterns)))) {
+      return failure();
+    }
+    return success();
+  }
 }
 
 /// Return the tile size associated to one thread or warp based on the number of

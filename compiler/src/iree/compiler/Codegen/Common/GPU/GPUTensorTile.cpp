@@ -21,7 +21,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
@@ -31,31 +33,118 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 namespace mlir {
 namespace iree_compiler {
 
+class TileConsumerAndFuseInputProducer final
+    : public OpInterfaceRewritePattern<TilingInterface> {
+ public:
+  TileConsumerAndFuseInputProducer(
+      MLIRContext *context, IREE::LinalgExt::LinalgTransformationFilter filter,
+      bool fuseInputProducer, PatternBenefit benefit = 1)
+      : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
+        filter(std::move(filter)),
+        fuseInputProducer(fuseInputProducer) {}
+
+  LogicalResult matchAndRewrite(TilingInterface op,
+                                PatternRewriter &rewriter) const override {
+    if (failed(filter.checkAndNotify(rewriter, op))) return failure();
+
+    // Make sure we have a PartitionableLoopInterface op here and query the tile
+    // sizes from the partitionable loops.
+    auto plOp = dyn_cast<PartitionableLoopsInterface>(*op);
+    if (!plOp) return failure();
+    auto partitionedLoops = plOp.getPartitionableLoops(kNumMaxParallelDims);
+    SmallVector<int64_t, 4> tileSizes = getTileSizes(op, 0);
+    if (tileSizes.empty()) return failure();
+    // Mask out non reduction dimensions.
+    for (unsigned depth : partitionedLoops) {
+      if (depth < tileSizes.size()) tileSizes[depth] = 0;
+    }
+
+    // Make sure we have a tile size for each dimension.
+    // TODO: This is currently needed for LLVMGPU, where we propagate the
+    // lowering configuration to all linalg ops. Some linalg ops may not have
+    // the same rank, e.g., the configuration for a matmul attached to a
+    // producer linalg.fill op. It implicitly assumes that the leading
+    // dimensions of different linalg ops match, which is the current status;
+    // but may not hold true in the long term.
+    tileSizes.resize(op.getLoopIteratorTypes().size());
+
+    if (llvm::all_of(tileSizes, [](int64_t s) { return s == 0; })) {
+      return failure();
+    }
+
+    // Tile the current op and fuse its immediate input operands.
+    FailureOr<scf::SCFTilingResult> tilingResult =
+        tileConsumerAndFuseInputProducer(rewriter, op, tileSizes);
+    if (failed(tilingResult)) {
+      return rewriter.notifyMatchFailure(op, "failed to tile consumer");
+    }
+
+    // Replace the tiled op with replacements.
+    rewriter.replaceOp(op, tilingResult->replacements);
+    filter.replaceLinalgTransformationFilter(rewriter,
+                                             tilingResult->tiledOps.front());
+    return success();
+  }
+
+ private:
+  FailureOr<scf::SCFTilingResult> tileConsumerAndFuseInputProducer(
+      RewriterBase &rewriter, TilingInterface consumer,
+      ArrayRef<int64_t> tileSizes) const {
+    // First tile the current op as the consumer op.
+    auto tilingOptions = scf::SCFTilingOptions().setTileSizes(tileSizes);
+    FailureOr<scf::SCFTilingResult> tilingResult =
+        tileUsingSCFForOp(rewriter, consumer, tilingOptions);
+    if (failed(tilingResult)) {
+      return rewriter.notifyMatchFailure(consumer, "failed to tile consumer");
+    }
+
+    if (!fuseInputProducer) return tilingResult;
+    // If there are no generated loops generated, fusion is immaterial.
+    if (tilingResult->loops.empty()) return tilingResult;
+
+    // Collect immediate input operands that are fusable into the tiled loop.
+    // We have tensor extract slice ops taking slices of the untiled op.
+    //
+    // Note that this excludes init operands for correctness. Input operands are
+    // fine to fuse, at the cost of recomputation though.
+    SmallVector<tensor::ExtractSliceOp> candidates;
+    assert(tilingResult->tiledOps.size() == 1);
+    Operation *tiledOp = tilingResult->tiledOps.front();
+    auto dsOp = dyn_cast<DestinationStyleOpInterface>(tiledOp);
+    if (!dsOp) return tilingResult;
+    for (OpOperand *operand : dsOp.getDpsInputOperands()) {
+      auto sliceOp = operand->get().getDefiningOp<tensor::ExtractSliceOp>();
+      if (!sliceOp) continue;
+      auto linalgOp = sliceOp.getSource().getDefiningOp<linalg::LinalgOp>();
+      if (!linalgOp) continue;
+      // Restrict to fully parallel linalg ops for now for simplicity.
+      auto isParallel = [](utils::IteratorType it) {
+        return linalg::isParallelIterator(it);
+      };
+      if (llvm::all_of(linalgOp.getIteratorTypesArray(), isParallel)) {
+        candidates.push_back(sliceOp);
+      }
+    }
+
+    // Fuse the candidate immeidate operands into the tiled loop.
+    OpBuilder::InsertionGuard guard(rewriter);
+    while (!candidates.empty()) {
+      tensor::ExtractSliceOp sliceOp = candidates.back();
+      candidates.pop_back();
+      tileAndFuseProducerOfSlice(rewriter, sliceOp, tilingResult->loops);
+    }
+    return tilingResult;
+  }
+
+  IREE::LinalgExt::LinalgTransformationFilter filter;
+  bool fuseInputProducer;
+};
+
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
 static void populateTilingPatterns(RewritePatternSet &patterns,
-                                   bool onlyReduction) {
-  auto tileSizesFn = [onlyReduction](OpBuilder &builder,
-                                     Operation *op) -> SmallVector<Value, 4> {
-    auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
-    auto partitionedLoops =
-        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-    SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
-    if (onlyReduction) {
-      auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
-      for (unsigned depth : partitionedLoops) {
-        if (depth < tileSizes.size()) {
-          tileSizes[depth] = zero;
-        }
-      }
-    }
-    return tileSizes;
-  };
-
-  auto tilingOptions = linalg::LinalgTilingOptions()
-                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(tileSizesFn);
+                                   bool fuseInputProducer) {
   MLIRContext *context = patterns.getContext();
 
   IREE::LinalgExt::LinalgTransformationFilter filter(
@@ -63,19 +152,19 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
-  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp, linalg::GenericOp,
-                 linalg::Conv2DNhwcHwcfOp,
-                 linalg::Conv2DNchwFchwOp>::insert(patterns, tilingOptions,
-                                                   filter);
+
+  patterns.add<TileConsumerAndFuseInputProducer>(context, filter,
+                                                 fuseInputProducer);
 }
 
-LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction) {
+LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
+                                         bool fuseInputProducer) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
-    populateTilingPatterns(wgTilingPatterns, onlyReduction);
+    populateTilingPatterns(wgTilingPatterns, fuseInputProducer);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(wgTilingPatterns)))) {
       return failure();
@@ -233,9 +322,7 @@ struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
 
     // Tile to serial loops to the wg tile size to handle reductions and other
     // dimension that have not been distributed.
-    if (failed(tileToSerialLoops(funcOp, /*onlyReduction=*/true))) {
-      return signalPassFailure();
-    }
+    if (failed(tileReductionToSerialLoops(funcOp))) return signalPassFailure();
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tile reductions:";
