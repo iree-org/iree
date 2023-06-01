@@ -1,4 +1,4 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -154,6 +154,9 @@ struct GenericTypeConversionPattern : public ConversionPattern {
   }
 };
 
+// Handles constructing the appropriate ext/trunc operations that depend on
+// element type. This could be for floating point, signed integers, and
+// unsigned integer values.
 template <typename OpTy, typename TypeTy,
           typename OperandToResultWidthLegalityRelation>
 struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
@@ -163,8 +166,7 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
       ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         this->getTypeConverter()->convertType(op.getResult().getType());
-    auto operandType =
-        this->getTypeConverter()->convertType(op.getOperand().getType());
+    auto operandType = adaptor.getIn().getType();
 
     auto resultEType = cast<TypeTy>(getElementTypeOrSelf(resultType));
     auto operandEType = cast<TypeTy>(getElementTypeOrSelf(operandType));
@@ -189,6 +191,11 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   }
 };
 
+// This is required due to https://github.com/openxla/iree/issues/13891.
+// We are not able to execute `arith.extf` or `arith.truncf` on a scalar
+// vector type. To handle materializing `vector<bf16>` to `vector<f32>`
+// we should propagate into the source operation by constant propagation
+// instead.
 template <typename SrcOp>
 class PropagateCastF : public OpRewritePattern<SrcOp> {
   using OpRewritePattern<SrcOp>::OpRewritePattern;
@@ -218,9 +225,17 @@ class PropagateCastF : public OpRewritePattern<SrcOp> {
   }
 };
 
-template <typename Base, typename Converter>
-struct ConvertArithTypesPass : public Base {
-  using Base::Base;
+// Converts BF16s to F32s.
+struct PromoteBF16ToF32Converter
+    : public FloatTypeConverter<BFloat16Type, Float32Type> {
+  Type getTargetType(BFloat16Type type) override {
+    return Float32Type::get(type.getContext());
+  }
+};
+
+struct ConvertBf16ArithToF32Pass
+    : public ConvertBf16ArithToF32Base<ConvertBf16ArithToF32Pass> {
+  using ConvertBf16ArithToF32Base::ConvertBf16ArithToF32Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
@@ -287,20 +302,9 @@ struct ConvertArithTypesPass : public Base {
     }
   }
 
-  Converter typeConverter;
+  PromoteBF16ToF32Converter typeConverter;
 };
 
-struct PromoteBF16ToF32Converter
-    : public FloatTypeConverter<BFloat16Type, Float32Type> {
-  Type getTargetType(BFloat16Type type) override {
-    return Float32Type::get(type.getContext());
-  }
-};
-
-struct ConvertBf16ArithToF32Pass
-    : public ConvertArithTypesPass<
-          ConvertBf16ArithToF32Base<ConvertBf16ArithToF32Pass>,
-          PromoteBF16ToF32Converter> {};
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
