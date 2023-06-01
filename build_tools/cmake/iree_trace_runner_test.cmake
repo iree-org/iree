@@ -47,28 +47,29 @@ function(iree_trace_runner_test)
     ${ARGN}
   )
 
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
-    return()
-  endif()
-
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   set(_MODULE_NAME "${_RULE_NAME}_module")
 
-  iree_bytecode_module_for_iree_check_test_and_friends(
-    MODULE_NAME
+  set(_BASE_COMPILER_FLAGS
+    "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+  )
+
+  if (_RULE_TARGET_CPU_FEATURES)
+    list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+  endif()
+
+  iree_bytecode_module(
+    NAME
       "${_MODULE_NAME}"
     MODULE_FILE_NAME
       "${_RULE_MODULE_FILE_NAME}"
     SRC
       "${_RULE_SRC}"
-    TARGET_BACKEND
-      "${_RULE_TARGET_BACKEND}"
     FLAGS
-      ${_RULE_COMPILER_FLAGS}
-    TARGET_CPU_FEATURES
-      ${_RULE_TARGET_CPU_FEATURES}
+      "${_BASE_COMPILER_FLAGS}"
+      "${_RULE_COMPILER_FLAGS}"
   )
 
   # A target specifically for the test. We could combine this with the above,
@@ -152,10 +153,6 @@ function(iree_single_backend_generated_trace_runner_test)
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
-
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
-    return()
-  endif()
 
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
@@ -300,14 +297,6 @@ function(iree_generated_trace_runner_test)
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
-
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
-    return()
-  endif()
-
-  if((NOT (IREE_ARCH STREQUAL "x86_64")) AND ("x86_64_only" IN_LIST _RULE_LABELS))
-    return()
-  endif()
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
     set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
