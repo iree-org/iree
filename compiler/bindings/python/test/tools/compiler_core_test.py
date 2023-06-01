@@ -105,7 +105,7 @@ class CompilerTest(unittest.TestCase):
   def testBadInputType(self):
     with self.assertRaisesRegex(
         ValueError, "For input_type= argument, expected one of: "
-        "NONE, STABLEHLO, STABLEHLO_XLA, TOSA"):
+        "NONE, AUTO, STABLEHLO, STABLEHLO_XLA, TOSA"):
       _ = iree.compiler.tools.compile_str(
           SIMPLE_MUL_ASM,
           input_type="not-existing",
