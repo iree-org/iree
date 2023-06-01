@@ -41,10 +41,12 @@ class InputType(Enum):
   `CompilerOptions.input_type`.
   """
   NONE = "none"
-  MHLO = "mhlo"
+  STABLEHLO = "stablehlo"
+  STABLEHLO_XLA = "stablehlo_xla"
   TOSA = "tosa"
   TM_TENSOR = "tm_tensor"
-  XLA = "xla"
+  MHLO_LEGACY = "mhlo_legacy"
+  XLA_LEGACY = "xla_legacy"
 
   @staticmethod
   def parse(spec: Union[str, InputType]) -> InputType:
