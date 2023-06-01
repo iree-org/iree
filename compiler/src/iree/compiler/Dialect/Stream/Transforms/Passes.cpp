@@ -145,6 +145,15 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Stream::createRefineUsagePass());
   addCleanupPatterns(passManager);
 
+  // Verify all stream.async.* op access ranges that we can by taking advantage
+  // of statically available information or that which we can infer from data
+  // flow analysis. Because this may require a global analysis it's best done in
+  // a pass instead of individual op verifiers. We could run the pass more
+  // frequently above or move some of the simpler checks to op verifiers if we
+  // wanted to catch errors earlier but this is mostly a guard before we go into
+  // the stream.cmd.* layer.
+  passManager.addPass(IREE::Stream::createVerifyAsyncAccessRangesPass());
+
   //----------------------------------------------------------------------------
   // Stream formation and scheduling
   //----------------------------------------------------------------------------

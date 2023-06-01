@@ -163,6 +163,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpStatisticsPass(
     DumpOutputFormat outputFormat = DumpOutputFormat::Pretty,
     std::string outputFile = "");
 
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createVerifyAsyncAccessRangesPass();
+
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyInputPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createVerifyLoweringToTensorsPass();
