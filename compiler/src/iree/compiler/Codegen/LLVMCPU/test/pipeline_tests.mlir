@@ -68,7 +68,7 @@ hal.executable private @check_no_cse {
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[65, 65], [8, 32, 0], [0, 0, 16]]>,
+    lowering_config = <tile_sizes = [[65, 65], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
     translation_info  = <CPUDoubleTilingPadExpert>,
     workgroup_size = []>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -114,7 +114,7 @@ hal.executable private @preset_pad_config_matmul  {
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16]]>,
+    lowering_config = <tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
     translation_info  = <CPUDoubleTilingPadExpert>,
     workgroup_size = []>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

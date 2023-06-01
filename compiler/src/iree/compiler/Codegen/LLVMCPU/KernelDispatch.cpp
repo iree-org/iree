@@ -806,6 +806,8 @@ static LogicalResult setMatmulPadRootConfig(
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  SmallVector<int64_t> zeros(reductionTileSizes.size(), 0);
+  tileSizes.push_back(zeros);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -871,6 +873,7 @@ static LogicalResult setMatmulNoPadRootConfig(
             std::back_inserter(newTileSizes));
   newTileSizes.push_back(parallelTileSizes);
   newTileSizes.push_back(reductionTileSizes);
+  newTileSizes.push_back({});
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for no-padding contraction: "
                        << newTileSizes << "\n");
@@ -906,6 +909,8 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  // nop
+  tileSizes.push_back(parallelTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -1345,6 +1350,7 @@ static LogicalResult setDefaultGenericOpRootConfig(
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  tileSizes.push_back({});
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
@@ -1441,6 +1447,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(/*reduction tile sizes=*/{});
+  tileSizes.push_back({});
 
   // For non-tensor based ops use the Buffer ops pipeline.
   auto passPipeline =
@@ -1522,6 +1529,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(vecTileSizes);
+  tileSizes.push_back(zeros);
   tileSizes.push_back(zeros);
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for element-wise op: " << tileSizes
@@ -1650,6 +1658,8 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  // nop
+  tileSizes.push_back(parallelTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);

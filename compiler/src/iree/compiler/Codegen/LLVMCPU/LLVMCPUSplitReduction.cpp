@@ -178,7 +178,8 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
                << "can't find lowering_config, skip SplitReduction");
     return;
   }
-  auto reductionSizes = maybeLoweringConfig.value().getTileSizeVals().back();
+  auto tileSizeList = maybeLoweringConfig.value().getTileSizeVals();
+  auto reductionSizes = tileSizeList[tileSizeList.size() - 2];
   if (reductionSizes.empty()) {
     LLVM_DEBUG(
         llvm::dbgs()

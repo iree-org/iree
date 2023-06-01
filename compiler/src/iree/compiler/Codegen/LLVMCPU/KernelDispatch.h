@@ -26,7 +26,10 @@ enum class TilingLevel : unsigned {
   ParallelTiles = 1,
   // Tile TilingInterface operations on workgroup thread for reduction dims.
   ReductionTiles = 2,
-  NumTileLevels = 3
+  // TileAndFuse TilingInterface operations at vector level for parallel
+  // dims.
+  InnerParallelTiles = 3,
+  NumTileLevels = 4
 };
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp);
