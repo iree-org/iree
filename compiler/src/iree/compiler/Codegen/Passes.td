@@ -636,11 +636,11 @@ def LLVMCPULowerExecutableTarget :
 }
 
 def ExpandArithF16ToF32 :
-    Pass<"iree-llvmcpu-expand-max-f16-to-f32", ""> {
+    Pass<"iree-llvmcpu-expand-f16-Op-to-f32", ""> {
   let summary =
-      "Promote f16 to f32 for max.";
+      "Preform f16 opertaions by expanding them to f32.";
   let constructor =
-      "mlir::iree_compiler::createExpandF16MaxFToF32Pass()";
+      "mlir::iree_compiler::createExpandF16OpToF32Pass()";
 }
 
 def LLVMCPULowerToUKernels :

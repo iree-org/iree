@@ -35,8 +35,11 @@ createLLVMCPUEmitVectorizationRemarksPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
 
-/// Convert F16 to f32 max.
-std::unique_ptr<Pass> createExpandF16MaxFToF32Pass();
+/// Pass to handel F16 bit operations, but converting them to F32. Currently 
+// this pass is handeling fmaxf conversion from f16 to f32, and then returing 
+// a f16 output back after preforming the operation. Can handel more operations
+// if ever required. 
+std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 
 /// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
 /// operation.

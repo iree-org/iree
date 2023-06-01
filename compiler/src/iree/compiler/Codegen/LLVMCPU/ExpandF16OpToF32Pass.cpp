@@ -17,11 +17,12 @@ namespace iree_compiler {
 
 namespace {
 
-struct ExpandF16MaxFToF32Pattern : public OpRewritePattern<arith::MaxFOp> {
+template<typename Op>
+struct ExpandF16OpToF32Pattern : public OpRewritePattern<Op> {
   public:
-    using OpRewritePattern<arith::MaxFOp>::OpRewritePattern;
+    using OpRewritePattern<Op>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(arith::MaxFOp op, 
+    LogicalResult matchAndRewrite(Op op, 
                                   PatternRewriter &rewriter) const override{
       Type resultType = op.getLhs().getType();
       if (getElementTypeOrSelf(resultType).getIntOrFloatBitWidth() != 16) {
@@ -38,16 +39,15 @@ struct ExpandF16MaxFToF32Pattern : public OpRewritePattern<arith::MaxFOp> {
       Value lhsExt = rewriter.create<arith::ExtFOp>(loc, wideType, op.getLhs());
       Value rhsExt = rewriter.create<arith::ExtFOp>(loc, wideType, op.getRhs());
       Value maxExt = 
-          rewriter.create<arith::MaxFOp>(loc, wideType, lhsExt, rhsExt);
-      Value result = rewriter.create<arith::TruncFOp>(loc, resultType, maxExt);
-
-      rewriter.replaceOp(op, result);
+          rewriter.create<Op>(loc, wideType, lhsExt, rhsExt);
+      
+      rewriter.replaceOpWithNewOp<arith::TruncFOp>(op, resultType, maxExt);
       return success();
     }
 };
 
-struct ExpandF16MaxFToF32Pass
-    : public ExpandArithF16ToF32Base<ExpandF16MaxFToF32Pass> {
+struct ExpandF16OpToF32Pass
+    : public ExpandArithF16ToF32Base<ExpandF16OpToF32Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -55,7 +55,7 @@ struct ExpandF16MaxFToF32Pass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ExpandF16MaxFToF32Pattern>(
+    patterns.insert<ExpandF16OpToF32Pattern<arith::MaxFOp>>(
         context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -65,8 +65,8 @@ struct ExpandF16MaxFToF32Pass
 };
 }  // namespace
 
-std::unique_ptr<Pass> createExpandF16MaxFToF32Pass() {
-  return std::make_unique<ExpandF16MaxFToF32Pass>();
+std::unique_ptr<Pass> createExpandF16OpToF32Pass() {
+  return std::make_unique<ExpandF16OpToF32Pass>();
 }
 
 }  // namespace iree_compiler
