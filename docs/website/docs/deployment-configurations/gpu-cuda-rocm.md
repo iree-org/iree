@@ -115,7 +115,7 @@ following command:
     iree-compile \
         --iree-hal-target-backends=cuda \
         --iree-hal-cuda-llvm-target-arch=<...> \
-        --iree-input-type=mhlo \
+        --iree-input-type=stablehlo \
         iree_input.mlir -o mobilenet-cuda.vmfb
     ```
 
@@ -141,7 +141,7 @@ following command:
         --iree-rocm-target-chip=<...> \
         --iree-rocm-link-bc=true \
         --iree-rocm-bc-dir=<...> \
-        --iree-input-type=mhlo \
+        --iree-input-type=stablehlo \
         iree_input.mlir -o mobilenet-rocm.vmfb
     ```
 

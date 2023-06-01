@@ -97,7 +97,7 @@ class ImportOptions(CompilerOptions):
   exported_names: Sequence[str] = ()
   import_only: bool = False
   import_type: ImportType = ImportType.OBJECT_GRAPH
-  input_type: Union[InputType, str] = InputType.XLA
+  input_type: Union[InputType, str] = InputType.XLA_LEGACY
   saved_model_tags: Set[str] = field(default_factory=set)
   save_temp_iree_input: Optional[str] = None
 

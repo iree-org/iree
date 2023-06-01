@@ -37,16 +37,16 @@ struct InputDialectOptions {
     // Analyses the input to determine what input dialect pipeline to use.
     auto_detect,
 #ifdef IREE_HAVE_MHLO_INPUT
-    // Legalizes input defined over MHLO ops.
-    mhlo,
-    // Special case of 'mhlo' legalization which also performs some XLA
-    // cleanup activities.
-    xla,
     // Legalizes input defined over StableHLO ops.
     stablehlo,
     // Special case of 'stablehlo' legalization which also performs some XLA
     // preprocessing, e.g., flattening of tuples.
     stablehlo_xla,
+    // Legalizes input defined over MHLO ops. (Deprecated.)
+    mhlo_legacy,
+    // Special case of 'mhlo' legalization which also performs some XLA
+    // cleanup activities. (Deprecated.)
+    xla_legacy,
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
     // Legalizes input defined over TMTensor ops.

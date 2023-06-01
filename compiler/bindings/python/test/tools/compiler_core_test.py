@@ -105,7 +105,7 @@ class CompilerTest(unittest.TestCase):
   def testBadInputType(self):
     with self.assertRaisesRegex(
         ValueError, "For input_type= argument, expected one of: "
-        "NONE, MHLO, TOSA"):
+        "NONE, STABLEHLO, STABLEHLO_XLA, TOSA"):
       _ = iree.compiler.tools.compile_str(
           SIMPLE_MUL_ASM,
           input_type="not-existing",
@@ -124,7 +124,7 @@ class CompilerTest(unittest.TestCase):
   def testOutputFbTextParsed(self):
     text = iree.compiler.tools.compile_str(
         SIMPLE_MUL_ASM,
-        input_type='mhlo',
+        input_type='stablehlo',
         output_format='flatbuffer_text',
         target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS).decode(
             "utf-8")

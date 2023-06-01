@@ -1,5 +1,5 @@
 // RUN: iree-run-mlir \
-// RUN:   --Xcompiler,iree-input-type=mhlo \
+// RUN:   --Xcompiler,iree-input-type=mhlo_legacy \
 // RUN:   --Xcompiler,iree-hal-target-backends=vmvx \
 // RUN:   --Xcompiler,iree-flow-trace-dispatch-tensors \
 // RUN:   %s 2>&1 | FileCheck %s

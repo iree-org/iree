@@ -107,7 +107,7 @@ dispatch functions, generate an IREE module with the
 
 ```shell
 $ build/tools/iree-compile \
-  --iree-input-type=mhlo \
+  --iree-input-type=stablehlo \
   --iree-flow-export-benchmark-funcs \
   --iree-hal-target-backends=vmvx \
   tests/e2e/models/fullyconnected.mlir \

@@ -95,7 +95,7 @@ import tool):
 ``` shell hl_lines="2"
 iree-compile \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-input-type=mhlo \
+    --iree-input-type=stablehlo \
     iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 

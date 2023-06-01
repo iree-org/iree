@@ -28,7 +28,7 @@ def build_module(artifacts_dir: str):
   compile_file(input_file=os.path.join(artifacts_dir, "mnist_train.mlirbc"),
                output_file=vmfb_file,
                target_backends=[args.target_backend],
-               input_type=InputType.MHLO)
+               input_type=InputType.MHLO_LEGACY)
   return load_vm_flatbuffer_file(vmfb_file, driver=args.driver)
 
 

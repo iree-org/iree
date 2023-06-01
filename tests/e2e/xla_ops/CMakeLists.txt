@@ -76,7 +76,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
   RUNNER_ARGS
     "--cuda_use_streams=false"
   LABELS
@@ -153,7 +153,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
   RUNNER_ARGS
     "--cuda_use_streams=true"
   LABELS
@@ -231,7 +231,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
 )
 
 iree_check_single_backend_test_suite(
@@ -299,7 +299,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
 )
 
 iree_check_single_backend_test_suite(
@@ -366,7 +366,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
 )
 
 iree_check_single_backend_test_suite(
@@ -436,7 +436,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
     "--iree-llvmcpu-target-cpu-features=host"
   LABELS
     "hostonly"
@@ -512,6 +512,6 @@ iree_check_single_backend_test_suite(
   # DRIVER
   #   "webgpu"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=mhlo_legacy"
     "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
 )
