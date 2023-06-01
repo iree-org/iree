@@ -6,11 +6,6 @@
 
 include(CMakeParseArguments)
 
-set(IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES
-  llvm-cpu
-  vmvx
-)
-
 # iree_check_test()
 #
 # Creates a test using iree-check-module for the specified source file.
