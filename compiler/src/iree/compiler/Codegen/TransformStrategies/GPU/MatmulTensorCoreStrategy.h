@@ -80,14 +80,15 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     assert(totalNumThreads() % numThreadsK == 0 &&
            "num threads must be divisible by num threads along k");
     int64_t numThreadsM = totalNumThreads() / numThreadsK;
-    assert(blockTileM() % numThreadsM == 0 &&
-           "blockTileSizes[0] must be divisible by numThreadsM");
-    assert(reductionTileSize % numThreadsK == 0 &&
-           "reductionTileSize must be divisible by numThreadsK");
+//     assert(blockTileM() % numThreadsM == 0 &&
+//            "blockTileSizes[0] must be divisible by numThreadsM");
+//     assert(reductionTileSize % numThreadsK == 0 &&
+//            "reductionTileSize must be divisible by numThreadsK");
     return MappingInfo{
         /*numThreads=*/{numThreadsM, numThreadsK},
         /*tileSizes=*/
-        {blockTileM() / numThreadsM, reductionTileSize / numThreadsK},
+        {std::max(1l, blockTileM() / numThreadsM), 
+        std::max(1l, reductionTileSize / numThreadsK)},
         /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
   }
   // RHS copy is of size kxn.
@@ -98,14 +99,15 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsK = totalNumThreads() / numThreadsN;
-    assert(reductionTileSize % numThreadsK == 0 &&
-           "blockTileSizes[0] must be divisible by numThreadsK");
-    assert(blockTileN() % numThreadsN == 0 &&
-           "reductionTileSize must be divisible by numThreadsN");
+//     assert(reductionTileSize % numThreadsK == 0 &&
+//            "blockTileSizes[0] must be divisible by numThreadsK");
+//     assert(blockTileN() % numThreadsN == 0 &&
+//            "reductionTileSize must be divisible by numThreadsN");
     return MappingInfo{
         /*numThreads=*/{numThreadsK, numThreadsN},
         /*tileSizes=*/
-        {reductionTileSize / numThreadsK, blockTileN() / numThreadsN},
+        {std::max(1l, reductionTileSize / numThreadsK), 
+        std::max(1l, blockTileN() / numThreadsN)},
         /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
   // RES copy is of size mxn.
@@ -116,20 +118,21 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsM = totalNumThreads() / numThreadsN;
-    assert(blockTileM() % numThreadsM == 0 &&
-           "blockTileSizes[0] must be divisible by numThreadsM");
-    assert(blockTileN() % numThreadsN == 0 &&
-           "blockTileSizes[1] must be divisible by numThreadsN");
+//     assert(blockTileM() % numThreadsM == 0 &&
+//            "blockTileSizes[0] must be divisible by numThreadsM");
+//     assert(blockTileN() % numThreadsN == 0 &&
+//            "blockTileSizes[1] must be divisible by numThreadsN");
     return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
                        /*tileSizes=*/
-                       {blockTileM() / numThreadsM, blockTileN() / numThreadsN},
+                       {std::max(1l, blockTileM() / numThreadsM), 
+                        std::max(1l, blockTileN() / numThreadsN)},
                        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {
     return MappingInfo{/*numThreads=*/{numWarps[0], numWarps[1]},
                        /*tileSizes=*/{},
-                       /*threadMapping=*/{warpY(ctx), warpX(ctx)}};
+                       /*threadMapping=*/{warpX(ctx), warpY(ctx)}};
   }
 
   void print(llvm::raw_ostream &os) const;

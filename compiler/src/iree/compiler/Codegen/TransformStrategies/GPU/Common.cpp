@@ -507,7 +507,7 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // TODO: don't rematch, apply on the variant op directly.
   Value funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH);
+  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 
   // Apply vectorization + cleanups to what remains.
   funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true);
