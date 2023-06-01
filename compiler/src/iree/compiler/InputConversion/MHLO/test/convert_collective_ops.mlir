@@ -76,6 +76,25 @@ func.func @all_reduce_sum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 
 // -----
 
+// CHECK-LABEL: @all_reduce_sum_uint
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<2304xi32>
+func.func @all_reduce_sum_uint(%input : tensor<2304xui32>) -> tensor<2304xui32> {
+  // CHECK: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<2304xi32>
+  // CHECK: %[[OP:.+]] = flow.collective.all_reduce sum, ui32, %[[EMPTY]], %[[ARG0]], %[[CHANNEL]]  : (tensor<2304xi32>, tensor<2304xi32>, !flow.channel) -> %[[EMPTY]] as tensor<2304xi32>
+  // CHECK: return %[[OP]] : tensor<2304xi32>
+  %out = "mhlo.all_reduce"(%input) ({
+    ^bb0(%arg0: tensor<ui32>, %arg1: tensor<ui32>):
+      %sum = mhlo.add %arg0, %arg1 : tensor<ui32>
+      mhlo.return %sum : tensor<ui32>
+    }) {channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+        replica_groups = dense<[[0, 1, 2, 3, 4, 5, 6, 7]]> : tensor<1x8xi64>,
+        use_global_device_ids} : (tensor<2304xui32>) -> tensor<2304xui32>
+  return %out : tensor<2304xui32>
+}
+
+// -----
+
 // CHECK-LABEL: @all_reduce_product
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<2304xf32>)
 func.func @all_reduce_product(%input : tensor<2304xf32>) -> tensor<2304xf32> {

@@ -651,11 +651,11 @@ struct AllReduceOpConversion final
 
     // Create an empty tensor for the result.
     ArrayRef<int64_t> inputShape = inputType.getShape();
-    Value target = rewriter.create<tensor::EmptyOp>(loc, inputShape,
-                                                    inputType.getElementType());
+    Value target = rewriter.create<tensor::EmptyOp>(
+        loc, inputShape, getElementTypeOrSelf(adaptor.getOperand().getType()));
     auto allReduceOp = rewriter.create<IREE::Flow::CollectiveAllReduceOp>(
-        op.getLoc(), reductionOpAttr, elementTypeAttr, target, op.getOperand(),
-        channel);
+        op.getLoc(), reductionOpAttr, elementTypeAttr, target,
+        adaptor.getOperand(), channel);
     rewriter.replaceOp(op, allReduceOp.getResult());
     return success();
   }
