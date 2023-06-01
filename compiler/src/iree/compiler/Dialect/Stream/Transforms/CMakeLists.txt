@@ -41,6 +41,7 @@ iree_cc_library(
     "ScheduleConcurrency.cpp"
     "ScheduleExecution.cpp"
     "SpecializeDispatches.cpp"
+    "VerifyAsyncAccessRanges.cpp"
     "VerifyLowerings.cpp"
   DEPS
     ::PassesIncGen

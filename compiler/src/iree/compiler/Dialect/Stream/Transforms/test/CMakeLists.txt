@@ -43,6 +43,7 @@ iree_lit_test_suite(
     "schedule_concurrency.mlir"
     "schedule_execution.mlir"
     "specialize_dispatches.mlir"
+    "verify_async_access_ranges.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -246,6 +246,14 @@ def DumpStatistics :
   ];
 }
 
+def VerifyAsyncAccessRanges :
+    Pass<"iree-stream-verify-async-access-ranges", "mlir::ModuleOp"> {
+  let summary = "Verifies that stream.async.* access ranges are in bounds where possible.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createVerifyAsyncAccessRangesPass()
+  }];
+}
+
 def VerifyInput :
     Pass<"iree-stream-verify-input", "mlir::ModuleOp"> {
   let summary = "Verifies that input dialects are supported by the streams dialect.";
