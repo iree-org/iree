@@ -47,7 +47,7 @@ bool ConvIsLowerable(HloInstruction *conv) {
   return gpu::GpuConvRewriter::ConvIsLowerable(conv);
 }
 
-Status RunSPMDOptimizer(HloModule *hlo_module, int64_t num_partitions) {
+Status RunSPMDOptimizer(HloModule *hlo_module) {
   AlgebraicSimplifierOptions layout_insensitive_algsimp_opts({},
                                                              ConvIsLowerable);
 
@@ -78,13 +78,14 @@ Status RunSPMDOptimizer(HloModule *hlo_module, int64_t num_partitions) {
       [](const HloSortInstruction *, int64_t) { return true; });
   TF_RETURN_IF_ERROR(pre_spmd_pipeline.Run(hlo_module).status());
 
+  const int64_t num_partitions = hlo_module->config().num_partitions();
   if (num_partitions > 1) {
     // TODO: Populate the config and enable check to match gpu_compiler?
-    // if (!hlo_module->config().use_spmd_partitioning()) {
-    //   return InvalidArgument(
-    //       "num_partitions=%d but SPMD partitioning not enabled.",
-    //       num_partitions);
-    // }
+    if (!hlo_module->config().use_spmd_partitioning()) {
+      return InvalidArgument(
+          "num_partitions=%d but SPMD partitioning not enabled.",
+          num_partitions);
+    }
     HloPassPipeline spmd_pipeline("spmd-partitioner");
     HloPassPipeline &spmd_simplify =
         spmd_pipeline.AddPass<HloPassFix<HloPassPipeline>>("spmd-simplify");
@@ -135,6 +136,19 @@ void GSPMDOptions::bindOptions(support::OptionsBinder &binder) {
   binder.opt<int>("openxla-partitioner-gspmd-num-partitions", numPartitions,
                   llvm::cl::desc("Number of partitions to shard"),
                   llvm::cl::cat(category));
+  binder.opt<int>("openxla-partitioner-gspmd-replica-count", replicaCount,
+                  llvm::cl::desc("Number of replicas"),
+                  llvm::cl::cat(category));
+  binder.opt<bool>("openxla-partitioner-gspmd-use-spmd-partitioning",
+                   useSpmdPartitioning,
+                   llvm::cl::desc("Whether to use SPMD partitioning"),
+                   llvm::cl::cat(category));
+  binder.list<bool>(
+      "openxla-partitioner-gspmd-allow-spmd-sharding-propagation-to-output",
+      allowSpmdShardingPropagationToOutput,
+      llvm::cl::desc(
+          "Whether to allow sharding propagation to propagate to the outputs"),
+      llvm::cl::cat(category), llvm::cl::CommaSeparated);
 }
 
 class RunGSPMDPartitionerPass
@@ -188,12 +202,16 @@ class RunGSPMDPartitionerPass
     TF_ASSIGN_OR_RETURN(xla::HloModuleConfig hlo_module_config,
                         xla::HloModule::CreateModuleConfigFromProto(
                             hlo_proto.hlo_module(), debugOptions));
+    // Set config options.
+    hlo_module_config.set_num_partitions(options.numPartitions);
+    hlo_module_config.set_replica_count(options.replicaCount);
+    hlo_module_config.set_use_spmd_partitioning(options.useSpmdPartitioning);
+    hlo_module_config.set_allow_spmd_sharding_propagation_to_output(
+        options.allowSpmdShardingPropagationToOutput);
     TF_ASSIGN_OR_RETURN(std::unique_ptr<xla::HloModule> hlo_module,
                         xla::HloModule::CreateFromProto(hlo_proto.hlo_module(),
                                                         hlo_module_config));
-    // TODO: Get the number of partitions from somewhere intelligible.
-    TF_RETURN_IF_ERROR(RunSPMDOptimizer(
-        hlo_module.get(), /*num_partitions=*/options.numPartitions));
+    TF_RETURN_IF_ERROR(RunSPMDOptimizer(hlo_module.get()));
 
     return hlo_module;
   }
@@ -207,8 +225,8 @@ void buildGSPMDPipeline(mlir::PassManager &passManager,
   // To MHLO.
   passManager.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
   passManager.addNestedPass<mlir::func::FuncOp>(
-        mlir::mhlo::createChloLegalizeToHloPass(
-            /*legalizeBroadcasts=*/true, /*expandCompositions=*/true));
+      mlir::mhlo::createChloLegalizeToHloPass(
+          /*legalizeBroadcasts=*/true, /*expandCompositions=*/true));
 
   passManager.addPass(std::make_unique<RunGSPMDPartitionerPass>(options));
 

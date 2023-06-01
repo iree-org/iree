@@ -13,7 +13,6 @@
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/iree_helpers.h"
 #include "iree/integrations/pjrt/common/tensor_utils.h"
-#include "xla/pjrt/compile_options.pb.h"
 
 using iree::vm::retain_ref;
 
@@ -993,14 +992,20 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     LoadedExecutableInstance* executable;
 
     // Read compilation options.
-    xla::CompileOptionsProto options;
-    if (!options.ParseFromArray(args->compile_options,
-                                args->compile_options_size)) {
+    xla::CompileOptionsProto options_proto;
+    if (!options_proto.ParseFromArray(args->compile_options,
+                                      args->compile_options_size)) {
       return MakeError(iree_make_status(IREE_STATUS_INTERNAL,
                                         "could not parse compilation options"));
     }
+    auto options = xla::CompileOptions::FromProto(options_proto);
+    if (!options.ok()) {
+      return MakeError(
+          iree_make_status(IREE_STATUS_INTERNAL,
+                           std::string(options.status().message()).c_str()));
+    }
 
-    auto* error = client->Compile(args->program, options, &executable);
+    auto* error = client->Compile(args->program, *options, &executable);
     if (error) return error;
     args->executable = *executable;
     return nullptr;
@@ -1080,7 +1085,7 @@ iree_status_t ClientInstance::PopulateDevices() {
 }
 
 PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
-                                    xla::CompileOptionsProto options,
+                                    xla::CompileOptions options,
                                     LoadedExecutableInstance** out_executable) {
   std::unique_ptr<ArtifactDumper::Transaction> artifact_tx;
   if (platform().artifact_dumper().enabled()) {
@@ -1118,10 +1123,38 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     }
 
     // Set flags.
-    int num_partitions = options.executable_build_options().num_partitions();
-    job->SetFlag(absl::StrCat("--openxla-partitioner-gspmd-num-partitions=",
-                              num_partitions)
-                     .c_str());
+    int num_partitions = options.executable_build_options.num_partitions();
+    int num_replicas = options.executable_build_options.num_replicas();
+    bool use_spmd_partitioning =
+        options.executable_build_options.use_spmd_partitioning();
+    auto allow_spmd_sharding_propagation_to_output =
+        options.executable_build_options
+            .allow_spmd_sharding_propagation_to_output();
+    if (!job->SetFlag(
+            absl::StrCat("--openxla-partitioner-gspmd-num-partitions=",
+                         num_partitions)
+                .c_str())) {
+      return MakeCompilerError(*job);
+    }
+    if (!job->SetFlag(absl::StrCat("--openxla-partitioner-gspmd-replica-count=",
+                                   num_replicas)
+                          .c_str())) {
+      return MakeCompilerError(*job);
+    }
+    if (!job->SetFlag(
+            absl::StrCat("--openxla-partitioner-gspmd-use-spmd-partitioning=",
+                         use_spmd_partitioning)
+                .c_str())) {
+      return MakeCompilerError(*job);
+    }
+    if (!job->SetFlag(
+            absl::StrCat(
+                "--openxla-partitioner-gspmd-allow-spmd-"
+                "sharding-propagation-to-output=",
+                absl::StrJoin(allow_spmd_sharding_propagation_to_output, ","))
+                .c_str())) {
+      return MakeCompilerError(*job);
+    }
 
     if (artifact_tx) {
       artifact_tx->WriteArtifact(

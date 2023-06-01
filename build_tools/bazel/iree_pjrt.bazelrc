@@ -23,6 +23,10 @@ build --copt="-fno-exceptions"
 # https://github.com/openxla/xla/issues/1323
 build --nocheck_visibility
 
+# TODO: File issue against XLA team: for deprecations in
+# external/xla/xla/comparison_util.h
+build --copt="-Wno-deprecated-declarations"
+
 ###############################################################################
 # Configurations affecting the build.
 ###############################################################################
