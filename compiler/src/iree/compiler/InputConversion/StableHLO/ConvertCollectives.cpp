@@ -555,7 +555,7 @@ struct AllGatherOpConversion final
           op, "unsupported element type for collective op");
     }
     uint64_t allGatherDim = op.getAllGatherDim();
-    Value gatherInput = op.getOperand();
+    Value gatherInput = adaptor.getOperand();
     SmallVector<int64_t> gatherResultShape(resultType.getShape());
 
     // When all_gather_dim != 0, we need to transpose between 0 and
@@ -568,7 +568,8 @@ struct AllGatherOpConversion final
 
     // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
-        loc, gatherResultShape, resultType.getElementType());
+        loc, gatherResultShape,
+        getElementTypeOrSelf(adaptor.getOperand().getType()));
     Value gatherResult = rewriter.create<IREE::Flow::CollectiveAllGatherOp>(
         op.getLoc(), elementTypeAttr, target, gatherInput, channel);
 
@@ -742,7 +743,7 @@ struct AllToAllOpConversion final
     uint64_t splitDim = op.getSplitDimension();
     uint64_t concatDim = op.getConcatDimension();
     uint64_t splitCount = op.getSplitCount();
-    Value allToAllInput = op.getOperand();
+    Value allToAllInput = adaptor.getOperand();
 
     // When splitDim != 0, we need to transpose splitDim to 0 before and after
     // the all-to-all.
@@ -757,7 +758,7 @@ struct AllToAllOpConversion final
     // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
         loc, cast<RankedTensorType>(allToAllInput.getType()).getShape(),
-        resultType.getElementType());
+        getElementTypeOrSelf(allToAllInput.getType()));
     // Create all-to-all.
     Value allToAllResult = rewriter.create<IREE::Flow::CollectiveAllToAllOp>(
         op.getLoc(), elementTypeAttr, target, allToAllInput, channel);
@@ -847,11 +848,11 @@ struct ReduceScatterOpConversion final
     uint64_t scatterDim = op.getScatterDimension();
     auto inputType = cast<RankedTensorType>(op.getOperand().getType());
     SmallVector<int64_t> reduceInputShape(inputType.getShape());
-    Value reduceInput = op.getOperand();
+    Value reduceInput = adaptor.getOperand();
     DenseIntElementsAttr permutationAttr;
 
     SmallVector<int64_t> scatterResultShape(resultType.getShape());
-    auto elemType = resultType.getElementType();
+    auto elemType = getElementTypeOrSelf(reduceInput.getType());
 
     if (scatterDim != 0) {
       auto permutation =
@@ -867,8 +868,8 @@ struct ReduceScatterOpConversion final
     }
 
     // Create an empty tensor for the result.
-    Value target = rewriter.create<tensor::EmptyOp>(
-        loc, scatterResultShape, resultType.getElementType());
+    Value target =
+        rewriter.create<tensor::EmptyOp>(loc, scatterResultShape, elemType);
     Value scatterResult =
         rewriter.create<IREE::Flow::CollectiveReduceScatterOp>(
             op.getLoc(), reductionOpAttr, elementTypeAttr, target, reduceInput,
@@ -966,13 +967,13 @@ struct CollectivePermuteOpConversion
                                                        recvTable);
 
     // Create an empty tensor for the result.
+    auto input = adaptor.getOperand();
     ArrayRef<int64_t> inputShape = inputType.getShape();
-    Value target = rewriter.create<tensor::EmptyOp>(loc, inputShape,
-                                                    inputType.getElementType());
+    Value target = rewriter.create<tensor::EmptyOp>(
+        loc, inputShape, getElementTypeOrSelf(input.getType()));
     auto collectiveSendRecvOp =
         rewriter.create<IREE::Flow::CollectiveSendRecvOp>(
-            op.getLoc(), elementTypeAttr, target, op.getOperand(), channel,
-            send, recv);
+            op.getLoc(), elementTypeAttr, target, input, channel, send, recv);
 
     rewriter.replaceOp(op, collectiveSendRecvOp.getResult());
     return success();
