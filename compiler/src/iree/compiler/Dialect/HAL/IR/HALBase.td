@@ -682,16 +682,16 @@ def HAL_DeviceTargetAttr :
     bool hasConfigurationAttr(StringRef name);
 
     // Returns zero or more executable targets that this device supports.
-    SmallVector<ExecutableTargetAttr> getExecutableTargets();
+    SmallVector<ExecutableTargetAttr, 4> getExecutableTargets();
 
     // Returns a list of target devices that may be active for the given
     // operation. This will recursively walk parent operations until one with
     // the `hal.device.targets` attribute is found.
-    static SmallVector<DeviceTargetAttr> lookup(Operation *op);
+    static SmallVector<DeviceTargetAttr, 4> lookup(Operation *op);
 
     // Returns a list of all target executable configurations that may be
     // required for the given operation.
-    static SmallVector<ExecutableTargetAttr>
+    static SmallVector<ExecutableTargetAttr, 4>
     lookupExecutableTargets(Operation *op);
   }];
   let hasCustomAssemblyFormat = 1;

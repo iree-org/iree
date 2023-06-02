@@ -276,8 +276,8 @@ bool DeviceTargetAttr::hasConfigurationAttr(StringRef name) {
   return configAttr && configAttr.get(name);
 }
 
-SmallVector<ExecutableTargetAttr> DeviceTargetAttr::getExecutableTargets() {
-  SmallVector<ExecutableTargetAttr> resultAttrs;
+SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
+  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
   auto configAttr = getConfiguration();
   if (configAttr) {
     auto targetsAttr = configAttr.getAs<ArrayAttr>("executable_targets");
@@ -291,7 +291,7 @@ SmallVector<ExecutableTargetAttr> DeviceTargetAttr::getExecutableTargets() {
 }
 
 // static
-SmallVector<IREE::HAL::DeviceTargetAttr> DeviceTargetAttr::lookup(
+SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
     Operation *op) {
   auto attrId = mlir::StringAttr::get(op->getContext(), "hal.device.targets");
   while (op) {
@@ -309,9 +309,9 @@ SmallVector<IREE::HAL::DeviceTargetAttr> DeviceTargetAttr::lookup(
 }
 
 // static
-SmallVector<ExecutableTargetAttr> DeviceTargetAttr::lookupExecutableTargets(
+SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::lookupExecutableTargets(
     Operation *op) {
-  SmallVector<ExecutableTargetAttr> resultAttrs;
+  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
   for (auto deviceTargetAttr : lookup(op)) {
     for (auto executableTargetAttr : deviceTargetAttr.getExecutableTargets()) {
       if (!llvm::is_contained(resultAttrs, executableTargetAttr)) {
