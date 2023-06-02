@@ -4,14 +4,14 @@
 func.func @dot_general_4x384x32x384() -> tensor<4x384x384xf32> {
     %lhs = util.unfoldable_constant dense<1.0> : tensor<4x384x32xf32>
     %rhs = util.unfoldable_constant dense<1.0> : tensor<4x32x384xf32>
-    %0 = "mhlo.dot_general"(%lhs, %rhs) {
-        dot_dimension_numbers = #mhlo.dot<
+    %0 = "stablehlo.dot_general"(%lhs, %rhs) {
+        dot_dimension_numbers = #stablehlo.dot<
             lhs_batching_dimensions = [0],
             lhs_contracting_dimensions = [2],
             rhs_batching_dimensions = [0],
             rhs_contracting_dimensions = [1],
         >,
-        precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
+        precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>]
     } : (tensor<4x384x32xf32>, tensor<4x32x384xf32>) -> tensor<4x384x384xf32>
     return %0 : tensor<4x384x384xf32>
 }
@@ -19,14 +19,14 @@ func.func @dot_general_4x384x32x384() -> tensor<4x384x384xf32> {
 func.func @dot_general_4x384x384x32() -> tensor<4x384x32xf32> {
     %lhs = util.unfoldable_constant dense<1.0> : tensor<4x384x384xf32>
     %rhs = util.unfoldable_constant dense<1.0> : tensor<4x384x32xf32>
-    %0 = "mhlo.dot_general"(%lhs, %rhs) {
-        dot_dimension_numbers = #mhlo.dot<
+    %0 = "stablehlo.dot_general"(%lhs, %rhs) {
+        dot_dimension_numbers = #stablehlo.dot<
             lhs_batching_dimensions = [0],
             lhs_contracting_dimensions = [2],
             rhs_batching_dimensions = [0],
             rhs_contracting_dimensions = [1],
         >,
-        precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
+        precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>]
     } : (tensor<4x384x384xf32>, tensor<4x384x32xf32>) -> tensor<4x384x32xf32>
     return %0 : tensor<4x384x32xf32>
 }
