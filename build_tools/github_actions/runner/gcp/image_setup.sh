@@ -276,8 +276,8 @@ EOF
     # Doing these all in one command fails, probably because there's a dependency
     # between them and apt-fast makes it happen in parallel. Also, it turns out
     # that the Vulkan ICD is in libnvidia-gl for some reason.
-    apt-get install nvidia-headless-515
-    apt-get install libnvidia-gl-515-server nvidia-utils-515-server vulkan-tools
+    apt-get install nvidia-headless-530
+    apt-get install libnvidia-gl-530 nvidia-utils-530 vulkan-tools
     "${script_dir}/check_cuda.sh"
     "${script_dir}/check_vulkan.sh"
 
