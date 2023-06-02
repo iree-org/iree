@@ -55,11 +55,20 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     return captures.matmulOpSizes[2];
   }
 
+  int64_t blockTileM() const override {
+    assert(blockTileSizes.size() >= 2 && "need at least 2 tile sizes");
+    return blockTileSizes[0];
+  }
+  int64_t blockTileN() const override {
+    assert(blockTileSizes.size() >= 2 && "need at least 2 tile sizes");
+    return blockTileSizes[1];
+  }
+
   using AbstractGemmLikeStrategy::MappingInfo;
 
   MappingInfo getBlockMapping() const override {
     return MappingInfo{/*numThreads=*/{},
-                       /*tileSizes=*/{blockTileSizes[0], blockTileSizes[1]},
+                       /*tileSizes=*/{blockTileM(), blockTileN()},
                        /*threadMapping=*/{blockY(ctx), blockX(ctx)}};
   }
 
@@ -71,51 +80,50 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     assert(totalNumThreads() % numThreadsK == 0 &&
            "num threads must be divisible by num threads along k");
     int64_t numThreadsM = totalNumThreads() / numThreadsK;
-    assert(blockTileSizes[0] % numThreadsM == 0 &&
+    assert(blockTileM() % numThreadsM == 0 &&
            "blockTileSizes[0] must be divisible by numThreadsM");
     assert(reductionTileSize % numThreadsK == 0 &&
            "reductionTileSize must be divisible by numThreadsK");
     return MappingInfo{
         /*numThreads=*/{numThreadsM, numThreadsK},
         /*tileSizes=*/
-        {blockTileSizes[0] / numThreadsM, reductionTileSize / numThreadsK},
+        {blockTileM() / numThreadsM, reductionTileSize / numThreadsK},
         /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
   }
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
-    assert(blockTileSizes[1] % rhsCopyVectorSize() == 0 &&
+    assert(blockTileN() % rhsCopyVectorSize() == 0 &&
            "vector size must divide blockTileSizes[1]");
-    int64_t numThreadsN = blockTileSizes[1] / rhsCopyVectorSize();
+    int64_t numThreadsN = blockTileN() / rhsCopyVectorSize();
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsK = totalNumThreads() / numThreadsN;
     assert(reductionTileSize % numThreadsK == 0 &&
            "blockTileSizes[0] must be divisible by numThreadsK");
-    assert(blockTileSizes[1] % numThreadsN == 0 &&
+    assert(blockTileN() % numThreadsN == 0 &&
            "reductionTileSize must be divisible by numThreadsN");
     return MappingInfo{
         /*numThreads=*/{numThreadsK, numThreadsN},
         /*tileSizes=*/
-        {reductionTileSize / numThreadsK, blockTileSizes[1] / numThreadsN},
+        {reductionTileSize / numThreadsK, blockTileN() / numThreadsN},
         /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
-    assert(blockTileSizes[1] % resCopyVectorSize() == 0 &&
+    assert(blockTileN() % resCopyVectorSize() == 0 &&
            "vector size must divide n");
     int64_t numThreadsN = blockTileSizes[1] / resCopyVectorSize();
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsM = totalNumThreads() / numThreadsN;
-    assert(blockTileSizes[0] % numThreadsM == 0 &&
+    assert(blockTileM() % numThreadsM == 0 &&
            "blockTileSizes[0] must be divisible by numThreadsM");
-    assert(blockTileSizes[1] % numThreadsN == 0 &&
+    assert(blockTileN() % numThreadsN == 0 &&
            "blockTileSizes[1] must be divisible by numThreadsN");
-    return MappingInfo{
-        /*numThreads=*/{numThreadsM, numThreadsN},
-        /*tileSizes=*/
-        {blockTileSizes[0] / numThreadsM, blockTileSizes[1] / numThreadsN},
-        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
+                       /*tileSizes=*/
+                       {blockTileM() / numThreadsM, blockTileN() / numThreadsN},
+                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {

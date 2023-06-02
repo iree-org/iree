@@ -46,6 +46,12 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
     llvm::cl::desc("activate the matmul tensorcore strategy"),
     llvm::cl::init(true));
 
+llvm::cl::opt<bool> clGPUEnableTransformDialectAlignedMatmul(
+    "iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul",
+    llvm::cl::desc(
+        "activate the matmul tensorcore strategy for tile aligned shapes"),
+    llvm::cl::init(false));
+
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
@@ -84,6 +90,7 @@ using iree_compiler::IREE::transform_dialect::
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
+using transform::RewriteInDestinationPassingStyleOp;
 using transform::ScalarizeOp;
 using transform::SequenceOp;
 using transform_ext::MatchCallbackOp;
@@ -433,37 +440,58 @@ std::tuple<Value, Value, Value>
 mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
     ImplicitLocOpBuilder &b, Value variantH, Value paddedMatmulOpH,
     const AbstractGemmLikeStrategy &strategy) {
-  // Explicitly materialize the parent parallel_insert into a copy to avoid late
-  // bufferization interferences.
-  // TODO: Avoid brittle rematching.
-  Value insertSliceH = b.create<transform::MatchOp>(
-      variantH, tensor::ParallelInsertSliceOp::getOperationName());
-  Value copyBackOpH = b.create<transform::InsertSliceToCopyOp>(
-      insertSliceH.getType(), insertSliceH);
+  // Aligned vs unaligned handling deviates here by converting the pads to
+  // copies for the aligned case.
+  // TODO: Unify aligned and unaligned codegen.
+  Value copyBackOpH;
+  if (!strategy.alignedRes()) {
+    // Explicitly materialize the parent parallel_insert into a copy to avoid
+    // late bufferization interferences.
+    // TODO: Avoid brittle rematching.
+    Value insertSliceH = b.create<transform::MatchOp>(
+        variantH, tensor::ParallelInsertSliceOp::getOperationName());
+    copyBackOpH = b.create<transform::InsertSliceToCopyOp>(
+        insertSliceH.getType(), insertSliceH);
+  } else {
+    Value resH = b.create<transform::GetProducerOfOperand>(
+        paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(2));
+    copyBackOpH =
+        b.create<RewriteInDestinationPassingStyleOp>(resH.getType(), resH);
+  }
 
   Value lhsH = b.create<transform::GetProducerOfOperand>(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(0));
   Value rhsH = b.create<transform::GetProducerOfOperand>(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(1));
 
+  // Rewrite aligned pads as destination passing (linalg.copy)
+  if (strategy.alignedLhs())
+    lhsH = b.create<RewriteInDestinationPassingStyleOp>(lhsH.getType(), lhsH);
+  if (strategy.alignedRhs())
+    rhsH = b.create<RewriteInDestinationPassingStyleOp>(rhsH.getType(), rhsH);
+
   AbstractGemmLikeStrategy::MappingInfo lhsCopyMapping =
       strategy.lhsCopyMapping();
   Value lhsCopyOpH = buildDistributeOnePadOrCopyWithNumThreads(
       b, variantH, lhsH, /*numThreads=*/lhsCopyMapping.numThreads,
-      /*threadDimMapping=*/lhsCopyMapping.threadMapping, /*foldIfBranch=*/true);
+      /*threadDimMapping=*/lhsCopyMapping.threadMapping,
+      /*foldIfBranch=*/!strategy.alignedLhs());
 
   AbstractGemmLikeStrategy::MappingInfo rhsCopyMapping =
       strategy.rhsCopyMapping();
   Value rhsCopyOpH = buildDistributeOnePadOrCopyWithNumThreads(
       b, variantH, rhsH, /*numThreads=*/rhsCopyMapping.numThreads,
-      /*threadDimMapping=*/rhsCopyMapping.threadMapping, /*foldIfBranch=*/true);
+      /*threadDimMapping=*/rhsCopyMapping.threadMapping,
+      /*foldIfBranch=*/!strategy.alignedRhs());
 
-  AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
-      strategy.resCopyMapping();
-  copyBackOpH = buildDistributeOnePadOrCopyWithNumThreads(
-      b, variantH, copyBackOpH,
-      /*numThreads=*/resCopyMapping.numThreads,
-      /*threadDimMapping=*/rhsCopyMapping.threadMapping);
+  if (!strategy.alignedRes()) {
+    AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
+        strategy.resCopyMapping();
+    copyBackOpH = buildDistributeOnePadOrCopyWithNumThreads(
+        b, variantH, copyBackOpH,
+        /*numThreads=*/resCopyMapping.numThreads,
+        /*threadDimMapping=*/rhsCopyMapping.threadMapping);
+  }
 
   return std::make_tuple(lhsCopyOpH, rhsCopyOpH, copyBackOpH);
 }
@@ -484,18 +512,24 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
       b, configuration, variantH);
 
   // Apply vector masking.
-  AbstractGemmLikeStrategy::MappingInfo lhsCopyMapping =
-      strategy.lhsCopyMapping();
-  b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
-                                         lhsCopyMapping.tileSizes);
-  AbstractGemmLikeStrategy::MappingInfo rhsCopyMapping =
-      strategy.rhsCopyMapping();
-  b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
-                                         rhsCopyMapping.tileSizes);
-  AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
-      strategy.resCopyMapping();
-  b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
-                                         resCopyMapping.tileSizes);
+  if (!strategy.alignedLhs()) {
+    AbstractGemmLikeStrategy::MappingInfo lhsCopyMapping =
+        strategy.lhsCopyMapping();
+    b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
+                                           lhsCopyMapping.tileSizes);
+  }
+  if (!strategy.alignedRhs()) {
+    AbstractGemmLikeStrategy::MappingInfo rhsCopyMapping =
+        strategy.rhsCopyMapping();
+    b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
+                                           rhsCopyMapping.tileSizes);
+  }
+  if (!strategy.alignedRes()) {
+    AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
+        strategy.resCopyMapping();
+    b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
+                                           resCopyMapping.tileSizes);
+  }
 
   // Lower all masked vector transfers at this point, as they make
   // canonicalization generate incorrect IR.
@@ -831,7 +865,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   //   - f32 only atm.
   //   - Mandatory fill op.
   //   - No trailing op.
-  //   - If the matmul is "too aligned", then use the default IREE strategy.
+  //   - If the matmul is "too aligned", then guard on the alignment flag.
   //   - If the matmul is "too small", then use the default IREE strategy.
   //   - Otherwise, we take it.
   if (!fill->getCaptured() || trailing->getCaptured()) {
@@ -852,19 +886,16 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
-  // Currently the unaligned transform strategy does not properly handle
-  // optionality when padding operations get folded away. So we only use it when
-  // all operands require a padding that does not fold. This is the case when
-  // either:
-  //   - m and k are not aligned to the tile sizes (conservatively, take 64, 16)
-  //   - n and k are not aligned to the tile sizes (conservatively, take 64, 16)
-  // Other cases currently result in folding and fall back to the default
-  // unaligned IREE strategy.
-  bool supportedUnalignedCases =
-      (matmulSize[0] % 64 != 0 && matmulSize[2] % 16 != 0) ||
-      (matmulSize[1] % 64 != 0 && matmulSize[2] % 16 != 0);
+  // Currently the fully aligned case still lags behind the current default
+  // pipeline and thus is guarded by a flag. This is the case when at least one
+  // of the following holds
+  //   - m is tile aligned (conservatively, take 64)
+  //   - n is tile aligned (conservatively, take 64)
+  //   - k is tile aligned (conservatively, take 16)
+  bool guardedAlignedCases = matmulSize[0] % 64 == 0 ||
+                             matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
 
-  if (!supportedUnalignedCases) {
+  if (guardedAlignedCases && !clGPUEnableTransformDialectAlignedMatmul) {
     LDBG("--Matmul strategy alignment check failed\n");
     return failure();
   }
