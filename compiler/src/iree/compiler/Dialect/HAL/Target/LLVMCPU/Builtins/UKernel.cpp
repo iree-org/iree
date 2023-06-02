@@ -17,7 +17,9 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static std::unique_ptr<llvm::Module>
+// Note: even if the llvm::Expected status is successful, the enclosed pointer
+// may still be null, indicating that the file was not found.
+static llvm::Expected<std::unique_ptr<llvm::Module>>
 loadUKernelBitcodeFile(StringRef filename, llvm::LLVMContext &context) {
   const iree_file_toc_t *file_start = iree_ukernel_bitcode_create();
   const iree_file_toc_t *file_end = file_start + iree_ukernel_bitcode_size();
@@ -25,16 +27,15 @@ loadUKernelBitcodeFile(StringRef filename, llvm::LLVMContext &context) {
     if (filename == file->name) {
       llvm::MemoryBufferRef bitcodeBufferRef(
           llvm::StringRef(file->data, file->size), file->name);
-      auto bitcodeFile = llvm::parseBitcodeFile(bitcodeBufferRef, context);
-      if (!bitcodeFile)
-        return nullptr;
-      return std::move(*bitcodeFile);
+      return llvm::parseBitcodeFile(bitcodeBufferRef, context);
     }
   }
+  // Some bitcode files are optional: we don't have arch-specific ukernel code
+  // for all architectures. So it's normal to be returning nullptr here.
   return nullptr;
 }
 
-std::unique_ptr<llvm::Module>
+llvm::Expected<std::unique_ptr<llvm::Module>>
 loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
                        llvm::LLVMContext &context) {
   llvm::Triple triple = targetMachine->getTargetTriple();
@@ -44,37 +45,44 @@ loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
   } else if (triple.isArch32Bit()) {
     filename = "ukernel_bitcode_32bit_base.bc";
   } else {
-    return nullptr;
+    return llvm::createStringError(
+        llvm::inconvertibleErrorCode(),
+        "Don't know what ukernel bitcode file to load.");
   }
-  std::unique_ptr<llvm::Module> baseBitcode =
+  llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
       loadUKernelBitcodeFile(filename, context);
-  assert(baseBitcode && "base ukernel bitcode file not found");
+  if (!bitcode) {
+    // Propagate the error to the caller.
+    return bitcode;
+  }
+
+  if (!bitcode.get()) {
+    // File not found. For base bitcode, this shouldn't happen.
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "Base ukernel bitcode file not found: %s",
+                                   filename.str().c_str());
+  }
 
   // Copied from Device.cpp - TODO: move this to a shared utility.
   // Clang adds its own per-function attributes that we need to strip so that
   // our current executable variant target is used instead.
-  for (auto &func : baseBitcode->functions()) {
+  for (auto &func : bitcode.get()->functions()) {
     func.removeFnAttr("target-cpu");
     func.removeFnAttr("tune-cpu");
     func.removeFnAttr("target-features");
   }
 
-  return baseBitcode;
+  return bitcode;
 }
 
-std::unique_ptr<llvm::Module>
+llvm::Expected<std::unique_ptr<llvm::Module>>
 loadUKernelArchBitcode(llvm::TargetMachine *targetMachine,
                        llvm::LLVMContext &context) {
   const char *archName =
       getIreeArchNameForTargetTriple(targetMachine->getTargetTriple());
-  char archBitcodeFilename[64];
-  snprintf(archBitcodeFilename, sizeof archBitcodeFilename,
-           "ukernel_bitcode_%s.bc", archName);
-  std::unique_ptr<llvm::Module> archBitcode =
-      loadUKernelBitcodeFile(archBitcodeFilename, context);
-  // archBitcode is optional: we don't have arch-specific ukernel code for all
-  // architectures. So it's normal to be returning nullptr here.
-  return archBitcode;
+  char filename[64];
+  snprintf(filename, sizeof filename, "ukernel_bitcode_%s.bc", archName);
+  return loadUKernelBitcodeFile(filename, context);
 }
 
 } // namespace HAL

@@ -465,15 +465,24 @@ public:
         }
       };
 
-      std::unique_ptr<llvm::Module> archBitcode =
+      llvm::Expected<std::unique_ptr<llvm::Module>> archBitcode =
           loadUKernelArchBitcode(targetMachine.get(), context);
+      if (!archBitcode) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed to load architecture-specific ukernel bitcode: "
+               << llvm::toString(archBitcode.takeError());
+      }
 
       // The archBitcode contains overrides for weak symbols that will come in
       // the baseBitcode below. So we link it before baseBitcode, with
       // OverrideFromSrc.
-      if (archBitcode) {
+      //
+      // archBitcode is optional, may be null if there is none for the target
+      // architecture.
+      if (archBitcode.get()) {
         // Sequence that access before we std::move(archBitcode)!
-        StringRef archBitcodeName = archBitcode->getName();
+        StringRef archBitcodeName =
+            archBitcode ? archBitcode.get()->getName() : "";
         if (failed(linkBitcodeModule(
                 variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
                 *targetMachine, archBitcodeName, std::move(archBitcode),
@@ -487,10 +496,11 @@ public:
 
       // The baseBitcode module contains weak symbols for fallbacks.
       // So we link it after the archBitcode and with LinkOnlyNeeded.
-      std::unique_ptr<llvm::Module> baseBitcode =
+      llvm::Expected<std::unique_ptr<llvm::Module>> baseBitcode =
           loadUKernelBaseBitcode(targetMachine.get(), context);
       // Sequence that access before we std::move(baseBitcode)!
-      StringRef baseBitcodeName = baseBitcode->getName();
+      StringRef baseBitcodeName =
+          baseBitcode ? baseBitcode.get()->getName() : "";
       if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
                                    llvm::Linker::LinkOnlyNeeded, *targetMachine,
                                    baseBitcodeName, std::move(baseBitcode),
