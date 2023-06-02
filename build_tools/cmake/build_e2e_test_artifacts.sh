@@ -50,12 +50,12 @@ if [[ -n "${BENCHMARK_PRESETS}" ]]; then
         BUILD_TARGETS+=(iree-e2e-compile-stats-suites)
         COMPILATION_PRESETS="${COMPILATION_PRESETS},${PRESET}"
         ;;
-      comp-stats-long)
-        BUILD_TARGETS+=(iree-e2e-compile-stats-suites-long)
+      comp-stats-large)
+        BUILD_TARGETS+=(iree-e2e-compile-stats-suites-large)
         COMPILATION_PRESETS="${COMPILATION_PRESETS},${PRESET}"
         ;;
-      *-long)
-        BUILD_TARGETS+=(iree-benchmark-suites-long)
+      *-large)
+        BUILD_TARGETS+=(iree-benchmark-suites-large)
         EXECUTION_PRESETS="${EXECUTION_PRESETS},${PRESET}"
         ;;
       *)

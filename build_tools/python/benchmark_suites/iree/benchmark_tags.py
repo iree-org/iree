@@ -8,8 +8,8 @@
 # statistics.
 COMPILE_STATS = "compile-stats"
 
-# Tag for long-running benchmarks.
-LONG_RUNNING = "long-running"
+# Tag for large benchmarks.
+LARGE = "large"
 
 # Tag for CUDA benchmarks.
 CUDA = "cuda"

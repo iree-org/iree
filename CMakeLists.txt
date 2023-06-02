@@ -651,15 +651,15 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   #   * compiling from .mlir files to benchmark-ready .vmfb files
   # Build default benchmark suites.
   add_custom_target(iree-benchmark-suites)
-  # Build long-running benchmark suites.
-  add_custom_target(iree-benchmark-suites-long)
+  # Build large benchmark suites.
+  add_custom_target(iree-benchmark-suites-large)
 
   # iree-e2e-compile-stats-suites* compiles the benchmark models with specific
   # flags to collect the compilation statistics.
   # Build for default benchmark suites.
   add_custom_target(iree-e2e-compile-stats-suites)
-  # Build for long-running benchmark suites.
-  add_custom_target(iree-e2e-compile-stats-suites-long)
+  # Build for large benchmark suites.
+  add_custom_target(iree-e2e-compile-stats-suites-large)
 
   # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
   # and model tests.
@@ -667,9 +667,9 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   add_dependencies(iree-e2e-test-artifacts
     iree-benchmark-import-models
     iree-benchmark-suites
-    iree-benchmark-suites-long
+    iree-benchmark-suites-large
     iree-e2e-compile-stats-suites
-    iree-e2e-compile-stats-suites-long
+    iree-e2e-compile-stats-suites-large
   )
 endif()
 

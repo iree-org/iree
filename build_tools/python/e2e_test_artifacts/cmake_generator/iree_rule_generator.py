@@ -21,10 +21,10 @@ BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models"
 BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites"
 # Compilation statistics suites for default benchmarks.
 E2E_COMPILE_STATS_SUITES = "iree-e2e-compile-stats-suites"
-# Long-running benchmark suites.
-LONG_BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites-long"
-# Compilation statistics suites for long-running benchmarks.
-LONG_E2E_COMPILE_STATS_SUITES_CMAKE_TARGET = "iree-e2e-compile-stats-suites-long"
+# Large benchmark suites.
+LARGE_BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites-large"
+# Compilation statistics suites for large benchmarks.
+LARGE_E2E_COMPILE_STATS_SUITES_CMAKE_TARGET = "iree-e2e-compile-stats-suites-large"
 
 
 @dataclass(frozen=True)
@@ -179,11 +179,11 @@ def generate_rules(
 
     is_compile_stats = (benchmark_tags.COMPILE_STATS
                         in gen_config.compile_config.tags)
-    if benchmark_tags.LONG_RUNNING in gen_config.tags:
+    if benchmark_tags.LARGE in gen_config.tags:
       if is_compile_stats:
-        suite_target = LONG_E2E_COMPILE_STATS_SUITES_CMAKE_TARGET
+        suite_target = LARGE_E2E_COMPILE_STATS_SUITES_CMAKE_TARGET
       else:
-        suite_target = LONG_BENCHMARK_SUITES_CMAKE_TARGET
+        suite_target = LARGE_BENCHMARK_SUITES_CMAKE_TARGET
     else:
       if is_compile_stats:
         suite_target = E2E_COMPILE_STATS_SUITES
