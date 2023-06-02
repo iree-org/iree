@@ -4,9 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
-# Executes long-running benchmarks that are expected to take multple hours.
+# Executes large benchmarks that are expected to take multple hours.
 
-name: Benchmark Long
+name: Benchmark Large
 
 on:
   schedule:
