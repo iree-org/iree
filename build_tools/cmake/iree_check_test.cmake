@@ -6,52 +6,6 @@
 
 include(CMakeParseArguments)
 
-set(IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES
-  llvm-cpu
-  vmvx
-)
-
-# Helper for iree_check_test and iree_trace_runner_test.
-# Just a thin wrapper around iree_bytecode_module, passing it some
-# common flags, including the appropriate --iree-llvmcpu-target-triple in the
-# Android case.
-function(iree_bytecode_module_for_iree_check_test_and_friends)
-  if(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
-
-  cmake_parse_arguments(
-    _RULE
-    ""
-    "MODULE_NAME;SRC;TARGET_BACKEND;MODULE_FILE_NAME"
-    "FLAGS;TARGET_CPU_FEATURES"
-    ${ARGN}
-  )
-
-  if(_RULE_TARGET_CPU_FEATURES)
-    if(NOT _RULE_TARGET_BACKEND IN_LIST IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES)
-      message(SEND_ERROR "TARGET_CPU_FEATURES should be empty when \
-TARGET_BACKEND is not in the list (${IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES}). Actual values: \
-TARGET_CPU_FEATURES=${_RULE_TARGET_CPU_FEATURES}, TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
-    endif()
-    list(APPEND _RULE_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
-  endif()
-
-  iree_bytecode_module(
-    NAME
-      "${_RULE_MODULE_NAME}"
-    MODULE_FILE_NAME
-      "${_RULE_MODULE_FILE_NAME}"
-    SRC
-      "${_RULE_SRC}"
-    FLAGS
-      "--mlir-print-op-on-diagnostic=false"
-      "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
-      ${_RULE_FLAGS}
-    TESTONLY
-  )
-endfunction()
-
 # iree_check_test()
 #
 # Creates a test using iree-check-module for the specified source file.
@@ -111,19 +65,24 @@ function(iree_check_test)
     set(_MODULE_FILE_NAME "${_MODULE_NAME}.vmfb")
   endif(DEFINED _RULE_MODULE_FILE_NAME)
 
-  iree_bytecode_module_for_iree_check_test_and_friends(
-    MODULE_NAME
+  set(_BASE_COMPILER_FLAGS
+    "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+  )
+
+  if (_RULE_TARGET_CPU_FEATURES)
+    list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+  endif()
+
+  iree_bytecode_module(
+    NAME
       "${_MODULE_NAME}"
     MODULE_FILE_NAME
       "${_MODULE_FILE_NAME}"
     SRC
       "${_RULE_SRC}"
-    TARGET_BACKEND
-      "${_RULE_TARGET_BACKEND}"
     FLAGS
-      ${_RULE_COMPILER_FLAGS}
-    TARGET_CPU_FEATURES
-      ${_RULE_TARGET_CPU_FEATURES}
+      "${_BASE_COMPILER_FLAGS}"
+      "${_RULE_COMPILER_FLAGS}"
   )
 
   set(_RUNNER_TARGET "iree-check-module")
