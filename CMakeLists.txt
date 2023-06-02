@@ -309,6 +309,15 @@ if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 endif()
 
 #-------------------------------------------------------------------------------
+# Experimental next-generation CUDA HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2")
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/cuda2")
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_TARGET "iree::experimental::cuda2::registration")
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_REGISTER "iree_hal_cuda2_driver_module_register")
+
+#-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver
 #-------------------------------------------------------------------------------
 
