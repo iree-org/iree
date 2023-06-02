@@ -208,6 +208,22 @@ func.func @all_gather_dim_0(%input : tensor<512xf32>) -> tensor<1024xf32> {
 
 // -----
 
+// CHECK-LABEL: @all_gather_dim_0_uint
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<512xi32>
+func.func @all_gather_dim_0_uint(%input : tensor<512xui32>) -> tensor<1024xui32> {
+  // CHECK: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1024xi32>
+  // CHECK: %[[OP:.+]] = flow.collective.all_gather ui32, %[[EMPTY]], %[[ARG0]], %[[CHANNEL]]  : (tensor<1024xi32>, tensor<512xi32>, !flow.channel) -> %[[EMPTY]] as tensor<1024xi32>
+  // CHECK: return %[[OP]] : tensor<1024xi32>
+  %out = "mhlo.all_gather"(%input) {all_gather_dim = 0 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+     use_global_device_ids} : (tensor<512xui32>) -> tensor<1024xui32>
+  return %out : tensor<1024xui32>
+}
+
+// -----
+
 // CHECK-LABEL: @all_gather_dim_1
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<2x2xf32>) -> tensor<2x4xf32>
 func.func @all_gather_dim_1(%input : tensor<2x2xf32>) -> tensor<2x4xf32> {
@@ -256,6 +272,24 @@ func.func @all_to_all_split_concat_same(%input : tensor<1024xf32>) -> tensor<102
      channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<1024xf32>) -> tensor<1024xf32>
   return %out : tensor<1024xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @all_to_all_split_concat_same_uint
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<1024xi32>
+func.func @all_to_all_split_concat_same_uint(%input : tensor<1024xui32>) -> tensor<1024xui32> {
+  // CHECK: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1024xi32>
+  // CHECK: %[[OP:.+]] = flow.collective.all_to_all ui32, %[[EMPTY]], %[[ARG0]], %[[CHANNEL]]  : (tensor<1024xi32>, tensor<1024xi32>, !flow.channel) -> %[[EMPTY]] as tensor<1024xi32>
+  // CHECK: return %[[OP]] : tensor<1024xi32>
+  %out = "mhlo.all_to_all"(%input) {
+     split_dimension = 0 : i64,
+     concat_dimension = 0 : i64,
+     split_count = 2 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<1024xui32>) -> tensor<1024xui32>
+  return %out : tensor<1024xui32>
 }
 
 // -----
@@ -365,6 +399,26 @@ func.func @reduce_scatter_dim_0(%input : tensor<4x2xf32>) -> tensor<2x2xf32> {
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       use_global_device_ids} : (tensor<4x2xf32>) -> tensor<2x2xf32>
   return %out : tensor<2x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @reduce_scatter_dim_0_uint
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x2xi32>
+func.func @reduce_scatter_dim_0_uint(%input : tensor<4x2xui32>) -> tensor<2x2xui32> {
+  // CHECK: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<2x2xi32>
+  // CHECK: %[[OP:.+]] = flow.collective.reduce_scatter sum, ui32, %[[EMPTY]], %[[ARG0]], %[[CHANNEL]]  : (tensor<2x2xi32>, tensor<4x2xi32>, !flow.channel) -> %[[EMPTY]] as tensor<2x2xi32>
+  // CHECK: return %[[OP]] : tensor<2x2xi32>
+  %out = "mhlo.reduce_scatter"(%input) ({
+  ^bb0(%arg0: tensor<ui32> , %arg1: tensor<ui32>) :
+    %sum = mhlo.add %arg0, %arg1 : tensor<ui32>
+    mhlo.return %sum : tensor<ui32>
+  }) {scatter_dimension = 0 : i64,
+      channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      use_global_device_ids} : (tensor<4x2xui32>) -> tensor<2x2xui32>
+  return %out : tensor<2x2xui32>
 }
 
 // -----
@@ -531,6 +585,24 @@ func.func @collective_permute(%input : tensor<8xf32>) -> tensor<8xf32> {
         source_target_pairs = dense<[[0, 1], [1, 2], [2, 3], [3, 0]]> : tensor<4x2xi64>,
         channel_handle = #mhlo.channel_handle<handle = 1, type = 1>} : (tensor<8xf32>) -> tensor<8xf32>
   return %out : tensor<8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @collective_permute_uint
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<8xi32>
+func.func @collective_permute_uint(%input : tensor<8xui32>) -> tensor<8xui32> {
+  // CHECK: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
+  // CHECK: %[[RANK:.+]] = flow.channel.rank %[[CHANNEL]] : index
+  // CHECK: %[[SEND:.+]] = util.switch index from [%c1, %c2, %c3, %c0] at %[[RANK]] else %c-1
+  // CHECK: %[[RECV:.+]] = util.switch index from [%c3, %c0, %c1, %c2] at %[[RANK]] else %c-1
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<8xi32>
+  // CHECK: %[[OP:.+]] = flow.collective.send_recv ui32, %[[EMPTY]], %[[ARG0]], %[[CHANNEL]], %[[SEND]], %[[RECV]] : (tensor<8xi32>, tensor<8xi32>, !flow.channel, index, index) -> %[[EMPTY]] as tensor<8xi32>
+  // CHECK: return %[[OP]] : tensor<8xi32>
+  %out = "mhlo.collective_permute"(%input) {
+        source_target_pairs = dense<[[0, 1], [1, 2], [2, 3], [3, 0]]> : tensor<4x2xi64>,
+        channel_handle = #mhlo.channel_handle<handle = 1, type = 1>} : (tensor<8xui32>) -> tensor<8xui32>
+  return %out : tensor<8xui32>
 }
 
 // -----
