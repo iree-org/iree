@@ -170,29 +170,28 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-      getLoweringConfig(computeOps);
-  if (failed(maybeLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "can't find lowering_config, skip SplitReduction");
-    return;
-  }
-  auto tileSizeList = maybeLoweringConfig.value().getTileSizeVals();
-  auto reductionSizes = tileSizeList[tileSizeList.size() - 2];
-  if (reductionSizes.empty()) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "the list of reduction tiling sizes is empty, skip SplitReduction");
-    return;
-  }
-  int64_t size = reductionSizes.back();
-
   IRRewriter rewriter(context);
   SmallVector<linalg::GenericOp> candidates;
   funcOp.walk([&](linalg::GenericOp op) { candidates.push_back(op); });
   for (auto genericOp : candidates) {
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << genericOp << "\n");
+
+    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+        getLoweringConfig(genericOp);
+    if (failed(maybeLoweringConfig)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "can't find lowering_config, skip SplitReduction");
+      continue;
+    }
+    auto tileSizeList = maybeLoweringConfig.value().getTileSizeVals();
+    auto reductionSizes = tileSizeList[tileSizeList.size() - 2];
+    if (reductionSizes.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "the list of reduction tiling sizes is empty, "
+                                 "skip SplitReduction");
+      return;
+    }
+    int64_t size = reductionSizes.back();
+
     if (failed(splitReductionPrecondition(genericOp, fpReductionReordering))) {
       continue;
     }

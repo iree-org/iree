@@ -85,9 +85,9 @@ void LLVMCPUTilePass::runOnOperation() {
     // Need a better way for handling this, but this works for now.
     if (isa<tensor::PadOp>(computeOp)) continue;
 
-    LLVM_DEBUG(llvm::dbgs() << "candidate: " << *op << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     SmallVector<int64_t> tileSizes;
-    if (auto loweringConfig = getLoweringConfig(computeOp)) {
+    if (auto loweringConfig = getLoweringConfig(op)) {
       tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
     } else {
       tileSizes = rootTileSizes;
@@ -95,7 +95,7 @@ void LLVMCPUTilePass::runOnOperation() {
 
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
       LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
-      return;
+      continue;
     }
 
     IRRewriter rewriter(context);

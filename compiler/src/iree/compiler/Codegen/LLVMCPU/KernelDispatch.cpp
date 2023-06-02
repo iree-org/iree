@@ -1155,6 +1155,17 @@ static bool isPackMatmulLHS(tensor::PackOp op) {
          op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1;
 }
 
+static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
+                                                   tensor::PackOp op) {
+  SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
+  if (hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
+    tileSizes.back() = vectorSize;
+  }
+  return tileSizes;
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
@@ -1172,15 +1183,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     distTileSizes[pos] = std::max<int64_t>(distTileSizes[pos], 1);
   }
 
-  SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  if (hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
-    tileSizes.back() = vectorSize;
-  }
-
+  SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
   TileSizesListType tileSizesList = {distTileSizes};
-  tileSizesList.push_back(tileSizes);
+  tileSizesList.push_back(vecTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
@@ -1660,6 +1665,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(reductionTileSizes);
   // nop
   tileSizes.push_back(parallelTileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
@@ -1773,6 +1779,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   // Tiling for vectorization.
   tileSizes.emplace_back(std::move(vectorTileSizes));
   // No further tiling.
+  tileSizes.push_back({});
   tileSizes.push_back({});
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -2109,6 +2116,67 @@ static LogicalResult setTranslationInfoAndRootConfig(
 
   if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
     return failure();
+  }
+
+  auto loweringConfig = getLoweringConfig(rootOperation);
+  auto distTileSizes = loweringConfig.getTileSizeVals(0);
+  auto tileAndFuseSizes = loweringConfig.getTileSizeVals(1);
+  auto ctx = entryPointFn.getContext();
+  auto targetMLTransInfo =
+        TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
+  for (auto op : computeOps) {
+    if (op == rootOperation) continue;
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    SmallVector<int64_t> zeros(tileAndFuseSizes.size(), 0);
+    TypeSwitch<Operation *>(op)
+        .Case<tensor::PackOp>([&](auto packOp) {
+          SmallVector<int64_t> vecTileSizes =
+              getPackVectorTileSizes(entryPointFn, packOp);
+          TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
+          tileSizesList.push_back(zeros);
+          tileSizesList.push_back(vecTileSizes);
+          for (auto &ts : tileSizesList)
+            if (ts.size() > numLoops) ts.resize(numLoops);
+          auto packLoweringConfig =
+              IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
+          setLoweringConfig(op, packLoweringConfig);
+        })
+        .Case<linalg::GenericOp>([&](auto genericOp) {
+          auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+          auto linalgOpInfo = LinalgOpInfo(genericOp);
+          int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
+          SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
+              entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+          for (auto &i : vecTileSizes) {
+            i = roundUpToPow2(
+                std::min(i, vecSize),
+                vecPreProcStrategy == VectorPreProcStrategy::Masking);
+          }
+          SmallVector<int64_t> reductionTiles;
+          splitParallelAndReductionTiles(genericOp, vecTileSizes,
+                                         reductionTiles);
+          setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+                                         vecTileSizes, reductionTiles);
+
+          TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
+          tileSizesList.push_back(reductionTiles);
+          tileSizesList.push_back(vecTileSizes);
+          for (auto &ts : tileSizesList)
+            if (ts.size() > numLoops) ts.resize(numLoops);
+          auto defaultLoweringConfig =
+              IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
+          setLoweringConfig(op, defaultLoweringConfig);
+        })
+        .Default([&](auto) {
+          TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
+          tileSizesList.push_back(zeros);
+          tileSizesList.push_back(zeros);
+          for (auto &ts : tileSizesList)
+            if (ts.size() > numLoops) ts.resize(numLoops);
+          auto defaultLoweringConfig =
+              IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
+          setLoweringConfig(op, defaultLoweringConfig);
+        });
   }
 
   return success();

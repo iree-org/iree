@@ -258,6 +258,8 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
            << loweringConfig.getTileSizes().size();
   }
 
+  if (!isa<linalg::ConvolutionOpInterface>(op)) return success();
+
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
   for (auto sizes : loweringConfig.getTileSizeVals()) {
