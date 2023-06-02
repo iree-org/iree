@@ -684,7 +684,7 @@ iree_fetch_artifact(
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_8/linalg.mlir"
   OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8_Resnet50fp16PT16Batch8.mlir"
+    "${ROOT_ARTIFACTS_DIR}/model_5e779dd2-f115-4a1c-9aab-87b7ae4a568d-batch-8_Resnet50fp16PTBatch8.mlir"
   UNPACK
 )
 
@@ -884,7 +884,7 @@ iree_fetch_artifact(
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1024/stablehlo.mlirbc"
   OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024_BertLargeJAXBatch1024.mlirbc"
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1024_BERT_LARGE_JAX_384XI32_BATCH1024.mlirbc"
   UNPACK
 )
 
@@ -894,7 +894,7 @@ iree_fetch_artifact(
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1280/stablehlo.mlirbc"
   OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280_BertLargeJAXBatch1280.mlirbc"
+    "${ROOT_ARTIFACTS_DIR}/model_47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32-batch1280_BERT_LARGE_JAX_384XI32_BATCH1280.mlirbc"
   UNPACK
 )
 

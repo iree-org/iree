@@ -5,8 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines Tensorflow models."""
 
+import string
+
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
+import e2e_test_framework.models.utils as model_utils
 
 TF_MODELS_MANUAL_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual"
 
@@ -58,203 +61,55 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
 
 TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084"
 
+ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
+NAME_FORMAT = string.Template("${name}Batch${batch_size}")
+SOURCE_URL_FORMAT = string.Template(
+    TF_MODELS_ROOT_DIR + "/${directory}/batch_${batch_size}/hlo.mlirbc")
+
 # Derived from https://huggingface.co/docs/transformers/model_doc/bert#transformers.TFBertModel.
-BERT_LARGE_1X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_1X384_FP32_TF,
-    name="BertLargeTFBatch1",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-1"],
+BERT_LARGE_384_FP32_TF_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_BERT_LARGE_384_FP32_TF),
+    name_template=model_utils.partial_template_substitute(NAME_FORMAT,
+                                                          name="BertLargeTF"),
+    tags=["fp32", "seqlen384", "tensorflow", "bert-variant"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_1/hlo.mlirbc",
+    source_url_template=model_utils.partial_template_substitute(
+        SOURCE_URL_FORMAT, directory="BERT_LARGE"),
     entry_function="forward",
-    input_types=["1x384xi32", "1x384xi32"])
-
-BERT_LARGE_16X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_16X384_FP32_TF,
-    name="BertLargeTFBatch16",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-16"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_16/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["16x384xi32", "16x384xi32"])
-
-BERT_LARGE_24X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_24X384_FP32_TF,
-    name="BertLargeTFBatch24",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-24"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_24/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["24x384xi32", "24x384xi32"])
-
-BERT_LARGE_32X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_32X384_FP32_TF,
-    name="BertLargeTFBatch32",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-32"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_32/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["32x384xi32", "32x384xi32"])
-
-BERT_LARGE_48X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_48X384_FP32_TF,
-    name="BertLargeTFBatch48",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-48"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_48/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["48x384xi32", "48x384xi32"])
-
-BERT_LARGE_64X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_64X384_FP32_TF,
-    name="BertLargeTFBatch64",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-64"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_64/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["64x384xi32", "64x384xi32"])
-
-BERT_LARGE_512X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_512X384_FP32_TF,
-    name="BertLargeTFBatch512",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-512"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_512/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["512x384xi32", "512x384xi32"])
-
-BERT_LARGE_1024X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_1024X384_FP32_TF,
-    name="BertLargeTFBatch1024",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-1024"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_1024/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["1024x384xi32", "1024x384xi32"])
-
-BERT_LARGE_1280X384_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_1280X384_FP32_TF,
-    name="BertLargeTFBatch1280",
-    tags=["fp32", "seqlen384", "tensorflow", "bert-variant", "batch-1280"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/BERT_LARGE/batch_1280/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["1280x384xi32", "1280x384xi32"])
+    input_type_templates=[
+        string.Template("${batch_size}x384xi32"),
+        string.Template("${batch_size}x384xi32")
+    ],
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
 
 # Converted from https://www.tensorflow.org/api_docs/python/tf/keras/applications/resnet50/ResNet50
-RESNET50_1X3X224X224_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_1X3X224X224_FP32_TF,
-    name="Resnet50TFBatch1",
-    tags=["fp32", "cnn", "batch-1"],
+RESNET50_3X224X224_FP32_TF_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_RESNET50_3X224X224_FP32_TF),
+    name_template=model_utils.partial_template_substitute(NAME_FORMAT,
+                                                          name="Resnet50TF"),
+    tags=["fp32", "cnn"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/RESNET50/batch_1/hlo.mlirbc",
+    source_url_template=model_utils.partial_template_substitute(
+        SOURCE_URL_FORMAT, directory="RESNET50"),
     entry_function="forward",
-    input_types=["1x224x224x3xf32"])
-
-RESNET50_8X3X224X224_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_8X3X224X224_FP32_TF,
-    name="Resnet50TFBatch8",
-    tags=["fp32", "cnn", "batch-8"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/RESNET50/batch_8/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["8x224x224x3xf32"])
-
-RESNET50_64X3X224X224_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_64X3X224X224_FP32_TF,
-    name="Resnet50TFBatch64",
-    tags=["fp32", "cnn", "batch-64"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/RESNET50/batch_64/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["64x224x224x3xf32"])
-
-RESNET50_128X3X224X224_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_128X3X224X224_FP32_TF,
-    name="Resnet50TFBatch128",
-    tags=["fp32", "cnn", "batch-128"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/RESNET50/batch_128/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["128x224x224x3xf32"])
-
-RESNET50_256X3X224X224_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_256X3X224X224_FP32_TF,
-    name="Resnet50TFBatch256",
-    tags=["fp32", "cnn", "batch-256"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/RESNET50/batch_256/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["256x224x224x3xf32"])
-
-RESNET50_2048X3X224X224_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_2048X3X224X224_FP32_TF,
-    name="Resnet50TFBatch2048",
-    tags=["fp32", "cnn", "batch-2048"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/RESNET50/batch_2048/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["2048x224x224x3xf32"])
+    input_type_templates=[string.Template("${batch_size}x224x224x3xf32")],
+    batch_sizes=[1, 8, 64, 128, 256, 2048])
 
 # Derived from https://huggingface.co/transformers/v3.0.2/model_doc/t5.html#tft5model.
-T5_LARGE_1x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_1x512_FP32_TF,
-    name="T5LargeTFBatch1",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-1"],
+T5_LARGE_512_FP32_TF_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_T5_LARGE_512_FP32_TF),
+    name_template=model_utils.partial_template_substitute(NAME_FORMAT,
+                                                          name="T5LargeTF"),
+    tags=["fp32", "seqlen512", "tensorflow"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_1/hlo.mlirbc",
+    source_url_template=model_utils.partial_template_substitute(
+        SOURCE_URL_FORMAT, directory="T5_LARGE"),
     entry_function="forward",
-    input_types=["1x512xi32", "1x512xi32"])
-
-T5_LARGE_16x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_16x512_FP32_TF,
-    name="T5LargeTFBatch16",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-16"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_16/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["16x512xi32", "16x512xi32"])
-
-T5_LARGE_24x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_24x512_FP32_TF,
-    name="T5LargeTFBatch24",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-24"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_24/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["24x512xi32", "24x512xi32"])
-
-T5_LARGE_32x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_32x512_FP32_TF,
-    name="T5LargeTFBatch32",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-32"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_32/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["32x512xi32", "32x512xi32"])
-
-T5_LARGE_48x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_48x512_FP32_TF,
-    name="T5LargeTFBatch48",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-48"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_48/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["48x512xi32", "48x512xi32"])
-
-T5_LARGE_64x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_64x512_FP32_TF,
-    name="T5LargeTFBatch64",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-64"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_64/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["64x512xi32", "64x512xi32"])
-
-T5_LARGE_512x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_512x512_FP32_TF,
-    name="T5LargeTFBatch512",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-512"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_512/hlo.mlirbc",
-    entry_function="forward",
-    input_types=["512x512xi32", "512x512xi32"])
+    input_type_templates=[
+        string.Template("${batch_size}x512xi32"),
+        string.Template("${batch_size}x512xi32")
+    ],
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512])
