@@ -410,7 +410,15 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // This approximates LTO.
     llvm::Linker moduleLinker(*llvmModule);
 
-    // Link any user bitcode objects and specialize them for the current config.
+    // Link any bitcode files specified on the command line.
+    if (failed(linkCmdlineBitcodeFile(variantOp.getLoc(), moduleLinker,
+                                      llvm::Linker::OverrideFromSrc,
+                                      *targetMachine, context))) {
+      return failure();
+    }
+
+    // Link any bitcode objects specified in executable.object attributes and
+    // specialize them for the current config.
     if (failed(linkBitcodeObjects(variantOp.getLoc(), moduleLinker,
                                   llvm::Linker::LinkOnlyNeeded, *targetMachine,
                                   variantOp.getObjectsAttr(), context))) {
