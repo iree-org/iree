@@ -12,13 +12,13 @@
 # We use .deb files that we host because we have to pin the version and packages
 # routinely dissapear from the Ubuntu apt repositories. The versions need to be
 # compatible with the host driver (usually <= host driver version).
-ARG NVIDIA_GL_DEB="libnvidia-gl-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-515-server_515.86.01-0ubuntu0.22.04.1_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-530_530.41.03-0ubuntu0.22.04.2_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_530.41.03-0ubuntu0.22.04.2_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-530_530.41.03-0ubuntu0.22.04.2_all.deb"
 ARG NVIDIA_EGL_WAYLAND_DEB="libnvidia-egl-wayland1_1.1.9-1.1_amd64.deb"
 
 
-FROM gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd AS fetch-nvidia
+FROM gcr.io/iree-oss/base-bleeding-edge@sha256:37f776a1bed43be618b98ef234a7562bd624192668aca301f63b66e5874d38ae AS fetch-nvidia
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -39,7 +39,7 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_EGL_WAYLA
 # - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan):
 #      does not support Ubuntu 22.04.
 # This allows to share configuration with base CMake.
-FROM gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd AS final
+FROM gcr.io/iree-oss/base-bleeding-edge@sha256:37f776a1bed43be618b98ef234a7562bd624192668aca301f63b66e5874d38ae AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -52,7 +52,9 @@ COPY --from=fetch-nvidia \
   "/fetch-nvidia/${NVIDIA_EGL_WAYLAND_DEB}" \
   /tmp/
 
-RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
+# The local .deb files have dependencies that requires apt-get update to locate.
+RUN apt-get update \
+  && apt-get -y install "/tmp/${NVIDIA_COMMON_DEB}" \
   "/tmp/${NVIDIA_GL_DEB}" \
   "/tmp/${NVIDIA_COMPUTE_DEB}" \
   "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"

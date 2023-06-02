@@ -11,9 +11,9 @@
 # We use .deb files that we host because we have to pin the version and packages
 # routinely dissapear from the Ubuntu apt repositories. The versions need to be
 # compatible with the host driver (usually <= host driver version).
-ARG NVIDIA_GL_DEB="libnvidia-gl-460_460.39-0ubuntu0.18.04.1_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-460_460.39-0ubuntu0.18.04.1_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-460_460.39-0ubuntu0.18.04.1_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-530_530.41.03-0ubuntu0.20.04.2_all.deb"
 
 
 FROM gcr.io/iree-oss/base@sha256:7dbb7e97e0baa6d4512822b5cd4f601d840a6f950f67c2df497a24cae64a0595 AS fetch-nvidia
@@ -30,12 +30,11 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_D
 # Set up the image and working directory by inheriting the base CMake
 # configuration.
 # Note that we don't start from NVIDIA's docker base:
-# - nvidia/cuda (https://hub.docker.com/r/nvidia/cuda):
-#     it's.. for CUDA.
-# - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan):
-#      does not support Ubuntu 18.04.
-# This allows to share configuration with base CMake, but it also means we need
-# to MATCH the driver version between the host machine and the docker image.
+# - nvidia/cuda (https://hub.docker.com/r/nvidia/cuda), or
+# - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan).
+# This allows to share configuration with base CMake and better control the
+# installed packages. But it does mean we need to carefully manage the MATCHING
+# of the driver version between the host machine and the docker image.
 FROM gcr.io/iree-oss/base@sha256:7dbb7e97e0baa6d4512822b5cd4f601d840a6f950f67c2df497a24cae64a0595 AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
