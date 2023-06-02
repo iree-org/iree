@@ -314,8 +314,8 @@ EOF
           bash -c "${script_dir}/check_cuda.sh && ${script_dir}/check_vulkan.sh"
     }
 
-    check_docker gcr.io/iree-oss/nvidia@sha256:e7a1daba40815d1e94c901ce7de4bead54e725302ba320eda6745857977528a7
-    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:d2bea95804c5f75dc64446f2839d17af5f245d3cc939c161482e213890c8213b
+    check_docker gcr.io/iree-oss/nvidia@sha256:f8c6680f435615256c9df7521d41ad49f13bbb34e2dd16a271a620e9dc8637e7
+    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:808f57962267eb1752c3200348421a22eca1770c737922ee2b933585d16f014d
 
     # Remove the docker images we've fetched. We might want to pre-fetch Docker
     # images into the VM image, but that should be a separate decision.
