@@ -97,7 +97,6 @@ function(iree_trace_runner_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
-      ${_RULE_TARGET_CPU_FEATURES}
   )
 endfunction()
 
@@ -320,11 +319,18 @@ function(iree_generated_trace_runner_test)
     else()
       set(_TARGET_CPU_FEATURES_VARIANTS "default")
     endif()
-    foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
-      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
+    foreach(_VARIANT_STRING IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
+      parse_target_cpu_features_variant("${_VARIANT_STRING}"
+        _ENABLED _TARGET_CPU_FEATURES_NAME _TARGET_CPU_FEATURES)
       if(NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
+      endif()
+      set(_TARGET_CPU_FEATURES_SUFFIX "")
+      set(_LABELS "${_RULE_LABELS}")
+      if (_TARGET_CPU_FEATURES_NAME)
+        set(_TARGET_CPU_FEATURES_SUFFIX "_${_TARGET_CPU_FEATURES_NAME}")
+        list(APPEND _LABELS "cpu_features=${_TARGET_CPU_FEATURES_NAME}")
       endif()
       iree_single_backend_generated_trace_runner_test(
         NAME
@@ -344,7 +350,7 @@ function(iree_generated_trace_runner_test)
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS
-          ${_RULE_LABELS}
+          ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
       )

@@ -114,7 +114,6 @@ function(iree_check_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
-      ${_RULE_TARGET_CPU_FEATURES}
     TIMEOUT
       ${_RULE_TIMEOUT}
   )
@@ -232,71 +231,52 @@ endfunction()
 # Helper function parsing a string occurring as an entry in TARGET_CPU_FEATURES_VARIANTS.
 #
 # This function has 3 output-params: variables that it sets with PARENT_SCOPE:
-# _ENABLED, _TARGET_CPU_FEATURES, _TARGET_CPU_FEATURES_SUFFIX.
+# _ENABLED, _FEATURES_NAME, _FEATURES.
 #
 # "default" is handled specially. _ENABLED is always set to "TRUE" and
-# _TARGET_CPU_FEATURES, and _TARGET_CPU_FEATURES_SUFFIX are set to
+# _FEATURES_NAME and _FEATURES are set to
 # the empty string.
 #
-# Other values are parsed as "arch:features", the parsed arch is matched with
-# `IREE_ARCH`, `_ENABLED` is set to "TRUE" if and only if they
-# match, `_TARGET_CPU_FEATURES_SUFFIX` is set to a string based on the
-# features that is appropriate to include in a CMake target or test name, and
-# More than one target cpu feature is currently unsupported.
+# Other values are parsed as "arch:features_name:features". The `arch`
+# component is  matched with `IREE_ARCH`, `_ENABLED` is set to "TRUE" if and
+# only if they match. In that case:
+#   `_FEATURES_NAME` is set to `features_name`.
+#   `_FEATURES` is set to `features`.
 #
-# aarch64:+dotprod ->_ENABLED="TRUE" if the target architecture is aarch64,
-#                    _TARGET_CPU_FEATURES="+dotprod",
-#                    _TARGET_CPU_FEATURES_SUFFIX="_dotprod",
-# default -> _ENABLED="TRUE" unconditionally,
-#            other output strings are "".
-function(process_target_cpu_features _INPUT_TARGET_CPU_FEATURES _ENABLED
-         _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
-  set(_TARGET_CPU_FEATURES "" PARENT_SCOPE)
-  set(_TARGET_CPU_FEATURES_SUFFIX "" PARENT_SCOPE)
-  if("${_INPUT_TARGET_CPU_FEATURES}" STREQUAL "default")
-    set(_ENABLED "TRUE" PARENT_SCOPE)
+# Examples:
+#
+# default:
+#    _ENABLED="TRUE" unconditionally,
+#        other output strings are "".
+#
+# aarch64:dotprod:+dotprod:
+#    _ENABLED="TRUE" if the target architecture is aarch64, and in that case:
+#        _FEATURES_NAME="dotprod".
+#        _FEATURES="+dotprod".
+function(parse_target_cpu_features_variant _VARIANT_STRING _ENABLED_VAR
+             _FEATURES_NAME_VAR _FEATURES_VAR)
+  set("${_ENABLED_VAR}" FALSE PARENT_SCOPE)
+  set("${_FEATURES_NAME_VAR}" "" PARENT_SCOPE)
+  set("${_FEATURES_VAR}" "" PARENT_SCOPE)
+  if("${_VARIANT_STRING}" STREQUAL "default")
+    set("{_ENABLED_VAR}" TRUE PARENT_SCOPE)
     return()
   endif()
-  string(REGEX MATCHALL "[^:]+" _COMPONENTS "${_INPUT_TARGET_CPU_FEATURES}")
+  # Interpret _VARIANT_STRING as a CMake list (;-separated).
+  string(REPLACE ":" ";" _COMPONENTS "${_VARIANT_STRING}")
   list(LENGTH _COMPONENTS _NUM_COMPONENTS)
-  if(NOT _NUM_COMPONENTS EQUAL 2)
-    message(SEND_ERROR "TARGET_CPU_FEATURES should be of the form \
-_FILTER_ARCH:_TARGET_CPU_FEATURES. Got: ${_INPUT_TARGET_CPU_FEATURES}")
+  if(NOT _NUM_COMPONENTS EQUAL 3)
+    message(SEND_ERROR "TARGET_CPU_FEATURES_VARIANTS should be of the form \
+    \"arch:features_name:features\". Got: \"${_VARIANT_STRING}\"")
     return()
   endif()
-  # TARGET_CPU_FEATURES_VARIANT is of the form _FILTER_ARCH:_TARGET_CPU_FEATURE.
   list(GET _COMPONENTS 0 _FILTER_ARCH)
-  list(GET _COMPONENTS 1 _TARGET_CPU_FEATURES)
+  list(GET _COMPONENTS 1 _FEATURES_NAME)
+  list(GET _COMPONENTS 2 _FEATURES)
   if(_FILTER_ARCH STREQUAL IREE_ARCH)
-    set(_ENABLED "TRUE" PARENT_SCOPE)
-    set(_TARGET_CPU_FEATURES "${_TARGET_CPU_FEATURES}" PARENT_SCOPE)
-    # TODO: the logic to generate the suffix from the list of target CPU features
-    # will need to be generalized when the lists have more than 1 element, when
-    # some features are being disabled by a "-" sign, and if some features involve
-    # any character that's not wanted in a cmake rule name.
-    # For now, let's just generate errors in those cases:
-    list(LENGTH _TARGET_CPU_FEATURES _NUM_TARGET_CPU_FEATURES)
-    if(NOT _NUM_TARGET_CPU_FEATURES EQUAL 1)
-      message(SEND_ERROR "Current limitation: \
-TARGET_CPU_FEATURES should have length 1")
-    endif()
-    string(SUBSTRING "${_TARGET_CPU_FEATURES}" 0 1 _TARGET_CPU_FEATURES_FIRST_CHAR)
-    string(SUBSTRING "${_TARGET_CPU_FEATURES}" 1 -1 _TARGET_CPU_FEATURES_AFTER_FIRST_CHAR)
-    if(NOT _TARGET_CPU_FEATURES_FIRST_CHAR STREQUAL "+")
-      message(SEND_ERROR "Current limitation: \
-TARGET_CPU_FEATURES should start with a +. Got: ${_TARGET_CPU_FEATURES}.")
-    endif()
-    if(NOT _TARGET_CPU_FEATURES_AFTER_FIRST_CHAR MATCHES "[a-zA-Z0-9_]+")
-      message(SEND_ERROR "Current limitation: \
-TARGET_CPU_FEATURES should match [a-zA-Z0-9]+ after the initial +. \
-Got: ${_TARGET_CPU_FEATURES}.")
-    endif()
-    # Generate the target cpu features suffix string with underscores ('_')
-    # separating the features.
-    string(REGEX REPLACE "[+,]+" "_" _TARGET_CPU_FEATURES_SUFFIX_LOCAL "${_TARGET_CPU_FEATURES}")
-    set(_TARGET_CPU_FEATURES_SUFFIX "${_TARGET_CPU_FEATURES_SUFFIX_LOCAL}" PARENT_SCOPE)
-  else()
-    set(_ENABLED "FALSE" PARENT_SCOPE)
+    set("${_ENABLED_VAR}" TRUE PARENT_SCOPE)
+    set("${_FEATURES_NAME_VAR}" "${_FEATURES_NAME}" PARENT_SCOPE)
+    set("${_FEATURES_VAR}" "${_FEATURES}" PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -364,11 +344,18 @@ function(iree_check_test_suite)
     else()
       set(_TARGET_CPU_FEATURES_VARIANTS "default")
     endif()
-    foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
-      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
+    foreach(_VARIANT_STRING IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
+      parse_target_cpu_features_variant("${_VARIANT_STRING}"
+        _ENABLED _TARGET_CPU_FEATURES_NAME _TARGET_CPU_FEATURES)
       if(NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
+      endif()
+      set(_TARGET_CPU_FEATURES_SUFFIX "")
+      set(_LABELS "${_RULE_LABELS}")
+      if (_TARGET_CPU_FEATURES_NAME)
+        set(_TARGET_CPU_FEATURES_SUFFIX "_${_TARGET_CPU_FEATURES_NAME}")
+        list(APPEND _LABELS "cpu_features=${_TARGET_CPU_FEATURES_NAME}")
       endif()
       iree_check_single_backend_test_suite(
         NAME
@@ -384,7 +371,7 @@ function(iree_check_test_suite)
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS
-          ${_RULE_LABELS}
+          ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
         TIMEOUT
