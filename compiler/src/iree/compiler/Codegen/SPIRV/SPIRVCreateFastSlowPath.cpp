@@ -54,7 +54,7 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
 
   // Find the anchor tensor.pad op, from which we get the conditions for
   // switching between the fast and slow path.
-  auto padOps = llvm::to_vector<4>(body->getOps<tensor::PadOp>());
+  auto padOps = llvm::to_vector(body->getOps<tensor::PadOp>());
   if (llvm::size(padOps) != 1) return;
   tensor::PadOp padOp = *padOps.begin();
 

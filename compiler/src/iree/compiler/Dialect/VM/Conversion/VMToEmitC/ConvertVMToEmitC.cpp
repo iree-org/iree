@@ -74,7 +74,7 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue) {
 
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
                             IREE::VM::EmitCTypeConverter &typeConverter,
-                            SmallVector<BlockArgument, 4> &blockArgsToRemove) {
+                            SmallVector<BlockArgument> &blockArgsToRemove) {
   auto ctx = funcOp.getContext();
   auto loc = funcOp.getLoc();
 
@@ -201,7 +201,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
 /// Remove block arguments
 LogicalResult removeBlockArguments(
     IREE::VM::ModuleOp moduleOp,
-    SmallVector<BlockArgument, 4> &blockArgsToRemove) {
+    SmallVector<BlockArgument> &blockArgsToRemove) {
   for (auto &blockArg : blockArgsToRemove) {
     assert(blockArg.getType().isa<IREE::VM::RefType>());
     assert(blockArg.use_empty());
@@ -1214,11 +1214,11 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
-  return llvm::map_to_vector<4>(
-      llvm::seq<int64_t>(0, n), [&ctx](int64_t i) -> Attribute {
-        return IntegerAttr::get(IndexType::get(ctx), i);
-      });
+SmallVector<Attribute> indexSequence(int64_t n, MLIRContext *ctx) {
+  return llvm::map_to_vector(llvm::seq<int64_t>(0, n),
+                             [&ctx](int64_t i) -> Attribute {
+                               return IntegerAttr::get(IndexType::get(ctx), i);
+                             });
 }
 
 template <typename ResultOpTy>
@@ -1272,7 +1272,7 @@ class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
     // attribute of the emitc call op. This consists of index attributes for
     // the operands, followed by the source op attributes themselves.
     if (op->getAttrs().size() > 0) {
-      SmallVector<Attribute, 4> args_ =
+      SmallVector<Attribute> args_ =
           indexSequence(adaptor.getOperands().size(), op.getContext());
 
       for (NamedAttribute attr : op->getAttrs()) {
@@ -4729,8 +4729,8 @@ class ConvertVMToEmitCPass
     // EmitC. We convert these upfront to make sure vm.call ops always
     // reference std.func ops with the correct calling convention during the
     // conversion.
-    SmallVector<IREE::VM::FuncOp, 4> funcsToRemove;
-    SmallVector<BlockArgument, 4> blockArgsToRemove;
+    SmallVector<IREE::VM::FuncOp> funcsToRemove;
+    SmallVector<BlockArgument> blockArgsToRemove;
     for (auto funcOp : module.getOps<IREE::VM::FuncOp>()) {
       Operation *op = funcOp.getOperation();
       typeConverter.analysisCache.insert(

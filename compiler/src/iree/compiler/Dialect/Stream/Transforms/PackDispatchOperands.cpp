@@ -167,8 +167,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
   SmallVector<Type> newArgTypes;
   SmallVector<DictionaryAttr> newArgAttrs;
   auto oldArgAttrs = funcOp.getAllArgAttrs();
-  for (auto it :
-       llvm::enumerate(llvm::to_vector<4>(funcOp.getArgumentTypes()))) {
+  for (auto it : llvm::enumerate(llvm::to_vector(funcOp.getArgumentTypes()))) {
     auto targetType = it.value();
     if (!targetType.isIntOrIndexOrFloat() ||
         (targetType.isIndex() && resourceConfig.getIndexBits() <= 32) ||

@@ -44,7 +44,7 @@ class SinkDefiningOpsPass
           continue;
         }
 
-        auto users = llvm::to_vector<4>(op.getUsers());
+        auto users = llvm::to_vector(op.getUsers());
         if (users.empty()) {
           // No users (probably leftover needing DCE).
           continue;

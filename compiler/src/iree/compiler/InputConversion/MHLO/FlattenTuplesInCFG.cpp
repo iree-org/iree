@@ -42,7 +42,7 @@ Value processTuple(Type type, Location loc, Block *block, OpBuilder &builder) {
   }
 
   auto tupleType = llvm::dyn_cast<TupleType>(type);
-  llvm::SmallVector<Value, 4> values;
+  llvm::SmallVector<Value> values;
   values.reserve(tupleType.size());
   for (auto subtype : tupleType.getTypes()) {
     values.push_back(processTuple(subtype, loc, block, builder));
@@ -132,13 +132,13 @@ bool convertReturnOp(mlir::func::ReturnOp *op, OpBuilder &builder,
 
 bool convertCallOp(func::CallOp *oldOp, OpBuilder &builder,
                    IRMapping *mapping) {
-  llvm::SmallVector<Value, 4> newArgs;
+  llvm::SmallVector<Value> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
   }
 
-  SmallVector<Type, 4> resultTypes;
+  SmallVector<Type> resultTypes;
   untupleTypes(oldOp->getOperation()->getResultTypes(), resultTypes);
   auto newOp = builder.create<func::CallOp>(oldOp->getLoc(), oldOp->getCallee(),
                                             resultTypes, newArgs);
@@ -157,7 +157,7 @@ bool convertCallOp(func::CallOp *oldOp, OpBuilder &builder,
 
 bool convertIndirectCallOp(func::CallIndirectOp *oldOp, OpBuilder &builder,
                            IRMapping *mapping) {
-  llvm::SmallVector<Value, 4> newArgs;
+  llvm::SmallVector<Value> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
@@ -178,7 +178,7 @@ bool convertIndirectCallOp(func::CallIndirectOp *oldOp, OpBuilder &builder,
 
 bool convertBranchOp(cf::BranchOp *oldOp, OpBuilder &builder,
                      IRMapping *mapping) {
-  llvm::SmallVector<Value, 4> newArgs;
+  llvm::SmallVector<Value> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
@@ -194,13 +194,13 @@ bool convertBranchOp(cf::BranchOp *oldOp, OpBuilder &builder,
 
 bool convertCondBranchOp(cf::CondBranchOp *oldOp, OpBuilder &builder,
                          IRMapping *mapping) {
-  llvm::SmallVector<Value, 4> trueArgs;
+  llvm::SmallVector<Value> trueArgs;
   if (untupleAndLookupValues(oldOp->getTrueOperands(), &trueArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
   }
 
-  llvm::SmallVector<Value, 4> falseArgs;
+  llvm::SmallVector<Value> falseArgs;
   if (untupleAndLookupValues(oldOp->getFalseOperands(), &falseArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
@@ -267,7 +267,7 @@ bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
   for (auto &oldBlock : oldFunction.getBlocks()) {
     auto *newBlock = builder.createBlock(&newFunction.getBody());
     for (auto oldArg : oldBlock.getArguments()) {
-      llvm::SmallVector<Type, 4> newTypes;
+      llvm::SmallVector<Type> newTypes;
       untupleTypes(oldArg.getType(), newTypes);
 
       Value newTuple = processTuple(oldArg.getType(), oldFunction.getLoc(),

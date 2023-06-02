@@ -27,7 +27,7 @@ class DropExcludedExportsPass
 
   void runOnOperation() override {
     // Remove exports annotated with emitc.exclude.
-    SmallVector<Operation *, 4> opsToRemove;
+    SmallVector<Operation *> opsToRemove;
     getOperation()->walk([&](IREE::VM::ExportOp exportOp) {
       Operation *op = exportOp.getOperation();
       if (op->hasAttr("emitc.exclude")) {

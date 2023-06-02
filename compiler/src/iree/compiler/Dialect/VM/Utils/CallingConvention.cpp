@@ -51,7 +51,7 @@ LogicalResult encodeCallingConventionType(Operation *op, Type type,
     }
   } else if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
     // Flatten tuple (so tuple<i32, i64> -> `...iI...`).
-    SmallVector<Type, 4> flattenedTypes;
+    SmallVector<Type> flattenedTypes;
     tupleType.getFlattenedTypes(flattenedTypes);
     for (auto elementType : flattenedTypes) {
       if (failed(encodeCallingConventionType(op, elementType, s))) {

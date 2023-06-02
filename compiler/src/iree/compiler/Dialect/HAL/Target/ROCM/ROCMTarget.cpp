@@ -128,8 +128,7 @@ class ROCMTargetBackend final : public TargetBackend {
 
     // Remove all the functions that are not part of the ROCM kernel.
     // TODO: Find a better solution to handle this.
-    auto illegalFuncOps =
-        llvm::to_vector<4>(innerModuleOp.getOps<func::FuncOp>());
+    auto illegalFuncOps = llvm::to_vector(innerModuleOp.getOps<func::FuncOp>());
     for (auto funcOp : illegalFuncOps) {
       funcOp.erase();
     }

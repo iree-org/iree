@@ -45,7 +45,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
     auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-    SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
+    SmallVector<Value> tileSizes = getTileSizes(builder, op, 0);
     auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
     for (unsigned depth : partitionedLoops) {
       if (depth < tileSizes.size()) {
@@ -101,10 +101,10 @@ static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
 
 /// Return the tile size associated to one thread or warp based on the number of
 /// element in the group.
-static SmallVector<Value, 4> calculateDistributedTileSize(
+static SmallVector<Value> calculateDistributedTileSize(
     ArrayRef<int64_t> numElements, OpBuilder &builder, Operation *operation) {
   SmallVector<int64_t> blockTileSize = getTileSizes(operation, 0);
-  SmallVector<Value, 4> tileSizesVal;
+  SmallVector<Value> tileSizesVal;
   // Use partitionedLoop to know what loop needs to be distributed.
   auto interfaceOp = cast<PartitionableLoopsInterface>(operation);
   auto partitionedLoops =
@@ -245,7 +245,7 @@ struct LLVMGPUTileAndDistributePass
       funcOp.dump();
     });
 
-    auto workgroupSize = llvm::map_to_vector<4>(
+    auto workgroupSize = llvm::map_to_vector(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
 

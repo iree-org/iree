@@ -200,7 +200,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   assert(convDims.outputImage.size() == 2);
   assert(convDims.filterLoop.size() == 2);
 
-  SmallVector<int64_t, 4> loopRanges = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
 
   const int ohIndex = convDims.outputImage.front();
   const int64_t oh = loopRanges[ohIndex];
@@ -621,7 +621,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   if (mIndex < 0 || nIndex < 0 || kIndex < 0) return failure();
   const bool isBM = bIndex >= 0;
 
-  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
   const unsigned numLoops = loopRanges.size();
 
   const int64_t dimM = loopRanges[mIndex];
@@ -946,7 +946,7 @@ LogicalResult setCooperativeMatrixConfig(
   if (mIndex < 0 || nIndex < 0 || kIndex < 0) return failure();
   const bool isBM = bIndex >= 0;
 
-  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
 
   const int64_t dimM = loopRanges[mIndex];
   const int64_t dimK = loopRanges[kIndex];
@@ -1143,7 +1143,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   bool foundSingleReductionOutput = false;
   for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
     // Only single combiner operations are supported for now.
-    SmallVector<Operation *, 4> combinerOps;
+    SmallVector<Operation *> combinerOps;
     if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
         combinerOps.size() == 1) {
       if (foundSingleReductionOutput) return failure();
@@ -1197,8 +1197,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> reductionTileSizes(numLoops, 0);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
   reductionTileSizes.push_back(groupSize * vectorSize);
 
   TileSizesListType tileSizes;
@@ -1312,7 +1312,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   };
 
   // Whether we can try to use the vectorization pipeline.
-  SmallVector<int64_t, 4> loopBounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
       allowVectorization &&
       // The vectorization pipeline assumes tensor semantics for tiling.

@@ -308,7 +308,7 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
   std::unique_ptr<Region> bodyRegion = std::make_unique<Region>();
   std::unique_ptr<Region> workloadCountRegion = std::make_unique<Region>();
   if (parser.parseOptionalAttrDict(result.attributes)) return failure();
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> workloadOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand> workloadOperands;
   SMLoc workloadOperandsLoc;
   (void)workloadOperandsLoc;
   if (succeeded(parser.parseOptionalLSquare())) {
@@ -669,7 +669,7 @@ Value DispatchTensorLoadOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> DispatchTensorLoadOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> DispatchTensorLoadOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -1054,16 +1054,15 @@ IREE::Util::ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  SmallVector<Type, 4> newResultTypes = llvm::to_vector<4>(getResultTypes());
-  SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(getResultDims());
-  SmallVector<Value, 4> newArguments = llvm::to_vector<4>(getArguments());
-  SmallVector<Value, 4> newArgumentDims = llvm::to_vector<4>(getArgumentDims());
+  SmallVector<Type> newResultTypes = llvm::to_vector(getResultTypes());
+  SmallVector<Value> newResultDims = llvm::to_vector(getResultDims());
+  SmallVector<Value> newArguments = llvm::to_vector(getArguments());
+  SmallVector<Value> newArgumentDims = llvm::to_vector(getArgumentDims());
   IREE::Util::excludeClosureOperandsAndResults(
       newArguments, newArgumentDims, excludedOperandIndices, newResultTypes,
       newResultDims, excludedResultIndices);
 
-  auto newTiedOperandIndices =
-      llvm::to_vector<4>(getTiedResultOperandIndices());
+  auto newTiedOperandIndices = llvm::to_vector(getTiedResultOperandIndices());
 
   // TODO(benvanik): all this offset stuff is confusing and should be reworked.
   // We should probably have absolute indices and relative indices, or just one
@@ -1101,7 +1100,7 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   // that the result can be dropped only if it is written within the dispatch
   // region op.
   unsigned baseResultIndex = getArguments().size();  // old index
-  auto erasedArguments = llvm::to_vector<4>(excludedOperandIndices);
+  auto erasedArguments = llvm::to_vector(excludedOperandIndices);
   for (unsigned i = baseResultIndex, e = newBody.getNumArguments(); i != e;
        ++i) {
     if (!is_contained(excludedResultIndices, i - baseResultIndex)) continue;
@@ -1471,7 +1470,7 @@ Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorReshapeOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorReshapeOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -1597,7 +1596,7 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1742,7 +1741,7 @@ Value CollectiveAllGatherOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> CollectiveAllGatherOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> CollectiveAllGatherOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1768,7 +1767,7 @@ Value CollectiveAllReduceOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> CollectiveAllReduceOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> CollectiveAllReduceOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1795,7 +1794,7 @@ std::optional<unsigned> CollectiveAllToAllOp::getTiedResultOperandIndex(
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> CollectiveAllToAllOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> CollectiveAllToAllOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1822,8 +1821,7 @@ Value CollectiveReduceScatterOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4>
-CollectiveReduceScatterOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> CollectiveReduceScatterOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1851,7 +1849,7 @@ std::optional<unsigned> CollectiveSendRecvOp::getTiedResultOperandIndex(
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> CollectiveSendRecvOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> CollectiveSendRecvOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 

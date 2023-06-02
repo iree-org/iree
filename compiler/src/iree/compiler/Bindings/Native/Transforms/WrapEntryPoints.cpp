@@ -297,7 +297,7 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
                                     func::FuncOp exportOp,
                                     func::FuncOp wrapperOp) {
   auto *context = exportOp.getContext();
-  SmallVector<NamedAttribute, 4> attrs;
+  SmallVector<NamedAttribute> attrs;
 
   if (auto abiAttr = exportOp->getAttr("iree.abi")) {
     attrs.emplace_back(StringAttr::get(context, "iree.abi"), abiAttr);
@@ -347,10 +347,10 @@ static func::FuncOp createExportWrapperFunc(
     StringRef publicName) {
   // Copy arg/result attrs from the export op to the wrapper function.
   // We may want to remove them from the export but would need to filter.
-  SmallVector<DictionaryAttr, 4> argAttrDict;
+  SmallVector<DictionaryAttr> argAttrDict;
   exportOp.getAllArgAttrs(argAttrDict);
   stripABIAttrs(argAttrDict);
-  SmallVector<DictionaryAttr, 4> resultAttrDict;
+  SmallVector<DictionaryAttr> resultAttrDict;
   exportOp.getAllResultAttrs(resultAttrDict);
   stripABIAttrs(resultAttrDict);
 

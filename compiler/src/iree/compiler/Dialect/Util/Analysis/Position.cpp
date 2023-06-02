@@ -96,7 +96,7 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
     regionOp.getSuccessorRegions(region.getRegionNumber(), successors);
     for (auto &successor : successors) {
       if (successor.isParent()) {
-        return llvm::to_vector<4>(getPositions(successor.getSuccessorInputs()));
+        return llvm::to_vector(getPositions(successor.getSuccessorInputs()));
       }
     }
     assert(false && "should have found a parent successor");
@@ -107,7 +107,7 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
   auto *parentOp = region.getParentOp();
   if (auto callableOp = dyn_cast<CallableOpInterface>(parentOp)) {
     unsigned resultCount = callableOp.getCallableResults().size();
-    return llvm::map_to_vector<4>(
+    return llvm::map_to_vector(
         llvm::seq(0u, resultCount), [parentOp](unsigned resultIdx) -> Position {
           return Position::forReturnedValue(parentOp, resultIdx);
         });

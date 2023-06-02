@@ -290,7 +290,7 @@ struct ConvertRankedDynamicBroadcastBinaryOp final
     // because, in the dynamic case, there are many corner cases regarding
     // when it is safe to omit, and some of them require analysis to prove
     // properly.
-    auto lhsBroadcastDimensions = llvm::to_vector<4>(
+    auto lhsBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - lhsType.getRank(), resultRank));
     Value broadcastedLhs =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -299,7 +299,7 @@ struct ConvertRankedDynamicBroadcastBinaryOp final
                                   lhsType.getElementType()),
             lhs, resultExtents,
             rewriter.getI64TensorAttr(lhsBroadcastDimensions));
-    auto rhsBroadcastDimensions = llvm::to_vector<4>(
+    auto rhsBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - rhsType.getRank(), resultRank));
     Value broadcastedRhs =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -396,7 +396,7 @@ struct ConvertSelectOp final
     Value broadcastedPred = pred;
     // Pred has an implicit broadcast for scalars, so use that when convenient.
     if (predType.getRank() > 0) {
-      auto predBroadcastDimensions = llvm::to_vector<4>(
+      auto predBroadcastDimensions = llvm::to_vector(
           llvm::seq<int64_t>(resultRank - predType.getRank(), resultRank));
       broadcastedPred =
           rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -406,7 +406,7 @@ struct ConvertSelectOp final
               pred, resultExtents,
               rewriter.getI64TensorAttr(predBroadcastDimensions));
     }
-    auto onTrueBroadcastDimensions = llvm::to_vector<4>(
+    auto onTrueBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - onTrueType.getRank(), resultRank));
     Value broadcastedOnTrue =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -415,7 +415,7 @@ struct ConvertSelectOp final
                                   onTrueType.getElementType()),
             onTrue, resultExtents,
             rewriter.getI64TensorAttr(onTrueBroadcastDimensions));
-    auto onFalseBroadcastDimensions = llvm::to_vector<4>(
+    auto onFalseBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - onFalseType.getRank(), resultRank));
     Value broadcastedOnFalse =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -2095,10 +2095,10 @@ struct ConvertTopKOp final : OpConversionPattern<mlir::chlo::TopKOp> {
     Value tupleFirstElement = sortOp.getResult(0);
     Value tupleSecondElement = sortOp.getResult(1);
 
-    SmallVector<int64_t, 4> beginIndices(operandRank, 0);
-    auto endIndices = llvm::to_vector<4>(operandType.getShape());
+    SmallVector<int64_t> beginIndices(operandRank, 0);
+    auto endIndices = llvm::to_vector(operandType.getShape());
     endIndices.back() = lastDimResultSize;
-    SmallVector<int64_t, 4> strides(operandRank, 1);
+    SmallVector<int64_t> strides(operandRank, 1);
 
     // Get the slice for the top K elements.
     auto indicesTy = RankedTensorType::get(operandRank, rewriter.getI64Type());
@@ -2111,8 +2111,8 @@ struct ConvertTopKOp final : OpConversionPattern<mlir::chlo::TopKOp> {
       Value stridesOp = rewriter.create<mlir::stablehlo::ConstantOp>(
           op.getLoc(), DenseIntElementsAttr::get(indicesTy, strides));
 
-      SmallVector<int64_t, 4> resultShape =
-          llvm::to_vector<4>(operandType.getShape());
+      SmallVector<int64_t> resultShape =
+          llvm::to_vector(operandType.getShape());
       resultShape.back() = lastDimResultSize;
       RankedTensorType resultType = RankedTensorType::get(
           resultShape, elementType, operandType.getEncoding());

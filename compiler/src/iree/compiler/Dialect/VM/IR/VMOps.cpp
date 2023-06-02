@@ -546,8 +546,8 @@ static TypedAttr convertConstIntegerValue(TypedAttr value) {
       return SplatElementsAttr::get(adjustedType,
                                     elements.getSplatValue<Attribute>());
     } else {
-      return DenseElementsAttr::get(
-          adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
+      return DenseElementsAttr::get(adjustedType,
+                                    llvm::to_vector(v.getValues<Attribute>()));
     }
   }
   assert(false && "unexpected attribute type");
@@ -583,8 +583,8 @@ static TypedAttr convertConstFloatValue(TypedAttr value) {
       return SplatElementsAttr::get(adjustedType,
                                     elements.getSplatValue<Attribute>());
     } else {
-      return DenseElementsAttr::get(
-          adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
+      return DenseElementsAttr::get(adjustedType,
+                                    llvm::to_vector(v.getValues<Attribute>()));
     }
   }
   assert(false && "unexpected attribute type");
@@ -867,7 +867,7 @@ LogicalResult ListSetRefOp::verify() {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> values;
+  SmallVector<OpAsmParser::UnresolvedOperand> values;
   OpAsmParser::UnresolvedOperand index;
   OpAsmParser::UnresolvedOperand defaultValue;
   Type type;
@@ -1059,12 +1059,12 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
   // We'll instead parse each segment as a flat list so `[(%a, %b), (%c, %d)]`
   // parses as `[%a, %b, %c, %d]` and then do the accounting below when parsing
   // types.
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> flatOperands;
-  SmallVector<int16_t, 4> flatSegmentSizes;
+  SmallVector<OpAsmParser::UnresolvedOperand> flatOperands;
+  SmallVector<int16_t> flatSegmentSizes;
   while (failed(parser.parseOptionalRParen())) {
     if (succeeded(parser.parseOptionalLSquare())) {
       // Variadic list.
-      SmallVector<OpAsmParser::UnresolvedOperand, 4> flatSegmentOperands;
+      SmallVector<OpAsmParser::UnresolvedOperand> flatSegmentOperands;
       while (failed(parser.parseOptionalRSquare())) {
         if (succeeded(parser.parseOptionalLParen())) {
           // List contains tuples, so track the () and parse inside of it.
@@ -1127,9 +1127,9 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
     return parser.emitError(parser.getCurrentLocation())
            << "malformed optional attributes list";
   }
-  SmallVector<Type, 4> flatOperandTypes;
-  SmallVector<Type, 4> segmentTypes;
-  SmallVector<int16_t, 4> segmentSizes;
+  SmallVector<Type> flatOperandTypes;
+  SmallVector<Type> segmentTypes;
+  SmallVector<int16_t> segmentSizes;
   int segmentIndex = 0;
   while (failed(parser.parseOptionalRParen())) {
     Type operandType;
@@ -1181,7 +1181,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
           segmentSizes));
   result.addAttribute("segment_types",
                       parser.getBuilder().getArrayAttr(
-                          llvm::map_to_vector<4>(segmentTypes, [&](Type type) {
+                          llvm::map_to_vector(segmentTypes, [&](Type type) {
                             return llvm::cast<Attribute>(TypeAttr::get(type));
                           })));
 
@@ -1210,7 +1210,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
           if (auto tupleType = llvm::dyn_cast<TupleType>(segmentType)) {
             for (size_t i = 0; i < segmentSize; ++i) {
               p << '(';
-              SmallVector<Value, 4> tupleOperands;
+              SmallVector<Value> tupleOperands;
               for (size_t j = 0; j < tupleType.size(); ++j) {
                 tupleOperands.push_back(getOperand(operand++));
               }
@@ -1219,7 +1219,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
               if (i < segmentSize - 1) p << ", ";
             }
           } else {
-            SmallVector<Value, 4> segmentOperands;
+            SmallVector<Value> segmentOperands;
             for (int i = 0; i < segmentSize; ++i) {
               segmentOperands.push_back(getOperand(operand++));
             }

@@ -345,7 +345,7 @@ LLVM::LLVMStructType HALDispatchABI::getEnvironmentType(
 
   auto uint32Type = IntegerType::get(context, 32);
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
-  SmallVector<Type, 4> fieldTypes;
+  SmallVector<Type> fieldTypes;
 
   // const uint32_t* constants;
   fieldTypes.push_back(opaquePtrType);
@@ -382,7 +382,7 @@ LLVM::LLVMStructType HALDispatchABI::getDispatchStateType(
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
-  SmallVector<Type, 4> fieldTypes;
+  SmallVector<Type> fieldTypes;
 
   // uint32_t workgroup_size_x;
   // uint32_t workgroup_size_y;
@@ -433,7 +433,7 @@ LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
-  SmallVector<Type, 4> fieldTypes;
+  SmallVector<Type> fieldTypes;
 
   // uint32_t workgroup_id_x;
   // uint32_t workgroup_id_y;

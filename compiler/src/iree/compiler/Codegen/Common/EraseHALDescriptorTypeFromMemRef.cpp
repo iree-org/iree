@@ -89,7 +89,7 @@ struct EraseMemorySpacePattern final : public ConversionPattern {
 LogicalResult EraseMemorySpacePattern::matchAndRewrite(
     Operation *op, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
-  llvm::SmallVector<Type, 4> newResults;
+  llvm::SmallVector<Type> newResults;
   (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
   OperationState state(op->getLoc(), op->getName().getStringRef(), operands,

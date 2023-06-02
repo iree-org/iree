@@ -97,7 +97,7 @@ struct GatherIsTorchIndexSelectPattern final
       }
     }
 
-    auto indexSelectShape = llvm::to_vector<4>(startIndicesTy.getShape());
+    auto indexSelectShape = llvm::to_vector(startIndicesTy.getShape());
 
     for (auto dim : operandTy.getShape().drop_front()) {
       indexSelectShape.push_back(dim);

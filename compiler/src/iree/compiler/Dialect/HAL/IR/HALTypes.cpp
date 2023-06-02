@@ -276,8 +276,8 @@ bool DeviceTargetAttr::hasConfigurationAttr(StringRef name) {
   return configAttr && configAttr.get(name);
 }
 
-SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
-  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
+SmallVector<ExecutableTargetAttr> DeviceTargetAttr::getExecutableTargets() {
+  SmallVector<ExecutableTargetAttr> resultAttrs;
   auto configAttr = getConfiguration();
   if (configAttr) {
     auto targetsAttr = configAttr.getAs<ArrayAttr>("executable_targets");
@@ -291,13 +291,13 @@ SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
 }
 
 // static
-SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
+SmallVector<IREE::HAL::DeviceTargetAttr> DeviceTargetAttr::lookup(
     Operation *op) {
   auto attrId = mlir::StringAttr::get(op->getContext(), "hal.device.targets");
   while (op) {
     auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
     if (targetsAttr) {
-      SmallVector<IREE::HAL::DeviceTargetAttr, 4> result;
+      SmallVector<IREE::HAL::DeviceTargetAttr> result;
       for (auto targetAttr : targetsAttr) {
         result.push_back(llvm::cast<IREE::HAL::DeviceTargetAttr>(targetAttr));
       }
@@ -309,9 +309,9 @@ SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
 }
 
 // static
-SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::lookupExecutableTargets(
+SmallVector<ExecutableTargetAttr> DeviceTargetAttr::lookupExecutableTargets(
     Operation *op) {
-  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
+  SmallVector<ExecutableTargetAttr> resultAttrs;
   for (auto deviceTargetAttr : lookup(op)) {
     for (auto executableTargetAttr : deviceTargetAttr.getExecutableTargets()) {
       if (!llvm::is_contained(resultAttrs, executableTargetAttr)) {
@@ -730,7 +730,7 @@ Value MatchAlwaysAttr::buildConditionExpression(Location loc, Value value,
 
 static ArrayAttr parseMultiMatchAttrArray(AsmParser &p) {
   auto b = p.getBuilder();
-  SmallVector<Attribute, 4> conditionAttrs;
+  SmallVector<Attribute> conditionAttrs;
   if (failed(p.parseLess()) || failed(p.parseLSquare())) {
     return {};
   }

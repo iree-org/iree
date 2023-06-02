@@ -368,10 +368,10 @@ struct GenericTypeConvert final : ConversionPattern {
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    llvm::SmallVector<NamedAttribute, 4> newAttr;
+    llvm::SmallVector<NamedAttribute> newAttr;
     llvm::append_range(newAttr, op->getAttrs());
 
-    llvm::SmallVector<Type, 4> newResults;
+    llvm::SmallVector<Type> newResults;
     if (failed(getTypeConverter()->convertTypes(op->getResultTypes(),
                                                 newResults))) {
       return rewriter.notifyMatchFailure(op, "result type conversion failed");

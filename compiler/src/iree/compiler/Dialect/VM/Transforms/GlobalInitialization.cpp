@@ -52,7 +52,7 @@ static std::tuple<IREE::VM::FuncOp, OpBuilder> appendOrCreateInitFuncOp(
   auto *newBlock = funcOp.addBlock();
 
   // Find all extant return points and redirect them to the new block.
-  auto returnOps = llvm::to_vector<4>(funcOp.getOps<IREE::VM::ReturnOp>());
+  auto returnOps = llvm::to_vector(funcOp.getOps<IREE::VM::ReturnOp>());
   for (auto returnOp :
        llvm::make_early_inc_range(funcOp.getOps<IREE::VM::ReturnOp>())) {
     OpBuilder(returnOp).create<IREE::VM::BranchOp>(returnOp.getLoc(), newBlock);

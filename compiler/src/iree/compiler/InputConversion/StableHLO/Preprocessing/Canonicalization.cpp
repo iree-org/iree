@@ -653,7 +653,7 @@ struct ChainedDynamicBroadcastInDimCanonicalization final
     DenseIntElementsAttr precedingBcastDims =
         precedingBcast.getBroadcastDimensions();
     DenseIntElementsAttr bcastDims = bcast.getBroadcastDimensions();
-    SmallVector<APInt, 4> composition;
+    SmallVector<APInt> composition;
     for (APInt precedingDim : precedingBcastDims) {
       composition.push_back(
           *(bcastDims.value_begin<APInt>() + precedingDim.getZExtValue()));

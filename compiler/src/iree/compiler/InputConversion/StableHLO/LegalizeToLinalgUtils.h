@@ -101,7 +101,7 @@ bool allOperandsAreScalarTensors(Operation* op);
 bool isInBodyOfLinalgOps(Operation* op);
 
 /// Extracts integer values from the attribute |elements|.
-SmallVector<int64_t, 4> extract1DVector(DenseIntElementsAttr elements);
+SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements);
 
 /// Returns true if the given |attr| is a splat of the given |value|.
 inline bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {

@@ -51,7 +51,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
-  SmallVector<OpFoldResult, 4> targetShape =
+  SmallVector<OpFoldResult> targetShape =
       getMixedValues(dispatchTensorType.getShape(), dynamicDims, builder);
   auto innerTileSizes = getInnerTileSizesOfr(
       builder, loc, boundTensorType, *encodingInfo, materializeEncodingValueFn);

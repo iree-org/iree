@@ -70,7 +70,7 @@ FailureOr<linalg::TileSizeComputationFunction> getSPIRVTileSizeComputeFn(
         auto range = llvm::map_range(*tileSizes, [&](int64_t size) -> Value {
           return builder.create<arith::ConstantIndexOp>(op->getLoc(), size);
         });
-        return llvm::to_vector<4>(range);
+        return llvm::to_vector(range);
       };
   return computeFn;
 }

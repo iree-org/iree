@@ -22,7 +22,7 @@ class SPIRVAnnotateWinogradLoopsPass final
 
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-    SmallVector<scf::ForOp, 4> forOps;
+    SmallVector<scf::ForOp> forOps;
     funcOp.walk([&](scf::ForOp forOp) {
       if (!isTiledAndDistributedLoop(forOp)) forOps.push_back(forOp);
     });

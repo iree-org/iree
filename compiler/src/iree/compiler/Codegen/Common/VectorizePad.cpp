@@ -141,7 +141,7 @@ struct VectorizePadWithConditions final
     Value fullVector = rewriter.createOrFold<arith::ConstantOp>(
         loc, SplatElementsAttr::get(fullVectorType, {paddingAttr}));
 
-    auto sliceVectorShape = llvm::to_vector<4>(paddedTensorShape);
+    auto sliceVectorShape = llvm::to_vector(paddedTensorShape);
     for (int dim : paddedDimIndices) sliceVectorShape[dim] = 1;
     auto sliceVectorType =
         VectorType::get(dropLeadingOne(sliceVectorShape), elementType);

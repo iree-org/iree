@@ -87,7 +87,7 @@ class SerializeTargetExecutablesPass
       llvm::sys::fs::create_directories(dumpBinariesPath);
     }
 
-    auto variantOps = llvm::to_vector<4>(
+    auto variantOps = llvm::to_vector(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       if (variantOp.getTarget().getBackend().getValue() != target) continue;

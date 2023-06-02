@@ -171,7 +171,7 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
     // Create indexing maps.
     AffineMap scalarMap = AffineMap::get(maxRank, 0, rewriter.getContext());
     AffineMap idMap = rewriter.getMultiDimIdentityMap(maxRank);
-    SmallVector<AffineMap, 4> maps;
+    SmallVector<AffineMap> maps;
     for (Value v : inputs) maps.push_back(isScalar(v) ? scalarMap : idMap);
     maps.push_back(idMap);
 

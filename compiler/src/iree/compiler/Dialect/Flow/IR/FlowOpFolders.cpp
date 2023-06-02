@@ -145,16 +145,17 @@ static Type makeZeroElementsStaticTensorType(Type type) {
 // Returns a new set of dynamic dimensions for a shape carrying op when a type
 // is being changed. This attempts to reuse the existing dimension values if
 // they are available and will drop/insert new ones as required.
-static SmallVector<Value, 4> refreshDimsOnTypeChange(
-    Operation *op, Type oldType, Type newType, ValueRange oldDims,
-    PatternRewriter &rewriter) {
-  if (oldType == newType) return llvm::to_vector<4>(oldDims);
+static SmallVector<Value> refreshDimsOnTypeChange(Operation *op, Type oldType,
+                                                  Type newType,
+                                                  ValueRange oldDims,
+                                                  PatternRewriter &rewriter) {
+  if (oldType == newType) return llvm::to_vector(oldDims);
 
   // Build an expanded list of all the dims - constants will be nullptr.
   // This lets us map back the new types without worrying about whether some
   // subset become static or dynamic.
   auto oldShapedType = llvm::cast<ShapedType>(oldType);
-  SmallVector<Value, 4> allOldDims(oldShapedType.getRank());
+  SmallVector<Value> allOldDims(oldShapedType.getRank());
   for (unsigned i = 0; i < oldShapedType.getRank(); ++i) {
     if (oldShapedType.isDynamicDim(i)) {
       allOldDims[i] = oldDims.front();
@@ -163,7 +164,7 @@ static SmallVector<Value, 4> refreshDimsOnTypeChange(
   }
 
   auto newShapedType = llvm::cast<ShapedType>(newType);
-  SmallVector<Value, 4> newDims;
+  SmallVector<Value> newDims;
   for (unsigned i = 0; i < newShapedType.getRank(); ++i) {
     if (newShapedType.isDynamicDim(i)) {
       auto oldValue = allOldDims[i];
@@ -465,7 +466,7 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
   auto dynamicDims = dynamicDimsOr.value();
   bool anyChanged = false;
   OperandRange oldValueRange = mutableDimValues;
-  auto oldValues = llvm::to_vector<4>(oldValueRange);
+  auto oldValues = llvm::to_vector(oldValueRange);
   for (unsigned i = 0; i < dynamicDims.size(); ++i) {
     if (oldValues[i] != dynamicDims[i]) {
       rewriter.updateRootInPlace(
@@ -948,7 +949,7 @@ OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
           llvm::dyn_cast_if_present<ElementsAttr>(operands.getSource())) {
     // Load directly from the constant source tensor.
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
-      return source.getValues<Attribute>()[llvm::map_to_vector<4>(
+      return source.getValues<Attribute>()[llvm::map_to_vector(
           operands.getIndices(), [](Attribute value) {
             return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
           })];
@@ -979,7 +980,7 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
       uint64_t offset = getFlattenedIndex(
           targetType,
-          llvm::map_to_vector<4>(operands.getIndices(), [](Attribute value) {
+          llvm::map_to_vector(operands.getIndices(), [](Attribute value) {
             return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
           }));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
@@ -1058,7 +1059,7 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
                                 uint64_t start, uint64_t length) {
   auto tensorType = cast<ShapedType>(tensor.getType());
-  auto shape = llvm::to_vector<4>(tensorType.getShape());
+  auto shape = llvm::to_vector(tensorType.getShape());
   if (length == shape[dim]) {
     // No need to slice.
     return tensor;
@@ -1067,7 +1068,7 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
   outputShape[dim] = length;
   auto outputType =
       RankedTensorType::get(outputShape, getElementTypeOrSelf(tensor));
-  llvm::SmallVector<Attribute, 4> newContents;
+  llvm::SmallVector<Attribute> newContents;
   newContents.reserve(outputType.getNumElements());
   auto valuesBegin = tensor.getValues<Attribute>().begin();
   int64_t step =
@@ -1088,11 +1089,11 @@ OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
     auto tensor = llvm::cast<ElementsAttr>(operands.getSource());
     int64_t rank = llvm::cast<ShapedType>(getSource().getType()).getRank();
     auto start =
-        llvm::map_to_vector<4>(operands.getStartIndices(), [](Attribute value) {
+        llvm::map_to_vector(operands.getStartIndices(), [](Attribute value) {
           return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
         });
     auto length =
-        llvm::map_to_vector<4>(operands.getLengths(), [](Attribute value) {
+        llvm::map_to_vector(operands.getLengths(), [](Attribute value) {
           return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
         });
     for (int64_t dim = 0; dim < rank; ++dim) {
@@ -1132,15 +1133,14 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
     return update;
   }
 
-  auto startIndex =
-      llvm::map_to_vector<4>(startIndicesAttrs, [](Attribute value) {
-        return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
-      });
-  auto targetValues = llvm::to_vector<4>(target.getValues<Attribute>());
+  auto startIndex = llvm::map_to_vector(startIndicesAttrs, [](Attribute value) {
+    return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+  });
+  auto targetValues = llvm::to_vector(target.getValues<Attribute>());
   // target indices start from startIndicesAttrs and update indices start from
   // all zeros.
-  llvm::SmallVector<uint64_t, 4> targetIndex(startIndex);
-  llvm::SmallVector<uint64_t, 4> updateIndex(rank, 0);
+  llvm::SmallVector<uint64_t> targetIndex(startIndex);
+  llvm::SmallVector<uint64_t> updateIndex(rank, 0);
   int64_t numElements = updateType.getNumElements();
   while (numElements--) {
     targetValues[getFlattenedIndex(targetType, targetIndex)] =

@@ -114,7 +114,7 @@ struct ConvertFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
                                            "failed to convert arg type");
       }
     }
-    SmallVector<Type, 4> newResultTypes;
+    SmallVector<Type> newResultTypes;
     if (failed(typeConverter.convertTypes(originalType.getResults(),
                                           newResultTypes))) {
       return rewriter.notifyMatchFailure(funcOp,
@@ -143,7 +143,7 @@ struct ConvertCallOp : public OpConversionPattern<mlir::func::CallOp> {
   LogicalResult matchAndRewrite(
       mlir::func::CallOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Type, 4> resultTypes;
+    SmallVector<Type> resultTypes;
     if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
                                                 resultTypes))) {
       return rewriter.notifyMatchFailure(op, "unable to convert result types");
@@ -207,7 +207,7 @@ struct ConvertIfOp : public OpConversionPattern<scf::IfOp> {
   LogicalResult matchAndRewrite(
       scf::IfOp ifOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultTypes = llvm::map_to_vector<4>(
+    auto resultTypes = llvm::map_to_vector(
         ifOp.getResultTypes(),
         [&](Type type) { return getTypeConverter()->convertType(type); });
     auto newOp = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes,

@@ -52,7 +52,7 @@ struct CommandBufferState {
   Value pushConstantLayout;
   SmallVector<Value, 32> pushConstants;
 
-  SmallVector<DescriptorSetState, 4> descriptorSets;
+  SmallVector<DescriptorSetState> descriptorSets;
 
   // Set after we know a full barrier has been issued; any subsequent barrier
   // until a real operation is redundant. We could track more fine-grained state

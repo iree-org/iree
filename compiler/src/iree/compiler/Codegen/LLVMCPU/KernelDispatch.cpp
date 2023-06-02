@@ -186,7 +186,7 @@ static void getBoundsFromRange(ArrayRef<Range> loopRange,
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
-  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
   return llvm::all_of(loopRanges,
                       [](int64_t size) { return ShapedType::isDynamic(size); });
 }
@@ -663,7 +663,7 @@ static void splitParallelAndReductionTiles(
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &parallelSizes,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
-  SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
   for (auto [index, valuePair] : llvm::enumerate(
            llvm::zip_equal(staticLoopRanges, op.getIteratorTypesArray()))) {
     auto [size, iterType] = valuePair;
@@ -1241,7 +1241,7 @@ static void setX86WorkgroupTileSizes(
     ArrayRef<int64_t> maxTileSizes, VectorPreProcStrategy vecPreProcStrategy,
     SmallVectorImpl<int64_t> &workgroupTileSizes) {
   workgroupTileSizes.append(numLoops, 0);
-  SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
+  SmallVector<int64_t> staticLoopRanges = genericOp.getStaticLoopRanges();
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] = getMaxVectorTileSize(
@@ -1630,7 +1630,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
       vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
-  SmallVector<int64_t, 4> shapes = convOp.getStaticLoopRanges();
+  SmallVector<int64_t> shapes = convOp.getStaticLoopRanges();
   SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
                                          targetTileSizes.end());
   for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
