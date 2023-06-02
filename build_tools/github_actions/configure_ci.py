@@ -82,7 +82,9 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
     "comp-stats"
 ]
 DEFAULT_BENCHMARK_PRESET = "default"
-LONG_RUNNING_BENCHMARK_PRESET_GROUP = ["cuda-long", "x86_64-long"]
+LONG_RUNNING_BENCHMARK_PRESET_GROUP = [
+    "comp-stats-long", "cuda-long", "x86_64-long"
+]
 # All available benchmark preset options including experimental presets.
 BENCHMARK_PRESET_OPTIONS = (DEFAULT_BENCHMARK_PRESET_GROUP +
                             LONG_RUNNING_BENCHMARK_PRESET_GROUP)
@@ -305,9 +307,14 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
     preset_options.update(DEFAULT_BENCHMARK_PRESET_GROUP)
 
   if preset_options.intersection(DEFAULT_BENCHMARK_PRESET_GROUP):
-    # The is a sugar to run the compilation benchmarks when any default
+    # The is a sugar to run the default compilation benchmarks when any default
     # benchmark preset is present.
     preset_options.add("comp-stats")
+
+  if preset_options.intersection(LONG_RUNNING_BENCHMARK_PRESET_GROUP):
+    # The is a sugar to run the long-running compilation benchmarks when any
+    # long-running benchmark preset is present.
+    preset_options.add("comp-stats-long")
 
   preset_options = sorted(preset_options)
   for preset_option in preset_options:

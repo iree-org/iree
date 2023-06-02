@@ -42,8 +42,14 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
         is_llvm_integrate_pr=False)
 
     self.assertEqual(
-        presets_str,
-        "android-cpu,comp-stats,cuda-long,vulkan-nvidia,x86_64-long")
+        presets_str, ",".join([
+            "android-cpu",
+            "comp-stats",
+            "comp-stats-long",
+            "cuda-long",
+            "vulkan-nvidia",
+            "x86_64-long",
+        ]))
 
   def test_get_benchmark_presets_from_default_group(self):
     presets_str = configure_ci.get_benchmark_presets(
