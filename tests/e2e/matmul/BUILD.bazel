@@ -50,8 +50,8 @@ py_binary(
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
-                                       "arm_64:+dotprod",
-                                       "arm_64:+i8mm",
+                                       "arm_64:dotprod:+dotprod",
+                                       "arm_64:i8mm:+i8mm",
                                    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
@@ -70,16 +70,17 @@ py_binary(
         "--shapes=large",
     ],
     tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator.
+        # "--shapes=large" can cause timeouts on riscv emulator and TSan.
         "noriscv",
+        "notsan",
     ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
-                                       "arm_64:+dotprod",
-                                       "arm_64:+i8mm",
+                                       "arm_64:dotprod:+dotprod",
+                                       "arm_64:i8mm:+i8mm",
                                    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
@@ -106,8 +107,8 @@ py_binary(
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
-                                       "arm_64:+dotprod",
-                                       "arm_64:+i8mm",
+                                       "arm_64:dotprod:+dotprod",
+                                       "arm_64:i8mm:+i8mm",
                                    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
@@ -189,17 +190,22 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=%s" % size,
     ],
+    tags = [
+        # "--shapes=large" can cause timeouts on riscv emulator and TSan.
+        "noriscv",
+        "notsan",
+    ] if size == "large" else [],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = [
         "default",
-        "x86_64:" + ",".join(X86_64_AVX2_FMA),
-        "x86_64:" + ",".join(X86_64_AVX512_BASE),
+        "x86_64:avx2_fma:" + ",".join(X86_64_AVX2_FMA),
+        "x86_64:avx512_base:" + ",".join(X86_64_AVX512_BASE),
     ] + ([
-        "x86_64:" + ",".join(X86_64_AVX512_VNNI),
-        "arm_64:+dotprod",
-        "arm_64:+i8mm",
+        "x86_64:avx512_vnni:" + ",".join(X86_64_AVX512_VNNI),
+        "arm_64:dotprod:+dotprod",
+        "arm_64:i8mm:+i8mm",
     ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
