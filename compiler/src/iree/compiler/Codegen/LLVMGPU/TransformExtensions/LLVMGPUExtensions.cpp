@@ -764,9 +764,11 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
     transform::TransformState &state) {
   IRRewriter rewriter(getContext());
   int64_t depth(getDepth());
+  auto schedule = getUseMmaSync()
+                      ? PipeliningSchedulingStrategy::nvidiaTensorCore
+                      : PipeliningSchedulingStrategy::loadGlobalStage0;
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
-      rewriter, forOp, PipeliningSchedulingStrategy::loadGlobalStage0, false,
-      depth);
+      rewriter, forOp, schedule, false, depth);
   if (failed(pipelinedFor)) return emitDefaultSilenceableFailure(forOp);
   results.push_back(pipelinedFor.value());
   return DiagnosedSilenceableFailure::success();
@@ -1210,6 +1212,11 @@ static bool mayAlias(Value first, Value second) {
       return globFirst.getNameAttr() == globSecond.getNameAttr();
     }
   }
+  if (auto subSpanFirst = first.getDefiningOp<HAL::InterfaceBindingSubspanOp>()) {
+    if (auto subSpanSecond = second.getDefiningOp<HAL::InterfaceBindingSubspanOp>()) {
+      return subSpanFirst.getBindingAttr() == subSpanSecond.getBindingAttr();
+    }
+  }
 
   bool isDistinct[] = {producesDistinctBase(first.getDefiningOp()),
                        producesDistinctBase(second.getDefiningOp())};
@@ -1292,11 +1299,30 @@ static bool haveConflictingEffects(
           isa<MemoryEffects::Allocate>(after.getEffect())) {
         continue;
       }
+      
+      // In the particular case that the before effect is a free, we only have 2
+      // possibilities:
+      //   1. either the program is well-formed and there must be an interleaved
+      //      alloc that must limit the scope of effect lookback and we can
+      //      safely ignore the free -> read / free -> write and free -> free
+      //      conflicts.
+      //   2. either the program is ill-formed and we are in undefined behavior
+      //      territory.
+      if (isa<MemoryEffects::Free>(before.getEffect()))
+        continue;
 
       // Other kinds of effects create a conflict, e.g. read-after-write.
-      LLVM_DEBUG(DBGS() << "found a conflict between: " << before.getValue()
+      LLVM_DEBUG(DBGS() << "found a conflict between (before): " << before.getValue()
+                        << " read:" << isa<MemoryEffects::Read>(before.getEffect())
+                        << " write:" << isa<MemoryEffects::Write>(before.getEffect())
+                        << " alloc:" << isa<MemoryEffects::Allocate>(before.getEffect())
+                        << " free:" << isa<MemoryEffects::Free>(before.getEffect())
                         << "\n");
-      LLVM_DEBUG(DBGS() << "and:                      " << after.getValue()
+      LLVM_DEBUG(DBGS() << "and (after):                " << after.getValue()
+                        << " read:" << isa<MemoryEffects::Read>(after.getEffect())
+                        << " write:" << isa<MemoryEffects::Write>(after.getEffect())
+                        << " alloc:" << isa<MemoryEffects::Allocate>(after.getEffect())
+                        << " free:" << isa<MemoryEffects::Free>(after.getEffect())
                         << "\n");
       return true;
     }

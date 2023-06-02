@@ -420,7 +420,8 @@ def PipelineSharedMemoryCopiesOp : Op<
   let arguments = (
       ins TransformHandleTypeInterface:$for_op,
           I64Attr:$depth,
-          UnitAttr:$peel_epilogue);
+          UnitAttr:$peel_epilogue,
+          UnitAttr:$use_mma_sync);
   let results = (outs TransformHandleTypeInterface:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

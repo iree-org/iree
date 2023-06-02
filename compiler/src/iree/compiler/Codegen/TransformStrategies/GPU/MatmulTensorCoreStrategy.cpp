@@ -51,6 +51,7 @@ using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
+using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::MatchOp;
@@ -302,6 +303,8 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
                                     strategy.numWarps);
+
+  funcH = b.create<EliminateGpuBarriersOp>(funcH);
 
   // Step 9. Convert to tensor core ops.
   // TODO: avoid consuming handles and returning here.
