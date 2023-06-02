@@ -107,10 +107,10 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
   auto *parentOp = region.getParentOp();
   if (auto callableOp = dyn_cast<CallableOpInterface>(parentOp)) {
     unsigned resultCount = callableOp.getCallableResults().size();
-    return llvm::to_vector<4>(llvm::map_range(
+    return llvm::map_to_vector<4>(
         llvm::seq(0u, resultCount), [parentOp](unsigned resultIdx) -> Position {
           return Position::forReturnedValue(parentOp, resultIdx);
-        }));
+        });
   }
 
   // None? Probably want to ensure this doesn't happen.

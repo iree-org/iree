@@ -52,10 +52,10 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
 
 static llvm::SmallVector<utils::IteratorType> getIteratorTypesFromAttr(
     ArrayAttr iteratorTypesAttr) {
-  return llvm::to_vector(llvm::map_range(iteratorTypesAttr, [](Attribute attr) {
+  return llvm::map_to_vector(iteratorTypesAttr, [](Attribute attr) {
     return utils::symbolizeIteratorType(llvm::cast<StringAttr>(attr).getValue())
         .value();
-  }));
+  });
 }
 
 /// External model implementation for all LinalgOps.

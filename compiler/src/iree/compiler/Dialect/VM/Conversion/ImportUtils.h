@@ -125,10 +125,10 @@ std::optional<SmallVector<Value>> rewriteToCall(
                             rewriter.getIntegerType(16)),
             segmentSizes));
     state.addAttribute("segment_types",
-                       rewriter.getArrayAttr(llvm::to_vector<4>(llvm::map_range(
+                       rewriter.getArrayAttr(llvm::map_to_vector<4>(
                            importType.getInputs(), [&](Type type) {
                              return TypeAttr::get(type).cast<Attribute>();
-                           }))));
+                           })));
   }
 
   auto *callOp = rewriter.create(state);

@@ -1864,8 +1864,8 @@ LogicalResult AsyncCallOp::verifySymbolUses(
 }
 
 FunctionType AsyncCallOp::getCalleeType() {
-  auto operandTypes = llvm::to_vector(llvm::map_range(
-      getArgOperands(), [](Value arg) { return arg.getType(); }));
+  auto operandTypes = llvm::map_to_vector(
+      getArgOperands(), [](Value arg) { return arg.getType(); });
   return FunctionType::get(getContext(), operandTypes, getResultTypes());
 }
 
@@ -2036,8 +2036,8 @@ IREE::Util::ClosureOpInterface
 AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  auto newResultTypes = llvm::to_vector<4>(llvm::map_range(
-      getResults(), [](auto value) { return value.getType(); }));
+  auto newResultTypes = llvm::map_to_vector<4>(
+      getResults(), [](auto value) { return value.getType(); });
   auto newResultSizes = llvm::to_vector<4>(getResultSizes());
   auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
   auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());

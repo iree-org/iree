@@ -96,10 +96,9 @@ struct ConcatenateOpConversion final
       offsets[dim] = accBound;
       sizes[dim] = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
       result = rewriter.create<tensor::InsertSliceOp>(
-          loc, arg, result,
-          llvm::to_vector(llvm::map_range(offsets, toOpFoldResult)),
-          llvm::to_vector(llvm::map_range(sizes, toOpFoldResult)),
-          llvm::to_vector(llvm::map_range(strides, toOpFoldResult)));
+          loc, arg, result, llvm::map_to_vector(offsets, toOpFoldResult),
+          llvm::map_to_vector(sizes, toOpFoldResult),
+          llvm::map_to_vector(strides, toOpFoldResult));
       accBound = rewriter.create<arith::AddIOp>(loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);

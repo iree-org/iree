@@ -181,10 +181,9 @@ class VectorReduceToGPUPass
       llvm::dbgs() << "\n\n";
     });
 
-    auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(), [&](Attribute attr) {
-          return llvm::cast<IntegerAttr>(attr).getInt();
-        }));
+    auto workgroupSize = llvm::map_to_vector<4>(
+        getEntryPoint(funcOp)->getWorkgroupSize().value(),
+        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
     assert(workgroupSize[1] == 1 && workgroupSize[2] == 1);
     // 2. Create the warp op and move the function body into it.
     const int groupSize = workgroupSize[0];

@@ -95,8 +95,8 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
   SymbolTable sourceSymbolTable(sourceModuleOp);
   SymbolTable targetSymbolTable(targetModuleOp);
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
-  auto sourceOps = llvm::to_vector<8>(
-      llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
+  auto sourceOps =
+      llvm::map_to_vector<8>(sourceBlock, [&](Operation &op) { return &op; });
 
   // Resolve conflicts and move the op.
   for (auto &sourceOp : sourceOps) {

@@ -595,10 +595,8 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
       }
       return getTypeConverter()->convertType(type);
     };
-    auto newArgTypes =
-        llvm::to_vector(llvm::map_range(op.getArgumentTypes(), convertType));
-    auto newResultTypes =
-        llvm::to_vector(llvm::map_range(op.getResultTypes(), convertType));
+    auto newArgTypes = llvm::map_to_vector(op.getArgumentTypes(), convertType);
+    auto newResultTypes = llvm::map_to_vector(op.getResultTypes(), convertType);
     auto newType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
     SmallVector<DictionaryAttr> argAttrs;
     if (auto argAttrsAttr = adaptor.getArgAttrsAttr()) {

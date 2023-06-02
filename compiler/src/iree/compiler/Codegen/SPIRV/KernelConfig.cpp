@@ -347,12 +347,12 @@ std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
   auto lhsShape = llvm::cast<ShapedType>(lhs->get().getType()).getShape();
   auto rhsShape = llvm::cast<ShapedType>(rhs->get().getType()).getShape();
 
-  auto lhsLoopIndices = llvm::to_vector(llvm::map_range(
+  auto lhsLoopIndices = llvm::map_to_vector(
       llvm::seq<int>(0, lhsShape.size()),
-      [&](int i) { return op.getMatchingIndexingMap(lhs).getDimPosition(i); }));
-  auto rhsLoopIndices = llvm::to_vector(llvm::map_range(
+      [&](int i) { return op.getMatchingIndexingMap(lhs).getDimPosition(i); });
+  auto rhsLoopIndices = llvm::map_to_vector(
       llvm::seq<int>(0, rhsShape.size()),
-      [&](int i) { return op.getMatchingIndexingMap(rhs).getDimPosition(i); }));
+      [&](int i) { return op.getMatchingIndexingMap(rhs).getDimPosition(i); });
 
   // Figure out what dimension each loop corresponds to.
   int bIndex = -1, mIndex = -1, nIndex = -1, kIndex = -1;

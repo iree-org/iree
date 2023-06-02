@@ -69,8 +69,8 @@ static LogicalResult mergeModuleInto(
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
   auto &targetBlock = targetModuleOp->getRegion(0).front();
   SymbolTable sourceSymbolTable(sourceModuleOp);
-  auto allOps = llvm::to_vector<8>(
-      llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
+  auto allOps =
+      llvm::map_to_vector<8>(sourceBlock, [&](Operation &op) { return &op; });
 
   for (auto &sourceOp : allOps) {
     if (sourceOp->hasTrait<OpTrait::IsTerminator>()) continue;

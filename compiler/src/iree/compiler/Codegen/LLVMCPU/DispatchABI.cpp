@@ -1122,8 +1122,8 @@ std::tuple<Type, Value> HALDispatchABI::packIntoParameterStruct(
   MLIRContext *context = builder.getContext();
 
   // Query any extra fields that were requested and append them to the struct.
-  auto extraFieldsTypes = llvm::to_vector(
-      llvm::map_range(extraFields, [](Value v) { return v.getType(); }));
+  auto extraFieldsTypes =
+      llvm::map_to_vector(extraFields, [](Value v) { return v.getType(); });
 
   std::optional<Type> structType =
       getParameterStructType(resultTypes, args, extraFieldsTypes);
@@ -1159,8 +1159,8 @@ FailureOr<LLVM::LLVMFunctionType> HALDispatchABI::getABIFunctionType(
     Operation *forOp, IREE::HAL::CallingConvention cConv, TypeRange resultTypes,
     TypeRange argTypes, ArrayRef<StringRef> extraFields) {
   MLIRContext *context = forOp->getContext();
-  SmallVector<Type> extraFieldsTypes = llvm::to_vector(llvm::map_range(
-      extraFields, [&](StringRef name) { return getExtraFieldType(name); }));
+  SmallVector<Type> extraFieldsTypes = llvm::map_to_vector(
+      extraFields, [&](StringRef name) { return getExtraFieldType(name); });
 
   // Check for extra fields already added.
   if (argTypes.size() >= extraFieldsTypes.size()) {
@@ -1232,8 +1232,8 @@ FailureOr<SmallVector<Value>> HALDispatchABI::materializeABI(
     Operation *forOp, StringRef symbolName, IREE::HAL::CallingConvention cConv,
     TypeRange resultTypes, ValueRange args, ArrayRef<StringRef> extraFields,
     RewriterBase &rewriter) {
-  auto argTypes = llvm::to_vector(
-      llvm::map_range(args, [](Value v) { return v.getType(); }));
+  auto argTypes =
+      llvm::map_to_vector(args, [](Value v) { return v.getType(); });
   FailureOr<LLVM::LLVMFunctionType> abiFunctionType =
       getABIFunctionType(forOp, cConv, resultTypes, argTypes, extraFields);
   if (failed(abiFunctionType)) {
@@ -1250,17 +1250,17 @@ FailureOr<SmallVector<Value>> HALDispatchABI::materializeABI(
   // Combined args list.
   SmallVector<Value> allArgsList = llvm::to_vector(args);
   SmallVector<Value> extraFieldVals =
-      llvm::to_vector(llvm::map_range(extraFields, [&](StringRef fieldName) {
+      llvm::map_to_vector(extraFields, [&](StringRef fieldName) {
         return getExtraField(forOp, fieldName, rewriter);
-      }));
+      });
   allArgsList.append(extraFieldVals);
 
   Location loc = forOp->getLoc();
   if (cConv == IREE::HAL::CallingConvention::Default) {
     auto callOp = rewriter.create<LLVM::CallOp>(
         loc, abiFunctionType->getReturnTypes(), allArgsList, forOp->getAttrs());
-    return llvm::to_vector(llvm::map_range(
-        callOp.getResults(), [](OpResult v) -> Value { return v; }));
+    return llvm::map_to_vector(callOp.getResults(),
+                               [](OpResult v) -> Value { return v; });
   }
 
   if (cConv == IREE::HAL::CallingConvention::ParameterStruct) {
@@ -1289,9 +1289,9 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
   auto loc = forOp->getLoc();
 
   SmallVector<Value> extraFieldVals =
-      llvm::to_vector(llvm::map_range(extraFields, [&](StringRef fieldName) {
+      llvm::map_to_vector(extraFields, [&](StringRef fieldName) {
         return getExtraField(forOp, fieldName, builder);
-      }));
+      });
 
   auto [structType, paramsPtr] = packIntoParameterStruct(
       forOp, resultTypes, args, extraFieldVals, builder);

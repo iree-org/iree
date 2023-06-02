@@ -379,8 +379,8 @@ void ConvertToSPIRVPass::runOnOperation() {
       return signalPassFailure();
     }
     std::optional<int64_t> subgroupSize = getSubgroupSize(exportOp);
-    auto workgroupSize32 = llvm::to_vector<4>(llvm::map_range(
-        workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
+    auto workgroupSize32 = llvm::map_to_vector<4>(
+        workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); });
     std::optional<int> subgroupSize32;
     if (subgroupSize) subgroupSize32 = *subgroupSize;
     funcOp->setAttr(

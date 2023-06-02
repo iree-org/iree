@@ -172,8 +172,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
         Util::findVariadicDynamicDims(it.index(), arguments, argumentDims);
     assert(dims.size() == tensorType.getNumDynamicDims() &&
            "dynamic dims not found among arguments");
-    SmallVector<Value> bbArgDims = llvm::to_vector(
-        llvm::map_range(dims, [&](Value v) { return bvm.lookup(v); }));
+    SmallVector<Value> bbArgDims =
+        llvm::map_to_vector(dims, [&](Value v) { return bvm.lookup(v); });
     Value loadedTensor = rewriter.create<IREE::Flow::DispatchTensorLoadOp>(
         loc, tensorType, inputBbArg, bbArgDims);
     bvm.map(it.value(), loadedTensor);
@@ -206,8 +206,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     assert(dims.size() == tensorType.getNumDynamicDims() &&
            "mismatching number of dynamic dims");
 #endif  // NDEBUG
-    SmallVector<Value> bbArgDims = llvm::to_vector(
-        llvm::map_range(dims, [&](Value v) { return bvm.lookup(v); }));
+    SmallVector<Value> bbArgDims =
+        llvm::map_to_vector(dims, [&](Value v) { return bvm.lookup(v); });
     rewriter.create<IREE::Flow::DispatchTensorStoreOp>(loc, it.value(),
                                                        outputBbArg, bbArgDims);
   }
