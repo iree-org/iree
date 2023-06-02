@@ -887,12 +887,13 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   }
 
   // Currently the fully aligned case still lags behind the current default
-  // pipeline and thus is guarded by a flag. This is the case when
+  // pipeline and thus is guarded by a flag. This is the case when at least one
+  // of the following holds
   //   - m is tile aligned (conservatively, take 64)
   //   - n is tile aligned (conservatively, take 64)
   //   - k is tile aligned (conservatively, take 16)
-  bool guardedAlignedCases = matmulSize[0] % 64 == 0 &&
-                             matmulSize[1] % 64 == 0 && matmulSize[2] % 16 == 0;
+  bool guardedAlignedCases = matmulSize[0] % 64 == 0 ||
+                             matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
 
   if (guardedAlignedCases && !clGPUEnableTransformDialectAlignedMatmul) {
     LDBG("--Matmul strategy alignment check failed\n");
