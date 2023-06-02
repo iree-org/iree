@@ -269,10 +269,10 @@ struct ElideRedundantWorkloadValues
 
       // Create a new entry basic block with as many arguments as the workload
       // and then merge this block with the original entry block.
-      auto newWorkloadTypes = llvm::to_vector(
-          llvm::map_range(newWorkload, [](Value v) { return v.getType(); }));
-      auto newWorkloadLocs = llvm::to_vector(
-          llvm::map_range(newWorkload, [](Value v) { return v.getLoc(); }));
+      auto newWorkloadTypes =
+          llvm::map_to_vector(newWorkload, [](Value v) { return v.getType(); });
+      auto newWorkloadLocs =
+          llvm::map_to_vector(newWorkload, [](Value v) { return v.getLoc(); });
       Block *oldCountBlock = &newCount.front();
       Block *newCountBlock = rewriter.createBlock(
           &newCount.front(), newWorkloadTypes, newWorkloadLocs);
@@ -948,10 +948,10 @@ OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
           llvm::dyn_cast_if_present<ElementsAttr>(operands.getSource())) {
     // Load directly from the constant source tensor.
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
-      return source.getValues<Attribute>()[llvm::to_vector<4>(
-          llvm::map_range(operands.getIndices(), [](Attribute value) {
+      return source.getValues<Attribute>()[llvm::map_to_vector<4>(
+          operands.getIndices(), [](Attribute value) {
             return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
-          }))];
+          })];
     }
   }
   return {};
@@ -979,10 +979,9 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
       uint64_t offset = getFlattenedIndex(
           targetType,
-          llvm::to_vector<4>(
-              llvm::map_range(operands.getIndices(), [](Attribute value) {
-                return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
-              })));
+          llvm::map_to_vector<4>(operands.getIndices(), [](Attribute value) {
+            return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+          }));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
       newContents[offset] = value;
       return DenseElementsAttr::get(targetType, newContents);
@@ -1088,14 +1087,14 @@ OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
     // Fully constant arguments so we can perform the slice here.
     auto tensor = llvm::cast<ElementsAttr>(operands.getSource());
     int64_t rank = llvm::cast<ShapedType>(getSource().getType()).getRank();
-    auto start = llvm::to_vector<4>(
-        llvm::map_range(operands.getStartIndices(), [](Attribute value) {
+    auto start =
+        llvm::map_to_vector<4>(operands.getStartIndices(), [](Attribute value) {
           return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
-        }));
-    auto length = llvm::to_vector<4>(
-        llvm::map_range(operands.getLengths(), [](Attribute value) {
+        });
+    auto length =
+        llvm::map_to_vector<4>(operands.getLengths(), [](Attribute value) {
           return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
-        }));
+        });
     for (int64_t dim = 0; dim < rank; ++dim) {
       tensor = tensorSlice(tensor, dim, start[dim], length[dim]);
     }
@@ -1133,10 +1132,10 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
     return update;
   }
 
-  auto startIndex = llvm::to_vector<4>(
-      llvm::map_range(startIndicesAttrs, [](Attribute value) {
+  auto startIndex =
+      llvm::map_to_vector<4>(startIndicesAttrs, [](Attribute value) {
         return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
-      }));
+      });
   auto targetValues = llvm::to_vector<4>(target.getValues<Attribute>());
   // target indices start from startIndicesAttrs and update indices start from
   // all zeros.

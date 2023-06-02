@@ -814,11 +814,11 @@ DiagnosedSilenceableFailure transform_dialect::
   // this to shuffle the workgroup count around.
   if (auto blockMapping = forAllOp.getMapping()) {
     // Get the mapping IDs.
-    auto mappingIds = llvm::to_vector(
-        llvm::map_range(blockMapping.value(), [](Attribute mappingAttr) -> int {
+    auto mappingIds = llvm::map_to_vector(
+        blockMapping.value(), [](Attribute mappingAttr) -> int {
           return llvm::cast<DeviceMappingAttrInterface>(mappingAttr)
               .getMappingId();
-        }));
+        });
     int maxId = 0;
     for (auto id : mappingIds) {
       maxId = std::max(maxId, id);

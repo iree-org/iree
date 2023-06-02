@@ -36,10 +36,9 @@ static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
   newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
 
   OpBuilder::InsertionGuard guard(b);
-  return llvm::to_vector(map_range(newTileSizes, [&](int64_t size) {
-    Value v = b.create<arith::ConstantIndexOp>(tilingOp->getLoc(), size);
-    return v;
-  }));
+  return llvm::map_to_vector(newTileSizes, [&](int64_t size) -> Value {
+    return b.create<arith::ConstantIndexOp>(tilingOp->getLoc(), size);
+  });
 }
 
 /// This pass tiles all the TilingInterface operations. The `tilingLevel` must

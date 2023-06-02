@@ -89,8 +89,7 @@ SmallVector<ModuleOp::Dependency> ModuleOp::getDependencies() {
       dependency.isOptional = false;
     }
   }
-  return llvm::to_vector(
-      llvm::map_range(dependencies, [](auto it) { return it.second; }));
+  return llvm::map_to_vector(dependencies, [](auto it) { return it.second; });
 }
 
 ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1181,10 +1180,10 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
                           parser.getBuilder().getIntegerType(16)),
           segmentSizes));
   result.addAttribute("segment_types",
-                      parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
-                          llvm::map_range(segmentTypes, [&](Type type) {
+                      parser.getBuilder().getArrayAttr(
+                          llvm::map_to_vector<4>(segmentTypes, [&](Type type) {
                             return llvm::cast<Attribute>(TypeAttr::get(type));
-                          }))));
+                          })));
 
   if (failed(parser.parseOptionalArrowTypeList(result.types))) {
     return parser.emitError(parser.getCurrentLocation())

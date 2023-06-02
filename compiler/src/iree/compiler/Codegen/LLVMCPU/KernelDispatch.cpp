@@ -177,10 +177,10 @@ static void getBoundsFromRange(ArrayRef<Range> loopRange,
     if (!intVal) return ShapedType::kDynamic;
     return intVal.value();
   };
-  lb = llvm::to_vector(llvm::map_range(
-      loopRange, [&](Range r) { return getStaticValue(r.offset); }));
-  ub = llvm::to_vector(llvm::map_range(
-      loopRange, [&](Range r) { return getStaticValue(r.size); }));
+  lb = llvm::map_to_vector(loopRange,
+                           [&](Range r) { return getStaticValue(r.offset); });
+  ub = llvm::map_to_vector(loopRange,
+                           [&](Range r) { return getStaticValue(r.size); });
 }
 
 /// Returns true if all the input and output tensor operands of 'op' are fully
@@ -1809,10 +1809,10 @@ static LogicalResult setRootConfig(
     if (!intVal) return ShapedType::kDynamic;
     return intVal.value();
   };
-  auto lbs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
-  auto ubs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
+  auto lbs = llvm::map_to_vector(
+      iterationDomain, [&](Range r) { return getStaticValue(r.offset); });
+  auto ubs = llvm::map_to_vector(
+      iterationDomain, [&](Range r) { return getStaticValue(r.size); });
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(), pipeline);
   if (failed(setTranslationInfo(entryPointFn, translationInfo))) {

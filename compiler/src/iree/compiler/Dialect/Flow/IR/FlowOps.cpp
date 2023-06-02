@@ -568,13 +568,13 @@ static void getDefaultOffsetSizeAndStrides(
 RankedTensorType DispatchTensorLoadOp::inferResultType(
     IREE::Flow::DispatchTensorType sourceType,
     ArrayRef<OpFoldResult> mixedSizes) {
-  auto shape = llvm::to_vector<4>(
-      llvm::map_range(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
+  auto shape =
+      llvm::map_to_vector(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
           return llvm::cast<IntegerAttr>(attr).getInt();
         }
         return ShapedType::kDynamic;
-      }));
+      });
   return RankedTensorType::get(shape, sourceType.getBoundElementType());
 }
 
@@ -1125,9 +1125,9 @@ DispatchWorkgroupsOp::getTiedOperandsIndexAndLength() {
 SmallVector<int64_t> DispatchWorkgroupsOp::getTiedOperandsAsIntegerList() {
   ArrayAttr attr = getTiedOperandsAttr();
   if (!attr) return {};
-  return llvm::to_vector(llvm::map_range(attr, [](Attribute intAttr) {
+  return llvm::map_to_vector(attr, [](Attribute intAttr) {
     return llvm::cast<IntegerAttr>(intAttr).getInt();
-  }));
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -1374,8 +1374,8 @@ void CallOp::build(OpBuilder &builder, OperationState &state,
 }
 
 FunctionType CallOp::getCalleeType() {
-  auto argumentTypes = llvm::to_vector(llvm::map_range(
-      getArgOperands(), [](Value arg) { return arg.getType(); }));
+  auto argumentTypes = llvm::map_to_vector(
+      getArgOperands(), [](Value arg) { return arg.getType(); });
   return FunctionType::get(getContext(), argumentTypes, getResultTypes());
 }
 

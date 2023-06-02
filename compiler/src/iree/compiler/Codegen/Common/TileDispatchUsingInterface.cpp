@@ -290,13 +290,11 @@ static FailureOr<IREETilingResult> tileDispatchUsingSCFFopOp(
   if (numLoops == 0) {
     return IREETilingResult();
   }
-  auto iterationDomain =
-      llvm::to_vector(llvm::map_range(iterationDomainOfr, [&](Range r) {
-        return RangeVal{
-            getValueOrCreateConstantIndexOp(rewriter, loc, r.offset),
-            getValueOrCreateConstantIndexOp(rewriter, loc, r.size),
-            getValueOrCreateConstantIndexOp(rewriter, loc, r.stride)};
-      }));
+  auto iterationDomain = llvm::map_to_vector(iterationDomainOfr, [&](Range r) {
+    return RangeVal{getValueOrCreateConstantIndexOp(rewriter, loc, r.offset),
+                    getValueOrCreateConstantIndexOp(rewriter, loc, r.size),
+                    getValueOrCreateConstantIndexOp(rewriter, loc, r.stride)};
+  });
 
   // 2. Materialize the tile sizes. Enforce the convention that "tiling by zero"
   // skips tiling a particular dimension. This convention is significantly

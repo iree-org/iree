@@ -126,11 +126,11 @@ static void packStorageResourceData(StorageResource &storageBuffer,
   // be useful if we wanted to map back a module size through data blobs.
   // With buffer <-> constant it's possible to build a tree map of
   // contributions in the source. TBD ;)
-  storageBuffer.loc =
-      FusedLoc::get(context, llvm::to_vector<8>(llvm::map_range(
-                                 storageBuffer.spans, [](PackedSpan &span) {
-                                   return span.slice.result.getLoc();
-                                 })));
+  storageBuffer.loc = FusedLoc::get(
+      context,
+      llvm::map_to_vector<8>(storageBuffer.spans, [](PackedSpan &span) {
+        return span.slice.result.getLoc();
+      }));
 
   // Construct a composite attribute that contains references to the original
   // uniqued storage values. This avoids needing to reallocate/unique/copy
