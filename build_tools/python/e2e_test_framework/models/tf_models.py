@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines Tensorflow models."""
 
+import string
+
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 import e2e_test_framework.models.utils as model_utils
@@ -59,39 +61,55 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
 
 TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084"
 
-ID_FORMAT = r"{}-batch-${{BATCH_SIZE}}"
-NAME_FORMAT = r"{}Batch${{BATCH_SIZE}}"
-SOURCE_URL_FORMAT = f"{TF_MODELS_ROOT_DIR}" r"/{}/batch_${{BATCH_SIZE}}/hlo.mlirbc"
+ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
+NAME_FORMAT = string.Template("${name}Batch${batch_size}")
+SOURCE_URL_FORMAT = string.Template(
+    TF_MODELS_ROOT_DIR + "/${directory}/batch_${batch_size}/hlo.mlirbc")
 
 # Derived from https://huggingface.co/docs/transformers/model_doc/bert#transformers.TFBertModel.
 BERT_LARGE_384_FP32_TF_BATCHES = model_utils.generate_batch_models(
-    id_template=ID_FORMAT.format(unique_ids.MODEL_BERT_LARGE_384_FP32_TF),
-    name_template=NAME_FORMAT.format("BertLargeTF"),
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_BERT_LARGE_384_FP32_TF),
+    name_template=model_utils.partial_template_substitute(NAME_FORMAT,
+                                                          name="BertLargeTF"),
     tags=["fp32", "seqlen384", "tensorflow", "bert-variant"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url_template=SOURCE_URL_FORMAT.format("BERT_LARGE"),
+    source_url_template=model_utils.partial_template_substitute(
+        SOURCE_URL_FORMAT, directory="BERT_LARGE"),
     entry_function="forward",
-    input_type_templates=[r"${BATCH_SIZE}x384xi32", r"${BATCH_SIZE}x384xi32"],
+    input_type_templates=[
+        string.Template("${batch_size}x384xi32"),
+        string.Template("${batch_size}x384xi32")
+    ],
     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
 
 # Converted from https://www.tensorflow.org/api_docs/python/tf/keras/applications/resnet50/ResNet50
 RESNET50_3X224X224_FP32_TF_BATCHES = model_utils.generate_batch_models(
-    id_template=ID_FORMAT.format(unique_ids.MODEL_RESNET50_3X224X224_FP32_TF),
-    name_template=NAME_FORMAT.format("Resnet50TF"),
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_RESNET50_3X224X224_FP32_TF),
+    name_template=model_utils.partial_template_substitute(NAME_FORMAT,
+                                                          name="Resnet50TF"),
     tags=["fp32", "cnn"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url_template=SOURCE_URL_FORMAT.format("RESNET50"),
+    source_url_template=model_utils.partial_template_substitute(
+        SOURCE_URL_FORMAT, directory="RESNET50"),
     entry_function="forward",
-    input_type_templates=[r"${BATCH_SIZE}x224x224x3xf32"],
+    input_type_templates=[string.Template("${batch_size}x224x224x3xf32")],
     batch_sizes=[1, 8, 64, 128, 256, 2048])
 
 # Derived from https://huggingface.co/transformers/v3.0.2/model_doc/t5.html#tft5model.
 T5_LARGE_512_FP32_TF_BATCHES = model_utils.generate_batch_models(
-    id_template=ID_FORMAT.format(unique_ids.MODEL_T5_LARGE_512_FP32_TF),
-    name_template=NAME_FORMAT.format("T5LargeTF"),
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_T5_LARGE_512_FP32_TF),
+    name_template=model_utils.partial_template_substitute(NAME_FORMAT,
+                                                          name="T5LargeTF"),
     tags=["fp32", "seqlen512", "tensorflow"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-    source_url_template=SOURCE_URL_FORMAT.format("T5_LARGE"),
+    source_url_template=model_utils.partial_template_substitute(
+        SOURCE_URL_FORMAT, directory="T5_LARGE"),
     entry_function="forward",
-    input_type_templates=[r"${BATCH_SIZE}x512xi32", r"${BATCH_SIZE}x512xi32"],
+    input_type_templates=[
+        string.Template("${batch_size}x512xi32"),
+        string.Template("${batch_size}x512xi32")
+    ],
     batch_sizes=[1, 16, 24, 32, 48, 64, 512])
