@@ -64,6 +64,7 @@ iree_cc_library(
     ::UtilTypesGen
     LLVMSupport
     MLIRArithDialect
+    MLIRCastInterface
     MLIRControlFlowDialect
     MLIRControlFlowInterfaces
     MLIRFuncDialect
