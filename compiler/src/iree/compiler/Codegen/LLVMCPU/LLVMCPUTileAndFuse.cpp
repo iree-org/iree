@@ -209,19 +209,24 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   }
 
   int numLoops = consumerOp.getLoopIteratorTypes().size();
-  SmallVector<int64_t> tilingSizes =
-      maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
-  if (numLoops > tilingSizes.size()) {
-    tilingSizes.append(numLoops - tilingSizes.size(), 0);
+  SmallVector<int64_t> tileSizes;
+  if (auto loweringConfig = getLoweringConfig(consumerOp)) {
+    tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+  } else {
+    tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
   }
-  tilingSizes.resize(numLoops);
 
-  if (llvm::all_of(tilingSizes, [&](int64_t size) { return size == 0; })) {
+  if (numLoops > tileSizes.size()) {
+    tileSizes.append(numLoops - tileSizes.size(), 0);
+  }
+  tileSizes.resize(numLoops);
+
+  if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
     return;
   }
 
-  auto options = scf::SCFTilingOptions().setTileSizes(tilingSizes);
+  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
   IRRewriter rewriter(context);
   if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
