@@ -778,7 +778,8 @@ static LogicalResult setDefaultRootConfig(
   return success();
 }
 
-static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
+static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
+                                                       bool isQuantized) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> noCacheLevelTiling(numLoops, 0);
 
@@ -789,6 +790,10 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op) {
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
+    if (isQuantized) {
+      return noCacheLevelTiling;
+    }
+
     // 'I' should be equal to the number of accumulators. Increasing it further
     // wouldn't contribute to spacial locality. 'K' should be at least the
     // number of elements in a cache line so that we maximize spatial locality
