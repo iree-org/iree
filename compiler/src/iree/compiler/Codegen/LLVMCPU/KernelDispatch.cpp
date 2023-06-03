@@ -804,31 +804,6 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
     // for fused consumers assuming a 32KB cache.
     SmallVector<int64_t> defaultCacheTileSizes(numLoops - 3, 0);
     defaultCacheTileSizes.append({8, 128, 16});
-
-    // We apply cache-level tiling if at least one of the dimensions is dynamic
-    // or one of the static dimensions is larger than the cache tile size for
-    // that dimension. Otherwise, the matmul is too small to benefit from
-    // cache-level tiling.
-    auto isCacheTilingProfitable =
-        [&defaultCacheTileSizes](linalg::LinalgOp op) -> bool {
-      SmallVector<int64_t> staticSizes = op.getStaticLoopRanges();
-      for (auto [dimSize, cacheTileSize] :
-           llvm::zip(staticSizes, defaultCacheTileSizes)) {
-        if (ShapedType::isDynamic(dimSize)) {
-          return true;
-        }
-        if (dimSize >= cacheTileSize) {
-          return true;
-        }
-      }
-
-      return false;
-    };
-
-    if (!isCacheTilingProfitable(op)) {
-      return noCacheLevelTiling;
-    }
-
     return defaultCacheTileSizes;
   }
 
@@ -1110,16 +1085,16 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> flowTileSizes;
   SmallVector<int64_t> cacheTileSizes;
   if (usePaddingPipeline) {
-    // It's inspired from https://github.com/iree-org/iree-llvm-sandbox repo.
-    // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
-    // because 288/12*8=192
-    if (numLoops == 3) {
-      maxTileSizes[0] = 192;
-      maxTileSizes[1] = 128;
+    // Compute cache-level tile sizes. Cache a dimension only if there are
+    // enough iterations.
+    cacheTileSizes = getDefaultMatmulCacheSizes(linalgOp, isQuantized);
+    auto staticSizes = linalgOp.getStaticLoopRanges();
+    for (int i = 0; i < numLoops; ++i) {
+      if (cacheTileSizes[i] != 0 && !ShapedType::isDynamic(staticSizes[i]) &&
+          cacheTileSizes[i] > staticSizes[i]) {
+        cacheTileSizes[i] = 0;
+      }
     }
-
-    // Compute cache-level tile sizes.
-    cacheTileSizes = getDefaultMatmulCacheSizes(linalgOp);
 
     // Choose the next non-zero tile size immediately after distribution to help
     // compute the distribution tile sizes.
@@ -1131,9 +1106,22 @@ static LogicalResult setRootConfig(
       minTileSizes.push_back(minTileSize);
     }
 
+    // It's inspired from https://github.com/iree-org/iree-llvm-sandbox repo.
+    // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
+    // because 288/12*8=192
+    if (numLoops == 3) {
+      maxTileSizes[0] = 192;
+      maxTileSizes[1] = 128;
+    }
+
     flowTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, minTileSizes, maxTileSizes,
         /*allowIncompleteTile=*/true);
+
+    // Cache a dimension only if there are enough iterations after distribution.
+    for (int i = 0; i < numLoops; ++i) {
+      cacheTileSizes[i] = std::min(flowTileSizes[i], cacheTileSizes[i]);
+    }
   } else {
     flowTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, workgroupTileSizes, maxTileSizes);
