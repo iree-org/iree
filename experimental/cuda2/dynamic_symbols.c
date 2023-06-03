@@ -44,7 +44,7 @@ static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
   }
 #define NCCL_PFN_DECL(nccl_symbol_name, ...)              // Ignore NCCL symbols
 #define NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)   // Ignore NCCL symbols
-#include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
+#include "experimental/cuda2/dynamic_symbol_tables.h"     // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
@@ -121,7 +121,7 @@ static iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_resolve_all(
         syms->dylib, name, (void**)&syms->nccl_symbol_name)); \
   }
 #define CU_PFN_DECL(cuda_symbol_name, ...)                // Ignore CUDA symbols
-#include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
+#include "experimental/cuda2/dynamic_symbol_tables.h"     // IWYU pragma: keep
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
 #undef CU_PFN_DECL

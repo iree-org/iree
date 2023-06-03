@@ -34,7 +34,7 @@ typedef struct iree_hal_cuda2_dynamic_symbols_t {
   CUresult (*cudaSymbolName)(__VA_ARGS__);
 #define NCCL_PFN_DECL(ncclSymbolName, ...)                // Ignore NCCL symbols
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)     // Ignore NCCL symbols
-#include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
+#include "experimental/cuda2/dynamic_symbol_tables.h"     // IWYU pragma: export
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
@@ -68,7 +68,7 @@ typedef struct iree_hal_cuda2_nccl_dynamic_symbols_t {
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
   const char* (*ncclSymbolName)(__VA_ARGS__);
 #define CU_PFN_DECL(cudaSymbolName, ...)                  // Ignore CUDA symbols
-#include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
+#include "experimental/cuda2/dynamic_symbol_tables.h"     // IWYU pragma: export
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
 #undef CU_PFN_DECL
