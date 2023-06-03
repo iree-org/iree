@@ -36,13 +36,14 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
 
   def test_get_benchmark_presets_from_trailers_and_labels(self):
     presets_str = configure_ci.get_benchmark_presets(
-        trailers={"benchmark-extra": "android-cpu,android-gpu"},
-        labels=["benchmarks:x86_64", "benchmarks:cuda"],
+        trailers={"benchmark-extra": "android-cpu,cuda-long,x86_64-long"},
+        labels=["benchmarks:vulkan-nvidia"],
         is_pr=True,
         is_llvm_integrate_pr=False)
 
-    self.assertEqual(presets_str,
-                     "android-cpu,android-gpu,comp-stats,cuda,x86_64")
+    self.assertEqual(
+        presets_str,
+        "android-cpu,comp-stats,cuda-long,vulkan-nvidia,x86_64-long")
 
   def test_get_benchmark_presets_from_default_group(self):
     presets_str = configure_ci.get_benchmark_presets(

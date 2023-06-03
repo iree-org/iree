@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRAffineUtils
     MLIRArithDialect
     MLIRBufferizationDialect
+    MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRGPUDialect
     MLIRGPUTransformOps
@@ -56,6 +57,7 @@ iree_cc_library(
     MLIRSCFUtils
     MLIRSideEffectInterfaces
     MLIRSupport
+    MLIRTensorDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF

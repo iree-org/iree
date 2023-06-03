@@ -46,6 +46,7 @@ iree_cc_library(
     "ConvertMHLOToFlow.cpp"
     "ConvertMHLOToFlow.h"
     "ConvertMHLOToLinalgExt.cpp"
+    "ConvertMHLOToStableHLO.cpp"
     "FlattenTuplesInCFG.cpp"
     "MHLOToLinalgOnTensors.cpp"
     "MHLOToMHLOPreprocessing.cpp"
@@ -87,8 +88,10 @@ iree_cc_library(
     MhloPasses
     MhloShapeOpsToStandard
     MhloToLinalg
+    MhloToStablehlo
     MhloToStandard
     StablehloBroadcastUtils
+    StablehloOps
     StablehloToMhlo
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR

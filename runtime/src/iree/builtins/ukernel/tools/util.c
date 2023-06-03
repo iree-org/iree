@@ -29,20 +29,20 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
   abort();
 }
 
-iree_uk_ssize_t iree_uk_2d_buffer_length(iree_uk_type_t type,
-                                         iree_uk_ssize_t size0,
-                                         iree_uk_ssize_t stride0) {
+iree_uk_index_t iree_uk_2d_buffer_length(iree_uk_type_t type,
+                                         iree_uk_index_t size0,
+                                         iree_uk_index_t stride0) {
   // Just for testing purposes, so it's OK to overestimate size.
   return size0 * stride0 << iree_uk_type_size_log2(type);
 }
 
 bool iree_uk_2d_buffers_equal(const void* buf1, const void* buf2,
-                              iree_uk_type_t type, iree_uk_ssize_t size0,
-                              iree_uk_ssize_t size1, iree_uk_ssize_t stride0) {
-  iree_uk_ssize_t elem_size = iree_uk_type_size(type);
+                              iree_uk_type_t type, iree_uk_index_t size0,
+                              iree_uk_index_t size1, iree_uk_index_t stride0) {
+  iree_uk_index_t elem_size = iree_uk_type_size(type);
   const char* buf1_ptr = buf1;
   const char* buf2_ptr = buf2;
-  for (iree_uk_ssize_t i0 = 0; i0 < size0; ++i0) {
+  for (iree_uk_index_t i0 = 0; i0 < size0; ++i0) {
     if (memcmp(buf1_ptr, buf2_ptr, elem_size * size1)) return false;
     buf1_ptr += elem_size * stride0;
     buf2_ptr += elem_size * stride0;
@@ -82,12 +82,12 @@ int iree_uk_random_engine_get_minus16_plus15(iree_uk_random_engine_t* e) {
   return (v % 32) - 16;
 }
 
-void iree_uk_write_random_buffer(void* buffer, iree_uk_ssize_t size_in_bytes,
+void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
                                  iree_uk_type_t type,
                                  iree_uk_random_engine_t* engine) {
-  iree_uk_ssize_t elem_size = iree_uk_type_size(type);
-  iree_uk_ssize_t size_in_elems = size_in_bytes / elem_size;
-  for (iree_uk_ssize_t i = 0; i < size_in_elems; ++i) {
+  iree_uk_index_t elem_size = iree_uk_type_size(type);
+  iree_uk_index_t size_in_elems = size_in_bytes / elem_size;
+  for (iree_uk_index_t i = 0; i < size_in_elems; ++i) {
     // Small integers, should work for now for all the types we currently have
     // and enable exact float arithmetic, allowing to keep tests simpler for
     // now. Watch out for when we'll do float16!

@@ -279,66 +279,6 @@ struct ConvertTypesPass : public Base {
 
   Converter typeConverter;
 };
-
-template <typename Base, typename Converter>
-struct ConvertArithTypesPass : public Base {
-  using Base::Base;
-  void runOnOperation() override {
-    MLIRContext *context = &this->getContext();
-    RewritePatternSet patterns(context);
-    patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
-    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::TruncFOp, FloatType,
-                                                    std::greater<unsigned>>>(
-        typeConverter, context);
-    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtFOp, FloatType,
-                                                    std::less<unsigned>>>(
-        typeConverter, context);
-    patterns.insert<ConvertTypeSensitiveArithCastOp<
-        arith::TruncIOp, IntegerType, std::less<unsigned>>>(typeConverter,
-                                                            context);
-    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtUIOp, IntegerType,
-                                                    std::less<unsigned>>>(
-        typeConverter, context);
-    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtSIOp, IntegerType,
-                                                    std::less<unsigned>>>(
-        typeConverter, context);
-    ConversionTarget target(*context);
-    target.markUnknownOpDynamicallyLegal([](Operation *op) { return true; });
-
-    auto checkOp = [&](Operation *op) {
-      for (Type type : op->getResultTypes()) {
-        if (!typeConverter.isLegal(type)) return false;
-      }
-      for (Type type : op->getOperandTypes()) {
-        if (!typeConverter.isLegal(type)) return false;
-      }
-      for (auto &region : op->getRegions()) {
-        if (!typeConverter.isLegal(&region)) return false;
-      }
-      return true;
-    };
-
-    // Operations are legal if they don't contain any illegal type.
-    target.addDynamicallyLegalDialect<arith::ArithDialect>(checkOp);
-    target.addDynamicallyLegalDialect<math::MathDialect>(checkOp);
-
-    // Some arithmetic operations exist in the vector dialect.
-    target
-        .addDynamicallyLegalOp<vector::ReductionOp, vector::MultiDimReductionOp,
-                               vector::MaskOp, vector::YieldOp>(checkOp);
-
-    // Some ops are always legal.
-    target.addLegalOp<arith::BitcastOp>();
-
-    if (failed(applyFullConversion(this->getOperation(), target,
-                                   std::move(patterns)))) {
-      return this->signalPassFailure();
-    }
-  }
-
-  Converter typeConverter;
-};
-
 }  // namespace
 
 namespace {
@@ -400,19 +340,10 @@ struct PromoteBF16ToF32Converter
 struct PromoteBF16ToF32Pass
     : public ConvertTypesPass<PromoteBF16ToF32Base<PromoteBF16ToF32Pass>,
                               PromoteBF16ToF32Converter> {};
-struct PromoteArithBF16ToF32Pass
-    : public ConvertArithTypesPass<
-          PromoteArithBF16ToF32Base<PromoteArithBF16ToF32Pass>,
-          PromoteBF16ToF32Converter> {};
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
   return std::make_unique<PromoteBF16ToF32Pass>();
-}
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createPromoteArithBF16ToF32Pass() {
-  return std::make_unique<PromoteArithBF16ToF32Pass>();
 }
 
 namespace {

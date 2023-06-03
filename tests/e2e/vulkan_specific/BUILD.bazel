@@ -20,7 +20,7 @@ iree_check_single_backend_test_suite(
         "dot_f16.mlir",
     ],
     compiler_flags = [
-        "--iree-input-type=mhlo_legacy",
+        "--iree-input-type=stablehlo",
         "--iree-vulkan-target-triple=valhall-unknown-android31",
     ],
     driver = "vulkan",
@@ -38,7 +38,7 @@ iree_check_single_backend_test_suite(
         "conv.mlir",
     ],
     compiler_flags = [
-        "--iree-input-type=mhlo_legacy",
+        "--iree-input-type=stablehlo",
         "--iree-vulkan-target-triple=valhall-unknown-android31",
     ],
     driver = "vulkan",
@@ -52,8 +52,8 @@ iree_check_single_backend_test_suite(
         "mul_i64.mlir",
     ],
     compiler_flags = [
-        "--iree-input-type=mhlo_legacy",
-        "--iree-mhlo-demote-i64-to-i32=false",
+        "--iree-input-type=stablehlo",
+        "--iree-stablehlo-demote-i64-to-i32=false",
         "--iree-vulkan-target-triple=valhall-unknown-android31",
     ],
     driver = "vulkan",

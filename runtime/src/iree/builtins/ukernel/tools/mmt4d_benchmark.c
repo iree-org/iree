@@ -47,11 +47,11 @@ static iree_status_t iree_uk_benchmark_mmt4d(
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(mmt4d_type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(mmt4d_type);
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
-  iree_uk_ssize_t lhs_buffer_size =
+  iree_uk_index_t lhs_buffer_size =
       iree_uk_2d_buffer_length(lhs_type, params.M, params.lhs_stride0);
-  iree_uk_ssize_t rhs_buffer_size =
+  iree_uk_index_t rhs_buffer_size =
       iree_uk_2d_buffer_length(rhs_type, params.N, params.rhs_stride0);
-  iree_uk_ssize_t out_buffer_size =
+  iree_uk_index_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.M, params.out_stride0);
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(rhs_buffer_size);

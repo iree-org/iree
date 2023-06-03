@@ -11,10 +11,10 @@
 
 void iree_uk_pack_tile_16x16_x32_x86_64_avx512_base_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 4);
   IREE_UK_ASSERT(tile_size0 == 16);
   IREE_UK_ASSERT(tile_size1 == 16);
@@ -30,10 +30,10 @@ void iree_uk_pack_tile_16x16_x32_x86_64_avx512_base_direct(
 
 static void iree_uk_pack_tile_16x4_x8_x86_64_avx512_base_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 1);
   IREE_UK_ASSERT(tile_size0 == 16);
   IREE_UK_ASSERT(tile_size1 == 4);
@@ -55,10 +55,10 @@ static void iree_uk_pack_tile_16x4_x8_x86_64_avx512_base_direct(
 
 void iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 4);
   IREE_UK_ASSERT(tile_size0 == 16);
   IREE_UK_ASSERT(tile_size1 == 1);
@@ -69,10 +69,10 @@ void iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_direct(
 
 void iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_transpose(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 4);
   IREE_UK_ASSERT(tile_size0 == 1);
   IREE_UK_ASSERT(tile_size1 == 16);
@@ -87,10 +87,10 @@ void iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_transpose(
 
 void iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 1);
   IREE_UK_ASSERT(tile_size0 == 16);
   IREE_UK_ASSERT(tile_size1 == 2);
@@ -111,16 +111,16 @@ void iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_direct(
 
 void iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_transpose(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 1);
   IREE_UK_ASSERT(tile_size0 == 2);
   IREE_UK_ASSERT(tile_size1 == 16);
   const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr = in_tile_ptr;
   iree_uk_int8_t* IREE_UK_RESTRICT out_ptr = out_tile_ptr;
-  iree_uk_ssize_t outer_i1 = 0;
+  iree_uk_index_t outer_i1 = 0;
   for (; outer_i1 <= outer_size1 - 4; outer_i1 += 4) {
     __m512i in0 = _mm512_loadu_si512((const __m512i*)in_ptr);
     __m512i in1 = _mm512_loadu_si512((const __m512i*)(in_ptr + in_stride0));

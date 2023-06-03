@@ -423,12 +423,12 @@ static LogicalResult buildFlatBufferModule(
   SmallVector<iree_vm_RwdataSegmentDef_ref_t, 8> rwdataSegmentRefs;
 
   auto signatureRefs =
-      llvm::to_vector<8>(llvm::map_range(internalFuncOps, [&](auto funcOp) {
+      llvm::map_to_vector<8>(internalFuncOps, [&](auto funcOp) {
         return makeFunctionSignatureDef(funcOp, typeOrdinalMap, fbb);
-      }));
+      });
 
   auto exportFuncRefs =
-      llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
+      llvm::map_to_vector<8>(exportFuncOps, [&](auto exportOp) {
         auto localNameRef = fbb.createString(exportOp.getExportName());
         auto funcOp =
             symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getFunctionRef());
@@ -437,10 +437,10 @@ static LogicalResult buildFlatBufferModule(
         iree_vm_ExportFunctionDef_internal_ordinal_add(
             fbb, funcOp.getOrdinal()->getLimitedValue());
         return iree_vm_ExportFunctionDef_end(fbb);
-      }));
+      });
 
   auto importFuncRefs =
-      llvm::to_vector<8>(llvm::map_range(importFuncOps, [&](auto importOp) {
+      llvm::map_to_vector<8>(importFuncOps, [&](auto importOp) {
         auto fullNameRef = fbb.createString(importOp.getName());
         auto signatureRef =
             makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
@@ -452,11 +452,11 @@ static LogicalResult buildFlatBufferModule(
         iree_vm_ImportFunctionDef_signature_add(fbb, signatureRef);
         iree_vm_ImportFunctionDef_flags_add(fbb, flags);
         return iree_vm_ImportFunctionDef_end(fbb);
-      }));
+      });
 
   auto dependencies = moduleOp.getDependencies();
-  auto dependencyRefs = llvm::to_vector<8>(
-      llvm::map_range(llvm::reverse(dependencies), [&](const auto &dependency) {
+  auto dependencyRefs = llvm::map_to_vector<8>(
+      llvm::reverse(dependencies), [&](const auto &dependency) {
         auto nameRef = fbb.createString(dependency.name);
         iree_vm_ModuleDependencyFlagBits_enum_t flags = 0;
         if (dependency.isOptional) {
@@ -472,15 +472,14 @@ static LogicalResult buildFlatBufferModule(
             fbb, dependency.minimumVersion);
         iree_vm_ModuleDependencyDef_flags_add(fbb, flags);
         return iree_vm_ModuleDependencyDef_end(fbb);
-      }));
+      });
 
-  auto typeRefs =
-      llvm::to_vector<8>(llvm::map_range(typeTable, [&](auto typeDef) {
-        auto fullNameRef = fbb.createString(typeDef.full_name);
-        iree_vm_TypeDef_start(fbb);
-        iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
-        return iree_vm_TypeDef_end(fbb);
-      }));
+  auto typeRefs = llvm::map_to_vector<8>(typeTable, [&](auto typeDef) {
+    auto fullNameRef = fbb.createString(typeDef.full_name);
+    iree_vm_TypeDef_start(fbb);
+    iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
+    return iree_vm_TypeDef_end(fbb);
+  });
 
   // NOTE: we keep the vectors clustered here so that we can hopefully keep the
   // pages mapped at runtime; vector dereferences in FlatBuffers require

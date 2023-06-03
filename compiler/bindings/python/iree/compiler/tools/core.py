@@ -41,6 +41,7 @@ class InputType(Enum):
   `CompilerOptions.input_type`.
   """
   NONE = "none"
+  AUTO = "auto"
   STABLEHLO = "stablehlo"
   STABLEHLO_XLA = "stablehlo_xla"
   TOSA = "tosa"
@@ -110,7 +111,7 @@ class CompilerOptions:
       or more of the compiled backends.
     input_type: The type of input legalization to perform prior to full
       compilation. Values can either be an `InputType` enum value or a
-      case-insensitive name. Defaults to `InputType.NONE`.
+      case-insensitive name. Defaults to `InputType.AUTO`.
     output_format: Override the output format. See the `OutputFormat` enum.
       Values can either be an enum value or a case-insensitive name of
       the option. Typically used for debugging Defaults to
@@ -139,7 +140,7 @@ class CompilerOptions:
 
   output_file: Optional[str] = None
   target_backends: Sequence[str] = ()
-  input_type: Union[InputType, str] = InputType.NONE
+  input_type: Union[InputType, str] = InputType.AUTO
   output_format: Union[OutputFormat, str] = OutputFormat.FLATBUFFER_BINARY
   extra_args: Sequence[str] = ()
   optimize: bool = True

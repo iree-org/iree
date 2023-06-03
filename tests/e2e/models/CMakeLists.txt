@@ -45,7 +45,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -59,7 +59,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
   TIMEOUT
     900
 )
@@ -75,7 +75,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
   LABELS
     "noasan"
     "nomsan"
@@ -100,7 +100,7 @@ iree_static_linker_test(
   FUNCTION_INPUTS
     "1x28x28x1xf32"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
 )
 
 iree_static_linker_test(
@@ -115,7 +115,7 @@ iree_static_linker_test(
   FUNCTION_INPUTS
     "1x28x28x1xf32"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
     "--iree-vm-target-index-bits=32"
   EMITC
 )

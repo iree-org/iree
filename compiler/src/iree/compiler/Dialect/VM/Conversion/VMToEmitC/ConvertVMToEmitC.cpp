@@ -1215,10 +1215,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 }
 
 SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
-  return llvm::to_vector<4>(
-      llvm::map_range(llvm::seq<int64_t>(0, n), [&ctx](int64_t i) -> Attribute {
+  return llvm::map_to_vector<4>(
+      llvm::seq<int64_t>(0, n), [&ctx](int64_t i) -> Attribute {
         return IntegerAttr::get(IndexType::get(ctx), i);
-      }));
+      });
 }
 
 template <typename ResultOpTy>

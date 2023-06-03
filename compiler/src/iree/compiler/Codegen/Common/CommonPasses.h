@@ -61,6 +61,9 @@ createConcretizePadResultShapePass();
 /// Convert BF16 buffer ops and conversions to simulated behavior with uint16.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertBf16ToUInt16BuffersPass();
 
+/// Convert BF16 buffer ops and conversions to simulated behavior with uint16.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertBf16ArithToF32Pass();
+
 /// Converts entry point function within dispatch regions to use
 /// destination-passing style, which is better suited for the upstream
 /// comprehensive bufferization pass.

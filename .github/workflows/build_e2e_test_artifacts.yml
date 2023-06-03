@@ -102,7 +102,7 @@ jobs:
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             --env "IREE_BENCHMARK_PRESETS=${IREE_BENCHMARK_PRESETS}" \
             --env "IREE_BUILD_DEFAULT_BENCHMARK_SUITES=${IREE_BUILD_DEFAULT_BENCHMARK_SUITES}" \
-            gcr.io/iree-oss/frontends@sha256:da48ff70cc3b956ba22465a3bef285711b66dfcd605ccba605db2278b96dbc5c \
+            gcr.io/iree-oss/frontends@sha256:95c23cc732e4f5b0b005816108c65cea7b024f186be9cdd22defdd6e68384298 \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"

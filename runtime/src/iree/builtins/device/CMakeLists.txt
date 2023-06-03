@@ -29,19 +29,19 @@ endif()
 iree_bitcode_library(
   NAME
     libdevice_wasm32_generic
-  SRCS
-    "device_generic.c"
   ARCH
     wasm_32
+  SRCS
+    "device_generic.c"
 )
 
 iree_bitcode_library(
   NAME
     libdevice_wasm64_generic
-  SRCS
-    "device_generic.c"
   ARCH
     wasm_64
+  SRCS
+    "device_generic.c"
 )
 
 iree_c_embed_data(

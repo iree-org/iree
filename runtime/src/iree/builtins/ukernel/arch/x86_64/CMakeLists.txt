@@ -15,18 +15,20 @@ if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 iree_bitcode_library(
   NAME
     ukernel_bitcode_x86_64_base
+  ARCH
+    x86_64
   SRCS
     "mmt4d_x86_64.c"
     "pack_x86_64.c"
     "query_tile_sizes_x86_64.c"
     "unpack_x86_64.c"
-  ARCH
-    x86_64
 )
 
 iree_bitcode_library(
   NAME
     ukernel_bitcode_x86_64_avx2_fma
+  ARCH
+    x86_64
   SRCS
     "mmt4d_x86_64_avx2_fma.c"
     "pack_x86_64_avx2_fma.c"
@@ -35,13 +37,13 @@ iree_bitcode_library(
     "-mavx"
     "-mavx2"
     "-mfma"
-  ARCH
-    x86_64
 )
 
 iree_bitcode_library(
   NAME
     ukernel_bitcode_x86_64_avx512_base
+  ARCH
+    x86_64
   SRCS
     "mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
@@ -55,13 +57,13 @@ iree_bitcode_library(
     "-mavx512cd"
     "-mavx512bw"
     "-mavx512dq"
-  ARCH
-    x86_64
 )
 
 iree_bitcode_library(
   NAME
     ukernel_bitcode_x86_64_avx512_vnni
+  ARCH
+    x86_64
   SRCS
     "mmt4d_x86_64_avx512_vnni.c"
   COPTS
@@ -74,8 +76,6 @@ iree_bitcode_library(
     "-mavx512bw"
     "-mavx512dq"
     "-mavx512vnni"
-  ARCH
-    x86_64
 )
 
 iree_link_bitcode(

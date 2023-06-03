@@ -86,7 +86,7 @@ func.func @gemm() {
        [0.93854749, 0.94413408, 0.94972067, 0.95530726, 0.96089385,
         0.96648045, 0.97206704, 0.97765363, 0.98324022, 0.98882682,
         0.99441341, 1.        ]]> : tensor<15x12xf32>
-  %2 = "mhlo.dot"(%0, %1) : (tensor<13x15xf32>, tensor<15x12xf32>)
+  %2 = "stablehlo.dot"(%0, %1) : (tensor<13x15xf32>, tensor<15x12xf32>)
                             -> (tensor<13x12xf32>)
   check.expect_almost_eq_const(%2,
     dense<

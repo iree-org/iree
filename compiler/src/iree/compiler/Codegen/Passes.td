@@ -114,6 +114,11 @@ def ConvertBf16ToUInt16Buffers :
   let constructor = "mlir::iree_compiler::createConvertBf16ToUInt16BuffersPass()";
 }
 
+def ConvertBf16ArithToF32 : Pass<"iree-convert-bf16-arith-to-f32", "ModuleOp"> {
+  let summary = "Convert bf16 arithmetic operations to f32";
+  let constructor = "mlir::iree_compiler::createConvertBf16ArithToF32Pass()";
+}
+
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
   let summary = "Extract address computations from memory accesses";
   let description = [{

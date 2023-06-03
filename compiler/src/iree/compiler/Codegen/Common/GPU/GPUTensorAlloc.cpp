@@ -8,9 +8,12 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-tensor-alloc"
@@ -89,6 +92,53 @@ static bool isSharedMemTranspose(AffineMap indexMap) {
 }
 
 namespace {
+/// Swaps bufferization.alloc_tensor with the copied linalg op result when the
+/// linalg op does not use the output initial value during calculation.
+///
+/// This converts the following IR:
+/// ```
+/// %linalg = linalg ... ins(...) outs(...)
+/// %val = bufferization.alloc_tensor() copy(%linalg)
+/// ```
+/// Into
+/// ```
+/// %alloc = bufferization.alloc_tensor()
+/// %val = linalg ... ins(...) outs(%alloc)
+/// ```
+struct SwapAllocTensorPattern final
+    : OpRewritePattern<bufferization::AllocTensorOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(bufferization::AllocTensorOp allocOp,
+                                PatternRewriter &rewriter) const override {
+    if (!allocOp.getCopy()) return failure();
+    auto linalgOp = allocOp.getCopy().getDefiningOp<linalg::LinalgOp>();
+    if (!linalgOp) return failure();
+
+    // Make sure we don't use the initial values for the linalg output we are
+    // copying during the tensor allocation.
+    unsigned resultNumber = cast<OpResult>(allocOp.getCopy()).getResultNumber();
+    OpOperand *initOperand = linalgOp.getDpsInitOperand(resultNumber);
+    if (linalgOp.payloadUsesValueFromOperand(initOperand)) return failure();
+
+    rewriter.setInsertionPoint(linalgOp);
+    std::optional<Attribute> memorySpace = allocOp.getMemorySpace();
+    auto newAllocOp = rewriter.create<bufferization::AllocTensorOp>(
+        allocOp.getLoc(), allocOp.getType(), allocOp.getDynamicSizes(),
+        /*copy=*/Value(),
+        memorySpace ? cast<IntegerAttr>(*memorySpace) : IntegerAttr());
+    newAllocOp->setAttr(bufferization::BufferizationDialect::kEscapeAttrName,
+                        rewriter.getBoolArrayAttr({false}));
+    rewriter.updateRootInPlace(linalgOp, [&]() {
+      linalgOp->setOperand(linalgOp.getNumDpsInputs() + resultNumber,
+                           newAllocOp);
+    });
+    rewriter.replaceOp(allocOp, linalgOp->getResult(resultNumber));
+
+    return failure();
+  }
+};
+
 struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
  private:
   GPUPromoteSharedMemPattern promoteSharedMemPattern =
@@ -104,9 +154,16 @@ struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
     auto funcOp = getOperation();
 
     // Tile the reduction first to reduce the alloc size.
-    if (failed(tileToSerialLoops(funcOp))) {
+    if (failed(
+            tileReductionToSerialLoops(funcOp, /*fuseInputProducer=*/true))) {
       return signalPassFailure();
     }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "// --- After tiling to serial loops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
 
     SmallVector<Operation *> opsToPromote;
     funcOp.walk([&](Operation *op) {
@@ -150,6 +207,24 @@ struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
             operand->set(v);
           }
           break;
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "// --- After promotion ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // Move tensor allocations earlier and use them for linalg init operands
+    // when possible. This change cleans up the IR to avoid bufferization
+    // creating extra buffers in later stages.
+    {
+      MLIRContext *context = &getContext();
+      RewritePatternSet patterns(context);
+      patterns.add<SwapAllocTensorPattern>(context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
       }
     }
   }

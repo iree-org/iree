@@ -27,10 +27,9 @@ struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
 
-    auto workgroupSize = llvm::to_vector(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(), [&](Attribute attr) {
-          return llvm::cast<IntegerAttr>(attr).getInt();
-        }));
+    auto workgroupSize = llvm::map_to_vector(
+        getEntryPoint(funcOp)->getWorkgroupSize().value(),
+        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
 
     IRRewriter rewriter(funcOp->getContext());
     rewriter.setInsertionPointToStart(&funcOp.getBody().front());

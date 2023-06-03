@@ -82,8 +82,10 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
     "comp-stats"
 ]
 DEFAULT_BENCHMARK_PRESET = "default"
+LONG_RUNNING_BENCHMARK_PRESET_GROUP = ["cuda-long", "x86_64-long"]
 # All available benchmark preset options including experimental presets.
-BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESET_GROUP
+BENCHMARK_PRESET_OPTIONS = (DEFAULT_BENCHMARK_PRESET_GROUP +
+                            LONG_RUNNING_BENCHMARK_PRESET_GROUP)
 BENCHMARK_LABEL_PREFIX = "benchmarks"
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"

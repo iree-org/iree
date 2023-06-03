@@ -10,8 +10,6 @@ from e2e_test_framework.models import matmul, tflite_models, torch_models, tf_mo
 
 # x86 models, single batch.
 
-
-
 # A list of models with thread configurations.
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
@@ -100,25 +98,24 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
 
 X86_64_BENCHMARK_CONFIG_LONG = [
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.BERT_LARGE_1X384_FP32_TF, threads=[8]),
+        model=tf_models.BERT_LARGE_384_FP32_TF_BATCHES[1], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.BERT_LARGE_32X384_FP32_TF, threads=[8]),
+        model=tf_models.BERT_LARGE_384_FP32_TF_BATCHES[32], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.BERT_LARGE_64X384_FP32_TF, threads=[8]),
+        model=tf_models.BERT_LARGE_384_FP32_TF_BATCHES[64], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.RESNET50_1X3X224X224_FP32_TF, threads=[8]),
+        model=tf_models.RESNET50_3X224X224_FP32_TF_BATCHES[1], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.RESNET50_64X3X224X224_FP32_TF, threads=[8]),
+        model=tf_models.RESNET50_3X224X224_FP32_TF_BATCHES[64], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.RESNET50_128X3X224X224_FP32_TF, threads=[8]),
+        model=tf_models.RESNET50_3X224X224_FP32_TF_BATCHES[128], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.T5_LARGE_1x512_FP32_TF, threads=[8]),
+        model=tf_models.T5_LARGE_512_FP32_TF_BATCHES[1], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.T5_LARGE_16x512_FP32_TF, threads=[8]),
+        model=tf_models.T5_LARGE_512_FP32_TF_BATCHES[16], threads=[8]),
     common_definitions.CpuBenchmarkConfig(
-        model=tf_models.T5_LARGE_32x512_FP32_TF, threads=[8]),
+        model=tf_models.T5_LARGE_512_FP32_TF_BATCHES[32], threads=[8]),
 ]
-
 
 # Microkernels.
 
@@ -139,116 +136,46 @@ MICRO_MATMUL_SPLITK = [
 
 # Batched Torch models.
 
-BERT_LARGE_TORCH_BATCHES = [
-    torch_models.BERT_LARGE_1X384_FP32_TORCH,
-    torch_models.BERT_LARGE_16X384_FP32_TORCH,
-    torch_models.BERT_LARGE_24X384_FP32_TORCH,
-    torch_models.BERT_LARGE_32X384_FP32_TORCH,
-    torch_models.BERT_LARGE_48X384_FP32_TORCH,
-    torch_models.BERT_LARGE_64X384_FP32_TORCH,
-    torch_models.BERT_LARGE_512X384_FP32_TORCH,
-    torch_models.BERT_LARGE_1024X384_FP32_TORCH,
-    torch_models.BERT_LARGE_1280X384_FP32_TORCH,
-]
+BERT_LARGE_TORCH_BATCHES = list(
+    torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES.values())
 
 BERT_LARGE_FP16_TORCH_BATCHES = [
+    model for batch_size, model in
+    torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES.items()
     # Batchsize 1 is included seperately in CUDA_MODELS
-    #torch_models.BERT_LARGE_1X384_FP16_TORCH,
-    torch_models.BERT_LARGE_16X384_FP16_TORCH,
-    torch_models.BERT_LARGE_24X384_FP16_TORCH,
-    torch_models.BERT_LARGE_32X384_FP16_TORCH,
-    torch_models.BERT_LARGE_48X384_FP16_TORCH,
-    torch_models.BERT_LARGE_64X384_FP16_TORCH,
-    torch_models.BERT_LARGE_512X384_FP16_TORCH,
-    torch_models.BERT_LARGE_1024X384_FP16_TORCH,
-    torch_models.BERT_LARGE_1280X384_FP16_TORCH,
+    if batch_size != 1
 ]
 
-RESNET50_TORCH_BATCHES = [
-    torch_models.RESNET50_1X3X224X224_FP32_TORCH,
-    torch_models.RESNET50_8X3X224X224_FP32_TORCH,
-    torch_models.RESNET50_64X3X224X224_FP32_TORCH,
-    torch_models.RESNET50_128X3X224X224_FP32_TORCH,
-    torch_models.RESNET50_256X3X224X224_FP32_TORCH,
-    torch_models.RESNET50_2048X3X224X224_FP32_TORCH,
-]
+RESNET50_TORCH_BATCHES = list(
+    torch_models.RESNET50_3X224X224_FP32_TORCH_BATCHES.values())
 
-RESNET50_FP16_TORCH_BATCHES = [
-    torch_models.RESNET50_1X3X224X224_FP16_TORCH,
-    torch_models.RESNET50_8X3X224X224_FP16_TORCH,
-    torch_models.RESNET50_64X3X224X224_FP16_TORCH,
-    torch_models.RESNET50_128X3X224X224_FP16_TORCH,
-    torch_models.RESNET50_256X3X224X224_FP16_TORCH,
-    torch_models.RESNET50_2048X3X224X224_FP16_TORCH,
-]
+RESNET50_FP16_TORCH_BATCHES = list(
+    torch_models.RESNET50_3X224X224_FP16_TORCH_BATCHES.values())
 
 # Batched Tensorflow models.
 
-BERT_LARGE_TF_BATCHES = [
-    tf_models.BERT_LARGE_1X384_FP32_TF,
-    tf_models.BERT_LARGE_16X384_FP32_TF,
-    tf_models.BERT_LARGE_24X384_FP32_TF,
-    tf_models.BERT_LARGE_32X384_FP32_TF,
-    tf_models.BERT_LARGE_48X384_FP32_TF,
-    tf_models.BERT_LARGE_64X384_FP32_TF,
-    tf_models.BERT_LARGE_512X384_FP32_TF,
-    tf_models.BERT_LARGE_1024X384_FP32_TF,
-    tf_models.BERT_LARGE_1280X384_FP32_TF,
-]
+BERT_LARGE_TF_BATCHES = list(tf_models.BERT_LARGE_384_FP32_TF_BATCHES.values())
 
-RESNET50_TF_BATCHES = [
-    tf_models.RESNET50_1X3X224X224_FP32_TF,
-    tf_models.RESNET50_8X3X224X224_FP32_TF,
-    tf_models.RESNET50_64X3X224X224_FP32_TF,
-    tf_models.RESNET50_128X3X224X224_FP32_TF,
-    tf_models.RESNET50_256X3X224X224_FP32_TF,
-    tf_models.RESNET50_2048X3X224X224_FP32_TF,
-]
+RESNET50_TF_BATCHES = list(
+    tf_models.RESNET50_3X224X224_FP32_TF_BATCHES.values())
 
 T5_LARGE_TF_BATCHES = [
-    tf_models.T5_LARGE_1x512_FP32_TF,
-    tf_models.T5_LARGE_16x512_FP32_TF,
-    tf_models.T5_LARGE_24x512_FP32_TF,
-    tf_models.T5_LARGE_32x512_FP32_TF,
-    tf_models.T5_LARGE_48x512_FP32_TF,
-    tf_models.T5_LARGE_64x512_FP32_TF,
+    model
+    for batch_size, model in tf_models.T5_LARGE_512_FP32_TF_BATCHES.items()
     # Disabled due to https://github.com/openxla/iree/issues/13801.
-    # tf_models.T5_LARGE_512x512_FP32_TF,
+    if batch_size != 512
 ]
-
 
 # Batched JAX models.
 
-RESNET50_JAX_BATCHES = [
-    jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCH1,
-    jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCH8,
-    jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCH64,
-    jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCH128,
-    jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCH256,
-    jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCH2048,
-]
+RESNET50_JAX_BATCHES = list(
+    jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES.values())
 
-BERT_LARGE_JAX_BATCHES = [
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH1,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH16,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH24,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH32,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH48,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH64,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH512,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH1024,
-    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCH1280,
-]
+BERT_LARGE_JAX_BATCHES = list(
+    jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES.values())
 
-T5_LARGE_JAX_BATCHES = [
-    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCH1,
-    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCH16,
-    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCH24,
-    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCH32,
-    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCH48,
-    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCH64,
-    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCH512,
-]
+T5_LARGE_JAX_BATCHES = list(
+    jax_models.T5_LARGE_FP32_JAX_512XI32_BATCHES.values())
 
 # GPU model groups.
 
@@ -260,7 +187,7 @@ CUDA_MODELS = [
     torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     torch_models.MODEL_UNET_2D_FP32_TORCH,
     torch_models.EFFICIENTNET_B7_FP32_TORCH,
-    torch_models.BERT_LARGE_1X384_FP16_TORCH,
+    torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES[1],
     torch_models.EFFICIENTNET_V2_S_FP16_TORCH,
 ]
 

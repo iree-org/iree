@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
 // Check that setting the command line options affect the transform
 // strategy as expected.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
@@ -225,42 +225,6 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.sequence  failures(propagate) {
 
 // -----
-hal.executable @matmul {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
-  hal.executable.export public @matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-    hal.return %x, %y, %z : index, index, index
-  }
-  builtin.module {
-    func.func @matmul() {
-      %c0 = arith.constant 0 : index
-      %cst = arith.constant 0.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x2048xf32>>
-      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>> -> tensor<2048x2048xf32>
-      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>> -> tensor<2048x2048xf32>
-      %5 = tensor.empty() : tensor<2048x2048xf32>
-      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2048x2048xf32>) -> tensor<2048x2048xf32>
-      %7 = linalg.matmul ins(%3, %4 : tensor<2048x2048xf32>, tensor<2048x2048xf32>) outs(%6 : tensor<2048x2048xf32>) -> tensor<2048x2048xf32>
-      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1] : tensor<2048x2048xf32> -> !flow.dispatch.tensor<writeonly:tensor<2048x2048xf32>>
-      return
-    }
-  }
-}
-}
-
-// CHECK-LABEL: func @matmul
-
-// "Enough" of this matmul's dimensions are divisible by 64/64/16.
-// We currently bail on such cases because at least one of the paddings involved
-// in the strategy fold away and result in the strategy failing to apply.
-// In the future we should also support this case but for now we are missing the 
-// generalization along this axis.
-// CHECK-NOT: transform.sequence
-
-// -----
 hal.executable @matmul_partially_unaligned {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @matmul_partially_unaligned ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
@@ -287,15 +251,94 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 }
 
-// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
 // CHECK-LABEL: func @matmul_partially_unaligned
 
-// "Enough" of this matmul's dimensions are divisible by 64/64/16.
-// We currently bail on such cases because at least one of the paddings involved
-// in the strategy fold away and result in the strategy failing to apply.
-// In the future we should also support this case but for now we are missing the
-// generalization along this axis.
-// CHECK-NOT: transform.sequence
+// CHECK: transform.structured.tile %tiled_op[0, 0, 16]
+
+// Make sure we do not canonicalize because the result is still aligned.
+// CHECK-NEXT: transform.structured.pad %tiled_linalg_op
+// CHECK-SAME:   pack_paddings = [1, 1, 1]
+// CHECK-SAME:   padding_dimensions = [0, 1, 2]
+// CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
+// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+// CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
+// CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
+// CHECK:      %[[RHS_PAD:.+]] = get_producer_of_operand %{{.*}}[1]
+// CHECK:      %{{.*}}, %[[TILED_LHS:.+]] = transform.structured.tile_to_forall_op %[[LHS_PAD]]   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
+// CHECK:      transform.structured.match ops{["scf.if"]}
+// CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
+// CHECK:      %{{.*}}, %[[TILED_RHS:.+]] = transform.structured.tile_to_forall_op %[[RHS_PAD]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
+// CHECK:      transform.structured.match ops{["scf.if"]}
+// CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+
+// alignLhs
+// CHECK:      transform.structured.masked_vectorize %[[TILED_LHS]] vector_sizes [4, 4]
+// alignRhs
+// CHECK:      transform.structured.masked_vectorize %[[TILED_RHS]] vector_sizes [4, 4]
+
+// CHECK:      transform.vector.lower_masks
+// CHECK:      transform.vector.materialize_masks
+
+// -----
+hal.executable @aligned_matmul {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @aligned_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @aligned_matmul() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x2048xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>> -> tensor<2048x2048xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>> -> tensor<2048x2048xf32>
+      %5 = tensor.empty() : tensor<2048x2048xf32>
+      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2048x2048xf32>) -> tensor<2048x2048xf32>
+      %7 = linalg.matmul ins(%3, %4 : tensor<2048x2048xf32>, tensor<2048x2048xf32>) outs(%6 : tensor<2048x2048xf32>) -> tensor<2048x2048xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1] : tensor<2048x2048xf32> -> !flow.dispatch.tensor<writeonly:tensor<2048x2048xf32>>
+      return
+    }
+  }
+}
+}
+
+// CHECK-LABEL: func @aligned_matmul
+
+// Block level is the same for aligned.
+// CHECK: transform.structured.tile %tiled_op[0, 0, 16]
+
+// Make sure we do not canonicalize if the result is aligned to avoid folding the extract_slice on the iterator.
+// CHECK-NEXT: transform.structured.pad %tiled_linalg_op
+// CHECK-SAME:   pack_paddings = [1, 1, 1]
+// CHECK-SAME:   padding_dimensions = [0, 1, 2]
+// CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
+
+// Canonicalization is currently required here to enable pad to dps to produce linalg.copy ops.
+// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+// CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
+// CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
+// CHECK:      %[[RHS_PAD:.+]] = get_producer_of_operand %{{.*}}[1]
+// CHECK:      %[[LHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[LHS_PAD]]
+// CHECK:      %[[RHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS_PAD]]
+// CHECK:      transform.structured.tile_to_forall_op %[[LHS_COPY]]   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
+// CHECK:      transform.structured.tile_to_forall_op %[[RHS_COPY]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+
+// Verify we don't go down the path without the flag.
+// WITH_OPTIONS-LABEL: func @aligned_matmul
+
+// WITH_OPTIONS-NOT: transform.sequence  failures(propagate) {
 
 // -----
 

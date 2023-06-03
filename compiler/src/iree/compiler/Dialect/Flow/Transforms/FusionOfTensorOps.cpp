@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -30,6 +31,12 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+// TODO(#12033): solve for the slow linalg transpose folder and remove the flag.
+static llvm::cl::opt<int64_t> clLinalgMaxConstantFoldElements(
+    "iree-codegen-linalg-max-constant-fold-elements",
+    llvm::cl::desc("Maximum number of elements to try to constant fold."),
+    llvm::cl::init(INT64_MAX));
 
 /// Check if any of the use dominates all other uses of the operation.
 static std::optional<OpOperand *> getFusableUse(Operation *op,
@@ -291,6 +298,13 @@ struct FusionOfTensorOpsPass
 
       // Constant fold Linalg operations.
       auto constantFoldControlFn = [](OpOperand *fusedOperand) {
+        if (auto shapedType =
+                dyn_cast<ShapedType>(fusedOperand->get().getType())) {
+          if (shapedType.hasStaticShape() &&
+              shapedType.getNumElements() > clLinalgMaxConstantFoldElements) {
+            return false;
+          }
+        }
         auto producer = fusedOperand->get().getDefiningOp();
         return producer && producer->hasOneUse();
       };

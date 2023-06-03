@@ -10,7 +10,6 @@
 #include "iree/builtins/ukernel/mmt4d.h"
 
 typedef enum iree_uk_mmt4d_type_t {
-  iree_uk_mmt4d_type_none = 0,
   iree_uk_mmt4d_type_f32f32f32 =
       IREE_UK_TIE_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),
   iree_uk_mmt4d_type_i8i8i32 =
@@ -24,7 +23,16 @@ static inline iree_uk_mmt4d_type_t iree_uk_mmt4d_type(iree_uk_uint32_t flags) {
     case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
       return iree_uk_mmt4d_type_i8i8i32;
     default:
-      return iree_uk_mmt4d_type_none;
+      // This unreachable statement is not just an optimization, it also works
+      // around a LLVM/riscv32 miscompile.
+
+      // When we used to have a iree_uk_mmt4d_type_none value equal to 0 and
+      // were returning it here, that caused this whole switch statement to be
+      // miscompiled by LLVM/riscv32 as if it were UB. That value was passed to
+      // `iree_uk_type_bit_count(x)`, which evaluates to `1<<(x - 3)`, which is
+      // UB if x<3. So it was fair to treat that default: clause as UB, but
+      // LLVM/riscv32 was incorrectly treating the whole switch as UB.
+      IREE_UK_ASSUME_UNREACHABLE;
   }
 }
 

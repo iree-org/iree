@@ -45,8 +45,11 @@ FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
     RewriterBase &rewriter, scf::ForOp forOp,
     PipeliningSchedulingStrategy startegy, bool peelEpilogue, int64_t depth);
 
-/// Tiles Linalg ops in the given `funcOp` to serial loops without distribution.
-LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction = true);
+/// Tiles Linalg ops in the given `funcOp` along reduction dimensions to serial
+/// loops without distribution. If `fuseInputProducer` is true, input producers
+/// will be fused into the serial loop.
+LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
+                                         bool fuseInputProducer = false);
 
 //===----------------------------------------------------------------------===//
 // Passes

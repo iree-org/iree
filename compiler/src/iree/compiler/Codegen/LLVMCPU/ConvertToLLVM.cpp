@@ -672,10 +672,9 @@ static SmallVector<StringRef> getExtraFields(Operation *forOp) {
   SmallVector<StringRef> extraFields;
   if (auto extraFieldsAttr =
           forOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
-    extraFields = llvm::to_vector(
-        llvm::map_range(extraFieldsAttr.getValue(), [](Attribute attr) {
-          return llvm::cast<StringAttr>(attr).getValue();
-        }));
+    extraFields = llvm::map_to_vector(
+        extraFieldsAttr.getValue(),
+        [](Attribute attr) { return llvm::cast<StringAttr>(attr).getValue(); });
   }
   return extraFields;
 }
@@ -732,10 +731,9 @@ struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
         funcOp, llvm::to_vector(LLVM::LLVMFuncOp::getAttributeNames()));
     SmallVector<DictionaryAttr> argAttrs;
     if (auto currArgAttrs = funcOp.getArgAttrsAttr()) {
-      argAttrs =
-          llvm::to_vector(llvm::map_range(currArgAttrs, [](Attribute attr) {
-            return llvm::cast<DictionaryAttr>(attr);
-          }));
+      argAttrs = llvm::map_to_vector(currArgAttrs, [](Attribute attr) {
+        return llvm::cast<DictionaryAttr>(attr);
+      });
     }
     rewriter.create<LLVM::LLVMFuncOp>(
         funcOp.getLoc(), funcOp.getName(), expectedType.value(),

@@ -24,7 +24,7 @@ INSTANCE_NAME="${INSTANCE_NAME:-github-runner-template-${RUNNER_TYPE}-${TIME_STR
 IMAGE_NAME="${INSTANCE_NAME/-template/}"
 ZONE="${ZONE:-us-central1-a}"
 PROJECT=iree-oss
-BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230114}"
+BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230531}"
 
 GPU_MACHINE_TYPE="a2-highgpu-1g"
 CPU_MACHINE_TYPE="e2-medium"

@@ -11,11 +11,11 @@
 
 int main(int argc, char *argv[]) {
   iree_cpu_initialize(iree_allocator_system());
+  const uint64_t* cpu_data = iree_cpu_data_fields();
 
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
   if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
-    int64_t result = 0;                                                       \
-    IREE_CHECK_OK(iree_cpu_lookup_data_by_key(IREE_SV(llvm_name), &result));  \
+    bool result = (cpu_data[field_index] & (1ull << bit_pos)) != 0;           \
     printf("%-20s %ld\n", llvm_name, result);                                 \
   }
 #include "iree/schemas/cpu_feature_bits.inl"

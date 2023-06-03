@@ -484,14 +484,15 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   }
 
   {
+    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createDecomposePackUnPackOpsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
+    options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
@@ -664,7 +665,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
         createLLVMCPUEmitVectorizationRemarksPass());
   }
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  passManager.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
+  passManager.addPass(createConvertBf16ArithToF32Pass());
   passManager.addPass(createConvertBf16ToUInt16BuffersPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());

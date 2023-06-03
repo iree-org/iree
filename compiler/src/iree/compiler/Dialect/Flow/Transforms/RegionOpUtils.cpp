@@ -63,9 +63,9 @@ static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
       tensor::createDimValues(builder, loc, source);
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
-  return llvm::to_vector(llvm::map_range(dimValues, [&](OpFoldResult dimValue) {
+  return llvm::map_to_vector(dimValues, [&](OpFoldResult dimValue) {
     return Range{zero, dimValue, one};
-  }));
+  });
 }
 
 static SmallVector<Range> getLoopRangesImpl(
@@ -77,9 +77,9 @@ static SmallVector<Range> getLoopRangesImpl(
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::to_vector(llvm::map_range(resultDims[0], [&](OpFoldResult v) {
+  return llvm::map_to_vector(resultDims[0], [&](OpFoldResult v) {
     return Range{zero, v, one};
-  }));
+  });
 }
 
 /// For a given operation returns the loop ranges needed to compute the op.
@@ -111,13 +111,13 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
   AffineExpr s0, s1, s2;
   bindSymbols(builder.getContext(), s0, s1, s2);
   AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
-  return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
+  return llvm::map_to_vector(loopRanges, [&](Range r) -> Value {
     Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
     Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
     Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
     return builder.create<affine::AffineApplyOp>(
         rootOp->getLoc(), workload, ValueRange{offset, size, stride});
-  }));
+  });
 }
 
 /// For very specific cases where the shape is data dependent, we cannot
@@ -453,10 +453,10 @@ FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
 
   if (succeeded(newRegionOp) && useWorkloadCountFromDagRootMode) {
     auto newWorkload = newRegionOp->getWorkload();
-    auto workloadTypes = llvm::to_vector(
-        llvm::map_range(newWorkload, [](Value v) { return v.getType(); }));
-    auto workloadLocs = llvm::to_vector(
-        llvm::map_range(newWorkload, [](Value v) { return v.getLoc(); }));
+    auto workloadTypes =
+        llvm::map_to_vector(newWorkload, [](Value v) { return v.getType(); });
+    auto workloadLocs =
+        llvm::map_to_vector(newWorkload, [](Value v) { return v.getLoc(); });
     createWorkgroupCountFromDagRootRegion(rewriter, *newRegionOp, workloadTypes,
                                           workloadLocs);
   }

@@ -136,11 +136,10 @@ class BenchmarkDriver(object):
           self.run_benchmark_case(benchmark_case, results_path, capture_path)
         except Exception as e:
           # Delete unfinished results if they exist.
-          # TODO(#11087): Use missing_ok=True once we move to Python 3.8.
-          if results_path is not None and results_path.is_file():
-            results_path.unlink()
-          if capture_path is not None and capture_path.is_file():
-            capture_path.unlink()
+          if results_path is not None:
+            results_path.unlink(missing_ok=True)
+          if capture_path is not None:
+            capture_path.unlink(missing_ok=True)
 
           if not self.config.keep_going:
             raise e

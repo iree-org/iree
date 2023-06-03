@@ -102,13 +102,7 @@ module attributes {
 }
 //      CHECK: llvm.func @paramstruct_cconv_with_extra_fields_and_executable_target(!llvm.ptr)
 //      CHECK: llvm.func @bar
-//  CHECK-DAG:   %[[F16C:.+]] = llvm.mlir.constant(16384 : i64) : i64
-//  CHECK-DAG:   %[[FMA:.+]] = llvm.mlir.constant(2048 : i64) : i64
-//  CHECK-DAG:   %[[AVX2:.+]] = llvm.mlir.constant(32768 : i64) : i64
-//  CHECK-DAG:   %[[AVX:.+]] = llvm.mlir.constant(1024 : i64) : i64
-//  CHECK-DAG:   %[[SSE41:.+]] = llvm.mlir.constant(4 : i64) : i64
-//  CHECK-DAG:   %[[SSSE3:.+]] = llvm.mlir.constant(2 : i64) : i64
-//  CHECK-DAG:   %[[SSE3:.+]] = llvm.mlir.constant(1 : i64) : i64
+//  CHECK-DAG:   %[[CPUDATA_FIELD0:.+]] = llvm.mlir.constant(52239 : i64) : i64
 //  CHECK-DAG:   %[[C8:.+]] = llvm.mlir.constant(8 : i64) : i64
 //  CHECK-DAG:   %[[C1:.+]] = llvm.mlir.constant(1 : index) : i64
 //  CHECK-DAG:   %[[Ci32:.+]] = llvm.mlir.constant(42 : i32) : i32
@@ -117,15 +111,8 @@ module attributes {
 //  CHECK-DAG:   %[[DATA_PTR:.+]] = llvm.getelementptr inbounds %arg0[4]
 //      CHECK:   %[[PROCESSOR_DATA_ALLOCA:.+]] = llvm.alloca %[[C8]] x i64 {alignment = 8 : i64}
 //  CHECK-DAG:   %[[DATA:.+]] = llvm.load %[[DATA_PTR]]
-//  CHECK-DAG:   %[[OR0:.+]] = llvm.or %[[DATA]], %[[SSE3]]
-//  CHECK-DAG:   %[[OR1:.+]] = llvm.or %[[OR0]], %[[SSSE3]]
-//  CHECK-DAG:   %[[OR2:.+]] = llvm.or %[[OR1]], %[[SSE41]]
-//  CHECK-DAG:   %[[OR3:.+]] = llvm.or %[[OR2]], %[[C8]]
-//  CHECK-DAG:   %[[OR4:.+]] = llvm.or %[[OR3]], %[[AVX]]
-//  CHECK-DAG:   %[[OR5:.+]] = llvm.or %[[OR4]], %[[AVX2]]
-//  CHECK-DAG:   %[[OR6:.+]] = llvm.or %[[OR5]], %[[FMA]]
-//  CHECK-DAG:   %[[OR7:.+]] = llvm.or %[[OR6]], %[[F16C]]
-//      CHECK:   llvm.store %[[OR7]], %[[PROCESSOR_DATA_ALLOCA]]
+//  CHECK-DAG:   %[[OR0:.+]] = llvm.or %[[DATA]], %[[CPUDATA_FIELD0]]
+//      CHECK:   llvm.store %[[OR0]], %[[PROCESSOR_DATA_ALLOCA]]
 
 //      CHECK:   %[[PROCESSOR_DATA_PTR_1:.+]] = llvm.getelementptr inbounds %[[DATA_PTR]][1]
 //      CHECK:   %[[PROCESSOR_DATA_1:.+]] = llvm.load %[[PROCESSOR_DATA_PTR_1]]

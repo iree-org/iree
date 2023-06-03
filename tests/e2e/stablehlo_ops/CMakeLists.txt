@@ -19,6 +19,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "bitcast_convert.mlir"
     "broadcast.mlir"
+    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
@@ -88,6 +89,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "bitcast_convert.mlir"
     "broadcast.mlir"
+    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
@@ -156,6 +158,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "bitcast_convert.mlir"
     "broadcast.mlir"
+    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
@@ -222,6 +225,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "bitcast_convert.mlir"
     "broadcast.mlir"
+    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
@@ -295,6 +299,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "bitcast_convert.mlir"
     "broadcast.mlir"
+    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
@@ -372,6 +377,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "bitcast_convert.mlir"
     "broadcast.mlir"
+    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
@@ -441,3 +447,75 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_webgpu
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    # "clamp.mlir"  # TODO(#10906): fix (i8/i16?)
+    # "compare.mlir"  # TODO(#10906): fix (i8/i16?)
+    # "complex.mlir" # TODO(#11054)
+    "concatenate.mlir"
+    "constant.mlir"
+    # "convert.mlir"  # TODO(#10906): fix (i8/i16?)
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    # "fft.mlir"  # TODO(#9583): fix (fft codegen via spirv)
+    # "finite.mlir"  # TODO(#11321): error: value cannot be represented as 'f32': inf
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    # "maximum.mlir"  # TODO(#10906): fix (i8/i16?)
+    # "minimum.mlir"  # TODO(#10906): fix (i8/i16?)
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    # "while.mlir"  # TODO(#12509): WebGPU SPIR-V broken
+  TARGET_BACKEND
+    "webgpu"
+  # Only test compilation for now, the WebGPU driver is not stable/tested yet.
+  # DRIVER
+  #   "webgpu"
+  COMPILER_FLAGS
+    "--iree-input-type=stablehlo"
+    "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
+)
+
