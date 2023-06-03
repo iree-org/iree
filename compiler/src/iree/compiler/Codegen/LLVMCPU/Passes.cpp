@@ -370,8 +370,18 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTilePass(tilingConfig.getReductionCacheIdx()));
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+  // Fuse next level only if reduction cache level is all zeros (no tiling).
+  // TODO(dcaballe): Teach TileAndFuse to only fuse up to the first reduction
+  // dimension.
+  if (llvm::all_of(tilingConfig.getReductionCacheSizes(),
+                   [](int64_t size) { return size == 0; })) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUTileAndFusePass(tilingConfig.getParallelVectorIdx()));
+  } else {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ParallelDims));
 
