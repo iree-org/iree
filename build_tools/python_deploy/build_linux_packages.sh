@@ -39,9 +39,31 @@
 # to packaging to avoid stomping on development artifacts.
 set -xeu -o errtrace
 
+# Function to find the directory the ".git" directory is in
+function find_git_dir_parent() {
+  # Get the current directory
+  curr_dir=$(pwd)
+
+  # Loop until we reach the root directory
+  while [ "$curr_dir" != "/" ]; do
+    # Check if there is a ".git" directory in the current directory
+    if [ -d "$curr_dir/.git" ]; then
+      # Return the path to the directory containing the ".git" directory
+      echo "$curr_dir"
+      return
+    fi
+
+    # Move up one directory
+    curr_dir=$(dirname "$curr_dir")
+  done
+
+  # If we reach the root directory and there is no ".git" directory, return an empty string
+  echo ""
+}
+
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
-repo_root="$(cd "${this_dir}" && while [[ "$(pwd)" != "/" && ! -d .git ]]; do cd ..; done; [[ -d .git ]] && pwd || echo "No git repo found")"
+repo_root=$(cd "${this_dir}" && find_git_dir_parent)
 manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:794513562cca263480c0c169c708eec9ff70abfe279d6dc44e115b04488b9ab5" }')}"
 python_versions="${override_python_versions:-cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
@@ -177,14 +199,12 @@ function install_deps() {
     yum update -y
     # Required for Tracy
     yum install -y capstone-devel tbb-devel libzstd-devel
-  else
+  elif [[ "$uname_m" == "x86_64" ]]; then
     # Check if the output is x86_64
-    if [[ "$uname_m" == "x86_64" ]]; then
-      echo "The architecture is x86_64 so assume we are on older manylinux2014 with TBB deps installed in the image"
-    else
-      echo "The architecture is unknown. Exiting"
-      exit 1
-   fi
+    echo "The architecture is x86_64 so assume we are on older manylinux2014 with TBB deps installed in the image"
+  else
+    echo "The architecture is unknown. Exiting"
+    exit 1
   fi
 }
 
