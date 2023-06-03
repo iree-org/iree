@@ -60,6 +60,7 @@ iree_cc_library(
     "arena.c"
   DEPS
     ::atomic_slist
+    ::internal
     ::synchronization
     iree::base
     iree::base::core_headers

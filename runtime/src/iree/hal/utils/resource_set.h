@@ -15,10 +15,6 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Bit 0 of the next_chunk pointer indicates whether we are inlined into the
-// resource set block - the chunks are always aligned and the bit is unused.
-#define IREE_HAL_RESOURCE_SET_CHUNK_FLAG_INLINE 0x1
-
 // Capacity is limited by how many bits we reserve for the count.
 #define IREE_HAL_RESOURCE_SET_CHUNK_MAX_CAPACITY 0xFFFFu
 
@@ -27,14 +23,7 @@ extern "C" {
 // pool the set was allocated from.
 typedef struct iree_hal_resource_set_chunk_t {
   // Next chunk in the chunk linked list.
-  // Bit 0 indicates whether this was an allocated block; 0 means that the
-  // chunk is stored within the parent resource set and should not be returned
-  // to the block pool. This works only because we know the blocks are allocated
-  // at an alignment >= 16 and we have a few bits to work with.
-  union {
-    struct iree_hal_resource_set_chunk_t* next_chunk;
-    uintptr_t flags;
-  };
+  struct iree_hal_resource_set_chunk_t* next_chunk;
 
   // Retained resources - may be less than the capacity derived from the block
   // pool block size. We keep the counts small here to reduce chunk overhead. We
@@ -47,9 +36,8 @@ typedef struct iree_hal_resource_set_chunk_t {
 } iree_hal_resource_set_chunk_t;
 
 // Returns true if the chunk is stored inline in the parent resource set.
-#define iree_hal_resource_set_chunk_is_stored_inline(chunk)      \
-  (((chunk)->flags & IREE_HAL_RESOURCE_SET_CHUNK_FLAG_INLINE) == \
-   IREE_HAL_RESOURCE_SET_CHUNK_FLAG_INLINE)
+#define iree_hal_resource_set_chunk_is_stored_inline(set, chunk) \
+  ((const void*)(chunk) == (const uint8_t*)set + sizeof(*set))
 
 // Number of elements in the most-recently-used resource list of a set.
 // The larger the number the greater the chance of having a hit but the more
@@ -126,6 +114,11 @@ IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
 // The |set| itself will be returned back to the block pool it was allocated
 // from.
 IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set);
+
+// Freezes the resource set to indicate that it is not expected to change until
+// it is freed. This only impacts debugging/ASAN and doesn't otherwise prevent
+// insertion.
+IREE_API_EXPORT void iree_hal_resource_set_freeze(iree_hal_resource_set_t* set);
 
 // Inserts zero or more resources into the set.
 // Each resource will be retained for at least the lifetime of the set.

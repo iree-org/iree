@@ -153,6 +153,7 @@ iree_cc_library(
     "resource_set.c"
   DEPS
     iree::base
+    iree::base::internal
     iree::base::internal::arena
     iree::base::tracing
     iree::hal
