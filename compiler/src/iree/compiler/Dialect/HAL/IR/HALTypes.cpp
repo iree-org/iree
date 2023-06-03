@@ -297,7 +297,7 @@ SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
   while (op) {
     auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
     if (targetsAttr) {
-      SmallVector<IREE::HAL::DeviceTargetAttr> result;
+      SmallVector<IREE::HAL::DeviceTargetAttr, 4> result;
       for (auto targetAttr : targetsAttr) {
         result.push_back(llvm::cast<IREE::HAL::DeviceTargetAttr>(targetAttr));
       }
