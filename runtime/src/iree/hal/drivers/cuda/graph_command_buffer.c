@@ -257,6 +257,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_end(
     command_buffer->graph = NULL;
   }
 
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
+
   return iree_ok_status();
 }
 
