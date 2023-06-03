@@ -83,7 +83,7 @@ iree_status_t iree_hal_cuda2_result_to_status(
 
 // Converts a ncclResult_t to an iree_status_t object.
 iree_status_t iree_hal_nccl2_result_to_status(
-    const iree_hal_cuda2_dynamic_symbols_t* syms, ncclResult_t result,
+    const iree_hal_cuda2_nccl_dynamic_symbols_t* syms, ncclResult_t result,
     const char* file, uint32_t line);
 
 #ifdef __cplusplus

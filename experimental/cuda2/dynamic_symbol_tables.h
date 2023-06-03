@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+//===----------------------------------------------------------------------===//
+// CUDA symbols
+//===----------------------------------------------------------------------===//
 CU_PFN_DECL(cuCtxCreate, CUcontext*, unsigned int, CUdevice)
 CU_PFN_DECL(cuCtxDestroy, CUcontext)
 CU_PFN_DECL(cuDevicePrimaryCtxRetain, CUcontext*, CUdevice)
@@ -68,8 +71,9 @@ CU_PFN_DECL(cuLaunchKernel, CUfunction, unsigned int, unsigned int,
             unsigned int, unsigned int, unsigned int, unsigned int,
             unsigned int, CUstream, void**, void**)
 
-// NCCL
-
+//===----------------------------------------------------------------------===//
+// NCCL symbols
+//===----------------------------------------------------------------------===//
 NCCL_PFN_DECL(ncclGetVersion, int*)
 NCCL_PFN_DECL(ncclGetUniqueId, ncclUniqueId*)
 NCCL_PFN_DECL(ncclCommInitRankConfig, ncclComm_t*, int, ncclUniqueId, int,

@@ -30,7 +30,8 @@ typedef struct iree_hal_cuda2_driver_t {
   // Identifier used for the driver in the IREE driver registry.
   iree_string_view_t identifier;
   // API dynamic symbols to interact with the CUDA driver.
-  iree_hal_cuda2_dynamic_symbols_t syms;
+  iree_hal_cuda2_dynamic_symbols_t cuda_symbols;
+  iree_hal_cuda2_nccl_dynamic_symbols_t nccl_symbols;
 
   // The index of the default CUDA device to use if multiple ones are available.
   int default_device_index;
@@ -68,15 +69,15 @@ static iree_status_t iree_hal_cuda2_driver_create_internal(
       (char*)driver + iree_sizeof_struct(*driver));
   driver->default_device_index = options->default_device_index;
 
-  iree_status_t status =
-      iree_hal_cuda2_dynamic_symbols_initialize(host_allocator, &driver->syms);
+  iree_status_t status = iree_hal_cuda2_dynamic_symbols_initialize(
+      host_allocator, &driver->cuda_symbols);
 
   if (iree_status_is_ok(status)) {
     // Try to load NCCL. This will fail if NCCL is unavailable or incompatible.
     // We only fail on unavailability when the user tries to create a channel
     // and otherwise defer reporting.
-    status = iree_hal_cuda2_nccl_dynamic_symbols_initialize(host_allocator,
-                                                            &driver->syms);
+    status = iree_hal_cuda2_nccl_dynamic_symbols_initialize(
+        host_allocator, &driver->cuda_symbols, &driver->nccl_symbols);
     if (iree_status_is_unavailable(status)) {
       status = iree_status_ignore(status);
     }
@@ -97,7 +98,8 @@ static void iree_hal_cuda2_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda2_dynamic_symbols_deinitialize(&driver->syms);
+  iree_hal_cuda2_nccl_dynamic_symbols_deinitialize(&driver->nccl_symbols);
+  iree_hal_cuda2_dynamic_symbols_deinitialize(&driver->cuda_symbols);
   iree_allocator_free(host_allocator, driver);
 
   IREE_TRACE_ZONE_END(z0);
@@ -121,7 +123,7 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda2_driver_create(
 static iree_status_t iree_hal_cuda2_init(iree_hal_cuda2_driver_t* driver) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, CU_RESULT_TO_STATUS(&driver->syms, cuInit(0), "cuInit"));
+      z0, CU_RESULT_TO_STATUS(&driver->cuda_symbols, cuInit(0), "cuInit"));
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -193,7 +195,7 @@ static iree_status_t iree_hal_cuda2_driver_query_available_devices(
 
   // Query the number of available cuda2 devices.
   int device_count = 0;
-  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetCount(&device_count),
+  CUDA_RETURN_IF_ERROR(&driver->cuda_symbols, cuDeviceGetCount(&device_count),
                        "cuDeviceGetCount");
 
   // Allocate the return infos and populate with the devices.
@@ -210,12 +212,12 @@ static iree_status_t iree_hal_cuda2_driver_query_available_devices(
         (uint8_t*)device_infos + device_count * sizeof(iree_hal_device_info_t);
     for (iree_host_size_t i = 0; i < device_count; ++i) {
       CUdevice device;
-      status = CU_RESULT_TO_STATUS(&driver->syms, cuDeviceGet(&device, i),
-                                   "cuDeviceGet");
+      status = CU_RESULT_TO_STATUS(&driver->cuda_symbols,
+                                   cuDeviceGet(&device, i), "cuDeviceGet");
       if (!iree_status_is_ok(status)) break;
       if (!iree_hal_cuda2_is_valid_device(driver, device)) continue;
       status = iree_hal_cuda2_populate_device_info(
-          device, &driver->syms, buffer_ptr, &buffer_ptr,
+          device, &driver->cuda_symbols, buffer_ptr, &buffer_ptr,
           &device_infos[valid_device_count]);
       if (!iree_status_is_ok(status)) break;
       valid_device_count++;
@@ -282,8 +284,8 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_id(
   if (device_id == IREE_HAL_DEVICE_ID_DEFAULT) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_cuda2_driver_select_default_device(
-                base_driver, &driver->syms, driver->default_device_index,
-                host_allocator, &device));
+                base_driver, &driver->cuda_symbols,
+                driver->default_device_index, host_allocator, &device));
   } else {
     device = DEVICE_ID_TO_CUDEVICE(device_id);
   }
@@ -306,14 +308,16 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_uuid(
   // cuda2 doesn't have an API to do this so we need to scan all devices to
   // find the one with the matching UUID.
   int device_count = 0;
-  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetCount(&device_count),
+  CUDA_RETURN_IF_ERROR(&driver->cuda_symbols, cuDeviceGetCount(&device_count),
                        "cuDeviceGetCount");
   CUdevice device = 0;
   bool found_device = false;
   for (int i = 0; i < device_count; i++) {
-    CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGet(&device, i), "cuDeviceGet");
+    CUDA_RETURN_IF_ERROR(&driver->cuda_symbols, cuDeviceGet(&device, i),
+                         "cuDeviceGet");
     CUuuid query_uuid;
-    CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetUuid(&query_uuid, device),
+    CUDA_RETURN_IF_ERROR(&driver->cuda_symbols,
+                         cuDeviceGetUuid(&query_uuid, device),
                          "cuDeviceGetUuid");
     if (memcmp(&device_uuid->bytes[0], &query_uuid.bytes[0],
                sizeof(device_uuid)) == 0) {
@@ -360,7 +364,7 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_index(
 
   // Query the number of available cuda2 devices.
   int device_count = 0;
-  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetCount(&device_count),
+  CUDA_RETURN_IF_ERROR(&driver->cuda_symbols, cuDeviceGetCount(&device_count),
                        "cuDeviceGetCount");
   if (device_index >= device_count) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
@@ -369,8 +373,8 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_index(
   }
 
   CUdevice device = 0;
-  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGet(&device, device_index),
-                       "cuDeviceGet");
+  CUDA_RETURN_IF_ERROR(&driver->cuda_symbols,
+                       cuDeviceGet(&device, device_index), "cuDeviceGet");
 
   iree_status_t status = iree_hal_cuda2_driver_create_device_by_id(
       base_driver, CUDEVICE_TO_DEVICE_ID(device), param_count, params,

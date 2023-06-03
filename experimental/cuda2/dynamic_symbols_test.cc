@@ -51,9 +51,9 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   }
 
 TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
-  iree_hal_cuda2_dynamic_symbols_t symbols;
+  iree_hal_cuda2_dynamic_symbols_t cuda_symbols;
   iree_status_t status = iree_hal_cuda2_dynamic_symbols_initialize(
-      iree_allocator_system(), &symbols);
+      iree_allocator_system(), &cuda_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
@@ -61,8 +61,9 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
     GTEST_SKIP();
   }
 
+  iree_hal_cuda2_nccl_dynamic_symbols_t nccl_symbols;
   status = iree_hal_cuda2_nccl_dynamic_symbols_initialize(
-      iree_allocator_system(), &symbols);
+      iree_allocator_system(), &cuda_symbols, &nccl_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
@@ -71,9 +72,10 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
   }
 
   int nccl_version = 0;
-  NCCL_CHECK_ERRORS(symbols.ncclGetVersion(&nccl_version));
+  NCCL_CHECK_ERRORS(nccl_symbols.ncclGetVersion(&nccl_version));
   ASSERT_EQ(NCCL_VERSION_CODE, nccl_version);
-  iree_hal_cuda2_dynamic_symbols_deinitialize(&symbols);
+  iree_hal_cuda2_nccl_dynamic_symbols_deinitialize(&nccl_symbols);
+  iree_hal_cuda2_dynamic_symbols_deinitialize(&cuda_symbols);
 }
 
 }  // namespace

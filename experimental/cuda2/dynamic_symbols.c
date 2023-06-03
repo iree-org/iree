@@ -9,11 +9,12 @@
 #include <string.h>
 
 #include "experimental/cuda2/status_util.h"
+#include "iree/base/assert.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
-static const char* kCUDALoaderSearchNames[] = {
+static const char* iree_hal_cuda_dylib_names[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
     "nvcuda.dll",
 #else
@@ -21,7 +22,7 @@ static const char* kCUDALoaderSearchNames[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-static const char* kNCCLLoaderSearchNames[] = {
+static const char* iree_hal_cuda_nccl_dylib_names[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
     "nccl.dll",
 #else
@@ -29,23 +30,24 @@ static const char* kNCCLLoaderSearchNames[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-#define concat(A, B) A B
+#define CONCAT(A, B) A B
 
-// Load CUDA entry points, prefer _v2 version if it exists.
+// Resolves all CUDA dynamic symbols in `dynamic_symbol_tables.h`, prefer _v2
+// version if it exists.
 static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
     iree_hal_cuda2_dynamic_symbols_t* syms) {
-#define CU_PFN_DECL(cudaSymbolName, ...)                                     \
-  {                                                                          \
-    static const char* kName = #cudaSymbolName;                              \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(                 \
-        syms->cuda_library, kName, (void**)&syms->cudaSymbolName));          \
-    static const char* kNameV2 = concat(#cudaSymbolName, "_v2");             \
-    void* funV2;                                                             \
-    iree_dynamic_library_lookup_symbol(syms->cuda_library, kNameV2, &funV2); \
-    if (funV2) syms->cudaSymbolName = funV2;                                 \
+#define CU_PFN_DECL(cuda_symbol_name, ...)                              \
+  {                                                                     \
+    static const char* name = #cuda_symbol_name;                        \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(            \
+        syms->dylib, name, (void**)&syms->cuda_symbol_name));           \
+    static const char* name_v2 = CONCAT(#cuda_symbol_name, "_v2");      \
+    void* fptr_v2;                                                      \
+    iree_dynamic_library_lookup_symbol(syms->dylib, name_v2, &fptr_v2); \
+    if (fptr_v2) syms->cuda_symbol_name = fptr_v2;                      \
   }
-#define NCCL_PFN_DECL(ncclSymbolName, ...)
-#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
+#define NCCL_PFN_DECL(nccl_symbol_name, ...)             // Ignore NCCL symbols
+#define NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)  // Ignore NCCL symbols
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
@@ -53,43 +55,49 @@ static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
   return iree_ok_status();
 }
 
-// Load NCCL entry points.
+#undef CONCAT
+
+// Resolves all NCCL dynamic symbols in `dynamic_symbol_tables.h`, prefer _v2
+// version if it exists.
 static iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_resolve_all(
-    iree_hal_cuda2_dynamic_symbols_t* syms) {
-#define CU_PFN_DECL(cudaSymbolName, ...)
-#define NCCL_PFN_DECL(ncclSymbolName, ...)                          \
-  {                                                                 \
-    static const char* kName = #ncclSymbolName;                     \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(        \
-        syms->nccl_library, kName, (void**)&syms->ncclSymbolName)); \
+    iree_hal_cuda2_nccl_dynamic_symbols_t* syms) {
+#define NCCL_PFN_DECL(nccl_symbol_name, ...)                  \
+  {                                                           \
+    static const char* name = #nccl_symbol_name;              \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(  \
+        syms->dylib, name, (void**)&syms->nccl_symbol_name)); \
   }
-#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)               \
-  {                                                                 \
-    static const char* kName = #ncclSymbolName;                     \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(        \
-        syms->nccl_library, kName, (void**)&syms->ncclSymbolName)); \
+#define NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)       \
+  {                                                           \
+    static const char* name = #nccl_symbol_name;              \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(  \
+        syms->dylib, name, (void**)&syms->nccl_symbol_name)); \
   }
+#define CU_PFN_DECL(cuda_symbol_name, ...)                // Ignore CUDA symbols
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
-#undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
+#undef CU_PFN_DECL
   return iree_ok_status();
 }
 
 iree_status_t iree_hal_cuda2_dynamic_symbols_initialize(
     iree_allocator_t host_allocator,
     iree_hal_cuda2_dynamic_symbols_t* out_syms) {
+  IREE_ASSERT_ARGUMENT(out_syms);
   IREE_TRACE_ZONE_BEGIN(z0);
+
   memset(out_syms, 0, sizeof(*out_syms));
   iree_status_t status = iree_dynamic_library_load_from_files(
-      IREE_ARRAYSIZE(kCUDALoaderSearchNames), kCUDALoaderSearchNames,
-      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->cuda_library);
+      IREE_ARRAYSIZE(iree_hal_cuda_dylib_names), iree_hal_cuda_dylib_names,
+      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->dylib);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "CUDA runtime library not available; ensure "
-                            "installed and on path");
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "CUDA driver library 'libcuda.so'/'nvcuda.dll' not available; please "
+        "ensure installed and in dynamic library search path");
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda2_dynamic_symbols_resolve_all(out_syms);
@@ -97,21 +105,21 @@ iree_status_t iree_hal_cuda2_dynamic_symbols_initialize(
   if (!iree_status_is_ok(status)) {
     iree_hal_cuda2_dynamic_symbols_deinitialize(out_syms);
   }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 static iree_status_t iree_hal_cuda2_nccl_check_version(
     iree_dynamic_library_t* nccl_library) {
-  IREE_ASSERT_ARGUMENT(nccl_library);
-
   ncclResult_t (*ncclGetVersion)(int*) = NULL;
 
   iree_status_t status = iree_dynamic_library_lookup_symbol(
       nccl_library, "ncclGetVersion", (void**)&ncclGetVersion);
   if (!iree_status_is_ok(status)) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "ncclGetVersion() not found");
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "ncclGetVersion symbol not found in dynamic library");
   }
 
   // Check the NCCL version compatibility.
@@ -119,7 +127,7 @@ static iree_status_t iree_hal_cuda2_nccl_check_version(
   ncclResult_t result = ncclGetVersion(&nccl_version);
   if (result != ncclSuccess) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "ncclGetVersion() failed (%d)", result);
+                            "ncclGetVersion() failed with error %d", result);
   }
 
   int major = 0;
@@ -145,32 +153,28 @@ static iree_status_t iree_hal_cuda2_nccl_check_version(
 
 iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_initialize(
     iree_allocator_t host_allocator,
-    iree_hal_cuda2_dynamic_symbols_t* out_syms) {
+    const iree_hal_cuda2_dynamic_symbols_t* cuda_library,
+    iree_hal_cuda2_nccl_dynamic_symbols_t* out_syms) {
   IREE_ASSERT_ARGUMENT(out_syms);
-  if (!out_syms->cuda_library) {
+  if (!cuda_library->dylib) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "CUDA dynamic symbols must be loaded prior to loading NCCL");
+        "CUDA dynamic symbols must be resolved prior to loading NCCL symbols");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO: rework this file - these functions are not safe as they mutate
-  // each other's state in hard to follow ways.
-  IREE_ASSERT(!out_syms->nccl_library);
-  out_syms->nccl_library = NULL;
-
-  // Attempt to load the NCCL shared library.
+  memset(out_syms, 0, sizeof(*out_syms));
   iree_status_t status = iree_dynamic_library_load_from_files(
-      IREE_ARRAYSIZE(kNCCLLoaderSearchNames), kNCCLLoaderSearchNames,
-      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->nccl_library);
+      IREE_ARRAYSIZE(iree_hal_cuda_nccl_dylib_names),
+      iree_hal_cuda_nccl_dylib_names, IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      host_allocator, &out_syms->dylib);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
     status = iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "NCCL runtime library (%d.%d.%d) not available; ensure installed and "
-        "the shared library is on your PATH/LD_LIBRARY_PATH "
-        "(nccl.dll/libnccl.so)",
+        "NCCL runtime library 'libnccl.so'/'nccl.dll' (version %d.%d.%d) not "
+        "available; please ensure installed and in dynamic library search path",
         NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
   }
 
@@ -178,7 +182,7 @@ iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_initialize(
     // Check the version first before resolving all symbols. This makes sure
     // that we have the right version and all symbols are available at the
     // time of resolving.
-    status = iree_hal_cuda2_nccl_check_version(out_syms->nccl_library);
+    status = iree_hal_cuda2_nccl_check_version(out_syms->dylib);
   }
 
   // Resolve all symbols; this will fail if any required symbols are missing.
@@ -187,8 +191,8 @@ iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_initialize(
   }
 
   if (!iree_status_is_ok(status)) {
-    iree_dynamic_library_release(out_syms->nccl_library);
-    out_syms->nccl_library = NULL;
+    iree_dynamic_library_release(out_syms->dylib);
+    out_syms->dylib = NULL;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -198,8 +202,17 @@ void iree_hal_cuda2_dynamic_symbols_deinitialize(
     iree_hal_cuda2_dynamic_symbols_t* syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_dynamic_library_release(syms->cuda_library);
-  iree_dynamic_library_release(syms->nccl_library);
+  iree_dynamic_library_release(syms->dylib);
+  memset(syms, 0, sizeof(*syms));
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_hal_cuda2_nccl_dynamic_symbols_deinitialize(
+    iree_hal_cuda2_nccl_dynamic_symbols_t* syms) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_dynamic_library_release(syms->dylib);
   memset(syms, 0, sizeof(*syms));
 
   IREE_TRACE_ZONE_END(z0);
