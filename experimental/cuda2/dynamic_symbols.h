@@ -26,8 +26,10 @@ extern "C" {
 
 // CUDA driver API dynamic symbols.
 typedef struct iree_hal_cuda2_dynamic_symbols_t {
+  // The dynamic library handle.
   iree_dynamic_library_t* dylib;
 
+  // Concrete CUDA symbols defined by including the `dynamic_symbol_tables.h`.
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
 #define NCCL_PFN_DECL(ncclSymbolName, ...)                // Ignore NCCL symbols
@@ -57,8 +59,10 @@ void iree_hal_cuda2_dynamic_symbols_deinitialize(
 
 // NCCL API dynamic symbols.
 typedef struct iree_hal_cuda2_nccl_dynamic_symbols_t {
+  // The dynamic library handle.
   iree_dynamic_library_t* dylib;
 
+  // Concrete NCCL symbols defined by including the `dynamic_symbol_tables.h`.
 #define NCCL_PFN_DECL(ncclSymbolName, ...) \
   ncclResult_t (*ncclSymbolName)(__VA_ARGS__);
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
