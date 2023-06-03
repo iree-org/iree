@@ -14,6 +14,7 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Registers the CUDA HAL driver to the given |registry|.
 IREE_API_EXPORT iree_status_t
 iree_hal_cuda2_driver_module_register(iree_hal_driver_registry_t* registry);
 
