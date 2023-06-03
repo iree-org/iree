@@ -11,12 +11,14 @@
 #include "experimental/cuda2/dynamic_symbols.h"
 #include "experimental/cuda2/status_util.h"
 #include "iree/base/api.h"
+#include "iree/base/assert.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 
-// Maximum device name length we support.
-#define IREE_HAL_cuda2_MAX_DEVICE_NAME_LENGTH 128
+// Maximum device name length supported by the CUDA HAL driver.
+#define IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH 128
 
+// Utility macros to convert between CUDevice and iree_hal_device_id_t.
 #define CUDEVICE_TO_DEVICE_ID(device) (iree_hal_device_id_t)((device) + 1)
 #define DEVICE_ID_TO_CUDEVICE(device_id) (CUdevice)((device_id)-1)
 
@@ -27,10 +29,11 @@ typedef struct iree_hal_cuda2_driver_t {
 
   iree_allocator_t host_allocator;
 
-  // Identifier used for the driver in the IREE driver registry.
+  // Identifier used for registering the driver in the IREE driver registry.
   iree_string_view_t identifier;
-  // API dynamic symbols to interact with the CUDA driver.
+  // CUDA driver API dynamic symbols to interact with the CUDA system.
   iree_hal_cuda2_dynamic_symbols_t cuda_symbols;
+  // NCCL API dynamic symbols to interact with the CUDA system.
   iree_hal_cuda2_nccl_dynamic_symbols_t nccl_symbols;
 
   // The index of the default CUDA device to use if multiple ones are available.
@@ -73,14 +76,12 @@ static iree_status_t iree_hal_cuda2_driver_create_internal(
       host_allocator, &driver->cuda_symbols);
 
   if (iree_status_is_ok(status)) {
-    // Try to load NCCL. This will fail if NCCL is unavailable or incompatible.
-    // We only fail on unavailability when the user tries to create a channel
-    // and otherwise defer reporting.
+    // Try to dynamically load NCCL. This will fail if NCCL is unavailable or
+    // incompatible. We only fail on unavailability when the user tries to
+    // create a channel and otherwise defer reporting.
     status = iree_hal_cuda2_nccl_dynamic_symbols_initialize(
         host_allocator, &driver->cuda_symbols, &driver->nccl_symbols);
-    if (iree_status_is_unavailable(status)) {
-      status = iree_status_ignore(status);
-    }
+    if (iree_status_is_unavailable(status)) status = iree_status_ignore(status);
   }
 
   if (iree_status_is_ok(status)) {
@@ -89,20 +90,6 @@ static iree_status_t iree_hal_cuda2_driver_create_internal(
     iree_hal_driver_release((iree_hal_driver_t*)driver);
   }
   return status;
-}
-
-static void iree_hal_cuda2_driver_destroy(iree_hal_driver_t* base_driver) {
-  IREE_ASSERT_ARGUMENT(base_driver);
-
-  iree_hal_cuda2_driver_t* driver = iree_hal_cuda2_driver_cast(base_driver);
-  iree_allocator_t host_allocator = driver->host_allocator;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_cuda2_nccl_dynamic_symbols_deinitialize(&driver->nccl_symbols);
-  iree_hal_cuda2_dynamic_symbols_deinitialize(&driver->cuda_symbols);
-  iree_allocator_free(host_allocator, driver);
-
-  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_cuda2_driver_create(
@@ -120,15 +107,30 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda2_driver_create(
   return status;
 }
 
-static iree_status_t iree_hal_cuda2_init(iree_hal_cuda2_driver_t* driver) {
+static void iree_hal_cuda2_driver_destroy(iree_hal_driver_t* base_driver) {
+  IREE_ASSERT_ARGUMENT(base_driver);
+
+  iree_hal_cuda2_driver_t* driver = iree_hal_cuda2_driver_cast(base_driver);
+  iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, CU_RESULT_TO_STATUS(&driver->cuda_symbols, cuInit(0), "cuInit"));
+
+  iree_hal_cuda2_nccl_dynamic_symbols_deinitialize(&driver->nccl_symbols);
+  iree_hal_cuda2_dynamic_symbols_deinitialize(&driver->cuda_symbols);
+  iree_allocator_free(host_allocator, driver);
+
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
-// Populates device information from the given cuda2 physical device handle.
+// Initializes the CUDA system.
+static iree_status_t iree_hal_cuda2_init(iree_hal_cuda2_driver_t* driver) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      CU_RESULT_TO_STATUS(&driver->cuda_symbols, cuInit(0), "cuInit");
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+// Populates device information from the given CUDA physical device handle.
 // |out_device_info| must point to valid memory and additional data will be
 // appended to |buffer_ptr| and the new pointer is returned.
 static iree_status_t iree_hal_cuda2_populate_device_info(
@@ -137,7 +139,7 @@ static iree_status_t iree_hal_cuda2_populate_device_info(
     iree_hal_device_info_t* out_device_info) {
   *out_buffer_ptr = buffer_ptr;
 
-  char device_name[IREE_HAL_cuda2_MAX_DEVICE_NAME_LENGTH];
+  char device_name[IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH];
   CUDA_RETURN_IF_ERROR(
       syms, cuDeviceGetName(device_name, sizeof(device_name), device),
       "cuDeviceGetName");
@@ -178,7 +180,7 @@ static iree_status_t iree_hal_cuda2_populate_device_info(
   return iree_ok_status();
 }
 
-// Return true if the device supports all the extension required.
+// Returns true if the device meets all the required capabilities.
 static bool iree_hal_cuda2_is_valid_device(iree_hal_cuda2_driver_t* driver,
                                            CUdevice device) {
   return true;
@@ -188,24 +190,29 @@ static iree_status_t iree_hal_cuda2_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
     iree_host_size_t* out_device_info_count,
     iree_hal_device_info_t** out_device_infos) {
+  IREE_ASSERT_ARGUMENT(base_driver);
+  IREE_ASSERT_ARGUMENT(out_device_info_count);
+  IREE_ASSERT_ARGUMENT(out_device_infos);
   iree_hal_cuda2_driver_t* driver = iree_hal_cuda2_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Ensure cuda2 is initialized before querying it.
-  IREE_RETURN_IF_ERROR(iree_hal_cuda2_init(driver));
+  // Ensure CUDA is initialized before querying it.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_cuda2_init(driver));
 
-  // Query the number of available cuda2 devices.
+  // Query the number of available CUDA devices.
   int device_count = 0;
-  CUDA_RETURN_IF_ERROR(&driver->cuda_symbols, cuDeviceGetCount(&device_count),
-                       "cuDeviceGetCount");
+  CUDA_RETURN_AND_END_ZONE_IF_ERROR(z0, &driver->cuda_symbols,
+                                    cuDeviceGetCount(&device_count),
+                                    "cuDeviceGetCount");
 
   // Allocate the return infos and populate with the devices.
   iree_hal_device_info_t* device_infos = NULL;
-  iree_host_size_t total_size = device_count * sizeof(iree_hal_device_info_t);
-  for (iree_host_size_t i = 0; i < device_count; ++i) {
-    total_size += IREE_HAL_cuda2_MAX_DEVICE_NAME_LENGTH * sizeof(char);
-  }
+  iree_host_size_t total_size =
+      device_count * (sizeof(iree_hal_device_info_t) +
+                      IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH * sizeof(char));
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&device_infos);
+
   int valid_device_count = 0;
   if (iree_status_is_ok(status)) {
     uint8_t* buffer_ptr =
@@ -229,6 +236,8 @@ static iree_status_t iree_hal_cuda2_driver_query_available_devices(
   } else {
     iree_allocator_free(host_allocator, device_infos);
   }
+
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -252,10 +261,11 @@ static iree_status_t iree_hal_cuda2_driver_select_default_device(
   iree_host_size_t device_count = 0;
   IREE_RETURN_IF_ERROR(iree_hal_cuda2_driver_query_available_devices(
       base_driver, host_allocator, &device_count, &device_infos));
+
   iree_status_t status = iree_ok_status();
   if (device_count == 0) {
     status = iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "no compatible cuda devices were found");
+                              "no compatible CUDA devices were found");
   } else if (default_device_index >= device_count) {
     status = iree_make_status(IREE_STATUS_NOT_FOUND,
                               "default device %d not found (of %ld enumerated)",
@@ -265,6 +275,7 @@ static iree_status_t iree_hal_cuda2_driver_select_default_device(
         DEVICE_ID_TO_CUDEVICE(device_infos[default_device_index].device_id);
   }
   iree_allocator_free(host_allocator, device_infos);
+
   return status;
 }
 
@@ -272,6 +283,10 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(base_driver);
+  IREE_ASSERT_ARGUMENT(params);
+  IREE_ASSERT_ARGUMENT(out_device);
+
   iree_hal_cuda2_driver_t* driver = iree_hal_cuda2_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -388,6 +403,10 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_path(
     iree_string_view_t device_path, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(base_driver);
+  IREE_ASSERT_ARGUMENT(params);
+  IREE_ASSERT_ARGUMENT(out_device);
+
   if (iree_string_view_is_empty(device_path)) {
     return iree_hal_cuda2_driver_create_device_by_id(
         base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,

@@ -37,6 +37,13 @@ extern "C" {
                                                        __FILE__, __LINE__),    \
                        __VA_ARGS__)
 
+#define CUDA_RETURN_AND_END_ZONE_IF_ERROR(zone_id, syms, expr, ...)     \
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                    \
+      zone_id,                                                          \
+      iree_hal_cuda2_result_to_status((syms), ((syms)->expr), __FILE__, \
+                                      __LINE__),                        \
+      __VA_ARGS__)
+
 // IREE_IGNORE_ERROR but implicitly converts the CUresult return value to an
 // iree_status_t.
 //
