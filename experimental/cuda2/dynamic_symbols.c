@@ -26,32 +26,32 @@ static const char* iree_hal_cuda_dylib_names[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-#define CONCAT(A, B) A B
+#define IREE_CONCAT(A, B) A B
 
 // Resolves all CUDA dynamic symbols in `dynamic_symbol_tables.h`, prefer _v2
 // version if it exists.
 static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
     iree_hal_cuda2_dynamic_symbols_t* syms) {
-#define CU_PFN_DECL(cuda_symbol_name, ...)                              \
+#define IREE_CU_PFN_DECL(cuda_symbol_name, ...)                              \
   {                                                                     \
     static const char* name = #cuda_symbol_name;                        \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(            \
         syms->dylib, name, (void**)&syms->cuda_symbol_name));           \
-    static const char* name_v2 = CONCAT(#cuda_symbol_name, "_v2");      \
+    static const char* name_v2 = IREE_CONCAT(#cuda_symbol_name, "_v2");      \
     void* fptr_v2;                                                      \
     iree_dynamic_library_lookup_symbol(syms->dylib, name_v2, &fptr_v2); \
     if (fptr_v2) syms->cuda_symbol_name = fptr_v2;                      \
   }
-#define NCCL_PFN_DECL(nccl_symbol_name, ...)             // Ignore NCCL symbols
-#define NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)  // Ignore NCCL symbols
+#define IREE_NCCL_PFN_DECL(nccl_symbol_name, ...)             // Ignore NCCL symbols
+#define IREE_NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)  // Ignore NCCL symbols
 #include "experimental/cuda2/dynamic_symbol_tables.h"    // IWYU pragma: keep
-#undef CU_PFN_DECL
-#undef NCCL_PFN_DECL
-#undef NCCL_PFN_DECL_STR_RETURN
+#undef IREE_CU_PFN_DECL
+#undef IREE_NCCL_PFN_DECL
+#undef IREE_NCCL_PFN_DECL_STR_RETURN
   return iree_ok_status();
 }
 
-#undef CONCAT
+#undef IREE_CONCAT
 
 iree_status_t iree_hal_cuda2_dynamic_symbols_initialize(
     iree_allocator_t host_allocator,
@@ -108,23 +108,23 @@ static const char* iree_hal_cuda_nccl_dylib_names[] = {
 // version if it exists.
 static iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_resolve_all(
     iree_hal_cuda2_nccl_dynamic_symbols_t* syms) {
-#define NCCL_PFN_DECL(nccl_symbol_name, ...)                  \
+#define IREE_NCCL_PFN_DECL(nccl_symbol_name, ...)                  \
   {                                                           \
     static const char* name = #nccl_symbol_name;              \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(  \
         syms->dylib, name, (void**)&syms->nccl_symbol_name)); \
   }
-#define NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)       \
+#define IREE_NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)       \
   {                                                           \
     static const char* name = #nccl_symbol_name;              \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(  \
         syms->dylib, name, (void**)&syms->nccl_symbol_name)); \
   }
-#define CU_PFN_DECL(cuda_symbol_name, ...)             // Ignore CUDA symbols
+#define IREE_CU_PFN_DECL(cuda_symbol_name, ...)             // Ignore CUDA symbols
 #include "experimental/cuda2/dynamic_symbol_tables.h"  // IWYU pragma: keep
-#undef NCCL_PFN_DECL
-#undef NCCL_PFN_DECL_STR_RETURN
-#undef CU_PFN_DECL
+#undef IREE_NCCL_PFN_DECL
+#undef IREE_NCCL_PFN_DECL_STR_RETURN
+#undef IREE_CU_PFN_DECL
   return iree_ok_status();
 }
 

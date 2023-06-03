@@ -27,14 +27,14 @@ typedef struct iree_hal_cuda2_driver_options_t {
   int default_device_index;
 } iree_hal_cuda2_driver_options_t;
 
-// Initializes the given |out_ptions| with default driver creation options.
+// Initializes the given |out_options| with default driver creation options.
 IREE_API_EXPORT void iree_hal_cuda2_driver_options_initialize(
     iree_hal_cuda2_driver_options_t* out_options);
 
 // Creates a CUDA HAL driver with the given |options|, from which CUDA devices
-// can be enumeratd and created with specific parameters.
+// can be enumerated and created with specific parameters.
 //
-// |out_driver| must be released by the caller (see |iree_hal_driver_release|).
+// |out_driver| must be released by the caller (see iree_hal_driver_release).
 IREE_API_EXPORT iree_status_t iree_hal_cuda2_driver_create(
     iree_string_view_t identifier,
     const iree_hal_cuda2_driver_options_t* options,

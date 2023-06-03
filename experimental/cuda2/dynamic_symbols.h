@@ -30,14 +30,14 @@ typedef struct iree_hal_cuda2_dynamic_symbols_t {
   iree_dynamic_library_t* dylib;
 
   // Concrete CUDA symbols defined by including the `dynamic_symbol_tables.h`.
-#define CU_PFN_DECL(cudaSymbolName, ...) \
+#define IREE_CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
-#define NCCL_PFN_DECL(ncclSymbolName, ...)             // Ignore NCCL symbols
-#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)  // Ignore NCCL symbols
+#define IREE_NCCL_PFN_DECL(ncclSymbolName, ...)             // Ignore NCCL symbols
+#define IREE_NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)  // Ignore NCCL symbols
 #include "experimental/cuda2/dynamic_symbol_tables.h"  // IWYU pragma: export
-#undef CU_PFN_DECL
-#undef NCCL_PFN_DECL
-#undef NCCL_PFN_DECL_STR_RETURN
+#undef IREE_CU_PFN_DECL
+#undef IREE_NCCL_PFN_DECL
+#undef IREE_NCCL_PFN_DECL_STR_RETURN
 } iree_hal_cuda2_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded CUDA symbols.
@@ -63,15 +63,15 @@ typedef struct iree_hal_cuda2_nccl_dynamic_symbols_t {
   iree_dynamic_library_t* dylib;
 
   // Concrete NCCL symbols defined by including the `dynamic_symbol_tables.h`.
-#define NCCL_PFN_DECL(ncclSymbolName, ...) \
+#define IREE_NCCL_PFN_DECL(ncclSymbolName, ...) \
   ncclResult_t (*ncclSymbolName)(__VA_ARGS__);
-#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
+#define IREE_NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
   const char* (*ncclSymbolName)(__VA_ARGS__);
-#define CU_PFN_DECL(cudaSymbolName, ...)               // Ignore CUDA symbols
+#define IREE_CU_PFN_DECL(cudaSymbolName, ...)               // Ignore CUDA symbols
 #include "experimental/cuda2/dynamic_symbol_tables.h"  // IWYU pragma: export
-#undef NCCL_PFN_DECL
-#undef NCCL_PFN_DECL_STR_RETURN
-#undef CU_PFN_DECL
+#undef IREE_NCCL_PFN_DECL
+#undef IREE_NCCL_PFN_DECL_STR_RETURN
+#undef IREE_CU_PFN_DECL
 } iree_hal_cuda2_nccl_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded NCCL symbols.
