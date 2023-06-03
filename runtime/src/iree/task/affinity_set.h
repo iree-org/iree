@@ -44,12 +44,14 @@ static inline iree_task_affinity_set_t iree_task_affinity_for_any_worker(void) {
   return UINT64_MAX;
 }
 
-#define iree_task_affinity_set_count_leading_zeros \
-  iree_math_count_leading_zeros_u64
-#define iree_task_affinity_set_count_trailing_zeros \
-  iree_math_count_trailing_zeros_u64
-#define iree_task_affinity_set_count_ones iree_math_count_ones_u64
-#define iree_task_affinity_set_rotr iree_math_rotr_u64
+#define iree_task_affinity_set_ones(count) \
+  (0xFFFFFFFFFFFFFFFFull >> (64 - (count)))
+#define iree_task_affinity_set_count_leading_zeros(set) \
+  iree_math_count_leading_zeros_u64(set)
+#define iree_task_affinity_set_count_trailing_zeros(set) \
+  iree_math_count_trailing_zeros_u64(set)
+#define iree_task_affinity_set_count_ones(set) iree_math_count_ones_u64(set)
+#define iree_task_affinity_set_rotr(set, count) iree_math_rotr_u64(set, count)
 
 //===----------------------------------------------------------------------===//
 // iree_atomic_task_affinity_set_t
