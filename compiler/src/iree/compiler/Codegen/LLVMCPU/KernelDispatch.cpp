@@ -1025,6 +1025,43 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
   return tileSizes;
 }
 
+/// Returns true if cache-level tiling may be profitable for the given Linalg op
+/// and tile sizes. For now, we apply cache-level tiling if at least one of the
+/// dimensions is dynamic or one of the static dimensions is larger than the
+/// cache tile size for that dimension. Otherwise, the matmul is too small to
+/// benefit from cache-level tiling.
+static bool isCacheTilingProfitable(ArrayRef<int64_t> cacheTileSizes,
+                                    ArrayRef<int64_t> dimSizes) {
+  for (auto [dimSize, cacheTileSize] : llvm::zip(dimSizes, cacheTileSizes)) {
+    if (ShapedType::isDynamic(dimSize)) {
+      return true;
+    }
+    if (dimSize >= cacheTileSize) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static SmallVector<int64_t> getMatmulCacheTileSizesForShape(
+    ArrayRef<int64_t> inputTileSizes, ArrayRef<int64_t> inputShape) {
+  int numDims = inputShape.size();
+  if (!isCacheTilingProfitable(inputTileSizes, inputShape))
+    return SmallVector<int64_t>(numDims, 0);
+
+  // Make sure the tile sizes are not larger than the dim sizes.
+  SmallVector<int64_t> outputTileSizes(numDims);
+  for (int i = 0, end = numDims; i < end; ++i) {
+    outputTileSizes[i] =
+        (ShapedType::isDynamic(inputShape[i]) || inputShape[i] == 0)
+            ? inputTileSizes[i]
+            : std::min(inputTileSizes[i], inputShape[i]);
+  }
+
+  return outputTileSizes;
+}
+
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
@@ -1088,16 +1125,11 @@ static LogicalResult setRootConfig(
     // Compute cache-level tile sizes. Cache a dimension only if there are
     // enough iterations.
     cacheTileSizes = getDefaultMatmulCacheSizes(linalgOp, isQuantized);
-    auto staticSizes = linalgOp.getStaticLoopRanges();
-    for (int i = 0; i < numLoops; ++i) {
-      if (cacheTileSizes[i] != 0 && !ShapedType::isDynamic(staticSizes[i]) &&
-          cacheTileSizes[i] > staticSizes[i]) {
-        cacheTileSizes[i] = 0;
-      }
-    }
+    cacheTileSizes = getMatmulCacheTileSizesForShape(
+        cacheTileSizes, linalgOp.getStaticLoopRanges());
 
-    // Choose the next non-zero tile size immediately after distribution to help
-    // compute the distribution tile sizes.
+    // Choose the next non-zero tile size immediately after the distribution
+    // level to help compute the distribution tile sizes.
     SmallVector<int64_t> minTileSizes;
     for (auto [cacheTileSize, workgroupTileSize] :
          llvm::zip_equal(cacheTileSizes, workgroupTileSizes)) {
@@ -1118,10 +1150,11 @@ static LogicalResult setRootConfig(
         linalgOp, minTileSizes, maxTileSizes,
         /*allowIncompleteTile=*/true);
 
-    // Cache a dimension only if there are enough iterations after distribution.
-    for (int i = 0; i < numLoops; ++i) {
-      cacheTileSizes[i] = std::min(flowTileSizes[i], cacheTileSizes[i]);
-    }
+    // Unfortunately, `getDefaultDistributedLevelTileSizes` may return sizes
+    // that are smaller than `minTileSizes` so we have to adjust the cache sizes
+    // again.
+    cacheTileSizes =
+        getMatmulCacheTileSizesForShape(cacheTileSizes, flowTileSizes);
   } else {
     flowTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, workgroupTileSizes, maxTileSizes);
