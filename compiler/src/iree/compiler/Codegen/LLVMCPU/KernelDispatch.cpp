@@ -964,10 +964,15 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
 /// should be introduced in this utility.
 static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
                                            SmallVectorImpl<int64_t> &sizes,
-                                           int64_t vectorSize) {
+                                           int64_t vectorSize, bool isQuantized) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
-    // 16 accumulators, 32 broadcasts, 8 vector loads.
+    if (isQuantized) {
+      sizes.append({8, 32, 16});
+      return;
+    }
+
+    // 4-byte case: 16 accumulators, 32 broadcasts, 8 vector loads.
     sizes.append({8, 32, 4});
     return;
   }
@@ -1008,7 +1013,8 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
 
   // Get default hard-coded tile sizes if we couldn't compute anything better.
   if (matmulTileSizes.empty())
-    getDefaultMatmulWorkgroupSizes(op, matmulTileSizes, vectorSize);
+    getDefaultMatmulWorkgroupSizes(op, matmulTileSizes, vectorSize,
+                                   isQuantized);
 
   SmallVector<int64_t> tileSizes;
   unsigned numLoops = op.getNumLoops();
@@ -1160,6 +1166,7 @@ static LogicalResult setRootConfig(
         linalgOp, workgroupTileSizes, maxTileSizes);
   }
 
+  LLVM_DEBUG(KD_DBGS() << "Quantized matmul: " << isQuantized << "\n");
   LLVM_DEBUG(KD_DBGS() << "Flow tile sizes: " << flowTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Cache tile sizes: " << cacheTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Workgroup tile sizes: " << workgroupTileSizes
