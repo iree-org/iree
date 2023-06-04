@@ -837,15 +837,8 @@ static LogicalResult setMatmulPadRootConfig(
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
-  SmallVector<int64_t> parallelCacheTileSizes(numTiledDims, 0);
+  SmallVector<int64_t> parallelCacheTileSizes(cacheTileSizes.begin(), cacheTileSizes.end());
   SmallVector<int64_t> reductionCacheTileSizes(numTiledDims, 0);
-  for (const auto &[index, flowSize] : llvm::enumerate(flowTileSizes)) {
-    // Make sure the cache tile sizes are within the distributed tile size
-    // range. If dim is not distributed we still apply cache level tiling.
-    parallelCacheTileSizes[index] =
-        flowSize == 0 ? cacheTileSizes[index]
-                      : std::min(cacheTileSizes[index], flowSize);
-  }
   std::swap(parallelCacheTileSizes.back(), reductionCacheTileSizes.back());
 
   TileSizesListType tileSizes;
