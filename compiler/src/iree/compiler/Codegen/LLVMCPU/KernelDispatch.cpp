@@ -837,7 +837,8 @@ static LogicalResult setMatmulPadRootConfig(
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
-  SmallVector<int64_t> parallelCacheTileSizes(cacheTileSizes.begin(), cacheTileSizes.end());
+  SmallVector<int64_t> parallelCacheTileSizes(cacheTileSizes.begin(),
+                                              cacheTileSizes.end());
   SmallVector<int64_t> reductionCacheTileSizes(numTiledDims, 0);
   std::swap(parallelCacheTileSizes.back(), reductionCacheTileSizes.back());
 
@@ -957,7 +958,8 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
 /// should be introduced in this utility.
 static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
                                            SmallVectorImpl<int64_t> &sizes,
-                                           int64_t vectorSize, bool isQuantized) {
+                                           int64_t vectorSize,
+                                           bool isQuantized) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
     if (isQuantized) {
