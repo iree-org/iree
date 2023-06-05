@@ -92,9 +92,8 @@ static int64_t topkSplitReduceRatio(int64_t splitReductionDepth,
                                             topkSplitReductionRatio.end());
     if (splitReductionDepth >= reductionRatios.size()) {
       return kNOTopkSplitReductionRatioDefault;
-    } else {
-      return reductionRatios[splitReductionDepth];
     }
+    return reductionRatios[splitReductionDepth];
   }
 
   // Step 1. Hard to predict of advantage of splitting reduction more than 2
@@ -120,20 +119,20 @@ static int64_t topkSplitReduceRatio(int64_t splitReductionDepth,
   }
 
   // Step 3. Find a value that balances the workload between the two kernels.
+  // For example, workload 640 and select reduction value 5:
+  // First workload : 128,  Second workload : 200
   int64_t lastDim = rankedType.getDimSize(rankedType.getRank() - 1);
   auto findSplitKValue = [](int64_t workload, int64_t kValue) {
     for (int64_t ki = 3; ki < kValue; ki++) {
       if (workload % ki != 0) continue;
-      int workload_2nd_kernel = kValue * ki;
-      int workload_1st_kernel = workload / ki;
-      int check = workload / (ki - 1);
+      int workload2ndDispatchRegion = kValue * ki;
+      int workload1stDispatchRegion = workload / ki;
       LLVM_DEBUG({
-        llvm::dbgs() << "1stKernel = " << workload_1st_kernel << "\t"
-                     << "2ndKernel = " << workload_2nd_kernel << "\t"
-                     << "Check Kernel = " << check << "\n";
+        llvm::dbgs() << "1stKernel = " << workload1stDispatchRegion << "\t"
+                     << "2ndKernel = " << workload2ndDispatchRegion << "\n";
       });
-      if (workload_2nd_kernel > workload_1st_kernel &&
-          workload_2nd_kernel > check) {
+      if (workload2ndDispatchRegion > workload1stDispatchRegion &&
+          workload2ndDispatchRegion > (workload / (ki - 1))) {
         return ki;
       }
     }
