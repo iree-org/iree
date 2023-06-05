@@ -1,0 +1,64 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Set the root for package namespacing to the current directory.
+set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+set(IREE_PACKAGE_ROOT_PREFIX "iree/experimental/cuda2")
+
+iree_add_all_subdirs()
+
+iree_cc_library(
+  NAME
+    cuda2
+  HDRS
+    "api.h"
+  SRCS
+    "api.h"
+    "cuda_driver.c"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+    iree::hal
+    iree::schemas::cuda_executable_def_c_fbs
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dynamic_symbols
+  HDRS
+    "dynamic_symbols.h"
+    "status_util.h"
+  TEXTUAL_HDRS
+    "dynamic_symbol_tables.h"
+  SRCS
+    "cuda_headers.h"
+    "dynamic_symbols.c"
+    "status_util.c"
+  DEPS
+    iree::base
+    iree::base::core_headers
+    iree::base::internal::dynamic_library
+    iree::base::tracing
+    iree_cuda::headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    dynamic_symbols_test
+  SRCS
+    "dynamic_symbols_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=cuda2"
+)
