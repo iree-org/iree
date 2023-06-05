@@ -61,7 +61,7 @@ COMPILE_TOOL="${INSTALL_ROOT}/bin/iree-compile"
 compile_sample() {
   echo "  Compiling '$1' sample..."
   "${COMPILE_TOOL}" "$2" \
-    --iree-input-type=mhlo_legacy \
+    --iree-input-type=stablehlo \
     --iree-hal-target-backends=llvm-cpu \
     --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
     --iree-llvmcpu-target-cpu-features=+atomics,+bulk-memory,+simd128 \
