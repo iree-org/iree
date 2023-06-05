@@ -68,8 +68,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
   if (detuple) passManager.addPass(createFlattenTuplesInCFG());
 
-  passManager.addNestedPass<func::FuncOp>(
-      createStableHLOToStableHLOPreprocessing());
+  passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
   // Various shape functions may have been materialized in the `shape.shape_of`

@@ -254,14 +254,13 @@ class ConvertDepthwiseConv2DNhwcHwc final
       auto nloops = indices.size();
       auto inputShape = operandTensorType.getShape();
 
-      SmallVector<AffineExpr, 4> exprs = llvm::to_vector<4>(
-          llvm::map_range(indices, [&](int64_t index) -> AffineExpr {
+      SmallVector<AffineExpr, 4> exprs =
+          llvm::map_to_vector<4>(indices, [&](int64_t index) -> AffineExpr {
             return rewriter.getAffineDimExpr(index);
-          }));
+          });
 
-      SmallVector<int64_t> targetShape = llvm::to_vector<4>(llvm::map_range(
-          indices,
-          [&](int64_t index) -> int64_t { return inputShape[index]; }));
+      SmallVector<int64_t> targetShape = llvm::map_to_vector<4>(
+          indices, [&](int64_t index) -> int64_t { return inputShape[index]; });
 
       Value outputTensor = rewriter.create<tensor::EmptyOp>(
           loc, targetShape, operandTensorType.getElementType());

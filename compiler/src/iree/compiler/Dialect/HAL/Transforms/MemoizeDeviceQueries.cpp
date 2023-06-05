@@ -72,9 +72,8 @@ class MemoizeDeviceQueriesPass
       auto queryType = anyQueryOp.getValue().getType();
 
       // Merge all the locs as we are deduping the original query ops.
-      auto fusedLoc =
-          moduleBuilder.getFusedLoc(llvm::to_vector<4>(llvm::map_range(
-              queryOps, [&](Operation *op) { return op->getLoc(); })));
+      auto fusedLoc = moduleBuilder.getFusedLoc(llvm::map_to_vector<4>(
+          queryOps, [&](Operation *op) { return op->getLoc(); }));
 
       // The initializer will perform the query once and store it in the
       // variable.

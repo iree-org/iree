@@ -145,9 +145,8 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
     Region &r = linalgModelOp->getRegion(0);
     Block *bodyBlock = rewriter.createBlock(
         &r, r.end(), linalgOp.getBlock()->getArgumentTypes(),
-        llvm::to_vector<4>(
-            llvm::map_range(linalgOp.getBlock()->getArguments(),
-                            [](Value v) { return v.getLoc(); })));
+        llvm::map_to_vector<4>(linalgOp.getBlock()->getArguments(),
+                               [](Value v) { return v.getLoc(); }));
     ImplicitLocOpBuilder b(linalgModelOp.getLoc(), rewriter);
     auto regionBuilder = linalgModelOp.getRegionBuilder();
     llvm::ArrayRef<mlir::NamedAttribute> attrs = {};

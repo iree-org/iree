@@ -307,10 +307,9 @@ struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
       op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
 
-    auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(), [&](Attribute attr) {
-          return llvm::cast<IntegerAttr>(attr).getInt();
-        }));
+    auto workgroupSize = llvm::map_to_vector<4>(
+        getEntryPoint(funcOp)->getWorkgroupSize().value(),
+        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
     if (failed(tileParallelDims(funcOp, workgroupSize, distributeToWarp))) {
       return signalPassFailure();
     }

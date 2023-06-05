@@ -207,9 +207,9 @@ struct ConvertIfOp : public OpConversionPattern<scf::IfOp> {
   LogicalResult matchAndRewrite(
       scf::IfOp ifOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultTypes = llvm::to_vector<4>(llvm::map_range(
+    auto resultTypes = llvm::map_to_vector<4>(
         ifOp.getResultTypes(),
-        [&](Type type) { return getTypeConverter()->convertType(type); }));
+        [&](Type type) { return getTypeConverter()->convertType(type); });
     auto newOp = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes,
                                             adaptor.getCondition(),
                                             ifOp.elseBlock() != nullptr);

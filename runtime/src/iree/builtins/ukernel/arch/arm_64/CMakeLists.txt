@@ -124,3 +124,5 @@ iree_cc_library(
     ${IREE_UK_ARM_64_DEPS}
   PUBLIC
 )
+
+set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::arm_64" PARENT_SCOPE)

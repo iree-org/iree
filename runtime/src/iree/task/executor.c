@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/base/internal/debugging.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/task/affinity_set.h"
@@ -81,6 +82,23 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
   iree_slim_mutex_initialize(&executor->coordinator_mutex);
 
+  IREE_TRACE({
+    static iree_atomic_int32_t executor_id = IREE_ATOMIC_VAR_INIT(0);
+    char trace_name[32];
+    int trace_name_length =
+        snprintf(trace_name, sizeof(trace_name), "iree-executor-%d",
+                 iree_atomic_fetch_add_int32(&executor_id, 1,
+                                             iree_memory_order_seq_cst));
+    IREE_LEAK_CHECK_DISABLE_PUSH();
+    executor->trace_name = malloc(trace_name_length + 1);
+    memcpy((void*)executor->trace_name, trace_name, trace_name_length + 1);
+    IREE_LEAK_CHECK_DISABLE_POP();
+    IREE_TRACE_SET_PLOT_TYPE(executor->trace_name,
+                             IREE_TRACING_PLOT_TYPE_PERCENTAGE, /*step=*/true,
+                             /*fill=*/true, /*color=*/0xFF1F883Du);
+    IREE_TRACE_PLOT_VALUE_F32(executor->trace_name, 0.0f);
+  });
+
   // Simple PRNG used to generate seeds for the per-worker PRNGs used to
   // distribute work. This isn't strong (and doesn't need to be); it's just
   // enough to ensure each worker gets a sufficiently random seed for itself to
@@ -135,13 +153,10 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
     uint8_t* worker_local_memory =
         (uint8_t*)executor->workers + worker_list_size;
 
-    iree_task_affinity_set_t worker_idle_mask = 0;
-    iree_task_affinity_set_t worker_live_mask = 0;
-    for (iree_host_size_t i = 0; i < worker_count; ++i) {
-      iree_task_affinity_set_t worker_bit = iree_task_affinity_for_worker(i);
-      worker_idle_mask |= worker_bit;
-      worker_live_mask |= worker_bit;
+    iree_task_affinity_set_t worker_mask =
+        iree_task_affinity_set_ones(worker_count);
 
+    for (iree_host_size_t i = 0; i < worker_count; ++i) {
       iree_task_worker_t* worker = &executor->workers[i];
       status = iree_task_worker_initialize(
           executor, i, iree_task_topology_get_group(topology, i),
@@ -152,13 +167,11 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
       worker_local_memory += options.worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
-    // The masks are accessed with 'relaxed' order because they are just hints.
+
     iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
-                                        worker_idle_mask,
-                                        iree_memory_order_relaxed);
+                                        worker_mask, iree_memory_order_release);
     iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
-                                        worker_live_mask,
-                                        iree_memory_order_relaxed);
+                                        worker_mask, iree_memory_order_release);
   }
 
   if (!iree_status_is_ok(status)) {

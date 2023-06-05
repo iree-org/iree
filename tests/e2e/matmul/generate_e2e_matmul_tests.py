@@ -161,6 +161,9 @@ def get_test_shapes(shapes_id: ShapesId):
         TestShape(m=1000, k=4, n=512, accumulate=False),
         TestShape(m=4, k=1000, n=512, accumulate=False),
         TestShape(m=512, k=1000, n=4, accumulate=False),
+        TestShape(m=512, k=128, n=500, accumulate=False),
+        TestShape(m=457, k=160, n=512, accumulate=False),
+        TestShape(m=512, k=330, n=512, accumulate=False),
     ]
 
   raise ValueError(shapes_id)

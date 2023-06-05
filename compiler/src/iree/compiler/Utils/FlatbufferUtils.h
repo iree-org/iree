@@ -60,10 +60,9 @@ class FlatbufferBuilder {
   // Creates a string vector containing all strings in the given range.
   template <typename RangeTy>
   flatbuffers_string_vec_ref_t createStringVec(RangeTy &&Range) {
-    auto stringRefs =
-        llvm::to_vector<8>(llvm::map_range(Range, [&](StringRef value) {
-          return flatbuffers_string_create(*this, value.data(), value.size());
-        }));
+    auto stringRefs = llvm::map_to_vector<8>(Range, [&](StringRef value) {
+      return flatbuffers_string_create(*this, value.data(), value.size());
+    });
     if (stringRefs.empty()) return 0;
     return flatbuffers_string_vec_create(*this, stringRefs.data(),
                                          stringRefs.size());

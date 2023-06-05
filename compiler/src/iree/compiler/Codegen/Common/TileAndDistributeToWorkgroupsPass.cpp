@@ -156,9 +156,9 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(workgroupCountOp);
   auto workloadValues = workgroupCountOp.getOperands();
-  SmallVector<OpFoldResult> tileSizes = llvm::to_vector(llvm::map_range(
+  SmallVector<OpFoldResult> tileSizes = llvm::map_to_vector(
       givenTileSizes,
-      [&](int64_t v) -> OpFoldResult { return rewriter.getIndexAttr(v); }));
+      [&](int64_t v) -> OpFoldResult { return rewriter.getIndexAttr(v); });
 
   Attribute zero = rewriter.getIndexAttr(0);
   tileSizes.resize(workloadValues.size(), zero);
@@ -166,7 +166,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
       llvm::to_vector(givenStaticLoopRanges);
   staticLoopRanges.resize(workloadValues.size(), ShapedType::kDynamic);
   Location loc = workgroupCountOp.getLoc();
-  auto numTiles = llvm::to_vector(llvm::map_range(
+  auto numTiles = llvm::map_to_vector(
       llvm::zip_equal(workloadValues, staticLoopRanges, tileSizes),
       [&](std::tuple<Value, int64_t, OpFoldResult> p) -> OpFoldResult {
         auto tileSize = std::get<2>(p);
@@ -184,7 +184,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
         SmallVector<OpFoldResult> mapOperands = {workload, tileSize};
         return affine::makeComposedFoldedAffineApply(
             rewriter, loc, s0.ceilDiv(s1), mapOperands);
-      }));
+      });
   // If there is interchange, first apply interchange on the number of tiles.
   if (!givenInterchange.empty()) {
     SmallVector<OpFoldResult> interchangedNumTiles = numTiles;
@@ -348,10 +348,9 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
                           Operation *op) -> SmallVector<Value, 4> {
       // Check if tile sizes are deduced from the configuration. If so use
       // those.
-      return llvm::to_vector<4>(
-          llvm::map_range(tileSizes, [&](int64_t ts) -> Value {
-            return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
-          }));
+      return llvm::map_to_vector<4>(tileSizes, [&](int64_t ts) -> Value {
+        return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
+      });
     };
 
     linalg::DistributionMethod distributionMethodValue =
@@ -360,11 +359,9 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         linalg::LinalgTilingOptions()
             .setDistributionOptions(getIREELinalgLoopDistributionOptions(
                 tileSizes, distributionMethodValue, maxWorkgroupParallelDims))
-            .setInterchange(llvm::to_vector<4>(
-                llvm::map_range(interchange,
-                                [](int64_t v) -> unsigned {
-                                  return static_cast<unsigned>(v);
-                                })))
+            .setInterchange(llvm::map_to_vector<4>(
+                interchange,
+                [](int64_t v) -> unsigned { return static_cast<unsigned>(v); }))
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 

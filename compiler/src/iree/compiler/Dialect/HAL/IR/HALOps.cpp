@@ -294,8 +294,8 @@ LogicalResult TensorExportOp::verify() {
 
 void TensorBarrierOp::build(OpBuilder &builder, OperationState &result,
                             ValueRange sources, Value signalFence) {
-  auto resultTypes = llvm::to_vector(
-      llvm::map_range(sources, [](Value source) { return source.getType(); }));
+  auto resultTypes = llvm::map_to_vector(
+      sources, [](Value source) { return source.getType(); });
   build(builder, result, resultTypes, sources, signalFence);
 }
 

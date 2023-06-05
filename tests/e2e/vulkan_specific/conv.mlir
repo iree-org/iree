@@ -47,9 +47,9 @@ func.func @normal_conv_1() {
         [[1.35714286, 1.38571429, 1.41428571],
          [1.44285714, 1.47142857, 1.5       ]]]]>
    : tensor<2x3x2x3xf32>
-  %2 = "mhlo.convolution"(%0, %1) {
+  %2 = "stablehlo.convolution"(%0, %1) {
        batch_group_count = 1 : i64,
-       dimension_numbers = #mhlo.conv<raw
+       dimension_numbers = #stablehlo.conv<raw
           input_batch_dimension = 0,
           input_feature_dimension = 3,
           input_spatial_dimensions = [1, 2],
@@ -129,8 +129,8 @@ func.func @normal_conv_2() {
           1.0, 1.0, 2.5, 3.0, 2.0, 1.0, 1.0, 0.5, 0.0, 4.5, 0.0, 1.0, 4.0, 1.5, 5.0, 0.0]]]]>
     : tensor<2x2x4x32xf32>
 
-    %0 = "mhlo.convolution"(%input, %filter) {batch_group_count = 1 : i64,
-      dimension_numbers = #mhlo.conv<raw
+    %0 = "stablehlo.convolution"(%input, %filter) {batch_group_count = 1 : i64,
+      dimension_numbers = #stablehlo.conv<raw
       input_batch_dimension = 0,
       input_feature_dimension = 3,
       input_spatial_dimensions = [1, 2],
@@ -174,8 +174,8 @@ func.func @depthwise_conv() {
     [[[[2.0, 2.0, 4.0, 2.0, 1.5, 5.0, 3.5, 2.5, 2.5, 0.0, 0.5, 2.5, 4.5, 1.5, 0.0, 2.5]]]]>
     : tensor<1x1x1x16xf32>
 
-    %0 = "mhlo.convolution"(%input, %filter) {batch_group_count = 1 : i64,
-      dimension_numbers = #mhlo.conv<raw
+    %0 = "stablehlo.convolution"(%input, %filter) {batch_group_count = 1 : i64,
+      dimension_numbers = #stablehlo.conv<raw
         input_batch_dimension = 0,
         input_feature_dimension = 3,
         input_spatial_dimensions = [1, 2],

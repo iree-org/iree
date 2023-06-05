@@ -74,6 +74,7 @@ iree_runtime_cc_library(
     hdrs = ["arena.h"],
     deps = [
         ":atomic_slist",
+        ":internal",
         ":synchronization",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",

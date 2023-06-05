@@ -114,10 +114,9 @@ static void populateTilingToSubgroupPatterns(
     // later to "tile" along reduction dimensions.
     tileSizes.resize(
         std::min(cast<linalg::LinalgOp>(op).getNumParallelLoops(), 3u));
-    return llvm::to_vector<4>(
-        llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
-        }));
+    return llvm::map_to_vector<4>(tileSizes, [&](int64_t v) -> Value {
+      return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
+    });
   };
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)

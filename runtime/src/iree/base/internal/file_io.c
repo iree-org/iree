@@ -10,7 +10,6 @@
 
 #if IREE_FILE_IO_ENABLE
 
-#include <errno.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -63,18 +62,18 @@ iree_status_t iree_file_query_length(FILE* file, uint64_t* out_length) {
 
   // Seek to the end of the file.
   if (iree_fseek64(file, 0, SEEK_END) == -1) {
-    return iree_make_status(iree_status_code_from_errno(errno), "seek (end)");
+    return iree_make_status(IREE_STATUS_INTERNAL, "seek (end)");
   }
 
   // Query the position, telling us the total file length in bytes.
   uint64_t file_length = iree_ftell64(file);
   if (file_length == -1L) {
-    return iree_make_status(iree_status_code_from_errno(errno), "size query");
+    return iree_make_status(IREE_STATUS_INTERNAL, "size query");
   }
 
   // Seek back to the file origin.
   if (iree_fseek64(file, origin, SEEK_SET) == -1) {
-    return iree_make_status(iree_status_code_from_errno(errno), "seek (beg)");
+    return iree_make_status(IREE_STATUS_INTERNAL, "seek (beg)");
   }
 
   *out_length = file_length;
@@ -149,9 +148,9 @@ static iree_status_t iree_file_read_contents_impl(
   contents->buffer.data_length = file_size;
 
   // Attempt to read the file into memory.
-  if (fread(contents->buffer.data, file_size, 1, file) != 1) {
+  if (fread(contents->buffer.data, 1, file_size, file) != file_size) {
     iree_allocator_free(allocator, contents);
-    return iree_make_status(iree_status_code_from_errno(errno),
+    return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
                             "unable to read entire %zu file bytes", file_size);
   }
 
@@ -172,8 +171,8 @@ iree_status_t iree_file_read_contents(const char* path,
   FILE* file = fopen(path, "rb");
   if (file == NULL) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "failed to open file '%s'", path);
+    return iree_make_status(IREE_STATUS_NOT_FOUND, "failed to open file '%s'",
+                            path);
   }
 
   // Read the file contents into memory.
@@ -197,7 +196,7 @@ iree_status_t iree_file_write_contents(const char* path,
   FILE* file = fopen(path, "wb");
   if (file == NULL) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(iree_status_code_from_errno(errno),
+    return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
                             "failed to open file '%s'", path);
   }
 

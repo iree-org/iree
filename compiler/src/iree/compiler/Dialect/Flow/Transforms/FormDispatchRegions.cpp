@@ -142,9 +142,9 @@ static bool hasFusionGroupsAttribute(Operation *op) {
 static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
   SmallVector<int64_t, 1> fusionGroups = {};
   if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    fusionGroups = llvm::to_vector<1>(llvm::map_range(
-        fusionGroupsAttr,
-        [](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); }));
+    fusionGroups = llvm::map_to_vector<1>(fusionGroupsAttr, [](Attribute attr) {
+      return llvm::cast<IntegerAttr>(attr).getInt();
+    });
   }
   return fusionGroups;
 }

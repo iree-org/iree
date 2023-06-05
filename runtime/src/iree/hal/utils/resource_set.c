@@ -6,24 +6,16 @@
 
 #include "iree/hal/utils/resource_set.h"
 
+#include "iree/base/internal/debugging.h"
 #include "iree/base/tracing.h"
 
-// Inlines the first chunk into the block using all of the remaining space.
-// This is a special case chunk that is released back to the pool with the
-// resource set and lets us avoid an additional allocation.
-static void iree_hal_resource_set_setup_inline_chunk(
-    iree_hal_resource_set_t* set) {
-  uint8_t* block_ptr = (uint8_t*)set + sizeof(*set);
-  iree_hal_resource_set_chunk_t* inlined_chunk =
-      (iree_hal_resource_set_chunk_t*)block_ptr;
-  inlined_chunk->flags = IREE_HAL_RESOURCE_SET_CHUNK_FLAG_INLINE;
-  inlined_chunk->capacity = (set->block_pool->total_block_size - sizeof(*set) -
-                             sizeof(*inlined_chunk)) /
-                            sizeof(iree_hal_resource_t*);
-  inlined_chunk->capacity = iree_min(inlined_chunk->capacity,
-                                     IREE_HAL_RESOURCE_SET_CHUNK_MAX_CAPACITY);
-  inlined_chunk->count = 0;
-  set->chunk_head = inlined_chunk;
+// Computes the total capacity in resources of a chunk allocated with a total
+// |storage_size| (including the header).
+static uint16_t iree_hal_resource_set_chunk_capacity(
+    iree_host_size_t storage_size) {
+  return iree_min((storage_size - sizeof(iree_hal_resource_set_chunk_t)) /
+                      sizeof(iree_hal_resource_t*),
+                  IREE_HAL_RESOURCE_SET_CHUNK_MAX_CAPACITY);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
@@ -32,26 +24,38 @@ IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
 
   // We could allow larger sizes (would require widening the capacity/count
   // fields in the chunk) but in real usage having even 64k is a bit too much.
-  IREE_ASSERT_LE(block_pool->total_block_size, 64 * 1024,
+  IREE_ASSERT_LE(block_pool->usable_block_size, 64 * 1024,
                  "keep block sizes small for resource sets");
 
   // Acquire block and place the set struct at the head.
   iree_arena_block_t* block = NULL;
+  iree_hal_resource_set_t* set = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_arena_block_pool_acquire(block_pool, &block));
-  uint8_t* block_ptr = (uint8_t*)block - block_pool->usable_block_size;
-  iree_hal_resource_set_t* set = (iree_hal_resource_set_t*)block_ptr;
+      z0, iree_arena_block_pool_acquire(block_pool, &block, (void**)&set));
   memset(set, 0, sizeof(*set));
   set->block_pool = block_pool;
-  iree_hal_resource_set_setup_inline_chunk(set);
+
+  // Inline the first chunk into the block using all of the remaining space.
+  // This is a special case chunk that is released back to the pool with the
+  // resource set and lets us avoid an additional allocation.
+  // The total capacity in resources will be less than those of chunks allocated
+  // from the block pool as there's reserved space at the front for the
+  // iree_hal_resource_set_t.
+  iree_hal_resource_set_chunk_t* inlined_chunk =
+      (iree_hal_resource_set_chunk_t*)((uint8_t*)set + sizeof(*set));
+  inlined_chunk->next_chunk = NULL;
+  inlined_chunk->capacity = iree_hal_resource_set_chunk_capacity(
+      block_pool->usable_block_size -
+      iree_host_align(sizeof(iree_hal_resource_set_t), iree_max_align_t));
+  inlined_chunk->count = 0;
+  set->chunk_head = inlined_chunk;
 
   *out_set = set;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
-static void iree_hal_resource_set_release_blocks(iree_hal_resource_set_t* set,
-                                                 bool preserve_set) {
+static void iree_hal_resource_set_release_blocks(iree_hal_resource_set_t* set) {
   // Release all resources in all chunks and stitch together the blocks in a
   // linked list. We do this first so that we can release all of the chunks back
   // to the block pool in one operation. Ideally we'd maintain the linked list
@@ -61,33 +65,25 @@ static void iree_hal_resource_set_release_blocks(iree_hal_resource_set_t* set,
   iree_arena_block_t* block_tail = NULL;
   iree_hal_resource_set_chunk_t* chunk = set->chunk_head;
   while (chunk) {
+    iree_hal_resource_set_chunk_t* next_chunk = chunk->next_chunk;
+
     // Release all resources in the chunk.
     for (iree_host_size_t i = 0; i < chunk->count; ++i) {
       iree_hal_resource_release(chunk->resources[i]);
     }
+
     // Consume the chunk and add it to the block pool release linked list.
-    iree_hal_resource_set_chunk_t* next_chunk = chunk->next_chunk;
-    iree_arena_block_t* block = NULL;
-    if (iree_hal_resource_set_chunk_is_stored_inline(chunk)) {
-      // This is the inlined first chunk that also stores the set header.
-      // If we are not freeing the set then we don't release the block back to
-      // the pool.
-      if (preserve_set) {
-        // Don't release the block.
-        break;
-      } else {
-        block = (iree_arena_block_t*)((uint8_t*)set +
-                                      set->block_pool->usable_block_size);
-        next_chunk = NULL;
-      }
-    } else {
-      // A chunk acquired after the set was acquired.
-      block = (iree_arena_block_t*)((uint8_t*)chunk +
-                                    set->block_pool->usable_block_size);
-    }
+    // Note that the block metadata is located in different places depending on
+    // whether this is the inline chunk or not.
+    iree_arena_block_t* block = iree_arena_block_trailer(
+        set->block_pool,
+        iree_hal_resource_set_chunk_is_stored_inline(set, chunk)
+            ? (void*)set
+            : (void*)chunk);
     block->next = block_head;
     block_head = block;
     if (!block_tail) block_tail = block;
+
     chunk = next_chunk;
   }
 
@@ -100,11 +96,48 @@ static void iree_hal_resource_set_release_blocks(iree_hal_resource_set_t* set,
 IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+#if defined(IREE_SANITIZER_ADDRESS)
+  // Unpoison the set so we can access the chunk list.
+  IREE_ASAN_UNPOISON_MEMORY_REGION(set, sizeof(iree_hal_resource_set_t));
+  // Unpoison all chunks so that we can free them.
+  iree_hal_resource_set_chunk_t* chunk = set->chunk_head;
+  while (chunk) {
+    // NOTE: as the chunk header is stored in the poisoned memory we need to
+    // unpoison based only on the base pointer and the shared set information.
+    IREE_ASAN_UNPOISON_MEMORY_REGION(
+        iree_hal_resource_set_chunk_is_stored_inline(set, chunk) ? (void*)set
+                                                                 : (void*)chunk,
+        set->block_pool->usable_block_size);
+    // Once unpoisoned we can read the memory to get the next chunk.
+    chunk = chunk->next_chunk;
+  }
+#endif  // IREE_SANITIZER_ADDRESS
+
   // Release all resources and the arena block used by the set.
   // The set pointer is invalid after this call returns.
-  iree_hal_resource_set_release_blocks(set, /*preserve_set=*/false);
+  iree_hal_resource_set_release_blocks(set);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+IREE_API_EXPORT void iree_hal_resource_set_freeze(
+    iree_hal_resource_set_t* set) {
+#if defined(IREE_SANITIZER_ADDRESS)
+  // Poison all chunks until the resource set is freed.
+  iree_hal_resource_set_chunk_t* chunk = set->chunk_head;
+  while (chunk) {
+    iree_hal_resource_set_chunk_t* next_chunk = chunk->next_chunk;
+    IREE_ASAN_POISON_MEMORY_REGION(
+        chunk, set->block_pool->usable_block_size -
+                   (iree_hal_resource_set_chunk_is_stored_inline(set, chunk)
+                        ? iree_host_align(sizeof(iree_hal_resource_set_t),
+                                          iree_max_align_t)
+                        : 0));
+    chunk = next_chunk;
+  }
+  // Poison the set.
+  IREE_ASAN_POISON_MEMORY_REGION(set, sizeof(iree_hal_resource_set_t));
+#endif  // IREE_SANITIZER_ADDRESS
 }
 
 // Retains |resource| and adds it to the main |set| list.
@@ -116,16 +149,11 @@ static iree_status_t iree_hal_resource_set_insert_retain(
     // the list of chunks.
     iree_arena_block_t* block = NULL;
     IREE_RETURN_IF_ERROR(
-        iree_arena_block_pool_acquire(set->block_pool, &block));
-    chunk =
-        (iree_hal_resource_set_chunk_t*)((uint8_t*)block -
-                                         set->block_pool->usable_block_size);
+        iree_arena_block_pool_acquire(set->block_pool, &block, (void**)&chunk));
     chunk->next_chunk = set->chunk_head;
     set->chunk_head = chunk;
-    chunk->capacity = (set->block_pool->total_block_size - sizeof(*chunk)) /
-                      sizeof(iree_hal_resource_t*);
-    chunk->capacity =
-        iree_min(chunk->capacity, IREE_HAL_RESOURCE_SET_CHUNK_MAX_CAPACITY);
+    chunk->capacity = iree_hal_resource_set_chunk_capacity(
+        set->block_pool->usable_block_size);
     chunk->count = 0;
   }
 

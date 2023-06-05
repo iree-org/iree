@@ -39,6 +39,9 @@ namespace {
 struct UsageInfo {
   // util.globals holding resources mapped by name.
   llvm::MapVector<StringRef, IREE::Util::GlobalOp> resourceGlobalOps;
+  // util.buffer.constants that are (for the most part) going to end up in the
+  // final binary.
+  SmallVector<IREE::Util::BufferConstantOp> bufferConstantOps;
 
   // stream.executable ops mapped by name.
   llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
@@ -68,6 +71,8 @@ struct UsageInfo {
     for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
       funcLikeOp.walk([&](Operation *op) {
         TypeSwitch<Operation *>(op)
+            .Case<IREE::Util::BufferConstantOp>(
+                [&](auto op) { bufferConstantOps.push_back(op); })
             .Case<IREE::Stream::ResourceAllocaOp>(
                 [&](auto op) { allocaOps.push_back(op); })
             .Case<IREE::Stream::CmdExecuteOp>(
@@ -120,11 +125,11 @@ struct Statistics {
 
   void analyze(const UsageInfo &usageInfo) {
     // Globals:
-    for (auto it : usageInfo.resourceGlobalOps) {
+    for (auto [name, globalOp] : usageInfo.resourceGlobalOps) {
       auto globalType =
-          llvm::dyn_cast<IREE::Stream::ResourceType>(it.second.getType());
+          llvm::dyn_cast<IREE::Stream::ResourceType>(globalOp.getType());
       if (!globalType) continue;
-      // TODO(benvanik): analyze size in UsageInfo.
+      // TODO(benvanik): analyze size in UsageInfo where possible.
       switch (globalType.getLifetime()) {
         case IREE::Stream::Lifetime::Constant:
           ++constantCount;
@@ -134,6 +139,13 @@ struct Statistics {
           break;
         default:
           continue;
+      }
+    }
+    for (auto constantOp : usageInfo.bufferConstantOps) {
+      if (auto serializableAttr =
+              constantOp.getValue()
+                  .dyn_cast<IREE::Util::SerializableAttrInterface>()) {
+        constantSize += serializableAttr.getStorageSize();
       }
     }
 
@@ -215,13 +227,15 @@ static void prettyPrintStatistics(const UsageInfo &usageInfo,
   stats.analyze(usageInfo);
 
   os << llvm::formatv("//   Constants: {0}, ", stats.constantCount);
-  os << llvm::formatv(
-      "{0}{1} B ({2:F2} MiB)\n", stats.constantSizeDynamic ? "minimum " : "",
-      stats.constantSize, stats.constantSize / (1 * 1024 * 1024.0f));
+  os << llvm::formatv("estimated storage of {0}{1} B ({2:F2} MiB)\n",
+                      stats.constantSizeDynamic ? "minimum " : "",
+                      stats.constantSize,
+                      stats.constantSize / (1 * 1024 * 1024.0f));
   os << llvm::formatv("//   Variables: {0}, ", stats.variableCount);
-  os << llvm::formatv(
-      "{0}{1} B ({2:F2} MiB)\n", stats.variableSizeDynamic ? "minimum " : "",
-      stats.variableSize, stats.variableSize / (1 * 1024 * 1024.0f));
+  os << llvm::formatv("(TBD) {0}{1} B ({2:F2} MiB)\n",
+                      stats.variableSizeDynamic ? "minimum " : "",
+                      stats.variableSize,
+                      stats.variableSize / (1 * 1024 * 1024.0f));
 
   os << llvm::formatv("//  D->H Syncs: {0}\n", stats.awaitCount);
 
