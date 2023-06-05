@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/cuda2/dynamic_symbols.h"
-
 #include <iostream>
 
+#include "experimental/cuda2/cuda_dynamic_symbols.h"
+#include "experimental/cuda2/nccl_dynamic_symbols.h"
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 
