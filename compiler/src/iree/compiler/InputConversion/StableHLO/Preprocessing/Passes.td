@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 def StableHLOToStableHLOPreprocessing :
-    Pass<"iree-stablehlo-to-stablehlo-preprocessing", "func::FuncOp"> {
+    Pass<"iree-stablehlo-to-stablehlo-preprocessing", "ModuleOp"> {
   let summary = "Applies IREE-specific stablehlo to stablehlo preprocessing transformations";
   let options = [
     Option<"orderConvFeatures", "order-conv-features", "bool", /*default=*/"true",
