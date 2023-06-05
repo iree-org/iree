@@ -10,15 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-flow-split-reduction"
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -33,6 +36,9 @@ static llvm::cl::list<int64_t> topkSplitReductionRatio(
     "iree-flow-topk-split-reduction",
     llvm::cl::desc("comma separated list of split ratios"),
     llvm::cl::CommaSeparated);
+
+constexpr int64_t kTopkSplitReductionRatioDefault = 8;
+constexpr int64_t kNOTopkSplitReductionRatioDefault = -1;
 
 namespace {
 /// Pattern to wrap splitReduction transformation. This also propagates
@@ -76,14 +82,87 @@ struct LinalgSplitReduction
   LinalgExt::LinalgTransformationFilter filter;
 };
 
+/// Sets the split reduction value for topk operation using a simple heuristic.
+/// The goal here is to increase parallelism.
+static int64_t topkSplitReduceRatio(int64_t splitReductionDepth,
+                                    LinalgExt::TopkOp topkOp, int64_t kValue) {
+  // Step 0. If user set the split reduction ratio use it.
+  if (!topkSplitReductionRatio.empty()) {
+    SmallVector<int64_t, 4> reductionRatios(topkSplitReductionRatio.begin(),
+                                            topkSplitReductionRatio.end());
+    if (splitReductionDepth >= reductionRatios.size()) {
+      return kNOTopkSplitReductionRatioDefault;
+    } else {
+      return reductionRatios[splitReductionDepth];
+    }
+  }
+
+  // Step 1. Hard to predict of advantage of splitting reduction more than 2
+  // depth.
+  if (splitReductionDepth > 1) return kNOTopkSplitReductionRatioDefault;
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- topkSplitReduceRatio started :";
+    llvm::dbgs() << "splitReductionDepth=" << splitReductionDepth
+                 << "\t kValue= " << kValue << "\n";
+  });
+
+  // Step 2. Set split value for for dynamic shape.
+  auto inputType = topkOp.getInputs().front().getType();
+  auto rankedType = dyn_cast<RankedTensorType>(inputType);
+  if (!rankedType) {
+    return kTopkSplitReductionRatioDefault;
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- tensor is not ranked tensor, setting splitk value "
+                      "as default: "
+                   << kTopkSplitReductionRatioDefault << "\n";
+    });
+  }
+
+  // Step 3. Find a value that balances the workload between the two kernels.
+  int64_t lastDim = rankedType.getDimSize(rankedType.getRank() - 1);
+  auto findSplitKValue = [](int64_t workload, int64_t kValue) {
+    for (int64_t ki = 3; ki < kValue; ki++) {
+      if (workload % ki != 0) continue;
+      int workload_2nd_kernel = kValue * ki;
+      int workload_1st_kernel = workload / ki;
+      int check = workload / (ki - 1);
+      LLVM_DEBUG({
+        llvm::dbgs() << "1stKernel = " << workload_1st_kernel << "\t"
+                     << "2ndKernel = " << workload_2nd_kernel << "\t"
+                     << "Check Kernel = " << check << "\n";
+      });
+      if (workload_2nd_kernel > workload_1st_kernel &&
+          workload_2nd_kernel > check) {
+        return ki;
+      }
+    }
+    return kNOTopkSplitReductionRatioDefault;
+  };
+
+  int64_t splitValue = findSplitKValue(lastDim, kValue);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << " ### Split-K[" << splitReductionDepth
+                 << "] Value is set to: " << splitValue << "\n";
+  });
+  return splitValue;
+}
+
+/// Find there is a topk operation in the given operation.
+static bool hasTopk(Operation *op) {
+  bool hasTopk = false;
+  op->walk([&](LinalgExt::TopkOp topkOp) { hasTopk = true; });
+  return hasTopk;
+}
+
 struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
 
   void runOnOperation() override {
-    if (splitReductionRatio.getValue() <= 1 &&
-        topkSplitReductionRatio.empty()) {
+    if (!hasTopk(getOperation()) && splitReductionRatio.getValue() <= 1) {
       return;
     }
 
@@ -102,18 +181,8 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
         LinalgExt::LinalgTransformationFilter(
             ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));
 
-    LinalgExt::TopkSplitReductionControlFn splitReductionFn =
-        [&](int64_t splitReductionDepth) -> int64_t {
-      SmallVector<int64_t, 4> reductionRatios(topkSplitReductionRatio.begin(),
-                                              topkSplitReductionRatio.end());
-      if (splitReductionDepth >= reductionRatios.size()) {
-        return -1;
-      } else {
-        return reductionRatios[splitReductionDepth];
-      }
-    };
     LinalgExt::populateTopkSplitReductionPattern(
-        patterns, splitReductionFn,
+        patterns, topkSplitReduceRatio,
         LinalgExt::LinalgTransformationFilter(
             ArrayRef<StringAttr>{},
             StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));

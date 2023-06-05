@@ -448,9 +448,9 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
    A Top-K operation for N-D tensors. Reduces the target dimension from the input
    size N down to K elements based on the supplied binary region.
 
-   Accepts an N-D tensor input consisting of values and an optioanl N-D tensor
+   Accepts an N-D tensor input consisting of values and an optional N-D tensor
    for indices of those values (i32 type). If input indices aren't provided, the
-   index mapping is inferred based on the k dim.  Both input values/indices
+   index mapping is inferred based on the k dim. Both input values/indices
    tensors and output values/indicies tensors must have the same shape. Top-K is
    computed along the target dimension (from dimension()). Returns two output
    tensors of values and the indicies of Top-K results. The output dimensions

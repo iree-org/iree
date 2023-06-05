@@ -318,7 +318,8 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
     int64_t kSize =
         topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
     int64_t splitReductionDepth = getSplitReductionDepth(topkOp);
-    int64_t splitReductionRatio = splitReductionFn(splitReductionDepth);
+    int64_t splitReductionRatio =
+        splitReductionFn(splitReductionDepth, topkOp, kSize);
     SmallVector<ReassociationIndices> reassociationIndices =
         getReassociationIndices(topkOp.getInputRank(), splitDimParallel);
 
@@ -386,7 +387,8 @@ struct TopkSplitReductionPass
     }
     RewritePatternSet patterns(&getContext());
     TopkSplitReductionControlFn splitReductionFn =
-        [&](int64_t splitReductionDepth) -> int64_t {
+        [&](int64_t splitReductionDepth, TopkOp topkOp,
+            int64_t kValue) -> int64_t {
       SmallVector<int64_t, 4> reductionRatios(splitRatios.begin(),
                                               splitRatios.end());
       if (splitReductionDepth >= reductionRatios.size()) {
