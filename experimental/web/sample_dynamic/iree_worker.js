@@ -32,7 +32,7 @@ var Module = {
     wasmInspectProgramFn = Module.cwrap('inspect_program', null, ['number']);
     wasmUnloadProgramFn = Module.cwrap('unload_program', null, ['number']);
     wasmCallFunctionFn = Module.cwrap(
-        'call_function', 'string', ['number', 'string', 'string', 'number']);
+        'call_function', 'number', ['number', 'string', 'string', 'number']);
 
     sampleState = wasmSetupSampleFn();
 
@@ -120,8 +120,11 @@ function callFunction(id, functionParams) {
     return;
   }
 
-  const returnValue =
+  // Receive as a pointer, convert, then free. This avoids a memory leak, see
+  // https://github.com/emscripten-core/emscripten/issues/6484
+  const returnValuePtr =
       wasmCallFunctionFn(programState, functionName, inputsJoined, iterations);
+  const returnValue = Module.UTF8ToString(returnValuePtr);
 
   if (returnValue === '') {
     postMessage({
@@ -130,16 +133,12 @@ function callFunction(id, functionParams) {
       'error': 'Wasm module error, check console for details',
     });
   } else {
+    Module._free(returnValuePtr);
     postMessage({
       'messageType': 'callResult',
       'id': id,
       'payload': JSON.parse(returnValue),
     });
-    // TODO(scotttodd): free char* buffer? Or does Emscripten handle that?
-    // Could refactor to
-    //   1) return void*
-    //   2) convert to String manually using UTF8ToString(pointer)
-    //   3) Module._free(pointer)
   }
 }
 

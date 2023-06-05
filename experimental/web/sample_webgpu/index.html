@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+Copyright 2022 The IREE Authors
+
+Licensed under the Apache License v2.0 with LLVM Exceptions.
+See https://llvm.org/LICENSE.txt for license information.
+SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+-->
+
+<head>
+  <meta charset="utf-8" />
+  <title>IREE WebGPU Sample</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="./ghost.svg" type="image/svg+xml">
+
+  <style>
+    body {
+      padding: 16px;
+    }
+
+    .drop-target {
+      border: 3px solid #2244CC;
+      background-color: #c0c0c0;
+      color: #222222;
+      width:  300px;
+      height: 140px;
+      margin: 20px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .drop-target p {
+      pointer-events: none;
+    }
+  </style>
+
+  <!-- https://getbootstrap.com/ for some webpage styling-->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+
+  <script src="./iree_api_webgpu.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <h1>IREE WebGPU Sample</h1>
+
+    <p>
+      This tool works similarly to
+      <a href="https://github.com/iree-org/iree/blob/main/tools/iree-run-module-main.cc"><code>iree-run-module</code></a>
+      (<a href="https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/developer_overview.md#iree-run-module">docs</a>).
+      <br>It loads a compiled IREE program then lets you call exported functions.
+      <br><b>Note:</b> Some outputs are logged to the console.</p>
+    </p>
+
+    <h2>1. Load a program</h2>
+
+    <div id="drop-zone" class="drop-target">
+      <p style="margin:0px">Drag a compiled IREE program<br>(.vmfb file) here to load it</p>
+    </div>
+    <p>
+      Currently loaded program:
+      <b><span id="loaded-program-name" style="display: inline;">(None)</span></b>
+    </p>
+
+    <h2>2. Call functions on a loaded program</h2>
+
+    <form>
+      <p>
+        <label for="function-name-input" class="form-label">Function name:</label>
+        <input type="text" id="function-name-input" class="form-control"
+               style="width:400px; font-family: monospace;" value="main"></input>
+      </p>
+
+      <p>
+        <label for="function-arguments-input" class="form-label">Function arguments:</label>
+        <br><span class="form-text">In the form <code>dim1xdim2xtype=val1,val2,...</code>, one per line</span>
+        <textarea type="text" id="function-arguments-input" spellcheck="false" class="form-control"
+                  style="min-width:400px; width:initial; min-height:100px; resize:both; font-family: monospace;"></textarea>
+      </p>
+
+      <p>
+        <label for="benchmark-iterations-input" class="form-label">
+          Benchmark iterations (inner invoke call):</label>
+        <input type="number" id="benchmark-iterations-input" class="form-control"
+               style="width:400px; font-family: monospace;" value="1" min="1"></input>
+      </p>
+
+      <button id="call-function" class="btn btn-primary" type="button"
+              onclick="callFunctionWithFormInputs()" disabled>Call function</button>
+      <button id="update-url" class="btn btn-secondary" type="button"
+              onclick="updateUrlWithFormValues()">Update URL</button>
+      <button id="update-url" class="btn btn-secondary" type="button"
+              onclick="clearUrl()">Clear URL</button>
+    </form>
+
+    <p>
+      <h4><label for="function-outputs" class="form-label">Function outputs:</label></h4>
+      <textarea type="text" id="function-outputs" readonly spellcheck="false" class="form-control"
+                style="min-width:400px; width:initial; height:100px; resize:both; font-family: monospace;"></textarea>
+    </p>
+
+    <p>Total time (including overheads):
+      <code id="benchmark-time-js-output" style="font-family: monospace;"></code></p>
+    <p>Mean inference time (Wasm only):
+      <code id="benchmark-time-wasm-output" style="font-family: monospace;"></code></p>
+
+    <hr>
+    <h2>Samples</h2>
+
+    <p>
+      Click to load a sample program, function, and arguments list.
+      <br>These links will automatically update the URL.
+    </p>
+
+    <div class="container" style="width:fit-content; margin-left:0px">
+      <div class="row" style="padding:4px">
+        <div class="col-sm">
+          simple_abs
+          (<a href="https://github.com/iree-org/iree/blob/main/iree/samples/models/simple_abs.mlir">source</a>)
+        </div>
+        <div class="col-sm-auto">
+          <button class="btn btn-secondary" onclick="loadSample('simple_abs')">Load sample</button>
+        </div>
+      </div>
+      <div class="row" style="padding:4px">
+        <div class="col-sm">
+          fullyconnected
+          (<a href="https://github.com/iree-org/iree/blob/main/tests/e2e/models/fullyconnected.mlir">source</a>)
+        </div>
+        <div class="col-sm-auto">
+          <button class="btn btn-secondary" onclick="loadSample('fullyconnected')">Load sample</button>
+        </div>
+      </div>
+      <div class="row" style="padding:4px">
+        <div class="col-sm">
+          mobilebert
+          (<a href="https://tfhub.dev/iree/lite-model/mobilebert/fp32/1">source</a>)
+        </div>
+        <div class="col-sm-auto">
+          <button class="btn btn-secondary" onclick="loadSample('mobilebert')">Load sample</button>
+        </div>
+      </div>
+      <div class="row" style="padding:4px">
+        <div class="col-sm">
+          posenet
+          (<a href="https://tfhub.dev/tensorflow/lite-model/posenet/mobilenet/float/075/1/default/1">source</a>)
+        </div>
+        <div class="col-sm-auto">
+          <button class="btn btn-secondary" onclick="loadSample('posenet')">Load sample</button>
+        </div>
+      </div>
+      <div class="row" style="padding:4px">
+        <div class="col-sm">
+          mobilessd
+          (<a href="https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/mobile_ssd_v2_float_coco.tflite">source</a>)
+        </div>
+        <div class="col-sm-auto">
+          <button class="btn btn-secondary" onclick="loadSample('mobilessd')">Load sample</button>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+    <h2>Compile your own program</h2>
+
+    <p>
+      Programs must be compiled for WebGPU to run on this page, using options
+      to <code>iree-compile</code> such as:
+    </p>
+
+    <textarea type="text" readonly spellcheck="false"
+    class="form-control" style="width:610px; height:90px; resize:none; font-family: monospace;">
+--iree-hal-target-backends=webgpu \
+--iree-codegen-gpu-native-math-precision=true \</textarea>
+
+  </div>
+
+  <script>
+    const initializePromise = ireeInitialize();
+    initializePromise.then(() => {
+      console.log("IREE initialized, ready to load programs.");
+    }).catch((error) => {
+      console.error("Failed to initialize IREE, error:");
+      console.error(error);
+    });
+
+    let loadedProgram = null;
+    const programNameElement = document.getElementById("loaded-program-name");
+    const callFunctionButton = document.getElementById("call-function");
+    const functionNameInput = document.getElementById("function-name-input");
+    const functionArgumentsInput = document.getElementById("function-arguments-input");
+    const benchmarkIterationsInput = document.getElementById("benchmark-iterations-input");
+    const functionOutputsElement = document.getElementById("function-outputs");
+    const timeJsOutputElement = document.getElementById("benchmark-time-js-output");
+    const timeWasmOutputElement = document.getElementById("benchmark-time-wasm-output");
+
+    async function finishLoadingProgram(newProgram, newProgramName) {
+      if (loadedProgram !== null) {
+        // Unload the previous program. We could keep a list of loaded programs
+        // and let users select between them.
+        await ireeUnloadProgram(loadedProgram);
+      }
+
+      await ireeInspectProgram(newProgram);
+
+      loadedProgram = newProgram;
+      programNameElement.innerText = newProgramName;
+      callFunctionButton.disabled = false;
+    }
+
+    async function tryLoadFromUrlParams() {
+      // Fetch IREE program from ?program=[file.vmfb] URL query parameter.
+      const searchParams = new URLSearchParams(window.location.search);
+
+      if (searchParams.has("function")) {
+        functionNameInput.value = searchParams.get("function");
+      }
+
+      if (searchParams.has("arguments")) {
+        functionArgumentsInput.value = searchParams.get("arguments");
+      }
+
+      if (searchParams.has("iterations")) {
+        benchmarkIterationsInput.value = searchParams.get("iterations");
+      }
+
+      if (searchParams.has("program")) {
+        const programPath = searchParams.get("program");
+
+        await initializePromise;
+        const program = await ireeLoadProgram(programPath);
+
+        // Set name to what is hopefully the file component of the path.
+        finishLoadingProgram(program, programPath.split("/").pop());
+      }
+    }
+
+    async function tryLoadFromBuffer(programDataBuffer, programName) {
+      // Clear 'program' from the URL.
+      const searchParams = new URLSearchParams(window.location.search);
+      searchParams.delete("program");
+      replaceUrlWithSearchParams(searchParams);
+
+      await initializePromise;
+      const program = await ireeLoadProgram(programDataBuffer);
+
+      finishLoadingProgram(program, programName);
+    }
+
+    // ------------------------------------------------------------------------
+    // Drag-and-drop to load from your local filesystem.
+    const dropZone = document.getElementById("drop-zone");
+    dropZone.addEventListener("drop", (dropEvent) => {
+      dropEvent.preventDefault();
+      dropEvent.target.style.border = "";
+
+      // Assume exactly one file was dropped.
+      const uploadedFile = dropEvent.dataTransfer.items[0].getAsFile();
+      const fileReader = new FileReader();
+      fileReader.onload = (fileLoadEvent) => {
+        tryLoadFromBuffer(fileLoadEvent.target.result, uploadedFile.name)
+          .catch((error) => {
+            console.error("Error loading program from drop: '" + error + "'");
+          });
+      };
+      fileReader.readAsArrayBuffer(uploadedFile);
+    });
+    dropZone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
+    dropZone.addEventListener("dragenter", (event) => {
+      if (event.target !== dropZone) return;
+      event.target.style.border = "3px dotted red";
+    });
+    dropZone.addEventListener("dragleave", (event) => {
+      if (event.target !== dropZone) return;
+      event.target.style.border = "";
+    });
+    // ------------------------------------------------------------------------
+
+    // ------------------------------------------------------------------------
+    // Form inputs.
+    function callFunctionWithFormInputs() {
+      if (loadedProgram === null) {
+        console.error("Can't call a function with no loaded program");
+        return;
+      }
+
+      const functionName = functionNameInput.value;
+      const inputs = functionArgumentsInput.value.split("\n");
+      const iterations = benchmarkIterationsInput.value;
+      const startJsTime = performance.now();
+
+      ireeCallFunction(loadedProgram, functionName, inputs, iterations)
+          .then((resultObject) => {
+            functionOutputsElement.value =
+                resultObject['outputs'].replace(";", "\n");
+
+            const endJsTime = performance.now();
+            const totalJsTime = endJsTime - startJsTime;
+            timeJsOutputElement.textContent = totalJsTime.toFixed(3) + "ms";
+
+            const totalWasmTimeMs = resultObject['total_invoke_time_ms'];
+            const meanWasmTimeMs = totalWasmTimeMs / iterations;
+            timeWasmOutputElement.textContent = meanWasmTimeMs.toFixed(3) +
+                "ms / iteration over " + iterations + " iteration(s)";
+          })
+          .catch((error) => {
+            console.error("Function call error: '" + error + "'");
+          });
+    }
+
+    function replaceUrlWithSearchParams(searchParams) {
+      let newUrl = window.location.protocol + "//" + window.location.host +
+          window.location.pathname;
+      const searchString = searchParams.toString();
+      if (searchString !== "") newUrl += "?" + searchParams;
+      window.history.replaceState({path: newUrl}, "", newUrl);
+    }
+
+    function updateUrlWithFormValues() {
+      const searchParams = new URLSearchParams(window.location.search);
+      searchParams.set("function", functionNameInput.value);
+      searchParams.set("arguments", functionArgumentsInput.value);
+      searchParams.set("iterations", benchmarkIterationsInput.value);
+      replaceUrlWithSearchParams(searchParams);
+    }
+
+    function clearUrl() {
+      const searchParams = new URLSearchParams(window.location.search);
+      searchParams.delete("program");
+      searchParams.delete("function");
+      searchParams.delete("arguments");
+      searchParams.delete("iterations");
+      replaceUrlWithSearchParams(searchParams);
+    }
+    // ------------------------------------------------------------------------
+
+    // ------------------------------------------------------------------------
+    // Load samples programs / inputs.
+    function loadSample(sampleName) {
+      const searchParams = new URLSearchParams(window.location.search);
+      searchParams.set("program", sampleName + "_webgpu.vmfb");
+      replaceUrlWithSearchParams(searchParams);
+
+      if (sampleName === "simple_abs") {
+        functionNameInput.value = "abs";
+        functionArgumentsInput.value = "f32=-1.23";
+      } else if (sampleName === "fullyconnected") {
+        functionNameInput.value = "main";
+        functionArgumentsInput.value = [
+          "1x5xf32=1,-2,-3,4,-5",
+          "1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1",
+        ].join("\n");
+      } else if (sampleName === "mobilebert") {
+        functionNameInput.value = "main";
+        functionArgumentsInput.value = [
+          "1x384xi32",
+          "1x384xi32",
+          "1x384xi32",
+        ].join("\n");
+      } else if (sampleName === "posenet") {
+        functionNameInput.value = "main";
+        functionArgumentsInput.value = "1x353x257x3xf32";
+      } else if (sampleName === "mobilessd") {
+        functionNameInput.value = "main";
+        functionArgumentsInput.value = "1x320x320x3xf32";
+      }
+
+      updateUrlWithFormValues();
+
+      tryLoadFromUrlParams().catch((error) => {
+        console.error("Error loading sample program: '" + error + "'");
+      });
+    }
+    // ------------------------------------------------------------------------
+
+    window.addEventListener("load", () => {
+      tryLoadFromUrlParams().catch((error) => {
+        console.error("Error loading program from URL: '" + error + "'");
+      });
+    });
+  </script>
+</body>
+
+</html>
