@@ -560,23 +560,8 @@ static iree_status_t print_outputs_from_call(
           call_state->output_states[i].mapped_host_buffer,
           call_state->output_states[i].buffer_view, iree_allocator_system(),
           &heap_buffer_view));
-      // Query total length (excluding NUL terminator).
-      iree_host_size_t result_length = 0;
-      iree_status_t status = iree_hal_buffer_view_format(
-          heap_buffer_view, SIZE_MAX, 0, NULL, &result_length);
-      if (!iree_status_is_out_of_range(status)) return status;
-      status = iree_ok_status();
-      ++result_length;  // include NUL
-      // Format into a scratch buffer and append.
-      char* scratch = (char*)iree_alloca(result_length);
-      if (iree_status_is_ok(status)) {
-        status = iree_hal_buffer_view_format(
-            heap_buffer_view, SIZE_MAX, result_length, scratch, &result_length);
-      }
-      if (iree_status_is_ok(status)) {
-        status = iree_string_builder_append_format(outputs_builder, "%.*s",
-                                                   (int)result_length, scratch);
-      }
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_append_to_builder(
+          heap_buffer_view, SIZE_MAX, outputs_builder));
       iree_hal_buffer_view_release(heap_buffer_view);
     } else {
       IREE_RETURN_IF_ERROR(
@@ -639,7 +624,7 @@ static iree_status_t map_all_callback(void* user_data, iree_loop_t loop,
     fprintf(stderr, "map_all_callback error:\n");
     iree_status_fprint(stderr, status);
     // Note: loop_emscripten.js must free 'status'!
-    call_state->callback_fn(0);
+    call_state->callback_fn(NULL);
   }
 
   iree_string_builder_deinitialize(&output_string_builder);
@@ -705,6 +690,11 @@ static iree_status_t process_call_outputs(
       (void**)&call_state->output_states));
   call_state->outputs_size = outputs_size;
 
+  // TODO(scotttodd): allocate on the heap and track?
+  //   * iree_loop_wait_all claims that wait_sources must live until the
+  //     callback is issued
+  //   * loop_emscripten uses what it needs (Promise handles/objects)
+  //     immediately, before objects go out of scope
   iree_wait_source_t* wait_sources = (iree_wait_source_t*)iree_alloca(
       sizeof(iree_wait_source_t) * outputs_size);
 
