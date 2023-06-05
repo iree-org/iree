@@ -1,4 +1,6 @@
 # Codeowners for IREE Github Repository.
+# The listed owners will automatically be added as reviewers to PRs that modify
+# paths matching the specified patterns.
 # Refer to https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 # for syntax of this file (tl;dr: syntax is like .gitignore. Last matching rule
 # takes precedence).
@@ -9,15 +11,12 @@
 # No global owners because we don't really want e.g. changing the root
 # CMakeLists.txt file to always ping a bunch of people.
 
-# Code owners for individual components/directories
-
 # Third-Party Code
 /.gitmodules @GMNGeoffrey @ScottTodd @stellaraccident
 /third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
 # Except for routinely-updated submodules
 /third_party/llvm-project @ghost
 /third_party/llvm-project.branch-pin @ghost
-/third_party/tensorflow @ghost
 /third_party/mlir-hlo @ghost
 
 # Bindings
@@ -27,17 +26,18 @@
 # Integrations
 /integrations/ @benvanik @stellaraccident
 /integrations/tensorflow/ @stellaraccident
-/integrations/tensorflow/build_tools/ @GMNGeoffrey @stellaraccident
 /integrations/tensorflow/test/**/iree_tfl_tests/ @rsuderman
 
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @GMNGeoffrey @stellaraccident
-/experimental/remoting/ @stellaraccident
+/experimental/cpu_ukernel/ @bjacob
+/experimental/cuda2/ @antiagainst
+/experimental/dispatch_profiler/ @manishucsd
+/experimental/rocm/ @benvanik
 /experimental/web/ @ScottTodd
 
 # Infra Top-Level Directories
-/benchmarks/ @GMNGeoffrey @antiagainst @pzread
 /build_tools/ @GMNGeoffrey @ScottTodd @pzread
 /build_tools/benchmarks/ @GMNGeoffrey @antiagainst @pzread
 /build_tools/python/ @GMNGeoffrey @pzread
