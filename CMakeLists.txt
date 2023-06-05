@@ -866,14 +866,23 @@ if(IREE_BUILD_PYTHON_BINDINGS)
 endif()
 
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
-  iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
+  iree_set_spirv_cross_cmake_options()
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_TARGET_BACKEND_WEBGPU)
   # Tint is needed to compile SPIR-V into WGSL source code.
   # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+
+  # NOTE: these can be synced by referencing one of these repositories:
+  #   * https://dawn.googlesource.com/dawn/
+  #   * https://dawn.googlesource.com/tint/
+  #   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
+  # or they can be updated independently
+  set(IREE_TINT_TAG         "fdb8787e9c1b79770bd98a8faf37fbe48a3077a4")  # 2023-03-06
+  set(IREE_SPIRV_TOOLS_TAG  "95f93810bbae12e1a601a3a5a5d975e5558a2994")  # 2023-02-15
+
   iree_set_spirv_headers_cmake_options()
   add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)

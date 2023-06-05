@@ -27,7 +27,7 @@ table ExecutableDef {
 
   // A mapping of executable entry point ordinals to the shader module in which
   // they reside.
-  entry_points:[int];
+  entry_points:[uint];
 }
 
 root_type ExecutableDef;
