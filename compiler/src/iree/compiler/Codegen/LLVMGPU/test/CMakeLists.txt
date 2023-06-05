@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
     "transform_dialect_bufferize.mlir"
+    "transform_dialect_eliminate_gpu_barriers.mlir"
     "transform_dialect_hoist_allocs.mlir"
     "transform_dialect_promote_operands.mlir"
     "transform_dialect_vector_distribution.mlir"

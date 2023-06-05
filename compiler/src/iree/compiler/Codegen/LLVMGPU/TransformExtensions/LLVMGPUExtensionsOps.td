@@ -557,4 +557,39 @@ def ReorderTransposeOp :
 
 }
 
+def EliminateGpuBarriersOp :
+  Op<Transform_Dialect, "iree.eliminate_gpu_barriers",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Removes unnecessary GPU barriers from the function. If a barrier does not
+    enforce any conflicting pair of memory effects, including a pair that is
+    enforced by another barrier, it is unnecessary and can be removed.
+
+    #### Return modes
+
+    Consumes the operand handle and produces a new handle to the function after
+    rewriting.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
