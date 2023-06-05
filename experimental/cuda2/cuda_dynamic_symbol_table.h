@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+IREE_CU_PFN_DECL(cuDriverGetVersion, int*)
 IREE_CU_PFN_DECL(cuCtxCreate, CUcontext*, unsigned int, CUdevice)
 IREE_CU_PFN_DECL(cuCtxDestroy, CUcontext)
 IREE_CU_PFN_DECL(cuDevicePrimaryCtxRetain, CUcontext*, CUdevice)

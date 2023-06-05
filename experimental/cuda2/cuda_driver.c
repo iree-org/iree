@@ -246,12 +246,160 @@ static iree_status_t iree_hal_cuda2_driver_query_available_devices(
 static iree_status_t iree_hal_cuda2_driver_dump_device_info(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_string_builder_t* builder) {
+  IREE_ASSERT_ARGUMENT(base_driver);
+  IREE_ASSERT_ARGUMENT(builder);
   iree_hal_cuda2_driver_t* driver = iree_hal_cuda2_driver_cast(base_driver);
-  CUdevice device = (CUdevice)device_id;
-  if (!device) return iree_ok_status();
-  // TODO: dump detailed device info.
-  (void)driver;
-  (void)device;
+  CUdevice device = IREE_DEVICE_ID_TO_CUDEVICE(device_id);
+
+#define IREE_CUDA_QUERY_ATTRIBUTE(attribute, value)                          \
+  IREE_CUDA_RETURN_IF_ERROR(                                                 \
+      &driver->cuda_symbols,                                                 \
+      cuDeviceGetAttribute(&value, CU_DEVICE_ATTRIBUTE_##attribute, device), \
+      "cuDeviceGetAttribute");
+
+  int compute_capability_major = 0, compute_capability_minor = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(COMPUTE_CAPABILITY_MAJOR, compute_capability_major);
+  IREE_CUDA_QUERY_ATTRIBUTE(COMPUTE_CAPABILITY_MINOR, compute_capability_minor);
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-compute-capability: %d.%d", compute_capability_major,
+      compute_capability_minor));
+
+  int driver_version = 0;
+  IREE_CUDA_RETURN_IF_ERROR(&driver->cuda_symbols,
+                            cuDriverGetVersion(&driver_version),
+                            "cuDriverGetVersion");
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- driver-max-cuda-version: %d.%d", driver_version / 1000,
+      (driver_version % 1000) / 10));
+
+  // Launch configuration limits.
+  int max_block_dim_x = 0, max_block_dim_y = 0, max_block_dim_z = 0;
+  int max_grid_dim_x = 0, max_grid_dim_y = 0, max_grid_dim_z = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_BLOCK_DIM_X, max_block_dim_x);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_BLOCK_DIM_Y, max_block_dim_y);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_BLOCK_DIM_Z, max_block_dim_z);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_GRID_DIM_X, max_grid_dim_x);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_GRID_DIM_Y, max_grid_dim_y);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_GRID_DIM_Z, max_grid_dim_z);
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- launch-max-block-dims: (%d, %d, %d)", max_block_dim_x,
+      max_block_dim_y, max_block_dim_z));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- launch-max-grid-dims: (%d, %d, %d)", max_grid_dim_x,
+      max_grid_dim_y, max_grid_dim_z));
+
+  // Per block resource limits.
+  int max_threads_per_block = 0;
+  int max_registers_per_block = 0;
+  int max_shared_memory_per_block = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_THREADS_PER_BLOCK, max_threads_per_block);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_REGISTERS_PER_BLOCK, max_registers_per_block);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_SHARED_MEMORY_PER_BLOCK,
+                            max_shared_memory_per_block);
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-thread-count: %d", max_threads_per_block));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-32-bit-register-count: %d",
+      max_registers_per_block));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-shared-memory: %d bytes",
+      max_shared_memory_per_block));
+
+  // Per multiprocessor resource limits.
+  int max_threads_per_multiprocessor = 0;
+  int max_blocks_per_multiprocessor = 0;
+  int max_registers_per_multiprocessor = 0;
+  int max_shared_memory_per_multiprocessor = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_THREADS_PER_MULTIPROCESSOR,
+                            max_threads_per_multiprocessor);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_BLOCKS_PER_MULTIPROCESSOR,
+                            max_blocks_per_multiprocessor);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_REGISTERS_PER_MULTIPROCESSOR,
+                            max_registers_per_multiprocessor);
+  IREE_CUDA_QUERY_ATTRIBUTE(MAX_SHARED_MEMORY_PER_MULTIPROCESSOR,
+                            max_shared_memory_per_multiprocessor);
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- multiprocessor-max-thread-count: %d",
+      max_threads_per_multiprocessor));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- multiprocessor-max-block-count: %d",
+      max_blocks_per_multiprocessor));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- multiprocessor-max-32-bit-register-count: %d",
+      max_registers_per_multiprocessor));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- multiprocessor-max-shared-memory: %d bytes",
+      max_shared_memory_per_multiprocessor));
+
+  // Memory characteristics.
+  int has_unified_address_space = 0;
+  int supports_managed_memory = 0;
+  int can_map_host_memory = 0;
+  int supports_pageable_memory_access = 0;
+  int supports_concurrent_managed_access = 0;
+  int supports_memory_pools = 0;
+  int l2_cache_size = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(UNIFIED_ADDRESSING, has_unified_address_space);
+  IREE_CUDA_QUERY_ATTRIBUTE(MANAGED_MEMORY, supports_managed_memory);
+  IREE_CUDA_QUERY_ATTRIBUTE(CAN_MAP_HOST_MEMORY, can_map_host_memory);
+  IREE_CUDA_QUERY_ATTRIBUTE(PAGEABLE_MEMORY_ACCESS,
+                            supports_pageable_memory_access);
+  IREE_CUDA_QUERY_ATTRIBUTE(CONCURRENT_MANAGED_ACCESS,
+                            supports_concurrent_managed_access);
+  IREE_CUDA_QUERY_ATTRIBUTE(MEMORY_POOLS_SUPPORTED, supports_memory_pools);
+  IREE_CUDA_QUERY_ATTRIBUTE(L2_CACHE_SIZE, l2_cache_size);
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-has-unified-address-space: %d",
+      has_unified_address_space));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-supports-managed-memory: %d",
+      supports_managed_memory));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-can-map-host-memory-to-device: %d",
+      can_map_host_memory));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-supports-pageable-memory-access-from-device: %d",
+      supports_pageable_memory_access));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-supports-concurrent-managed-access: %d",
+      supports_concurrent_managed_access));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-supports-memory-pools: %d", supports_memory_pools));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-l2-cache-size: %d bytes", l2_cache_size));
+
+  // Other GPU characteristics.
+  int multiprocessor_count = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(MULTIPROCESSOR_COUNT, multiprocessor_count);
+  int clock_rate = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(CLOCK_RATE, clock_rate);
+  int warp_size = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(WARP_SIZE, warp_size);
+  int execution_timeout = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(KERNEL_EXEC_TIMEOUT, execution_timeout);
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-multiprocessor-count: %d", multiprocessor_count));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-clock-rate: %d kHz", clock_rate));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-warp-size: %d", warp_size));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- kernel-has-execution-timeout: %d", execution_timeout));
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+
+#undef IREE_CUDA_QUERY_ATTRIBUTE
+
   return iree_ok_status();
 }
 
