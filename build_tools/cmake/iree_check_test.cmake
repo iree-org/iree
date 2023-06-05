@@ -303,12 +303,14 @@ endfunction()
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
-#   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
-#       for drivers that vary based on the target CPU features. For each list
-#       element, a separate test is created, with the list element passed as
-#       argument to --iree-llvmcpu-target-cpu-features. The special value "default"
-#       is interpreted as no --iree-llvmcpu-target-cpu-features flag to work around
-#       corner cases with empty entries in CMake lists.
+#   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Each
+#       entry is either "default" for the architecture defaults, or a colon-
+#       separated triple "arch:name:cpu_features" where "arch" filters
+#       for a target CPU architecture (in IREE_ARCH format), "name" is a
+#       short name for the CPU features set (used to generate target names)
+#       and cpu_features is a comma-separated list of LLVM target attributes
+#       to enable. Example:
+#         x86_64:avx2_fma:+avx,+avx2,+fma
 function(iree_check_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -321,6 +323,12 @@ function(iree_check_test_suite)
     "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS;TIMEOUT"
     ${ARGN}
   )
+
+  if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
+    set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
+  else()
+    set(_TARGET_CPU_FEATURES_VARIANTS "default")
+  endif()
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
     set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
@@ -339,11 +347,6 @@ function(iree_check_test_suite)
   foreach(_INDEX RANGE "${_MAX_INDEX}")
     list(GET _RULE_TARGET_BACKENDS ${_INDEX} _TARGET_BACKEND)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
-    if(_TARGET_BACKEND STREQUAL "llvm-cpu" AND _RULE_TARGET_CPU_FEATURES_VARIANTS)
-      set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
-    else()
-      set(_TARGET_CPU_FEATURES_VARIANTS "default")
-    endif()
     foreach(_VARIANT_STRING IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
       parse_target_cpu_features_variant("${_VARIANT_STRING}"
         _ENABLED _TARGET_CPU_FEATURES_NAME _TARGET_CPU_FEATURES)

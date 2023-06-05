@@ -6,18 +6,6 @@
 
 iree_add_all_subdirs()
 
-if (IREE_ARCH STREQUAL "arm_64")
-  set(IREE_UK_ARCH_ARM_64 TRUE)
-  list(APPEND IREE_UK_ARCH_DEPS
-    "iree::builtins::ukernel::arch::arm_64"
-  )
-elseif (IREE_ARCH STREQUAL "x86_64")
-  set(IREE_UK_ARCH_X86_64 TRUE)
-  list(APPEND IREE_UK_ARCH_DEPS
-    "iree::builtins::ukernel::arch::x86_64"
-  )
-endif()
-
 iree_cc_library(
   NAME
     ukernel_arch
