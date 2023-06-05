@@ -10,4 +10,3 @@
 #include "third_party/nccl/nccl.h"  // IWYU pragma: export
 
 #endif  // IREE_EXPERIMENTAL_CUDA2_NCCL_HEADERS_H_
-

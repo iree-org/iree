@@ -53,4 +53,3 @@ iree_status_t iree_hal_nccl2_result_to_status(
 #endif  // __cplusplus
 
 #endif  // IREE_EXPERIMENTAL_CUDA2_NCCL_STATUS_UTIL_H_
-

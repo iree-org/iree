@@ -42,4 +42,3 @@ IREE_NCCL_PFN_DECL(ncclRecv, void*, size_t, ncclDataType_t, int, ncclComm_t,
                    cudaStream_t)
 IREE_NCCL_PFN_DECL(ncclGroupStart)
 IREE_NCCL_PFN_DECL(ncclGroupEnd)
-
