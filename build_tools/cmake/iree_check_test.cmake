@@ -303,7 +303,7 @@ endfunction()
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
-#   TARGET_CPU_FEATURES_VARIANTS:list of target cpu features variants. Each
+#   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Each
 #       entry is either "default" for the architecture defaults, or a colon-
 #       separated triple "arch:name:cpu_features" where "arch" filters
 #       for a target CPU architecture (in IREE_ARCH format), "name" is a
