@@ -8,8 +8,10 @@
 #include <string.h>
 
 #include "experimental/cuda2/api.h"
-#include "experimental/cuda2/dynamic_symbols.h"
-#include "experimental/cuda2/status_util.h"
+#include "experimental/cuda2/cuda_dynamic_symbols.h"
+#include "experimental/cuda2/cuda_status_util.h"
+#include "experimental/cuda2/nccl_dynamic_symbols.h"
+#include "experimental/cuda2/nccl_status_util.h"
 #include "iree/base/api.h"
 #include "iree/base/assert.h"
 #include "iree/base/tracing.h"

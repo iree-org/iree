@@ -32,14 +32,20 @@ iree_cc_library(
   NAME
     dynamic_symbols
   HDRS
-    "dynamic_symbols.h"
-    "status_util.h"
+    "cuda_dynamic_symbols.h"
+    "cuda_status_util.h"
+    "nccl_dynamic_symbols.h"
+    "nccl_status_util.h"
   TEXTUAL_HDRS
-    "dynamic_symbol_tables.h"
+    "cuda_dynamic_symbol_table.h"
+    "nccl_dynamic_symbol_table.h"
   SRCS
+    "cuda_dynamic_symbols.c"
     "cuda_headers.h"
-    "dynamic_symbols.c"
-    "status_util.c"
+    "cuda_status_util.c"
+    "nccl_dynamic_symbols.c"
+    "nccl_headers.h"
+    "nccl_status_util.c"
   DEPS
     iree::base
     iree::base::core_headers
