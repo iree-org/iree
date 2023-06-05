@@ -23,7 +23,8 @@ extern "C" {
 // Converts a CUresult to an iree_status_t.
 //
 // Usage:
-//   iree_status_t status = CU_RESULT_TO_STATUS(cuda_symbols, cuDoThing(...));
+//   iree_status_t status = IREE_CURESULT_TO_STATUS(cuda_symbols,
+//                                                  cuDoThing(...));
 #define IREE_CURESULT_TO_STATUS(syms, expr, ...) \
   iree_hal_cuda2_result_to_status((syms), ((syms)->expr), __FILE__, __LINE__)
 
@@ -31,7 +32,7 @@ extern "C" {
 // an iree_status_t.
 //
 // Usage:
-//   CUDA_RETURN_IF_ERROR(cuda_symbols, cuDoThing(...), "message");
+//   IREE_CUDA_RETURN_IF_ERROR(cuda_symbols, cuDoThing(...), "message");
 #define IREE_CUDA_RETURN_IF_ERROR(syms, expr, ...)                             \
   IREE_RETURN_IF_ERROR(iree_hal_cuda2_result_to_status((syms), ((syms)->expr), \
                                                        __FILE__, __LINE__),    \
@@ -41,8 +42,8 @@ extern "C" {
 // CUresult return value to an iree_status_t.
 //
 // Usage:
-//   CUDA_RETURN_AND_END_ZONE_IF_ERROR(zone_id, cuda_symbols, cuDoThing(...),
-//                                     "message");
+//   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(zone_id, cuda_symbols,
+//                                          cuDoThing(...), "message");
 #define IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(zone_id, syms, expr, ...) \
   IREE_RETURN_AND_END_ZONE_IF_ERROR(                                     \
       zone_id,                                                           \
@@ -54,7 +55,7 @@ extern "C" {
 // iree_status_t.
 //
 // Usage:
-//   CUDA_IGNORE_ERROR(cuda_symbols, cuDoThing(...));
+//   IREE_CUDA_IGNORE_ERROR(cuda_symbols, cuDoThing(...));
 #define IREE_CUDA_IGNORE_ERROR(syms, expr)                                  \
   IREE_IGNORE_ERROR(iree_hal_cuda2_result_to_status((syms), ((syms)->expr), \
                                                     __FILE__, __LINE__))
@@ -71,8 +72,8 @@ iree_status_t iree_hal_cuda2_result_to_status(
 // Converts a ncclResult_t to an iree_status_t.
 //
 // Usage:
-//   iree_status_t status = NCCL_RESULT_TO_STATUS(nccl_symbols,
-//                                                ncclDoThing(...));
+//   iree_status_t status = IREE_NCCL_RESULT_TO_STATUS(nccl_symbols,
+//                                                     ncclDoThing(...));
 #define IREE_NCCL_RESULT_TO_STATUS(syms, expr, ...) \
   iree_hal_nccl2_result_to_status((syms), ((syms)->expr), __FILE__, __LINE__)
 
@@ -80,7 +81,7 @@ iree_status_t iree_hal_cuda2_result_to_status(
 // an iree_status_t.
 //
 // Usage:
-//   NCCL_RETURN_IF_ERROR(nccl_symbols, ncclDoThing(...), "message");
+//   IREE_NCCL_RETURN_IF_ERROR(nccl_symbols, ncclDoThing(...), "message");
 #define IREE_NCCL_RETURN_IF_ERROR(syms, expr, ...)                             \
   IREE_RETURN_IF_ERROR(iree_hal_nccl2_result_to_status((syms), ((syms)->expr), \
                                                        __FILE__, __LINE__),    \
@@ -90,7 +91,7 @@ iree_status_t iree_hal_cuda2_result_to_status(
 // an iree_status_t.
 //
 // Usage:
-//   NCCL_IGNORE_ERROR(nccl_symbols, ncclDoThing(...));
+//   IREE_NCCL_IGNORE_ERROR(nccl_symbols, ncclDoThing(...));
 #define IREE_NCCL_IGNORE_ERROR(syms, expr)                                  \
   IREE_IGNORE_ERROR(iree_hal_nccl2_result_to_status((syms), ((syms)->expr), \
                                                     __FILE__, __LINE__))

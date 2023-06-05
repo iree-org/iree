@@ -32,9 +32,9 @@ typedef struct iree_hal_cuda2_dynamic_symbols_t {
   // Concrete CUDA symbols defined by including the `dynamic_symbol_tables.h`.
 #define IREE_CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
-#define IREE_NCCL_PFN_DECL(ncclSymbolName, ...)  // Ignore NCCL symbols
-#define IREE_NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, \
-                                      ...)             // Ignore NCCL symbols
+// Ignore NCCL symbols
+#define IREE_NCCL_PFN_DECL(ncclSymbolName, ...)
+#define IREE_NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
 #include "experimental/cuda2/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef IREE_CU_PFN_DECL
 #undef IREE_NCCL_PFN_DECL
@@ -68,7 +68,8 @@ typedef struct iree_hal_cuda2_nccl_dynamic_symbols_t {
   ncclResult_t (*ncclSymbolName)(__VA_ARGS__);
 #define IREE_NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
   const char* (*ncclSymbolName)(__VA_ARGS__);
-#define IREE_CU_PFN_DECL(cudaSymbolName, ...)          // Ignore CUDA symbols
+// Ignore CUDA symbols
+#define IREE_CU_PFN_DECL(cudaSymbolName, ...)
 #include "experimental/cuda2/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef IREE_NCCL_PFN_DECL
 #undef IREE_NCCL_PFN_DECL_STR_RETURN

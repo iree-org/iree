@@ -42,9 +42,9 @@ static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
     iree_dynamic_library_lookup_symbol(syms->dylib, name_v2, &fptr_v2); \
     if (fptr_v2) syms->cuda_symbol_name = fptr_v2;                      \
   }
-#define IREE_NCCL_PFN_DECL(nccl_symbol_name, ...)  // Ignore NCCL symbols
-#define IREE_NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, \
-                                      ...)             // Ignore NCCL symbols
+// Ignore NCCL symbols
+#define IREE_NCCL_PFN_DECL(nccl_symbol_name, ...)
+#define IREE_NCCL_PFN_DECL_STR_RETURN(nccl_symbol_name, ...)
 #include "experimental/cuda2/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef IREE_CU_PFN_DECL
 #undef IREE_NCCL_PFN_DECL
@@ -66,8 +66,7 @@ iree_status_t iree_hal_cuda2_dynamic_symbols_initialize(
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->dylib);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
+    status = iree_make_status(
         IREE_STATUS_UNAVAILABLE,
         "CUDA driver library 'libcuda.so'/'nvcuda.dll' not available; please "
         "ensure installed and in dynamic library search path");
@@ -121,7 +120,8 @@ static iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_resolve_all(
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(  \
         syms->dylib, name, (void**)&syms->nccl_symbol_name)); \
   }
-#define IREE_CU_PFN_DECL(cuda_symbol_name, ...)        // Ignore CUDA symbols
+// Ignore CUDA symbols
+#define IREE_CU_PFN_DECL(cuda_symbol_name, ...)
 #include "experimental/cuda2/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef IREE_NCCL_PFN_DECL
 #undef IREE_NCCL_PFN_DECL_STR_RETURN
@@ -136,6 +136,7 @@ static iree_status_t iree_hal_cuda2_nccl_check_version(
   iree_status_t status = iree_dynamic_library_lookup_symbol(
       nccl_library, "ncclGetVersion", (void**)&ncclGetVersion);
   if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
         "ncclGetVersion symbol not found in dynamic library");
