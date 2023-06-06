@@ -663,6 +663,8 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   # iree-benchmark-import-models imports benchmark models from their source
   # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
   add_custom_target(iree-benchmark-import-models)
+  # Build for large benchmark suites.
+  add_custom_target(iree-benchmark-import-models-large)
 
   # iree-benchmark-suites* fully prepares benchmark models for benchmarking:
   #   * importing from source formats to IREE-compatible .mlir files
