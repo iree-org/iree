@@ -53,6 +53,7 @@ compile_sample() {
     --iree-input-type=$2 \
     --iree-hal-target-backends=webgpu \
     --iree-codegen-gpu-native-math-precision=true \
+    --iree-stream-resource-alias-mutable-bindings=true \
     --o ${BINARY_DIR}/$1_webgpu.vmfb
 }
 

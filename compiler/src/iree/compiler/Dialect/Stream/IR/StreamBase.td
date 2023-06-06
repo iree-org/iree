@@ -319,7 +319,9 @@ def Stream_ResourceConfigAttr :
     // bindings.
     "int64_t":$minBufferRangeAlignment,
     // Number of bits in `index` values as passed across device boundaries.
-    "int64_t":$indexBits
+    "int64_t":$indexBits,
+    // Fuses bindings that are mutable instead of leaving them split.
+    "bool":$aliasMutableBindings
   );
 
   let valueType = NoneType;
