@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_pjrt_cc_library(
     name = "tensor_utils",
     srcs = [
         "tensor_utils.cc",
