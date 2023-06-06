@@ -29,7 +29,7 @@ static llvm::cl::opt<bool> clDemoteI64ToI32(
     "iree-mhlo-demote-i64-to-i32",
     llvm::cl::desc(
         "Converts all MHLO i64 ops and values into i32 counterparts."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clDemoteF64ToF32(
     "iree-mhlo-demote-f64-to-f32",
     llvm::cl::desc(
