@@ -21,16 +21,17 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 class LLVMCPUTensorPadPass : public LLVMCPUTensorPadBase<LLVMCPUTensorPadPass> {
- private:
-  LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims;
-
  public:
-  explicit LLVMCPUTensorPadPass(LLVMCPUTensorPadOption option)
-      : option(option) {}
+  using LLVMCPUTensorPadBase::LLVMCPUTensorPadBase;
+  explicit LLVMCPUTensorPadPass(LLVMCPUTensorPadOptions options)
+      : options(options) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, linalg::LinalgDialect>();
   }
   void runOnOperation() override;
+
+ private:
+  LLVMCPUTensorPadOptions options;
 };
 
 void LLVMCPUTensorPadPass::runOnOperation() {
@@ -40,13 +41,13 @@ void LLVMCPUTensorPadPass::runOnOperation() {
   // can kick canonicalization patterns to fold outer tensor.pad ops away.
   bool nofold;
   utils::IteratorType targetIterType;
-  switch (option) {
-    case LLVMCPUTensorPadOption::ParallelDims:
+  switch (options.padDims) {
+    case LLVMCPUTensorPadOptions::LLVMCPUPadDims::ParallelDims:
       LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
       targetIterType = utils::IteratorType::parallel;
       nofold = false;
       break;
-    case LLVMCPUTensorPadOption::ReductionDims:
+    case LLVMCPUTensorPadOptions::LLVMCPUPadDims::ReductionDims:
       LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
       targetIterType = utils::IteratorType::reduction;
       nofold = true;
@@ -59,10 +60,12 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << linalgOp);
 
     // Early exit if there are no target dimensions to pad.
-    if (option == LLVMCPUTensorPadOption::ParallelDims &&
+    if (options.padDims ==
+            LLVMCPUTensorPadOptions::LLVMCPUPadDims::ParallelDims &&
         linalgOp.getNumParallelLoops() == 0)
       continue;
-    if (option == LLVMCPUTensorPadOption::ReductionDims &&
+    if (options.padDims ==
+            LLVMCPUTensorPadOptions::LLVMCPUPadDims::ReductionDims &&
         linalgOp.getNumReductionLoops() == 0)
       continue;
 
@@ -70,10 +73,12 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     rewriter.setInsertionPointAfter(linalgOp);
 
     SmallVector<int64_t> paddingDims;
+    SmallVector<int64_t> padToMultipleOf;
     for (auto [index, iterType] :
          llvm::enumerate(linalgOp.getIteratorTypesArray())) {
       if (iterType == targetIterType) {
         paddingDims.push_back(index);
+        padToMultipleOf.push_back(options.padToMultipleOf[index]);
       }
     }
 
@@ -90,12 +95,13 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     SmallVector<bool> noFold(linalgOp.getNumDpsInputs(), nofold);
     noFold.append(linalgOp.getNumDpsInits(), false);
 
-    auto options = linalg::LinalgPaddingOptions()
-                       .setPaddingDimensions(paddingDims)
-                       .setPaddingValues(paddingValueAttributes)
-                       .setPackPaddings(noFold);
+    auto padAndHoistOptions = linalg::LinalgPaddingOptions()
+                                  .setPaddingDimensions(paddingDims)
+                                  .setPaddingValues(paddingValueAttributes)
+                                  .setPackPaddings(noFold)
+                                  .setPadToMultipleOf(padToMultipleOf);
     FailureOr<linalg::LinalgOp> maybePaddedLinalgOp =
-        linalg::padAndHoistLinalgOp(rewriter, linalgOp, options);
+        linalg::padAndHoistLinalgOp(rewriter, linalgOp, padAndHoistOptions);
     if (failed(maybePaddedLinalgOp)) {
       LLVM_DEBUG(llvm::dbgs() << "failed on padding\n");
       return signalPassFailure();
@@ -119,9 +125,12 @@ void LLVMCPUTensorPadPass::runOnOperation() {
 }
 }  // namespace
 
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass() {
+  return std::make_unique<LLVMCPUTensorPadPass>();
+}
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
-    LLVMCPUTensorPadOption option) {
-  return std::make_unique<LLVMCPUTensorPadPass>(option);
+    const LLVMCPUTensorPadOptions& options) {
+  return std::make_unique<LLVMCPUTensorPadPass>(options);
 }
 }  // namespace iree_compiler
 }  // namespace mlir
