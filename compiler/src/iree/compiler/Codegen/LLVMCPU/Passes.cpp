@@ -462,21 +462,44 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRematerializeParallelOpsPass());
 
-  SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
-  // Apply tile and fuse to all the non-distribution fusable levels. Skip
-  // distribution level as that level has been fused already.
-  if (allFusableLevels.size() > 1) {
-    ArrayRef<int64_t> nonDistFusableLevels(allFusableLevels.begin() + 1,
-                                           allFusableLevels.end());
-    for (int64_t level : nonDistFusableLevels) {
+  if (tilingConfig.getNumLevels() == 5) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUTileAndFusePass(tilingConfig.getParallelCacheIdx()));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUTilePass(tilingConfig.getReductionCacheIdx()));
+
+    // Fuse next level only if reduction cache level is all zeros (no tiling).
+    // TODO(dcaballe): Teach TileAndFuse to only fuse up to the first reduction
+    // dimension.
+    if (llvm::all_of(tilingConfig.getReductionCacheSizes(),
+                     [](int64_t size) { return size == 0; })) {
       nestedModulePM.addNestedPass<func::FuncOp>(
-          createLLVMCPUTileAndFusePass(level));
+          createLLVMCPUTileAndFusePass(tilingConfig.getParallelVectorIdx()));
+    } else {
       nestedModulePM.addNestedPass<func::FuncOp>(
-          createFuseTensorPadWithConsumerPass());
-      nestedModulePM.addNestedPass<func::FuncOp>(
-          createConcretizePadResultShapePass());
+          createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+    }
+
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
+  } else {  // TODO: Unify.
+    SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
+    // Apply tile and fuse to all the non-distribution fusable levels. Skip
+    // distribution level as that level has been fused already.
+    if (allFusableLevels.size() > 1) {
+      ArrayRef<int64_t> nonDistFusableLevels(allFusableLevels.begin() + 1,
+                                             allFusableLevels.end());
+      for (int64_t level : nonDistFusableLevels) {
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createLLVMCPUTileAndFusePass(level));
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createFuseTensorPadWithConsumerPass());
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createConcretizePadResultShapePass());
+      }
     }
   }
+
   // Run SplitReductionPass before the final reduction Fuse pass, because
   // SplitReductionPass takes care of banked-tiling.
   nestedModulePM.addNestedPass<func::FuncOp>(

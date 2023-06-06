@@ -109,7 +109,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     dialects.push_back(ctx->getLoadedDialect<vector::VectorDialect>());
     dialects.push_back(ctx->getLoadedDialect<memref::MemRefDialect>());
     dialects.push_back(ctx->getLoadedDialect<linalg::LinalgDialect>());
-    for (auto &dialect : dialects)
+    for (auto dialect : dialects)
       dialect->getCanonicalizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
