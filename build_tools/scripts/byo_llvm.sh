@@ -69,7 +69,7 @@ do_build_llvm() {
   echo "*********************** BUILDING LLVM *********************************"
   main_build_dir="${LLVM_BUILD_DIR}/llvm"
   main_install_dir="${LLVM_INSTALL_DIR}/llvm"
-  targets_to_build="${LLVM_TARGETS_TO_BUILD:-X86;ARM;AArch64;RISCV}"
+  targets_to_build="${LLVM_TARGETS_TO_BUILD:-X86}"
   enable_projects="${LLVM_ENABLE_TARGETS:-clang;lld}"
 
   cmake_options="-DLLVM_ENABLE_PROJECTS='${enable_projects}' -DLLVM_TARGETS_TO_BUILD='${targets_to_build}'"
