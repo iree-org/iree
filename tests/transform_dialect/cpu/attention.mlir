@@ -9,8 +9,9 @@ func.func @attention() -> tensor<1x4x4xf32> {
 }
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
-// RUN: --iree-codegen-llvmcpu-use-transform-dialect=%p/attention_codegen_spec.mlir | \
-// RUN: iree-run-module --module=- --function=attention | \
+// RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/attention_codegen_spec.mlir \
+// RUN:   > %t \
+// RUN: && iree-run-module --module=%t --function=attention | \
 // RUN: FileCheck %s --check-prefixes=EXEC
 
 // EXEC: 1x4x4xf32={{\[}}[2 2 2 2][2 2 2 2][2 2 2 2][2 2 2 2]{{]}}
