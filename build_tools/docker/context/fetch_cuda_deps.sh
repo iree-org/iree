@@ -38,7 +38,7 @@ DOWNLOAD_SCRIPT_PATH="$DOWNLOAD_DIR/parse_redist.py"
 # Parameters to the download script.
 # Look for an appropriate redistrib_*.json here to verify:
 #   https://developer.download.nvidia.com/compute/cuda/redist/
-VERSION="11.6.2"
+VERSION="12.1.1"
 PRODUCT="cuda"
 OS="linux"
 ARCH="x86_64"
