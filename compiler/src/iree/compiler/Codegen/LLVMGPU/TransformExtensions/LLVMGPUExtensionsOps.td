@@ -439,6 +439,39 @@ def PipelineSharedMemoryCopiesOp : Op<
   }];
 }
 
+def SynchronizeLoopOp : Op<
+    Transform_Dialect, "iree.synchronize_loop", [
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+      TransformEachOpTrait,
+      TransformOpInterface]> {
+  let description = [{
+    This inserts a gpu.barrier after a given scf.for loop.
+
+    #### Return modes
+    This transform consumes the scf.for handle and produces a result handle
+    which points to the new scf.for loop generated. It will fail if the loop
+    cannot be pipelined or if there are no shared memory copies.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$for_op);
+  let results = (outs);
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let assemblyFormat = [{ 
+    $for_op 
+    attr-dict 
+    `:` functional-type(operands, results)}];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::scf::ForOp forOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def CreateAsyncGroupsOp :
   Op<Transform_Dialect, "iree.create_async_groups",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,

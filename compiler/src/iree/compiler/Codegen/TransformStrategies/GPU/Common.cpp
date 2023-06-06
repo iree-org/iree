@@ -52,6 +52,7 @@ using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
 using iree_compiler::gpu::GPUModel;
 using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
+using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
@@ -59,6 +60,7 @@ using iree_compiler::IREE::transform_dialect::
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
+using iree_compiler::IREE::transform_dialect::SynchronizeLoopOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
 using transform::RewriteInDestinationPassingStyleOp;
@@ -547,6 +549,15 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
       config.unrollVectorsGpuWmma = true;
     b.create<ApplyPatternsOp>(funcH, config);
   }
+
+  Value forH = b.create<transform::MatchOp>(
+      transform::OperationType::get(b.getContext(), "scf.for"), funcH,
+      b.getStrArrayAttr({scf::ForOp::getOperationName()}),
+      /*matchInterfaceEnum=*/transform::MatchInterfaceEnumAttr(),
+      /*opAttrs=*/DictionaryAttr(),
+      /*filterResultType=*/TypeAttr());
+  b.create<SynchronizeLoopOp>(forH);
+
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
       transform::AnyOpType::get(b.getContext()), funcH);
@@ -560,6 +571,9 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
     vectorToMMaConversionOp.setUseMmaSync(true);
   else
     vectorToMMaConversionOp.setUseWmma(true);
+
+  // Post-hoc elimiation of barriers.
+  funcH = b.create<EliminateGpuBarriersOp>(funcH);
   return funcH;
 }
 

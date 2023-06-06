@@ -80,16 +80,15 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     assert(totalNumThreads() % numThreadsK == 0 &&
            "num threads must be divisible by num threads along k");
     int64_t numThreadsM = totalNumThreads() / numThreadsK;
-//     assert(blockTileM() % numThreadsM == 0 &&
-//            "blockTileSizes[0] must be divisible by numThreadsM");
-//     assert(reductionTileSize % numThreadsK == 0 &&
-//            "reductionTileSize must be divisible by numThreadsK");
-    return MappingInfo{
-        /*numThreads=*/{numThreadsM, numThreadsK},
-        /*tileSizes=*/
-        {std::max(1l, blockTileM() / numThreadsM), 
-        std::max(1l, reductionTileSize / numThreadsK)},
-        /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
+    assert(blockTileM() % numThreadsM == 0 &&
+           "blockTileM must be divisible by numThreadsM");
+    assert(reductionTileSize % numThreadsK == 0 &&
+           "reductionTileSize must be divisible by numThreadsK");
+    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsK},
+                       /*tileSizes=*/
+                       {std::max(1l, blockTileM() / numThreadsM),
+                        std::max(1l, reductionTileSize / numThreadsK)},
+                       /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
   }
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
@@ -99,32 +98,31 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsK = totalNumThreads() / numThreadsN;
-//     assert(reductionTileSize % numThreadsK == 0 &&
-//            "blockTileSizes[0] must be divisible by numThreadsK");
-//     assert(blockTileN() % numThreadsN == 0 &&
-//            "reductionTileSize must be divisible by numThreadsN");
-    return MappingInfo{
-        /*numThreads=*/{numThreadsK, numThreadsN},
-        /*tileSizes=*/
-        {std::max(1l, reductionTileSize / numThreadsK), 
-        std::max(1l, blockTileN() / numThreadsN)},
-        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+    assert(reductionTileSize % numThreadsK == 0 &&
+           "reductionTileSize must be divisible by numThreadsK");
+    assert(blockTileN() % numThreadsN == 0 &&
+           "blockTileN must be divisible by numThreadsN");
+    return MappingInfo{/*numThreads=*/{numThreadsK, numThreadsN},
+                       /*tileSizes=*/
+                       {std::max(1l, reductionTileSize / numThreadsK),
+                        std::max(1l, blockTileN() / numThreadsN)},
+                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
     assert(blockTileN() % resCopyVectorSize() == 0 &&
            "vector size must divide n");
-    int64_t numThreadsN = blockTileSizes[1] / resCopyVectorSize();
+    int64_t numThreadsN = blockTileN() / resCopyVectorSize();
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsM = totalNumThreads() / numThreadsN;
-//     assert(blockTileM() % numThreadsM == 0 &&
-//            "blockTileSizes[0] must be divisible by numThreadsM");
-//     assert(blockTileN() % numThreadsN == 0 &&
-//            "blockTileSizes[1] must be divisible by numThreadsN");
+    assert(blockTileM() % numThreadsM == 0 &&
+           "blockTileM() must be divisible by numThreadsM");
+    assert(blockTileN() % numThreadsN == 0 &&
+           "blockTileN() must be divisible by numThreadsN");
     return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
                        /*tileSizes=*/
-                       {std::max(1l, blockTileM() / numThreadsM), 
+                       {std::max(1l, blockTileM() / numThreadsM),
                         std::max(1l, blockTileN() / numThreadsN)},
                        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }

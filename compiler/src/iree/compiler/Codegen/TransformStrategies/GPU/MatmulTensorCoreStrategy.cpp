@@ -303,7 +303,6 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
                                     strategy.numWarps);
-
   funcH = b.create<EliminateGpuBarriersOp>(funcH);
 
   // Step 9. Convert to tensor core ops.

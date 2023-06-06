@@ -774,6 +774,25 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+//===----------------------------------------------------------------------===//
+// SynchronizeLoopOp
+//===----------------------------------------------------------------------===//
+
+void transform_dialect::SynchronizeLoopOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getForOp(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure transform_dialect::SynchronizeLoopOp::applyToOne(
+    scf::ForOp forOp, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  rewriter.setInsertionPointAfter(forOp);
+  rewriter.create<gpu::BarrierOp>(forOp.getLoc());
+  return DiagnosedSilenceableFailure::success();
+}
+
 //===---------------------------------------------------------------------===//
 // CreateAsyncGroupsOp.
 //===---------------------------------------------------------------------===//
@@ -1212,8 +1231,10 @@ static bool mayAlias(Value first, Value second) {
       return globFirst.getNameAttr() == globSecond.getNameAttr();
     }
   }
-  if (auto subSpanFirst = first.getDefiningOp<HAL::InterfaceBindingSubspanOp>()) {
-    if (auto subSpanSecond = second.getDefiningOp<HAL::InterfaceBindingSubspanOp>()) {
+  if (auto subSpanFirst =
+          first.getDefiningOp<HAL::InterfaceBindingSubspanOp>()) {
+    if (auto subSpanSecond =
+            second.getDefiningOp<HAL::InterfaceBindingSubspanOp>()) {
       return subSpanFirst.getBindingAttr() == subSpanSecond.getBindingAttr();
     }
   }
@@ -1299,7 +1320,7 @@ static bool haveConflictingEffects(
           isa<MemoryEffects::Allocate>(after.getEffect())) {
         continue;
       }
-      
+
       // In the particular case that the before effect is a free, we only have 2
       // possibilities:
       //   1. either the program is well-formed and there must be an interleaved
@@ -1308,22 +1329,23 @@ static bool haveConflictingEffects(
       //      conflicts.
       //   2. either the program is ill-formed and we are in undefined behavior
       //      territory.
-      if (isa<MemoryEffects::Free>(before.getEffect()))
-        continue;
+      if (isa<MemoryEffects::Free>(before.getEffect())) continue;
 
       // Other kinds of effects create a conflict, e.g. read-after-write.
-      LLVM_DEBUG(DBGS() << "found a conflict between (before): " << before.getValue()
-                        << " read:" << isa<MemoryEffects::Read>(before.getEffect())
-                        << " write:" << isa<MemoryEffects::Write>(before.getEffect())
-                        << " alloc:" << isa<MemoryEffects::Allocate>(before.getEffect())
-                        << " free:" << isa<MemoryEffects::Free>(before.getEffect())
-                        << "\n");
-      LLVM_DEBUG(DBGS() << "and (after):                " << after.getValue()
-                        << " read:" << isa<MemoryEffects::Read>(after.getEffect())
-                        << " write:" << isa<MemoryEffects::Write>(after.getEffect())
-                        << " alloc:" << isa<MemoryEffects::Allocate>(after.getEffect())
-                        << " free:" << isa<MemoryEffects::Free>(after.getEffect())
-                        << "\n");
+      LLVM_DEBUG(
+          DBGS() << "found a conflict between (before): " << before.getValue()
+                 << " read:" << isa<MemoryEffects::Read>(before.getEffect())
+                 << " write:" << isa<MemoryEffects::Write>(before.getEffect())
+                 << " alloc:"
+                 << isa<MemoryEffects::Allocate>(before.getEffect()) << " free:"
+                 << isa<MemoryEffects::Free>(before.getEffect()) << "\n");
+      LLVM_DEBUG(
+          DBGS() << "and (after):                " << after.getValue()
+                 << " read:" << isa<MemoryEffects::Read>(after.getEffect())
+                 << " write:" << isa<MemoryEffects::Write>(after.getEffect())
+                 << " alloc:" << isa<MemoryEffects::Allocate>(after.getEffect())
+                 << " free:" << isa<MemoryEffects::Free>(after.getEffect())
+                 << "\n");
       return true;
     }
   }
