@@ -6,6 +6,8 @@
 """Defines IREE RISC-V benchmarks."""
 
 from typing import List, Tuple
+
+from benchmark_suites.iree import benchmark_presets
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
@@ -40,7 +42,8 @@ class Linux_RV64_Benchmarks(object):
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
+            imported_model=iree_definitions.ImportedModel.from_model(model),
+            presets=[benchmark_presets.RISCV, benchmark_presets.DEFAULT])
         for model in self.MODELS
     ]
     return (gen_configs, [])
@@ -72,7 +75,8 @@ class Linux_RV32_Benchmarks(object):
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
+            imported_model=iree_definitions.ImportedModel.from_model(model),
+            presets=[benchmark_presets.RISCV, benchmark_presets.DEFAULT])
         for model in self.MODELS
     ]
     return (gen_configs, [])

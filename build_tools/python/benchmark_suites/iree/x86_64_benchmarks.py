@@ -6,12 +6,11 @@
 """Defines IREE x86_64 benchmarks."""
 
 from typing import List, Sequence, Tuple
-from benchmark_suites.iree import benchmark_tags
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import unique_ids
-from benchmark_suites.iree import module_execution_configs
+from benchmark_suites.iree import benchmark_presets, module_execution_configs
 import benchmark_suites.iree.utils
 
 
@@ -42,7 +41,7 @@ class Linux_x86_64_Benchmarks(object):
       benchmark_configs: List[common_definitions.CpuBenchmarkConfig],
       compile_config: iree_definitions.CompileConfig,
       device_specs: List[common_definitions.DeviceSpec],
-      tags: Sequence[str] = [],
+      presets: Sequence[str],
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     gen_configs_all = []
@@ -56,7 +55,7 @@ class Linux_x86_64_Benchmarks(object):
           compile_config=compile_config,
           imported_model=iree_definitions.ImportedModel.from_model(
               config.model),
-          tags=tags)
+          presets=presets)
 
       execution_configs = []
       for thread in config.threads:
@@ -71,7 +70,7 @@ class Linux_x86_64_Benchmarks(object):
           module_generation_configs=[gen_config],
           module_execution_configs=execution_configs,
           device_specs=device_specs,
-          tags=tags)
+          presets=presets)
 
       gen_configs_all.append(gen_config)
       run_configs_all.extend(run_configs)
@@ -88,23 +87,22 @@ class Linux_x86_64_Benchmarks(object):
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
 
-    # The X86_64 tag is required to put them into the X86_64 benchmark preset.
     default_gen_configs, default_run_configs = self._generate(
         model_groups.X86_64_BENCHMARK_CONFIG,
         self.CASCADELAKE_COMPILE_CONFIG,
         cascadelake_devices,
-        tags=[benchmark_tags.X86_64])
+        presets=[benchmark_presets.X86_64, benchmark_presets.DEFAULT])
     experimental_gen_configs, experimental_run_configs = self._generate(
         model_groups.X86_64_BENCHMARK_CONFIG_EXPERIMENTAL,
         self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
         cascadelake_devices,
-        tags=[benchmark_tags.X86_64])
+        presets=[benchmark_presets.X86_64, benchmark_presets.DEFAULT])
 
     large_gen_configs, large_run_configs = self._generate(
         model_groups.X86_64_BENCHMARK_CONFIG_LONG,
         self.CASCADELAKE_COMPILE_CONFIG,
         cascadelake_devices,
-        tags=[benchmark_tags.X86_64, benchmark_tags.LARGE])
+        presets=[benchmark_presets.X86_64_LARGE, benchmark_presets.LARGE])
 
     return (default_gen_configs + experimental_gen_configs + large_gen_configs,
             default_run_configs + experimental_run_configs + large_run_configs)

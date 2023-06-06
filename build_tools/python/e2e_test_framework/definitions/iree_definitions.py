@@ -235,7 +235,8 @@ class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   composite_id: str
   name: str
-  tags: List[str]
+  # Presets that need to compile this module.
+  presets: List[str]
   imported_model: ImportedModel
   compile_config: CompileConfig
   # Full list of flags to compile with, derived from sub-components, with
@@ -271,7 +272,7 @@ class ModuleGenerationConfig(object):
   def build(cls,
             imported_model: ImportedModel,
             compile_config: CompileConfig,
-            tags: Sequence[str] = ()):
+            presets: Sequence[str] = ()):
     composite_id = unique_ids.hash_composite_id(
         [imported_model.composite_id, compile_config.id])
     # Format: <imported_model_name> <compile_config_name>
@@ -280,7 +281,7 @@ class ModuleGenerationConfig(object):
         compile_config, imported_model.import_config.dialect_type)
     return cls(composite_id=composite_id,
                name=name,
-               tags=list(tags),
+               presets=list(presets),
                imported_model=imported_model,
                compile_config=compile_config,
                compile_flags=compile_flags)
@@ -298,7 +299,8 @@ class E2EModelRunConfig(object):
   """Describes an e2e run."""
   composite_id: str
   name: str
-  tags: List[str]
+  # Presets that run this benchmark.
+  presets: List[str]
   module_generation_config: ModuleGenerationConfig
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
@@ -324,22 +326,28 @@ class E2EModelRunConfig(object):
             target_device_spec: common_definitions.DeviceSpec,
             input_data: common_definitions.ModelInputData,
             tool: E2EModelRunTool,
-            tags: Optional[Sequence[str]] = None):
+            presets: Sequence[str] = ()):
     composite_id = unique_ids.hash_composite_id([
         module_generation_config.composite_id, module_execution_config.id,
         target_device_spec.id, input_data.id
     ])
     # Format: <module_generation_config_name> <module_execution_config_name> with <input_data_name> @ <target_device_spec_name>
     name = f"{module_generation_config} {module_execution_config} with {input_data} @ {target_device_spec}"
+
+    if not set(module_generation_config.presets).issuperset(presets):
+      raise ValueError(
+          "Presets of module generation config isn't a superset of the run"
+          f" config: {module_generation_config.presets} not >= {presets}")
+
     run_flags = generate_run_flags(
         imported_model=module_generation_config.imported_model,
         input_data=input_data,
         module_execution_config=module_execution_config,
         gpu_id=r"${GPU_ID}")
-    tags_list = [] if tags is None else list(tags)
+
     return cls(composite_id=composite_id,
                name=name,
-               tags=tags_list,
+               presets=list(presets),
                module_generation_config=module_generation_config,
                module_execution_config=module_execution_config,
                target_device_spec=target_device_spec,

@@ -6,7 +6,7 @@
 """Defines IREE Vulkan NVIDIA benchmarks."""
 
 from typing import List, Tuple, Sequence
-from benchmark_suites.iree import benchmark_tags, module_execution_configs
+from benchmark_suites.iree import benchmark_presets, module_execution_configs
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
@@ -56,16 +56,16 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
       self,
       models: Sequence[common_definitions.Model],
       compile_config: iree_definitions.CompileConfig,
+      presets: Sequence[str],
       execution_config: iree_definitions.
-      ModuleExecutionConfig = module_execution_configs.VULKAN_CONFIG,
-      tags: Sequence[str] = [],
+      ModuleExecutionConfig = module_execution_configs.VULKAN_CONFIG
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model),
-            tags=tags) for model in models
+            presets=presets) for model in models
     ]
     # We use the same NVIDIA Ampere GPU for benchmarking code generated for
     # both Pascal and Ampere architectures. What we care is not exactly these
@@ -79,7 +79,7 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
         module_generation_configs=gen_configs,
         module_execution_configs=[execution_config],
         device_specs=ampere_devices,
-        tags=tags)
+        presets=presets)
 
     return (gen_configs, run_module_configs)
 
@@ -88,15 +88,15 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
-    # The `vulkan-nvidia`` tag is required to put them into the Vulkan NVIDIA
-    # benchmark preset.
+
+    presets = [benchmark_presets.VULKAN_NVIDIA, benchmark_presets.DEFAULT]
+
     tensorcore_gen_configs, tensorcore_run_configs = self._generate_configs(
         model_groups.VULKAN_MODELS,
         self.TENSORCORE_COMPILE_CONFIG,
-        tags=[benchmark_tags.VULKAN_NVIDIA])
+        presets=presets)
     simt_gen_configs, simt_run_configs = self._generate_configs(
-        model_groups.VULKAN_MODELS,
-        self.SIMT_COMPILE_CONFIG,
-        tags=[benchmark_tags.VULKAN_NVIDIA])
+        model_groups.VULKAN_MODELS, self.SIMT_COMPILE_CONFIG, presets=presets)
+
     return (tensorcore_gen_configs + simt_gen_configs,
             tensorcore_run_configs + simt_run_configs)

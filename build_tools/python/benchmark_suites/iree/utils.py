@@ -15,7 +15,7 @@ def generate_e2e_model_run_configs(
         iree_definitions.ModuleGenerationConfig],
     module_execution_configs: Sequence[iree_definitions.ModuleExecutionConfig],
     device_specs: Sequence[common_definitions.DeviceSpec],
-    tags: Optional[Sequence[str]] = None,
+    presets: Sequence[str],
     tool: iree_definitions.E2EModelRunTool = iree_definitions.E2EModelRunTool.
     IREE_BENCHMARK_MODULE
 ) -> List[iree_definitions.E2EModelRunConfig]:
@@ -27,8 +27,8 @@ def generate_e2e_model_run_configs(
           module_execution_config=module_execution_config,
           target_device_spec=device_spec,
           input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
-          tool=tool,
-          tags=tags) for module_generation_config,
+          presets=presets,
+          tool=tool) for module_generation_config,
       module_execution_config, device_spec in itertools.product(
           module_generation_configs, module_execution_configs, device_specs)
   ]

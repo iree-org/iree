@@ -10,7 +10,7 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import tflite_models
-from benchmark_suites.iree import module_execution_configs
+from benchmark_suites.iree import benchmark_presets, module_execution_configs
 import benchmark_suites.iree.utils
 
 
@@ -70,22 +70,25 @@ class Android_ARMv8_A_Benchmarks(object):
             thread_num) for thread_num in [1, 4]
     ]
 
+    presets = [benchmark_presets.ANDROID_CPU, benchmark_presets.DEFAULT]
+
     default_gen_confings = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
+            imported_model=iree_definitions.ImportedModel.from_model(model),
+            presets=presets)
         for model in self.NONQUANT_MODELS + self.QUANT_MODELS
     ]
     experimental_gen_confings = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.MMT4D_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in self.NONQUANT_MODELS
+            imported_model=iree_definitions.ImportedModel.from_model(model),
+            presets=presets) for model in self.NONQUANT_MODELS
     ] + [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.MMT4D_AND_DOTPROD_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in self.QUANT_MODELS
+            imported_model=iree_definitions.ImportedModel.from_model(model),
+            presets=presets) for model in self.QUANT_MODELS
     ]
 
     all_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
@@ -99,15 +102,18 @@ class Android_ARMv8_A_Benchmarks(object):
         module_generation_configs=default_gen_confings,
         module_execution_configs=local_sync_execution_configs +
         local_task_execution_configs,
-        device_specs=all_devices)
+        device_specs=all_devices,
+        presets=presets)
     run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=experimental_gen_confings,
         module_execution_configs=local_sync_execution_configs,
-        device_specs=all_devices)
+        device_specs=all_devices,
+        presets=presets)
     run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=experimental_gen_confings,
         module_execution_configs=local_task_execution_configs,
-        device_specs=big_cores_devices)
+        device_specs=big_cores_devices,
+        presets=presets)
 
     gen_confings = (default_gen_confings + experimental_gen_confings)
     return (gen_confings, run_configs)
