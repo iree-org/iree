@@ -16,13 +16,13 @@ from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import iree_definitions
 import cmake_builder.rules
 
-# Imported model for default benchmarks.
+# Imported models for default benchmarks.
 BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models"
 # Default benchmark suites.
 BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites"
 # Compilation statistics suites for default benchmarks.
 E2E_COMPILE_STATS_SUITES = "iree-e2e-compile-stats-suites"
-# Imported model for large benchmarks.
+# Imported models for large benchmarks.
 LARGE_BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models-large"
 # Large benchmark suites.
 LARGE_BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites-large"
