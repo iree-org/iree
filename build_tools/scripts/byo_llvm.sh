@@ -77,6 +77,7 @@ do_build_llvm() {
   cmake_options="${cmake_options} -DLLVM_INSTALL_UTILS=ON"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
   cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
+  cmake_options="${cmake_options} -DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64;RISCV"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
     cmake_options="${cmake_options} -DLLVM_ENABLE_LLD=ON"
@@ -144,7 +145,7 @@ print_iree_config() {
     return 1
   fi
 
-  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DCLANG_DIR='$clang_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF"
+  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DCLANG_DIR='$clang_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF -DLLVM_INSTALL_DIR=${LLVM_INSTALL_DIR}"
 }
 
 do_build_iree() {
