@@ -103,14 +103,21 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
+  // TODO(dcaballe): This code is not doing what I thought it was doing.
+  // `getCanonicalizationPatterns` from a dialect won't register all the
+  // canonicalization patterns from all the dialect's op. We have to split this
+  // file and run full canonicalization.
   {
     RewritePatternSet patterns(ctx);
     SmallVector<Dialect *> dialects;
+
     dialects.push_back(ctx->getLoadedDialect<vector::VectorDialect>());
     dialects.push_back(ctx->getLoadedDialect<memref::MemRefDialect>());
     dialects.push_back(ctx->getLoadedDialect<linalg::LinalgDialect>());
     for (auto dialect : dialects)
       dialect->getCanonicalizationPatterns(patterns);
+
+    vector::TransposeOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
