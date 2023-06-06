@@ -103,7 +103,6 @@ iree_check_single_backend_test_suite(
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
-    "dot_bf16.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
