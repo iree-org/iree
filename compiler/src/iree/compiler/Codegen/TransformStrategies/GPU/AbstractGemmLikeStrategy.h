@@ -47,6 +47,9 @@ struct AbstractGemmLikeStrategy {
   virtual int64_t blockTileM() const = 0;
   virtual int64_t blockTileN() const = 0;
 
+  virtual int64_t numWarpsM() const = 0;
+  virtual int64_t numWarpsN() const = 0;
+
   bool alignedLhs() const {
     return m() % blockTileM() == 0 && k() % reductionTileSize == 0;
   }
@@ -88,12 +91,17 @@ struct AbstractGemmLikeStrategy {
     // vectorization properly computes the bounds automatically.
     SmallVector<int64_t> tileSizes;
     SmallVector<Attribute> threadMapping;
+    void print(llvm::raw_ostream &os) const;
+    LLVM_DUMP_METHOD void dump() const;
   };
 
   virtual MappingInfo getBlockMapping() const = 0;
   virtual MappingInfo lhsCopyMapping() const = 0;
+  virtual LogicalResult validateLhsCopyMapping() const = 0;
   virtual MappingInfo rhsCopyMapping() const = 0;
+  virtual LogicalResult validateRhsCopyMapping() const = 0;
   virtual MappingInfo resCopyMapping() const = 0;
+  virtual LogicalResult validateResCopyMapping() const = 0;
   virtual MappingInfo computeMapping() const = 0;
 
   virtual void print(llvm::raw_ostream &os) const = 0;

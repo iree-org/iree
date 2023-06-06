@@ -149,14 +149,13 @@ void MatmulStrategy::initDefaultValues() {
 
 LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
 
-static llvm::raw_ostream &printMappingInfo(
-    llvm::raw_ostream &os, const MatmulStrategy::MappingInfo &mapping) {
+void mlir::iree_compiler::gpu::AbstractGemmLikeStrategy::MappingInfo::print(
+    llvm::raw_ostream &os) const {
   os << "MappingInfo{";
-  llvm::interleaveComma(mapping.numThreads, os << "numThreads: {");
-  llvm::interleaveComma(mapping.tileSizes, os << "}, tileSizes: {");
-  llvm::interleaveComma(mapping.threadMapping, os << "}, threadMapping: {");
+  llvm::interleaveComma(numThreads, os << "numThreads: {");
+  llvm::interleaveComma(tileSizes, os << "}, tileSizes: {");
+  llvm::interleaveComma(threadMapping, os << "}, threadMapping: {");
   os << "}}";
-  return os;
 }
 
 void MatmulStrategy::print(llvm::raw_ostream &os) const {
@@ -195,13 +194,14 @@ void MatmulStrategy::print(llvm::raw_ostream &os) const {
   os << "\n-- Derived quantities --\n";
   os << "- lhs copy:\n";
   os << "    -> vector size (num elements): " << lhsCopyVectorSize() << '\n';
-  printMappingInfo(os << "    -> ", lhsCopyMapping()) << '\n';
-  os << "- rhs copy:\n";
+  lhsCopyMapping().print(os << "    -> ");
+  os << "\n- rhs copy:\n";
   os << "    -> vector size (num elements): " << rhsCopyVectorSize() << '\n';
-  printMappingInfo(os << "    -> ", rhsCopyMapping()) << '\n';
-  os << "- res copy:\n";
+  rhsCopyMapping().print(os << "    -> ");
+  os << "\n- res copy:\n";
   os << "    -> vector size (num elements): " << resCopyVectorSize() << '\n';
-  printMappingInfo(os << "    -> ", resCopyMapping()) << '\n';
+  resCopyMapping().print(os << "    -> ");
+  os << "\n";
 }
 
 static std::tuple<Value, Value, Value, Value>
@@ -239,6 +239,19 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
 
 void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
     ImplicitLocOpBuilder &b, Value variantH, const MatmulStrategy &strategy) {
+  if (failed(strategy.validateLhsCopyMapping())) {
+    strategy.print(llvm::errs());
+    assert(false && "invalid lhs copy mapping");
+  }
+  if (failed(strategy.validateRhsCopyMapping())) {
+    strategy.print(llvm::errs());
+    assert(false && "invalid rhs copy mapping");
+  }
+  if (failed(strategy.validateResCopyMapping())) {
+    strategy.print(llvm::errs());
+    assert(false && "invalid res copy mapping");
+  }
+
   LLVM_DEBUG(strategy.print(DBGS()));
   assert(strategy.totalNumThreads() ==
              strategy.totalNumWarps() * kCudaWarpSize &&

@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/AbstractGemmLikeStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace llvm {
 class raw_ostream;
@@ -64,6 +65,15 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     return blockTileSizes[1];
   }
 
+  int64_t numWarpsM() const override {
+    assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
+    return numWarps[0];
+  }
+  int64_t numWarpsN() const override {
+    assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
+    return numWarps[1];
+  }
+
   using AbstractGemmLikeStrategy::MappingInfo;
 
   MappingInfo getBlockMapping() const override {
@@ -74,61 +84,73 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // LHS copy is of size mxk.
   MappingInfo lhsCopyMapping() const override {
-    assert(reductionTileSize % lhsCopyVectorSize() == 0 &&
-           "vector size must divide reductionTileSize");
     int64_t numThreadsK = reductionTileSize / lhsCopyVectorSize();
-    assert(totalNumThreads() % numThreadsK == 0 &&
-           "num threads must be divisible by num threads along k");
     int64_t numThreadsM = totalNumThreads() / numThreadsK;
-    assert(blockTileM() % numThreadsM == 0 &&
-           "blockTileM must be divisible by numThreadsM");
-    assert(reductionTileSize % numThreadsK == 0 &&
-           "reductionTileSize must be divisible by numThreadsK");
     return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsK},
                        /*tileSizes=*/
                        {std::max(1l, blockTileM() / numThreadsM),
                         std::max(1l, reductionTileSize / numThreadsK)},
                        /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
   }
+
+  LogicalResult validateLhsCopyMapping() const override {
+    MappingInfo mapping = lhsCopyMapping();
+    bool cond1 = (reductionTileSize % lhsCopyVectorSize() == 0);
+    bool cond2 =
+        (totalNumThreads() == mapping.numThreads[0] * mapping.numThreads[1]);
+    bool cond3 = (blockTileM() % mapping.numThreads[0] == 0);
+    bool cond4 = (reductionTileSize % mapping.numThreads[1] == 0);
+    return success(cond1 && cond2 && cond3 && cond4);
+  }
+
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
-    assert(blockTileN() % rhsCopyVectorSize() == 0 &&
-           "vector size must divide blockTileSizes[1]");
     int64_t numThreadsN = blockTileN() / rhsCopyVectorSize();
-    assert(totalNumThreads() % numThreadsN == 0 &&
-           "num threads must be divisible by num threads along n");
     int64_t numThreadsK = totalNumThreads() / numThreadsN;
-    assert(reductionTileSize % numThreadsK == 0 &&
-           "reductionTileSize must be divisible by numThreadsK");
-    assert(blockTileN() % numThreadsN == 0 &&
-           "blockTileN must be divisible by numThreadsN");
     return MappingInfo{/*numThreads=*/{numThreadsK, numThreadsN},
                        /*tileSizes=*/
                        {std::max(1l, reductionTileSize / numThreadsK),
                         std::max(1l, blockTileN() / numThreadsN)},
                        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
+
+  LogicalResult validateRhsCopyMapping() const override {
+    MappingInfo mapping = rhsCopyMapping();
+    bool cond1 = (blockTileN() % rhsCopyVectorSize() == 0);
+    bool cond2 =
+        (totalNumThreads() == mapping.numThreads[0] * mapping.numThreads[1]);
+    bool cond3 = (reductionTileSize % mapping.numThreads[0] == 0);
+    bool cond4 = (blockTileN() % mapping.numThreads[1] == 0);
+    return success(cond1 && cond2 && cond3 && cond4);
+  }
+
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
-    assert(blockTileN() % resCopyVectorSize() == 0 &&
-           "vector size must divide n");
     int64_t numThreadsN = blockTileN() / resCopyVectorSize();
-    assert(totalNumThreads() % numThreadsN == 0 &&
-           "num threads must be divisible by num threads along n");
     int64_t numThreadsM = totalNumThreads() / numThreadsN;
-    assert(blockTileM() % numThreadsM == 0 &&
-           "blockTileM() must be divisible by numThreadsM");
-    assert(blockTileN() % numThreadsN == 0 &&
-           "blockTileN() must be divisible by numThreadsN");
     return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
                        /*tileSizes=*/
                        {std::max(1l, blockTileM() / numThreadsM),
                         std::max(1l, blockTileN() / numThreadsN)},
                        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
+
+  LogicalResult validateResCopyMapping() const override {
+    MappingInfo mapping = resCopyMapping();
+    bool cond1 = (blockTileN() % resCopyVectorSize() == 0);
+    bool cond2 =
+        (totalNumThreads() == mapping.numThreads[0] * mapping.numThreads[1]);
+    bool cond3 = (blockTileM() % mapping.numThreads[0] == 0);
+    bool cond4 = (blockTileN() % mapping.numThreads[1] == 0);
+    return success(cond1 && cond2 && cond3 && cond4);
+  }
+
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {
-    return MappingInfo{/*numThreads=*/{numWarps[0], numWarps[1]},
+    // Warps along M and N need to properly be ordered along the X and Y
+    // dimensions respectively, otherwise we would improperly generate
+    // predicated code.
+    return MappingInfo{/*numThreads=*/{numWarpsM(), numWarpsN()},
                        /*tileSizes=*/{},
                        /*threadMapping=*/{warpX(ctx), warpY(ctx)}};
   }
