@@ -33,7 +33,7 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:e020d5c748f293674ab5f63533d6bf2a6a83b4c3045da10f76aa2ef2236f008b \
+    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:8a5ea90aeb795bd62cfce55af8fb933b1f764f3690ae369e906c490ad0b132d9 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
