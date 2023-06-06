@@ -327,6 +327,15 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
 
 #-------------------------------------------------------------------------------
+# Experimental WebGPU HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_TARGET "iree::experimental::webgpu::registration")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_REGISTER "iree_hal_webgpu_driver_module_register")
+
+#-------------------------------------------------------------------------------
 # Compiler Target Options
 # By default, all compiler targets supported by the current platform are
 # enabled. Some compiler targets like CUDA will install external deps as

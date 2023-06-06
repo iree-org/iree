@@ -36,6 +36,7 @@
 /experimental/dispatch_profiler/ @manishucsd
 /experimental/rocm/ @benvanik
 /experimental/web/ @ScottTodd
+/experimental/webgpu/ @benvanik @ScottTodd
 
 # Infra Top-Level Directories
 /build_tools/ @GMNGeoffrey @ScottTodd @pzread
