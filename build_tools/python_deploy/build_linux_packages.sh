@@ -39,22 +39,23 @@
 # to packaging to avoid stomping on development artifacts.
 set -xeu -o errtrace
 
-# Function to find the directory the ".git" directory is in
+# Function to find the directory the ".git" directory is in.
+# We do this instead of using git directly because `git` may complain about
+# operating in a directory owned by another user.
 function find_git_dir_parent() {
-  # Get the current directory
-  curr_dir=$(pwd)
+  curr_dir="${PWD}"
 
   # Loop until we reach the root directory
-  while [ "$curr_dir" != "/" ]; do
+  while [ "${curr_dir}" != "/" ]; do
     # Check if there is a ".git" directory in the current directory
-    if [ -d "$curr_dir/.git" ]; then
+    if [ -d "${curr_dir}/.git" ]; then
       # Return the path to the directory containing the ".git" directory
-      echo "$curr_dir"
+      echo "${curr_dir}"
       return
     fi
 
     # Move up one directory
-    curr_dir=$(dirname "$curr_dir")
+    curr_dir="$(dirname "${curr_dir}")"
   done
 
   # If we reach the root directory and there is no ".git" directory, return an empty string
