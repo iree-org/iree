@@ -69,7 +69,7 @@ do_build_llvm() {
   echo "*********************** BUILDING LLVM *********************************"
   main_build_dir="${LLVM_BUILD_DIR}/llvm"
   main_install_dir="${LLVM_INSTALL_DIR}/llvm"
-  targets_to_build="${LLVM_TARGETS_TO_BUILD:-X86}"
+  targets_to_build="${LLVM_TARGETS_TO_BUILD:-X86;ARM;AArch64;RISCV}"
   enable_projects="${LLVM_ENABLE_TARGETS:-clang;lld}"
 
   cmake_options="-DLLVM_ENABLE_PROJECTS='${enable_projects}' -DLLVM_TARGETS_TO_BUILD='${targets_to_build}'"
@@ -77,7 +77,6 @@ do_build_llvm() {
   cmake_options="${cmake_options} -DLLVM_INSTALL_UTILS=ON"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
   cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
-  cmake_options="${cmake_options} -DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64;RISCV"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
     cmake_options="${cmake_options} -DLLVM_ENABLE_LLD=ON"
