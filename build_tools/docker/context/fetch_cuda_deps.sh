@@ -45,8 +45,9 @@ ARCH="x86_64"
 
 # Components that we need to fetch.
 COMPONENTS=(
-  cuda_nvcc
-  cuda_cudart
+  cuda_cccl   # CXX Core Compute Libraries
+  cuda_nvcc   # CUDA NVCC
+  cuda_cudart # CUDA Runtime
 )
 
 # Paths within the arch specific installation that we want to retain.
