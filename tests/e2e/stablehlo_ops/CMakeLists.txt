@@ -507,7 +507,7 @@ iree_check_single_backend_test_suite(
     "reshape.mlir"
     "reverse.mlir"
     "rng_normal.mlir"
-    "rng_uniform.mlir"
+    # "rng_uniform.mlir"  #TODO(#12509): WebGPU SPIR-V broken
     "round.mlir"
     "rsqrt.mlir"
     "scatter.mlir"

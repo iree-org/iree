@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "legalize_chlo_with_broadcast.mlir"
     "legalize_control_flow.mlir"
     "legalize_shape_computations.mlir"
+    "rng_preprocessing.mlir"
     "stablehlo_to_iree_input_dialects.mlir"
     "stablehlo_to_linalg.mlir"
     "stablehlo_to_linalg_convolution.mlir"

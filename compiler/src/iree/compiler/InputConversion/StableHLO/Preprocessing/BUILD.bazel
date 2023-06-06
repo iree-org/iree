@@ -69,6 +69,7 @@ iree_compiler_cc_library(
         "LowerComplex.cpp",
         "Passes.cpp",
         "StableHLOToStableHLO.cpp",
+        "StatefulRng.cpp",
         "UnfuseBatchNorm.cpp",
     ],
     hdrs = [
@@ -84,6 +85,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MLProgramDialect",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

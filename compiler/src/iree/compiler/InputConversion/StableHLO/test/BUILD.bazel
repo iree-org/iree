@@ -6,8 +6,8 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -24,6 +24,7 @@ iree_lit_test_suite(
             "legalize_chlo_with_broadcast.mlir",
             "legalize_control_flow.mlir",
             "legalize_shape_computations.mlir",
+            "rng_preprocessing.mlir",
             "stablehlo_to_iree_input_dialects.mlir",
             "stablehlo_to_linalg_convolution.mlir",
             "stablehlo_to_linalg_dot_prod.mlir",

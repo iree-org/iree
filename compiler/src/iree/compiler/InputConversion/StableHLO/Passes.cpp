@@ -50,6 +50,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
     passManager.addPass(createFlattenTuplesInCFG());
   }
 
+  passManager.addPass(createStatefulRng());
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 

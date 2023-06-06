@@ -1,11 +1,11 @@
 // Note that they are stateless random generators, so they have fixed results.
 func.func @rng_uniform_1d() {
-    %min = util.unfoldable_constant dense<-10.0> : tensor<f32>
+    %min = util.unfoldable_constant dense<5.0> : tensor<f32>
     %max = util.unfoldable_constant dense<10.0> : tensor<f32>
     %shape = util.unfoldable_constant dense<[10]>  : tensor<1xi32>
     %res = "stablehlo.rng"(%min, %max, %shape) {rng_distribution = #stablehlo<rng_distribution UNIFORM>} : (tensor<f32>, tensor<f32>, tensor<1xi32>) -> tensor<10xf32>
     check.expect_almost_eq_const(%res, dense<[
-        -9.99994, -4.8613, 0.277344, 5.41599, -9.44537, -4.30673, 0.831918, 5.97056, -8.8908, -3.75215
+        8.29371, 9.07137, 6.2785, 8.15428, 5.85622, 6.70665, 9.6468, 7.03495, 6.20795, 5.30799
         ]> : tensor<10xf32>) : tensor<10xf32>
     return
 }

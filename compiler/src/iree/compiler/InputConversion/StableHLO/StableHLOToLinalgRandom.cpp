@@ -816,98 +816,13 @@ struct RngBitGeneratorConverter final
   }
 };
 
-struct RngUniformConversion final
-    : OpConversionPattern<mlir::stablehlo::RngOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::RngOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // We only handle uniform distributions.
-    if (op.getRngDistribution() != mlir::stablehlo::RngDistribution::UNIFORM) {
-      return failure();
-    }
-    // TODO(raikonenfnu): Handle other element types as well.
-    auto minTy = dyn_cast<ShapedType>(adaptor.getA().getType());
-    auto maxTy = dyn_cast<ShapedType>(adaptor.getB().getType());
-    if (!isa<FloatType>(minTy.getElementType()) ||
-        !isa<FloatType>(maxTy.getElementType())) {
-      return rewriter.notifyMatchFailure(
-          op, "expected min/max for rng op to be FloatType");
-    }
-    auto targetTy = dyn_cast_or_null<ShapedType>(
-        getTypeConverter()->convertType(op.getResult().getType()));
-    if (!targetTy) {
-      return rewriter.notifyMatchFailure(
-          op, "expected target shape of rng op to be ShapedType");
-    }
-    auto loc = op.getLoc();
-    Value emptyTensor =
-        getEmptyTensorFor(rewriter, loc, targetTy, op, adaptor.getOperands());
-    // Creates index map using target matrix's rank.
-    auto targetRank = targetTy.getRank();
-    SmallVector<AffineMap, 3> indexingMaps(
-        2, AffineMap::get(targetRank, /*symbolCount=*/0,
-                          SmallVector<AffineExpr>({}), rewriter.getContext()));
-    indexingMaps.push_back(rewriter.getMultiDimIdentityMap(targetRank));
-    const int kInitialSeed = 0;
-
-    // Generic region with LCG Algorithm that make use of element index from:
-    // https://reviews.llvm.org/D101364
-    auto linalgOp = rewriter.create<linalg::GenericOp>(
-        loc, /*resultTensors=*/targetTy,
-        /*inputs=*/
-        ValueRange{adaptor.getOperands()[0], adaptor.getOperands()[1]},
-        /*outputs=*/emptyTensor, indexingMaps,
-        getParallelAndReductionIterators(/*nLoops=*/targetRank,
-                                         /*nReduction=*/0),
-        [&](OpBuilder &b, Location loc, ValueRange args) {
-          llvm::SmallVector<Value> updateVec = {b.create<arith::ConstantOp>(
-              loc, b.getI32IntegerAttr(kInitialSeed))};
-          Value multiplier =
-              b.create<arith::ConstantOp>(loc, b.getI32IntegerAttr(1103515245));
-          Value incrementStep =
-              b.create<arith::ConstantOp>(loc, b.getI32IntegerAttr(12345));
-          // For output matrix with rank N:
-          // temp1 = (cast(I32, index(D.0)) + seed) * mult + incr
-          // ...
-          // tempN = (cast(I32, index(D.(N))) + tempN_1) * mult + incr
-          for (int i = 0; i < targetRank; i++) {
-            Value update = updateVec.back();
-            Value ind = b.create<linalg::IndexOp>(loc, i);
-            Value castInd =
-                b.create<arith::IndexCastOp>(loc, b.getI32Type(), ind);
-            Value addRes = b.create<arith::AddIOp>(loc, castInd, update);
-            Value multRes = b.create<arith::MulIOp>(loc, addRes, multiplier);
-            Value incRes = b.create<arith::AddIOp>(loc, multRes, incrementStep);
-            updateVec.push_back(incRes);
-          }
-          // Scaling = (max - min) * const(F64, 2.3283064E-10)
-          // which is derived from rand(min,max) = rand()/(RAND_MAX/(max-min)).
-          Value epsilon = b.create<arith::ConstantOp>(
-              loc, b.getFloatAttr(args[0].getType(), 2.3283064E-10));
-          Value range = b.create<arith::SubFOp>(loc, args[1], args[0]);
-          Value scale = b.create<arith::MulFOp>(loc, range, epsilon);
-          // Res = cast(T, cast(F64, tempN) * scaling + min)
-          Value updateCast = b.create<arith::UIToFPOp>(
-              loc, targetTy.getElementType(), updateVec.back());
-          Value scaleUpdate = b.create<arith::MulFOp>(loc, updateCast, scale);
-          Value res = b.create<arith::AddFOp>(loc, scaleUpdate, args[0]);
-          b.create<linalg::YieldOp>(loc, res);
-        },
-        linalg::getPrunedAttributeList(op));
-    rewriter.replaceOp(op, linalgOp.getResults());
-    return success();
-  }
-};
 } // namespace
 
 namespace detail {
 void populateStableHloRandomToLinalgConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns) {
-  patterns->add<RngBitGeneratorConverter, RngUniformConversion>(typeConverter,
-                                                                context);
+  patterns->add<RngBitGeneratorConverter>(typeConverter, context);
 }
 } // namespace detail
 } // namespace mlir::iree_compiler::stablehlo

@@ -53,6 +53,16 @@ def LowerComplex :
   let summary = "Lowers complex operations into non-complex operations";
 }
 
+def StatefulRng :
+    Pass<"iree-stablehlo-preprocessing-stateful-rng", "ModuleOp"> {
+  let summary = "Lowers a stateful rng to stateless ones";
+  let description = [{
+    This pass may change the order and results of the random numbers generated
+    from the stateful one (in particular the stateful rng could use a different
+    algorithm).
+  }];
+}
+
 def UnfuseBatchNorm :
     Pass<"iree-stablehlo-preprocessing-unfuse-batch-norm", "func::FuncOp"> {
   let summary = "Materializes 'broadcast_dimensions' attributes";
