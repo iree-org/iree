@@ -50,12 +50,12 @@ RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
   "/tmp/${NVIDIA_GL_DEB}" \
   "/tmp/${NVIDIA_COMPUTE_DEB}"
 
-# install cuda sdk
-RUN wget https://developer.download.nvidia.com/compute/cuda/11.6.0/local_installers/cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb \
-  && dpkg --install cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb \
-  && apt-key add /var/cuda-repo-debian11-11-6-local/7fa2af80.pub \
+# Install the CUDA SDK
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb \
+  && dpkg --install cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb \
+  && cp /var/cuda-repo-ubuntu2004-12-1-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
-  && apt-get -y install cuda-toolkit-11-6
+  && apt-get -y install cuda-toolkit-12-1
 
 # Adding CUDA binaries to Path
 ENV PATH=${PATH}:/usr/local/cuda/bin/

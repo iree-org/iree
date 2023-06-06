@@ -59,15 +59,12 @@ RUN apt-get update \
   "/tmp/${NVIDIA_COMPUTE_DEB}" \
   "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"
 
-# install cuda sdk
-# 11.8 is the latest version of 11.x, which is IREE currently compiled with.
-# See https://docs.nvidia.com/cuda/cuda-runtime-api/version-mixing-rules.html
-# about runtime version mixing
-RUN wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda-repo-ubuntu2204-11-8-local_11.8.0-520.61.05-1_amd64.deb \
-  && dpkg --install cuda-repo-ubuntu2204-11-8-local_11.8.0-520.61.05-1_amd64.deb \
-  && cp /var/cuda-repo-ubuntu2204-11-8-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
+# Install the CUDA SDK
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2204-12-1-local_12.1.1-530.30.02-1_amd64.deb \
+  && dpkg --install cuda-repo-ubuntu2204-12-1-local_12.1.1-530.30.02-1_amd64.deb \
+  && cp /var/cuda-repo-ubuntu2204-12-1-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
-  && apt-get -y install cuda-toolkit-11-8
+  && apt-get -y install cuda-toolkit-12-1
 
 # Adding CUDA binaries to Path
 ENV PATH=${PATH}:/usr/local/cuda/bin/
