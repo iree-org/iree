@@ -96,9 +96,9 @@ static int64_t topkSplitReduceRatio(int64_t splitReductionDepth,
     return reductionRatios[splitReductionDepth];
   }
 
-  // Step 1. Hard to predict of advantage of splitting reduction more than 1
+  // Step 1. Hard to predict of advantage of splitting reduction more than 2
   // depth.
-  if (splitReductionDepth > 0) return kNOTopkSplitReductionRatioDefault;
+  if (splitReductionDepth > 1) return kNOTopkSplitReductionRatioDefault;
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- topkSplitReduceRatio started :";
