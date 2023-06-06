@@ -65,7 +65,6 @@ jobs:
   ##############################################################################
   build_all:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
     uses: ./.github/workflows/build_all.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -232,7 +231,6 @@ jobs:
 
   test_all:
     needs: [setup, build_all]
-    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -470,7 +468,6 @@ jobs:
 
   asan:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
