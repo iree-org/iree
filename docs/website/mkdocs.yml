@@ -111,11 +111,11 @@ nav:
   - "Guides":
       - "guides/index.md"
       - "ML frameworks":
-        - "guides/ml-frameworks/index.md"
-        - TensorFlow: "guides/ml-frameworks/tensorflow.md"
-        - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
-        - JAX: "guides/ml-frameworks/jax.md"
-        - PyTorch: "guides/ml-frameworks/pytorch.md"
+          - "guides/ml-frameworks/index.md"
+          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
+          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
+          - JAX: "guides/ml-frameworks/jax.md"
+          - PyTorch: "guides/ml-frameworks/pytorch.md"
       - "Deployment configurations":
           - "guides/deployment-configurations/index.md"
           - CPU: "guides/deployment-configurations/cpu.md"
@@ -125,14 +125,14 @@ nav:
   - "Reference":
       - "reference/index.md"
       - "API bindings":
-        - "reference/bindings/index.md"
-        - Runtime C API: "reference/bindings/c-api.md"
-        - Python: "reference/bindings/python.md"
-        - TensorFlow Lite: "reference/bindings/tensorflow-lite.md"
+          - "reference/bindings/index.md"
+          - Runtime C API: "reference/bindings/c-api.md"
+          - Python: "reference/bindings/python.md"
+          - TensorFlow Lite: "reference/bindings/tensorflow-lite.md"
       - "Other topics":
-        - Glossary: "reference/glossary.md"
-        - Optimization options: "reference/optimization-options.md"
-        - Extensions: "reference/extensions.md"
+          - Glossary: "reference/glossary.md"
+          - Optimization options: "reference/optimization-options.md"
+          - Extensions: "reference/extensions.md"
   - "Community":
       - "community/index.md"
       - "Blog":
@@ -145,31 +145,30 @@ plugins:
   # https://github.com/mkdocs/mkdocs-redirects
   - redirects:
       redirect_maps:  # old -> new
+        "extensions/index.md": "reference/extensions.md"
 
-          "extensions/index.md": "reference/extensions.md"
+        # "getting-started/" moved under "guides/ml-frameworks/"
+        "getting-started/index.md": "guides/ml-frameworks/index.md"
+        "getting-started/tensorflow.md": "guides/ml-frameworks/tensorflow.md"
+        "getting-started/tflite.md": "guides/ml-frameworks/tflite.md"
+        "getting-started/jax.md": "guides/ml-frameworks/jax.md"
+        "getting-started/pytorch.md": "guides/ml-frameworks/pytorch.md"
 
-          # "getting-started/" moved under "guides/ml-frameworks/"
-          "getting-started/index.md":       "guides/ml-frameworks/index.md"
-          "getting-started/tensorflow.md":  "guides/ml-frameworks/tensorflow.md"
-          "getting-started/tflite.md":      "guides/ml-frameworks/tflite.md"
-          "getting-started/jax.md":         "guides/ml-frameworks/jax.md"
-          "getting-started/pytorch.md":     "guides/ml-frameworks/pytorch.md"
+        # "deployment-configurations/" moved under "guides/"
+        "deployment-configurations/index.md": "guides/deployment-configurations/index.md"
+        "deployment-configurations/cpu.md": "guides/deployment-configurations/cpu.md"
+        "deployment-configurations/bare-metal.md": "guides/deployment-configurations/bare-metal.md"
+        "deployment-configurations/gpu-vulkan.md": "guides/deployment-configurations/gpu-vulkan.md"
+        "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda-rocm.md"
 
-          # "deployment-configurations/" moved under "guides/"
-          "deployment-configurations/index.md":         "guides/deployment-configurations/index.md"
-          "deployment-configurations/cpu.md":           "guides/deployment-configurations/cpu.md"
-          "deployment-configurations/bare-metal.md":    "guides/deployment-configurations/bare-metal.md"
-          "deployment-configurations/gpu-vulkan.md":    "guides/deployment-configurations/gpu-vulkan.md"
-          "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda-rocm.md"
+        # "bindings/" moved under "reference/"
+        "bindings/index.md": "reference/bindings/index.md"
+        "bindings/c-api.md": "reference/bindings/c-api.md"
+        "bindings/python.md": "reference/bindings/python.md"
+        "bindings/tensorflow-lite.md": "reference/bindings/tensorflow-lite.md"
 
-          # "bindings/" moved under "reference/"
-          "bindings/index.md":           "reference/bindings/index.md"
-          "bindings/c-api.md":           "reference/bindings/c-api.md"
-          "bindings/python.md":          "reference/bindings/python.md"
-          "bindings/tensorflow-lite.md": "reference/bindings/tensorflow-lite.md"
-
-          # "blog/" moved under "community/"
-          "blog/index.md":                   "community/blog/index.md"
-          "blog/2021-07-19-tflite-tosa.md":  "community/blog/2021-07-19-tflite-tosa.md"
-          "blog/2021-10-13-mmt4d.md":        "community/blog/2021-10-13-mmt4d.md"
-          "blog/2021-10-15-cuda-backend.md": "community/blog/2021-10-15-cuda-backend.md"
+        # "blog/" moved under "community/"
+        "blog/index.md": "community/blog/index.md"
+        "blog/2021-07-19-tflite-tosa.md": "community/blog/2021-07-19-tflite-tosa.md"
+        "blog/2021-10-13-mmt4d.md": "community/blog/2021-10-13-mmt4d.md"
+        "blog/2021-10-15-cuda-backend.md": "community/blog/2021-10-15-cuda-backend.md"
