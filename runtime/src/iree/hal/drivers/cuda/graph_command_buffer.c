@@ -134,7 +134,7 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Drop any pending collective batches before we tear things down.
-  iree_hal_collective_batch_reset(&command_buffer->collective_batch);
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
 
   if (command_buffer->graph != NULL) {
     CUDA_IGNORE_ERROR(command_buffer->context->syms,
@@ -206,7 +206,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_flush_collectives(
       IREE_STATUS_UNIMPLEMENTED,
       "CUDA graph capture of collective operations not yet implemented");
 
-  iree_hal_collective_batch_reset(&command_buffer->collective_batch);
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
