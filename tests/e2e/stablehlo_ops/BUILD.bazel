@@ -405,7 +405,11 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [],
     ),
-    compiler_flags = ["--iree-input-type=stablehlo"],
+    compiler_flags = [
+        "--iree-input-type=stablehlo",
+        # TODO(#13984): memset emulation required for graphs.
+        "--iree-stream-emulate-memset",
+    ],
     driver = "cuda",
     runner_args = ["--cuda_use_streams=false"],
     tags = [

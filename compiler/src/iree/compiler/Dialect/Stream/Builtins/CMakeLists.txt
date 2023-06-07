@@ -14,8 +14,14 @@ iree_c_embed_data(
   NAME
     Builtins
   SRCS
+    "fill_i16.mlir"
+    "fill_i32.mlir"
     "fill_i64.mlir"
+    "fill_i8.mlir"
+    "splat_i16.mlir"
+    "splat_i32.mlir"
     "splat_i64.mlir"
+    "splat_i8.mlir"
   C_FILE_OUTPUT
     "Builtins.c"
   H_FILE_OUTPUT
