@@ -119,6 +119,46 @@ function(iree_arch_to_llvm_arch DST_LLVM_ARCH_VARIABLE SRC_ARCH)
   endif()
 endfunction()
 
+# iree_arch_to_llvm_target()
+#
+# Helper mapping an architecture in IREE's naming scheme (as in IREE_ARCH)
+# to a LLVM CPU target (as in LLVM_TARGETS_TO_BUILD, the CMake variable).
+function(iree_arch_to_llvm_target DST_LLVM_TARGET_VARIABLE SRC_ARCH)
+  if("${SRC_ARCH}" STREQUAL "arm_64")
+    set(${DST_LLVM_TARGET_VARIABLE} "AArch64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "arm_32")
+    set(${DST_LLVM_TARGET_VARIABLE} "ARM" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^x86_")
+    set(${DST_LLVM_TARGET_VARIABLE} "X86" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^riscv_")
+    set(${DST_LLVM_TARGET_VARIABLE} "RISCV" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^wasm_")
+    set(${DST_LLVM_TARGET_VARIABLE} "WebAssembly" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "What is the LLVM target handling of the architecture that we call ${SRC_ARCH} ?")
+    set(${DST_LLVM_TARGET_VARIABLE} "" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# iree_compiler_targeting_iree_arch
+#
+# Helper returning true if we are building the IREE compiler with the llvm-cpu
+# backend enabled and with the LLVM target supporting the CPU architecture
+# give in IREE's naming scheme (as in IREE_ARCH).
+function(iree_compiler_targeting_iree_arch DST_VAR SRC_ARCH)
+  if (NOT IREE_BUILD_COMPILER OR NOT IREE_TARGET_BACKEND_LLVM_CPU)
+    set(${DST_VAR} OFF PARENT_SCOPE)
+    return()
+  endif()
+  
+  iree_arch_to_llvm_target(_LLVM_TARGET "${SRC_ARCH}")
+  if (_LLVM_TARGET IN_LIST LLVM_TARGETS_TO_BUILD)
+    set(${DST_VAR} ON PARENT_SCOPE)
+  else()
+    set(${DST_VAR} OFF PARENT_SCOPE)
+  endif()
+endfunction()
+
 #-------------------------------------------------------------------------------
 # General utilities
 #-------------------------------------------------------------------------------
