@@ -239,24 +239,12 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
 
 void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
     ImplicitLocOpBuilder &b, Value variantH, const MatmulStrategy &strategy) {
-  if (failed(strategy.validateLhsCopyMapping())) {
+  if (failed(strategy.validate())) {
     strategy.print(llvm::errs());
-    assert(false && "invalid lhs copy mapping");
+    assert(false && "invalid strategy");
   }
-  if (failed(strategy.validateRhsCopyMapping())) {
-    strategy.print(llvm::errs());
-    assert(false && "invalid rhs copy mapping");
-  }
-  if (failed(strategy.validateResCopyMapping())) {
-    strategy.print(llvm::errs());
-    assert(false && "invalid res copy mapping");
-  }
-
   LLVM_DEBUG(strategy.print(DBGS()));
-  assert(strategy.totalNumThreads() ==
-             strategy.totalNumWarps() * kCudaWarpSize &&
-         "Number of threads specified by warps must match total number of "
-         "threads");
+
   // Step 1. Apply block-level part of the strategy, keeps everything fused.
   auto [fillH, matmulH, maybeTiledTrailingHBlock, forall] =
       buildMatmulStrategyBlockDistribution(b, variantH, strategy);

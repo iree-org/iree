@@ -40,10 +40,12 @@ using llvm::dbgs;
 
 #define DEBUG_TYPE "transform-llvmgpu-extensions"
 #define DEBUG_TYPE_ALIAS "transform-llvmgpu-extensions-alias"
+#define DEBUG_VECTOR_TO_MMA "transform-llvmgpu-extensions-vector-to-mma"
 
 #define DBGS() (dbgs() << '[' << DEBUG_TYPE << "] ")
 #define LDBG(X) LLVM_DEBUG(dbgs() << '[' << DEBUG_TYPE << "] " << X)
 #define DBGS_ALIAS() (dbgs() << '[' << DEBUG_TYPE_ALIAS << "] ")
+#define DBGS_VECTOR_TO_MMA() (dbgs() << '[' << DEBUG_VECTOR_TO_MMA << "] ")
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
@@ -695,6 +697,11 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     return emitDefaultDefiniteFailure(target);
   }
 
+  DEBUG_WITH_TYPE(DEBUG_VECTOR_TO_MMA, {
+    DBGS_VECTOR_TO_MMA() << "after cast away vector leading one dim patterns:\n"
+                         << *target << "\n";
+  });
+
   IRRewriter rewriter(target->getContext());
   rewriter.setListener(&listener);
   auto diag = DiagnosedSilenceableFailure::success();
@@ -708,6 +715,13 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp)))
     return mlir::emitDefiniteFailure(target,
                                      "vector to mma patterns failed to apply");
+
+  DEBUG_WITH_TYPE(DEBUG_VECTOR_TO_MMA,
+                  {
+                    DBGS_VECTOR_TO_MMA()
+                        << "after convert vector to NVVM compatible MMA sync:\n"
+                        << *target << "\n";
+                  });
 
   // Using TF32 for Float.
   RewritePatternSet f32ToTF32patterns(funcOp.getContext());
