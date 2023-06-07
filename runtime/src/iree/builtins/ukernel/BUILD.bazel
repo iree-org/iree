@@ -14,6 +14,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# iree_bitcode_library generates targets on the other package
+# we need to expose files used by it.
+exports_files(glob(["*.h"]))
+
 iree_runtime_cc_library(
     name = "static_assert",
     hdrs = ["static_assert.h"],

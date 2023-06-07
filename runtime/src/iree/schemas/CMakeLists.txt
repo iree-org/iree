@@ -10,6 +10,8 @@
 
 iree_add_all_subdirs()
 
+file(GLOB _GLOB_X_H LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.h)
+file(GLOB _GLOB_X_INL LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.inl)
 flatbuffer_c_library(
   NAME
     bytecode_module_def_c_fbs
