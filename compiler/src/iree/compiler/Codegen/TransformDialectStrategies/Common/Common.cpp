@@ -289,7 +289,7 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
 Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
     ImplicitLocOpBuilder &b, Value containingOpH) {
   // TODO: avoid functional style transform so we can apply to the variant.
-  containingOpH = b.create<transform::LowerMaskedTransfersOp>(
+  containingOpH = b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(
       containingOpH.getType(), containingOpH);
   {
     ApplyPatternsOpPatterns configuration;
@@ -303,10 +303,10 @@ Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
 Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
     ImplicitLocOpBuilder &b, Value containingOpH) {
   // TODO: not a functional style op to avoid invalidating artificially.
-  containingOpH = b.create<transform::LowerMasksOp>(
+  containingOpH = b.create<transform::ApplyLowerMasksPatternsOp>(
       transform::AnyOpType::get(b.getContext()), containingOpH);
   // TODO: not a functional style op to avoid invalidating artificially.
-  containingOpH = b.create<transform::MaterializeMasksOp>(
+  containingOpH = b.create<transform::ApplyMaterializeMasksPatternsOp>(
       transform::AnyOpType::get(b.getContext()), containingOpH);
   {
     ApplyPatternsOpPatterns config;

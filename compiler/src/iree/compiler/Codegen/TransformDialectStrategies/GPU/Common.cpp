@@ -625,7 +625,7 @@ Value mlir::iree_compiler::gpu::buildConvertToAsyncCopies(
     const AbstractGemmLikeStrategy &strategy) {
   // Atm, vectors need to be lowered to 1-D for cp.async mapping to connect.
   // TODO: not a functional style op to avoid invalidating artificially.
-  auto transferToScfOp = b.create<transform::TransferToScfOp>(
+  auto transferToScfOp = b.create<transform::ApplyTransferToScfPatternsOp>(
       transform::AnyOpType::get(b.getContext()), funcH);
   // TODO: proper builder instead of a setting post-hoc.
   transferToScfOp.setMaxTransferRank(1);

@@ -34,16 +34,16 @@ using iree_compiler::cpu::ReductionConfig;
 using iree_compiler::cpu::ReductionStrategy;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
+using transform::ApplyLowerContractionPatternsOp;
+using transform::ApplyLowerMultiReductionPatternsOp;
+using transform::ApplyLowerShapeCastPatternsOp;
+using transform::ApplyLowerTransferPatternsOp;
+using transform::ApplyLowerTransposePatternsOp;
+using transform::ApplySplitTransferFullPartialPatternsOp;
 using transform::ApplyTransferPermutationPatternsOp;
-using transform::LowerContractionOp;
-using transform::LowerMultiReductionOp;
-using transform::LowerShapeCastOp;
-using transform::LowerTransferOp;
-using transform::LowerTransposeOp;
+using transform::ApplyTransferToScfPatternsOp;
 using transform::MatchOp;
 using transform::SplitHandleOp;
-using transform::SplitTransferFullPartialOp;
-using transform::TransferToScfOp;
 using transform_ext::AllDims;
 using transform_ext::m_StructuredOp;
 using transform_ext::NumEqualsTo;
@@ -61,23 +61,24 @@ static Value buildDefaultVectorLoweringStrategy(
     ImplicitLocOpBuilder &b, Value funcH,
     const vector::LowerVectorsOptions &lowerVectorsOpts) {
   auto anyOpType = transform::AnyOpType::get(b.getContext());
-  funcH = b.create<LowerContractionOp>(
+  funcH = b.create<ApplyLowerContractionPatternsOp>(
       anyOpType, funcH,
       /*loweringStrategy*/ lowerVectorsOpts.vectorContractLowering);
   funcH = b.create<ApplyTransferPermutationPatternsOp>(anyOpType, funcH);
-  funcH = b.create<LowerMultiReductionOp>(
+  funcH = b.create<ApplyLowerMultiReductionPatternsOp>(
       anyOpType, funcH,
       /*loweringStrategy=*/lowerVectorsOpts.vectorMultiReductionLowering);
-  funcH = b.create<SplitTransferFullPartialOp>(
+  funcH = b.create<ApplySplitTransferFullPartialPatternsOp>(
       anyOpType, funcH,
       /*splitTransferStrategy=*/lowerVectorsOpts.vectorTransferSplit);
-  funcH = b.create<TransferToScfOp>(
+  funcH = b.create<ApplyTransferToScfPatternsOp>(
       anyOpType, funcH,
       /*maxTransferRank=*/1,
       /*fullUnroll=*/lowerVectorsOpts.unrollVectorTransfers);
-  funcH = b.create<LowerTransferOp>(anyOpType, funcH, /*maxTransferRank=*/1);
-  funcH = b.create<LowerShapeCastOp>(anyOpType, funcH);
-  funcH = b.create<LowerTransposeOp>(
+  funcH = b.create<ApplyLowerTransferPatternsOp>(anyOpType, funcH,
+                                                 /*maxTransferRank=*/1);
+  funcH = b.create<ApplyLowerShapeCastPatternsOp>(anyOpType, funcH);
+  funcH = b.create<ApplyLowerTransposePatternsOp>(
       anyOpType, funcH,
       /*loweringStrategy=*/lowerVectorsOpts.vectorTransposeLowering,
       /*avx2LoweringStrategy=*/lowerVectorsOpts.transposeAVX2Lowering);
