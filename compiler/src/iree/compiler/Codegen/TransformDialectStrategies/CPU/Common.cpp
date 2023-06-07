@@ -155,7 +155,8 @@ LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
   transform_ext::MatcherContext matcherContext;
-  makeReductionMatcher(matcherContext, reduction, captures);
+  makeReductionMatcher(matcherContext, reduction, captures,
+                       /*mustMatchEntireFunc=*/true);
   if (!matchPattern(op, *reduction)) return failure();
 
   // 2. Construct the configuration and the strategy builder.

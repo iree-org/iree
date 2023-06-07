@@ -809,7 +809,8 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
   transform_ext::MatcherContext matcherContext;
-  makeReductionMatcher(matcherContext, reduction, captures);
+  makeReductionMatcher(matcherContext, reduction, captures,
+                       /*mustMatchEntireFunc=*/true);
   if (!matchPattern(op, *reduction)) {
     LDBG("--Reduction strategy failed to match\n");
     return failure();
@@ -855,7 +856,8 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   StructuredOpMatcher *trailing;
   transform_ext::MatchedMatmulCaptures captures;
   transform_ext::MatcherContext matcherContext;
-  makeMatmulMatcher(matcherContext, matmul, fill, trailing, captures);
+  makeMatmulMatcher(matcherContext, matmul, fill, trailing, captures,
+                    /*mustMatchEntireFunc=*/true);
   if (!matchPattern(op, *matmul)) {
     LDBG("--Matmul strategy fail to match\n");
     return failure();
