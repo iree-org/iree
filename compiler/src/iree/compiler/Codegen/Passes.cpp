@@ -39,19 +39,19 @@ void registerCodegenPasses() {
         buildLLVMCPUCodegenPassPipeline(passManager);
       });
 
-  static PassPipelineRegistration<> LinalgNVVMPipeline(
-      "iree-codegen-linalg-to-nvvm-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to NVVM",
-      [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, false);
-      });
+  // static PassPipelineRegistration<> LinalgNVVMPipeline(
+  //     "iree-codegen-linalg-to-nvvm-pipeline",
+  //     "Runs the progressive lowering pipeline from Linalg to NVVM",
+  //     [](OpPassManager &passManager) {
+  //       buildLLVMGPUTransformPassPipeline(passManager, false);
+  //     });
 
-  static PassPipelineRegistration<> LinalgROCDLPipeline(
-      "iree-codegen-linalg-to-rocdl-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to ROCDL",
-      [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, true);
-      });
+  // static PassPipelineRegistration<> LinalgROCDLPipeline(
+  //     "iree-codegen-linalg-to-rocdl-pipeline",
+  //     "Runs the progressive lowering pipeline from Linalg to ROCDL",
+  //     [](OpPassManager &passManager) {
+  //       buildLLVMGPUTransformPassPipeline(passManager, true);
+  //     });
 
   static PassPipelineRegistration<> LinalgSPIRVPipeline(
       "iree-codegen-linalg-to-spirv-pipeline",
