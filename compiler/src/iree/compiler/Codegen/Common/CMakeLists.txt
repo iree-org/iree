@@ -60,6 +60,7 @@ iree_cc_library(
     MLIRSCFUtils
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransformOps
     MLIRTensorTransforms
     MLIRTransformDialect
     MLIRTransformDialectTransforms
