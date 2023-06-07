@@ -49,9 +49,9 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
 
 /// A tracking listener for tensor IR that checks for payload replacement
 /// errors.
-class ErrorCheckingTrackingListener : public tensor::TrackingListener {
+class ErrorCheckingTrackingListener : public transform::TrackingListener {
 public:
-  using tensor::TrackingListener::TrackingListener;
+  using transform::TrackingListener::TrackingListener;
 
   ~ErrorCheckingTrackingListener() override {
     assert(status.succeeded() && "must check listener error state");

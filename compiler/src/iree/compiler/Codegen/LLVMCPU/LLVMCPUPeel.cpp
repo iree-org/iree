@@ -77,7 +77,7 @@ void LLVMCPUPeelPass::runOnOperation() {
   RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

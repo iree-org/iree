@@ -225,7 +225,7 @@ void CollapseDimensionsPass::runOnOperation() {
   }
 
   RewritePatternSet canonicalizationPatterns(&getContext());
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(
       canonicalizationPatterns);
   tensor::populateFoldTensorEmptyPatterns(canonicalizationPatterns);
   if (failed(applyPatternsAndFoldGreedily(

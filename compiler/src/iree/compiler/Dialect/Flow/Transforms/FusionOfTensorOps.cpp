@@ -321,7 +321,7 @@ struct FusionOfTensorOpsPass
                                                            context);
       context->getLoadedDialect<linalg::LinalgDialect>()
           ->getCanonicalizationPatterns(fusionPatterns);
-      memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
+      memref::populateResolveRankedShapedTypeResultDimsPatterns(fusionPatterns);
 
       GreedyRewriteConfig rewriteConfig;
       rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
@@ -363,7 +363,7 @@ struct FusionOfTensorOpsPass
       tensor::ExpandShapeOp::getCanonicalizationPatterns(
           collapsingReshapePatterns, context);
       tensor::populateFoldTensorEmptyPatterns(collapsingReshapePatterns);
-      memref::populateResolveRankedShapeTypeResultDimsPatterns(
+      memref::populateResolveRankedShapedTypeResultDimsPatterns(
           collapsingReshapePatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(collapsingReshapePatterns)))) {

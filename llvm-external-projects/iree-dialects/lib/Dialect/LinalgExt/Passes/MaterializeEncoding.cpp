@@ -454,7 +454,7 @@ void populateMaterializeEncodingPatterns(
                   SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToPackOpConversion>(
       patterns.getContext(), typeConverter, materializeEncodingValueFn);
-  ::mlir::memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  ::mlir::memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass() {

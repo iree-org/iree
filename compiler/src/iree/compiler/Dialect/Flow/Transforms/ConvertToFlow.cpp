@@ -32,7 +32,7 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
     RewritePatternSet convertToFlowPatterns(context);
     Flow::populateTensorToFlowConversionPatterns(context,
                                                  convertToFlowPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
         convertToFlowPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             getOperation(), std::move(convertToFlowPatterns)))) {
