@@ -268,7 +268,7 @@ Value mlir::iree_compiler::buildPad(
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
   return b.create<transform::PadOp>(
       opH.getType(), opH, b.getArrayAttr(paddingValues),
-      b.getI64ArrayAttr(padToMultipleOf), b.getI64ArrayAttr(paddingDimensions),
+      b.getI64ArrayAttr(paddingDimensions), b.getI64ArrayAttr(padToMultipleOf),
       b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs));
 }
 
