@@ -18,3 +18,5 @@ add_mlir_library(IREEDialectsTransforms
   IREELinalgExtIncGen
   IREELinalgExtInterfacesIncGen
 )
+
+iree_dialects_target_includes(IREEDialectsTransforms)
