@@ -6,6 +6,7 @@
 
 import enum, re
 from enum import auto
+from ml_dtypes import bfloat16
 import numpy as np
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -150,6 +151,7 @@ DataTypeName = {
 }
 
 DataTypeNumPyTag = {
+    DataType.bf16: bfloat16,
     DataType.f16: np.float16,
     DataType.f32: np.float32,
 }

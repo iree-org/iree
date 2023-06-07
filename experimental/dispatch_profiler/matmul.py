@@ -461,7 +461,7 @@ class CudaMatmulGenerator:
     # List of pre-defined threadblock tile shapes for Tensor Core.
     self.tile_descriptions_tensor_cores_f16 = [
         #TileDescription([256, 128, 32], 3, [64, 4, 1]),
-        #TileDescription([128, 256, 32], 3, [128, 2, 1]),
+        TileDescription([128, 256, 32], 3, [128, 2, 1]),
         TileDescription([128, 128, 64], 4, [64, 2, 1]),
         #TileDescription([128, 128, 32], 5, [64, 2, 1]),
         #TileDescription([128, 64, 32], 5, [64, 2, 1]),
