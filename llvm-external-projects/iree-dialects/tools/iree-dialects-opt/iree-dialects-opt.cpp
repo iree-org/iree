@@ -99,7 +99,8 @@ int main(int argc, char **argv) {
   mlir::bufferization::registerTransformDialectExtension(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::scf::registerTransformDialectExtension(registry);
-  mlir::tensor::registerFindPayloadReplacementOpInterfaceExternalModels();
+  mlir::tensor::registerFindPayloadReplacementOpInterfaceExternalModels(
+      registry);
   mlir::vector::registerTransformDialectExtension(registry);
 
   // Dialect extensions.
