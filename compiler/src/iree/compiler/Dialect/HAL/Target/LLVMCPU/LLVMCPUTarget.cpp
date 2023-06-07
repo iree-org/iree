@@ -818,6 +818,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
 
   void initializeConfiguration(const LLVMTargetOptions &options) {
     auto targetMachine = createTargetMachine(options.target, options);
+    // TODO(#13988): proper error propagation. This is a common user scenario.
+    assert(targetMachine && "createTargetMachine failed");
 
     // Data layout
     llvm::DataLayout DL = targetMachine->createDataLayout();
