@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-flow-split-reduction"
@@ -150,9 +151,9 @@ static int64_t topkSplitReduceRatio(int64_t splitReductionDepth,
 
 /// Find there is a topk operation in the given operation.
 static bool hasTopk(Operation *op) {
-  bool hasTopk = false;
-  op->walk([&](LinalgExt::TopkOp topkOp) { hasTopk = true; });
-  return hasTopk;
+  auto result = op->walk(
+      [&](LinalgExt::TopkOp topkOp) { return WalkResult::interrupt(); });
+  return result.wasInterrupted();
 }
 
 struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
