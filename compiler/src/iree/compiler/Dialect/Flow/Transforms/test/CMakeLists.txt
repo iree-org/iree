@@ -46,6 +46,7 @@ iree_lit_test_suite(
     "pipeline_tests.mlir"
     "raise_special_ops.mlir"
     "set_encoding.mlir"
+    "split_reduction_topk.mlir"
     "strip_and_splat_constant_variables.mlir"
     "strip_signedness.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"
