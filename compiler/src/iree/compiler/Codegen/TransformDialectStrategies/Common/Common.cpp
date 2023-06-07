@@ -262,12 +262,13 @@ Value mlir::iree_compiler::buildPad(
     ImplicitLocOpBuilder &b, Value opH, ArrayRef<Attribute> paddingValues,
     ArrayRef<int64_t> paddingDimensions, ArrayRef<int64_t> packingDimensions,
     ArrayRef<SmallVector<int64_t>> transposePaddings) {
+  SmallVector<int64_t> padToMultipleOf(paddingDimensions.size(), 1);
   SmallVector<Attribute> transposeAttrs;
   for (auto &transp : transposePaddings)
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
   return b.create<transform::PadOp>(
       opH.getType(), opH, b.getArrayAttr(paddingValues),
-      b.getI64ArrayAttr(paddingDimensions),
+      b.getI64ArrayAttr(padToMultipleOf), b.getI64ArrayAttr(paddingDimensions),
       b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs));
 }
 
