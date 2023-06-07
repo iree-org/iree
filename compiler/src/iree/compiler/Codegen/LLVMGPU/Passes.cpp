@@ -473,7 +473,7 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
   pm.addPass(createLowerAffinePass());
 }
 
-static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
+static void addLowerToLLVMGPUPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -532,15 +532,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
-  // Cast address spaces of all function arguments to generic
-  if (!useROCM) pm.addPass(createLLVMGPUCastAddressSpaceFunction());
-  if (useROCM) {
-    // convert to ROCDL.
-    pm.addPass(createConvertToROCDLPass());
-  } else {
-    // convert to NVVM.
-    pm.addPass(createConvertToNVVMPass());
-  }
 }
 
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
@@ -562,7 +553,7 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
+void buildLLVMGPUTransformPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
@@ -577,7 +568,7 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
-  addLowerToLLVMGPUPasses(nestedModulePM, useROCM);
+  addLowerToLLVMGPUPasses(nestedModulePM);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using LLVMGPU pass pipeline:\n";

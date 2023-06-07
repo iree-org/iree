@@ -392,7 +392,10 @@ class CUDATargetBackend final : public TargetBackend {
     // ala libdevice.bc, etc).
     if (variantOp.isExternal()) return;
 
-    buildLLVMGPUTransformPassPipeline(passManager, false);
+    buildLLVMGPUTransformPassPipeline(passManager);
+    // Cast address spaces of all function arguments to generic
+    passManager.addPass(createLLVMGPUCastAddressSpaceFunction());
+    passManager.addPass(createConvertToNVVMPass());
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,

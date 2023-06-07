@@ -107,7 +107,8 @@ class ROCMTargetBackend final : public TargetBackend {
     // ala libdevice.bc, etc).
     if (variantOp.isExternal()) return;
 
-    buildLLVMGPUTransformPassPipeline(passManager, true);
+    buildLLVMGPUTransformPassPipeline(passManager);
+    passManager.addPass(createConvertToROCDLPass());
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
