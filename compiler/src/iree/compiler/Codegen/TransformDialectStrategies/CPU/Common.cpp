@@ -60,28 +60,38 @@ using vector::VectorContractLoweringAttr;
 static Value buildDefaultVectorLoweringStrategy(
     ImplicitLocOpBuilder &b, Value funcH,
     const vector::LowerVectorsOptions &lowerVectorsOpts) {
-  auto anyOpType = transform::AnyOpType::get(b.getContext());
-  funcH = b.create<ApplyLowerContractionPatternsOp>(
-      anyOpType, funcH,
-      /*loweringStrategy*/ lowerVectorsOpts.vectorContractLowering);
-  funcH = b.create<ApplyTransferPermutationPatternsOp>(anyOpType, funcH);
-  funcH = b.create<ApplyLowerMultiReductionPatternsOp>(
-      anyOpType, funcH,
-      /*loweringStrategy=*/lowerVectorsOpts.vectorMultiReductionLowering);
-  funcH = b.create<ApplySplitTransferFullPartialPatternsOp>(
-      anyOpType, funcH,
-      /*splitTransferStrategy=*/lowerVectorsOpts.vectorTransferSplit);
-  funcH = b.create<ApplyTransferToScfPatternsOp>(
-      anyOpType, funcH,
-      /*maxTransferRank=*/1,
-      /*fullUnroll=*/lowerVectorsOpts.unrollVectorTransfers);
-  funcH = b.create<ApplyLowerTransferPatternsOp>(anyOpType, funcH,
-                                                 /*maxTransferRank=*/1);
-  funcH = b.create<ApplyLowerShapeCastPatternsOp>(anyOpType, funcH);
-  funcH = b.create<ApplyLowerTransposePatternsOp>(
-      anyOpType, funcH,
-      /*loweringStrategy=*/lowerVectorsOpts.vectorTransposeLowering,
-      /*avx2LoweringStrategy=*/lowerVectorsOpts.transposeAVX2Lowering);
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerContractionPatternsOp>(
+        loc, lowerVectorsOpts.vectorContractLowering);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyTransferPermutationPatternsOp>(loc);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerMultiReductionPatternsOp>(
+        loc, lowerVectorsOpts.vectorMultiReductionLowering);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplySplitTransferFullPartialPatternsOp>(
+        loc, lowerVectorsOpts.vectorTransferSplit);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyTransferToScfPatternsOp>(
+        loc, /*maxTransferRank=*/1,
+        /*fullUnroll=*/lowerVectorsOpts.unrollVectorTransfers);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerTransferPatternsOp>(loc,
+                                                      /*maxTransferRank=*/1);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerShapeCastPatternsOp>(loc);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerTransposePatternsOp>(
+        loc, /*loweringStrategy=*/lowerVectorsOpts.vectorTransposeLowering,
+        /*avx2LoweringStrategy=*/lowerVectorsOpts.transposeAVX2Lowering);
+  });
   return funcH;
 }
 
