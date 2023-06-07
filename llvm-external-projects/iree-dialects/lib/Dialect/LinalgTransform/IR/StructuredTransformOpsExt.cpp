@@ -357,7 +357,7 @@ void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
   }
 
   status = emitSilenceableFailure(
-      getTransformOp(), "tracking listener failed to find replacement op");
+      getTransformOp(), "!!! tracking listener failed to find replacement op");
   status.attachNote(op->getLoc()) << "replaced op";
   for (Value v : values)
     status.attachNote(v.getLoc()) << "replacement value";

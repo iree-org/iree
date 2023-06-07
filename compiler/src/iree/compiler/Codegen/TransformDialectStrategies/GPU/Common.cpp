@@ -623,14 +623,15 @@ void mlir::iree_compiler::gpu::buildMultiBuffering(
 Value mlir::iree_compiler::gpu::buildConvertToAsyncCopies(
     ImplicitLocOpBuilder &b, Value funcH,
     const AbstractGemmLikeStrategy &strategy) {
-  // Atm, vectors need to be lowered to 1-D for cp.async mapping to connect.
-  // TODO: not a functional style op to avoid invalidating artificially.
-  auto transferToScfOp = b.create<transform::TransferToScfOp>(
-      transform::AnyOpType::get(b.getContext()), funcH);
-  // TODO: proper builder instead of a setting post-hoc.
-  transferToScfOp.setMaxTransferRank(1);
-  transferToScfOp.setFullUnroll(true);
-  funcH = transferToScfOp->getResult(0);
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    // Atm, vectors need to be lowered to 1-D for cp.async mapping to connect.
+    // TODO: not a functional style op to avoid invalidating artificially.
+    auto transferToScfOp =
+        b.create<transform::ApplyTransferToScfPatternsOp>(loc);
+    // TODO: proper builder instead of a setting post-hoc.
+    transferToScfOp.setMaxTransferRank(1);
+    transferToScfOp.setFullUnroll(true);
+  });
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
   auto createAsyncGroupOp =

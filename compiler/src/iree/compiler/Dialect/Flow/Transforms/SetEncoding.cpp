@@ -274,7 +274,7 @@ void SetEncodingPass::runOnOperation() {
     patterns.insert<SetMatmulEncoding>(context, defaultPadding);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
