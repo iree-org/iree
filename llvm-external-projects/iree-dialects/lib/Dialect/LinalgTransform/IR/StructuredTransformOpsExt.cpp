@@ -684,7 +684,7 @@ static DiagnosedSilenceableFailure testShapedValueMatcherCallback(
 static DiagnosedSilenceableFailure
 reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
                   const mlir::transform::TransformState &state,
-                  ValueRange handles) {
+                  ValueRange handles, bool mustMatchEntireFunc) {
   if (handles.size() != 1 ||
       !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
     return emitSilenceableFailure(loc)
@@ -694,8 +694,8 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   transform_ext::StructuredOpMatcher *pattern, *fill, *leading, *trailing;
   transform_ext::MatchedReductionCaptures ignore;
   transform_ext::MatcherContext matcherContext;
-  makeReductionMatcher(matcherContext, pattern, fill, leading, trailing,
-                       ignore);
+  makeReductionMatcher(matcherContext, pattern, fill, leading, trailing, ignore,
+                       mustMatchEntireFunc);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -756,7 +756,8 @@ convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   transform_ext::StructuredOpMatcher *pattern, *fill, *trailing;
   transform_ext::MatchedConvolutionCaptures ignore;
   transform_ext::MatcherContext matcherContext;
-  makeConvolutionMatcher(matcherContext, pattern, fill, trailing, ignore);
+  makeConvolutionMatcher(matcherContext, pattern, fill, trailing, ignore,
+                         /*mustMatchEntireFunc=*/true);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -815,7 +816,8 @@ matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
   transform_ext::StructuredOpMatcher *pattern, *fill, *trailing;
   transform_ext::MatchedMatmulCaptures ignore;
   transform_ext::MatcherContext matcherContext;
-  makeMatmulMatcher(matcherContext, pattern, fill, trailing, ignore);
+  makeMatmulMatcher(matcherContext, pattern, fill, trailing, ignore,
+                    /*mustMatchEntireFunc=*/true);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -859,7 +861,10 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
                             testValueMatcherCallback);
   registry.registerCallback("_test_shaped_value_matcher_callback",
                             testShapedValueMatcherCallback);
-  registry.registerCallback("reduction", reductionCallback);
+  registry.registerCallback("reduction",
+                            wrapAsEntireFuncMatch(reductionCallback));
+  registry.registerCallback("reduction_partial",
+                            wrapAsPartialMatch(reductionCallback));
   registry.registerCallback("convolution", convolutionCallback);
   registry.registerCallback("matmul", matmulCallback);
   return DiagnosedSilenceableFailure::success();
