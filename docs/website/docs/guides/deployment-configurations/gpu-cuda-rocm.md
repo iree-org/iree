@@ -47,7 +47,7 @@ hardware) or ROCm (for AMD hardware) HAL driver.
 #### Build runtime from source
 
 Please make sure you have followed the
-[Getting started](../building-from-source/getting-started.md) page to build
+[Getting started](../../building-from-source/getting-started.md) page to build
 IREE from source, then enable the CUDA HAL driver with the
 `IREE_HAL_DRIVER_CUDA` option or the experimental ROCm HAL driver with the
 `IREE_EXTERNAL_HAL_DRIVERS=rocm` option.
@@ -57,7 +57,8 @@ IREE from source, then enable the CUDA HAL driver with the
 === "Nvidia/CUDA"
 
     Python packages for various IREE functionalities are regularly published
-    to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the [Python Bindings][../bindings/python.md] page for more
+    to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+    [Python Bindings][../../reference/bindings/python.md] page for more
     details. The core `iree-compiler` package includes the CUDA compiler:
 
     ``` shell
@@ -80,7 +81,7 @@ IREE from source, then enable the CUDA HAL driver with the
 #### Build compiler from source
 
 Please make sure you have followed the
-[Getting started](../building-from-source/getting-started.md) page to build the
+[Getting started](../../building-from-source/getting-started.md) page to build the
 IREE compiler, then enable the CUDA compiler target with the
 `IREE_TARGET_BACKEND_CUDA` option or the ROCm compiler target with the
 `IREE_TARGET_BACKEND_ROCM` option.
@@ -101,7 +102,7 @@ Using MobileNet v2 as an example, you can download the SavedModel with trained
 weights from
 [TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 and convert it using IREE's
-[TensorFlow importer](../getting-started/tensorflow.md). Then,
+[TensorFlow importer](../ml-frameworks/tensorflow.md). Then,
 
 #### Compile using the command-line
 

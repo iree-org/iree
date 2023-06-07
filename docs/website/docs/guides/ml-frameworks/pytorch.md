@@ -7,7 +7,7 @@ as well as models defined using [`functorch`](https://pytorch.org/functorch/).
 ## Prerequisites
 
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/getting-started.md#python-bindings):
+[building from source](../../building-from-source/getting-started.md#python-bindings):
 
 ```shell
 pip install \
@@ -75,8 +75,8 @@ iree_vmfb = ireec.compile_str(bytecode_stream.getvalue(),
 ```
 
 Here we have a choice of backend we want to target. See the
-[Deployment Configurations](https://openxla.github.io/iree/deployment-configurations/)
-section of this site for a full list of targets and configurations.
+[deployment configuration guides](../deployment-configurations/index.md)
+for more details about specific targets and configurations.
 
 The generated flatbuffer can now be serialized and stored for another time or
 loaded and executed immediately.
@@ -87,7 +87,7 @@ loaded and executed immediately.
 
 !!! note
     The conversion to bytecode before passing the module to IREE is needed
-    to cross the border from the Torch-MLIR MLIR CAPI to the IREE MLIR CAPI.
+    to cross the border from the Torch-MLIR MLIR C API to the IREE MLIR C API.
 
 ### Load the VM flatbuffer into IREE
 

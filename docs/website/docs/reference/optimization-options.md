@@ -1,4 +1,4 @@
-# Optimization Options
+# Optimization options
 
 This page documents various supported flags for optimizing IREE programs. Each
 is presented with its English name, flag to enable/disable, and default state.

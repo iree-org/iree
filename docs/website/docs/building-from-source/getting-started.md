@@ -249,7 +249,7 @@ ls ../iree-build/tools/
 ## :simple-python: Python bindings
 
 Python packages can either be built from source or installed from our releases.
-See the [Python bindings](../bindings/python.md) page for details about the
+See the [Python bindings](../reference/bindings/python.md) page for details about the
 bindings themselves.
 
 ### Dependencies

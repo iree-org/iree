@@ -1,4 +1,4 @@
-# Bindings
+# API bindings
 
 IREE offers specialized sets of bindings for running compiled programs from
 various languages or with specific APIs:

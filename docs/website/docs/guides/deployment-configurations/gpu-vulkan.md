@@ -75,9 +75,9 @@ so it can execute the model on GPU via Vulkan.
 #### Build runtime from source
 
 Please make sure you have followed the
-[Getting started](../building-from-source/getting-started.md) page to build IREE
+[Getting started](../../building-from-source/getting-started.md) page to build IREE
 for Linux/Windows and the
-[Android cross-compilation](../building-from-source/android.md) page for
+[Android cross-compilation](../../building-from-source/android.md) page for
 Android. The Vulkan HAL driver is compiled in by default on non-Apple platforms.
 
 <!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
@@ -97,7 +97,7 @@ the model must be compiled into.
 
 Python packages for various IREE functionalities are regularly published
 to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
-[Python Bindings](../bindings/python.md) page for more
+[Python Bindings](../../reference/bindings/python.md) page for more
 details. The core `iree-compiler` package includes the SPIR-V compiler:
 
 ``` shell
@@ -117,9 +117,9 @@ python -m pip install iree-compiler
 #### Build compiler from source
 
 Please make sure you have followed the
-[Getting started](../building-from-source/getting-started.md) page to build IREE
+[Getting started](../../building-from-source/getting-started.md) page to build IREE
 for Linux/Windows and the
-[Android cross-compilation](../building-from-source/android.md) page for
+[Android cross-compilation](../../building-from-source/android.md) page for
 Android. The SPIR-V compiler backend is compiled in by default on all platforms.
 
 Ensure that the `IREE_TARGET_BACKEND_VULKAN_SPIRV` CMake option is `ON` when
@@ -141,7 +141,7 @@ Using MobileNet v2 as an example, you can download the SavedModel with trained
 weights from
 [TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 and convert it using IREE's
-[TensorFlow importer](../getting-started/tensorflow.md). Then,
+[TensorFlow importer](../ml-frameworks/tensorflow.md). Then,
 
 #### Compile using the command-line
 
