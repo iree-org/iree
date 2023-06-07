@@ -26,36 +26,19 @@ namespace {
 }  // namespace
 
 namespace {
-// TODO(#8745): remove these flags when the -iree-flow-demote-* flags can be
-// used without tripping upstream verifier issues.
-llvm::cl::opt<bool> clDemoteI64ToI32(
-    "iree-stablehlo-demote-i64-to-i32",
-    llvm::cl::desc(
-        "Converts all StableHLO i64 ops and values into i32 counterparts."),
-    llvm::cl::init(true));
-llvm::cl::opt<bool> clDemoteF64ToF32(
-    "iree-stablehlo-demote-f64-to-f32",
-    llvm::cl::desc(
-        "Converts all StableHLO f64 ops and values into f32 counterparts."),
-    llvm::cl::init(true));
-llvm::cl::opt<bool> clPromoteBF16ToF32(
-    "iree-stablehlo-promote-bf16-to-f32",
-    llvm::cl::desc(
-        "Converts all StableHLO bf16 ops and values into f32 counterparts."),
-    llvm::cl::init(false));
 
 void registerStableHLOConversionPassPipeline() {
-  PassPipelineRegistration<> stablehlo(
+  PassPipelineRegistration<StableHloOptions> stablehlo(
       "iree-stablehlo-input-transformation-pipeline",
       "Runs the StableHLO IREE flow dialect transformation pipeline",
-      [](OpPassManager &passManager) {
-        buildStableHLOInputConversionPassPipeline(passManager);
+      [](OpPassManager& passManager, const StableHloOptions& options) {
+        buildStableHLOInputConversionPassPipeline(passManager, options);
       });
 }
 
 // Prepare HLO for use as an input to the Flow dialect.
-void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
-                                                   bool detuple) {
+void buildStableHLOInputConversionPassPipelineImpl(
+    OpPassManager& passManager, const StableHloOptions& options, bool detuple) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
@@ -88,13 +71,13 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
   // stack. This is often required because of implicit i64 insertion by JAX/HLO
   // that we don't want forcing 32-bit embedded devices to support.
   // TODO(#8745): remove these and prefer the flow pipeline options instead.
-  if (clDemoteI64ToI32) {
+  if (options.demoteI64ToI32) {
     passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
   }
-  if (clDemoteF64ToF32) {
+  if (options.demoteF64ToF32) {
     passManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
   }
-  if (clPromoteBF16ToF32) {
+  if (options.promoteBF16ToF32) {
     passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
   }
 
@@ -123,12 +106,16 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
 }
 }  // namespace
 
-void buildStableHLOInputConversionPassPipeline(OpPassManager &passManager) {
-  buildStableHLOInputConversionPassPipelineImpl(passManager, /*detuple=*/false);
+void buildStableHLOInputConversionPassPipeline(
+    OpPassManager& passManager, const StableHloOptions& options) {
+  buildStableHLOInputConversionPassPipelineImpl(passManager, options,
+                                                /*detuple=*/false);
 }
 
-void buildStableHLOXLAInputConversionPassPipeline(OpPassManager &passManager) {
-  buildStableHLOInputConversionPassPipelineImpl(passManager, /*detuple=*/true);
+void buildStableHLOXLAInputConversionPassPipeline(
+    OpPassManager& passManager, const StableHloOptions& options) {
+  buildStableHLOInputConversionPassPipelineImpl(passManager, options,
+                                                /*detuple=*/true);
 }
 
 void registerStableHLOConversionPasses() {

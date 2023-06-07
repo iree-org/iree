@@ -51,18 +51,28 @@ void buildIREEVMTransformPassPipeline(
     hooks.pipelineExtensions->extendInputConversionPreprocessingPassPipeline(
         passManager, inputOptions.type);
   }
+  AutoInputConversionPipelineOptions autoOptions;
+
+#ifdef IREE_HAVE_MHLO_INPUT
+  stablehlo::StableHloOptions stablehloOptions;
+  stablehloOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
+  stablehloOptions.demoteF64ToF32 = inputOptions.demoteF64ToF32;
+  stablehloOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
+#endif
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
     case InputDialectOptions::Type::auto_detect:
-      passManager.addPass(createAutoInputConversionPipelinePass());
+      passManager.addPass(createAutoInputConversionPipelinePass(autoOptions));
       break;
 #ifdef IREE_HAVE_MHLO_INPUT
     case InputDialectOptions::Type::stablehlo:
-      stablehlo::buildStableHLOInputConversionPassPipeline(passManager);
+      stablehlo::buildStableHLOInputConversionPassPipeline(passManager,
+                                                           stablehloOptions);
       break;
     case InputDialectOptions::Type::stablehlo_xla:
-      stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager);
+      stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager,
+                                                              stablehloOptions);
       break;
     case InputDialectOptions::Type::mhlo_legacy:
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
