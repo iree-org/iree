@@ -1,3 +1,10 @@
+---
+hide:
+  - tags
+tags:
+  - Python
+---
+
 # Python bindings
 
 !!! info

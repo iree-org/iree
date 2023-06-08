@@ -1,3 +1,9 @@
+---
+tags:
+  - GPU
+  - CUDA
+---
+
 Friday, October 15, 2021<br>
 By Thomas Raoux
 

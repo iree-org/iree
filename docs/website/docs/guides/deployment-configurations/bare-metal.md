@@ -1,3 +1,10 @@
+---
+hide:
+  - tags
+tags:
+  - CPU
+---
+
 # Run on a Bare-Metal Platform
 
 IREE supports CPU model execution on bare-metal platforms. That is, platforms

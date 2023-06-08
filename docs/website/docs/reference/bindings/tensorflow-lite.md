@@ -1,3 +1,10 @@
+---
+hide:
+  - tags
+tags:
+  - TensorFlow
+---
+
 # TensorFlow Lite bindings
 
 !!! todo

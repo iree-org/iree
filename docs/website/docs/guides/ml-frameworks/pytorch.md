@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - Python
+  - PyTorch
+---
+
 # PyTorch Integration
 
 IREE supports compiling and running PyTorch programs represented as
