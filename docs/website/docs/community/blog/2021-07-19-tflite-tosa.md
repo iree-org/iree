@@ -1,3 +1,8 @@
+---
+tags:
+  - TensorFlow
+---
+
 Monday, July 19, 2021<br>
 By Rob Suderman and Jenni Kilduff
 

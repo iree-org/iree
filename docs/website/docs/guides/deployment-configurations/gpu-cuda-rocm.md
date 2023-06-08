@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - CUDA
+---
+
 # CUDA and ROCm GPU HAL Driver
 
 IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs

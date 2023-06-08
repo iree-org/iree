@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - Python
+  - JAX
+---
+
 # JAX Integration
 
 !!! note

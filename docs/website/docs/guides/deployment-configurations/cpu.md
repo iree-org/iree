@@ -1,3 +1,10 @@
+---
+hide:
+  - tags
+tags:
+  - CPU
+---
+
 # CPU Deployment
 
 IREE supports efficient program execution on CPU devices by using

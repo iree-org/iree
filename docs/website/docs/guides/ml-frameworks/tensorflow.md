@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - Python
+  - TensorFlow
+---
+
 # TensorFlow Integration
 
 IREE supports compiling and running TensorFlow programs represented as

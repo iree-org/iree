@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - Vulkan
+---
+
 # Vulkan GPU HAL Driver
 
 IREE can accelerate model execution on GPUs via
