@@ -34,6 +34,15 @@ typedef struct iree_arena_block_t {
 IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_atomic_arena_block, iree_arena_block_t,
                                 offsetof(iree_arena_block_t, next));
 
+// Returns the first usable byte of the given |block| following
+// iree_max_align_t. Up to usable_block_size is available.
+#define iree_arena_block_ptr(block_pool, block) \
+  (void*)((uint8_t*)(block) - (block_pool)->usable_block_size)
+
+// Returns the iree_arena_block_t from the given usable block |ptr| at offset 0.
+#define iree_arena_block_trailer(block_pool, ptr) \
+  (iree_arena_block_t*)((const uint8_t*)(ptr) + (block_pool)->usable_block_size)
+
 // A simple atomic fixed-size block pool.
 // Blocks are allocated from the system as required and kept in the pool to
 // satisfy future requests. Blocks are all of a uniform size specified when the
@@ -73,10 +82,12 @@ void iree_arena_block_pool_deinitialize(iree_arena_block_pool_t* block_pool);
 void iree_arena_block_pool_trim(iree_arena_block_pool_t* block_pool);
 
 // Acquires a single block from the pool and returns it in |out_block|.
+// The first usable byte of the block is returned in |out_ptr|.
 // The block may be either a new allocation with undefined contents or a reused
 // prior allocation with undefined contents.
 iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
-                                            iree_arena_block_t** out_block);
+                                            iree_arena_block_t** out_block,
+                                            void** out_ptr);
 
 // Releases one or more blocks back to the block pool.
 // Any blocks chained in |block_head| will also be released allowing for

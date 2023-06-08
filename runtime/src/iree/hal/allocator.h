@@ -317,25 +317,6 @@ typedef struct iree_hal_external_buffer_t {
   } handle;
 } iree_hal_external_buffer_t;
 
-typedef void(IREE_API_PTR* iree_hal_buffer_release_fn_t)(
-    void* user_data, iree_hal_buffer_t* buffer);
-
-// A callback issued when a buffer is released.
-typedef struct {
-  // Callback function pointer.
-  iree_hal_buffer_release_fn_t fn;
-  // User data passed to the callback function. Unowned.
-  void* user_data;
-} iree_hal_buffer_release_callback_t;
-
-// Returns a no-op buffer release callback that implies that no cleanup is
-// required.
-static inline iree_hal_buffer_release_callback_t
-iree_hal_buffer_release_callback_null(void) {
-  iree_hal_buffer_release_callback_t callback = {NULL, NULL};
-  return callback;
-}
-
 //===----------------------------------------------------------------------===//
 // Statistics/reporting
 //===----------------------------------------------------------------------===//

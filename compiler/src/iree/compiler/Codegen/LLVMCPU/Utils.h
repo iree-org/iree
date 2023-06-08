@@ -48,6 +48,9 @@ bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// features.
 bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
+bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

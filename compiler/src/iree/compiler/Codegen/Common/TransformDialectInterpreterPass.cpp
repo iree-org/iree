@@ -36,6 +36,7 @@
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
@@ -90,6 +91,7 @@ class TransformDialectInterpreterPass
     bufferization::func_ext::registerBufferizableOpInterfaceExternalModels(
         registry);
     tensor::registerBufferizableOpInterfaceExternalModels(registry);
+    tensor::registerFindPayloadReplacementOpInterfaceExternalModels(registry);
     vector::registerBufferizableOpInterfaceExternalModels(registry);
 
     registry.addExtensions<

@@ -22,6 +22,7 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/ArmSME/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -329,7 +330,8 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
 
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
                                              TilingConfig &tilingConfig,
-                                             bool enableVectorMasking) {
+                                             bool enableVectorMasking,
+                                             bool enableAArch64SSVE) {
   addTileAndDistributePasses(passManager);
 
   // Skip tiling reduction loops because this is expected to apply on copy ops
@@ -358,6 +360,11 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
   }
+
+  if (enableAArch64SSVE)
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        mlir::arm_sme::createEnableArmStreamingPass(
+            mlir::arm_sme::ArmStreaming::Locally));
 }
 
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
@@ -452,7 +459,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
                                       TilingConfig &tilingConfig,
                                       bool enablePeeling,
                                       bool enableVectorMasking,
-                                      bool lowerToAVX2) {
+                                      bool lowerToAVX2,
+                                      bool enableAArch64SSVE) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -547,11 +555,17 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
   }
+
+  if (enableAArch64SSVE)
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        mlir::arm_sme::createEnableArmStreamingPass(
+            mlir::arm_sme::ArmStreaming::Locally));
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
                                                TilingConfig &tilingConfig,
-                                               bool enableVectorMasking) {
+                                               bool enableVectorMasking,
+                                               bool enableAArch64SSVE) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -605,6 +619,11 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
   }
+
+  if (enableAArch64SSVE)
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        mlir::arm_sme::createEnableArmStreamingPass(
+            mlir::arm_sme::ArmStreaming::Locally));
 }
 
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,

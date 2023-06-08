@@ -284,11 +284,11 @@ typedef struct iree_hal_task_queue_retire_cmd_t {
   // A list of semaphores to signal upon retiring.
   iree_hal_semaphore_list_t signal_semaphores;
 
-  // Command buffers retained until all have retired.
+  // Resources retained until all have retired.
   // We could release them earlier but that would require tracking individual
-  // command buffer task completion.
-  iree_host_size_t command_buffer_count;
-  iree_hal_command_buffer_t* command_buffers[];
+  // resource-level completion.
+  iree_host_size_t resource_count;
+  iree_hal_resource_t* resources[];
 } iree_hal_task_queue_retire_cmd_t;
 
 // Retires a submission by signaling semaphores to their desired value and
@@ -303,9 +303,9 @@ static iree_status_t iree_hal_task_queue_retire_cmd(
   // Release command buffers now that all are known to have retired.
   // We do this before signaling so that waiting threads can immediately reuse
   // resources that are released.
-  for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
-    iree_hal_command_buffer_release(cmd->command_buffers[i]);
-    cmd->command_buffers[i] = NULL;
+  for (iree_host_size_t i = 0; i < cmd->resource_count; ++i) {
+    iree_hal_resource_release(cmd->resources[i]);
+    cmd->resources[i] = NULL;
   }
 
   // Signal all semaphores to their new values.
@@ -331,12 +331,12 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
   iree_hal_task_queue_retire_cmd_t* cmd =
       (iree_hal_task_queue_retire_cmd_t*)task;
 
-  // Release command buffers now that all are known to have retired.
+  // Release resources now that all are known to have retired.
   // In success cases we try to do this eagerly to allow for more potential
   // reuse but during full/partial failures they may still be live here.
-  for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
-    iree_hal_command_buffer_release(cmd->command_buffers[i]);
-    cmd->command_buffers[i] = NULL;
+  for (iree_host_size_t i = 0; i < cmd->resource_count; ++i) {
+    iree_hal_resource_release(cmd->resources[i]);
+    cmd->resources[i] = NULL;
   }
 
   // If the command failed then fail all semaphores to ensure future
@@ -361,8 +361,8 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
 // The command will own an arena that can be used for other submission-related
 // allocations.
 static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
-    iree_task_scope_t* scope, iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
+    iree_task_scope_t* scope, iree_host_size_t resource_count,
+    iree_hal_resource_t* const* resources,
     const iree_hal_semaphore_list_t* signal_semaphores,
     iree_arena_block_pool_t* block_pool,
     iree_hal_task_queue_retire_cmd_t** out_cmd) {
@@ -373,7 +373,7 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
   // Allocate the command from the arena.
   iree_hal_task_queue_retire_cmd_t* cmd = NULL;
   iree_host_size_t total_cmd_size =
-      sizeof(*cmd) + command_buffer_count * sizeof(*cmd->command_buffers);
+      sizeof(*cmd) + resource_count * sizeof(*cmd->resources);
   iree_status_t status =
       iree_arena_allocate(&arena, total_cmd_size, (void**)&cmd);
   if (iree_status_is_ok(status)) {
@@ -396,10 +396,10 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
     memcpy(&cmd->arena, &arena, sizeof(cmd->arena));
 
     // Retain command buffers.
-    cmd->command_buffer_count = command_buffer_count;
-    for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-      cmd->command_buffers[i] = command_buffers[i];
-      iree_hal_command_buffer_retain(cmd->command_buffers[i]);
+    cmd->resource_count = resource_count;
+    for (iree_host_size_t i = 0; i < resource_count; ++i) {
+      cmd->resources[i] = resources[i];
+      iree_hal_resource_retain(cmd->resources[i]);
     }
 
     *out_cmd = cmd;
@@ -458,7 +458,8 @@ static iree_status_t iree_hal_task_queue_submit_batch(
   // arena which we will use to allocate all other commands.
   iree_hal_task_queue_retire_cmd_t* retire_cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_task_queue_retire_cmd_allocate(
-      &queue->scope, batch->command_buffer_count, batch->command_buffers,
+      &queue->scope, batch->command_buffer_count,
+      (iree_hal_resource_t* const*)batch->command_buffers,
       &batch->signal_semaphores, queue->block_pool, &retire_cmd));
 
   // NOTE: if we fail from here on we must drop the retire_cmd arena.
@@ -484,7 +485,7 @@ static iree_status_t iree_hal_task_queue_submit_batch(
   // After this task completes the commands have been issued but have not yet
   // completed and the issued commands may complete in any order.
   iree_hal_task_queue_issue_cmd_t* issue_cmd = NULL;
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && batch->command_buffer_count > 0) {
     status = iree_hal_task_queue_issue_cmd_allocate(
         &queue->scope, queue, &retire_cmd->task.header,
         batch->command_buffer_count, batch->command_buffers, &retire_cmd->arena,
@@ -501,14 +502,15 @@ static iree_status_t iree_hal_task_queue_submit_batch(
   iree_task_submission_initialize(&submission);
 
   // Sequencing: wait on semaphores or go directly into the executor queue.
+  iree_task_t* head_task =
+      issue_cmd ? &issue_cmd->task.header : &retire_cmd->task.header;
   if (wait_cmd != NULL) {
     // Ensure that we only issue command buffers after all waits have completed.
-    iree_task_set_completion_task(&wait_cmd->task.header,
-                                  &issue_cmd->task.header);
+    iree_task_set_completion_task(&wait_cmd->task.header, head_task);
     iree_task_submission_enqueue(&submission, &wait_cmd->task.header);
   } else {
     // No waits needed; directly enqueue.
-    iree_task_submission_enqueue(&submission, &issue_cmd->task.header);
+    iree_task_submission_enqueue(&submission, head_task);
   }
 
   // Submit the tasks immediately. The executor may queue them up until we

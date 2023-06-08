@@ -232,6 +232,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           (isAArch64(target) && hasAnySVEFeature(target));
 
       bool enableMicrokernels = hasMicrokernels(target);
+      bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&
+                               hasSMEFeature(target);
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
@@ -241,7 +243,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUBufferOpsTileAndVectorize:
             addCPUBufferOpsTileAndVectorizePipeline(
-                executableLoweringPipeline, tilingConfig, enableVectorMasking);
+                executableLoweringPipeline, tilingConfig, enableVectorMasking,
+                enableAArch64SSVE);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
@@ -258,12 +261,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
               CPUDoubleTilingPeelingExpert:
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline, tilingConfig,
-                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2);
+                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2,
+                enableAArch64SSVE);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
             addConvTileAndDecomposeExpertPassPipeline(
-                executableLoweringPipeline, tilingConfig, enableVectorMasking);
+                executableLoweringPipeline, tilingConfig, enableVectorMasking,
+                enableAArch64SSVE);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
             addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,

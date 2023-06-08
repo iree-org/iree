@@ -102,6 +102,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:MemRefTransformOps",
         "@llvm-project//mlir:SCFTransformOps",
+        "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:VectorTransformOps",
     ],
 )

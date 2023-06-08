@@ -276,9 +276,16 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     iree_wait_token_t wait_token =
         iree_notification_prepare_wait(&worker->wake_notification);
     // The masks are accessed with 'relaxed' order because they are just hints.
-    iree_atomic_task_affinity_set_fetch_and(&worker->executor->worker_idle_mask,
-                                            ~worker->worker_bit,
-                                            iree_memory_order_relaxed);
+    iree_task_affinity_set_t old_idle_mask =
+        iree_atomic_task_affinity_set_fetch_and(
+            &worker->executor->worker_idle_mask, ~worker->worker_bit,
+            iree_memory_order_relaxed);
+    (void)old_idle_mask;
+    IREE_TRACE_PLOT_VALUE_F32(
+        worker->executor->trace_name,
+        100.0f - 100.0f *
+                     (iree_task_affinity_set_count_ones(old_idle_mask) - 1) /
+                     (float)worker->executor->worker_count);
 
     // Check state to see if we've been asked to exit.
     if (iree_atomic_load_int32(&worker->state, iree_memory_order_acquire) ==
@@ -309,9 +316,15 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // We've finished all the work we have scheduled so set our idle flag.
     // This ensures that if any other thread comes in and wants to give us
     // work we will properly coordinate/wake below.
-    iree_atomic_task_affinity_set_fetch_or(&worker->executor->worker_idle_mask,
-                                           worker->worker_bit,
-                                           iree_memory_order_relaxed);
+    old_idle_mask = iree_atomic_task_affinity_set_fetch_or(
+        &worker->executor->worker_idle_mask, worker->worker_bit,
+        iree_memory_order_relaxed);
+    (void)old_idle_mask;
+    IREE_TRACE_PLOT_VALUE_F32(
+        worker->executor->trace_name,
+        100.0f - 100.0f *
+                     (iree_task_affinity_set_count_ones(old_idle_mask) + 1) /
+                     (float)worker->executor->worker_count);
 
     // When we encounter a complete lack of work we can self-nominate to check
     // the global work queue and distribute work to other threads. Only one

@@ -50,6 +50,11 @@ LogicalResult linkBitcodeObjects(
     llvm::LLVMContext &context,
     ModuleSpecializationCallback specializationCallback = {});
 
+LogicalResult linkCmdlineBitcodeFile(Location loc, llvm::Linker &linker,
+                                     unsigned linkerFlags,
+                                     llvm::TargetMachine &targetMachine,
+                                     llvm::LLVMContext &context);
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

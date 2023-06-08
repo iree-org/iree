@@ -1500,10 +1500,10 @@ LogicalResult TensorStoreOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.alloc
+// flow.tensor.alloca
 //===----------------------------------------------------------------------===//
 
-LogicalResult TensorAllocOp::verify() {
+LogicalResult TensorAllocaOp::verify() {
   if (failed(verifyOpDynamicDims(getOperation(), {getResult()},
                                  getResultDims()))) {
     return failure();

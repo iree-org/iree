@@ -378,13 +378,17 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
-# Our Emscripten library code uses dynCall, which needs these link flags.
-# TODO(scotttodd): Find a way to refactor this, this is nasty to always set :(
-if(EMSCRIPTEN)
+if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)
   iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ALL
-      "-sDYNCALLS=1"
-      "-sEXPORTED_RUNTIME_METHODS=['dynCall']"
+      # TODO(scotttodd): Only add when using WebGPU in a library/binary?
+      "-sUSE_WEBGPU"
+      # Hack: Used to create sync versions of requestAdapter and requestDevice
+      # TODO(scotttodd): Only set for test binaries, avoid sync code in apps
+      #   this doesn't _break_ apps that don't use the sync functions, but it
+      #   does bloat their binary size (and each Emscripten flag comes with
+      #   some risk of breaking compatibility with other features)
+      "-sASYNCIFY"
   )
 endif()
 

@@ -4,9 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
-# Executes long-running benchmarks that are expected to take multple hours.
+# Executes large benchmarks that are expected to take multple hours.
 
-name: Benchmark Long
+name: Benchmark Large
 
 on:
   schedule:
@@ -55,7 +55,7 @@ jobs:
       build-dir: ${{ needs.build_all.outputs.build-dir }}
       build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      benchmark-presets: cuda-long,comp-stats-long,x86_64-long
+      benchmark-presets: cuda-large,comp-stats-large,x86_64-large
       build-default-benchmark-suites: 0
 
   compilation_benchmarks:

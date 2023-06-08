@@ -68,7 +68,10 @@ function(iree_bytecode_module)
     set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
   endif()
 
-  set(_ARGS "--output-format=vm-bytecode")
+  set(_ARGS
+    "--output-format=vm-bytecode"
+    "--mlir-print-op-on-diagnostic=false"
+  )
   list(APPEND _ARGS "${_RULE_FLAGS}")
 
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)

@@ -104,7 +104,7 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     // TODO(hanchung): The upstream utils should use OpFoldResult. Then we don't
     // have to clean things up after every padding transform.
     RewritePatternSet patterns(context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     context->getLoadedDialect<tensor::TensorDialect>()
         ->getCanonicalizationPatterns(patterns);
     tensor::PadOp::getCanonicalizationPatterns(patterns, context);

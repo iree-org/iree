@@ -877,28 +877,35 @@ struct MatchedMatmulCaptures {
 ///     trailing(reduction(leading(), fill()))
 ///
 /// where trailing and leading are elementwise operations whose presence is
-/// optional. Each matcher will capture the corresponding operation.
+/// optional. Each matcher will capture the corresponding operation. If
+/// `mustMatchEntireFunc` is set, the matcher additionally checks if all
+/// tileable operations in the functions are captured.
 void makeReductionMatcher(transform_ext::MatcherContext &context,
                           StructuredOpMatcher *&reductionCapture,
                           StructuredOpMatcher *&fillCapture,
                           StructuredOpMatcher *&leadingCapture,
                           StructuredOpMatcher *&trailingCapture,
-                          MatchedReductionCaptures &captures);
+                          MatchedReductionCaptures &captures,
+                          bool mustMatchEntireFunc);
 void makeReductionMatcher(transform_ext::MatcherContext &context,
                           StructuredOpMatcher *&reductionCapture,
-                          MatchedReductionCaptures &captures);
+                          MatchedReductionCaptures &captures,
+                          bool mustMatchEntireFunc);
 
 /// Creates a group of matchers for:
 ///
 ///     trailing(matmul(*, *, fill()))
 ///
 /// where trailing and leading are elementwise operations whose presence is
-/// optional. Each matcher will capture the corresponding operation.
+/// optional. Each matcher will capture the corresponding operation. If
+/// `mustMatchEntireFunc` is set, the matcher additionally checks if all
+/// tileable operations in the functions are captured.
 void makeMatmulMatcher(transform_ext::MatcherContext &matcherContext,
                        StructuredOpMatcher *&matmulCapture,
                        StructuredOpMatcher *&fillCapture,
                        StructuredOpMatcher *&trailingCapture,
-                       MatchedMatmulCaptures &captures);
+                       MatchedMatmulCaptures &captures,
+                       bool mustMatchEntireFunc);
 
 /// Create a group of matchers for a different code sequence of operations
 /// matching exactly a softmax operation.
@@ -927,15 +934,43 @@ struct MatchedConvolutionCaptures {
 ///     trailing(convolution(input, filter, fill()))
 ///
 /// where fill is a FillOp and trailing is an elementwise operation, both of
-/// which is optional. Each matcher will capture the corresponding operation.
+/// which is optional. Each matcher will capture the corresponding operation. If
+/// `mustMatchEntireFunc` is set, the matcher additionally checks if all
+/// tileable operations in the functions are captured.
 void makeConvolutionMatcher(transform_ext::MatcherContext &context,
                             StructuredOpMatcher *&convolutionCapture,
                             StructuredOpMatcher *&fillCapture,
                             StructuredOpMatcher *&trailingCapture,
-                            MatchedConvolutionCaptures &captures);
+                            MatchedConvolutionCaptures &captures,
+                            bool mustMatchEntireFunc);
 void makeConvolutionMatcher(transform_ext::MatcherContext &context,
                             StructuredOpMatcher *&convolutionCapture,
-                            MatchedConvolutionCaptures &captures);
+                            MatchedConvolutionCaptures &captures,
+                            bool mustMatchEntireFunc);
+
+/// Wraps the given matcher callback to indicate that it must capture all
+/// tilable ops in the parent function. Expects the callback to accept the same
+/// arguments as what is expected by MatchCallbacksRegistry::register, followed
+/// by a bool.
+template <typename Fn>
+auto wrapAsEntireFuncMatch(Fn &&fn) {
+  return [fn = std::move(fn)](
+             transform_ext::MatchCallbackResult &res, Location loc,
+             const mlir::transform::TransformState &state,
+             ValueRange handles) { return fn(res, loc, state, handles, true); };
+}
+
+/// Wraps the given matcher callback to indicate that it can match subgraphs.
+/// Expects the callback to accept the same arguments as what is expected by
+/// MatchCallbacksRegistry::register, followed by a bool.
+template <typename Fn>
+auto wrapAsPartialMatch(Fn &&fn) {
+  return [fn = std::move(fn)](
+             transform_ext::MatchCallbackResult &res, Location loc,
+             const mlir::transform::TransformState &state, ValueRange handles) {
+    return fn(res, loc, state, handles, false);
+  };
+}
 
 } // namespace transform_ext
 } // namespace mlir

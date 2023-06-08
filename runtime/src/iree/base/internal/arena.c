@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/base/internal/debugging.h"
 #include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
@@ -58,7 +59,8 @@ void iree_arena_block_pool_trim(iree_arena_block_pool_t* block_pool) {
 }
 
 iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
-                                            iree_arena_block_t** out_block) {
+                                            iree_arena_block_t** out_block,
+                                            void** out_ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_arena_block_t* block =
@@ -76,7 +78,10 @@ iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
         z0, iree_allocator_malloc_uninitialized(block_pool->block_allocator,
                                                 block_pool->total_block_size,
                                                 (void**)&block_base));
-    block = (iree_arena_block_t*)(block_base + block_pool->usable_block_size);
+    block = iree_arena_block_trailer(block_pool, block_base);
+    *out_ptr = block_base;
+  } else {
+    *out_ptr = iree_arena_block_ptr(block_pool, block);
   }
 
   block->next = NULL;
@@ -122,6 +127,15 @@ void iree_arena_reset(iree_arena_allocator_t* arena) {
     arena->allocation_head = NULL;
   }
   if (arena->block_head != NULL) {
+#if defined(IREE_SANITIZER_ADDRESS)
+    iree_arena_block_t* block = arena->block_head;
+    while (block) {
+      IREE_ASAN_UNPOISON_MEMORY_REGION(
+          iree_arena_block_ptr(arena->block_pool, block),
+          arena->block_pool->usable_block_size);
+      block = block->next;
+    }
+#endif  // IREE_SANITIZER_ADDRESS
     iree_arena_block_pool_release(arena->block_pool, arena->block_head,
                                   arena->block_tail);
     arena->block_head = NULL;
@@ -142,7 +156,7 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     // Oversized allocation that can't be handled by the block pool. We'll
     // allocate directly from the system allocator and track it ourselves for
     // freeing during reset.
-    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_arena_allocate_oversize");
     iree_host_size_t allocation_size =
         sizeof(iree_arena_oversized_allocation_t) + byte_length;
     iree_arena_oversized_allocation_t* allocation = NULL;
@@ -167,20 +181,25 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
   // Check to see if the current block (if any) has space - if not, get another.
   if (arena->block_head == NULL ||
       arena->block_bytes_remaining < aligned_length) {
-    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_arena_allocate_grow");
     iree_arena_block_t* block = NULL;
+    void* ptr = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_arena_block_pool_acquire(arena->block_pool, &block));
+        z0, iree_arena_block_pool_acquire(arena->block_pool, &block, &ptr));
     block->next = arena->block_head;
     arena->block_head = block;
     if (!arena->block_tail) arena->block_tail = block;
     arena->total_allocation_size += block_pool->total_block_size;
     arena->block_bytes_remaining = block_pool->usable_block_size;
+    IREE_ASAN_POISON_MEMORY_REGION(
+        iree_arena_block_ptr(block_pool, arena->block_head),
+        block_pool->usable_block_size);
     IREE_TRACE_ZONE_END(z0);
   }
 
   // Slice out the allocation from the current block.
   void* ptr = (uint8_t*)arena->block_head - arena->block_bytes_remaining;
+  IREE_ASAN_UNPOISON_MEMORY_REGION(ptr, aligned_length);
   arena->block_bytes_remaining -= aligned_length;
   arena->used_allocation_size += aligned_length;
   *out_ptr = ptr;

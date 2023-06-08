@@ -225,6 +225,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
   command_buffer->descriptor_set_group =
       command_buffer->descriptor_set_arena.Flush();
 
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
+
   return iree_ok_status();
 }
 

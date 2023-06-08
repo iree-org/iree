@@ -1237,104 +1237,6 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
 }
 
 //===----------------------------------------------------------------------===//
-// Builtins
-//===----------------------------------------------------------------------===//
-// Builtins are added by frontends or during tensor encoding to handle ops or
-// data types not supported by the lower-level stream ops (stream.async.* and
-// stream.cmd.*).
-
-def Stream_BuiltinSplatI64Op : Stream_Op<"builtin.splat.i64", [
-  Stream_AffinityOp,
-  Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
-    "mergeBuiltinModule",
-    "convertBuiltinOp",
-  ]>,
-  Util_SizeAwareOp,
-]> {
-  let summary = [{splats a value into a resource}];
-  let description = [{
-    Generated builtin for emulating 64-bit splats.
-    As with stream.async.splat it returns a new resource with the given
-    value splatted out to fill the entire contents.
-  }];
-
-  let arguments = (ins
-    I64:$value,
-    Stream_Size:$result_size,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_AnyStreamResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $value `:` type($value) `->` type($result) `` `{` $result_size `}`
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getResultSize(); }
-  }];
-
-  let hasVerifier = 1;
-}
-
-def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
-  AllTypesMatch<["target", "result"]>,
-  Stream_AffinityOp,
-  Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
-    "mergeBuiltinModule",
-    "convertBuiltinOp",
-  ]>,
-  Util_SizeAwareOp,
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-    "getTiedResult",
-    "getTiedResultOperandIndex",
-    "getTiedResultOperandIndices",
-  ]>,
-]> {
-  let summary = [{fills a subview of a stream resource with a value}];
-  let description = [{
-    Generated builtin for emulating 64-bit fills.
-    As with stream.async.fill it splats a value into a subview of the given
-    stream resource and returns the resource with the update applied.
-  }];
-
-  let arguments = (ins
-    Stream_AnyStreamResource:$target,
-    Stream_Size:$target_size,
-    Stream_Offset:$target_offset,
-    Stream_Offset:$target_end,
-    Stream_Size:$target_length,
-    I64:$value,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_AnyStreamResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $value `,`
-    $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
-    type($value) `->`
-    custom<ShapedTiedResult>(type($target), $target_size)
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return getTargetSize(); }
-    Value getResultSize(unsigned idx) { return getTargetSize(); }
-  }];
-
-  let hasVerifier = 1;
-}
-
-//===----------------------------------------------------------------------===//
 // Resource transfer ops
 //===----------------------------------------------------------------------===//
 
@@ -2521,7 +2423,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
     Stream_Size:$target_size,
     Stream_Offset:$target_offset,
     Stream_Size:$target_length,
-    Stream_FillPatternType:$value
+    Stream_NativeFillPatternType:$value
   );
   let results = (outs);
 

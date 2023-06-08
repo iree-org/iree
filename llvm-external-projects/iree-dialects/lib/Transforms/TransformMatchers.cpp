@@ -1211,7 +1211,7 @@ void transform_ext::makeReductionMatcher(
     transform_ext::StructuredOpMatcher *&fillCapture,
     transform_ext::StructuredOpMatcher *&leadingCapture,
     transform_ext::StructuredOpMatcher *&trailingCapture,
-    MatchedReductionCaptures &captures) {
+    MatchedReductionCaptures &captures, bool mustMatchEntireFunc) {
   // The core part of the matcher is anchored on a particular reduction op.
   auto &reduction =
       m_StructuredOp(matcherContext)
@@ -1311,9 +1311,21 @@ void transform_ext::makeReductionMatcher(
           // Capture output elemental type.
           .output(0, CaptureElementTypeBitWidth(
                          captures.maybeTrailingOutputElementalTypeBitWidth));
-  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
-                  .allTilableOpsCaptured<func::FuncOp>();
+  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch());
+  if (mustMatchEntireFunc)
+    reduction = reduction.allTilableOpsCaptured<func::FuncOp>();
   trailingCapture = &trailing;
+}
+
+void transform_ext::makeReductionMatcher(transform_ext::MatcherContext &context,
+                                         StructuredOpMatcher *&reductionCapture,
+                                         MatchedReductionCaptures &captures,
+                                         bool mustMatchEntireFunc) {
+  StructuredOpMatcher *fill;
+  StructuredOpMatcher *leading;
+  StructuredOpMatcher *trailing;
+  makeReductionMatcher(context, reductionCapture, fill, leading, trailing,
+                       captures, mustMatchEntireFunc);
 }
 
 void transform_ext::makeMatmulMatcher(
@@ -1321,7 +1333,7 @@ void transform_ext::makeMatmulMatcher(
     transform_ext::StructuredOpMatcher *&matmulCapture,
     transform_ext::StructuredOpMatcher *&fillCapture,
     transform_ext::StructuredOpMatcher *&trailingCapture,
-    transform_ext::MatchedMatmulCaptures &captures) {
+    transform_ext::MatchedMatmulCaptures &captures, bool mustMatchEntireFunc) {
   auto &matmul = transform_ext::m_StructuredOp<linalg::MatmulOp>(matcherContext)
                      // Capture op sizes.
                      .dim(AllDims(), CaptureDims(captures.matmulOpSizes))
@@ -1336,19 +1348,10 @@ void transform_ext::makeMatmulMatcher(
   fillCapture = &fill;
 
   auto &trailing = m_StructuredOp<linalg::GenericOp>(matcherContext);
-  matmul = matmul.result(0, HasAnyUse(), trailing, OptionalMatch())
-               .allTilableOpsCaptured<func::FuncOp>();
+  matmul = matmul.result(0, HasAnyUse(), trailing, OptionalMatch());
+  if (mustMatchEntireFunc)
+    matmul = matmul.allTilableOpsCaptured<func::FuncOp>();
   trailingCapture = &trailing;
-}
-
-void transform_ext::makeReductionMatcher(transform_ext::MatcherContext &context,
-                                         StructuredOpMatcher *&reductionCapture,
-                                         MatchedReductionCaptures &captures) {
-  StructuredOpMatcher *fill;
-  StructuredOpMatcher *leading;
-  StructuredOpMatcher *trailing;
-  makeReductionMatcher(context, reductionCapture, fill, leading, trailing,
-                       captures);
 }
 
 /// Match sum(%src, broadcast(%reduction))
@@ -1531,7 +1534,7 @@ void transform_ext::makeConvolutionMatcher(
     transform_ext::StructuredOpMatcher *&convolutionCapture,
     transform_ext::StructuredOpMatcher *&fillCapture,
     transform_ext::StructuredOpMatcher *&trailingCapture,
-    MatchedConvolutionCaptures &captures) {
+    MatchedConvolutionCaptures &captures, bool mustMatchEntireFunc) {
   // The core part of the matcher is anchored on a particular convolution op.
   auto &convolution =
       m_StructuredOp<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
@@ -1571,16 +1574,18 @@ void transform_ext::makeConvolutionMatcher(
 
   // Optional trailing can be any map, transpose, broadcast but not reduce or
   // windowing operation for now.
-  convolution = convolution.result(0, HasAnyUse(), trailing, OptionalMatch())
-                    .allTilableOpsCaptured<func::FuncOp>();
+  convolution = convolution.result(0, HasAnyUse(), trailing, OptionalMatch());
+  if (mustMatchEntireFunc)
+    convolution = convolution.allTilableOpsCaptured<func::FuncOp>();
   trailingCapture = &trailing;
 }
 
 void transform_ext::makeConvolutionMatcher(
     transform_ext::MatcherContext &context,
     StructuredOpMatcher *&convolutionCapture,
-    MatchedConvolutionCaptures &captures) {
+    MatchedConvolutionCaptures &captures, bool mustMatchEntireFunc) {
   StructuredOpMatcher *fill;
   StructuredOpMatcher *trailing;
-  makeConvolutionMatcher(context, convolutionCapture, fill, trailing, captures);
+  makeConvolutionMatcher(context, convolutionCapture, fill, trailing, captures,
+                         mustMatchEntireFunc);
 }

@@ -35,7 +35,16 @@ cmake -GNinja -B "${IREE_BUILD_DIR?}" -S "${IREE_REPO?}" \
   -DIREE_BUILD_E2E_TEST_ARTIFACTS=ON
 ```
 
-Build the benchmark suites and tools:
+If you only need the imported MLIR models:
+
+```sh
+cmake --build "${IREE_BUILD_DIR?}" --target \
+  iree-benchmark-import-models
+  # For large benchmarks (this will take > 100G disk space)
+  # iree-benchmark-import-models-large
+```
+
+Otherwise, compile the benchmark suites and tools for benchmarking:
 
 ```sh
 cmake --build "${IREE_BUILD_DIR?}" --target \

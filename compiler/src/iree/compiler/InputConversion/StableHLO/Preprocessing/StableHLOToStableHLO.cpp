@@ -1433,6 +1433,113 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
   }
 };
 
+struct CustomCallIsTopK final
+    : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getCallTargetName() != "TopK") {
+      return rewriter.notifyMatchFailure(op, "not a TopK custom call");
+    }
+
+    if (op.getNumOperands() != 1 ||
+        !(op.getNumResults() == 1 || op.getNumResults() == 2)) {
+      return rewriter.notifyMatchFailure(
+          op, "incorrect number of operands / results");
+    }
+
+    ArrayAttr computations = op.getCalledComputations();
+    if (computations.size() != 1) {
+      return rewriter.notifyMatchFailure(op,
+                                         "incorrect number of computations");
+    }
+
+    SymbolRefAttr computation = dyn_cast<SymbolRefAttr>(computations[0]);
+    if (!computation) {
+      return rewriter.notifyMatchFailure(op, "not a ref attr");
+    }
+
+    auto operand = op.getOperand(0);
+    auto operandTy = cast<ShapedType>(operand.getType());
+    if (!operandTy.hasRank() || operandTy.getRank() != 2) {
+      return rewriter.notifyMatchFailure(op, "rank-2 input not found");
+    }
+
+    ShapedType topVTy;
+    ShapedType topITy;
+    if (op.getNumResults() == 1) {
+      if (auto tupleTy = dyn_cast<TupleType>(op.getType(0))) {
+        if (tupleTy.size() != 2) {
+          return rewriter.notifyMatchFailure(
+              op, "tuple return does not tuple two values");
+        }
+        topVTy = dyn_cast<ShapedType>(tupleTy.getType(0));
+        topITy = dyn_cast<ShapedType>(tupleTy.getType(1));
+      }
+    }
+
+    if (op.getNumResults() == 2) {
+      topVTy = dyn_cast<ShapedType>(op.getType(0));
+      topITy = dyn_cast<ShapedType>(op.getType(1));
+    }
+
+    if (!topVTy || !topITy) {
+      return rewriter.notifyMatchFailure(op, "unknown return type behavior");
+    }
+
+    int64_t k = topVTy.getDimSize(1);
+    if (k == ShapedType::kDynamic) {
+      return rewriter.notifyMatchFailure(op, "dynamic top-k k value");
+    }
+
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    auto funcOp = dyn_cast<func::FuncOp>(moduleOp.lookupSymbol(computation));
+
+    Block &block = funcOp.getRegion().front();
+    auto stablehloCompareOp =
+        dyn_cast<mlir::stablehlo::CompareOp>(block.front());
+    if (!stablehloCompareOp) {
+      return rewriter.notifyMatchFailure(op, "not stablehlo compare op");
+    }
+
+    auto returnOp = dyn_cast<func::ReturnOp>(block.getTerminator());
+    if (!returnOp) {
+      return rewriter.notifyMatchFailure(op, "could not find ReturnOp");
+    }
+
+    if (returnOp.getNumOperands() != 1 ||
+        returnOp.getOperand(0) != stablehloCompareOp.getResult()) {
+      return rewriter.notifyMatchFailure(op, "ReturnOp operand not compare op");
+    }
+
+    auto direction = stablehloCompareOp.getComparisonDirection();
+    bool getTop = direction == mlir::stablehlo::ComparisonDirection::GT ||
+                  direction == mlir::stablehlo::ComparisonDirection::GE;
+
+    if (!getTop) {
+      return rewriter.notifyMatchFailure(op,
+                                         "Unsupported comparison direction");
+    }
+
+    auto newTopK = rewriter.create<chlo::TopKOp>(
+        op.getLoc(), TypeRange{topVTy, topITy}, operand, k);
+
+    if (op.getNumResults() == 2) {
+      rewriter.replaceOp(op, newTopK.getResults());
+      return success();
+    }
+
+    if (auto tupleTy = dyn_cast<TupleType>(op.getType(0))) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::TupleOp>(
+          op, op.getType(0), newTopK.getResults());
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 struct StableHLOToStableHLOPreprocessing final
     : impl::StableHLOToStableHLOPreprocessingBase<
           StableHLOToStableHLOPreprocessing> {
@@ -1441,7 +1548,7 @@ struct StableHLOToStableHLOPreprocessing final
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<shape::ShapeDialect, mlir::stablehlo::StablehloDialect,
-                    tensor::TensorDialect>();
+                    chlo::ChloDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
@@ -1494,6 +1601,9 @@ struct StableHLOToStableHLOPreprocessing final
                     FuseWidenOperands<mlir::stablehlo::ConvolutionOp>>(
         context,
         /*benefit=*/400);
+
+    // Identify known custom calls and convert them to equivalent StableHLO.
+    patterns.insert<CustomCallIsTopK>(context);
 
     // Additional canonicalizers that simplify to computationally
     // less-complex operations.

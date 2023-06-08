@@ -185,7 +185,8 @@ iree_status_t iree_hal_heap_buffer_wrap(
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (!iree_host_size_has_alignment((uintptr_t)data.data,
+  if (!iree_any_bit_set(allowed_access, IREE_HAL_MEMORY_ACCESS_UNALIGNED) &&
+      !iree_host_size_has_alignment((uintptr_t)data.data,
                                     IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(

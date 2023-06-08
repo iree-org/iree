@@ -230,6 +230,9 @@ static iree_status_t iree_hal_deferred_command_buffer_begin(
 
 static iree_status_t iree_hal_deferred_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_deferred_command_buffer_t* command_buffer =
+      iree_hal_deferred_command_buffer_cast(base_command_buffer);
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
   return iree_ok_status();
 }
 

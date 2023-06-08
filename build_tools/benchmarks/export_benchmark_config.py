@@ -49,16 +49,16 @@ PresetMatcher = Callable[[Any], bool]
 EXECUTION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "x86_64":
         lambda config: (benchmark_tags.X86_64 in config.tags and benchmark_tags.
-                        LONG_RUNNING not in config.tags),
-    "x86_64-long":
+                        LARGE not in config.tags),
+    "x86_64-large":
         lambda config: (benchmark_tags.X86_64 in config.tags and benchmark_tags.
-                        LONG_RUNNING in config.tags),
+                        LARGE in config.tags),
     "cuda":
         lambda config: (benchmark_tags.CUDA in config.tags and benchmark_tags.
-                        LONG_RUNNING not in config.tags),
-    "cuda-long":
+                        LARGE not in config.tags),
+    "cuda-large":
         lambda config: (benchmark_tags.CUDA in config.tags and benchmark_tags.
-                        LONG_RUNNING in config.tags),
+                        LARGE in config.tags),
     "vulkan-nvidia":
         lambda config: benchmark_tags.VULKAN_NVIDIA in config.tags,
     "android-cpu":
@@ -75,9 +75,9 @@ EXECUTION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
 
 COMPILATION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "comp-stats":
-        lambda gen_config: benchmark_tags.LONG_RUNNING not in gen_config.tags,
-    "comp-stats-long":
-        lambda gen_config: benchmark_tags.LONG_RUNNING in gen_config.tags,
+        lambda gen_config: benchmark_tags.LARGE not in gen_config.tags,
+    "comp-stats-large":
+        lambda gen_config: benchmark_tags.LARGE in gen_config.tags,
 }
 
 
