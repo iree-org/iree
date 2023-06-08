@@ -27,14 +27,3 @@ sudo -u runner bash -c \
 popd
 
 sudo ln -s "${RUNNER_ROOT}/actions-runner/_work/iree/iree" "/work"
-
-echo "Loading systemd services"
-sudo cp /runner-root/config/systemd/system/lab-* /etc/systemd/system/
-sudo systemctl daemon-reload
-
-echo "Enabling systemd services."
-find /runner-root/config/systemd/system/ -name "lab-*" -type f -printf "%f\n" \
-  | xargs sudo systemctl enable
-
-echo "Starting the runner services"
-sudo systemctl start lab-runner-setup.target
