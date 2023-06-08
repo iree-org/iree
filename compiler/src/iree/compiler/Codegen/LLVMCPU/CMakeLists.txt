@@ -18,6 +18,7 @@ iree_cc_library(
     "KernelDispatch.h"
     "LLVMCPUPasses.h"
     "TargetMLTransformInfo.h"
+    "TileSizeSelection.h"
     "Utils.h"
   SRCS
     "ConvertToLLVM.cpp"
