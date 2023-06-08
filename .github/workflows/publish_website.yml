@@ -11,21 +11,30 @@ on:
     branches:
       - main
     paths:
-      - "docs/website/**"
-      - "build_tools/scripts/generate_release_index.py"
+      # This file itself.
       - ".github/workflows/publish_website.yml"
-  # Regenerate the release pip index when a regular or pre-release is created or
-  # deleted.
+      # Directly authored website source files.
+      - "docs/website/**"
+      # Python/pip release index page.
+      - "build_tools/scripts/generate_release_index.py"
+      # MLIR dialect definitions and .md generation using iree-tblgen.
+      #   Technically this should also include the sources for Tablegen, but
+      #   that rarely changes and we want to run this workflow conservatively.
+      - "**.td"
+      - "build_tools/cmake/iree_tablegen_doc.cmake"
+  # Regenerate the release pip index when a release is created or deleted.
   release:
     types: [published, unpublished]
 
 jobs:
   publish_website:
+    # Note: building `iree-tblgen` takes ~5 minutes on standard sized runners.
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
+          submodules: true
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
       - name: Fetching base gh-pages branch
         # We have to explicitly fetch the gh-pages branch as well to preserve history
@@ -41,11 +50,17 @@ jobs:
             mkdocs-material \
             mkdocs-redirects \
             requests
+          sudo apt-get install -y ninja-build
       - name: Generating release index
         run: |
           ./build_tools/scripts/generate_release_index.py \
             --repo="${GITHUB_REPOSITORY}" \
             --output=docs/website/docs/pip-release-links.html
+      # We could run this script under Docker, to avoid the need to install
+      # certain dependencies explicitly (e.g. ninja-build). The Docker image
+      # gives a consistent, tested environment... but fetching takes 1 minute+
+      - name: Building documentation files
+        run: ./docs/website/generate_extra_files.sh
       - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
