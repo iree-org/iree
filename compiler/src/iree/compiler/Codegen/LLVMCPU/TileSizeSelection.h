@@ -17,7 +17,6 @@ namespace iree_compiler {
 class TilingConfig {
  public:
   TilingConfig(IREE::Codegen::LoweringConfigAttr lc) : loweringConfig(lc) {
-
     // TODO: Verify parallel/reductions.
 
     int numTileLevels = loweringConfig.getTileSizes().size();

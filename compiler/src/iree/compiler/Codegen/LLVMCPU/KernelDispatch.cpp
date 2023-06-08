@@ -881,7 +881,7 @@ static LogicalResult setMatmulNoPadRootConfig(
       // Quantized cases are not fully evaluated yet, so it might go with NoPad
       // approach.
       if (tileSize == 0 || shape[idx] == ShapedType::kDynamic) continue;
-       assert(shape[idx] % tileSize == 0);
+      assert(shape[idx] % tileSize == 0);
       shape[idx] = tileSize;
     }
   }

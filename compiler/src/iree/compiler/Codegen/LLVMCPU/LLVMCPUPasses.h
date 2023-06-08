@@ -151,12 +151,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
                                       TilingConfig &tilingConfig,
                                       bool enableMicrokernels);
 
-void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
-                                      TilingConfig &tilingConfig,
-                                      bool enablePeeling,
-                                      bool enableVectorMasking,
-                                      bool lowerToAVX2,
-                                      bool enableAArch64SSVE = false);
+void addMultiTilingExpertPassPipeline(
+    OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
+    bool enableVectorMasking, bool lowerToAVX2, bool enableAArch64SSVE = false);
 
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);

@@ -131,8 +131,8 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
 }
 
 // Returns the vector sizes to vectorize a linalg operation. We try to retrieve
-// them from its `lowering_config`, if available. Otherwise, we try to infer them
-// from the tiled loops in the IR.
+// them from its `lowering_config`, if available. Otherwise, we try to infer
+// them from the tiled loops in the IR.
 static SmallVector<int64_t> getVectorSizes(linalg::LinalgOp linalgOp) {
   auto loweringConfig = iree_compiler::getLoweringConfig(linalgOp);
   // Give priority to the operation's lowering config.
@@ -147,7 +147,8 @@ static SmallVector<int64_t> getVectorSizes(linalg::LinalgOp linalgOp) {
     return vectorShape;
   }
 
-  // Try to infer the vector sizes from the IR. If it fails, we can't vectorize this op.
+  // Try to infer the vector sizes from the IR. If it fails, we can't vectorize
+  // this op.
   auto inferredVectorSizes = inferVectorSizesFromIR(linalgOp);
   if (succeeded(inferredVectorSizes)) {
     return *inferredVectorSizes;

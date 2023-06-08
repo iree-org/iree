@@ -455,12 +455,9 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   }
 }
 
-void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
-                                      TilingConfig &tilingConfig,
-                                      bool enablePeeling,
-                                      bool enableVectorMasking,
-                                      bool lowerToAVX2,
-                                      bool enableAArch64SSVE) {
+void addMultiTilingExpertPassPipeline(
+    OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
+    bool enableVectorMasking, bool lowerToAVX2, bool enableAArch64SSVE) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
