@@ -1010,7 +1010,7 @@ static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
     }
 
     // 4-byte case: 16 accumulators, 32 broadcasts, 8 vector loads.
-    sizes.append({8, 32, 4});
+    sizes.append({8, 32, 1});
     return;
   }
 
