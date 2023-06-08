@@ -18,9 +18,9 @@ Information about the definitions of the benchmark suites can be found in the
 
 Install `iree-import-tf` and `iree-import-tflite` in your Python environment
 (see
-[Tensorflow Integration](https://openxla.github.io/iree/getting-started/tensorflow/)
+[Tensorflow Integration](https://openxla.github.io/iree/guides/ml-frameworks/tensorflow/)
 and
-[TFLite Integration](https://openxla.github.io/iree/getting-started/tflite/)).
+[TFLite Integration](https://openxla.github.io/iree/guides/ml-frameworks/tflite/)).
 
 ### Build Benchmark Suites
 

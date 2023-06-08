@@ -87,7 +87,7 @@ compile the imported MLIR file using IREE's tools on your own machine.
 
 For example, to use IREE's `cpu` target, which is optimized for CPU execution
 using LLVM, refer to the
-[documentation](https://openxla.github.io/iree/deployment-configurations/cpu/)
+[documentation](https://openxla.github.io/iree/guides/deployment-configurations/cpu/)
 and compile the imported `counter.mlir` file using `iree-compile`:
 
 ```

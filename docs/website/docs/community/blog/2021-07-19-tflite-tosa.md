@@ -41,4 +41,4 @@ also have an
 [Android Java app](https://github.com/not-jenni/iree-android-tflite-demo) that
 was forked from an existing TFLite demo app, swapping out the TFLite library
 for our own AAR.  More information on IREE’s TFLite frontend is available
-[here](../getting-started/tflite.md).
+[here](../../guides/ml-frameworks/tflite.md).

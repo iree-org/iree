@@ -91,7 +91,7 @@ To use IREE's Python bindings, you will first need to install
 
 ### :material-hammer-wrench: Building from source
 
-See [Building Python bindings](../building-from-source/getting-started.md#python-bindings)
+See [Building Python bindings](../../building-from-source/getting-started.md#python-bindings)
 page for instructions for building from source.
 
 ## Using the Python bindings
