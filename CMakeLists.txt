@@ -372,14 +372,14 @@ cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler
 # Compiler Input Dialects
 #-------------------------------------------------------------------------------
 
-cmake_dependent_option(IREE_INPUT_MHLO "Builds support for compiling MHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_STABLEHLO "Builds support for compiling StableHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
 
 if(IREE_BUILD_COMPILER)
   message(STATUS "IREE compiler input dialects:")
-  if(IREE_INPUT_MHLO)
-    message(STATUS "  - MHLO")
+  if(IREE_INPUT_STABLEHLO)
+    message(STATUS "  - StableHLO")
   endif()
   if(IREE_INPUT_TORCH)
     message(STATUS "  - Torch MLIR")
