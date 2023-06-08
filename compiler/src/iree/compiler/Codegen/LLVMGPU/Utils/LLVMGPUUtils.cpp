@@ -290,7 +290,7 @@ void reorderTranspose(IRRewriter& rewriter, func::FuncOp funcOp) {
           rewriter.create<vector::TransposeOp>(op->getLoc(), operand, perm);
       transposedOperands.push_back(transposed);
     }
-    SmallVector<Type> resultTypes{transposedOperands.front().getType()};
+    SmallVector<Type> resultTypes{transposeOp.getResult().getType()};
     Operation* newOp =
         rewriter.create(op->getLoc(), op->getName().getIdentifier(),
                         transposedOperands, resultTypes, op->getAttrs());
