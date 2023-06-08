@@ -291,7 +291,8 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
 }
 
 Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
-    ImplicitLocOpBuilder &b, Value containingOpH) {
+    ImplicitLocOpBuilder &b, Value containingOpH, bool cleanup) {
+  // TODO: avoid functional style transform so we can apply to the variant.
   b.create<transform::ApplyPatternsOp>(
       containingOpH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(loc);
@@ -309,7 +310,7 @@ Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
 }
 
 Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
-    ImplicitLocOpBuilder &b, Value containingOpH) {
+    ImplicitLocOpBuilder &b, Value containingOpH, bool cleanup) {
   b.create<transform::ApplyPatternsOp>(
       containingOpH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyLowerMasksPatternsOp>(loc);
@@ -318,7 +319,7 @@ Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
       containingOpH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyMaterializeMasksPatternsOp>(loc);
       });
-  {
+  if (cleanup) {
     iree_compiler::buildCanonicalizationAndEnablingTransforms(
         b, containingOpH, [](OpBuilder &b, Location loc) {
           b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);

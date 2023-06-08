@@ -59,83 +59,46 @@ using transform_ext::RegisterMatchCallbacksOp;
 
 /// Options to set the default values of the matmul strategy.
 
-/// Block tile size X, Y, Z.
-static llvm::cl::opt<int64_t> clBlockTileSizeX(
-    "td-matmul-strategy-blk-size-x",
-    llvm::cl::desc("block tile size for dim X (x,y,z) for the transform "
+static llvm::cl::list<int64_t> clBlockTileSizes(
+    "td-matmul-strategy-blk-sizes",
+    llvm::cl::desc("block tile size for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::init(128));
-static llvm::cl::opt<int64_t> clBlockTileSizeY(
-    "td-matmul-strategy-blk-size-y",
-    llvm::cl::desc("block tile size for dim Y (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(128));
-static llvm::cl::opt<int64_t> clBlockTileSizeZ(
-    "td-matmul-strategy-blk-size-z",
-    llvm::cl::desc("block tile size for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
+    llvm::cl::list_init(ArrayRef<int64_t>{128, 128, 1}),
+    llvm::cl::CommaSeparated);
 static llvm::cl::opt<int64_t> clReductionTileSize(
     "td-matmul-strategy-reduc-size",
     llvm::cl::desc(
         "reduction tile sized for the transform dialect matmul strategy"),
     llvm::cl::init(16));
-
-/// Number of threads X, Y, Z.
-static llvm::cl::opt<int64_t> clNumThreadsX(
-    "td-matmul-strategy-num-threads-x",
-    llvm::cl::desc("number of threads for dim X (x,y,z) for the transform "
+static llvm::cl::list<int64_t> clNumThreads(
+    "td-matmul-strategy-num-threads",
+    llvm::cl::desc("number of threads for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::init(64));
-static llvm::cl::opt<int64_t> clNumThreadsY(
-    "td-matmul-strategy-num-threads-y",
-    llvm::cl::desc("number of threads for dim Y (x,y,z) for the transform "
+    llvm::cl::list_init(ArrayRef<int64_t>{64, 2, 1}), llvm::cl::CommaSeparated);
+static llvm::cl::list<int64_t> clNumWarps(
+    "td-matmul-strategy-num-warps",
+    llvm::cl::desc("number of warps for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumThreadsZ(
-    "td-matmul-strategy-num-threads-z",
-    llvm::cl::desc("number of threads for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
-/// Number of warps X, Y, Z.
-static llvm::cl::opt<int64_t> clNumWarpsX(
-    "td-matmul-strategy-num-warps-x",
-    llvm::cl::desc("number of warps for dim X (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumWarpsY(
-    "td-matmul-strategy-num-warps-y",
-    llvm::cl::desc("number of warps for dim Y (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumWarpsZ(
-    "td-matmul-strategy-num-warps-z",
-    llvm::cl::desc("number of warps for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
+    llvm::cl::list_init(ArrayRef<int64_t>{2, 2, 1}), llvm::cl::CommaSeparated);
 static llvm::cl::opt<bool> clUseAsyncCopies(
     "td-matmul-strategy-use-async-copies",
     llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
     llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clUseMmaSync(
     "td-matmul-strategy-use-mma-sync",
     llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
     llvm::cl::init(false));
-
 static llvm::cl::opt<int64_t> clPipelineDepth(
     "td-matmul-strategy-pipeline-depth",
     llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"),
     llvm::cl::init(3));
 
 void MatmulStrategy::initDefaultValues() {
-  blockTileSizes = {clBlockTileSizeX, clBlockTileSizeY, clBlockTileSizeZ};
+  blockTileSizes =
+      SmallVector<int64_t>{clBlockTileSizes.begin(), clBlockTileSizes.end()};
   reductionTileSize = clReductionTileSize;
-  numThreads = {clNumThreadsX, clNumThreadsY, clNumThreadsZ};
-  numWarps = {clNumWarpsX, clNumWarpsY, clNumWarpsZ};
+  numThreads = SmallVector<int64_t>{clNumThreads.begin(), clNumThreads.end()};
+  numWarps = SmallVector<int64_t>{clNumWarps.begin(), clNumWarps.end()};
   useAsyncCopies = clUseAsyncCopies;
   useMmaSync = clUseMmaSync;
   pipelineDepth = clPipelineDepth;

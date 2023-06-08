@@ -3,16 +3,10 @@
 // Check that setting the command line options affect the transform
 // strategy as expected.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
-// RUN: -td-matmul-strategy-blk-size-x=256 \
-// RUN: -td-matmul-strategy-blk-size-y=64 \
-// RUN: -td-matmul-strategy-blk-size-z=1 \
+// RUN: -td-matmul-strategy-blk-sizes=256,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=8 \
-// RUN: -td-matmul-strategy-num-threads-x=32 \
-// RUN: -td-matmul-strategy-num-threads-y=4 \
-// RUN: -td-matmul-strategy-num-threads-z=1 \
-// RUN: -td-matmul-strategy-num-warps-x=1 \
-// RUN: -td-matmul-strategy-num-warps-y=4 \
-// RUN: -td-matmul-strategy-num-warps-z=1 \
+// RUN: -td-matmul-strategy-num-threads=32,4,1 \
+// RUN: -td-matmul-strategy-num-warps=1,4,1 \
 // RUN: -td-matmul-strategy-use-async-copies=true \
 // RUN: -td-matmul-strategy-use-mma-sync=true \
 // RUN: -td-matmul-strategy-pipeline-depth=5 \
@@ -21,16 +15,10 @@
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
-// RUN: -td-matmul-strategy-blk-size-x=16 \
-// RUN: -td-matmul-strategy-blk-size-y=16 \
-// RUN: -td-matmul-strategy-blk-size-z=1 \
+// RUN: -td-matmul-strategy-blk-sizes=16,16,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
-// RUN: -td-matmul-strategy-num-threads-x=32 \
-// RUN: -td-matmul-strategy-num-threads-y=1 \
-// RUN: -td-matmul-strategy-num-threads-z=1 \
-// RUN: -td-matmul-strategy-num-warps-x=1 \
-// RUN: -td-matmul-strategy-num-warps-y=1 \
-// RUN: -td-matmul-strategy-num-warps-z=1 \
+// RUN: -td-matmul-strategy-num-threads=32,1,1
+// RUN: -td-matmul-strategy-num-warps=1,1,1
 // RUN: -td-matmul-strategy-use-async-copies=true \
 // RUN: -td-matmul-strategy-use-mma-sync=true \
 // RUN: -td-matmul-strategy-pipeline-depth=9 \
@@ -39,16 +27,10 @@
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
-// RUN: -td-matmul-strategy-blk-size-x=128 \
-// RUN: -td-matmul-strategy-blk-size-y=64 \
-// RUN: -td-matmul-strategy-blk-size-z=1 \
+// RUN: -td-matmul-strategy-blk-sizes=128,64,1
 // RUN: -td-matmul-strategy-reduc-size=16 \
-// RUN: -td-matmul-strategy-num-threads-x=128 \
-// RUN: -td-matmul-strategy-num-threads-y=2 \
-// RUN: -td-matmul-strategy-num-threads-z=1 \
-// RUN: -td-matmul-strategy-num-warps-x=1 \
-// RUN: -td-matmul-strategy-num-warps-y=8 \
-// RUN: -td-matmul-strategy-num-warps-z=1 \
+// RUN: -td-matmul-strategy-num-threads=128,2,1 \
+// RUN: -td-matmul-strategy-num-warps=1,8,1 \
 // RUN: -td-matmul-strategy-use-async-copies=true \
 // RUN: -td-matmul-strategy-use-mma-sync=true \
 // RUN: -td-matmul-strategy-pipeline-depth=3 \
