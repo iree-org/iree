@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Pass/Pass.h"
 
@@ -29,7 +30,8 @@ class GPUCheckResourceUsagePass final
 };
 }  // namespace
 
-static int shapedTypeStaticSize(ShapedType shapedType) {
+static int shapedTypeStaticSize(memref::AllocOp allocOp,
+                                ShapedType shapedType) {
   int allocSize = 1;
   for (auto dimSize : shapedType.getShape()) {
     if (ShapedType::isDynamic(dimSize)) continue;
@@ -37,9 +39,15 @@ static int shapedTypeStaticSize(ShapedType shapedType) {
   }
   if (auto elementType =
           llvm::dyn_cast<ShapedType>(shapedType.getElementType())) {
-    allocSize *= shapedTypeStaticSize(elementType);
+    allocSize *= shapedTypeStaticSize(allocOp, elementType);
   } else {
-    allocSize *= shapedType.getElementType().getIntOrFloatBitWidth();
+    auto eltTy = shapedType.getElementType();
+    if (eltTy.isIndex()) {
+      auto mod = allocOp->getParentOfType<ModuleOp>();
+      LowerToLLVMOptions options(mod.getContext(), DataLayout(mod));
+      allocSize *= options.getIndexBitwidth();
+    } else
+      allocSize *= shapedType.getElementType().getIntOrFloatBitWidth();
   }
   return allocSize;
 }
@@ -64,7 +72,7 @@ static LogicalResult checkGPUAllocationSize(func::FuncOp funcOp,
           "has unsupported dynamic shared memory allocations");
     }
 
-    int allocSize = shapedTypeStaticSize(allocType);
+    int allocSize = shapedTypeStaticSize(allocOp, allocType);
     if (allocOp.getAlignment()) {
       int64_t alignmentInBits = *allocOp.getAlignment() * 8;
       allocSize =
