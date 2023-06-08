@@ -131,6 +131,8 @@ nav:
           - CPU - Bare-Metal: "guides/deployment-configurations/bare-metal.md"
           - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
           - GPU - CUDA/ROCm: "guides/deployment-configurations/gpu-cuda-rocm.md"
+      - "Other topics":
+          - Compiler tips and tricks: "guides/compiler-tips.md"
   - "Reference":
       - "reference/index.md"
       - "API bindings":
