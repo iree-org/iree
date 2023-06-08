@@ -991,12 +991,12 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.alloc
+// flow.tensor.alloca
 //===----------------------------------------------------------------------===//
 
-void TensorAllocOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                MLIRContext *context) {
-  results.insert<ElideUnusedOp<TensorAllocOp>>(context);
+void TensorAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideUnusedOp<TensorAllocaOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//

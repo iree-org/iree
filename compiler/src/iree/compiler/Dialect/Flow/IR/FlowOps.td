@@ -1205,7 +1205,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   let hasFolder = 1;
 }
 
-def FLOW_TensorAllocOp : FLOW_Op<"tensor.alloc", [
+def FLOW_TensorAllocaOp : FLOW_Op<"tensor.alloca", [
   Util_ShapeAwareOp,
   MemoryEffects<[MemAlloc]>,
 ]> {
