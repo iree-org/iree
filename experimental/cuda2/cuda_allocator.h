@@ -16,8 +16,10 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Create a CUDA allocator that allocates device memory from the given
-// |device| and used in the given |stream|.
+// Creates a CUDA memory allocator.
+// |device| and |stream| will be used for management operations.
+// |pools| provides memory pools that may be shared across multiple allocators
+// and the pointer must remain valid for the lifetime of the allocator.
 iree_status_t iree_hal_cuda2_allocator_create(
     iree_hal_device_t* base_device,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols, CUdevice device,

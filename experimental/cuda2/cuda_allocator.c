@@ -569,10 +569,10 @@ static iree_status_t iree_hal_cuda2_allocator_import_buffer(
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD:
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplmented handle-based imports");
+                              "handle-based imports not yet implemented");
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplmented external buffer type");
+                              "external buffer type not supported");
   }
 
   iree_hal_buffer_t* buffer = NULL;
@@ -605,7 +605,7 @@ static iree_status_t iree_hal_cuda2_allocator_export_buffer(
     iree_hal_external_buffer_flags_t requested_flags,
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "unimplemented exporting to external buffers");
+                          "exporting to external buffers not supported");
 }
 
 static const iree_hal_allocator_vtable_t iree_hal_cuda2_allocator_vtable = {
