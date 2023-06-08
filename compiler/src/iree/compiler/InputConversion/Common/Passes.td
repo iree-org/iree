@@ -15,6 +15,12 @@ def IREEImportPublic :
   let constructor = "mlir::iree_compiler::createIREEImportPublicPass()";
 }
 
+def DecomposeComplexPass
+    : Pass<"iree-decompose-complex", "func::FuncOp"> {
+  let summary = "decompose complex dialect operations to IREE compatible cases.";
+  let constructor = "mlir::iree_compiler::createDecomposeComplexPass()";
+}
+
 def ImportMLProgram :
     Pass<"iree-import-ml-program", "ModuleOp"> {
   let summary = "Imports MLProgram dialect to IREE Equivalents.";

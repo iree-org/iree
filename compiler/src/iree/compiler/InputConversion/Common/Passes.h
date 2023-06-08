@@ -35,6 +35,7 @@ createAutoInputConversionPipelinePass();
 std::unique_ptr<OperationPass<ModuleOp>> createAutoInputConversionPipelinePass(
     const AutoInputConversionPipelineOptions& options);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeComplexPass();
 std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedConvToConvPass();

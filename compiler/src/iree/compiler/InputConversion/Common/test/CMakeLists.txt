@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "auto_input_conversion_pipeline.mlir"
+    "decompose_complex.mlir"
     "import_ml_program.mlir"
     "iree_import_public.mlir"
     "linalg_quantized_conv_to_conv.mlir"

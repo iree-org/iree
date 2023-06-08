@@ -49,6 +49,7 @@ iree_cc_library(
     "Passes.h"
     "Utils.h"
   SRCS
+    "DecomposeComplex.cpp"
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
     "Passes.cpp"

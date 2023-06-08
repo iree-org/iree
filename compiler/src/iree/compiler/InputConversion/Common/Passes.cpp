@@ -23,6 +23,7 @@ void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createIREEImportPublicPass());
   passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());
+  passManager.addNestedPass<func::FuncOp>(createDecomposeComplexPass());
 }
 
 void registerCommonInputConversionPasses() {
