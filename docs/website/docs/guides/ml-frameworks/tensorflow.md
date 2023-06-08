@@ -17,7 +17,7 @@ python -m pip install tf-nightly
 ```
 
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/getting-started.md#python-bindings):
+[building from source](../../building-from-source/getting-started.md#python-bindings):
 
 ```shell
 python -m pip install \
@@ -79,19 +79,16 @@ iree-import-tf
     You can find out the full path to the `site-packages` directory via the
     `python -m site` command.
 
+!!! tip
+
     `-tf-import-type` needs to match the SavedModel version. You can try both v1
     and v2 if you see one of them gives an empty dump.
 
-Afterwards you can further compile the model in `iree_input.mlir` for
-[CPU](../deployment-configurations/cpu.md) or
-[GPU](../deployment-configurations/gpu-vulkan.md).
+Next, you can compile the model in `iree_input.mlir` for one of IREE's
+supported targets by following one of the
+[deployment configuration guides](../deployment-configurations/index.md).
 
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
-
-## Training
-
-!!! todo
-    Discuss training
 
 ## Samples
 

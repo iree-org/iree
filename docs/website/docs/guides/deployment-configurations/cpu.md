@@ -35,8 +35,8 @@ At runtime, CPU executables can be loaded using one of IREE's CPU HAL drivers:
 
 Python packages for various IREE functionalities are regularly published
 to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
-[Python Bindings](../bindings/python.md) page for more details. The core
-`iree-compiler` package includes the LLVM-based CPU compiler:
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The core `iree-compiler` package includes the LLVM-based CPU compiler:
 
 ``` shell
 python -m pip install iree-compiler
@@ -55,10 +55,10 @@ python -m pip install iree-compiler
 #### Build compiler from source
 
 Please make sure you have followed the
-[Getting started](../building-from-source/getting-started.md) page to build IREE
+[Getting started](../../building-from-source/getting-started.md) page to build IREE
 for your host platform and the
-[Android cross-compilation](../building-from-source/android.md) or
-[iOS cross-compilation](../building-from-source/ios.md) page if you are cross
+[Android cross-compilation](../../building-from-source/android.md) or
+[iOS cross-compilation](../../building-from-source/ios.md) page if you are cross
 compiling for a mobile device. The LLVM (CPU) compiler backend is compiled in by
 default on all platforms.
 
@@ -85,7 +85,7 @@ Using MobileNet v2 as an example, you can download the SavedModel with trained
 weights from
 [TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 and convert it using IREE's
-[TensorFlow importer](../getting-started/tensorflow.md). Then,
+[TensorFlow importer](../ml-frameworks/tensorflow.md). Then,
 
 #### Compile using the command-line
 
@@ -116,9 +116,9 @@ along with the appropriate executable loaders for your application.
 #### Build runtime from source
 
 Please make sure you have followed the
-[Getting started](../building-from-source/getting-started.md) page to build IREE
+[Getting started](../../building-from-source/getting-started.md) page to build IREE
 for your host platform and the
-[Android cross-compilation](../building-from-source/android.md) page if you are
+[Android cross-compilation](../../building-from-source/android.md) page if you are
 cross compiling for Android. The local CPU HAL drivers are compiled in by
 default on all platforms.
 

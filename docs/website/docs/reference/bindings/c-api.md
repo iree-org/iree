@@ -17,10 +17,10 @@ directory demonstrates several ways to use IREE's C API.
 ## Prerequisites
 
 To use IREE's C API, you will need to build the runtime
-[from source](../building-from-source/getting-started.md). The
+[from source](../../building-from-source/getting-started.md). The
 [iree-template-cpp](https://github.com/iml130/iree-template-cpp) community
 project also shows how to integrate IREE into an external project using
-CMake[^2].
+CMake.
 
 ## Concepts
 
@@ -210,12 +210,7 @@ iree_vm_instance_release(instance);
 <!-- TODO(scotttodd): common problems? object ownership? loaded modules (HAL)? -->
 
 [^1]:
-  We are exploring adding a C API for IREE's compiler, see
+  We also have a C API for IREE's compiler, see
   [this GitHub issue](https://github.com/openxla/iree/issues/3817)
-
-[^2]:
-  We plan on deploying via [vcpkg](https://github.com/microsoft/vcpkg) in the
-  future too, see
-  [this GitHub project](https://github.com/openxla/iree/projects/18)
 
 *[vmfb]: VM FlatBuffer

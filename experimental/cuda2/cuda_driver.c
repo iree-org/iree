@@ -338,6 +338,7 @@ static iree_status_t iree_hal_cuda2_driver_dump_device_info(
       max_shared_memory_per_multiprocessor));
 
   // Memory characteristics.
+  int is_integrated_memory = 0;
   int has_unified_address_space = 0;
   int supports_managed_memory = 0;
   int can_map_host_memory = 0;
@@ -345,6 +346,7 @@ static iree_status_t iree_hal_cuda2_driver_dump_device_info(
   int supports_concurrent_managed_access = 0;
   int supports_memory_pools = 0;
   int l2_cache_size = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(INTEGRATED, is_integrated_memory);
   IREE_CUDA_QUERY_ATTRIBUTE(UNIFIED_ADDRESSING, has_unified_address_space);
   IREE_CUDA_QUERY_ATTRIBUTE(MANAGED_MEMORY, supports_managed_memory);
   IREE_CUDA_QUERY_ATTRIBUTE(CAN_MAP_HOST_MEMORY, can_map_host_memory);
@@ -356,6 +358,8 @@ static iree_status_t iree_hal_cuda2_driver_dump_device_info(
   IREE_CUDA_QUERY_ATTRIBUTE(L2_CACHE_SIZE, l2_cache_size);
 
   IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-is-integrated-memory: %d", is_integrated_memory));
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
       builder, "\n- memory-has-unified-address-space: %d",
       has_unified_address_space));

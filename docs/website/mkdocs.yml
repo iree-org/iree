@@ -25,13 +25,13 @@ theme:
     - navigation.instant  # Ajax-style dynamic loading (faster)
     - navigation.tracking # Update URL in address bar with the active anchor
     - navigation.sections # Group sections without collapsible buttons
+    - navigation.tabs     # Show primary sections in tabs below the header
     - navigation.top      # "Back to top" button
-    - navigation.indexes  # section names can link to index.md pages
+    - navigation.indexes  # Section names can link to index.md pages
 
-    # TODO(scotttodd): decide if we want this
-    #     these move sections from the left nav to tabs below the header
-    # - navigation.tabs
-    # - navigation.tabs.sticky  # insiders only
+    # Disabled options (consider enabling as the site changes)
+    # - navigation.expand      # When 'sections' is disabled, start expanded
+    # - navigation.tabs.sticky # Keep tabs visible at the top when scrolled
 
     - toc.follow # Scroll the TOC panel to follow the reader
 
@@ -102,38 +102,76 @@ markdown_extensions:
 # Note: may include external links and titles are optional for internal links
 nav:
   - Home: "index.md"
-  - "Getting Started":
-      - "getting-started/index.md"
-      - TensorFlow: "getting-started/tensorflow.md"
-      - TensorFlow Lite: "getting-started/tflite.md"
-      - JAX: "getting-started/jax.md"
-      - PyTorch: "getting-started/pytorch.md"
-  - "Deployment configurations":
-      - "deployment-configurations/index.md"
-      - CPU: "deployment-configurations/cpu.md"
-      - CPU - Bare-Metal: "deployment-configurations/bare-metal.md"
-      - GPU - Vulkan: "deployment-configurations/gpu-vulkan.md"
-      - GPU - CUDA/ROCm: "deployment-configurations/gpu-cuda-rocm.md"
   - "Building from source":
       - "building-from-source/index.md"
       - "building-from-source/getting-started.md"
       - "building-from-source/android.md"
       - "building-from-source/ios.md"
       - "building-from-source/riscv.md"
-  - "Bindings":
-      - "bindings/index.md"
-      - C API: "bindings/c-api.md"
-      - Python: "bindings/python.md"
-      - TensorFlow Lite: "bindings/tensorflow-lite.md"
-  - "Extensions":
-      - "extensions/index.md"
-  - "Blog":
-      - "blog/index.md"
-      - CUDA backend: "blog/2021-10-15-cuda-backend.md"
-      - Work in progress on Matrix Multiplication on CPU: "blog/2021-10-13-mmt4d.md"
-      - TFLite Support via TOSA: "blog/2021-07-19-tflite-tosa.md"
+  - "Guides":
+      - "guides/index.md"
+      - "ML frameworks":
+          - "guides/ml-frameworks/index.md"
+          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
+          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
+          - JAX: "guides/ml-frameworks/jax.md"
+          - PyTorch: "guides/ml-frameworks/pytorch.md"
+      - "Deployment configurations":
+          - "guides/deployment-configurations/index.md"
+          - CPU: "guides/deployment-configurations/cpu.md"
+          - CPU - Bare-Metal: "guides/deployment-configurations/bare-metal.md"
+          - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
+          - GPU - CUDA/ROCm: "guides/deployment-configurations/gpu-cuda-rocm.md"
   - "Reference":
-      - Glossary: "reference/glossary.md"
-      - Optimization Options: "reference/optimization-options.md"
+      - "reference/index.md"
+      - "API bindings":
+          - "reference/bindings/index.md"
+          - Runtime C API: "reference/bindings/c-api.md"
+          - Python: "reference/bindings/python.md"
+          - TensorFlow Lite: "reference/bindings/tensorflow-lite.md"
+      - "Other topics":
+          - Glossary: "reference/glossary.md"
+          - Optimization options: "reference/optimization-options.md"
+          - Extensions: "reference/extensions.md"
   - "Community":
       - "community/index.md"
+      - "Blog":
+          - "community/blog/index.md"
+          - CUDA backend: "community/blog/2021-10-15-cuda-backend.md"
+          - Work in progress on Matrix Multiplication on CPU: "community/blog/2021-10-13-mmt4d.md"
+          - TFLite Support via TOSA: "community/blog/2021-07-19-tflite-tosa.md"
+
+plugins:
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search/
+  - search
+
+  # https://github.com/mkdocs/mkdocs-redirects
+  - redirects:
+      redirect_maps:  # old -> new
+        "extensions/index.md": "reference/extensions.md"
+
+        # "getting-started/" moved under "guides/ml-frameworks/"
+        "getting-started/index.md": "guides/ml-frameworks/index.md"
+        "getting-started/tensorflow.md": "guides/ml-frameworks/tensorflow.md"
+        "getting-started/tflite.md": "guides/ml-frameworks/tflite.md"
+        "getting-started/jax.md": "guides/ml-frameworks/jax.md"
+        "getting-started/pytorch.md": "guides/ml-frameworks/pytorch.md"
+
+        # "deployment-configurations/" moved under "guides/"
+        "deployment-configurations/index.md": "guides/deployment-configurations/index.md"
+        "deployment-configurations/cpu.md": "guides/deployment-configurations/cpu.md"
+        "deployment-configurations/bare-metal.md": "guides/deployment-configurations/bare-metal.md"
+        "deployment-configurations/gpu-vulkan.md": "guides/deployment-configurations/gpu-vulkan.md"
+        "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda-rocm.md"
+
+        # "bindings/" moved under "reference/"
+        "bindings/index.md": "reference/bindings/index.md"
+        "bindings/c-api.md": "reference/bindings/c-api.md"
+        "bindings/python.md": "reference/bindings/python.md"
+        "bindings/tensorflow-lite.md": "reference/bindings/tensorflow-lite.md"
+
+        # "blog/" moved under "community/"
+        "blog/index.md": "community/blog/index.md"
+        "blog/2021-07-19-tflite-tosa.md": "community/blog/2021-07-19-tflite-tosa.md"
+        "blog/2021-10-13-mmt4d.md": "community/blog/2021-10-13-mmt4d.md"
+        "blog/2021-10-15-cuda-backend.md": "community/blog/2021-10-15-cuda-backend.md"
