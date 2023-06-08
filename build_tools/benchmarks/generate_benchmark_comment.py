@@ -30,7 +30,7 @@ GITHUB_IREE_REPO_PREFIX = "https://github.com/openxla/iree"
 IREE_DASHBOARD_URL = "https://perf.iree.dev/apis/v2"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
-MAX_BASE_COMMIT_QUERY_COUNT = 10
+MAX_BASE_COMMIT_QUERY_COUNT = 100
 # The max number of rows to show per table.
 TABLE_SIZE_CUT = 3
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
