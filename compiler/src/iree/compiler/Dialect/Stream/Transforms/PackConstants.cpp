@@ -262,7 +262,7 @@ static TimepointResource buildFileRead(
   auto zeroI64 =
       builder.create<arith::ConstantIntOp>(storageResource.loc, 0, 64);
   auto readOp = builder.create<IREE::Stream::FileReadOp>(
-      storageResource.loc, fileOp.getResult(), zeroI64, allocOp.getResult(0),
+      storageResource.loc, fileOp.getResult(), zeroI64, allocOp.getResult(),
       allocOp.getResultSize(0), indexSet.get(0), storageResourceSize,
       awaitTimepoint, affinityAttr);
 

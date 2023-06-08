@@ -620,22 +620,124 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 // stream.resource.alloc
 //===----------------------------------------------------------------------===//
 
-LogicalResult ResourceAllocOp::verify() {
-  ResourceAllocOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getResults(), op.getStorageSizes()))) {
-    return failure();
+// static
+std::pair<IREE::Stream::ResourceAllocOp, SmallVector<Value>>
+ResourceAllocOp::createSuballocations(
+    Type resourceType, ArrayRef<Location> locs, ValueRange storageSizes,
+    bool uninitialized, AffinityAttr affinityAttr, OpBuilder &builder) {
+  assert(locs.size() == storageSizes.size() &&
+         "expect locs and storageSizes to match");
+  if (locs.empty())
+    return {};
+  if (locs.size() == 1) {
+    auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
+        locs.front(), resourceType, storageSizes.front(), uninitialized,
+        affinityAttr);
+    return {allocOp, {allocOp.getResult()}};
   }
+  auto fusedLoc = builder.getFusedLoc(locs);
 
-  // All allocated resources must have the same lifetime.
-  auto anyType = op.getResults().front().getType();
-  for (auto type : op.getResultTypes()) {
-    if (type != anyType) {
-      return op.emitError()
-             << "all allocated resources must have the same lifetime";
-    }
+  // NOTE: this is risky: we are assuming right now that all of the
+  // allocations will fit within the constraints of the system. This is not
+  // guaranteed: a very low maximum buffer range may lead to packed slabs
+  // that are not fully addressable. For now we are processing models with
+  // small enough workloads and our target devices are relatively lax on
+  // things so long as we stay under UINT32_MAX boundaries.
+
+  // All slices are 0-0 (overlapping).
+  size_t sliceCount = locs.size();
+  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
+
+  // Compute total size and the offsets of all suballocated resources via the
+  // pack op.
+  auto indexType = builder.getIndexType();
+  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
+  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
+      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+      builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
+
+  // Create the new alloca based on the total required size.
+  auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
+      fusedLoc, resourceType, packOp.getTotalLength(), uninitialized,
+      affinityAttr);
+  auto slab = allocOp.getResult();
+  auto slabSize = packOp.getTotalLength();
+
+  // Create subviews for all of the suballocated resources.
+  SmallVector<Value> results;
+  for (auto [loc, subviewOffset, subviewLength] :
+       llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
+    results.push_back(builder
+                          .create<IREE::Stream::ResourceSubviewOp>(
+                              loc, slab, slabSize, subviewOffset, subviewLength)
+                          .getResult());
   }
+  return {allocOp, results};
+}
 
-  return success();
+//===----------------------------------------------------------------------===//
+// stream.resource.alloca
+//===----------------------------------------------------------------------===//
+
+// static
+std::pair<IREE::Stream::ResourceAllocaOp, SmallVector<Value>>
+ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
+                                       ArrayRef<Location> locs,
+                                       ValueRange storageSizes,
+                                       Value awaitTimepoint,
+                                       AffinityAttr affinityAttr,
+                                       OpBuilder &builder) {
+  assert(locs.size() == storageSizes.size() &&
+         "expect locs and storageSizes to match");
+  if (locs.empty())
+    return {};
+  if (locs.size() == 1) {
+    auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
+        locs.front(), resourceType, timepointType, storageSizes.front(),
+        awaitTimepoint, affinityAttr);
+    return {allocaOp, {allocaOp.getResult()}};
+  }
+  auto fusedLoc = builder.getFusedLoc(locs);
+
+  // NOTE: this is risky: we are assuming right now that all of the
+  // allocations will fit within the constraints of the system. This is not
+  // guaranteed: a very low maximum buffer range may lead to packed slabs
+  // that are not fully addressable. For now we are processing models with
+  // small enough workloads and our target devices are relatively lax on
+  // things so long as we stay under UINT32_MAX boundaries. If a user starts
+  // hitting this the solution is to do in-place outputs such that we don't
+  // need to allocate them; when possible that's always going to be better than
+  // leaving them to the IREE compiled program to deal with.
+
+  // All slices are 0-0 (overlapping).
+  size_t sliceCount = locs.size();
+  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
+
+  // Compute total size and the offsets of all suballocated resources via the
+  // pack op.
+  auto indexType = builder.getIndexType();
+  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
+  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
+      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+      builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
+
+  // Create the new alloca based on the total required size.
+  auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
+      fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
+      awaitTimepoint, affinityAttr);
+  auto slab = allocaOp.getResult();
+  auto slabSize = packOp.getTotalLength();
+
+  // Create subviews for all of the suballocated resources.
+  SmallVector<Value> results;
+  for (auto [loc, subviewOffset, subviewLength] :
+       llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
+    results.push_back(builder
+                          .create<IREE::Stream::ResourceSubviewOp>(
+                              loc, slab, slabSize, subviewOffset, subviewLength)
+                          .getResult());
+  }
+  return {allocaOp, results};
 }
 
 //===----------------------------------------------------------------------===//
