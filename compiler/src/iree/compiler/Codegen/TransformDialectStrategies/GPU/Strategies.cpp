@@ -1,4 +1,4 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -387,9 +387,22 @@ static LogicalResult matchAndSetPadStrategy(func::FuncOp entryPoint,
 
   // 2. Construct the strategy builder.
   PadConfig padConfig = getPadConfig(captures, gpuModel);
+  iree_compiler::gpu::PadStrategy strategy(op->getContext(), captures,
+                                           padConfig);
+  if (strategy.useAsyncCopies) {
+    LDBG("--Async copies not supported yet\n");
+    return failure();
+  }
+  if (strategy.numThreads.size() > 3) {
+    LDBG("--Can only assign 3 num threads\n");
+    return failure();
+  }
+  // Make sure all thread numbers are set.
+  if (strategy.numThreads.size() != 3) {
+    strategy.numThreads.resize(3, 1);
+  }
+
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    iree_compiler::gpu::PadStrategy strategy(op->getContext(), captures,
-                                             padConfig);
     return buildPadStrategy(b, variant, strategy);
   };
 

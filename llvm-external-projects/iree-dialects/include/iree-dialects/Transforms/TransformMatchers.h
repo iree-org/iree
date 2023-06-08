@@ -12,6 +12,7 @@
 #include <functional>
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -90,6 +91,13 @@ struct CaptureElementTypeBitWidth : public CaptureStaticValue<int64_t> {
 /// Captures element element type.
 struct CaptureElementType : public CaptureStaticValue<Type> {
   using Base::Base;
+};
+
+template <typename T = Attribute>
+struct CaptureAttribute : public CaptureStaticValue<T> {
+  static_assert(std::is_base_of_v<Attribute, T>,
+                "can only capture a subclass of Attribute");
+  using CaptureStaticValue<T>::CaptureStaticValue;
 };
 
 /// A tag indicating to look for any user of the operation's result that would
@@ -433,6 +441,84 @@ protected:
   /// Matched value.
   Operation *captured = nullptr;
 };
+
+namespace detail {
+/// Prints the debug output from the ConcreteOpMatcher constructor. The
+/// implementation must reside in the C++ file so we don't pollute the header
+/// with debug includes, and ConcreteOpMatcher is a class template that can only
+/// reside in the header.
+void debugOutputForConcreteOpMatcherConstructor(StringRef name);
+
+/// Specialization hook that returns an op description used in ConcreteOpMatcher
+/// debug output. By default, returns the operation name. This class template
+/// can be specialized for a better name and must be specialized for interfaces
+/// that don't have an operation name.
+template <typename OpTy>
+struct DebugOpKindDescription {
+  static StringRef get() { return OpTy::getOperationName(); }
+};
+} // namespace detail
+
+/// Base class for matchers that match a specific op. Adds an initial predicate
+/// checking if the op is indeed of the specified kind.
+/// Derived classes specializing this for op interfaces MUST also define a
+/// specialization of DebugOpKindDescription.
+// TODO: use traits instead of inheritance to inject behavior and avoid
+// unintended upcasting when calling parent methods in the fluent API.
+template <typename OpTy>
+class ConcreteOpMatcher : public CapturingOpMatcher {
+protected:
+  /// Adds a predicate checking if the op is of the OpTy kind.
+  ConcreteOpMatcher() {
+    CapturingOpMatcher::addPredicate([](Operation *op) {
+      detail::debugOutputForConcreteOpMatcherConstructor(
+          detail::DebugOpKindDescription<OpTy>::get());
+      return isa<OpTy>(op);
+    });
+  }
+
+  /// Adds a predicate for the matched operation to satisfy.
+  template <typename FnTy>
+  void addPredicate(FnTy &&predicate) {
+    // Dispatch to the callback.
+    CapturingOpMatcher::addPredicate(
+        [inner = std::move(predicate)](Operation *op) {
+          return inner(cast<OpTy>(op));
+        });
+  }
+};
+
+/// Matcher for the `tensor.pad` operation.
+class TensorPadOpMatcher : public ConcreteOpMatcher<tensor::PadOp> {
+  friend class MatcherContext;
+
+  TensorPadOpMatcher() : ConcreteOpMatcher<tensor::PadOp>() {}
+
+public:
+  /// Adds a predicate checking that the low padding sizes are exactly the given
+  /// values.
+  TensorPadOpMatcher &low(ArrayRef<int64_t> sizes);
+
+  /// Adds a predicate checking that the low padding sizes for all dimensions
+  /// are exactly the same given value.
+  TensorPadOpMatcher &low(AllDims tag, int64_t size);
+
+  /// Adds a predicate checking that the high padding sizes for all dimensions
+  /// are exactly the same given value.
+  TensorPadOpMatcher &high(ArrayRef<int64_t> sizes);
+
+  /// Adds a predicate checking that the high padding sizes for all dimensions
+  /// are exactly the same given value.
+  TensorPadOpMatcher &high(AllDims tag, int64_t size);
+
+  /// Adds a predicate checking that the body of the pad only yields values
+  /// defined outside the pad region.
+  TensorPadOpMatcher &yieldsExternalValue();
+};
+
+inline TensorPadOpMatcher &m_tensorPad(MatcherContext &matcherContext) {
+  return matcherContext.allocate<TensorPadOpMatcher>();
+}
 
 /// Creates a default operation matcher in the given context that accepts any
 /// operation.

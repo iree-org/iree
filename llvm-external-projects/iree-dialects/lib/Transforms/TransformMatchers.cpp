@@ -1194,6 +1194,75 @@ transform_ext::StructuredOpMatcher::passThroughOp() {
   return *this;
 }
 
+void transform_ext::detail::debugOutputForConcreteOpMatcherConstructor(
+    StringRef name) {
+  LLVM_DEBUG(DBGS() << "op is a " << name << "'");
+}
+
+//===---------------------------------------------------------------------===//
+// TensorPadOpMatcher
+//===---------------------------------------------------------------------===//
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::low(ArrayRef<int64_t> sizes) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG({
+      DBGS() << "low pad sizes are ";
+      llvm::interleaveComma(sizes, llvm::dbgs());
+    });
+    return tensorPad.getStaticLow() == sizes;
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::low(AllDims tag, int64_t size) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG(DBGS() << "all low pad sizes are " << size);
+    return llvm::all_of(tensorPad.getStaticLow(),
+                        [&](int64_t v) { return v == size; });
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::high(ArrayRef<int64_t> sizes) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG({
+      DBGS() << "high pad sizes are ";
+      llvm::interleaveComma(sizes, llvm::dbgs());
+    });
+    return tensorPad.getStaticHigh() == sizes;
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::high(AllDims tag, int64_t size) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG(DBGS() << "all high pad sizes are " << size);
+    return llvm::all_of(tensorPad.getStaticHigh(),
+                        [&](int64_t v) { return v == size; });
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::yieldsExternalValue() {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG(DBGS() << "pad body yields an externally-defined value");
+    Block *body = tensorPad.getBody();
+    if (!llvm::hasSingleElement(*body))
+      return false;
+    return llvm::all_of(body->getTerminator()->getOperands(),
+                        [body](Value operand) {
+                          auto arg = dyn_cast<BlockArgument>(operand);
+                          return !arg || arg.getOwner() != body;
+                        });
+  });
+  return *this;
+}
+
 //===---------------------------------------------------------------------===//
 // MatchCallbackResult.
 //===---------------------------------------------------------------------===//
@@ -1608,8 +1677,10 @@ void transform_ext::makePadMatcher(MatcherContext &context,
   value.rank(transform_ext::CaptureRank(captures.rank))
       .dim(transform_ext::AllDims(), transform_ext::CaptureDims(captures.dims))
       .elementType(CaptureElementType(captures.elementType));
-  auto &opMatcher =
-      transform_ext::m_Operation<tensor::PadOp>(context).result(0, value);
+  auto &opMatcher = transform_ext::m_tensorPad(context)
+                        .low(AllDims(), 0)
+                        .yieldsExternalValue()
+                        .result(0, value);
   if (mustMatchEntireFunc)
     opMatcher = opMatcher.allTilableOpsCaptured<func::FuncOp>();
   padCapture = &opMatcher;

@@ -103,3 +103,74 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       WITH_OPTIONS:     transform.apply_patterns.vector.lower_masks
 //       WITH_OPTIONS:     transform.apply_patterns.vector.materialize_masks
 //       WITH_OPTIONS:   transform.iree.apply_patterns {{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization} : (!transform.any_op) -> ()
+
+// -----
+
+hal.executable @pad_low {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @pad_low ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @pad_low() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
+
+      %pad = arith.constant 0.0 : f32
+      %padded = tensor.pad %3 low[5, 0] high[0, 56] {
+        ^bb0(%arg1: index, %arg2: index):
+          tensor.yield %pad : f32
+      } : tensor<123x456xf32> to tensor<128x512xf32>
+
+      flow.dispatch.tensor.store %padded, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+      return
+    }
+  }
+}
+}
+
+// The strategy doesn't apply for low padding.
+// CHECK-LABEL: @pad_low
+// CHECK-NOT: transform.iree
+// WITH_OPTIONS-NOT: transform.iree
+
+// -----
+
+hal.executable @pad_local {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @pad_local ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @pad_local() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
+
+      %padded = tensor.pad %3 low[0, 0] high[5, 56] {
+        ^bb0(%arg1: index, %arg2: index):
+          %5 = arith.index_cast %arg1 : index to i64
+          %pad = arith.uitofp %5 : i64 to f32
+          tensor.yield %pad : f32
+      } : tensor<123x456xf32> to tensor<128x512xf32>
+
+      flow.dispatch.tensor.store %padded, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+      return
+    }
+  }
+}
+}
+
+// The strategy doesn't apply for local pad values.
+// CHECK-LABEL: @pad_local
+// CHECK-NOT: transform.iree
+// WITH_OPTIONS-NOT: transform.iree
