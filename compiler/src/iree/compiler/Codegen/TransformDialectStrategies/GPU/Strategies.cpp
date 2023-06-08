@@ -48,16 +48,14 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy",
     llvm::cl::desc("activate the matmul tensorcore strategy"),
     llvm::cl::init(true));
-
 llvm::cl::opt<bool> clGPUEnableTransformDialectAlignedMatmul(
     "iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul",
     llvm::cl::desc(
         "activate the matmul tensorcore strategy for tile aligned shapes"),
     llvm::cl::init(false));
-
 llvm::cl::opt<bool> clGPUEnableTransformDialectPadStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
-    llvm::cl::desc("activate the pad strategy"), llvm::cl::init(true));
+    llvm::cl::desc("activate the pad strategy"), llvm::cl::init(false));
 
 // TODO: significantly better namespacing.
 using iree_compiler::gpu::AbstractGemmLikeStrategy;

@@ -1,18 +1,17 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
-// RUN: --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy | FileCheck %s
+// RUN: iree-opt %s --split-input-file \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
+// RUN: | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
-// RUN: --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy
-// RUN: -td-pad-strategy-blk-size-x=32 \
-// RUN: -td-pad-strategy-blk-size-y=32 \
-// RUN: -td-pad-strategy-blk-size-z=1 \
-// RUN: -td-pad-strategy-num-threads-x=8 \
-// RUN: -td-pad-strategy-num-threads-y=4 \
-// RUN: -td-pad-strategy-num-threads-z=1 \
-// RUN: -td-pad-strategy-vector-size={2, 2} \
-// RUN: -td-pad-strategy-use-async-copies=false \
+// RUN: iree-opt %s --split-input-file \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
+// RUN:   --td-pad-strategy-blk-sizes=32,32,1 \
+// RUN:   --td-pad-strategy-num-threads=8,4,1 \
+// RUN:   --td-pad-strategy-vector-size=2,2 \
+// RUN:   --td-pad-strategy-use-async-copies=false \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
 hal.executable @pad {
@@ -78,16 +77,16 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       WITH_OPTIONS:   transform.sequence  failures(propagate) {
 //       WITH_OPTIONS:   transform.iree.register_match_callbacks
 //       WITH_OPTIONS:   {{.*}} = transform.iree.match_callback failures(propagate) "pad"({{.*}}) : (!transform.any_op) -> !transform.any_op
-//       WITH_OPTIONS:   transform.structured.tile_to_forall_op {{.*}}   num_threads [] tile_sizes [64, 64](mapping = [#gpu.block<y>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+//       WITH_OPTIONS:   transform.structured.tile_to_forall_op {{.*}}   num_threads [] tile_sizes [32, 32](mapping = [#gpu.block<y>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 //       WITH_OPTIONS:   transform.iree.apply_patterns {{.*}} {canonicalization, cse, licm, tiling_canonicalization} : (!transform.any_op) -> ()
 //       WITH_OPTIONS:   {{.*}} = transform.structured.match ops{["scf.if"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       WITH_OPTIONS:   transform.scf.take_assumed_branch {{.*}} take_else_branch : (!transform.any_op) -> ()
 //       WITH_OPTIONS:   transform.iree.populate_workgroup_count_region_using_num_threads_slice {{.*}} : (!transform.any_op) -> ()
-//       WITH_OPTIONS:   {{.*}} = transform.structured.tile_to_forall_op {{.*}}   num_threads [16, 16] tile_sizes [](mapping = [#gpu.thread<y>, #gpu.thread<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+//       WITH_OPTIONS:   {{.*}} = transform.structured.tile_to_forall_op {{.*}}   num_threads [8, 4] tile_sizes [](mapping = [#gpu.thread<y>, #gpu.thread<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 //       WITH_OPTIONS:   transform.iree.apply_patterns {{.*}} {canonicalization, cse, licm, tiling_canonicalization} : (!transform.any_op) -> ()
 //       WITH_OPTIONS:   {{.*}} = transform.structured.match ops{["scf.if"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       WITH_OPTIONS:   transform.scf.take_assumed_branch {{.*}} take_else_branch : (!transform.any_op) -> ()
-//       WITH_OPTIONS:   transform.structured.masked_vectorize {{.*}} vector_sizes [4, 4] : !transform.any_op
+//       WITH_OPTIONS:   transform.structured.masked_vectorize {{.*}} vector_sizes [2, 2] : !transform.any_op
 //       WITH_OPTIONS:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       WITH_OPTIONS:     transform.apply_patterns.vector.lower_masked_transfers
 //       WITH_OPTIONS:   transform.iree.apply_patterns {{.*}} {rank_reducing_linalg, rank_reducing_vector} : (!transform.any_op) -> ()
@@ -100,7 +99,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       WITH_OPTIONS:   transform.iree.apply_buffer_optimizations {{.*}} : (!transform.any_op) -> ()
 //       WITH_OPTIONS:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       WITH_OPTIONS:   transform.iree.forall_to_workgroup {{.*}} : (!transform.any_op) -> ()
-//       WITH_OPTIONS:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [64, 64, 1] warp_dims = [] : (!transform.any_op) -> ()
+//       WITH_OPTIONS:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [32, 32, 1] warp_dims = [] : (!transform.any_op) -> ()
 //       WITH_OPTIONS:     transform.apply_patterns.vector.lower_masks
 //       WITH_OPTIONS:     transform.apply_patterns.vector.materialize_masks
 //       WITH_OPTIONS:   transform.iree.apply_patterns {{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization} : (!transform.any_op) -> ()

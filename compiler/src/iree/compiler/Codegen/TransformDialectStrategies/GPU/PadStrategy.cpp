@@ -50,44 +50,22 @@ using iree_compiler::IREE::transform_dialect::
 using transform::MatchOp;
 using transform_ext::RegisterMatchCallbacksOp;
 
-/// Block tile size X, Y, Z.
-static llvm::cl::opt<int64_t> clBlockTileSizeX(
-    "td-pad-strategy-blk-size-x",
-    llvm::cl::desc("block tile size for dim X (x,y,z) for the transform "
+static llvm::cl::list<int64_t> clBlockTileSizes(
+    "td-pad-strategy-blk-sizes",
+    llvm::cl::desc("block tile sizes for dims (x,y,z) for the transform "
                    "dialect pad strategy"),
-    llvm::cl::init(64));
-static llvm::cl::opt<int64_t> clBlockTileSizeY(
-    "td-pad-strategy-blk-size-y",
-    llvm::cl::desc("block tile size for dim Y (x,y,z) for the transform "
+    llvm::cl::list_init(ArrayRef<int64_t>{64, 64, 1}),
+    llvm::cl::CommaSeparated);
+static llvm::cl::list<int64_t> clNumThreads(
+    "td-pad-strategy-num-threads",
+    llvm::cl::desc("number of threads for dims (x,y,z) for the transform "
                    "dialect pad strategy"),
-    llvm::cl::init(64));
-static llvm::cl::opt<int64_t> clBlockTileSizeZ(
-    "td-pad-strategy-blk-size-z",
-    llvm::cl::desc("block tile size for dim z (x,y,z) for the transform "
-                   "dialect pad strategy"),
-    llvm::cl::init(1));
-
-/// Number of threads X, Y, Z.
-static llvm::cl::opt<int64_t> clNumThreadsX(
-    "td-pad-strategy-num-threads-x",
-    llvm::cl::desc("number of threads for dim X (x,y,z) for the transform "
-                   "dialect pad strategy"),
-    llvm::cl::init(16));
-static llvm::cl::opt<int64_t> clNumThreadsY(
-    "td-pad-strategy-num-threads-y",
-    llvm::cl::desc("number of threads for dim Y (x,y,z) for the transform "
-                   "dialect pad strategy"),
-    llvm::cl::init(16));
-static llvm::cl::opt<int64_t> clNumThreadsZ(
-    "td-pad-strategy-num-threads-z",
-    llvm::cl::desc("number of threads for dim z (x,y,z) for the transform "
-                   "dialect pad strategy"),
-    llvm::cl::init(1));
-
+    llvm::cl::list_init(ArrayRef<int64_t>{16, 16, 1}),
+    llvm::cl::CommaSeparated);
 static llvm::cl::list<int64_t> clVectorSize(
     "td-pad-strategy-vector-size",
-    llvm::cl::desc("vector size  for the transform dialect pad strategy"),
-    llvm::cl::list_init(ArrayRef<int64_t>{4, 4}));
+    llvm::cl::desc("vector size for the transform dialect pad strategy"),
+    llvm::cl::list_init(ArrayRef<int64_t>{4, 4}), llvm::cl::CommaSeparated);
 static llvm::cl::opt<bool> clUseAsyncCopies(
     "td-pad-strategy-use-async-copies",
     llvm::cl::desc(
@@ -95,8 +73,9 @@ static llvm::cl::opt<bool> clUseAsyncCopies(
     llvm::cl::init(false));
 
 void iree_compiler::gpu::PadStrategy::initDefaultValues() {
-  blockTileSizes = {clBlockTileSizeX, clBlockTileSizeY, clBlockTileSizeZ};
-  numThreads = {clNumThreadsX, clNumThreadsY, clNumThreadsZ};
+  blockTileSizes =
+      SmallVector<int64_t>{clBlockTileSizes.begin(), clBlockTileSizes.end()};
+  numThreads = SmallVector<int64_t>{clNumThreads.begin(), clNumThreads.end()};
   vectorSize = SmallVector<int64_t>{clVectorSize.begin(), clVectorSize.end()};
   useAsyncCopies = clUseAsyncCopies;
 }
