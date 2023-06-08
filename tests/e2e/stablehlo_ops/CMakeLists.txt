@@ -367,6 +367,7 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
+    "--iree-stream-emulate-memset"
   RUNNER_ARGS
     "--cuda_use_streams=false"
   LABELS

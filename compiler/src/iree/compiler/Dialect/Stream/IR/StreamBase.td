@@ -127,7 +127,8 @@ class Stream_Op<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def Stream_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat, AnyComplex]>;
-def Stream_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
+def Stream_FillPatternType : AnyTypeOf<[I8, I16, I32, I64]>;
+def Stream_NativeFillPatternType : AnyTypeOf<[I8, I16, I32]>;
 
 def Stream_Offset : TypeAlias<Index>;
 def Stream_Size : TypeAlias<Index>;
