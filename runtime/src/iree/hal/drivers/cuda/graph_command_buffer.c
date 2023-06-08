@@ -392,8 +392,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
   CUDA_MEMSET_NODE_PARAMS params = {
       .dst = target_device_buffer + target_offset,
       .elementSize = pattern_length,
-      // width in number of elements despite what driver documentation says.
-      .width = length / pattern_length,
+      .pitch = 0,                        // unused if height == 1
+      .width = length / pattern_length,  // element count
       .height = 1,
       .value = dword_pattern,
   };
