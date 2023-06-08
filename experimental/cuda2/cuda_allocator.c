@@ -306,6 +306,10 @@ static void iree_hal_cuda2_buffer_free(
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; async)");
       break;
     }
+    case IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; external)");
+      break;
+    }
   }
   IREE_TRACE_ZONE_END(z0);
 }
@@ -564,6 +568,11 @@ static iree_status_t iree_hal_cuda2_allocator_import_buffer(
             cuMemHostGetDevicePointer(&device_ptr, host_ptr, 0),
             "cuMemHostGetDevicePointer");
       }
+      break;
+    }
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION: {
+      buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL;
+      device_ptr = (CUdeviceptr)external_buffer->handle.device_allocation.ptr;
       break;
     }
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD:
