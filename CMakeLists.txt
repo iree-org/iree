@@ -412,6 +412,7 @@ endif()
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
+option(IREE_BYTECODE_MODULE_ENABLE_ASAN "Enable address sanitizer in IREE modules in tests" OFF)
 option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules in tests" OFF)
 option(IREE_ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
@@ -430,12 +431,12 @@ if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
       "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
 endif()
 
-if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
   if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
     message(SEND_ERROR
-        "When IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+        "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
         "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
-        "TSAN instrumentation is not currently supported in embedded modules.")
+        "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
   endif()
 endif()
 
