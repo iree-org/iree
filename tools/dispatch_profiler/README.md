@@ -35,7 +35,7 @@ The `generator.py` script serves as a generator for implemented operation data t
 #### Generating user-specified matmul shape `768x512x1024`
 
 ```bash
-python3 ../iree/experimental/dispatch_profiler/generator.py --generated-dir </path/to/create/`generated`/dir> --problem-m=768 --problem-n=512 --problem-k=1024
+python3 ../iree/tools/dispatch_profiler/generator.py --generated-dir </path/to/create/`generated`/dir> --problem-m=768 --problem-n=512 --problem-k=1024
 ...
 [Generating]: ./generated/linalg/matmul/matmul_768x512x1024_f16t_f16t_f16t/matmul_768x512x1024_f16t_f16t_f16t.mlir
 [Generating]: ./generated/linalg/matmul/matmul_768x512x1024_f32t_f32t_f32t/matmul_768x512x1024_f32t_f32t_f32t.mlir
@@ -47,7 +47,7 @@ python3 ../iree/experimental/dispatch_profiler/generator.py --generated-dir </pa
 Generate matmuls where M ranges from 64 to 1024 in increments of 128, N varies from 64 to 1024 in steps of 128, and K is fixed at 4096.
 
 ```bash
-$ python3 ../iree/experimental/dispatch_profiler/generator.py --generated-dir </path/to/create/`generated`/dir> --problem-m=64:1024:128 --problem-n=64:1024:128 --problem-k=4096
+$ python3 ../iree/tools/dispatch_profiler/generator.py --generated-dir </path/to/create/`generated`/dir> --problem-m=64:1024:128 --problem-n=64:1024:128 --problem-k=4096
 ...
 ```
 
@@ -56,7 +56,7 @@ $ python3 ../iree/experimental/dispatch_profiler/generator.py --generated-dir </
 IREE dispatch profiler provies `compile.py` that trigges `iree-compile` with appropiate compilation flags. The output of `iree-compile` vmfb files are placed in `mlir_dialect/operation_path/operation_name.mlir`. The `compiler.py` uses all the possible cpus on your machine to compile all different generated mlir source files.
 
 ```bash
-python3 ../iree/experimental/dispatch_profiler/compile.py --build-dir </path/to/iree/build/dir> --generated-dir </path/to/create/`generated`/dir>
+python3 ../iree/tools/dispatch_profiler/compile.py --build-dir </path/to/iree/build/dir> --generated-dir </path/to/create/`generated`/dir>
 ```
 
 Compiles all the generated source mlir dispatches. One can check the generated dispatched folder to find the vmfb files.
