@@ -13,13 +13,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# iree_runtime_cc_library generates targets on the other package
-# we need to expose files used by it.
-exports_files(glob([
-    "*.h",
-    "*.inl",
-]))
-
 FLATCC_ARGS = [
     "--reader",
     "--builder",
@@ -73,10 +66,18 @@ iree_build_test(
     ],
 )
 
+cpu_data_headers = [
+    "cpu_data.h",
+    "cpu_feature_bits.inl",
+]
+
+# Filegroup used in Bazel only (only Bazel enforces header dependencies).
+filegroup(
+    name = "cpu_data_headers_filegroup",
+    srcs = cpu_data_headers,
+)
+
 iree_runtime_cc_library(
     name = "cpu_data",
-    hdrs = [
-        "cpu_data.h",
-        "cpu_feature_bits.inl",
-    ],
+    hdrs = cpu_data_headers,
 )
