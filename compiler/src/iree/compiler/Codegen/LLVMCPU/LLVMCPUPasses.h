@@ -15,10 +15,10 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "mlir/Pass/Pass.h"
 
-class TilingConfig;
-
 namespace mlir {
 namespace iree_compiler {
+
+class TilingConfig;
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
