@@ -72,46 +72,6 @@ static FailureOr<Operation *> getRootOp(Operation *op) {
   return rootOp;
 }
 
-/// Computes the canonical shape used to vectorize this dispatch. Retrieves
-/// the vectorization tile sizes (parallel and reduction levels) out of the
-/// lowering config and adjusts them to the format expected by the Linalg
-/// vectorizer.
-static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
-  FailureOr<Operation *> rootOp = getRootOp(funcOp);
-  if (failed(rootOp)) {
-    return {};
-  }
-
-  unsigned numTileLevels =
-      mlir::iree_compiler::getNumTileLevels(rootOp.value());
-  if (numTileLevels < 3) {
-    return {};
-  }
-
-  // Retrieve the tile sizes from the last two tiling levels (parallel and
-  // reduction) used for vectorization.
-  SmallVector<int64_t> canonicalVectorShape =
-      mlir::iree_compiler::getTileSizes(rootOp.value(), numTileLevels - 2);
-  SmallVector<int64_t> reductionTileSizes =
-      mlir::iree_compiler::getTileSizes(rootOp.value(), numTileLevels - 1);
-
-  if (!reductionTileSizes.empty()) {
-    assert(canonicalVectorShape.size() == reductionTileSizes.size() &&
-           "Unexpected tile sizes");
-
-    // Combine the reduction tile sizes with the parallel tile sizes already in
-    // the canonical vector shape.
-    for (int i = 0, end = canonicalVectorShape.size(); i < end; ++i) {
-      if (reductionTileSizes[i] > 0)
-        canonicalVectorShape[i] = reductionTileSizes[i];
-    }
-  }
-
-  // Replace zeros in canonical vector shape to turn it into a valid shape.
-  std::replace(canonicalVectorShape.begin(), canonicalVectorShape.end(), 0, 1);
-  return canonicalVectorShape;
-}
-
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis.
 /// Returns failure if vector sizes can't be inferred.
 static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
@@ -170,44 +130,33 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
   return vectorSizes;
 }
 
-// Give the canonical vector shape of a dispatch, returns the vector sizes for a
-// particular linalg op within that dispatch.
-static SmallVector<int64_t> getVectorSizes(
-    linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
-  // Try to infer the vector sizes from the IR. If it fails, try to get them
-  // from the lowering config.
+// Returns the vector sizes to vectorize a linalg operation. We try to retrieve
+// them from its `lowering_config`, if available. Otherwise, we try to infer them
+// from the tiled loops in the IR.
+static SmallVector<int64_t> getVectorSizes(linalg::LinalgOp linalgOp) {
+  auto loweringConfig = iree_compiler::getLoweringConfig(linalgOp);
+  // Give priority to the operation's lowering config.
+  if (loweringConfig) {
+    TilingConfig tilingConfig(loweringConfig);
+    SmallVector<int64_t> vectorShape = tilingConfig.getVectorTileSizes();
+
+    // Replace zeros in vector shape to turn it into a valid vector shape.
+    std::replace(vectorShape.begin(), vectorShape.end(), 0, 1);
+
+    LLVM_DEBUG(VEC_DBGS() << "Using vector sizes from 'lowering_config'\n");
+    return vectorShape;
+  }
+
+  // Try to infer the vector sizes from the IR. If it fails, we can't vectorize this op.
   auto inferredVectorSizes = inferVectorSizesFromIR(linalgOp);
   if (succeeded(inferredVectorSizes)) {
     return *inferredVectorSizes;
   }
 
-  FailureOr<Operation *> rootOp = getRootOp(linalgOp);
-  if (failed(rootOp)) {
-    return {};
-  }
-
-  // TODO: Infer the tiles sizes for an op that is not the root op.
-  if (*rootOp != linalgOp.getOperation()) {
-    return {};
-  }
-
-  if (canonicalVectorShape.empty()) {
-    return {};
-  }
-
-  assert(canonicalVectorShape.size() >= linalgOp.getNumLoops() &&
-         "Unexpected canonical vector shape or number of loops");
-
-  // Return the valid canonical vector shape subset based on the number of loops
-  // of the linalg op.
-  SmallVector<int64_t> vecSize(
-      canonicalVectorShape.take_front(linalgOp.getNumLoops()));
-  for (auto [idx, val] : llvm::enumerate(linalgOp.getStaticLoopRanges())) {
-    if (ShapedType::isDynamic(val)) continue;
-    vecSize[idx] = std::max(vecSize[idx], val);
-  }
-
-  return vecSize;
+  // We couldn't infer the vector sizes for this op so we return all the vector
+  // sizes set to zero.
+  LLVM_DEBUG(VEC_DBGS() << "Couldn't infer vector sizes\n");
+  return SmallVector<int64_t>(linalgOp.getNumLoops(), 0);
 }
 
 class LLVMCPUVectorizationPass
@@ -230,11 +179,6 @@ class LLVMCPUVectorizationPass
 void LLVMCPUVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-  SmallVector<int64_t> canonicalVectorShape;
-  if (enableVectorMasking) {
-    canonicalVectorShape = getCanonicalVectorShape(funcOp);
-  }
-
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
@@ -246,7 +190,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
     SmallVector<int64_t> vectorSizes;
     if (enableVectorMasking) {
       if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-        vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
+        vectorSizes = getVectorSizes(linalgOp);
       } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
         auto ty = padOp.getResultType();
         // TODO(hanchung): Infer the vector sizes for pad op after
