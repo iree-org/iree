@@ -276,17 +276,31 @@ iree_status_t iree_hal_cuda2_memory_pools_dealloca(
   IREE_TRACE_ZONE_APPEND_VALUE(
       z0, (int64_t)iree_hal_buffer_allocation_size(buffer));
 
-  // Try to schedule the buffer for freeing.
-  CUdeviceptr device_ptr = iree_hal_cuda2_buffer_device_pointer(buffer);
-  iree_status_t status = IREE_CURESULT_TO_STATUS(
-      pools->cuda_symbols, cuMemFreeAsync(device_ptr, stream),
-      "cuMemFreeAsync");
+  // Only process the request if the buffer came from an async pool.
+  // We may get requests for deallocations on ones that didn't if one part of
+  // the application allocated the buffer synchronously and another deallocated
+  // it asynchronously.
+  iree_status_t status = iree_ok_status();
+  if (iree_hal_cuda2_buffer_type(buffer) == IREE_HAL_CUDA_BUFFER_TYPE_ASYNC) {
+    // Try to schedule the buffer for freeing.
+    CUdeviceptr device_ptr = iree_hal_cuda2_buffer_device_pointer(buffer);
+    status = IREE_CURESULT_TO_STATUS(pools->cuda_symbols,
+                                     cuMemFreeAsync(device_ptr, stream),
+                                     "cuMemFreeAsync");
+    if (iree_status_is_ok(status)) {
+      // Drop the release callback so that we don't try to double-free the
+      // buffer. Note that we only do this if the CUDA free succeeded as
+      // otherwise we still need to synchronously deallocate the buffer when it
+      // is destroyed.
+      iree_hal_cuda2_buffer_drop_release_callback(buffer);
 
-  // Drop the release callback so that we don't try to double-free the buffer.
-  iree_hal_cuda2_buffer_drop_release_callback(buffer);
-
-  // Update statistics (note that it may not yet be accurate).
-  iree_hal_cuda2_memory_pool_track_free(pools, buffer);
+      // Update statistics (note that it may not yet be accurate).
+      iree_hal_cuda2_memory_pool_track_free(pools, buffer);
+    }
+  } else {
+    // Not allocated via alloca, ignore.
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, "ignored sync allocation");
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
