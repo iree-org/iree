@@ -30,6 +30,7 @@ typedef struct iree_hal_cuda2_allocator_t {
   // The CUDA stream that allocations should be used in.
   CUstream stream;
 
+  // NOTE: optional depending on device support.
   iree_hal_cuda2_memory_pools_t* pools;
 
   const iree_hal_cuda2_dynamic_symbols_t* symbols;
@@ -136,8 +137,10 @@ static void iree_hal_cuda2_allocator_query_statistics(
     iree_hal_cuda2_allocator_t* allocator =
         iree_hal_cuda2_allocator_cast(base_allocator);
     memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
-    iree_hal_cuda2_memory_pools_merge_statistics(allocator->pools,
-                                                 out_statistics);
+    if (allocator->pools) {
+      iree_hal_cuda2_memory_pools_merge_statistics(allocator->pools,
+                                                   out_statistics);
+    }
   });
 }
 

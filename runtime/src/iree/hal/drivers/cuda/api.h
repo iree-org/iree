@@ -84,6 +84,10 @@ typedef struct iree_hal_cuda_device_params_t {
   // tracing with this enabled.
   bool stream_tracing;
 
+  // Whether to use async allocations even if reported as available by the
+  // device. Defaults to true when the device supports it.
+  bool async_allocations;
+
   // Parameters for each CUmemoryPool used for queue-ordered allocations.
   iree_hal_cuda_memory_pooling_params_t memory_pools;
 } iree_hal_cuda_device_params_t;
