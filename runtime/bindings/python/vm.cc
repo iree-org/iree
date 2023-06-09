@@ -189,7 +189,8 @@ std::optional<iree_vm_function_t> VmModule::LookupFunction(
     const std::string& name, iree_vm_function_linkage_t linkage) {
   iree_vm_function_t f;
   auto status = iree_vm_module_lookup_function_by_name(
-      raw_ptr(), linkage, {name.data(), name.size()}, &f);
+      raw_ptr(), linkage,
+      {name.data(), static_cast<iree_host_size_t>(name.size())}, &f);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
     return std::nullopt;

@@ -608,7 +608,8 @@ TEST(StringViewTest, InvalidParseHex) {
 iree::StatusOr<iree_device_size_t> ParseDeviceSize(std::string_view value) {
   iree_device_size_t size = 0;
   IREE_RETURN_IF_ERROR(iree::Status(iree_string_view_parse_device_size(
-      iree_string_view_t{value.data(), value.size()}, &size)));
+      iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+      &size)));
   return size;
 }
 
