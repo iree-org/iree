@@ -122,7 +122,7 @@ architecture, target abi, linker script, system library path, etc.
 ### :octicons-gear-16: Define IREE macros
 
 These macros should be defined, either in C/C++ or via CMake options like
-```cmake
+``` cmake
 set(MY_FLAGS "-DIREE_PLATFORM_GENERIC=1")
 set(CMAKE_C_FLAGS ${MY_FLAGS} ${CMAKE_C_FLAGS})
 set(CMAKE_CXX_FLAGS ${MY_FLAGS} ${CMAKE_CXX_FLAGS})

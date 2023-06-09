@@ -14,7 +14,7 @@ API. Vulkan is cross-platform: it is available on many operating systems,
 including Android, Linux, and Windows. Vulkan is also cross-vendor: it is
 supported by most GPU vendors, including AMD, ARM, Intel, NVIDIA, and Qualcomm.
 
-##  :octicons-project-roadmap-16: Support matrix
+## :octicons-project-roadmap-16: Support matrix
 
 As IREE and the compiler ecosystem it operates within matures, more
 target specific optimizations will be implemented. At this stage, expect
