@@ -453,11 +453,11 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
 
   if (map_status != WGPUBufferMapAsyncStatus_Success) {
     // Set the sticky async error if not already set.
-    if (iree_status_is_ok(userdata->call_state->async_status)) {
-      userdata->call_state->async_status = iree_make_status(
-          IREE_STATUS_UNKNOWN, "wgpuBufferMapAsync failed for buffer %" PRIhsz,
-          buffer_index);
-    }
+    userdata->call_state->async_status = iree_status_join(
+        userdata->call_state->async_status,
+        iree_make_status(IREE_STATUS_UNKNOWN,
+                         "wgpuBufferMapAsync failed for buffer %" PRIhsz,
+                         buffer_index));
     iree_event_set(
         &userdata->call_state->output_states[buffer_index].ready_event);
     iree_allocator_free(iree_allocator_system(), userdata);
@@ -498,14 +498,9 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
         mapped_host_buffer_ptr);
   }
 
-  if (!iree_status_is_ok(status)) {
-    // Set the sticky async error if not already set.
-    if (iree_status_is_ok(userdata->call_state->async_status)) {
-      userdata->call_state->async_status = status;
-    } else {
-      iree_status_free(status);
-    }
-  }
+  // Set the sticky async error if not already set.
+  userdata->call_state->async_status =
+      iree_status_join(userdata->call_state->async_status, status);
 
   iree_event_set(
       &userdata->call_state->output_states[buffer_index].ready_event);
