@@ -17,7 +17,7 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
-// iree_hal_cuda_device_t
+// iree_hal_cuda2_device_t
 //===----------------------------------------------------------------------===//
 
 // Parameters defining a CUmemoryPool.
@@ -40,9 +40,10 @@ typedef struct iree_hal_cuda2_memory_pooling_params_t {
   iree_hal_cuda2_memory_pool_params_t other;
 } iree_hal_cuda2_memory_pooling_params_t;
 
-// Parameters configuring an iree_hal_cuda_device_t.
-// Must be initialized with iree_hal_cuda_device_params_initialize prior to use.
-typedef struct iree_hal_cuda_device_params_t {
+// Parameters configuring an iree_hal_cuda2_device_t.
+// Must be initialized with iree_hal_cuda2_device_params_initialize prior to
+// use.
+typedef struct iree_hal_cuda2_device_params_t {
   // Number of queues exposed on the device.
   // Each queue acts as a separate synchronization scope where all work executes
   // concurrently unless prohibited by semaphores.
@@ -54,7 +55,7 @@ typedef struct iree_hal_cuda_device_params_t {
   iree_host_size_t arena_block_size;
 
   // Specifies how command buffers are recorded and executed.
-  iree_hal_cuda_command_buffer_mode_t command_buffer_mode;
+  iree_hal_cuda2_command_buffer_mode_t command_buffer_mode;
 
   // Allow executing command buffers against CUDA streams as they are recorded.
   // Only command buffers produced by the compiler that have the
@@ -76,12 +77,12 @@ typedef struct iree_hal_cuda_device_params_t {
   bool async_allocations;
 
   // Parameters for each CUmemoryPool used for queue-ordered allocations.
-  iree_hal_cuda_memory_pooling_params_t memory_pools;
-} iree_hal_cuda_device_params_t;
+  iree_hal_cuda2_memory_pooling_params_t memory_pools;
+} iree_hal_cuda2_device_params_t;
 
 // Initializes |out_params| to default values.
-IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
-    iree_hal_cuda_device_params_t* out_params);
+IREE_API_EXPORT void iree_hal_cuda2_device_params_initialize(
+    iree_hal_cuda2_device_params_t* out_params);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda2_driver_t
