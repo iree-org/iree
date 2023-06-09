@@ -40,6 +40,49 @@ typedef struct iree_hal_cuda2_memory_pooling_params_t {
   iree_hal_cuda2_memory_pool_params_t other;
 } iree_hal_cuda2_memory_pooling_params_t;
 
+// Parameters configuring an iree_hal_cuda_device_t.
+// Must be initialized with iree_hal_cuda_device_params_initialize prior to use.
+typedef struct iree_hal_cuda_device_params_t {
+  // Number of queues exposed on the device.
+  // Each queue acts as a separate synchronization scope where all work executes
+  // concurrently unless prohibited by semaphores.
+  iree_host_size_t queue_count;
+
+  // Total size of each block in the device shared block pool.
+  // Larger sizes will lower overhead and ensure the heap isn't hit for
+  // transient allocations while also increasing memory consumption.
+  iree_host_size_t arena_block_size;
+
+  // Specifies how command buffers are recorded and executed.
+  iree_hal_cuda_command_buffer_mode_t command_buffer_mode;
+
+  // Allow executing command buffers against CUDA streams as they are recorded.
+  // Only command buffers produced by the compiler that have the
+  // IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION bit set will use this.
+  bool allow_inline_execution;
+
+  // Enables tracing of command buffers when IREE tracing is enabled.
+  // May take advantage of additional extensions for more accurate timing or
+  // hardware-specific performance counters.
+  //
+  // NOTE: tracing has a non-trivial overhead and will skew the timing of
+  // submissions and introduce false barriers between dispatches. Use this to
+  // identify slow dispatches and refine from there; be wary of whole-program
+  // tracing with this enabled.
+  bool stream_tracing;
+
+  // Whether to use async allocations even if reported as available by the
+  // device. Defaults to true when the device supports it.
+  bool async_allocations;
+
+  // Parameters for each CUmemoryPool used for queue-ordered allocations.
+  iree_hal_cuda_memory_pooling_params_t memory_pools;
+} iree_hal_cuda_device_params_t;
+
+// Initializes |out_params| to default values.
+IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
+    iree_hal_cuda_device_params_t* out_params);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda2_driver_t
 //===----------------------------------------------------------------------===//
