@@ -123,6 +123,18 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
             nullptr);
         exit(0);
       }));
+  llvm::cl::opt<bool> listPlugins(
+      "iree-list-plugins", llvm::cl::desc("Lists all loaded plugins."),
+      llvm::cl::init(false), llvm::cl::ValueDisallowed,
+      llvm::cl::callback([&](const bool &) {
+        llvm::outs() << "Loaded plugins:\n";
+        ireeCompilerEnumeratePlugins(
+            [](const char *pluginName, void *userData) {
+              llvm::outs() << "  " << pluginName << "\n";
+            },
+            nullptr);
+        exit(0);
+      }));
 
   ireeCompilerGlobalInitialize();
   ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
