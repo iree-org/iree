@@ -1540,6 +1540,87 @@ struct CustomCallIsTopK final
   }
 };
 
+struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::SortOp op,
+                                PatternRewriter &rewriter) const override {
+    auto opOperands = op.getOperands();
+    auto opResults = op.getResults();
+    Value topKInput;
+    if (opOperands.size() != 2 || opResults.size() != 2) {
+      return rewriter.notifyMatchFailure(
+          op, "Slice that maps to TopK must have exactly two inputs/outputs");
+    }
+
+    Value inputIota;
+    // Check that one of the inputs is iota, assume that the other one is the
+    // input.
+    for (Value operand : opOperands) {
+      auto iotaOp =
+          dyn_cast_or_null<mlir::stablehlo::IotaOp>(operand.getDefiningOp());
+      if (iotaOp) {
+        inputIota = iotaOp.getResult();
+      } else {
+        topKInput = operand;
+      }
+    }
+
+    if (!inputIota) {
+      return rewriter.notifyMatchFailure(op, "Sort isn't called from Iota.");
+    }
+
+    Block &block = op.getRegion().front();
+    auto stablehloCompareOp =
+        dyn_cast<mlir::stablehlo::CompareOp>(block.front());
+    if (!stablehloCompareOp) {
+      return rewriter.notifyMatchFailure(op, "not stablehlo compare op");
+    }
+
+    auto direction = stablehloCompareOp.getComparisonDirection();
+    bool getTop = direction == mlir::stablehlo::ComparisonDirection::GT ||
+                  direction == mlir::stablehlo::ComparisonDirection::GE;
+
+    if (!getTop) {
+      return rewriter.notifyMatchFailure(op,
+                                         "Unsupported comparison direction");
+    }
+
+    Value topV, topI;
+    int64_t k;
+    // Check that the output of the sort op gets fed into a slice.
+    for (auto [idx, result] : llvm::enumerate(opResults)) {
+      auto sliceOp =
+          dyn_cast<mlir::stablehlo::SliceOp>(*result.getUsers().begin());
+      if (!sliceOp) {
+        return rewriter.notifyMatchFailure(
+            op, "Sort isn't calling into a slice op.");
+      }
+
+      for (auto stride : sliceOp.getStrides().getValues<int64_t>()) {
+        if (stride != 1) {
+          return rewriter.notifyMatchFailure(
+              op, "All slice strides must be 1 in order to match to TopK.");
+        }
+      }
+
+      // Treat the first slice as inputs, the second as indices.
+      if (idx == 0) {
+        topV = sliceOp.getResult();
+        k = sliceOp.getLimitIndices().getValues<int64_t>()[1];
+      } else {
+        topI = sliceOp.getResult();
+      }
+    }
+
+    auto topK = rewriter.create<chlo::TopKOp>(
+        op.getLoc(), TypeRange{topV.getType(), topI.getType()}, topKInput, k);
+    topV.replaceAllUsesWith(topK.getResults()[0]);
+    topI.replaceAllUsesWith(topK.getResults()[1]);
+    return success();
+  }
+};
+
 struct StableHLOToStableHLOPreprocessing final
     : impl::StableHLOToStableHLOPreprocessingBase<
           StableHLOToStableHLOPreprocessing> {
@@ -1604,6 +1685,9 @@ struct StableHLOToStableHLOPreprocessing final
 
     // Identify known custom calls and convert them to equivalent StableHLO.
     patterns.insert<CustomCallIsTopK>(context);
+
+    // Identify an iota->sort->slice pattern that maps to TopK.
+    patterns.insert<IotaSortSliceIsTopK>(context);
 
     // Additional canonicalizers that simplify to computationally
     // less-complex operations.
