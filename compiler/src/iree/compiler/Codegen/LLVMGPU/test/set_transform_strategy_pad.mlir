@@ -24,13 +24,14 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   builtin.module {
     func.func @pad() {
       %c0 = arith.constant 0 : index
+      %c56 = arith.constant 56 : index
       %cst = arith.constant 0.000000e+00 : f32
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
       %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
       %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
 
       %pad = arith.constant 0.0 : f32
-      %padded = tensor.pad %3 low[0, 0] high[5, 56] {
+      %padded = tensor.pad %3 low[%c0, 0] high[5, %c56] {
         ^bb0(%arg1: index, %arg2: index):
           tensor.yield %pad : f32
       } : tensor<123x456xf32> to tensor<128x512xf32>
