@@ -452,8 +452,10 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_ReadyEvent =
       +[](PJRT_Buffer_ReadyEvent_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE0("PJRT_Buffer_ReadyEvent");
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_ReadyEvent"));
+    BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+    args->event =
+        reinterpret_cast<PJRT_Event*>(new EventInstance(buffer->ready_fence()));
+    return nullptr;
   };
   // TODO: Rework the API to be Aliases(b1, b2) to let the plugin explicitly
   // check for aliases.
@@ -491,26 +493,21 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
   // needs to include the destination and aligned buffer, along with the size
   // so the destination can be mem-copied if necessary.
   struct CopyToHostData {
-    // Set up an event for external triggering. While a little wonky, we
-    // trigger it in the host buffer release callback, which happens once the
-    // transfer is done. I don't love this option but it seems to match what
-    // I'm looking for.
-    EventInstance* event;
     void* alloc;
     void* aligned;
     void* dst;
     size_t size;
+    // Fence will be signaled when copy to host is complete.
+    iree_hal_fence_t* copy_done_fence;
   };
 
   //  Configure a default structure that writes directly to dst.
   const size_t alignment = 64;
   struct CopyToHostData* copy_to_host_data = new CopyToHostData;
-  copy_to_host_data->event = new EventInstance(EventInstance::Type::EXTERNAL);
   copy_to_host_data->alloc = nullptr;
   copy_to_host_data->aligned = dst;
   copy_to_host_data->dst = dst;
   copy_to_host_data->size = dst_size;
-  *out_done_event = copy_to_host_data->event;
 
   // If the destination is unaligned we need to write to an intermediary buffer.
   if (((uintptr_t)dst) & (alignment - 1)) {
@@ -540,20 +537,10 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
   dst_external_buffer.flags = IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE;
   dst_external_buffer.size = dst_size;
   dst_external_buffer.handle.host_allocation.ptr = copy_to_host_data->aligned;
-  auto release_callback = +[](void* user_data, iree_hal_buffer_t* buffer) {
-    IREE_TRACE_SCOPE0("PJRT_CopyToHost_ReleaseCallback");
-    auto* copy_data = static_cast<CopyToHostData*>(user_data);
-    // If there is an allocated buffer we need to copy to the destinaton.
-    if (copy_data->alloc) {
-      std::memcpy(copy_data->dst, copy_data->aligned, copy_data->size);
-      delete[] static_cast<char*>(copy_data->alloc);
-    }
-    copy_data->event->ExternalSignalReady(iree_ok_status());
-    delete copy_data;
-  };
   IREE_RETURN_IF_ERROR(IreeApi::hal_allocator_import_buffer(
       device_.device_allocator(), dst_buffer_params, &dst_external_buffer,
-      /*release_callback=*/{release_callback, copy_to_host_data}, &dst_buffer));
+      /*release_callback=*/iree_hal_buffer_release_callback_null(),
+      &dst_buffer));
 
   // Create the transfer command buffer.
   iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;
@@ -572,12 +559,68 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       /*transfer_count=*/1, &transfer_command, &transfer_cb));
   dst_buffer.reset();
 
+  iree_hal_semaphore_t* semaphore;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_create(device_.device(), 0ull, &semaphore));
+
+  // Signaled when `dst_buffer` is ready to be consumed.
+  iree_hal_fence_t* dst_buffer_ready_fence;
+  IREE_RETURN_IF_ERROR(IreeApi::hal_fence_create_at(
+      semaphore, 1ull, device_.client().host_allocator(),
+      &dst_buffer_ready_fence));
+
+  // Signaled when copy to host is complete.
+  iree_hal_fence_t* copy_done_fence;
+  IREE_RETURN_IF_ERROR(IreeApi::hal_fence_create_at(
+      semaphore, 2ull, device_.client().host_allocator(), &copy_done_fence));
+  copy_to_host_data->copy_done_fence = copy_done_fence;
+
+  auto dst_buffer_callback = [](PJRT_Error* error, void* user_data) {
+    const ErrorInstance* error_instance = ErrorInstance::FromError(error);
+    auto* copy_data = static_cast<CopyToHostData*>(user_data);
+
+    if (!error) {
+      // If there is an allocated buffer we need to copy to the destinaton.
+      if (copy_data->alloc) {
+        std::memcpy(copy_data->dst, copy_data->aligned, copy_data->size);
+      }
+      iree_hal_fence_signal(copy_data->copy_done_fence);
+    } else {
+      iree_hal_fence_fail(copy_data->copy_done_fence, error_instance->status());
+    }
+
+    if (copy_data->alloc) {
+      delete[] static_cast<char*>(copy_data->alloc);
+    }
+    delete copy_data;
+    delete error_instance;
+  };
+
+  // This callback simply deletes the `dst_buffer_ready_event`. We could perform
+  // this deletion in the `dst_buffer_callback`, but this would result in the
+  // callback thread of `dst_buffer_ready_event` detaching from the main thread,
+  // potentially resulting in the callback thread outliving the main thread.
+  auto copy_done_callback = [](PJRT_Error* error, void* user_data) {
+    EventInstance* dst_buffer_ready_event =
+        static_cast<EventInstance*>(user_data);
+    delete dst_buffer_ready_event;
+    delete ErrorInstance::FromError(error);
+  };
+
+  auto dst_buffer_ready_event = new EventInstance(dst_buffer_ready_fence);
+  dst_buffer_ready_event->OnReady(dst_buffer_callback, copy_to_host_data);
+
+  auto copy_done_event = new EventInstance(copy_done_fence);
+  copy_done_event->OnReady(copy_done_callback, dst_buffer_ready_event);
+
   IREE_RETURN_IF_ERROR(IreeApi::hal_device_queue_execute(
       device_.device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(ready_fence_.get()),
-      /*signal_semaphore_list=*/iree_hal_semaphore_list_empty(),
+      /*signal_semaphore_list=*/
+      iree_hal_fence_semaphore_list(dst_buffer_ready_fence),
       /*command_buffer_count=*/1, &transfer_cb));
 
+  *out_done_event = copy_done_event;
   return iree_ok_status();
 }
 
@@ -866,8 +909,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   // We snapshotted the caller data when acquiring the host staging buffer,
   // so we won't be touching it again.
-  *out_done_with_host_buffer_event =
-      new EventInstance(EventInstance::Type::SIGNALLED);
+  *out_done_with_host_buffer_event = new EventInstance(/*fence=*/nullptr);
 
   return iree_ok_status();
 }
@@ -1278,18 +1320,44 @@ std::tuple<uint64_t, uint64_t> ClientInstance::AdvanceTimeline() {
 // EventInstance
 //===----------------------------------------------------------------------===//
 
-EventInstance::EventInstance(Type type) : type_(type) {
-  switch (type) {
-    case Type::SIGNALLED:
-      is_ready_ = true;
-      break;
-    case Type::EXTERNAL:
-      is_ready_ = false;
-      break;
+EventInstance::EventInstance(iree_hal_fence_t* fence) : is_ready_(false) {
+  if (fence == nullptr) {
+    is_ready_ = true;
+    return;
+  }
+
+  iree_hal_fence_retain(fence);
+  {
+    std::lock_guard<std::mutex> guard(lock_);
+    // Create a thread that waits on the fence and executes the callbacks when
+    // the fence is ready.
+    signal_thread_ = std::make_unique<std::thread>(
+        [](EventInstance* event_instance, iree_hal_fence_t* fence) {
+          iree_status_t wait_status =
+              iree_hal_fence_wait(fence, iree_infinite_timeout());
+          iree_hal_fence_release(fence);
+          event_instance->SignalReady(wait_status);
+        },
+        this, fence);
   }
 }
 
-EventInstance::~EventInstance() { iree_status_ignore(status_); }
+EventInstance::~EventInstance() {
+  std::lock_guard<std::mutex> guard(lock_);
+  if (signal_thread_) {
+    if (std::this_thread::get_id() != signal_thread_->get_id()) {
+      signal_thread_->join();
+    } else {
+      // An `EventInstance` is allowed to delete itself in one of its callbacks,
+      // resulting in `signal_thread_` being the thread calling the destructor.
+      // In such cases, we must let the thread continue running independent of
+      // the destructor to avoid a deadlock.
+      signal_thread_->detach();
+      signal_thread_.release();
+    }
+  }
+  iree_status_ignore(status_);
+}
 
 void EventInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Event_Destroy = +[](PJRT_Event_Destroy_Args* args) -> PJRT_Error* {
@@ -1351,9 +1419,8 @@ iree_status_t EventInstance::OnReady(PJRT_Event_OnReadyCallback callback,
   return iree_ok_status();
 }
 
-void EventInstance::ExternalSignalReady(iree_status_t status) {
+void EventInstance::SignalReady(iree_status_t status) {
   IREE_TRACE_SCOPE();
-  assert(type_ == Type::EXTERNAL && "expected EXTERNAL Event type");
   iree_status_t local_status;
   std::vector<std::pair<PJRT_Event_OnReadyCallback, void*>> local_callbacks;
   {
@@ -1724,10 +1791,8 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
     }
 
     if (args->device_complete_events) {
-      // TODO: Plumb through signal fence. This doesn't seem to be used in
-      // the simple cases I've seen so far.
       args->device_complete_events[dev_index] =
-          *(new EventInstance(EventInstance::Type::SIGNALLED));
+          *(new EventInstance(inv.wait_fence.get()));
     }
   }
 
