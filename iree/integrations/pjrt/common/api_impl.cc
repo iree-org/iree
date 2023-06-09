@@ -1199,7 +1199,10 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     // The input here should be stablehlo if coming from JAX and xla if
     // importing from XLA HLO. Set to xla for now as it merely runs an
     // additional pass. We can flip to auto post more testing.
-    if (!job->SetFlag("--iree-input-type=xla_legacy")) {
+    if (!job->SetFlag("--iree-input-type=stablehlo_xla")) {
+      return MakeCompilerError(*job);
+    }
+    if (!job->SetFlag("--iree-input-demote-i64-to-i32=false")) {
       return MakeCompilerError(*job);
     }
     if (!job->SetFlag("--iree-execution-model=async-external")) {
