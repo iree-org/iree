@@ -10,7 +10,8 @@
 
 iree_add_all_subdirs()
 
-if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
+iree_compiler_targeting_iree_arch(_IREE_UKERNEL_BITCODE_BUILD_ARM_64 "arm_64")
+if(_IREE_UKERNEL_BITCODE_BUILD_ARM_64)
 
 iree_bitcode_library(
   NAME
@@ -56,7 +57,9 @@ iree_link_bitcode(
 
 )
 
-endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU
+elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arm_64.bc" "")
+endif()  # _IREE_UKERNEL_BITCODE_BUILD_ARM_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
