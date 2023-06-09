@@ -154,7 +154,7 @@ iree_status_t iree_hal_cuda2_pipeline_layout_create(
   iree_hal_cuda2_pipeline_layout_t* pipeline_layout = NULL;
   iree_host_size_t total_size =
       sizeof(*pipeline_layout) +
-      set_layout_count * sizeof(iree_hal_descriptor_set_layout_t*);
+      set_layout_count * sizeof(*pipeline_layout->set_layouts);
   iree_status_t status = iree_allocator_malloc(host_allocator, total_size,
                                                (void**)&pipeline_layout);
 
