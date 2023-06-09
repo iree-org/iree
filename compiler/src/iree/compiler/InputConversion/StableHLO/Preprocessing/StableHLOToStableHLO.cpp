@@ -1607,7 +1607,9 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
       // Treat the first slice as inputs, the second as indices.
       if (idx == 0) {
         topV = sliceOp.getResult();
-        k = sliceOp.getLimitIndices().getValues<int64_t>()[1];
+        SmallVector<int64_t> limitIndices =
+            llvm::to_vector(sliceOp.getLimitIndices().getValues<int64_t>());
+        k = limitIndices.back();
       } else {
         topI = sliceOp.getResult();
       }
