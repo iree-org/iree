@@ -67,7 +67,7 @@ if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
 fi
 if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE?}" == 1 ]]; then
-  default_test_tag_filters+=("-requires-gpu-nvidia")
+  default_test_tag_filters+=("-requires-gpu-nvidia" "-requires-gpu-sm80")
 fi
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.

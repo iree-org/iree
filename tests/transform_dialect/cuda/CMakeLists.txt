@@ -81,6 +81,7 @@ iree_lit_test_suite(
     "nomsan"
     "notsan"
     "noubsan"
+    "requires-gpu-nvidia"
     "requires-gpu-sm80"
     "driver=cuda"
 )
