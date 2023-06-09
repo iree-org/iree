@@ -6,7 +6,7 @@ tags:
   - Vulkan
 ---
 
-# Vulkan GPU HAL Driver
+# GPU Deployment using Vulkan
 
 IREE can accelerate model execution on GPUs via
 [Vulkan](https://www.khronos.org/vulkan/), a low-overhead graphics and compute
@@ -14,9 +14,7 @@ API. Vulkan is cross-platform: it is available on many operating systems,
 including Android, Linux, and Windows. Vulkan is also cross-vendor: it is
 supported by most GPU vendors, including AMD, ARM, Intel, NVIDIA, and Qualcomm.
 
-<!-- TODO(??): when to use CPU vs GPU -->
-
-## Support matrix
+## :octicons-project-roadmap-16: Support matrix
 
 As IREE and the compiler ecosystem it operates within matures, more
 target specific optimizations will be implemented. At this stage, expect
@@ -28,9 +26,9 @@ GPU Vendor | Category | Performance | Focus Architecture
 ARM Mali GPU | Mobile |  Good | Valhall
 Qualcomm Adreno GPU | Mobile | Reasonable | 640+
 AMD GPU | Desktop/server | Reasonable | -
-NVIDIA GPU | Desktop/server | Reasonable | -
+NVIDIA GPU | Desktop/server | Good | -
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 In order to use Vulkan to drive the GPU, you need to have a functional Vulkan
 environment. IREE requires Vulkan 1.1 on Android and 1.2 elsewhere. It can be
@@ -50,11 +48,11 @@ verified by the following steps:
     ```
 
     If `vulkaninfo` does not exist, you will need to [install the latest Vulkan
-    SDK](https://vulkan.lunarg.com/sdk/home/). For Ubuntu 18.04/20.04,
-    installing via LunarG's package repository is recommended, as it places
-    Vulkan libraries and tools under system paths so it's easy to discover.
+    SDK](https://vulkan.lunarg.com/sdk/home/). Installing via LunarG's package
+    repository is recommended, as it places Vulkan libraries and tools under
+    system paths so it's easy to discover.
 
-    If the showed version is lower than Vulkan 1.2, you will need to update the
+    If the listed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
 
 === "Windows"
@@ -68,45 +66,21 @@ verified by the following steps:
     If `vulkaninfo` does not exist, you will need to [install the latest Vulkan
     SDK](https://vulkan.lunarg.com/sdk/home/).
 
-    If the showed version is lower than Vulkan 1.2, you will need to update the
+    If the listed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
 
-## Get runtime and compiler
-
-### Get IREE runtime with Vulkan HAL driver
-
-Next you will need to get an IREE runtime that supports the Vulkan HAL driver
-so it can execute the model on GPU via Vulkan.
-
-<!-- TODO(??): vcpkg -->
-
-#### Build runtime from source
-
-Please make sure you have followed the
-[Getting started](../../building-from-source/getting-started.md) page to build IREE
-for Linux/Windows and the
-[Android cross-compilation](../../building-from-source/android.md) page for
-Android. The Vulkan HAL driver is compiled in by default on non-Apple platforms.
-
-<!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
-
-Ensure that the `IREE_HAL_DRIVER_VULKAN` CMake option is `ON` when configuring
-for the target.
-
-### Get compiler for SPIR-V exchange format
+### Get the IREE compiler
 
 Vulkan expects the program running on GPU to be expressed by the
 [SPIR-V](https://www.khronos.org/registry/spir-v/) binary exchange format, which
 the model must be compiled into.
 
-<!-- TODO(??): vcpkg -->
+#### :octicons-package-16: Download the compiler from a release
 
-#### Download as Python package
-
-Python packages for various IREE functionalities are regularly published
-to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
-[Python Bindings](../../reference/bindings/python.md) page for more
-details. The core `iree-compiler` package includes the SPIR-V compiler:
+Python packages are regularly published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The core `iree-compiler` package includes the SPIR-V compiler:
 
 ``` shell
 python -m pip install iree-compiler
@@ -116,80 +90,112 @@ python -m pip install iree-compiler
     `iree-compile` is installed to your python module installation path. If you
     pip install with the user mode, it is under `${HOME}/.local/bin`, or
     `%APPDATA%Python` on Windows. You may want to include the path in your
-    system's `PATH` environment variable.
+    system's `PATH` environment variable:
 
-    ``` shell
+    ```shell
     export PATH=${HOME}/.local/bin:${PATH}
     ```
 
-#### Build compiler from source
+#### :material-hammer-wrench: Build the compiler from source
 
 Please make sure you have followed the
-[Getting started](../../building-from-source/getting-started.md) page to build IREE
-for Linux/Windows and the
-[Android cross-compilation](../../building-from-source/android.md) page for
-Android. The SPIR-V compiler backend is compiled in by default on all platforms.
+[Getting started](../../building-from-source/getting-started.md) page to build
+IREE for your host platform and the
+[Android cross-compilation](../../building-from-source/android.md) page if you
+are cross compiling for Android. The SPIR-V compiler backend is compiled in by
+default on all platforms.
 
 Ensure that the `IREE_TARGET_BACKEND_VULKAN_SPIRV` CMake option is `ON` when
 configuring for the host.
 
-## Compile and run the model
+!!! tip
+    `iree-compile` will be built under the `iree-build/tools/` directory. You
+    may want to include this path in your system's `PATH` environment variable.
 
-With the compiler for SPIR-V and runtime for Vulkan, we can now compile a model
-and run it on the GPU.
+### Get the IREE runtime
 
-### Compile the model
+Next you will need to get an IREE runtime that supports the Vulkan HAL driver.
 
-IREE compilers transform a model into its final deployable format in many
+You can check for Vulkan support by looking for a matching driver and device:
+
+```console hl_lines="6"
+$ iree-run-module --list_drivers
+
+        cuda: CUDA (dynamic)
+  local-sync: Local execution using a lightweight inline synchronous queue
+  local-task: Local execution using the IREE multithreading task system
+      vulkan: Vulkan 1.x (dynamic)
+```
+
+```console hl_lines="6"
+$ iree-run-module --list_devices
+
+  cuda://GPU-00000000-1111-2222-3333-444444444444
+  local-sync://
+  local-task://
+  vulkan://00000000-1111-2222-3333-444444444444
+```
+
+#### :material-hammer-wrench: Build the runtime from source
+
+Please make sure you have followed the
+[Getting started](../../building-from-source/getting-started.md) page to build
+IREE for Linux/Windows and the
+[Android cross-compilation](../../building-from-source/android.md) page for
+Android. The Vulkan HAL driver is compiled in by default on non-Apple platforms.
+
+Ensure that the `IREE_HAL_DRIVER_VULKAN` CMake option is `ON` when configuring
+for the target.
+
+## Compile and run a program
+
+With the SPIR-V compiler and Vulkan runtime, we can now compile programs and run
+them on GPUs.
+
+### :octicons-file-code-16: Compile a program
+
+The IREE compiler transforms a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
-[MLIR](https://mlir.llvm.org/)) expected by main IREE compilers first.
+[MLIR](https://mlir.llvm.org/)) expected by the IREE compiler first.
 
 Using MobileNet v2 as an example, you can download the SavedModel with trained
 weights from
 [TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 and convert it using IREE's
-[TensorFlow importer](../ml-frameworks/tensorflow.md). Then,
-
-#### Compile using the command-line
-
-Run the following command (passing `--iree-input-type=` as needed for your
-import tool):
+[TensorFlow importer](../ml-frameworks/tensorflow.md). Then run the following
+command to compile with the `vulkan-spirv` target:
 
 ``` shell hl_lines="2 3"
 iree-compile \
     --iree-hal-target-backends=vulkan-spirv \
     --iree-vulkan-target-triple=<...> \
-    --iree-input-type=stablehlo \
-    iree_input.mlir -o mobilenet-vulkan.vmfb
+    mobilenet_iree_input.mlir -o mobilenet_vulkan.vmfb
 ```
 
-where `iree_input.mlir` is the imported program.
+!!! note
+    A target triple of the form `<vendor/arch>-<product>-<os>` is needed
+    to compile towards each GPU architecture. If no triple is specified then a safe
+    but more limited default will be used. We don't support the full spectrum
+    here[^1]; the following table summarizes the
+    currently recognized ones:
 
-Note that a target triple of the form `<vendor/arch>-<product>-<os>` is needed
-to compile towards each GPU architecture. If no triple is specified then a safe
-but more limited default will be used. We don't support the full spectrum
-here[^1]; the following table summarizes the
-currently recognized ones:
+| GPU Vendor          | Target Triple                    |
+| ------------------- | -------------------------------- |
+| ARM Mali GPU        | e.g., `valhall-g78-android30`    |
+| Qualcomm Adreno GPU | e.g., `adreno-unknown-android30` |
+| AMD GPU             | e.g., `rdna1-5700xt-linux`       |
+| NVIDIA GPU          | e..g, `ampere-rtx3080-windows`   |
+| SwiftShader CPU     | `cpu-swiftshader-unknown`        |
 
-GPU Vendor | Target Triple
-:--------: | :-----------:
-ARM Mali GPU | `valhall-g78-android30`
-Qualcomm Adreno GPU | `adreno-unknown-android30`
-AMD GPU | e.g., `rdna1-5700xt-linux`
-NVIDIA GPU | e..g, `ampere-rtx3080-windows`
-SwiftShader CPU | `cpu-swiftshader-unknown`
-
-### Run the model
-
-#### Run using the command-line
+### :octicons-terminal-16: Run a compiled program
 
 In the build directory, run the following command:
 
 ``` shell hl_lines="2"
 tools/iree-run-module \
     --device=vulkan \
-    --module=mobilenet-vulkan.vmfb \
+    --module=mobilenet_vulkan.vmfb \
     --function=predict \
     --input="1x224x224x3xf32=0"
 ```
@@ -200,8 +206,6 @@ here for brevity, see `iree-run-module --help` for the format to specify
 concrete values.
 
 <!-- TODO(??): Vulkan profiles / API versions / extensions -->
-
-<!-- TODO(??): deployment options -->
 
 <!-- TODO(??): measuring performance -->
 

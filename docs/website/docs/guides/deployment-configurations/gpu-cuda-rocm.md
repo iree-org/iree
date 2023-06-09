@@ -6,9 +6,9 @@ tags:
   - CUDA
 ---
 
-# CUDA and ROCm GPU HAL Driver
+# GPU Deployment using CUDA and ROCm
 
-IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs
+IREE can accelerate model execution on Nvidia GPUs using CUDA and on AMD GPUs
 using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the
 CUDA and ROCm backends share much of their implementation in IREE:
 
@@ -18,7 +18,7 @@ CUDA and ROCm backends share much of their implementation in IREE:
   command buffers implementations - where CUDA has "direct", "stream", and
   "graph" command buffers, and ROCm has only "direct" command buffers
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 In order to use CUDA or ROCm to drive the GPU, you need to have a functional
 CUDA or ROCm environment. It can be verified by the following steps:
@@ -45,40 +45,28 @@ CUDA or ROCm environment. It can be verified by the following steps:
     If `rocm-smi` does not exist, you will need to
     [install the latest ROCm Toolkit SDK](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html)).
 
-## Get runtime and compiler
+### Get the IREE compiler
 
-### Get IREE runtime
-
-Next you will need to get an IREE runtime that includes the CUDA (for Nvidia
-hardware) or ROCm (for AMD hardware) HAL driver.
-
-#### Build runtime from source
-
-Please make sure you have followed the
-[Getting started](../../building-from-source/getting-started.md) page to build
-IREE from source, then enable the CUDA HAL driver with the
-`IREE_HAL_DRIVER_CUDA` option or the experimental ROCm HAL driver with the
-`IREE_EXTERNAL_HAL_DRIVERS=rocm` option.
-
-#### Download compiler as Python package
+#### :octicons-package-16: Download the compiler from a release
 
 === "Nvidia/CUDA"
 
-    Python packages for various IREE functionalities are regularly published
-    to [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
-    [Python Bindings][../../reference/bindings/python.md] page for more
-    details. The core `iree-compiler` package includes the CUDA compiler:
+    Python packages are regularly published to
+    [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+    [Python Bindings](../../reference/bindings/python.md) page for more details.
+    The core `iree-compiler` package includes the CUDA compiler:
 
     ``` shell
     python -m pip install iree-compiler
     ```
 
     !!! tip
-        `iree-compile` is installed to your python module installation path. If
-        you pip install with the user mode, it is under `${HOME}/.local/bin`, or
+        `iree-compile` is installed to your python module installation path. If you
+        pip install with the user mode, it is under `${HOME}/.local/bin`, or
         `%APPDATA%Python` on Windows. You may want to include the path in your
-        system's `PATH` environment variable.
-        ``` shell
+        system's `PATH` environment variable:
+
+        ```shell
         export PATH=${HOME}/.local/bin:${PATH}
         ```
 
@@ -86,46 +74,57 @@ IREE from source, then enable the CUDA HAL driver with the
 
     Currently ROCm is **NOT supported** for the Python interface.
 
-#### Build compiler from source
+#### :material-hammer-wrench: Build the compiler from source
 
 Please make sure you have followed the
-[Getting started](../../building-from-source/getting-started.md) page to build the
-IREE compiler, then enable the CUDA compiler target with the
+[Getting started](../../building-from-source/getting-started.md) page to build
+the IREE compiler, then enable the CUDA compiler target with the
 `IREE_TARGET_BACKEND_CUDA` option or the ROCm compiler target with the
 `IREE_TARGET_BACKEND_ROCM` option.
 
-## Compile and run the model
+!!! tip
+    `iree-compile` will be built under the `iree-build/tools/` directory. You
+    may want to include this path in your system's `PATH` environment variable.
 
-With the compiler and runtime ready, we can now compile a model and run it on
-the GPU.
+### Get the IREE runtime
 
-### Compile the model
+Next you will need to get an IREE runtime that includes the CUDA (for Nvidia
+hardware) or ROCm (for AMD hardware) HAL driver.
 
-IREE compilers transform a model into its final deployable format in many
+#### :material-hammer-wrench: Build the runtime from source
+
+Please make sure you have followed the
+[Getting started](../../building-from-source/getting-started.md) page to build
+IREE from source, then enable the CUDA HAL driver with the
+`IREE_HAL_DRIVER_CUDA` option or the experimental ROCm HAL driver with the
+`IREE_EXTERNAL_HAL_DRIVERS=rocm` option.
+
+## Compile and run a program model
+
+With the compiler and runtime ready, we can now compile programs and run them
+on GPUs.
+
+### :octicons-file-code-16: Compile a program
+
+The IREE compiler transforms a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
-[MLIR](https://mlir.llvm.org/)) expected by main IREE compilers first.
+[MLIR](https://mlir.llvm.org/)) expected by the IREE compiler first.
 
 Using MobileNet v2 as an example, you can download the SavedModel with trained
 weights from
 [TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 and convert it using IREE's
-[TensorFlow importer](../ml-frameworks/tensorflow.md). Then,
-
-#### Compile using the command-line
-
-Let `iree_input.mlir` be the model's initial MLIR representation generated by
-IREE's TensorFlow importer. We can now compile them for each GPU by running the
-following command:
+[TensorFlow importer](../ml-frameworks/tensorflow.md). Then run one of the
+following commands to compile:
 
 === "Nvidia/CUDA"
 
-    ```shell hl_lines="2-4"
+    ```shell hl_lines="2-3"
     iree-compile \
         --iree-hal-target-backends=cuda \
         --iree-hal-cuda-llvm-target-arch=<...> \
-        --iree-input-type=stablehlo \
-        iree_input.mlir -o mobilenet-cuda.vmfb
+        mobilenet_iree_input.mlir -o mobilenet_cuda.vmfb
     ```
 
     Note that a cuda target architecture(`iree-hal-cuda-llvm-target-arch`) of
@@ -135,12 +134,12 @@ following command:
 
     Here is a table of commonly used architectures:
 
-    CUDA GPU  | Target Architecture
-    :--------: | :-----------:
-    Nvidia K80 | `sm_35`
-    Nvidia P100 | `sm_60`
-    Nvidia V100 | `sm_70`
-    Nvidia A100 | `sm_80`
+    | CUDA GPU    | Target Architecture |
+    | ----------- | ------------------- |
+    | Nvidia K80  | `sm_35`             |
+    | Nvidia P100 | `sm_60`             |
+    | Nvidia V100 | `sm_70`             |
+    | Nvidia A100 | `sm_80`             |
 
 === "AMD/ROCm"
 
@@ -150,8 +149,7 @@ following command:
         --iree-rocm-target-chip=<...> \
         --iree-rocm-link-bc=true \
         --iree-rocm-bc-dir=<...> \
-        --iree-input-type=stablehlo \
-        iree_input.mlir -o mobilenet-rocm.vmfb
+        mobilenet_iree_input.mlir -o mobilenet_rocm.vmfb
     ```
 
     Note ROCm Bitcode Dir(`iree-rocm-bc-dir`) path is required. If the system
@@ -166,16 +164,14 @@ following command:
 
     Here is a table of commonly used architectures:
 
-    AMD GPU  | Target Chip
-    :--------: | :-----------:
-    AMD MI25 | `gfx900`
-    AMD MI50 | `gfx906`
-    AMD MI60 | `gfx906`
-    AMD MI100 | `gfx908`
+    | AMD GPU   | Target Chip |
+    | --------- | ----------- |
+    | AMD MI25  | `gfx900`    |
+    | AMD MI50  | `gfx906`    |
+    | AMD MI60  | `gfx906`    |
+    | AMD MI100 | `gfx908`    |
 
-### Run the model
-
-#### Run using the command-line
+### :octicons-terminal-16: Run a compiled program
 
 Run the following command:
 
@@ -184,7 +180,7 @@ Run the following command:
     ``` shell hl_lines="2"
     iree-run-module \
         --device=cuda \
-        --module=mobilenet-cuda.vmfb \
+        --module=mobilenet_cuda.vmfb \
         --function=predict \
         --input="1x224x224x3xf32=0"
     ```
@@ -194,7 +190,7 @@ Run the following command:
     ``` shell hl_lines="2"
     iree-run-module \
         --device=rocm \
-        --module=mobilenet-rocm.vmfb \
+        --module=mobilenet_rocm.vmfb \
         --function=predict \
         --input="1x224x224x3xf32=0"
     ```
