@@ -19,7 +19,6 @@ iree_cc_library(
     "buffer_diagnostics.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
     iree::modules::hal::types
     iree::vm

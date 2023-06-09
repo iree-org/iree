@@ -12,7 +12,6 @@
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "experimental/cuda2/cuda_status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 static const char* IREE_HAL_CUDA_ALLOCATOR_ID = "CUDA2 unpooled";

@@ -8,7 +8,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/api.h"
 #include "iree/hal/drivers/cuda/cuda_device.h"

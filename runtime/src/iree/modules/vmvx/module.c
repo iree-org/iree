@@ -13,7 +13,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 
 // Include the ukernel support library so that we can use its implementations

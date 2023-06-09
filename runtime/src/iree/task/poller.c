@@ -6,7 +6,6 @@
 
 #include "iree/task/poller.h"
 
-#include "iree/base/tracing.h"
 #include "iree/task/executor.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/submission.h"

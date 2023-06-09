@@ -7,7 +7,6 @@
 #include <cstddef>
 
 #include "iree/base/internal/prng.h"
-#include "iree/base/tracing.h"
 #include "iree/task/executor.h"
 
 // TODO(benvanik): clean this up into a reasonable demo; it's currently staging

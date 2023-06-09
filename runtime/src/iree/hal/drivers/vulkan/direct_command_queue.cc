@@ -8,7 +8,6 @@
 
 #include <cstdint>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/direct_command_buffer.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/native_semaphore.h"

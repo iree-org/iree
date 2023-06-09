@@ -134,7 +134,6 @@ iree_cc_library(
     ${_RESOLVER_EXTERNAL_COPTS}
   DEPS
     iree::base
-    iree::base::tracing
     iree::vm
     ${_RESOLVER_INTERNAL_DEPS}
     ${_RESOLVER_EXTERNAL_DEPS}

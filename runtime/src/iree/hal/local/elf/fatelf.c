@@ -6,7 +6,6 @@
 
 #include "iree/hal/local/elf/fatelf.h"
 
-#include "iree/base/target_platform.h"
 #include "iree/hal/local/elf/arch.h"
 
 iree_status_t iree_fatelf_select(iree_const_byte_span_t file_data,

@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/modules/hal/types.h"
 
 //===----------------------------------------------------------------------===//

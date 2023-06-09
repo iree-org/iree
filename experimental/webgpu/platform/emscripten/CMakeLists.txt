@@ -18,9 +18,7 @@ iree_cc_library(
     "emscripten_util.c"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal
-    iree::base::tracing
     iree::hal
     iree::experimental::webgpu::platform
   PUBLIC

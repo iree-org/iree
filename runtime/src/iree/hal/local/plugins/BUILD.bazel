@@ -28,7 +28,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local:executable_plugin_manager",
@@ -52,7 +51,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local:executable_plugin_manager",
     ],
@@ -74,7 +72,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:dynamic_library",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local:executable_plugin_manager",

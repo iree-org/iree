@@ -6,8 +6,6 @@
 
 #include "experimental/webgpu/platform/native/native_driver.h"
 
-#include "iree/base/tracing.h"
-
 //===----------------------------------------------------------------------===//
 // Driver and device options
 //===----------------------------------------------------------------------===//

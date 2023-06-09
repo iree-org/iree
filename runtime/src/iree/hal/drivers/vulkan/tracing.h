@@ -14,7 +14,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
 
 #ifdef __cplusplus

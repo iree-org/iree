@@ -8,8 +8,6 @@
 
 #include <stdbool.h>
 
-#include "iree/base/target_platform.h"
-
 #if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
 #include <xmmintrin.h>
 #endif  // IREE_ARCH_X86_*
@@ -57,11 +55,11 @@ static void iree_fpu_store_state(uint64_t state) {
 #elif defined(IREE_ARCH_ARM_32)
 static uint64_t iree_fpu_load_state() {
   uint32_t fpscr;
-  __asm__ __volatile__("VMRS %[fpscr], fpscr" : [ fpscr ] "=r"(fpscr));
+  __asm__ __volatile__("VMRS %[fpscr], fpscr" : [fpscr] "=r"(fpscr));
   return (uint64_t)fpscr;
 }
 static void iree_fpu_store_state(uint64_t state) {
-  __asm__ __volatile__("VMSR fpscr, %[fpscr]" : : [ fpscr ] "r"(state));
+  __asm__ __volatile__("VMSR fpscr, %[fpscr]" : : [fpscr] "r"(state));
 }
 #elif defined(IREE_ARCH_ARM_64) && defined(IREE_COMPILER_MSVC)
 static uint64_t iree_fpu_load_state(void) {
@@ -73,11 +71,11 @@ static void iree_fpu_store_state(uint64_t state) {
 #elif defined(IREE_ARCH_ARM_64)
 static uint64_t iree_fpu_load_state(void) {
   uint64_t fpcr;
-  __asm__ __volatile__("MRS %[fpcr], fpcr" : [ fpcr ] "=r"(fpcr));
+  __asm__ __volatile__("MRS %[fpcr], fpcr" : [fpcr] "=r"(fpcr));
   return fpcr;
 }
 static void iree_fpu_store_state(uint64_t state) {
-  __asm__ __volatile__("MSR fpcr, %[fpcr]" : : [ fpcr ] "r"(state));
+  __asm__ __volatile__("MSR fpcr, %[fpcr]" : : [fpcr] "r"(state));
 }
 #elif defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
 static uint64_t iree_fpu_load_state(void) { return (uint64_t)_mm_getcsr(); }

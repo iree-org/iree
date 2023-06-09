@@ -11,7 +11,6 @@
 
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/post_batch.h"
 #include "iree/task/submission.h"

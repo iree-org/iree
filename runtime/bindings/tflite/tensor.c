@@ -6,7 +6,6 @@
 
 #include "runtime/bindings/tflite/tensor.h"
 
-#include "iree/base/tracing.h"
 #include "runtime/bindings/tflite/shim.h"
 
 iree_status_t _TfLiteTensorParseNameAttr(TfLiteTensor* tensor,

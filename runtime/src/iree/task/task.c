@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/task/list.h"
 #include "iree/task/pool.h"
 #include "iree/task/post_batch.h"

@@ -11,8 +11,6 @@
 #include <type_traits>
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbol_tables.h"
 
 namespace iree {

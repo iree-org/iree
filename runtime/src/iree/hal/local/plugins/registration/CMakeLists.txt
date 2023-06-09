@@ -22,7 +22,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::hal::local::executable_plugin_manager
     ${IREE_HAL_EXECUTABLE_PLUGIN_EXTRA_DEPS}

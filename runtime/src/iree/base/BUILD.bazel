@@ -46,7 +46,7 @@ iree_runtime_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":core_headers",
-        ":tracing",
+        ":tracing_impl",
     ],
 )
 
@@ -81,7 +81,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":base",
-        ":tracing",
         "//runtime/src/iree/base/internal:wait_handle",
         "//runtime/src/iree/testing:gtest",
     ],
@@ -121,6 +120,7 @@ iree_runtime_cc_test(
 # Core headers (platform detection, compiler compat, etc)
 #===------------------------------------------------------------------------===#
 
+# NOTE: this cannot contain any sources as it is used by header-only targets.
 iree_runtime_cc_library(
     name = "core_headers",
     hdrs = [
@@ -128,12 +128,8 @@ iree_runtime_cc_library(
         "attributes.h",
         "config.h",
         "target_platform.h",
+        "tracing.h",
     ],
-)
-
-iree_runtime_cc_library(
-    name = "target_platform",
-    hdrs = ["target_platform.h"],
 )
 
 #===------------------------------------------------------------------------===#
@@ -146,7 +142,6 @@ iree_runtime_cc_library(
     hdrs = ["loop_sync.h"],
     deps = [
         ":base",
-        ":tracing",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:wait_handle",
     ],
@@ -167,9 +162,8 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
-    name = "tracing",
+    name = "tracing_impl",
     srcs = ["tracing.cc"],
-    hdrs = ["tracing.h"],
     deps = [
         ":core_headers",
         "@tracy_client//:runtime_impl",

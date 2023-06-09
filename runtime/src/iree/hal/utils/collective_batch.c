@@ -6,8 +6,6 @@
 
 #include "iree/hal/utils/collective_batch.h"
 
-#include "iree/base/tracing.h"
-
 //===----------------------------------------------------------------------===//
 // Collective batching utility
 //===----------------------------------------------------------------------===//

@@ -10,7 +10,6 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"

@@ -9,7 +9,6 @@
 #include <math.h>
 
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_equality_t

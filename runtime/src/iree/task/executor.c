@@ -12,7 +12,6 @@
 
 #include "iree/base/internal/debugging.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/list.h"

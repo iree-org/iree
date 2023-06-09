@@ -9,10 +9,8 @@
 #include <string.h>
 
 #include "experimental/cuda2/nccl_status_util.h"
-#include "iree/base/assert.h"
+#include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 static const char* iree_hal_cuda_nccl_dylib_names[] = {
 #if defined(IREE_PLATFORM_WINDOWS)

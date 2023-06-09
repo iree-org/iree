@@ -6,7 +6,6 @@
 
 #include "iree/hal/drivers/cuda/memory_pools.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 

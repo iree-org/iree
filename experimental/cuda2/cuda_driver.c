@@ -14,8 +14,6 @@
 #include "experimental/cuda2/nccl_dynamic_symbols.h"
 #include "experimental/cuda2/nccl_status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/assert.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 
 // Maximum device name length supported by the CUDA HAL driver.

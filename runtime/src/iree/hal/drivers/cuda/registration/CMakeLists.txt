@@ -19,9 +19,7 @@ iree_cc_library(
     "driver_module.c"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::hal::drivers::cuda
   DEFINES

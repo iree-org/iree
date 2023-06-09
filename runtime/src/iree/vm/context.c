@@ -12,7 +12,6 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/debugging.h"
-#include "iree/base/tracing.h"
 
 struct iree_vm_context_t {
   iree_atomic_ref_count_t ref_count;

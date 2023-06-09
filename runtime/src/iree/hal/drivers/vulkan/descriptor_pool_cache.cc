@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <ostream>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
 namespace iree {

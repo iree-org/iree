@@ -13,7 +13,6 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/testing/benchmark.h"
 
 //===----------------------------------------------------------------------===//

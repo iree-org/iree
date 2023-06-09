@@ -48,12 +48,10 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
     iree::hal::utils::collective_batch
@@ -79,9 +77,7 @@ iree_cc_library(
     "status_util.c"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree_cuda::headers
     nccl::headers
   PUBLIC

@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 typedef struct iree_hal_cuda2_buffer_t {
   iree_hal_buffer_t base;

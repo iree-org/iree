@@ -9,7 +9,6 @@
 #include "experimental/cuda2/cuda_buffer.h"
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "experimental/cuda2/cuda_status_util.h"
-#include "iree/base/tracing.h"
 
 // NOTE: these are currently global for all devices; we could make
 // device-specific ones by malloc() and leaking (with LSAN note) unique string
