@@ -19,7 +19,6 @@ iree_lit_test_suite(
     "fragment_000.mlir"
     "fullyconnected.mlir"
     "mnist_fake_weights.mlir"
-    "resnet50_fake_weights.mlir"
     "unidirectional_lstm.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
@@ -30,8 +29,24 @@ iree_lit_test_suite(
     "driver=vulkan"
     "hostonly"
     "optonly"
-  TIMEOUT
-    900
+)
+
+iree_lit_test_suite(
+  NAME
+    lit_large
+  SRCS
+    "resnet50_fake_weights.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree-run-mlir
+  LABELS
+    "driver=local-task"
+    "driver=vulkan"
+    "hostonly"
+    "noasan"
+    "notsan"
+    "optonly"
 )
 
 iree_check_single_backend_test_suite(
@@ -46,6 +61,11 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
+  LABELS
+    "hostonly"
+    "noasan"
+    "notsan"
+    "optonly"
 )
 
 iree_check_single_backend_test_suite(

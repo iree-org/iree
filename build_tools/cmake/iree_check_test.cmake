@@ -6,6 +6,17 @@
 
 include(CMakeParseArguments)
 
+function(iree_is_bytecode_module_test_excluded_by_labels _DST_IS_EXCLUDED_VAR _SRC_LABELS)
+  string(TOLOWER "${CMAKE_BUILD_TYPE}" _LOWERCASE_BUILD_TYPE)
+  if(((IREE_ARCH MARCHES "^riscv_") AND ("noriscv" IN_LIST _SRC_LABELS)) OR
+     (IREE_ENABLE_ASAN AND ("noasan" IN_LIST _SRC_LABELS)) OR
+     (IREE_ENABLE_TSAN AND ("notsan" IN_LIST _SRC_LABELS)) OR
+     (CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS) OR
+     ((_LOWERCASE_BUILD_TYPE STREQUAL "debug") AND ( "optonly" IN_LIST _RULE_LABELS)))
+    set("${_DST_IS_EXCLUDED_VAR}" TRUE PARENT_SCOPE)
+  endif()
+endfunction()
+
 # iree_check_test()
 #
 # Creates a test using iree-check-module for the specified source file.
@@ -50,7 +61,8 @@ function(iree_check_test)
     ${ARGN}
   )
 
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
+  if(_EXCLUDED_BY_LABELS)
     return()
   endif()
 
@@ -158,6 +170,11 @@ function(iree_check_single_backend_test_suite)
     "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
     ${ARGN}
   )
+
+  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
+  if(_EXCLUDED_BY_LABELS)
+    return()
+  endif()
 
   string(TOUPPER "${IREE_EXTERNAL_HAL_DRIVERS}" _UPPERCASE_EXTERNAL_DRIVERS)
   string(REPLACE "-" "_" _NORMALIZED_EXTERNAL_DRIVERS "${_UPPERCASE_EXTERNAL_DRIVERS}")
@@ -323,6 +340,11 @@ function(iree_check_test_suite)
     "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS;TIMEOUT"
     ${ARGN}
   )
+
+  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
+  if(_EXCLUDED_BY_LABELS)
+    return()
+  endif()
 
   if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
     set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")

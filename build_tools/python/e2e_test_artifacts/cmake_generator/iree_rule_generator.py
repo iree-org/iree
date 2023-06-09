@@ -16,11 +16,14 @@ from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import iree_definitions
 import cmake_builder.rules
 
+# Imported models for default benchmarks.
 BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models"
 # Default benchmark suites.
 BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites"
 # Compilation statistics suites for default benchmarks.
 E2E_COMPILE_STATS_SUITES = "iree-e2e-compile-stats-suites"
+# Imported models for large benchmarks.
+LARGE_BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models-large"
 # Large benchmark suites.
 LARGE_BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites-large"
 # Compilation statistics suites for large benchmarks.
@@ -166,7 +169,7 @@ def generate_rules(
     model_import_rule_map[imported_model_id] = model_import_rule
     cmake_rules.extend(model_import_rule.cmake_rules)
 
-  suite_target_names = collections.defaultdict(list)
+  cmake_target_names = collections.defaultdict(set)
   for gen_config in module_generation_configs:
     model_import_rule = model_import_rule_map[
         gen_config.imported_model.composite_id]
@@ -180,33 +183,27 @@ def generate_rules(
     is_compile_stats = (benchmark_tags.COMPILE_STATS
                         in gen_config.compile_config.tags)
     if benchmark_tags.LARGE in gen_config.tags:
+      import_target = LARGE_BENCHMARK_IMPORT_MODELS_CMAKE_TARGET
       if is_compile_stats:
         suite_target = LARGE_E2E_COMPILE_STATS_SUITES_CMAKE_TARGET
       else:
         suite_target = LARGE_BENCHMARK_SUITES_CMAKE_TARGET
     else:
+      import_target = BENCHMARK_IMPORT_MODELS_CMAKE_TARGET
       if is_compile_stats:
         suite_target = E2E_COMPILE_STATS_SUITES
       else:
         suite_target = BENCHMARK_SUITES_CMAKE_TARGET
 
-    suite_target_names[suite_target].append(module_compile_rule.target_name)
-
+    cmake_target_names[import_target].add(model_import_rule.target_name)
+    cmake_target_names[suite_target].add(module_compile_rule.target_name)
     cmake_rules.extend(module_compile_rule.cmake_rules)
 
-  if len(model_import_rule_map) > 0:
+  for cmake_target, module_target_names in cmake_target_names.items():
+    module_target_names = sorted(module_target_names)
     cmake_rules.append(
         cmake_builder.rules.build_add_dependencies(
-            target=BENCHMARK_IMPORT_MODELS_CMAKE_TARGET,
-            deps=[
-                rule_builder.build_target_path(rule.target_name)
-                for rule in model_import_rule_map.values()
-            ]))
-
-  for suite_target, module_target_names in suite_target_names.items():
-    cmake_rules.append(
-        cmake_builder.rules.build_add_dependencies(
-            target=suite_target,
+            target=cmake_target,
             deps=[
                 rule_builder.build_target_path(target_name)
                 for target_name in module_target_names

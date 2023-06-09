@@ -63,7 +63,6 @@ iree_compiler_cc_library(
         ":StreamInterfacesGen",
         ":StreamOpsGen",
         ":StreamTypesGen",
-        "//compiler/src/iree/compiler/Dialect/Stream/Builtins",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",

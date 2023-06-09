@@ -18,9 +18,9 @@ Information about the definitions of the benchmark suites can be found in the
 
 Install `iree-import-tf` and `iree-import-tflite` in your Python environment
 (see
-[Tensorflow Integration](https://openxla.github.io/iree/getting-started/tensorflow/)
+[Tensorflow Integration](https://openxla.github.io/iree/guides/ml-frameworks/tensorflow/)
 and
-[TFLite Integration](https://openxla.github.io/iree/getting-started/tflite/)).
+[TFLite Integration](https://openxla.github.io/iree/guides/ml-frameworks/tflite/)).
 
 ### Build Benchmark Suites
 
@@ -35,7 +35,16 @@ cmake -GNinja -B "${IREE_BUILD_DIR?}" -S "${IREE_REPO?}" \
   -DIREE_BUILD_E2E_TEST_ARTIFACTS=ON
 ```
 
-Build the benchmark suites and tools:
+If you only need the imported MLIR models:
+
+```sh
+cmake --build "${IREE_BUILD_DIR?}" --target \
+  iree-benchmark-import-models
+  # For large benchmarks (this will take > 100G disk space)
+  # iree-benchmark-import-models-large
+```
+
+Otherwise, compile the benchmark suites and tools for benchmarking:
 
 ```sh
 cmake --build "${IREE_BUILD_DIR?}" --target \

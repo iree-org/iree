@@ -17,15 +17,19 @@ iree_compiler_cc_library(
     srcs = [
         "Common.cpp",
         "MatmulTensorCoreStrategy.cpp",
+        "PadStrategy.cpp",
         "SmallReductionStrategy.cpp",
         "StagedReductionStrategy.cpp",
+        "Strategies.cpp",
     ],
     hdrs = [
         "AbstractGemmLikeStrategy.h",
         "Common.h",
         "MatmulTensorCoreStrategy.h",
+        "PadStrategy.h",
         "SmallReductionStrategy.h",
         "StagedReductionStrategy.h",
+        "Strategies.h",
     ],
     deps = [
         # Dialects

@@ -31,6 +31,8 @@ iree_cc_library(
     "event_semaphore.h"
     "graph_command_buffer.c"
     "graph_command_buffer.h"
+    "memory_pools.c"
+    "memory_pools.h"
     "native_executable.c"
     "native_executable.h"
     "nccl_channel.c"

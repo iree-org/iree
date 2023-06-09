@@ -154,6 +154,14 @@ struct DescriptorSetBindingValue {
   Value byteLength;
 };
 
+template <typename T>
+struct StaticRange {
+  T min;
+  T max;
+  StaticRange(T value) : min(value), max(value) {}
+  StaticRange(T min, T max) : min(min), max(max) {}
+};
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

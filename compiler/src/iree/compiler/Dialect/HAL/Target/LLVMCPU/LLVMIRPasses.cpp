@@ -74,11 +74,18 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
       passBuilder.registerOptimizerLastEPCallback(
           [](llvm::ModulePassManager &modulePassManager,
              llvm::OptimizationLevel Level) {
-            llvm::AddressSanitizerOptions Opts;
+            llvm::AddressSanitizerOptions opts;
+            // Can use Never or Always, just not the default Runtime, which
+            // introduces a reference to
+            // __asan_option_detect_stack_use_after_return, causing linker
+            // errors, and anyway we wouldn't really want bother to with a
+            // runtime switch for that.
+            opts.UseAfterReturn =
+                llvm::AsanDetectStackUseAfterReturnMode::Always;
             bool moduleUseAfterScope = false;
             bool useOdrIndicator = false;
             modulePassManager.addPass(llvm::AddressSanitizerPass(
-                Opts, moduleUseAfterScope, useOdrIndicator));
+                opts, moduleUseAfterScope, useOdrIndicator));
           });
     } break;
     case SanitizerKind::kThread: {

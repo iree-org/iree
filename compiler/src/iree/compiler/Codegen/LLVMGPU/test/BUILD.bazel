@@ -35,6 +35,7 @@ iree_lit_test_suite(
             "reduction_pipeline.mlir",
             "rocdl_pipeline_test.mlir",
             "set_transform_strategy.mlir",
+            "set_transform_strategy_pad.mlir",
             "illegal_configuration.mlir",
             "layout_analysis_and_distribution.mlir",
             "linalg_transform.mlir",

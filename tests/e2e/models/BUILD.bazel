@@ -22,7 +22,6 @@ CHECK_FRAMEWORK_TESTS = [
 
 iree_lit_test_suite(
     name = "lit",
-    timeout = "long",  # needed for resnet50_fake_weights / VMVX / TSan
     srcs = enforce_glob(
         [
             "collatz.mlir",
@@ -30,12 +29,14 @@ iree_lit_test_suite(
             "fragment_000.mlir",
             "fullyconnected.mlir",
             "mnist_fake_weights.mlir",
-            "resnet50_fake_weights.mlir",
             "unidirectional_lstm.mlir",
         ],
         include =
             ["*.mlir"],
-        exclude = CHECK_FRAMEWORK_TESTS,
+        exclude = CHECK_FRAMEWORK_TESTS + [
+            # Part of lit_large below.
+            "resnet50_fake_weights.mlir",
+        ],
     ),
     cfg = "//tests:lit.cfg.py",
     tags = [
@@ -51,11 +52,39 @@ iree_lit_test_suite(
     ],
 )
 
+# Larger tests requiring tags skipping them in slow configurations such as
+# sanitizers.
+iree_lit_test_suite(
+    name = "lit_large",
+    srcs = ["resnet50_fake_weights.mlir"],
+    cfg = "//tests:lit.cfg.py",
+    tags = [
+        "driver=local-task",
+        "driver=vulkan",
+        "hostonly",
+        "noasan",
+        "notsan",
+        "optonly",  # swiftshader is too slow in dbg
+    ],
+    tools = [
+        "//tools:iree-run-mlir",
+        "@llvm-project//lld",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
+    tags = [
+        # Large models, skip on slow targets.
+        "hostonly",
+        "noasan",
+        "notsan",
+        "optonly",  # swiftshader is too slow in dbg
+    ],
     target_backend = "llvm-cpu",
 )
 

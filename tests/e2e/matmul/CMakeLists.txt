@@ -102,6 +102,7 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   LABELS
     "noriscv"
+    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
@@ -127,6 +128,7 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   LABELS
     "noriscv"
+    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
@@ -297,6 +299,7 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   LABELS
     "noriscv"
+    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
@@ -351,6 +354,7 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   LABELS
     "noriscv"
+    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"

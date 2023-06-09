@@ -95,6 +95,10 @@ function(iree_bytecode_module)
     list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
   endif()
 
+  if(IREE_BYTECODE_MODULE_ENABLE_ASAN)
+    list(APPEND _ARGS "--iree-llvmcpu-sanitize=address")
+  endif()
+
   # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an
   # ABI break: when the host code is built with TSan, the module must be too,
   # otherwise we get crashes calling module code.

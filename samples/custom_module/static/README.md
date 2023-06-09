@@ -36,7 +36,7 @@ the same module code between all various modes with minor differences.
     python -m pip install iree-compiler
     ```
 
-    [See here](https://openxla.github.io/iree/getting-started/)
+    [See here](https://openxla.github.io/iree/reference/bindings/python/)
     for general instructions on installing the compiler.
 
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:

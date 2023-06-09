@@ -25,24 +25,11 @@ function(iree_bitcode_library)
     ${ARGN}
   )
 
-  set(_CLANG_TOOL "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
-  set(_LINK_TOOL "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
-
   if(DEFINED _RULE_OUT)
     set(_OUT "${_RULE_OUT}")
   else()
     set(_OUT "${_RULE_NAME}.bc")
   endif()
-
-  # We need CLANG_VERSION_MAJOR to set up include directories. Unfortunately,
-  # Clang's own CMakeLists do not expose CLANG_VERSION_MAJOR to PARENT_SCOPE.
-  # Likewise with LLVM_VERSION_MAJOR. However, CLANG_EXECUTABLE_VERSION is
-  # CACHE'd, so we can access it, and it currently has the same value.
-  set(_CLANG_VERSION_MAJOR "${CLANG_EXECUTABLE_VERSION}")
-
-  # These are copied as part of the clang build; we could allow the user to
-  # override this but it should be harmless.
-  set(_BUILTIN_HEADERS_PATH "${IREE_BINARY_DIR}/llvm-project/lib/clang/${_CLANG_VERSION_MAJOR}/include/")
 
   iree_arch_to_llvm_arch(_LLVM_ARCH "${_RULE_ARCH}")
 
@@ -77,7 +64,7 @@ function(iree_bitcode_library)
     "-DIREE_DEVICE_STANDALONE=1"
   )
 
-  list(APPEND _COPTS "-isystem" "${_BUILTIN_HEADERS_PATH}")
+  list(APPEND _COPTS "-isystem" "${IREE_CLANG_BUILTIN_HEADERS_PATH}")
   list(APPEND _COPTS "-I" "${IREE_SOURCE_DIR}/runtime/src")
   list(APPEND _COPTS "-I" "${IREE_BINARY_DIR}/runtime/src")
   list(APPEND _COPTS "${_RULE_COPTS}")
@@ -91,14 +78,13 @@ function(iree_bitcode_library)
       OUTPUT
         "${_BITCODE_FILE}"
       COMMAND
-        "${_CLANG_TOOL}"
+        "${IREE_CLANG_BINARY}"
         ${_COPTS}
         "${_BITCODE_SRC_PATH}"
         "-o"
         "${_BITCODE_FILE}"
       DEPENDS
-        "${_CLANG_TOOL}"
-        "${_LINK_TOOL}"
+        "${IREE_CLANG_BINARY}"
         "${_SRC}"
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
@@ -110,12 +96,12 @@ function(iree_bitcode_library)
     OUTPUT
       ${_OUT}
     COMMAND
-      ${_LINK_TOOL}
+      ${IREE_LLVM_LINK_BINARY}
       ${_BITCODE_FILES}
       "-o"
       "${_OUT}"
     DEPENDS
-      ${_LINK_TOOL}
+      ${IREE_LLVM_LINK_BINARY}
       ${_BITCODE_FILES}
     COMMENT
       "Linking bitcode to ${_OUT}"
@@ -147,8 +133,6 @@ function(iree_link_bitcode)
     ${ARGN}
   )
 
-  set(_LINK_TOOL "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
-
   if(DEFINED _RULE_OUT)
     set(_OUT "${_RULE_OUT}")
   else()
@@ -161,12 +145,12 @@ function(iree_link_bitcode)
     OUTPUT
       ${_OUT}
     COMMAND
-      ${_LINK_TOOL}
+      ${IREE_LLVM_LINK_BINARY}
       ${_BITCODE_FILES}
       "-o"
       "${_OUT}"
     DEPENDS
-      ${_LINK_TOOL}
+      ${IREE_LLVM_LINK_BINARY}
       ${_BITCODE_FILES}
     COMMENT
       "Linking bitcode to ${_OUT}"

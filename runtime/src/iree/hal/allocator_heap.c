@@ -218,11 +218,6 @@ static iree_status_t iree_hal_heap_allocator_import_buffer(
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  if (external_buffer->type != IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "external buffer type not supported");
-  }
-
   // Coerce options into those required for use by heap-based devices.
   iree_hal_buffer_params_t compat_params = *params;
   iree_device_size_t allocation_size = external_buffer->size;
@@ -234,12 +229,24 @@ static iree_status_t iree_hal_heap_allocator_import_buffer(
         "allocator cannot import a buffer with the given parameters");
   }
 
+  void* ptr = NULL;
+  switch (external_buffer->type) {
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION:
+      ptr = external_buffer->handle.host_allocation.ptr;
+      break;
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
+      ptr = (void*)external_buffer->handle.device_allocation.ptr;
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "external buffer type not supported");
+  }
+
   return iree_hal_heap_buffer_wrap(
       base_allocator, compat_params.type, compat_params.access,
       compat_params.usage, external_buffer->size,
-      iree_make_byte_span(external_buffer->handle.host_allocation.ptr,
-                          external_buffer->size),
-      release_callback, out_buffer);
+      iree_make_byte_span(ptr, external_buffer->size), release_callback,
+      out_buffer);
 }
 
 static iree_status_t iree_hal_heap_allocator_export_buffer(

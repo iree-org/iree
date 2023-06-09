@@ -17,7 +17,13 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
+    "cuda_allocator.c"
+    "cuda_allocator.h"
+    "cuda_buffer.c"
+    "cuda_buffer.h"
     "cuda_driver.c"
+    "memory_pools.c"
+    "memory_pools.h"
   DEPS
     ::dynamic_symbols
     iree::base
