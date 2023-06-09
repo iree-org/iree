@@ -148,7 +148,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
                              CU_DEVICE_ATTRIBUTE_MEMORY_POOLS_SUPPORTED,
                              cu_device),
         "cuDeviceGetAttribute");
-    device->supports_memory_pools = supports_memory_pools ? true : false;
+    device->supports_memory_pools = supports_memory_pools != 0;
   }
 
   // Create memory pools first so that we can share them with the allocator.
