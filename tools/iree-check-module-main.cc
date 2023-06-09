@@ -79,7 +79,6 @@ class CheckModuleTest : public ::testing::Test {
 };
 
 iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
-  IREE_TRACE_SCOPE0("iree-check-module");
   *out_exit_code = 1;
 
   iree_vm_instance_t* instance = nullptr;
@@ -158,9 +157,12 @@ extern "C" int main(int argc, char** argv) {
                            &argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
 
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-check-module");
   int exit_code = 1;
   iree_status_t status = Run(iree_allocator_system(), &exit_code);
   int ret = iree_status_is_ok(status) ? exit_code : 1;
+  IREE_TRACE_ZONE_END(z0);
+
   if (FLAG_expect_failure) {
     if (ret == 0) {
       printf("Test passed but expected failure\n");

@@ -545,24 +545,12 @@ enum {
 #endif
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
-// TODO(#1886): update these to tracy and drop the 0.
 #define IREE_TRACE_SCOPE() ZoneScoped
-#define IREE_TRACE_SCOPE_DYNAMIC(name_cstr) \
-  ZoneTransientN(___tracy_scoped_zone, name_cstr, true)
-#define IREE_TRACE_SCOPE0(name_literal) ZoneScopedN(name_literal)
-#define IREE_TRACE_EVENT
-#define IREE_TRACE_EVENT0
-
+#define IREE_TRACE_SCOPE_NAMED(name_literal) ZoneScopedN(name_literal)
 #else
 #define IREE_TRACE_SCOPE()
-#define IREE_TRACE_SCOPE_DYNAMIC(name_string_view)
-#define IREE_TRACE_SCOPE0(name_literal)
-#define IREE_TRACE_EVENT(void)
-#define IREE_TRACE_EVENT0
+#define IREE_TRACE_SCOPE_NAMED(name_literal)
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
-
-// TODO(benvanik): macros for LockableCtx / Lockable mutex tracking.
 
 #endif  // __cplusplus
 
