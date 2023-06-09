@@ -354,11 +354,6 @@ public:
   // Constraints on adjacent ops.
   //===-------------------------------------------------------------------===//
 
-  /// Checks that `matchers` captured all tilable ops nested in `parent` except
-  /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
-  static bool checkAllTilableMatched(Operation *parent, Operation *op,
-                                     ArrayRef<CapturingOpMatcher *> matchers);
-
   /// Adds a predicate checking that all ops implementing TilingInterface in the
   /// parent of the given type (e.g., a function or a module) were matched by
   /// this or nested matchers. This is useful to ensure that the matcher covered
@@ -422,6 +417,11 @@ private:
   /// A list of additional conditions for the operation to match.
   SmallVector<PredicateFn> predicates;
 
+  /// Checks that `matchers` captured all tilable ops nested in `parent` except
+  /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
+  static bool checkAllTilableMatched(Operation *parent, Operation *op,
+                                     ArrayRef<CapturingOpMatcher *> matchers);
+
   /// Creates a matcher for an operation with one of the given types.
   template <typename... OpType>
   static CapturingOpMatcher create() {
@@ -448,51 +448,111 @@ namespace detail {
 /// with debug includes, and ConcreteOpMatcher is a class template that can only
 /// reside in the header.
 void debugOutputForConcreteOpMatcherConstructor(StringRef name);
-
-/// Specialization hook that returns an op description used in ConcreteOpMatcher
-/// debug output. By default, returns the operation name. This class template
-/// can be specialized for a better name and must be specialized for interfaces
-/// that don't have an operation name.
-template <typename OpTy>
-struct DebugOpKindDescription {
-  static StringRef get() { return OpTy::getOperationName(); }
-};
 } // namespace detail
 
 /// Base class for matchers that match a specific op. Adds an initial predicate
 /// checking if the op is indeed of the specified kind.
 /// Derived classes specializing this for op interfaces MUST also define a
 /// specialization of DebugOpKindDescription.
-// TODO: use traits instead of inheritance to inject behavior and avoid
-// unintended upcasting when calling parent methods in the fluent API.
-template <typename OpTy>
+template <typename Derived, typename OpTy>
 class ConcreteOpMatcher : public CapturingOpMatcher {
 protected:
+  using Base = ConcreteOpMatcher;
+
+  static StringRef getConcreteOpDescription() {
+    return OpTy::getOperationName();
+  }
+
   /// Adds a predicate checking if the op is of the OpTy kind.
   ConcreteOpMatcher() {
     CapturingOpMatcher::addPredicate([](Operation *op) {
       detail::debugOutputForConcreteOpMatcherConstructor(
-          detail::DebugOpKindDescription<OpTy>::get());
+          Derived::getConcreteOpDescription());
       return isa<OpTy>(op);
     });
   }
 
   /// Adds a predicate for the matched operation to satisfy.
   template <typename FnTy>
-  void addPredicate(FnTy &&predicate) {
+  Derived &addPredicate(FnTy &&predicate) {
     // Dispatch to the callback.
     CapturingOpMatcher::addPredicate(
         [inner = std::move(predicate)](Operation *op) {
           return inner(cast<OpTy>(op));
         });
+    return static_cast<Derived &>(*this);
+  }
+
+public:
+  /// Adds alternative paths for predicates. In practice, this is just a
+  /// predicate that is satisfied when either the first or the second matcher is
+  /// satisfied. The alternative satisfaction is eager and short-cutting, i.e.,
+  /// the second alternative will not be processed, and therefore will not
+  /// capture values, if the first alternative succeeded.
+  Derived &alternatives(CapturingOpMatcher &first, CapturingOpMatcher &second) {
+    return static_cast<Derived &>(
+        CapturingOpMatcher::alternatives(first, second));
+  }
+
+  /// Adds a predicate checking that all ops implementing TilingInterface in the
+  /// parent of the given type (e.g., a function or a module) were matched by
+  /// this or nested matchers. This is useful to ensure that the matcher covered
+  /// the entire parent region, not just a parent of it. This predicate **must**
+  /// be added *after* all the other predicates that capture.
+  template <typename ParentTy>
+  Derived &allTilableOpsCaptured() {
+    return static_cast<Derived &>(
+        CapturingOpMatcher::allTilableOpsCaptured<ParentTy>());
+  }
+
+  //-------------------------------------------------------------------------//
+  // Predicates for operands and results.
+  //-------------------------------------------------------------------------//
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of operands.
+  Derived &operand(NumEqualsTo num) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(num));
+  }
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by an operation that satisfies the given matcher.
+  Derived &operand(int64_t pos, CapturingOpMatcher &nested) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(pos, nested));
+  }
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation
+  /// satisfies the given value matcher.
+  Derived &operand(int64_t pos, CapturingValueMatcher &nested) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(pos, nested));
+  }
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by `arith.constant` with the value 1.0.
+  // TODO: better matching for attributes.
+  Derived &operand(int64_t pos, ConstantFloatOne c) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(pos, c));
+  }
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of results.
+  Derived &result(NumEqualsTo num) {
+    return static_cast<Derived &>(CapturingOpMatcher::result(num));
+  }
+
+  /// Adds a predicate checking that the `pos`-th result of the operation
+  /// satisfies the given value matcher.
+  Derived &result(int64_t pos, CapturingValueMatcher &nested) {
+    return static_cast<Derived &>(CapturingOpMatcher::result(pos, nested));
   }
 };
 
 /// Matcher for the `tensor.pad` operation.
-class TensorPadOpMatcher : public ConcreteOpMatcher<tensor::PadOp> {
+class TensorPadOpMatcher
+    : public ConcreteOpMatcher<TensorPadOpMatcher, tensor::PadOp> {
   friend class MatcherContext;
 
-  TensorPadOpMatcher() : ConcreteOpMatcher<tensor::PadOp>() {}
+  TensorPadOpMatcher() = default;
 
 public:
   /// Adds a predicate checking that the low padding sizes are exactly the given
@@ -534,14 +594,18 @@ inline CapturingOpMatcher &m_Operation(MatcherContext &matcherContext) {
       CapturingOpMatcher::create<OpTy...>());
 }
 
-/// Matcher for structured aka Linalg operations. Extensions must follow the
-/// same conditions as the base class.
-class StructuredOpMatcher : public CapturingOpMatcher {
+/// Matcher for structured aka Linalg operations.
+class StructuredOpMatcher
+    : public ConcreteOpMatcher<StructuredOpMatcher, linalg::LinalgOp> {
   friend class MatcherContext;
 
-  StructuredOpMatcher();
+  StructuredOpMatcher() = default;
 
 public:
+  static StringRef getConcreteOpDescription() {
+    return "linalg interface implementation";
+  }
+
   /// Creates a matcher for a structured operation with one of the given types.
   template <typename... OpType>
   static StructuredOpMatcher create() {
@@ -561,7 +625,6 @@ public:
   //===-------------------------------------------------------------------===//
   /// Adds a predicate checking that the given rank must be greater than some
   /// constant value.
-  // TODO: Base class, derived class and proper API.
   StructuredOpMatcher &rank(NumGreaterEqualTo minRank);
   StructuredOpMatcher &rank(NumLowerEqualTo maxRank);
 
@@ -688,27 +751,6 @@ public:
   StructuredOpMatcher &input(int64_t position, ConstantFloatZero);
 
   //===-------------------------------------------------------------------===//
-  // Constraints on adjacent ops.
-  //===-------------------------------------------------------------------===//
-
-  /// Adds a predicate checking that all ops implementing TilingInterface in the
-  /// parent of the given type (e.g., a function or a module) were matched by
-  /// this or nested matchers. This is useful to ensure that the matcher covered
-  /// the entire parent region, not just a parent of it. This predicate **must**
-  /// be added *after* all the other predicates that capture.
-  template <typename OpTy>
-  StructuredOpMatcher &allTilableOpsCaptured() {
-    SmallVector<CapturingOpMatcher *> copy;
-    copy.push_back(this);
-    getAllNested(copy);
-    addPredicate([copy = std::move(copy)](linalg::LinalgOp linalgOp) {
-      Operation *parent = linalgOp->getParentOfType<OpTy>();
-      return checkAllTilableMatched(parent, linalgOp, copy);
-    });
-    return *this;
-  }
-
-  //===-------------------------------------------------------------------===//
   // Constraints on output operands.
   //===-------------------------------------------------------------------===//
 
@@ -822,17 +864,6 @@ public:
   StructuredOpMatcher &passThroughOp();
 
 private:
-  /// Adds a predicate for the matched operation to satisfy.
-  void addPredicate(std::function<bool(linalg::LinalgOp)> predicate) {
-    // Check that the operation implements the LinalgOp interface and dispatch
-    // to the predicate.
-    CapturingOpMatcher::addPredicate(
-        [inner = std::move(predicate)](Operation *op) {
-          auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-          return linalgOp && inner(linalgOp);
-        });
-  }
-
   /// Non-template implementations of nested predicate builders for inputs,
   /// outputs and results. Should not be called directly.
   void addInputMatcher(int64_t position,
