@@ -269,18 +269,19 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
 
   // Step N-5. Fold tensor.empty to avoid large allocations.
-  ApplyPatternsOpPatterns configuration;
-  configuration.foldTensorEmptyExtract = true;
-
   // Step N-4. Perform a pass of canonicalization + enabling after tiling.
-  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, configuration, funcH);
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, funcH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyFoldTensorEmptyPatternsOp>(loc);
+      });
   funcH = iree_compiler::buildVectorize(b, funcH);
 
   // Step N-3. Perform a pass of canonicalization + enabling after vectorization
   // as well as hoisting subset operations such as vector.transfer_read/write.
-  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, configuration, funcH);
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, funcH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyFoldTensorEmptyPatternsOp>(loc);
+      });
   iree_compiler::buildHoisting(b, funcH);
 
   // Step N-2. Bufferize and drop HAL descriptor from memref ops.
@@ -294,8 +295,10 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 
   // Step N. Perform a final pass of canonicalization + enabling before
   // returning.
-  variantH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, configuration, variantH);
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, variantH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyFoldTensorEmptyPatternsOp>(loc);
+      });
   return std::make_pair(variantH, funcH);
 }
 
@@ -328,11 +331,13 @@ Value mlir::iree_compiler::gpu::buildHoistOutputPaddingOp(
   // Perform a pass of canonicalization cleanups + folding fill + pad into pad
   // by applying `foldTensorSubsets` and `tilingCanonicalization`.
   {
-    ApplyPatternsOpPatterns config;
-    config.foldTensorSubsets = true;
-    config.tilingCanonicalization = true;
-    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config,
-                                                              variantH);
+    iree_compiler::buildCanonicalizationAndEnablingTransforms(
+        b, variantH, [](OpBuilder &b, Location loc) {
+          b.create<transform::ApplyFoldTensorSubsetOpsPatternsOp>(loc);
+          b.create<
+              transform::ApplyMergeConsecutiveInsertExtractSlicePatternsOp>(
+              loc);
+        });
   }
 
   // The canonicalization above should have rewritten hoistPad into a FillOp.
@@ -475,9 +480,7 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // Also, no canonicalization is allowed after vector masking and before we
   // lower the masks: masks are currently quite brittle and do not like
   // canonicalization or anything else that may insert an op in their region.
-  ApplyPatternsOpPatterns configuration;
-  variantH = iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, configuration, variantH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, variantH);
 
   // Apply vector masking.
   if (!strategy.alignedLhs()) {
@@ -525,8 +528,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
     ImplicitLocOpBuilder &b, Value funcH,
     const AbstractGemmLikeStrategy &strategy) {
   // TODO: Fewer canonicalization.
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, ApplyPatternsOpPatterns(), funcH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   b.create<iree_compiler::IREE::transform_dialect::HoistStaticAllocOp>(funcH);
   {
     ApplyPatternsOpPatterns config;
@@ -538,8 +540,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
     config.extractAddressComputations = true;
     b.create<ApplyPatternsOp>(funcH, config);
   }
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, ApplyPatternsOpPatterns(), funcH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   {
     ApplyPatternsOpPatterns config;
     if (strategy.useMmaSync)
@@ -551,8 +552,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
       transform::AnyOpType::get(b.getContext()), funcH);
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, ApplyPatternsOpPatterns(), funcH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   b.create<ApplyBufferOptimizationsOp>(funcH);
   auto vectorToMMaConversionOp =
       b.create<iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(
@@ -568,8 +568,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
 void mlir::iree_compiler::gpu::buildMultiBuffering(
     ImplicitLocOpBuilder &b, Value funcH,
     const AbstractGemmLikeStrategy &strategy) {
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, ApplyPatternsOpPatterns(), funcH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   ApplyPatternsOpPatterns config;
   config.foldMemrefAliases = true;
   b.create<ApplyPatternsOp>(funcH, config);
@@ -600,16 +599,16 @@ Value mlir::iree_compiler::gpu::buildConvertToAsyncCopies(
     transferToScfOp.setMaxTransferRank(1);
     transferToScfOp.setFullUnroll(true);
   });
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, ApplyPatternsOpPatterns(), funcH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   auto createAsyncGroupOp =
       b.create<iree_compiler::IREE::transform_dialect::CreateAsyncGroupsOp>(
           TypeRange{}, funcH);
   // TODO: proper builder instead of a setting post-hoc.
   createAsyncGroupOp.setUseMmaSync(strategy.useMmaSync);
-  ApplyPatternsOpPatterns config;
-  config.foldMemrefAliases = true;
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config, funcH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, funcH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
+      });
   return funcH;
 }
 

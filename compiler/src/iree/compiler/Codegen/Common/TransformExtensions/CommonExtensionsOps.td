@@ -70,8 +70,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     The following additive attributes can be set, they add patterns in an
     unspecified order:
-      - additional_iree_patterns: fancy patterns we shortcut into the system,
-      will need to be sliced out better in the future.
       - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This
       must be applied separately from `bubble_expand` patterns because of some
       upstream pattern interference issue atm.
@@ -97,8 +95,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
-      - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
-      case it is the only use of extract.
       - fold_tensor_subsets: adds patterns for folding tensor subset ops into
       their producer and consumers.
       - licm: additionally apply loop-independent code motion and single 
@@ -151,7 +147,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-                       UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse,
                        UnitAttr:$bubble_expand,
                        UnitAttr:$bubble_pack_un_pack,
@@ -162,7 +157,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$extract_address_computations,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
-                       UnitAttr:$fold_tensor_empty_extract,
                        UnitAttr:$fold_tensor_subsets,
                        UnitAttr:$fold_vector_transfer_tensor_slice,
                        UnitAttr:$licm,

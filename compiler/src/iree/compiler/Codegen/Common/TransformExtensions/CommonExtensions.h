@@ -34,7 +34,6 @@ namespace IREE {
 namespace transform_dialect {
 /// Selected patterns for ApplyPatternOp.
 struct ApplyPatternsOpPatterns {
-  bool additionalIreePatterns = false;
   bool bubbleCollapse = false;
   bool bubbleExpand = false;
   bool bubblePackUnPack = false;
@@ -45,7 +44,6 @@ struct ApplyPatternsOpPatterns {
   bool extractAddressComputations = false;
   bool foldMemrefAliases = false;
   bool foldReassociativeReshapes = false;
-  bool foldTensorEmptyExtract = false;
   bool foldTensorSubsets = false;
   bool foldVectorTransferTensorSlice = false;
   bool licm = false;

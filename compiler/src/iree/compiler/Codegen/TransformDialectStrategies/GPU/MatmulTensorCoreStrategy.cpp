@@ -245,9 +245,7 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   // Running canonicalization is required here to enable aligned pads to become
   // linalg.copy ops when rewriting in DPS.
-  ApplyPatternsOpPatterns config;
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config,
-                                                            variantH);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, variantH);
 
   // Step 4. Distribute pad and copies: SIMT programming model.
   auto [lhsCopyOpH, rhsCopyOpH, copyBackOpH] =
