@@ -40,7 +40,7 @@
 
 using namespace mlir;
 
-#define DEBUG_TYPE "iree-transform-builder"
+#define DEBUG_TYPE "iree-transform-strategy-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(llvm::dbgs() << '[' << DEBUG_TYPE << "] " << X)
 

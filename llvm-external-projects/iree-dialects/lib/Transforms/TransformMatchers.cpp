@@ -15,7 +15,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Debug.h"
-#include <mlir/Dialect/Tensor/IR/Tensor.h>
 
 using namespace mlir;
 
@@ -1166,7 +1165,11 @@ transform_ext::TensorPadOpMatcher::low(ArrayRef<int64_t> sizes) {
       DBGS() << "low pad sizes are ";
       llvm::interleaveComma(sizes, llvm::dbgs());
     });
-    return tensorPad.getStaticLow() == sizes;
+    for (auto [ofr, sz] : llvm::zip(tensorPad.getMixedLowPad(), sizes)) {
+      if (isConstantIntValue(ofr, sz))
+        return false;
+    }
+    return true;
   });
 }
 
@@ -1174,8 +1177,9 @@ transform_ext::TensorPadOpMatcher &
 transform_ext::TensorPadOpMatcher::low(AllDims tag, int64_t size) {
   return addPredicate([=](tensor::PadOp tensorPad) {
     LLVM_DEBUG(DBGS() << "all low pad sizes are " << size);
-    return llvm::all_of(tensorPad.getStaticLow(),
-                        [&](int64_t v) { return v == size; });
+    return llvm::all_of(tensorPad.getMixedLowPad(), [&](OpFoldResult ofr) {
+      return isConstantIntValue(ofr, size);
+    });
   });
 }
 
@@ -1186,7 +1190,11 @@ transform_ext::TensorPadOpMatcher::high(ArrayRef<int64_t> sizes) {
       DBGS() << "high pad sizes are ";
       llvm::interleaveComma(sizes, llvm::dbgs());
     });
-    return tensorPad.getStaticHigh() == sizes;
+    for (auto [ofr, sz] : llvm::zip(tensorPad.getMixedHighPad(), sizes)) {
+      if (isConstantIntValue(ofr, sz))
+        return false;
+    }
+    return true;
   });
 }
 
@@ -1194,8 +1202,9 @@ transform_ext::TensorPadOpMatcher &
 transform_ext::TensorPadOpMatcher::high(AllDims tag, int64_t size) {
   return addPredicate([=](tensor::PadOp tensorPad) {
     LLVM_DEBUG(DBGS() << "all high pad sizes are " << size);
-    return llvm::all_of(tensorPad.getStaticHigh(),
-                        [&](int64_t v) { return v == size; });
+    return llvm::all_of(tensorPad.getMixedHighPad(), [&](OpFoldResult ofr) {
+      return isConstantIntValue(ofr, size);
+    });
   });
 }
 
