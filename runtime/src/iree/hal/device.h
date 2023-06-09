@@ -364,10 +364,17 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
     iree_device_size_t target_offset, iree_device_size_t data_length,
     iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
-// Reserves and returns a queue-ordered transient buffer.
+// Reserves and returns a device-local queue-ordered transient buffer.
 // The allocation will not be committed until the entire |wait_semaphore_list|
 // has been reached. Once the storage is available for use the
-// |signal_semaphore_list| will be signaled.
+// |signal_semaphore_list| will be signaled. The contents of the buffer are
+// undefined until signaled even if all waits have been resolved and callers
+// must always wait for the signal.
+//
+// For optimal performance and minimal memory consumption the returned buffer
+// should be deallocated using iree_hal_device_queue_dealloca as soon as
+// possible. It's still safe to synchronously release the buffer but the
+// lifetime will then be controlled by all potential retainers.
 //
 // Usage:
 //   iree_hal_device_queue_alloca(wait(0), signal(1), &buffer);
@@ -384,7 +391,13 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
 // Deallocates a queue-ordered transient buffer.
 // The deallocation will not be made until the entire |wait_semaphore_list| has
 // been reached. Once the storage is available for reuse the
-// |signal_semaphore_list| will be signaled.
+// |signal_semaphore_list| will be signaled. After all waits have been resolved
+// the contents of the buffer are immediately undefined even if the signal has
+// not yet occurred.
+//
+// Deallocations will only be queue-ordered if the |buffer| was originally
+// allocated with iree_hal_device_queue_alloca. Any synchronous allocations will
+// be ignored and deallocated when the |buffer| has been released.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
