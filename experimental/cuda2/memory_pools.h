@@ -52,6 +52,11 @@ void iree_hal_cuda2_memory_pools_merge_statistics(
     iree_hal_cuda2_memory_pools_t* pools,
     iree_hal_allocator_statistics_t* statistics);
 
+// Trims all memory pools by releasing resources back to the system.
+iree_status_t iree_hal_cuda2_memory_pools_trim(
+    iree_hal_cuda2_memory_pools_t* pools,
+    const iree_hal_cuda2_memory_pooling_params_t* pooling_params);
+
 // Asynchronously allocates a buffer from an appropriate pool.
 // The allocation will be stream-ordered on |stream|.
 iree_status_t iree_hal_cuda2_memory_pools_alloca(

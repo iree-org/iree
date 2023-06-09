@@ -119,8 +119,10 @@ static void iree_hal_cuda_allocator_query_statistics(
     iree_hal_cuda_allocator_t* allocator =
         iree_hal_cuda_allocator_cast(base_allocator);
     memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
-    iree_hal_cuda_memory_pools_merge_statistics(allocator->pools,
-                                                out_statistics);
+    if (allocator->pools) {
+      iree_hal_cuda_memory_pools_merge_statistics(allocator->pools,
+                                                  out_statistics);
+    }
   });
 }
 

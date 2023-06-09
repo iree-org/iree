@@ -178,6 +178,21 @@ void iree_hal_cuda2_memory_pools_merge_statistics(
   });
 }
 
+iree_status_t iree_hal_cuda2_memory_pools_trim(
+    iree_hal_cuda2_memory_pools_t* pools,
+    const iree_hal_cuda2_memory_pooling_params_t* pooling_params) {
+  IREE_CUDA_RETURN_IF_ERROR(
+      pools->cuda_symbols,
+      cuMemPoolTrimTo(pools->device_local,
+                      pooling_params->device_local.minimum_capacity),
+      "cuMemPoolTrimTo");
+  IREE_CUDA_RETURN_IF_ERROR(
+      pools->cuda_symbols,
+      cuMemPoolTrimTo(pools->other, pooling_params->other.minimum_capacity),
+      "cuMemPoolTrimTo");
+  return iree_ok_status();
+}
+
 // NOTE: this is only issued if the buffer is destroyed without having had been
 // scheduled for deallocation asynchronously. When a buffer is scheduled we drop
 // the release callback so that this isn't called and we don't double-free.
