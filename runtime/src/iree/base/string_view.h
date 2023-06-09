@@ -164,8 +164,8 @@ IREE_API_EXPORT iree_string_view_t
 iree_string_view_trim(iree_string_view_t value);
 
 // Returns a substring of the string view at offset |pos| and length |n|.
-// Use |n| == INTPTR_MAX to take the remainder of the string after |pos|.
-// Returns empty string on failure.
+// Use |n| == IREE_HOST_SIZE_MAX to take the remainder of the string after
+// |pos|. Returns empty string on failure.
 IREE_API_EXPORT iree_string_view_t iree_string_view_substr(
     iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n);
 
