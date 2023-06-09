@@ -20,7 +20,7 @@ if(NOT _BUILD_COMPILER_TARGETING_X86_64 OR NOT _BUILD_COMPILER_TARGETING_ARM_64)
   return()
 endif()
 # Check if the host architecture matches what we are building code for.
-if(NOT (IREE_ARCH STREQUAL "x86_64" OR IREE_ARCH STREQUAL "arm_64"))
+if(NOT IREE_ARCH STREQUAL "x86_64" AND NOT IREE_ARCH STREQUAL "arm_64")
   message(STATUS "IREE custom_dispatch/cpu/embedded ignored - host architecture unsupported.")
   return()
 endif()
