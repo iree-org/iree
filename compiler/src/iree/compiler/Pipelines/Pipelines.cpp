@@ -42,6 +42,15 @@ void buildIREEVMTransformPassPipeline(
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager, IREEVMPipelinePhase compileTo) {
+  // If the user specified a set of target devices we attach them to the module
+  // IR so that they are available for all passes that may want to use this
+  // information. If trying to compile in a generic mode the user should omit
+  // specifying targets.
+  if (!executableOptions.targets.empty()) {
+    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
+        targetRegistry, executableOptions.targets));
+  }
+
   // Input pipelines can result in changes to the exported functions and types
   // and must run before generating bindings.
   // After input processing, there should only be IREE legal types in
