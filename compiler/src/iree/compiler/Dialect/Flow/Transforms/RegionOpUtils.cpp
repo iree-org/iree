@@ -137,7 +137,9 @@ static bool checkShapeIsDataDependant(Operation *op) {
                       linalg::isParallelIterator)) {
       return false;
     }
-    auto filterFn = [](Operation *op) {
+    BackwardSliceOptions options;
+    options.inclusive = true;
+    options.filter = [](Operation *op) {
       // Only look for slices with a few ops to not blow up the slice
       // computation.
       if (!isa<arith::IndexCastOp, tensor::EmptyOp, tensor::ExtractOp>(op)) {
@@ -159,8 +161,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
     };
     llvm::SetVector<Operation *> slice;
     for (OpOperand *initOperand : linalgOp.getDpsInitOperands()) {
-      mlir::getBackwardSlice(initOperand->get(), &slice, filterFn,
-                             /*inclusive =*/true);
+      mlir::getBackwardSlice(initOperand->get(), &slice, options);
     }
     return llvm::any_of(
         slice, [](Operation *op) { return isa<tensor::ExtractOp>(op); });
