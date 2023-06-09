@@ -80,6 +80,9 @@ static iree_status_t iree_hal_cuda2_driver_factory_try_create(
   iree_hal_cuda2_driver_options_t driver_options;
   iree_hal_cuda2_driver_options_initialize(&driver_options);
 
+  iree_hal_cuda2_device_params_t device_params;
+  iree_hal_cuda2_device_params_initialize(&device_params);
+
   driver_options.default_device_index = FLAG_cuda2_default_index;
   if (FLAG_cuda2_default_index_from_mpi) {
     driver_options.default_device_index =
@@ -88,7 +91,7 @@ static iree_status_t iree_hal_cuda2_driver_factory_try_create(
   }
 
   iree_status_t status = iree_hal_cuda2_driver_create(
-      driver_name, &driver_options, host_allocator, out_driver);
+      driver_name, &driver_options, &device_params, host_allocator, out_driver);
 
   IREE_TRACE_ZONE_END(z0);
 

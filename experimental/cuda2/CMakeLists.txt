@@ -21,15 +21,20 @@ iree_cc_library(
     "cuda_allocator.h"
     "cuda_buffer.c"
     "cuda_buffer.h"
+    "cuda_device.c"
+    "cuda_device.h"
     "cuda_driver.c"
     "memory_pools.c"
     "memory_pools.h"
   DEPS
     ::dynamic_symbols
     iree::base
+    iree::base::internal
+    iree::base::internal::arena
     iree::base::core_headers
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )
