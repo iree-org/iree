@@ -1553,21 +1553,37 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
           op, "Slice that maps to TopK must have exactly two inputs/outputs");
     }
 
-    bool isInputIota = false;
+    Value inputIota;
     // Check that one of the inputs is iota, assume that the other one is the
     // input.
     for (Value operand : opOperands) {
       auto iotaOp =
           dyn_cast_or_null<mlir::stablehlo::IotaOp>(operand.getDefiningOp());
       if (iotaOp) {
-        isInputIota = true;
+        inputIota = iotaOp.getResult();
       } else {
         topKInput = operand;
       }
     }
 
-    if (!isInputIota) {
+    if (!inputIota) {
       return rewriter.notifyMatchFailure(op, "Sort isn't called from Iota.");
+    }
+
+    Block &block = op.getRegion().front();
+    auto stablehloCompareOp =
+        dyn_cast<mlir::stablehlo::CompareOp>(block.front());
+    if (!stablehloCompareOp) {
+      return rewriter.notifyMatchFailure(op, "not stablehlo compare op");
+    }
+
+    auto direction = stablehloCompareOp.getComparisonDirection();
+    bool getTop = direction == mlir::stablehlo::ComparisonDirection::GT ||
+                  direction == mlir::stablehlo::ComparisonDirection::GE;
+
+    if (!getTop) {
+      return rewriter.notifyMatchFailure(op,
+                                         "Unsupported comparison direction");
     }
 
     Value topV, topI;
