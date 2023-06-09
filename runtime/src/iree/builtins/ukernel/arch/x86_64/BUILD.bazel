@@ -24,12 +24,12 @@ if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
     inline = True,
 )
 
-filegroup(
-    name = "bitcode_internal_headers",
-    srcs = [
-        "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h",
-    ],
-)
+# All headers transitively included by code in this directory. Bazel-only.
+UKERNEL_X86_64_INTERNAL_HEADERS = [
+    "common_x86_64.h",
+    "//runtime/src/iree/builtins/ukernel:internal_headers_filegroup",
+    "//runtime/src/iree/schemas:cpu_data_headers_filegroup",
+]
 
 UKERNEL_X86_64_BASE_SRCS = [
     "mmt4d_x86_64.c",
@@ -42,10 +42,7 @@ iree_bitcode_library(
     name = "ukernel_bitcode_x86_64_base",
     srcs = UKERNEL_X86_64_BASE_SRCS,
     arch = "x86_64",
-    internal_hdrs = [
-        ":bitcode_internal_headers",
-        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
-    ],
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
 )
 
 UKERNEL_X86_64_AVX2_FMA_SRCS = [
@@ -65,10 +62,7 @@ iree_bitcode_library(
     srcs = UKERNEL_X86_64_AVX2_FMA_SRCS,
     arch = "x86_64",
     copts = UKERNEL_X86_64_AVX2_FMA_COPTS,
-    internal_hdrs = [
-        ":bitcode_internal_headers",
-        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
-    ],
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
 )
 
 UKERNEL_X86_64_AVX512_BASE_SRCS = [
@@ -90,10 +84,7 @@ iree_bitcode_library(
     srcs = UKERNEL_X86_64_AVX512_BASE_SRCS,
     arch = "x86_64",
     copts = UKERNEL_X86_64_AVX512_BASE_COPTS,
-    internal_hdrs = [
-        ":bitcode_internal_headers",
-        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
-    ],
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
 )
 
 UKERNEL_X86_64_AVX512_VNNI_SRCS = [
@@ -109,10 +100,7 @@ iree_bitcode_library(
     srcs = UKERNEL_X86_64_AVX512_VNNI_SRCS,
     arch = "x86_64",
     copts = UKERNEL_X86_64_AVX512_VNNI_COPTS,
-    internal_hdrs = [
-        ":bitcode_internal_headers",
-        "//runtime/src/iree/builtins/ukernel:bitcode_internal_headers",
-    ],
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
 )
 
 iree_link_bitcode(
