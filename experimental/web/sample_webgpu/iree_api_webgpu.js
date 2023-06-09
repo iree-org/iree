@@ -207,6 +207,7 @@ function _ireeCallFunction(programState, functionName, inputs) {
     const completionCallbackFunction = addFunction((resultPtr) => {
       if (resultPtr === 0) {
         reject('Error from callback when calling function');
+        return;
       }
 
       const resultStr = Module.UTF8ToString(resultPtr);

@@ -452,7 +452,12 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
   }
 
   if (map_status != WGPUBufferMapAsyncStatus_Success) {
-    // TODO(scotttodd): set userdata->call_state->async_status if unset
+    // Set the sticky async error if not already set.
+    if (iree_status_is_ok(userdata->call_state->async_status)) {
+      userdata->call_state->async_status = iree_make_status(
+          IREE_STATUS_UNKNOWN, "wgpuBufferMapAsync failed for buffer %" PRIhsz,
+          buffer_index);
+    }
     iree_event_set(
         &userdata->call_state->output_states[buffer_index].ready_event);
     iree_allocator_free(iree_allocator_system(), userdata);
@@ -494,10 +499,12 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
   }
 
   if (!iree_status_is_ok(status)) {
-    fprintf(stderr, "buffer_map_async_callback error:\n");
-    iree_status_fprint(stderr, status);
-    iree_status_free(status);
-    // TODO(scotttodd): set userdata->call_state->async_status if unset
+    // Set the sticky async error if not already set.
+    if (iree_status_is_ok(userdata->call_state->async_status)) {
+      userdata->call_state->async_status = status;
+    } else {
+      iree_status_free(status);
+    }
   }
 
   iree_event_set(
@@ -585,6 +592,8 @@ static iree_status_t map_all_callback(void* user_data, iree_loop_t loop,
       (iree_call_function_state_t*)user_data;
   call_state->readback_end_time = iree_time_now();
 
+  status = iree_status_join(call_state->async_status, status);
+
   iree_string_builder_t output_string_builder;
   iree_string_builder_initialize(iree_allocator_system(),
                                  &output_string_builder);
@@ -622,6 +631,9 @@ static iree_status_t map_all_callback(void* user_data, iree_loop_t loop,
     call_state->callback_fn(outputs_string);
   } else {
     fprintf(stderr, "map_all_callback error:\n");
+    // TODO(scotttodd): return a JSON object with the error message
+    //   * free |status| and return a status to the loop with no storage
+    //   * the returned string is always freed, so then we'd have no leaks
     iree_status_fprint(stderr, status);
     // Note: loop_emscripten.js must free 'status'!
     call_state->callback_fn(NULL);
