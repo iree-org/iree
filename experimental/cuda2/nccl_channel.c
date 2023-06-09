@@ -20,7 +20,8 @@
 // be stable as it's not part of their public API. Only to be used for
 // correlating debug logging/traces. We keep it internal here too so that we
 // aren't tempted to use it either.
-static uint64_t iree_hal_cuda_nccl_hash_id(const iree_hal_cuda_nccl_id_t* id) {
+static uint64_t iree_hal_cuda2_nccl_hash_id(
+    const iree_hal_cuda2_nccl_id_t* id) {
   uint64_t hash = 0xDEADBEEF;
   for (iree_host_size_t i = 0; i < sizeof(*id); i++) {
     hash ^= hash >> 32;
@@ -30,9 +31,9 @@ static uint64_t iree_hal_cuda_nccl_hash_id(const iree_hal_cuda_nccl_id_t* id) {
   return hash;
 }
 
-iree_status_t iree_hal_cuda_nccl_get_unique_id_from_context(
-    iree_hal_cuda_context_wrapper_t* context_wrapper,
-    iree_hal_cuda_nccl_id_t* out_id) {
+iree_status_t iree_hal_cuda2_nccl_get_unique_id_from_context(
+    iree_hal_cuda2_context_wrapper_t* context_wrapper,
+    iree_hal_cuda2_nccl_id_t* out_id) {
   IREE_ASSERT_ARGUMENT(context_wrapper);
   IREE_ASSERT_ARGUMENT(out_id);
   memset(out_id, 0, sizeof(*out_id));
@@ -49,9 +50,9 @@ iree_status_t iree_hal_cuda_nccl_get_unique_id_from_context(
   return iree_ok_status();
 }
 
-typedef struct iree_hal_cuda_nccl_channel_t {
+typedef struct iree_hal_cuda2_nccl_channel_t {
   iree_hal_resource_t resource;
-  iree_hal_cuda_context_wrapper_t* context_wrapper;
+  iree_hal_cuda2_context_wrapper_t* context_wrapper;
 
   // Parent channel this was split from, if any.
   // This is only used to keep the parent channel live for as long as there are
@@ -72,26 +73,26 @@ typedef struct iree_hal_cuda_nccl_channel_t {
 
   // Communicator handle.
   ncclComm_t comm;
-} iree_hal_cuda_nccl_channel_t;
+} iree_hal_cuda2_nccl_channel_t;
 
-static const iree_hal_channel_vtable_t iree_hal_cuda_nccl_channel_vtable;
+static const iree_hal_channel_vtable_t iree_hal_cuda2_nccl_channel_vtable;
 
-static iree_hal_cuda_nccl_channel_t* iree_hal_cuda_nccl_channel_cast(
+static iree_hal_cuda2_nccl_channel_t* iree_hal_cuda2_nccl_channel_cast(
     iree_hal_channel_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_nccl_channel_vtable);
-  return (iree_hal_cuda_nccl_channel_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda2_nccl_channel_vtable);
+  return (iree_hal_cuda2_nccl_channel_t*)base_value;
 }
 
-iree_status_t iree_hal_cuda_nccl_channel_create(
-    iree_hal_cuda_context_wrapper_t* context_wrapper,
-    const iree_hal_cuda_nccl_id_t* id, int rank, int count,
+iree_status_t iree_hal_cuda2_nccl_channel_create(
+    iree_hal_cuda2_context_wrapper_t* context_wrapper,
+    const iree_hal_cuda2_nccl_id_t* id, int rank, int count,
     iree_hal_channel_t** out_channel) {
   IREE_ASSERT_ARGUMENT(context_wrapper);
   IREE_ASSERT_ARGUMENT(out_channel);
   *out_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_TRACE(const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id));
+  IREE_TRACE(const uint64_t id_hash = iree_hal_cuda2_nccl_hash_id(id));
   IREE_TRACE_ZONE_APPEND_VALUE(z0, id_hash);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, rank);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
@@ -105,11 +106,11 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
                              &config));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, status, "ncclCommInitRankConfig");
 
-  iree_hal_cuda_nccl_channel_t* channel = NULL;
+  iree_hal_cuda2_nccl_channel_t* channel = NULL;
   status = iree_allocator_malloc(context_wrapper->host_allocator,
                                  sizeof(*channel), (void**)&channel);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
+    iree_hal_resource_initialize(&iree_hal_cuda2_nccl_channel_vtable,
                                  &channel->resource);
     channel->context_wrapper = context_wrapper;
     IREE_TRACE(channel->id_hash = id_hash);
@@ -123,10 +124,10 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
   return status;
 }
 
-static void iree_hal_cuda_nccl_channel_destroy(
+static void iree_hal_cuda2_nccl_channel_destroy(
     iree_hal_channel_t* base_channel) {
-  iree_hal_cuda_nccl_channel_t* channel =
-      iree_hal_cuda_nccl_channel_cast(base_channel);
+  iree_hal_cuda2_nccl_channel_t* channel =
+      iree_hal_cuda2_nccl_channel_cast(base_channel);
   iree_allocator_t host_allocator = channel->context_wrapper->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->id_hash);
@@ -157,12 +158,12 @@ static void iree_hal_cuda_nccl_channel_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_cuda_nccl_channel_split(
+static iree_status_t iree_hal_cuda2_nccl_channel_split(
     iree_hal_channel_t* base_channel, int32_t color, int32_t key,
     iree_hal_channel_flags_t flags, iree_hal_channel_t** out_split_channel) {
-  iree_hal_cuda_nccl_channel_t* channel =
-      iree_hal_cuda_nccl_channel_cast(base_channel);
-  iree_hal_cuda_dynamic_symbols_t* syms = channel->context_wrapper->syms;
+  iree_hal_cuda2_nccl_channel_t* channel =
+      iree_hal_cuda2_nccl_channel_cast(base_channel);
+  iree_hal_cuda2_dynamic_symbols_t* syms = channel->context_wrapper->syms;
 
   // TODO: see if we need to set the sharing config - we may always want to.
   ncclConfig_t config = NCCL_CONFIG_INITIALIZER;
@@ -185,14 +186,14 @@ static iree_status_t iree_hal_cuda_nccl_channel_split(
   }
 
   // Wrap the split communicator in a new channel.
-  iree_hal_cuda_nccl_channel_t* split_channel = NULL;
+  iree_hal_cuda2_nccl_channel_t* split_channel = NULL;
   if (iree_status_is_ok(status)) {
     status =
         iree_allocator_malloc(channel->context_wrapper->host_allocator,
                               sizeof(*split_channel), (void**)&split_channel);
   }
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
+    iree_hal_resource_initialize(&iree_hal_cuda2_nccl_channel_vtable,
                                  &split_channel->resource);
     split_channel->context_wrapper = channel->context_wrapper;
     split_channel->parent_channel = base_channel;
@@ -209,12 +210,12 @@ static iree_status_t iree_hal_cuda_nccl_channel_split(
   return status;
 }
 
-static void iree_hal_cuda_nccl_channel_query_rank_and_count(
+static void iree_hal_cuda2_nccl_channel_query_rank_and_count(
     const iree_hal_channel_t* base_channel, int32_t* out_rank,
     int32_t* out_count) {
   IREE_ASSERT_ARGUMENT(base_channel);
-  iree_hal_cuda_nccl_channel_t* channel =
-      iree_hal_cuda_nccl_channel_cast((iree_hal_channel_t*)base_channel);
+  iree_hal_cuda2_nccl_channel_t* channel =
+      iree_hal_cuda2_nccl_channel_cast((iree_hal_channel_t*)base_channel);
   // NOTE: since it's cheap we keep rank/count local - this lets us trace them
   // out without needing to call into NCCL each time.
   *out_rank = channel->rank;
@@ -222,15 +223,15 @@ static void iree_hal_cuda_nccl_channel_query_rank_and_count(
 }
 
 // Returns the NCCL communicator for the given |channel|, if available.
-static ncclComm_t iree_hal_cuda_nccl_channel_comm(
+static ncclComm_t iree_hal_cuda2_nccl_channel_comm(
     iree_hal_channel_t* base_channel) {
   IREE_ASSERT_ARGUMENT(base_channel);
-  iree_hal_cuda_nccl_channel_t* channel =
-      iree_hal_cuda_nccl_channel_cast(base_channel);
+  iree_hal_cuda2_nccl_channel_t* channel =
+      iree_hal_cuda2_nccl_channel_cast(base_channel);
   return channel->comm;
 }
 
-static iree_status_t iree_hal_cuda_get_nccl_data_type(
+static iree_status_t iree_hal_cuda2_get_nccl_data_type(
     iree_hal_collective_element_type_t in, ncclDataType_t* out) {
   switch (in) {
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_8:
@@ -276,7 +277,7 @@ static iree_status_t iree_hal_cuda_get_nccl_data_type(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_get_nccl_red_type(
+static iree_status_t iree_hal_cuda2_get_nccl_red_type(
     iree_hal_collective_reduction_t in, ncclRedOp_t* out) {
   switch (in) {
     case IREE_HAL_COLLECTIVE_REDUCTION_SUM:
@@ -302,28 +303,28 @@ static iree_status_t iree_hal_cuda_get_nccl_red_type(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
+static iree_status_t iree_hal_cuda2_nccl_submit_batch_entry(
     const iree_hal_collective_batch_entry_t* entry, CUstream stream) {
   IREE_ASSERT_ARGUMENT(entry);
   IREE_ASSERT_ARGUMENT(stream);
 
-  iree_hal_cuda_nccl_channel_t* channel =
-      iree_hal_cuda_nccl_channel_cast(entry->channel);
-  iree_hal_cuda_dynamic_symbols_t* syms = channel->context_wrapper->syms;
-  ncclComm_t comm = iree_hal_cuda_nccl_channel_comm(entry->channel);
+  iree_hal_cuda2_nccl_channel_t* channel =
+      iree_hal_cuda2_nccl_channel_cast(entry->channel);
+  iree_hal_cuda2_dynamic_symbols_t* syms = channel->context_wrapper->syms;
+  ncclComm_t comm = iree_hal_cuda2_nccl_channel_comm(entry->channel);
   ncclDataType_t datatype;
   IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_get_nccl_data_type(entry->op.element_type, &datatype));
+      iree_hal_cuda2_get_nccl_data_type(entry->op.element_type, &datatype));
 
   switch (entry->op.kind) {
     case IREE_HAL_COLLECTIVE_KIND_ALL_GATHER: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
@@ -336,18 +337,18 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_ALL_REDUCE: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
       IREE_RETURN_IF_ERROR(
-          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
+          iree_hal_cuda2_get_nccl_red_type(entry->op.reduction, &redop));
       NCCL_RETURN_IF_ERROR(
           syms,
           ncclAllReduce((const void*)sendbuff, (void*)recvbuff,
@@ -357,12 +358,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_ALL_TO_ALL: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
@@ -370,7 +371,7 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       iree_device_size_t element_size_bytes =
           iree_hal_collective_element_byte_count(entry->op.element_type);
       iree_device_size_t rank_offset = send_count * element_size_bytes;
-      // These calls are already grouped by iree_hal_cuda_nccl_submit_batch.
+      // These calls are already grouped by iree_hal_cuda2_nccl_submit_batch.
       for (iree_host_size_t r = 0; r < channel->count; ++r) {
         NCCL_RETURN_IF_ERROR(syms,
                              ncclSend((const void*)(sendbuff + r * rank_offset),
@@ -385,12 +386,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_BROADCAST: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
@@ -403,18 +404,18 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_REDUCE: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
       IREE_RETURN_IF_ERROR(
-          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
+          iree_hal_cuda2_get_nccl_red_type(entry->op.reduction, &redop));
       NCCL_RETURN_IF_ERROR(syms,
                            ncclReduce((const void*)sendbuff, (void*)recvbuff,
                                       entry->element_count, datatype, redop,
@@ -424,18 +425,18 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_REDUCE_SCATTER: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
       IREE_RETURN_IF_ERROR(
-          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
+          iree_hal_cuda2_get_nccl_red_type(entry->op.reduction, &redop));
       NCCL_RETURN_IF_ERROR(
           syms,
           ncclReduceScatter((const void*)sendbuff, (void*)recvbuff,
@@ -446,7 +447,7 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_SEND: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
@@ -458,7 +459,7 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_RECV: {
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
@@ -470,12 +471,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
     }
     case IREE_HAL_COLLECTIVE_KIND_SEND_RECV: {
       CUdeviceptr sendbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
-          iree_hal_cuda_buffer_device_pointer(
+          iree_hal_cuda2_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
@@ -510,9 +511,9 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_cuda_nccl_submit_batch(
-    iree_hal_cuda_context_wrapper_t* context,
-    iree_hal_cuda_tracing_context_t* tracing_context,
+iree_status_t iree_hal_cuda2_nccl_submit_batch(
+    iree_hal_cuda2_context_wrapper_t* context,
+    iree_hal_cuda2_tracing_context_t* tracing_context,
     const iree_hal_collective_batch_t* batch, CUstream stream) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(batch);
@@ -540,7 +541,7 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
   NCCL_RETURN_IF_ERROR(context->syms, ncclGroupStart(), "ncclGroupStart");
   for (iree_host_size_t i = 0; i < batch->count; ++i) {
     IREE_RETURN_IF_ERROR(
-        iree_hal_cuda_nccl_submit_batch_entry(&batch->entries[i], stream));
+        iree_hal_cuda2_nccl_submit_batch_entry(&batch->entries[i], stream));
   }
   NCCL_RETURN_IF_ERROR(context->syms, ncclGroupEnd(), "ncclGroupEnd");
 
@@ -555,8 +556,8 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
   return iree_ok_status();
 }
 
-static const iree_hal_channel_vtable_t iree_hal_cuda_nccl_channel_vtable = {
-    .destroy = iree_hal_cuda_nccl_channel_destroy,
-    .split = iree_hal_cuda_nccl_channel_split,
-    .query_rank_and_count = iree_hal_cuda_nccl_channel_query_rank_and_count,
+static const iree_hal_channel_vtable_t iree_hal_cuda2_nccl_channel_vtable = {
+    .destroy = iree_hal_cuda2_nccl_channel_destroy,
+    .split = iree_hal_cuda2_nccl_channel_split,
+    .query_rank_and_count = iree_hal_cuda2_nccl_channel_query_rank_and_count,
 };
