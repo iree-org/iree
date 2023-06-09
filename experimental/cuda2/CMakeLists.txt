@@ -26,6 +26,8 @@ iree_cc_library(
     "cuda_driver.c"
     "memory_pools.c"
     "memory_pools.h"
+    "nccl_channel.c"
+    "nccl_channel.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
   DEPS
@@ -61,6 +63,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::dynamic_library
     iree_cuda::headers
+    nccl::headers
   PUBLIC
 )
 
