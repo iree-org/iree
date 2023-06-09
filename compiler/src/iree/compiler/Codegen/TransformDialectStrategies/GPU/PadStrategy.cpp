@@ -94,7 +94,7 @@ static std::tuple<Value, Value> buildPadStrategyBlockDistribution(
   MLIRContext *ctx = b.getContext();
   auto [tiledPadH, forallH] = buildDistributeOnePadOrCopyWithTileSizes(
       b, variantH, padH,
-      /*tileSizes=*/ArrayRef<int64_t>{strategy.blockTileSizes}.take_front(2),
+      /*tileSizes=*/{strategy.blockTileSizeY(), strategy.blockTileSizeX()},
       /*threadDimMapping=*/{blockY(ctx), blockX(ctx)}, /*foldIfBranch=*/true);
 
   // Step 3.Handle the workgroup count region.
@@ -113,7 +113,7 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
   // Step 2. Apply thread-level part of the strategy.
   auto padThreadH = buildDistributeOnePadOrCopyWithNumThreads(
       b, variantH, padBlockH,
-      /*numThreads=*/ArrayRef<int64_t>{strategy.numThreads}.take_front(2),
+      /*numThreads=*/{strategy.numThreadsY(), strategy.numThreadsX()},
       /*threadDimMapping=*/{threadY(ctx), threadX(ctx)}, /*foldIfBranch=*/true);
 
   // Step 3. Masked vectorization.
@@ -137,8 +137,10 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, needs hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH,
-                                    /*blockSize=*/strategy.blockTileSizes);
+  funcH = buildMapToBlockAndThreads(
+      b, funcH,
+      /*blockSize=*/
+      {strategy.numThreadsX(), strategy.numThreadsY(), strategy.numThreadsZ()});
 
   // TODO: Multi-buffering and async copies in cases where HW supports it.
   assert(!strategy.useAsyncCopies && "not implemented yet");

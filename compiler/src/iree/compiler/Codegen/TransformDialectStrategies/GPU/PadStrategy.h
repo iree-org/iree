@@ -37,6 +37,13 @@ class PadStrategy {
   void initDefaultValues();
   void configure(GPUModel gpuModel);
 
+  int64_t blockTileSizeX() const { return blockTileSizes[0]; }
+  int64_t blockTileSizeY() const { return blockTileSizes[1]; }
+  int64_t blockTileSizeZ() const { return blockTileSizes[2]; }
+  int64_t numThreadsX() const { return numThreads[0]; }
+  int64_t numThreadsY() const { return numThreads[1]; }
+  int64_t numThreadsZ() const { return numThreads[2]; }
+
   /// Constructor quantities.
   MLIRContext *ctx;
   transform_ext::MatchedPadCaptures captures;
