@@ -7,13 +7,13 @@ tags:
 
 # Running on a Bare-Metal Platform
 
-IREE supports CPU model execution on bare-metal platforms. That is, platforms
-without operating system support, for which executables are built using
+IREE supports model execution via CPU on bare-metal platforms. Bare metal
+platforms have no operating system support, and executables are built using
 machine-specific linker scripts and/or board support packages (BSPs).
 
-Bare-metal deployment typically uses IREE's LLVM compiler target much like the
-[CPU configuration](./cpu.md), but using a limited subset of IREE's CPU HAL
-driver code at runtime to load and execute compiled programs.
+Bare-metal deployment typically uses IREE's LLVM compiler target backend much
+like the [CPU configuration](./cpu.md), but using a limited subset of IREE's CPU
+HAL driver code at runtime to load and execute compiled programs.
 
 ## :octicons-download-16: Prerequisites
 
@@ -30,8 +30,7 @@ to retrieve the IREE compiler.
 
 ## :octicons-file-code-16: Compile the model for bare-metal
 
-The model can be compiled with the following command (assuming the path to
-`iree-compile` is in your system's `PATH`):
+The model can be compiled with the following command:
 
 ``` shell
 iree-compile \
@@ -56,10 +55,10 @@ In which
 * `--iree-llvmcpu-debug-symbols=false`: To reduce the artifact size
 
 See [generate.sh](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/local/elf/testdata/generate.sh)
-for example command-line instructions of some common architectures
+for example command-line instructions of some common architectures.
 
 You can replace the MLIR file with the other MLIR model files, following the
-[instructions](./cpu.md#compile-a-program)
+[instructions](./cpu.md#compile-a-program).
 
 ### Compiling the bare-metal model for static-library support
 
@@ -128,7 +127,7 @@ set(CMAKE_C_FLAGS ${MY_FLAGS} ${CMAKE_C_FLAGS})
 set(CMAKE_CXX_FLAGS ${MY_FLAGS} ${CMAKE_CXX_FLAGS})
 ```
 
-| macro | description |
+| Macro | Description |
 | ----- | ----------- |
 | `IREE_PLATFORM_GENERIC` | Let IREE build the runtime library without targeting a specific platform. |
 | `IREE_SYNCHRONIZATION_DISABLE_UNSAFE=1` | Disable thread synchronization support.<br>Must only be used if there's a single thread. |

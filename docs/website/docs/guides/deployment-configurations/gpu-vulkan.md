@@ -180,13 +180,13 @@ iree-compile \
     here[^1]; the following table summarizes the
     currently recognized ones:
 
-| GPU Vendor | Target Triple |
-| ---------- | ------------- |
-ARM Mali GPU | `valhall-g78-android30`
-Qualcomm Adreno GPU | `adreno-unknown-android30`
-AMD GPU | e.g., `rdna1-5700xt-linux`
-NVIDIA GPU | e..g, `ampere-rtx3080-windows`
-SwiftShader CPU | `cpu-swiftshader-unknown`
+| GPU Vendor          | Target Triple                    |
+| ------------------- | -------------------------------- |
+| ARM Mali GPU        | e.g., `valhall-g78-android30`    |
+| Qualcomm Adreno GPU | e.g., `adreno-unknown-android30` |
+| AMD GPU             | e.g., `rdna1-5700xt-linux`       |
+| NVIDIA GPU          | e..g, `ampere-rtx3080-windows`   |
+| SwiftShader CPU     | `cpu-swiftshader-unknown`        |
 
 ### :octicons-terminal-16: Run a compiled program
 
