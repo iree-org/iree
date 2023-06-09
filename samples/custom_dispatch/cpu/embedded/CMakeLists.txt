@@ -15,7 +15,7 @@ endif()
 iree_compiler_targeting_iree_arch(_BUILD_COMPILER_TARGETING_X86_64 "x86_64")
 iree_compiler_targeting_iree_arch(_BUILD_COMPILER_TARGETING_ARM_64 "arm_64")
 # First check compiler support
-if(NOT (_BUILD_COMPILER_TARGETING_X86_64 AND _BUILD_COMPILER_TARGETING_ARM_64))
+if(NOT _BUILD_COMPILER_TARGETING_X86_64 OR NOT _BUILD_COMPILER_TARGETING_ARM_64)
   message(STATUS "IREE custom_dispatch/cpu/embedded ignored - some required LLVM targets are not built.")
   return()
 endif()
