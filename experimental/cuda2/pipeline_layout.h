@@ -1,15 +1,14 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_CUDA_PIPELINE_LAYOUT_H_
-#define IREE_HAL_DRIVERS_CUDA_PIPELINE_LAYOUT_H_
+#ifndef EXPERIMENTAL_CUDA2_PIPELINE_LAYOUT_H_
+#define EXPERIMENTAL_CUDA2_PIPELINE_LAYOUT_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/cuda/context_wrapper.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,10 +21,10 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 iree_status_t iree_hal_cuda2_descriptor_set_layout_create(
-    iree_hal_cuda2_context_wrapper_t* context,
     iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_allocator_t host_allocator,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
 
 // Return the binding count for the given descriptor set layout.
@@ -38,10 +37,9 @@ iree_host_size_t iree_hal_cuda2_descriptor_set_layout_binding_count(
 
 // Creates the kernel arguments.
 iree_status_t iree_hal_cuda2_pipeline_layout_create(
-    iree_hal_cuda2_context_wrapper_t* context,
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_host_size_t push_constant_count,
+    iree_host_size_t push_constant_count, iree_allocator_t host_allocator,
     iree_hal_pipeline_layout_t** out_pipeline_layout);
 
 // Return the base binding index for the given set.
@@ -60,4 +58,4 @@ iree_host_size_t iree_hal_cuda2_pipeline_layout_num_constants(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_CUDA_PIPELINE_LAYOUT_H_
+#endif  // EXPERIMENTAL_CUDA2_PIPELINE_LAYOUT_H_

@@ -26,6 +26,8 @@ iree_cc_library(
     "cuda_driver.c"
     "memory_pools.c"
     "memory_pools.h"
+    "pipeline_layout.c"
+    "pipeline_layout.h"
   DEPS
     ::dynamic_symbols
     iree::base
