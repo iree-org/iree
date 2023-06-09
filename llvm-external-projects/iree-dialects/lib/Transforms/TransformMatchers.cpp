@@ -93,6 +93,27 @@ void transform_ext::CapturingMatcherBase::resetCapture() {
 // CapturingOpMatcher
 //===---------------------------------------------------------------------===//
 
+bool transform_ext::CapturingOpMatcher::checkAllTilableMatched(
+    Operation *parent, Operation *op,
+    ArrayRef<transform_ext::CapturingOpMatcher *> matchers) {
+  LLVM_DEBUG(DBGS() << "all tilable ops captured");
+  int64_t numTilableOps = 0;
+  if (!parent)
+    return false;
+  parent->walk([&](TilingInterface Op) { ++numTilableOps; });
+
+  llvm::SmallPtrSet<Operation *, 6> matched;
+  for (CapturingOpMatcher *nested : matchers) {
+    if (Operation *captured = nested->getCaptured()) {
+      matched.insert(captured);
+    }
+  }
+
+  // Don't forget to include the root matcher.
+  matched.insert(op);
+  return numTilableOps == matched.size();
+}
+
 bool transform_ext::CapturingOpMatcher::match(Operation *op) {
   auto debugRAII =
       llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
@@ -369,6 +390,16 @@ transform_ext::ShapedValueMatcher::dim(AllDims tag, CaptureDims captures) {
     LLVM_DEBUG(DBGS() << "capturing all shaped value dimensions");
     ArrayRef<int64_t> shape = value.getType().cast<ShapedType>().getShape();
     captures.value.assign(shape.begin(), shape.end());
+    return true;
+  });
+  return *this;
+}
+
+transform_ext::ShapedValueMatcher &
+transform_ext::ShapedValueMatcher::elementType(CaptureElementType captures) {
+  addPredicate([=](Value value) {
+    LLVM_DEBUG(DBGS() << "capturing elementType");
+    captures.value = value.getType().cast<ShapedType>().getElementType();
     return true;
   });
   return *this;
@@ -1077,27 +1108,6 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
   });
 }
 
-bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
-    Operation *parent, linalg::LinalgOp linalgOp,
-    ArrayRef<transform_ext::CapturingOpMatcher *> matchers) {
-  LLVM_DEBUG(DBGS() << "all tilable ops captured");
-  int64_t numTilableOps = 0;
-  if (!parent)
-    return false;
-  parent->walk([&](TilingInterface Op) { ++numTilableOps; });
-
-  llvm::SmallPtrSet<Operation *, 6> matched;
-  for (CapturingOpMatcher *nested : matchers) {
-    if (Operation *captured = nested->getCaptured()) {
-      matched.insert(captured);
-    }
-  }
-
-  // Don't forget to include the root matcher.
-  matched.insert(linalgOp);
-  return numTilableOps == matched.size();
-}
-
 //===-------------------------------------------------------------------===//
 // Constraints on op region.
 //===-------------------------------------------------------------------===//
@@ -1180,6 +1190,75 @@ transform_ext::StructuredOpMatcher::passThroughOp() {
         return false;
     }
     return true;
+  });
+  return *this;
+}
+
+void transform_ext::detail::debugOutputForConcreteOpMatcherConstructor(
+    StringRef name) {
+  LLVM_DEBUG(DBGS() << "op is a " << name << "'");
+}
+
+//===---------------------------------------------------------------------===//
+// TensorPadOpMatcher
+//===---------------------------------------------------------------------===//
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::low(ArrayRef<int64_t> sizes) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG({
+      DBGS() << "low pad sizes are ";
+      llvm::interleaveComma(sizes, llvm::dbgs());
+    });
+    return tensorPad.getStaticLow() == sizes;
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::low(AllDims tag, int64_t size) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG(DBGS() << "all low pad sizes are " << size);
+    return llvm::all_of(tensorPad.getStaticLow(),
+                        [&](int64_t v) { return v == size; });
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::high(ArrayRef<int64_t> sizes) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG({
+      DBGS() << "high pad sizes are ";
+      llvm::interleaveComma(sizes, llvm::dbgs());
+    });
+    return tensorPad.getStaticHigh() == sizes;
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::high(AllDims tag, int64_t size) {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG(DBGS() << "all high pad sizes are " << size);
+    return llvm::all_of(tensorPad.getStaticHigh(),
+                        [&](int64_t v) { return v == size; });
+  });
+  return *this;
+}
+
+transform_ext::TensorPadOpMatcher &
+transform_ext::TensorPadOpMatcher::yieldsExternalValue() {
+  addPredicate([=](tensor::PadOp tensorPad) {
+    LLVM_DEBUG(DBGS() << "pad body yields an externally-defined value");
+    Block *body = tensorPad.getBody();
+    if (!llvm::hasSingleElement(*body))
+      return false;
+    return llvm::all_of(body->getTerminator()->getOperands(),
+                        [body](Value operand) {
+                          auto arg = dyn_cast<BlockArgument>(operand);
+                          return !arg || arg.getOwner() != body;
+                        });
   });
   return *this;
 }
@@ -1588,4 +1667,21 @@ void transform_ext::makeConvolutionMatcher(
   StructuredOpMatcher *trailing;
   makeConvolutionMatcher(context, convolutionCapture, fill, trailing, captures,
                          mustMatchEntireFunc);
+}
+
+void transform_ext::makePadMatcher(MatcherContext &context,
+                                   CapturingOpMatcher *&padCapture,
+                                   MatchedPadCaptures &captures,
+                                   bool mustMatchEntireFunc) {
+  auto &value = transform_ext::m_ShapedValue(context);
+  value.rank(transform_ext::CaptureRank(captures.rank))
+      .dim(transform_ext::AllDims(), transform_ext::CaptureDims(captures.dims))
+      .elementType(CaptureElementType(captures.elementType));
+  auto &opMatcher = transform_ext::m_tensorPad(context)
+                        .low(AllDims(), 0)
+                        .yieldsExternalValue()
+                        .result(0, value);
+  if (mustMatchEntireFunc)
+    opMatcher = opMatcher.allTilableOpsCaptured<func::FuncOp>();
+  padCapture = &opMatcher;
 }
