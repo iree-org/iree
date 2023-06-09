@@ -39,7 +39,8 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "flatbuffer data is not present or less than 16 bytes (%zu total)",
+        "flatbuffer data is not present or less than 16 bytes (%" PRIhsz
+        " total)",
         flatbuffer_data.data_length);
   }
 
@@ -66,9 +67,9 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
         iree_hal_wgsl_ShaderModuleDef_vec_at(shader_modules_vec, i);
     if (flatbuffers_string_len(
             iree_hal_wgsl_ShaderModuleDef_code_get(shader_module_def)) == 0) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "shader module %zu WGSL code is missing/empty",
-                              i);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "shader module %" PRIhsz " WGSL code is missing/empty", i);
     }
   }
 
@@ -77,18 +78,19 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
   size_t entry_point_count = flatbuffers_uint32_vec_len(entry_points_vec);
   if (entry_point_count != expected_entry_point_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "executable provides %zu entry points but caller "
-                            "provided %zu; must match",
+                            "executable provides %" PRIhsz
+                            " entry points but caller "
+                            "provided %" PRIhsz "; must match",
                             entry_point_count, expected_entry_point_count);
   }
 
   for (size_t i = 0; i < entry_point_count; ++i) {
     uint32_t module_ordinal = flatbuffers_uint32_vec_at(entry_points_vec, i);
     if (module_ordinal >= shader_module_count) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "executable entry point %zu references an invalid shader module %d",
-          i, module_ordinal);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable entry point %" PRIhsz
+                              " references an invalid shader module %d",
+                              i, module_ordinal);
     }
   }
 

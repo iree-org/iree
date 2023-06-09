@@ -271,8 +271,8 @@ iree_status_t iree_hal_modules_buffer_view_trace(
 
     // Query total length (excluding NUL terminator).
     iree_host_size_t result_length = 0;
-    iree_status_t status = iree_hal_buffer_view_format(buffer_view, SIZE_MAX, 0,
-                                                       NULL, &result_length);
+    iree_status_t status = iree_hal_buffer_view_format(
+        buffer_view, IREE_HOST_SIZE_MAX, 0, NULL, &result_length);
     if (!iree_status_is_out_of_range(status)) {
       return status;
     }
@@ -282,8 +282,9 @@ iree_status_t iree_hal_modules_buffer_view_trace(
     char* result_str = NULL;
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, result_length,
                                                (void**)&result_str));
-    status = iree_hal_buffer_view_format(buffer_view, SIZE_MAX, result_length,
-                                         result_str, &result_length);
+    status =
+        iree_hal_buffer_view_format(buffer_view, IREE_HOST_SIZE_MAX,
+                                    result_length, result_str, &result_length);
     if (iree_status_is_ok(status)) {
       fprintf(stderr, "%.*s\n", (int)result_length, result_str);
     }

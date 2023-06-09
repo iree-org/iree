@@ -347,7 +347,8 @@ struct Unpacker {
     if (IREE_UNLIKELY(ptr != limit)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "argument buffer unpacking failure; consumed %zu of %zu bytes",
+          "argument buffer unpacking failure; consumed %" PRIhsz " of %" PRIhsz
+          " bytes",
           (reinterpret_cast<intptr_t>(ptr) -
            reinterpret_cast<intptr_t>(storage.data)),
           storage.data_length);
@@ -700,7 +701,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
   using dispatch_functor_t = packing::DispatchFunctor<Owner, Result, Params...>;
   return {iree_make_cstring_view(name),
           packing::cconv_storage<Result, sizeof...(Params), Params...>::value(),
-          (void (Owner::*)())fn, &dispatch_functor_t::Call};
+          (void(Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 template <typename Owner, typename... Params>
@@ -709,7 +710,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
   using dispatch_functor_t = packing::DispatchFunctorVoid<Owner, Params...>;
   return {iree_make_cstring_view(name),
           packing::cconv_storage_void<sizeof...(Params), Params...>::value(),
-          (void (Owner::*)())fn, &dispatch_functor_t::Call};
+          (void(Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 }  // namespace vm

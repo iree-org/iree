@@ -372,7 +372,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       }
 
       // Extract dims from the buffer view.
-      size_t rank = 0;
+      iree_host_size_t rank = 0;
       std::vector<iree_hal_dim_t> dims(6);
       iree_status_t status = iree_hal_buffer_view_shape(
           buffer_view, dims.capacity(), dims.data(), &rank);

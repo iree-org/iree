@@ -22,7 +22,7 @@ extern "C" {
 
 typedef struct iree_status_handle_t* iree_status_t;
 
-#define IREE_STRING_VIEW_NPOS SIZE_MAX
+#define IREE_STRING_VIEW_NPOS IREE_HOST_SIZE_MAX
 
 // A string view (ala std::string_view) into a non-NUL-terminated string.
 typedef struct iree_string_view_t {

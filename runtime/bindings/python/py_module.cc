@@ -324,10 +324,11 @@ class PyModuleInterface {
         &packed_arguments_required_size));
     if (IREE_UNLIKELY(packed_arguments_required_size !=
                       call.arguments.data_length)) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "mismatched packed argument size: actual=%zu, required=%zu",
-          call.arguments.data_length, packed_arguments_required_size);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "mismatched packed argument size: actual=%" PRIhsz
+                              ", required=%" PRIhsz,
+                              call.arguments.data_length,
+                              packed_arguments_required_size);
     }
 
     // Unpack arguments.
