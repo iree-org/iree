@@ -6,8 +6,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Runs all matched benchmark suites on a Linux device."""
 
-import sys
+import hashlib
 import pathlib
+import sys
 
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
@@ -64,7 +65,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     ]
 
   def __build_tool_cmds(self, benchmark_case: BenchmarkCase,
-                        tool_path: pathlib.Path) -> List[Any]:
+                        tool_path: pathlib.Path,
+                        module_path: pathlib.Path) -> List[Any]:
     run_config = benchmark_case.run_config
     if run_config is None:
       # TODO(#11076): Remove legacy path.
@@ -90,8 +92,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         run_config.target_device_spec)
     cmds.append(tool_path)
 
-    module_dir_path = benchmark_case.benchmark_case_dir
-    cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
+    cmds += [f"--module={module_path}"]
     cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
 
     return cmds
@@ -102,9 +103,15 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
       raise ValueError("normal_benchmark_tool_dir can't be None.")
 
     tool_name = benchmark_case.benchmark_tool_name
-    tool_path = self.config.normal_benchmark_tool_dir / tool_name
+    tool_path, tool_hash = self.normal_benchmark_tools[tool_name]
+
+    module_path = (benchmark_case.benchmark_case_dir /
+                   iree_artifacts.MODULE_FILENAME)
+    module_hash = self.get_module_hash(module_path)
+
     cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
-                                 tool_path=tool_path)
+                                 tool_path=tool_path,
+                                 module_path=module_path)
 
     if tool_name == "iree-benchmark-module":
       cmd.extend(
@@ -113,13 +120,20 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
+    fingerprints = {
+        "tool_hash": tool_hash,
+        "module_hash": module_hash,
+        "command": [str(part) for part in cmd],
+    }
+
     # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
     cwd = (benchmark_case.benchmark_case_dir
            if benchmark_case.run_config is None else None)
     benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
         cmd, cwd=cwd, verbose=self.verbose)
     benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout,
-                                                     benchmark_stderr)
+                                                     benchmark_stderr,
+                                                     fingerprints)
     if self.verbose:
       print(benchmark_metrics)
     results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
@@ -132,8 +146,11 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
 
     tool_path = (capture_config.traced_benchmark_tool_dir /
                  benchmark_case.benchmark_tool_name)
+    module_path = (benchmark_case.benchmark_case_dir /
+                   iree_artifacts.MODULE_FILENAME)
     cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
-                                 tool_path=tool_path)
+                                 tool_path=tool_path,
+                                 module_path=module_path)
 
     # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
     cwd = (benchmark_case.benchmark_case_dir

@@ -4,15 +4,24 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import hashlib
 import json
 import pathlib
 import time
-from typing import List, Optional, Sequence, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
+
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
                                          BenchmarkMetrics, BenchmarkRun,
                                          DeviceInfo)
+
+# Map of tool name to a function that returns its hash (taking account of
+# related files).
+BENCHMARK_TOOL_HASH_FUNCS = {
+    "iree-benchmark-module":
+        lambda tool_path: hashlib.sha256(tool_path.read_bytes()).hexdigest()
+}
 
 
 class BenchmarkDriver(object):
@@ -33,6 +42,31 @@ class BenchmarkDriver(object):
     self.finished_captures: List[pathlib.Path] = []
     self.benchmark_errors = []
     self._seen_benchmark_names: Set[str] = set()
+
+    # Map of benchmark tool name to its path and file hash.
+    normal_benchmark_tools: Dict[str, Tuple[pathlib.Path, str]] = {}
+    normal_benchmark_tool_dir = self.config.normal_benchmark_tool_dir
+    if normal_benchmark_tool_dir is not None:
+      for tool, hash_func in BENCHMARK_TOOL_HASH_FUNCS.items():
+        tool_path = normal_benchmark_tool_dir / tool
+        tool_hash = hash_func(tool_path)
+        normal_benchmark_tools[tool] = (tool_path, tool_hash)
+
+    self.normal_benchmark_tools = normal_benchmark_tools
+    self.module_hash_cache: Dict[pathlib.Path, str] = {}
+
+  def get_module_hash(self, module_path: pathlib.Path) -> str:
+    module_hash = self.module_hash_cache.get(module_path)
+    if module_hash is not None:
+      return module_hash
+
+    hasher = hashlib.sha256()
+    with module_path.open(mode="rb") as module_file:
+      hasher.update(module_file.read(4 * 1024))
+    module_hash = hasher.hexdigest()
+
+    self.module_hash_cache[module_path] = module_hash
+    return module_hash
 
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],

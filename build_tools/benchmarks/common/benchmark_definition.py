@@ -531,12 +531,15 @@ class BenchmarkMetrics(object):
       framework.
   - raw_data: additional JSON-compatible raw results returned by the
       benchmarking framework.
+  - fingerprints: Associated artifact file hashes and flags to know if two
+      benchmarks runs are the same.
   """
   real_time: BenchmarkLatency
   cpu_time: BenchmarkLatency
   host_memory: BenchmarkMemory
   device_memory: BenchmarkMemory
   raw_data: Dict[str, Any]
+  fingerprints: Dict[str, Any]
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
@@ -545,6 +548,7 @@ class BenchmarkMetrics(object):
         "host_memory": self.host_memory.to_json_object(),
         "device_memory": self.device_memory.to_json_object(),
         "raw_data": self.raw_data,
+        "fingerprints": self.fingerprints,
     }
 
   @staticmethod
@@ -557,11 +561,13 @@ class BenchmarkMetrics(object):
         device_memory=BenchmarkMemory.from_json_object(
             json_object["device_memory"]),
         raw_data=json_object["raw_data"],
+        fingerprints=json_object["fingerprints"],
     )
 
 
-def parse_iree_benchmark_metrics(benchmark_stdout: str,
-                                 benchmark_stderr: str) -> BenchmarkMetrics:
+def parse_iree_benchmark_metrics(
+    benchmark_stdout: str, benchmark_stderr: str,
+    fingerprints: Dict[str, Any]) -> BenchmarkMetrics:
   """Extract benchmark metrics from the output of iree-benchmark-module.
 
   Args:
@@ -582,6 +588,7 @@ def parse_iree_benchmark_metrics(benchmark_stdout: str,
       device_memory=_get_iree_memory_statistics(benchmark_stderr,
                                                 "DEVICE_LOCAL"),
       raw_data=benchmark_json,
+      fingerprints=fingerprints,
   )
 
 
