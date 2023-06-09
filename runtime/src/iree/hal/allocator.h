@@ -234,6 +234,9 @@ typedef enum iree_hal_external_buffer_type_e {
   // caller is responsible for ensuring the memory remains live for as long as
   // the iree_hal_buffer_t referencing it.
   //
+  // CPU:
+  //  When using the default heap allocator this is just a host pointer.
+  //
   // CUDA:
   //  Requires device support.
   //  Uses cuMemHostRegister / cuMemHostUnregister.
@@ -242,9 +245,24 @@ typedef enum iree_hal_external_buffer_type_e {
   //
   // Vulkan:
   //  Requires VK_EXT_external_memory_host.
-  //  Requires device support.
   //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT.
-  IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION = 1,
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+
+  // A device pointer allocated from an external allocator.
+  // An imported/exported buffer does not own a reference to the memory and the
+  // caller is responsible for ensuring the memory remains live for as long as
+  // the iree_hal_buffer_t referencing it.
+  //
+  // CPU:
+  //  When using the default heap allocator this is just a host pointer.
+  //
+  // CUDA:
+  //  Buffer usage is declared on import.
+  //
+  // Vulkan:
+  //  Requires VK_KHR_buffer_device_address.
+  //  Treats the pointer as VkDeviceAddress.
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION,
 
   // A driver/device-specific POSIX file descriptor handle.
   // The handle supports dup, dup2, close, and transport using the SCM_RIGHTS
@@ -259,7 +277,7 @@ typedef enum iree_hal_external_buffer_type_e {
   // Vulkan:
   //  Requires device support.
   //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT.
-  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD = 2,
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD,
 
   // A driver/device-specific Win32 HANDLE.
   // The handle supports DuplicateHandle, CompareObjectHandles, CloseHandle, and
@@ -274,10 +292,11 @@ typedef enum iree_hal_external_buffer_type_e {
   // Vulkan:
   //  Requires device support.
   //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT.
-  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32 = 3,
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32,
 
   // TODO(benvanik): additional memory types:
   //  shared memory fd (shmem)/mapped file
+  //  VkBuffer?
   //  VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT
   //  VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID
 } iree_hal_external_buffer_type_t;
@@ -306,6 +325,12 @@ typedef struct iree_hal_external_buffer_t {
       // Host memory pointer.
       void* ptr;
     } host_allocation;
+    // IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION
+    struct {
+      // Device memory pointer. Pointer width may vary across devices so it is
+      // always treated as a 64-bit integer here.
+      uint64_t ptr;
+    } device_allocation;
     // IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD
     struct {
       int fd;

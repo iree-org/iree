@@ -37,6 +37,7 @@ iree_lit_test_suite(
     "reduction_pipeline_transform.mlir"
     "rocdl_pipeline_test.mlir"
     "set_transform_strategy.mlir"
+    "set_transform_strategy_pad.mlir"
     "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
     "transform_dialect_bufferize.mlir"

@@ -27,6 +27,9 @@ typedef enum iree_hal_cuda2_buffer_type_e {
   // Device local buffer, allocated with cuMemAllocFromPoolAsync, freed with
   // cuMemFree/cuMemFreeAsync.
   IREE_HAL_CUDA_BUFFER_TYPE_ASYNC,
+  // Externally registered buffer whose providence is unknown.
+  // Must be freed by the user.
+  IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL,
 } iree_hal_cuda2_buffer_type_t;
 
 // Wraps a CUDA allocation in an iree_hal_buffer_t.
