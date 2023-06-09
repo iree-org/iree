@@ -1,15 +1,16 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_CUDA_NOP_EXECUTABLE_CACHE_H_
-#define IREE_HAL_DRIVERS_CUDA_NOP_EXECUTABLE_CACHE_H_
+#ifndef EXPERIMENTAL_CUDA2_NOP_EXECUTABLE_CACHE_H_
+#define EXPERIMENTAL_CUDA2_NOP_EXECUTABLE_CACHE_H_
 
+#include "experimental/cuda2/cuda_dynamic_symbols.h"
+#include "experimental/cuda2/cuda_headers.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/cuda/context_wrapper.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,11 +20,13 @@ extern "C" {
 // This is useful to isolate pipeline caching behavior and verify compilation
 // behavior.
 iree_status_t iree_hal_cuda2_nop_executable_cache_create(
-    iree_hal_cuda2_context_wrapper_t* context, iree_string_view_t identifier,
+    iree_string_view_t identifier,
+    const iree_hal_cuda2_dynamic_symbols_t* symbols, CUdevice device,
+    iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_CUDA_NOP_EXECUTABLE_CACHE_H_
+#endif  // EXPERIMENTAL_CUDA2_NOP_EXECUTABLE_CACHE_H_
