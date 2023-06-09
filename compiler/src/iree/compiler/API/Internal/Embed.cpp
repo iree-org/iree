@@ -851,18 +851,6 @@ iree_compiler_output_t *wrap(Output *output) {
 // C API implementation
 //===----------------------------------------------------------------------===//
 
-void ireeCompilerEnumerateRegisteredHALTargetBackends(
-    void (*callback)(const char *backend, void *userData), void *userData) {
-  // TODO: Replace this entry point with one on the invocation where we can
-  // reliably enumerate all targets.
-  auto registeredTargetBackends =
-      mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal()
-          .getRegisteredTargetBackends();
-  for (auto &b : registeredTargetBackends) {
-    callback(b.c_str(), userData);
-  }
-}
-
 void ireeCompilerEnumeratePlugins(void (*callback)(const char *pluginName,
                                                    void *userData),
                                   void *userData) {
@@ -1062,6 +1050,18 @@ void ireeCompilerInvocationSetCrashHandler(
         return std::make_unique<StreamImpl>(output);
       },
       /*genLocalReproducer=*/genLocalReproducer);
+}
+
+void ireeCompilerInvocationEnumerateRegisteredHALTargetBackends(
+    iree_compiler_invocation_t *inv,
+    void (*callback)(const char *backend, void *userData), void *userData) {
+  // HACK: activate plugins and ignore failures.
+  (void)unwrap(inv)->session.activatePluginsOnce();
+  auto registeredTargetBackends =
+      unwrap(inv)->session.targetRegistry.getRegisteredTargetBackends();
+  for (auto &b : registeredTargetBackends) {
+    callback(b.c_str(), userData);
+  }
 }
 
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,

@@ -2,7 +2,6 @@
 VER_0 {
   global:
     ireeCompilerEnumeratePlugins;
-    ireeCompilerEnumerateRegisteredHALTargetBackends;
     ireeCompilerErrorDestroy;
     ireeCompilerErrorGetMessage;
     ireeCompilerGetAPIVersion;
@@ -14,6 +13,7 @@ VER_0 {
     ireeCompilerInvocationDestroy;
     ireeCompilerInvocationEnableCallbackDiagnostics;
     ireeCompilerInvocationEnableConsoleDiagnostics;
+    ireeCompilerInvocationEnumerateRegisteredHALTargetBackends;
     ireeCompilerInvocationImportModule;
     ireeCompilerInvocationOutputHALExecutable;
     ireeCompilerInvocationOutputIR;
