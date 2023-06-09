@@ -77,7 +77,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#run-on-a-bare-metal-platform" class="md-skip">
+        <a href="#running-on-a-bare-metal-platform" class="md-skip">
           Skip to content
         </a>
       
@@ -856,14 +856,14 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#compile-the-model-for-bare-metal" class="md-nav__link">
-    Compile the model for bare-metal
+     Compile the model for bare-metal
   </a>
   
     <nav class="md-nav" aria-label="Compile the model for bare-metal">
@@ -882,23 +882,23 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build-bare-metal-runtime-from-the-source" class="md-nav__link">
-    Build bare-metal runtime from the source
+  <a href="#build-bare-metal-runtime-from-source" class="md-nav__link">
+     Build bare-metal runtime from source
   </a>
   
-    <nav class="md-nav" aria-label="Build bare-metal runtime from the source">
+    <nav class="md-nav" aria-label="Build bare-metal runtime from source">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#set-cmake-options" class="md-nav__link">
-    Set CMake options
+     Set CMake options
   </a>
   
 </li>
         
           <li class="md-nav__item">
   <a href="#define-iree-macros" class="md-nav__link">
-    Define IREE macros
+     Define IREE macros
   </a>
   
 </li>
@@ -1381,14 +1381,14 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#compile-the-model-for-bare-metal" class="md-nav__link">
-    Compile the model for bare-metal
+     Compile the model for bare-metal
   </a>
   
     <nav class="md-nav" aria-label="Compile the model for bare-metal">
@@ -1407,23 +1407,23 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build-bare-metal-runtime-from-the-source" class="md-nav__link">
-    Build bare-metal runtime from the source
+  <a href="#build-bare-metal-runtime-from-source" class="md-nav__link">
+     Build bare-metal runtime from source
   </a>
   
-    <nav class="md-nav" aria-label="Build bare-metal runtime from the source">
+    <nav class="md-nav" aria-label="Build bare-metal runtime from source">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#set-cmake-options" class="md-nav__link">
-    Set CMake options
+     Set CMake options
   </a>
   
 </li>
         
           <li class="md-nav__item">
   <a href="#define-iree-macros" class="md-nav__link">
-    Define IREE macros
+     Define IREE macros
   </a>
   
 </li>
@@ -1472,14 +1472,14 @@
   
 
 
-<h1 id="run-on-a-bare-metal-platform">Run on a Bare-Metal Platform<a class="headerlink" href="#run-on-a-bare-metal-platform" title="Permanent link">link</a></h1>
-<p>IREE supports CPU model execution on bare-metal platforms. That is, platforms
-without operating system support, for which executables are built using
+<h1 id="running-on-a-bare-metal-platform">Running on a Bare-Metal Platform<a class="headerlink" href="#running-on-a-bare-metal-platform" title="Permanent link">link</a></h1>
+<p>IREE supports model execution via CPU on bare-metal platforms. Bare metal
+platforms have no operating system support, and executables are built using
 machine-specific linker scripts and/or board support packages (BSPs).</p>
-<p>Bare-metal deployment typically uses IREE's LLVM compiler target much like the
-<a href="../cpu/">CPU configuration</a>, but using a limited subset of IREE's CPU HAL
-driver code at runtime to load and execute compiled programs.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<p>Bare-metal deployment typically uses IREE's LLVM compiler target backend much
+like the <a href="../cpu/">CPU configuration</a>, but using a limited subset of IREE's CPU
+HAL driver code at runtime to load and execute compiled programs.</p>
+<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>Out-of-tree bare-metal platform tools and source code for the system should be
 ready, such as</p>
 <ul>
@@ -1488,11 +1488,10 @@ ready, such as</p>
 <li>Firmware libraries</li>
 </ul>
 <p>Please follow the
-<a href="../cpu/#get-compiler-for-cpu-native-instructions">instructions</a>
+<a href="../cpu/#get-the-iree-compiler">instructions</a>
 to retrieve the IREE compiler.</p>
-<h2 id="compile-the-model-for-bare-metal">Compile the model for bare-metal<a class="headerlink" href="#compile-the-model-for-bare-metal" title="Permanent link">link</a></h2>
-<p>The model can be compiled with the following command (assuming the path to
-<code>iree-compile</code> is in your system's <code>PATH</code>):</p>
+<h2 id="compile-the-model-for-bare-metal"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.47-1.47-1.47-1.47a.75.75 0 0 1 0-1.06ZM3.28 7.78 1.81 9.25l1.47 1.47a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Zm8.22-6.218V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"/></svg></span> Compile the model for bare-metal<a class="headerlink" href="#compile-the-model-for-bare-metal" title="Permanent link">link</a></h2>
+<p>The model can be compiled with the following command:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--iree-stream-partitioning-favor<span class="o">=</span>min-peak-memory<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
@@ -1513,9 +1512,9 @@ to retrieve the IREE compiler.</p>
 <li><code>--iree-llvmcpu-debug-symbols=false</code>: To reduce the artifact size</li>
 </ul>
 <p>See <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/local/elf/testdata/generate.sh">generate.sh</a>
-for example command-line instructions of some common architectures</p>
+for example command-line instructions of some common architectures.</p>
 <p>You can replace the MLIR file with the other MLIR model files, following the
-<a href="../cpu/#compile-the-model">instructions</a></p>
+<a href="../cpu/#compile-a-program">instructions</a>.</p>
 <h3 id="compiling-the-bare-metal-model-for-static-library-support">Compiling the bare-metal model for static-library support<a class="headerlink" href="#compiling-the-bare-metal-model-for-static-library-support" title="Permanent link">link</a></h3>
 <p>See the <a href="https://github.com/openxla/iree/tree/main/samples/static_library">static_library</a>
 demo sample for an example and instructions on running a model with IREE's
@@ -1525,33 +1524,40 @@ bare-metal compatible model, run <code>iree-compile</code> as in the previous ex
 and add the additional <code>-iree-llvmcpu-static-library-output-path=</code> flag to specify
 the static library destination. This will produce a <code>.h\.o</code> file to link
 directly into the target application.</p>
-<h2 id="build-bare-metal-runtime-from-the-source">Build bare-metal runtime from the source<a class="headerlink" href="#build-bare-metal-runtime-from-the-source" title="Permanent link">link</a></h2>
+<h2 id="build-bare-metal-runtime-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Build bare-metal runtime from source<a class="headerlink" href="#build-bare-metal-runtime-from-source" title="Permanent link">link</a></h2>
 <p>A few CMake options and macros should be set to build a subset of IREE runtime
 libraries compatible with the bare-metal platform. We assume there's no
 multi-thread control nor system library support in the bare-metal system. The
 model execution is in a single-thread synchronous fashion.</p>
-<h3 id="set-cmake-options">Set CMake options<a class="headerlink" href="#set-cmake-options" title="Permanent link">link</a></h3>
-<ul>
-<li><code>set(IREE_BUILD_COMPILER OFF)</code>: Build IREE runtime only</li>
-<li><code>set(CMAKE_SYSTEM_NAME Generic)</code>: Tell CMake to skip targeting a specific
-  operating system</li>
-<li><code>set(IREE_BINDINGS_TFLITE OFF)</code>: Disable the TFLite binding support</li>
-<li><code>set(IREE_ENABLE_THREADING OFF)</code>: Disable multi-thread library support</li>
-<li><code>set(IREE_HAL_DRIVER_DEFAULTS OFF)</code>: Disable HAL drivers by default, then
-  enable the synchronous HAL drivers with <code>set(IREE_HAL_DRIVER_LOCAL_SYNC ON)</code></li>
-<li><code>set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)</code>: Disable HAL executable
-  loaders by default, then enable the CPU codegen and VMVX loaders with
-  <code>set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)</code> and
-  <code>set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)</code></li>
-<li><code>set(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS OFF)</code>: Disable HAL executable plugins
-  by default, then enable the embedded ELF loader with
-  <code>set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF ON)</code></li>
-<li><code>set(IREE_BUILD_TESTS OFF)</code>: Disable tests until IREE supports running them
-  on bare-metal platforms</li>
-<li><code>set(IREE_BUILD_SAMPLES ON)</code>: Build
-  <a href="https://github.com/openxla/iree/tree/main/samples/simple_embedding">simple_embedding</a>
-  example</li>
-</ul>
+<h3 id="set-cmake-options"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75Zm-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5H6.5Zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5h6ZM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8Zm-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0v-2Zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75Z"/></svg></span> Set CMake options<a class="headerlink" href="#set-cmake-options" title="Permanent link">link</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c"># Build the IREE runtime only</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_BUILD_COMPILER</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+
+<span class="c"># Tell CMake to skip targeting a specific operating system</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_SYSTEM_NAME</span><span class="w"> </span><span class="s">Generic</span><span class="p">)</span>
+
+<span class="c"># Disable multi-thread library support</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_ENABLE_THREADING</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+
+<span class="c"># Only enable the local synchronous HAL driver</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_DRIVER_DEFAULTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_DRIVER_LOCAL_SYNC</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
+<span class="c"># Only enable some executable loaders</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_LOADER_DEFAULTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
+<span class="c"># Only enable the embedded ELF executable plugin</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
+<span class="c"># Disable tests until IREE supports running them on bare-metal platforms</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_BUILD_TESTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+
+<span class="c"># Build samples</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_BUILD_SAMPLES</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+</code></pre></div>
 <div class="admonition todo">
 <p class="admonition-title">Todo</p>
 <p>Clean the list up after <a href="https://github.com/openxla/iree/issues/6353">#6353</a>
@@ -1559,20 +1565,42 @@ is fixed.</p>
 </div>
 <p>Also, set the toolchain-specific cmake file to match the tool path, target
 architecture, target abi, linker script, system library path, etc.</p>
-<h3 id="define-iree-macros">Define IREE macros<a class="headerlink" href="#define-iree-macros" title="Permanent link">link</a></h3>
-<ul>
-<li><code>-DIREE_PLATFORM_GENERIC</code>: Let IREE to build the runtime library without
-  targeting a specific platform.</li>
-<li><code>-DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1</code>: Disable thread synchronization
-  support. Must only be used if there's a single thread.</li>
-<li><code>-DIREE_FILE_IO_ENABLE=0</code>: Disable file I/O.</li>
-<li><code>-DIREE_TIME_NOW_FN</code>: A function to return the system time. For the bare-metal
-  system, it can be set as <code>-DIREE_TIME_NOW_FN=\"\{ return 0;\}\"</code> as there's no
-  asynchronous wait handling.</li>
-<li><code>-DIREE_WAIT_UNTIL_FN</code>: A function to wait until the given time in
-  nanoseconds. Must match the signature <code>bool(uint64_t nanos)</code> and return
-  false if the wait failed.</li>
-</ul>
+<h3 id="define-iree-macros"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63.27.385.506.792.704 1.218.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294.016.257.016.515 0 .772-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a7.977 7.977 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a5.909 5.909 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a5.738 5.738 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8.12 8.12 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6.214 6.214 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a7.92 7.92 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071.214-.143.437-.272.668-.386.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03 7.53.01 7.764 0 8 0Zm-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189-.173.086-.34.183-.5.29-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045-.22.312-.412.644-.573.99-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a4.709 4.709 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19.162.346.353.677.573.989.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27.161.107.328.204.501.29.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189.173-.086.34-.183.5-.29.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045.22-.313.411-.644.573-.99.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a4.709 4.709 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.464 6.464 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.44 4.44 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8Z"/></svg></span> Define IREE macros<a class="headerlink" href="#define-iree-macros" title="Permanent link">link</a></h3>
+<p>These macros should be defined, either in C/C++ or via CMake options like</p>
+<div class="highlight"><pre><span></span><code><span class="nb">set</span><span class="p">(</span><span class="s">MY_FLAGS</span><span class="w"> </span><span class="s2">&quot;-DIREE_PLATFORM_GENERIC=1&quot;</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_C_FLAGS</span><span class="w"> </span><span class="o">${</span><span class="nv">MY_FLAGS</span><span class="o">}</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_C_FLAGS</span><span class="o">}</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_CXX_FLAGS</span><span class="w"> </span><span class="o">${</span><span class="nv">MY_FLAGS</span><span class="o">}</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_CXX_FLAGS</span><span class="o">}</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Macro</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IREE_PLATFORM_GENERIC</code></td>
+<td>Let IREE build the runtime library without targeting a specific platform.</td>
+</tr>
+<tr>
+<td><code>IREE_SYNCHRONIZATION_DISABLE_UNSAFE=1</code></td>
+<td>Disable thread synchronization support.<br>Must only be used if there's a single thread.</td>
+</tr>
+<tr>
+<td><code>IREE_FILE_IO_ENABLE=0</code></td>
+<td>Disable file I/O.</td>
+</tr>
+<tr>
+<td><code>IREE_TIME_NOW_FN</code></td>
+<td>A function to return the system time. For the bare-metal systems, it can be set as <code>IREE_TIME_NOW_FN=\"\{ return 0;\}\"</code> as there's no asynchronous wait handling.</td>
+</tr>
+<tr>
+<td><code>IREE_WAIT_UNTIL_FN</code></td>
+<td>A function to wait until the given time in nanoseconds. Must match the signature <code>bool(uint64_t nanos)</code> and return false if the wait failed.</td>
+</tr>
+</tbody>
+</table>
 <p>Examples of how to setup the CMakeLists.txt and .cmake file:</p>
 <ul>
 <li><a href="https://github.com/openxla/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake">IREE RISC-V toolchain cmake</a></li>

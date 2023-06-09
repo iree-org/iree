@@ -1336,7 +1336,7 @@ runtime entirely or interface with custom accelerators.</p>
 </ul>
 <p>These are just the most stable configurations IREE supports. Feel free to reach
 out on any of IREE's
-<a href="../#communication-channels">communication channels</a> if you have
+<a href="../../#communication-channels">communication channels</a> if you have
 questions about a specific platform, hardware accelerator, or set of system
 features.</p>
 <h2 id="compiler-target-backends">Compiler target backends<a class="headerlink" href="#compiler-target-backends" title="Permanent link">link</a></h2>
@@ -1368,7 +1368,7 @@ or generate distinct code for certain device/architecture/performance profiles.<
 <td><code>local-sync</code>, <code>local-task</code></td>
 </tr>
 <tr>
-<td><code>vulkan-spirv</code></td>
+<td><code>vulkan</code> or<br><code>vulkan-spirv</code></td>
 <td>Portable GPU support via SPIR-V for Vulkan</td>
 <td><code>vulkan</code></td>
 </tr>
@@ -1388,19 +1388,45 @@ or generate distinct code for certain device/architecture/performance profiles.<
 <td><code>webgpu</code></td>
 </tr>
 <tr>
-<td><code>metal-spirv</code></td>
-<td><strong>Stale - see <a href="https://github.com/openxla/iree/issues/4370">Issue#4370</a></strong> <br> GPU support on Apple platforms via MSL for Metal</td>
+<td><code>metal</code> or<br><code>metal-spirv</code></td>
+<td><strong>Experimental</strong> <br> GPU support on Apple platforms via MSL for Metal</td>
 <td><code>metal</code></td>
 </tr>
 </tbody>
 </table>
 <div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>The list of available compiler target backends can be queried with</p>
-<ul>
-<li><code>iree-compile --iree-hal-list-target-backends</code> (command-line)</li>
-<li><code>iree.compiler.query_available_targets()</code> (Python)</li>
-</ul>
+<p class="admonition-title">Tip - listing available backends</p>
+<p>The list of compiler target backends can be queried:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Command-line</label><label for="__tabbed_1_2">Python bindings</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-list-target-backends
+
+<span class="go">Registered target backends:</span>
+<span class="go">    llvm-cpu</span>
+<span class="go">    metal</span>
+<span class="go">    metal-spirv</span>
+<span class="go">    vmvx</span>
+<span class="go">    vmvx-inline</span>
+<span class="go">    vulkan</span>
+<span class="go">    vulkan-spirv</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="n">iree</span><span class="o">.</span><span class="n">compiler</span><span class="o">.</span><span class="n">query_available_targets</span><span class="p">()</span>
+
+<span class="p">[</span><span class="s1">&#39;cuda&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;llvm-cpu&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;metal&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;metal-spirv&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;vmvx&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;vmvx-inline&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;vulkan&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;vulkan-spirv&#39;</span><span class="p">]</span>
+</code></pre></div>
+</div>
+</div>
+</div>
 </div>
 <h2 id="runtime-hal-driversdevices">Runtime HAL drivers/devices<a class="headerlink" href="#runtime-hal-driversdevices" title="Permanent link">link</a></h2>
 <p>Runtime HAL devices call into hardware APIs to load and run executable code.
@@ -1440,18 +1466,10 @@ focus and the build configuration.</p>
 </tr>
 <tr>
 <td><code>metal</code></td>
-<td><strong>Stale - see <a href="https://github.com/openxla/iree/issues/4370">Issue#4370</a></strong> <br> GPU execution on Apple platforms using Metal</td>
+<td><strong>Experimental</strong> <br> GPU execution on Apple platforms using Metal</td>
 </tr>
 </tbody>
 </table>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>The list of available runtime HAL devices can be queried with</p>
-<ul>
-<li><code>iree-run-module --list_devices</code> (command-line)</li>
-<li><code>iree.runtime.query_available_drivers()</code> (Python)</li>
-</ul>
-</div>
 <p>Additional HAL drivers can also be defined external to the core project via
 <code>IREE_EXTERNAL_HAL_DRIVERS</code>.</p>
 
