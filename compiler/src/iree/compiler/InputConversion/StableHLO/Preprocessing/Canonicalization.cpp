@@ -737,9 +737,7 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
                                          "unranked input unsupported");
     }
 
-    if (llvm::all_of(elemTy.getShape(), [](int64_t d) { return d != 0; })) {
-      return failure();
-    }
+    if (!llvm::is_contained(elemTy.getShape(), 0)) return failure();
 
     Location loc = op.getLoc();
     DenseIntElementsAttr empty = rewriter.getI64TensorAttr({});
