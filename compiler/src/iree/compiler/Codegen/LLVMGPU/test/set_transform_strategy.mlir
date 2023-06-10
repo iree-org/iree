@@ -17,8 +17,8 @@
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=16,16,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
-// RUN: -td-matmul-strategy-num-threads=32,1,1
-// RUN: -td-matmul-strategy-num-warps=1,1,1
+// RUN: -td-matmul-strategy-num-threads=32,1,1 \
+// RUN: -td-matmul-strategy-num-warps=1,1,1 \
 // RUN: -td-matmul-strategy-use-async-copies=true \
 // RUN: -td-matmul-strategy-use-mma-sync=true \
 // RUN: -td-matmul-strategy-pipeline-depth=9 \
@@ -27,7 +27,7 @@
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
-// RUN: -td-matmul-strategy-blk-sizes=128,64,1
+// RUN: -td-matmul-strategy-blk-sizes=128,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
 // RUN: -td-matmul-strategy-num-threads=128,2,1 \
 // RUN: -td-matmul-strategy-num-warps=1,8,1 \
@@ -95,20 +95,20 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
 // CHECK: } : !transform.any_op
 // CHECK: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
-// CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_wmma}
+// CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_mma_sync}
 // CHECK: transform.structured.match ops{["scf.for"]} in %{{.*}} 
 // CHECK: transform.iree.synchronize_loop %{{.*}}
 // CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // CHECK: transform.iree.apply_buffer_optimizations %{{.*}}
-// CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_wmma}
+// CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync}
 // CHECK: transform.iree.eliminate_gpu_barriers
 // CHECK: apply_patterns to %{{.*}} {
 // CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
 // CHECK: } : !transform.any_op
 // CHECK: transform.memref.multibuffer %{{.*}} {factor = 3 : i64, skip_analysis}
 // CHECK: transform.apply_patterns.vector.transfer_to_scf max_transfer_rank = 1 full_unroll = true
-// CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync = false}
-// CHECK: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 3 : i64}
+// CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync = true}
+// CHECK: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 3 : i64, use_mma_sync}
 // CHECK: transform.apply_patterns.vector.lower_masks
 // CHECK: transform.apply_patterns.vector.materialize_masks
 // CHECK: apply_patterns to %{{.*}} {
