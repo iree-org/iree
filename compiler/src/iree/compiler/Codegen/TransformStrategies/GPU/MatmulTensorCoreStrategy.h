@@ -29,7 +29,10 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
  public:
   MatmulStrategy(MLIRContext *context,
                  const transform_ext::MatchedMatmulCaptures &captures)
-      : AbstractGemmLikeStrategy(), ctx(context), captures(captures) {
+      : AbstractGemmLikeStrategy(),
+        ctx(context),
+        captures(captures),
+        cliOptionsSpecified(false) {
     initDefaultValues();
   }
 
@@ -40,6 +43,13 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   MLIRContext *ctx;
   transform_ext::MatchedMatmulCaptures captures;
 
+  /// Encodes whether the user has specified any CLI options. When true, the
+  /// strategy should just run what was specified and is not allowed to
+  /// override the user's choices.
+  bool cliOptionsSpecified;
+
+  /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
+  /// default CLI values have been overriden.
   void initDefaultValues();
 
   LogicalResult verify() const;

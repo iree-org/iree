@@ -87,7 +87,7 @@ static llvm::cl::opt<bool> clUseAsyncCopies(
 static llvm::cl::opt<bool> clUseMmaSync(
     "td-matmul-strategy-use-mma-sync",
     llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 static llvm::cl::opt<int64_t> clPipelineDepth(
     "td-matmul-strategy-pipeline-depth",
     llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"),
@@ -96,9 +96,9 @@ static llvm::cl::opt<int64_t> clPipelineDepth(
 void MatmulStrategy::initDefaultValues() {
   blockTileSizes =
       SmallVector<int64_t>{clBlockTileSizes.begin(), clBlockTileSizes.end()};
-  reductionTileSize = clReductionTileSize;
   numThreads = SmallVector<int64_t>{clNumThreads.begin(), clNumThreads.end()};
   numWarps = SmallVector<int64_t>{clNumWarps.begin(), clNumWarps.end()};
+  reductionTileSize = clReductionTileSize;
   useAsyncCopies = clUseAsyncCopies;
   useMmaSync = clUseMmaSync;
   pipelineDepth = clPipelineDepth;
@@ -108,6 +108,15 @@ void MatmulStrategy::initDefaultValues() {
   paddingValues = {0.0f, 0.0f, 0.0f};
   paddingDimensions = {0, 1, 2};
   packingDimensions = {1, 1, 1};
+
+  if (!clBlockTileSizes.isDefaultAssigned() ||
+      !clNumThreads.isDefaultAssigned() || !clNumWarps.isDefaultAssigned() ||
+      reductionTileSize != clReductionTileSize.getDefault().getValue() ||
+      useAsyncCopies != clUseAsyncCopies.getDefault().getValue() ||
+      useMmaSync != clUseMmaSync.getDefault().getValue() ||
+      pipelineDepth != clPipelineDepth.getDefault().getValue()) {
+    cliOptionsSpecified = true;
+  }
 }
 
 LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
@@ -123,6 +132,8 @@ void mlir::iree_compiler::gpu::AbstractGemmLikeStrategy::MappingInfo::print(
 
 void MatmulStrategy::print(llvm::raw_ostream &os) const {
   os << "\n--- Matmul strategy ---\n";
+  os << "- forced by CLI specification: "
+     << (cliOptionsSpecified ? "true" : "false") << "\n";
   os << "- block tile sizes: {";
   bool isFirst = true;
   for (int64_t blockTileSize : blockTileSizes) {

@@ -37,6 +37,7 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Support/MathExtras.h"
 
 using namespace mlir;
 
@@ -63,6 +64,7 @@ using iree_compiler::gpu::GPUModel;
 using iree_compiler::gpu::kCudaMaxNumThreads;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
 using iree_compiler::gpu::kCudaWarpSize;
+using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::PadConfig;
 using iree_compiler::gpu::PadStrategy;
 using iree_compiler::gpu::ReductionConfig;
@@ -239,6 +241,68 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
 //===--------------------------------------------------------------------===//
 // Matmul strategies.
 //===--------------------------------------------------------------------===//
+/// Placeholder to encode fixed matmuls that should take finer-grained
+/// precedence over other heuristics. In the future, this could be lifted to
+/// e.g. `gpuModel` or higher up in some transform dialect database summary of
+/// "known good things".
+static FailureOr<MatmulStrategy> applyKnownGoodMatmulConfigurations(
+    const transform_ext::MatchedMatmulCaptures &captures,
+    const GPUModel &gpuModel) {
+  return failure();
+}
+
+static int64_t selectLargestFailsafeValueIfNeeded(
+    int64_t value, int64_t limit, ArrayRef<int64_t> thresholds,
+    ArrayRef<int64_t> failSafeValues) {
+  for (auto [threshold, failSafeValue] :
+       llvm::zip(thresholds, failSafeValues)) {
+    if (limit < threshold && value > failSafeValue) return failSafeValue;
+  }
+  return value;
+}
+
+static void failSafeOverrides(MatmulStrategy &strategy,
+                              const GPUModel &gpuModel) {
+  // Failsafe for blockTileM to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileM = selectLargestFailsafeValueIfNeeded(
+      strategy.blockTileM(), strategy.m(), {16, 32, 64, 128}, {1, 16, 32, 64});
+  // Failsafe for blockTileN to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileN = selectLargestFailsafeValueIfNeeded(
+      strategy.blockTileN(), strategy.n(), {16, 32, 64, 128}, {1, 16, 32, 64});
+  // Failsafe for reductionSize to avoid tiling by > size (i.e. no tiling).
+  int64_t reductionTileSize = selectLargestFailsafeValueIfNeeded(
+      strategy.reductionTileSize, strategy.k(), {8, 16, 24, 32, 40, 48, 56, 64},
+      {1, 8, 16, 24, 32, 40, 48, 56});
+  strategy.blockTileSizes = {blockTileM, blockTileN};
+  strategy.reductionTileSize = reductionTileSize;
+  // Avoid too deep pipelines. This should also look at shared memory usage in
+  // the future.
+  if (strategy.pipelineDepth * strategy.reductionTileSize > strategy.k()) {
+    strategy.pipelineDepth =
+        mlir::floorDiv(strategy.k(), strategy.reductionTileSize);
+  }
+}
+
+/// The configurations below have been determined empirically.
+// TODO: Significantly improve these heuristics.
+static MatmulStrategy getMatmulConfig(
+    MLIRContext *context, const transform_ext::MatchedMatmulCaptures &captures,
+    const GPUModel &gpuModel) {
+  MatmulStrategy strategy(context, captures);
+  if (strategy.cliOptionsSpecified) return strategy;
+
+  auto maybeHardcodedConfiguration =
+      applyKnownGoodMatmulConfigurations(captures, gpuModel);
+  if (succeeded(maybeHardcodedConfiguration))
+    return *maybeHardcodedConfiguration;
+
+  // TODO: encode a decision tree of reasonnable heuristics here.
+
+  // Apply failsafe overrides to avoid identified bad corner cases.
+  failSafeOverrides(strategy, gpuModel);
+
+  return strategy;
+}
 
 static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
                                                linalg::LinalgOp op,
@@ -310,9 +374,9 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   // tensorcore path, we are better off with a simple simt strategy.
   // TODO: profitability details can be ironed out in the future when we have a
   // heuristic to better select strategy parameters.
-  bool unsupportedSmallCases = (matmulSize[0] > 0 && matmulSize[0] < 8) ||
-                               (matmulSize[1] > 0 && matmulSize[1] < 8) ||
-                               (matmulSize[2] > 0 && matmulSize[2] < 8);
+  bool unsupportedSmallCases = (matmulSize[0] > 0 && matmulSize[0] < 16) ||
+                               (matmulSize[1] > 0 && matmulSize[1] < 16) ||
+                               (matmulSize[2] > 0 && matmulSize[2] < 16);
   if (unsupportedSmallCases) {
     LDBG("--Matmul strategy small size check failed\n");
     return failure();
@@ -321,7 +385,8 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    iree_compiler::gpu::MatmulStrategy strategy(op->getContext(), captures);
+    iree_compiler::gpu::MatmulStrategy strategy =
+        getMatmulConfig(op->getContext(), captures, gpuModel);
     return buildMatmulTensorCoreStrategy(b, variant, strategy);
   };
 
