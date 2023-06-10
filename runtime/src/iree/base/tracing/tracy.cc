@@ -6,8 +6,6 @@
 
 #include "iree/base/tracing.h"
 
-#include "iree/base/target_platform.h"
-
 // Textually include the Tracy implementation.
 // We do this here instead of relying on an external build target so that we can
 // ensure our configuration specified in tracing.h is picked up.

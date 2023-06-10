@@ -34,7 +34,7 @@ iree_cc_library(
     "wait_source.h"
   DEPS
     ::core_headers
-    ::tracing_impl
+    iree::base::tracing::tracy
   PUBLIC
 )
 
@@ -144,17 +144,6 @@ iree_cc_test(
     ::loop_test_hdrs
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    tracing_impl
-  SRCS
-    "tracing.cc"
-  DEPS
-    ::core_headers
-    tracy_client::runtime_impl
-  PUBLIC
 )
 
 if(EMSCRIPTEN)

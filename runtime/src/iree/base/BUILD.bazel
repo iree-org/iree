@@ -46,7 +46,7 @@ iree_runtime_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":core_headers",
-        ":tracing_impl",
+        "//runtime/src/iree/base/tracing:tracy",
     ],
 )
 
@@ -158,14 +158,5 @@ iree_runtime_cc_test(
         ":loop_test_hdrs",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "tracing_impl",
-    srcs = ["tracing.cc"],
-    deps = [
-        ":core_headers",
-        "@tracy_client//:runtime_impl",
     ],
 )
