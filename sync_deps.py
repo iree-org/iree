@@ -7,9 +7,9 @@
 ### Update with: openxla-workspace pin
 
 PINNED_VERSIONS = {
-  "iree": "7f10fe28ddc3cbc1bd8466a751ce2e03dd0da0c5",
-  "xla": "f532bacf938626c62c710b66f7d1a7c6c5180766",
-  "jax": "e785574b2b7b13f063a5399b13c41c422c54ea14"
+  "iree": "651630eb01be0529b49249d560c10fe625de683e",
+  "xla": "f920496e114b6091b6d273ec039e094d31740582",
+  "jax": "1a7336d44938e95f1baa53ace51e797df57a994a"
 }
 
 ORIGINS = {
