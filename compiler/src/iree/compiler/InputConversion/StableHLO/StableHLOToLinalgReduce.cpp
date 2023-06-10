@@ -103,7 +103,10 @@ struct ReduceOpToGenericConverter final
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (isUnsupported(op)) return failure();
+    if (isUnsupported(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported reduce (noop or empty)");
+    }
 
     Location loc = op.getLoc();
 
@@ -208,7 +211,10 @@ struct ReduceOpToReduceConverter final
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (isUnsupported(op)) return failure();
+    if (isUnsupported(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported reduce (noop or empty)");
+    }
 
     auto reductionDims =
         llvm::to_vector(op.getDimensions().getValues<int64_t>());
