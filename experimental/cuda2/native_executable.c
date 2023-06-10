@@ -46,6 +46,69 @@ iree_hal_cuda2_native_executable_cast(iree_hal_executable_t* base_value) {
   return (iree_hal_cuda2_native_executable_t*)base_value;
 }
 
+// Verifies the structure of the flatbuffer so that we can avoid doing so during
+// runtime.
+//
+// There are still some conditions we must be aware of (such as omitted names on
+// functions with internal linkage), however we shouldn't need to bounds check
+// anything within the flatbuffer after this succeeds.
+static iree_status_t iree_hal_cuda2_native_executable_flatbuffer_verify(
+    iree_const_byte_span_t flatbuffer_data) {
+  if (!flatbuffer_data.data) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer data is not present");
+  }
+
+  // Run flatcc generated verification. This ensures all pointers are in-bounds
+  // and that we can safely walk the file, but not that the actual contents of
+  // the flatbuffer meet our expectations.
+  int verify_ret = iree_hal_cuda_ExecutableDef_verify_as_root(
+      flatbuffer_data.data, flatbuffer_data.data_length);
+  if (verify_ret != flatcc_verify_ok) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer verification failed: %s",
+                            flatcc_verify_error_string(verify_ret));
+  }
+
+  iree_hal_cuda_ExecutableDef_table_t executable_def =
+      iree_hal_cuda_ExecutableDef_as_root(flatbuffer_data.data);
+
+  flatbuffers_string_vec_t entry_points_vec =
+      iree_hal_cuda_ExecutableDef_entry_points_get(executable_def);
+  size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  for (size_t i = 0; i < entry_point_count; ++i) {
+    if (flatbuffers_string_len(
+            flatbuffers_string_vec_at(entry_points_vec, i)) == 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable entry point %zu has no name", i);
+    }
+  }
+
+  iree_hal_cuda_BlockSizeDef_vec_t block_sizes_vec =
+      iree_hal_cuda_ExecutableDef_block_sizes_get(executable_def);
+  size_t block_size_count = iree_hal_cuda_BlockSizeDef_vec_len(block_sizes_vec);
+  if (block_size_count == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no block sizes present");
+  }
+
+  if (entry_point_count != block_size_count) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "entry points (%zu) and block sizes (%zu) count mismatch",
+        entry_point_count, block_size_count);
+  }
+
+  flatbuffers_string_t ptx_image =
+      iree_hal_cuda_ExecutableDef_ptx_image_get(executable_def);
+  if (flatbuffers_string_len(ptx_image) == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no PTX image present");
+  }
+
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_cuda2_native_executable_create(
     const iree_hal_cuda2_dynamic_symbols_t* symbols, CUdevice device,
     const iree_hal_executable_params_t* executable_params,
@@ -57,9 +120,10 @@ iree_status_t iree_hal_cuda2_native_executable_create(
   *out_executable = NULL;
   iree_hal_cuda2_native_executable_t* executable = NULL;
 
-  // TODO: verify the flatbuffer.
-  // WARNING: THIS IS CURRENTLY INSECURE. This code is not checking any of the
-  // data from the flatbuffer.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_cuda2_native_executable_flatbuffer_verify(
+              executable_params->executable_data));
+
   iree_hal_cuda_ExecutableDef_table_t executable_def =
       iree_hal_cuda_ExecutableDef_as_root(
           executable_params->executable_data.data);
