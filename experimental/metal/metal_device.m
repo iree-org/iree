@@ -242,8 +242,9 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
 
   iree_status_t status = iree_hal_metal_direct_command_buffer_create(
       base_device, mode, command_categories, binding_capacity,
-      device->command_buffer_resource_reference_mode, device->queue, device->host_allocator,
-      &device->block_pool, &device->staging_buffer, device->builtin_executable, out_command_buffer);
+      device->command_buffer_resource_reference_mode, device->queue, &device->block_pool,
+      &device->staging_buffer, device->builtin_executable, device->host_allocator,
+      out_command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_metal_staging_buffer_increase_refcount(&device->staging_buffer);
   }
@@ -255,8 +256,8 @@ static iree_status_t iree_hal_metal_device_create_descriptor_set_layout(
     iree_host_size_t binding_count, const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  return iree_hal_metal_descriptor_set_layout_create(device->host_allocator, flags, binding_count,
-                                                     bindings, out_descriptor_set_layout);
+  return iree_hal_metal_descriptor_set_layout_create(
+      flags, binding_count, bindings, device->host_allocator, out_descriptor_set_layout);
 }
 
 static iree_status_t iree_hal_metal_device_create_event(iree_hal_device_t* base_device,
@@ -268,8 +269,8 @@ static iree_status_t iree_hal_metal_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier, iree_loop_t loop,
     iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  return iree_hal_metal_nop_executable_cache_create(device->device, device->host_allocator,
-                                                    identifier, out_executable_cache);
+  return iree_hal_metal_nop_executable_cache_create(device->device, identifier,
+                                                    device->host_allocator, out_executable_cache);
 }
 
 static iree_status_t iree_hal_metal_device_create_pipeline_layout(
@@ -277,8 +278,8 @@ static iree_status_t iree_hal_metal_device_create_pipeline_layout(
     iree_host_size_t set_layout_count, iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_pipeline_layout_t** out_pipeline_layout) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  return iree_hal_metal_pipeline_layout_create(device->host_allocator, set_layout_count,
-                                               set_layouts, push_constants, out_pipeline_layout);
+  return iree_hal_metal_pipeline_layout_create(set_layout_count, set_layouts, push_constants,
+                                               device->host_allocator, out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_metal_device_create_semaphore(iree_hal_device_t* base_device,

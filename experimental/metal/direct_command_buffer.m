@@ -232,10 +232,16 @@ static iree_hal_metal_command_buffer_t* iree_hal_metal_command_buffer_cast(
   return (iree_hal_metal_command_buffer_t*)base_value;
 }
 
+static const iree_hal_metal_command_buffer_t* iree_hal_metal_command_buffer_const_cast(
+    const iree_hal_command_buffer_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_command_buffer_vtable);
+  return (const iree_hal_metal_command_buffer_t*)base_value;
+}
+
 id<MTLCommandBuffer> iree_hal_metal_direct_command_buffer_handle(
-    iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_metal_command_buffer_t* command_buffer =
-      iree_hal_metal_command_buffer_cast(base_command_buffer);
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  const iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_const_cast(base_command_buffer);
   return command_buffer->command_buffer;
 }
 
@@ -325,9 +331,9 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, iree_host_size_t binding_capacity,
     iree_hal_metal_command_buffer_resource_reference_mode_t resource_reference_mode,
-    id<MTLCommandQueue> queue, iree_allocator_t host_allocator, iree_arena_block_pool_t* block_pool,
+    id<MTLCommandQueue> queue, iree_arena_block_pool_t* block_pool,
     iree_hal_metal_staging_buffer_t* staging_buffer,
-    iree_hal_metal_builtin_executable_t* builtin_executable,
+    iree_hal_metal_builtin_executable_t* builtin_executable, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
@@ -842,7 +848,7 @@ static iree_status_t iree_hal_metal_command_buffer_push_constants(
 }
 
 static inline MTLResourceUsage iree_hal_metal_get_metal_resource_usage(
-    iree_hal_descriptor_set_layout_binding_t* binding) {
+    const iree_hal_descriptor_set_layout_binding_t* binding) {
   MTLResourceUsage usage = MTLResourceUsageRead;
   if (binding->flags != IREE_HAL_DESCRIPTOR_FLAG_READ_ONLY) usage |= MTLResourceUsageWrite;
   return usage;
@@ -870,7 +876,7 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
     command_buffer->state.descriptor_sets[i].active_count = 0;
   }
 
-  iree_hal_descriptor_set_layout_t* set_layout =
+  const iree_hal_descriptor_set_layout_t* set_layout =
       iree_hal_metal_pipeline_layout_descriptor_set_layout(pipeline_layout, set);
   iree_hal_metal_descriptor_t* descriptors = command_buffer->state.descriptor_sets[set].bindings;
 
@@ -884,7 +890,7 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
     descriptor->buffer = bindings[i].buffer;
     descriptor->offset = bindings[i].offset;
 
-    iree_hal_descriptor_set_layout_binding_t* binding_params =
+    const iree_hal_descriptor_set_layout_binding_t* binding_params =
         iree_hal_metal_descriptor_set_layout_binding(set_layout, descriptor->binding);
     descriptor->usage = iree_hal_metal_get_metal_resource_usage(binding_params);
   }

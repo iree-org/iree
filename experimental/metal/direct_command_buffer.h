@@ -42,10 +42,10 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_host_size_t binding_capacity,
     iree_hal_metal_command_buffer_resource_reference_mode_t
         resource_reference_mode,
-    id<MTLCommandQueue> queue, iree_allocator_t host_allocator,
-    iree_arena_block_pool_t* block_pool,
+    id<MTLCommandQueue> queue, iree_arena_block_pool_t* block_pool,
     iree_hal_metal_staging_buffer_t* staging_buffer,
     iree_hal_metal_builtin_executable_t* builtin_executable,
+    iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a direct Metal command buffer.
@@ -55,7 +55,7 @@ bool iree_hal_metal_direct_command_buffer_isa(
 // Returns the underlying Metal command buffer handle for the given
 // |command_buffer|.
 id<MTLCommandBuffer> iree_hal_metal_direct_command_buffer_handle(
-    iree_hal_command_buffer_t* base_command_buffer);
+    const iree_hal_command_buffer_t* command_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

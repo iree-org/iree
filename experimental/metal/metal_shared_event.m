@@ -39,12 +39,19 @@ static iree_hal_metal_shared_event_t* iree_hal_metal_shared_event_cast(
   return (iree_hal_metal_shared_event_t*)base_value;
 }
 
+static const iree_hal_metal_shared_event_t* iree_hal_metal_shared_event_const_cast(
+    const iree_hal_semaphore_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_shared_event_vtable);
+  return (const iree_hal_metal_shared_event_t*)base_value;
+}
+
 bool iree_hal_metal_shared_event_isa(iree_hal_semaphore_t* semaphore) {
   return iree_hal_resource_is(semaphore, &iree_hal_metal_shared_event_vtable);
 }
 
-id<MTLSharedEvent> iree_hal_metal_shared_event_handle(iree_hal_semaphore_t* base_semaphore) {
-  iree_hal_metal_shared_event_t* semaphore = iree_hal_metal_shared_event_cast(base_semaphore);
+id<MTLSharedEvent> iree_hal_metal_shared_event_handle(const iree_hal_semaphore_t* base_semaphore) {
+  const iree_hal_metal_shared_event_t* semaphore =
+      iree_hal_metal_shared_event_const_cast(base_semaphore);
   return semaphore->shared_event;
 }
 

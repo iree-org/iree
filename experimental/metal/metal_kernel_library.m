@@ -33,6 +33,12 @@ static iree_hal_metal_kernel_library_t* iree_hal_metal_kernel_library_cast(
   return (iree_hal_metal_kernel_library_t*)base_value;
 }
 
+static const iree_hal_metal_kernel_library_t* iree_hal_metal_kernel_library_const_cast(
+    const iree_hal_executable_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_kernel_library_vtable);
+  return (const iree_hal_metal_kernel_library_t*)base_value;
+}
+
 // Verifies the structure of the flatbuffer so that we can avoid doing so during runtime.
 //
 // There are still some conditions we must be aware of (such as omitted names on functions with
@@ -226,8 +232,8 @@ iree_status_t iree_hal_metal_load_mtllib(iree_const_byte_span_t source_data,
 }
 
 iree_status_t iree_hal_metal_kernel_library_create(
-    iree_allocator_t host_allocator, id<MTLDevice> device,
-    const iree_hal_executable_params_t* executable_params, iree_hal_executable_t** out_executable) {
+    id<MTLDevice> device, const iree_hal_executable_params_t* executable_params,
+    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
@@ -356,9 +362,10 @@ static void iree_hal_metal_kernel_library_destroy(iree_hal_executable_t* base_ex
 }
 
 iree_status_t iree_hal_metal_kernel_library_entry_point_kernel_params(
-    iree_hal_executable_t* base_executable, int32_t entry_point,
+    const iree_hal_executable_t* base_executable, int32_t entry_point,
     iree_hal_metal_kernel_params_t* out_params) {
-  iree_hal_metal_kernel_library_t* executable = iree_hal_metal_kernel_library_cast(base_executable);
+  const iree_hal_metal_kernel_library_t* executable =
+      iree_hal_metal_kernel_library_const_cast(base_executable);
   if (entry_point >= executable->entry_point_count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "invalid entry point ordinal %d",
                             entry_point);

@@ -33,7 +33,7 @@ bool iree_hal_metal_shared_event_isa(iree_hal_semaphore_t* semaphore);
 
 // Returns the underlying Metal shared event handle for the given |semaphore|.
 id<MTLSharedEvent> iree_hal_metal_shared_event_handle(
-    iree_hal_semaphore_t* base_semaphore);
+    const iree_hal_semaphore_t* semaphore);
 
 // Waits on the shared events in the given |semaphore_list| according to the
 // |wait_mode| before |timeout|.

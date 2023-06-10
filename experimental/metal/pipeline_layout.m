@@ -33,9 +33,16 @@ static iree_hal_metal_descriptor_set_layout_t* iree_hal_metal_descriptor_set_lay
   return (iree_hal_metal_descriptor_set_layout_t*)base_value;
 }
 
+static const iree_hal_metal_descriptor_set_layout_t*
+iree_hal_metal_descriptor_set_layout_const_cast(
+    const iree_hal_descriptor_set_layout_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_descriptor_set_layout_vtable);
+  return (const iree_hal_metal_descriptor_set_layout_t*)base_value;
+}
+
 iree_status_t iree_hal_metal_descriptor_set_layout_create(
-    iree_allocator_t host_allocator, iree_hal_descriptor_set_layout_flags_t flags,
-    iree_host_size_t binding_count, const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_hal_descriptor_set_layout_flags_t flags, iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_layout_binding_t* bindings, iree_allocator_t host_allocator,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
   IREE_ASSERT_ARGUMENT(!binding_count || bindings);
   IREE_ASSERT_ARGUMENT(out_descriptor_set_layout);
@@ -70,10 +77,10 @@ static void iree_hal_metal_descriptor_set_layout_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_hal_descriptor_set_layout_binding_t* iree_hal_metal_descriptor_set_layout_binding(
-    iree_hal_descriptor_set_layout_t* base_descriptor_set_layout, uint32_t binding) {
-  iree_hal_metal_descriptor_set_layout_t* descriptor_set_layout =
-      iree_hal_metal_descriptor_set_layout_cast(base_descriptor_set_layout);
+const iree_hal_descriptor_set_layout_binding_t* iree_hal_metal_descriptor_set_layout_binding(
+    const iree_hal_descriptor_set_layout_t* base_descriptor_set_layout, uint32_t binding) {
+  const iree_hal_metal_descriptor_set_layout_t* descriptor_set_layout =
+      iree_hal_metal_descriptor_set_layout_const_cast(base_descriptor_set_layout);
   for (iree_host_size_t i = 0; i < descriptor_set_layout->binding_count; ++i) {
     if (descriptor_set_layout->bindings[i].binding == binding) {
       return &descriptor_set_layout->bindings[i];
@@ -83,9 +90,9 @@ iree_hal_descriptor_set_layout_binding_t* iree_hal_metal_descriptor_set_layout_b
 }
 
 iree_host_size_t iree_hal_metal_descriptor_set_layout_binding_count(
-    iree_hal_descriptor_set_layout_t* base_descriptor_set_layout) {
-  iree_hal_metal_descriptor_set_layout_t* descriptor_set_layout =
-      iree_hal_metal_descriptor_set_layout_cast(base_descriptor_set_layout);
+    const iree_hal_descriptor_set_layout_t* base_descriptor_set_layout) {
+  const iree_hal_metal_descriptor_set_layout_t* descriptor_set_layout =
+      iree_hal_metal_descriptor_set_layout_const_cast(base_descriptor_set_layout);
   return descriptor_set_layout->binding_count;
 }
 
@@ -117,9 +124,15 @@ static iree_hal_metal_pipeline_layout_t* iree_hal_metal_pipeline_layout_cast(
   return (iree_hal_metal_pipeline_layout_t*)base_value;
 }
 
+static const iree_hal_metal_pipeline_layout_t* iree_hal_metal_pipeline_layout_const_cast(
+    const iree_hal_pipeline_layout_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_pipeline_layout_vtable);
+  return (const iree_hal_metal_pipeline_layout_t*)base_value;
+}
+
 iree_status_t iree_hal_metal_pipeline_layout_create(
-    iree_allocator_t host_allocator, iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t* const* set_layouts, iree_host_size_t push_constant_count,
+    iree_host_size_t set_layout_count, iree_hal_descriptor_set_layout_t* const* set_layouts,
+    iree_host_size_t push_constant_count, iree_allocator_t host_allocator,
     iree_hal_pipeline_layout_t** out_pipeline_layout) {
   IREE_ASSERT_ARGUMENT(!set_layout_count || set_layouts);
   IREE_ASSERT_ARGUMENT(out_pipeline_layout);
@@ -161,18 +174,18 @@ static void iree_hal_metal_pipeline_layout_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_hal_descriptor_set_layout_t* iree_hal_metal_pipeline_layout_descriptor_set_layout(
-    iree_hal_pipeline_layout_t* base_pipeline_layout, uint32_t set) {
-  iree_hal_metal_pipeline_layout_t* pipeline_layout =
-      iree_hal_metal_pipeline_layout_cast(base_pipeline_layout);
+const iree_hal_descriptor_set_layout_t* iree_hal_metal_pipeline_layout_descriptor_set_layout(
+    const iree_hal_pipeline_layout_t* base_pipeline_layout, uint32_t set) {
+  const iree_hal_metal_pipeline_layout_t* pipeline_layout =
+      iree_hal_metal_pipeline_layout_const_cast(base_pipeline_layout);
   if (set < pipeline_layout->set_layout_count) return pipeline_layout->set_layouts[set];
   return NULL;
 }
 
 iree_host_size_t iree_hal_metal_pipeline_layout_push_constant_count(
-    iree_hal_pipeline_layout_t* base_pipeline_layout) {
-  iree_hal_metal_pipeline_layout_t* pipeline_layout =
-      iree_hal_metal_pipeline_layout_cast(base_pipeline_layout);
+    const iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  const iree_hal_metal_pipeline_layout_t* pipeline_layout =
+      iree_hal_metal_pipeline_layout_const_cast(base_pipeline_layout);
   return pipeline_layout->push_constant_count;
 }
 

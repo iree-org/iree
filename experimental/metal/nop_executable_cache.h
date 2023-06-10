@@ -23,8 +23,8 @@ extern "C" {
 // |out_executable_cache| must be released by the caller (see
 // iree_hal_executable_cache_release).
 iree_status_t iree_hal_metal_nop_executable_cache_create(
-    id<MTLDevice> device, iree_allocator_t host_allocator,
-    iree_string_view_t identifier,
+    id<MTLDevice> device, iree_string_view_t identifier,
+    iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 
 #ifdef __cplusplus

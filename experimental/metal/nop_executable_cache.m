@@ -32,7 +32,7 @@ static iree_hal_metal_nop_executable_cache_t* iree_hal_metal_nop_executable_cach
 }
 
 iree_status_t iree_hal_metal_nop_executable_cache_create(
-    id<MTLDevice> device, iree_allocator_t host_allocator, iree_string_view_t identifier,
+    id<MTLDevice> device, iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(out_executable_cache);
   *out_executable_cache = NULL;
@@ -76,9 +76,8 @@ static iree_status_t iree_hal_metal_nop_executable_cache_prepare_executable(
     const iree_hal_executable_params_t* executable_params, iree_hal_executable_t** out_executable) {
   iree_hal_metal_nop_executable_cache_t* executable_cache =
       iree_hal_metal_nop_executable_cache_cast(base_executable_cache);
-  return iree_hal_metal_kernel_library_create(executable_cache->host_allocator,
-                                              executable_cache->device, executable_params,
-                                              out_executable);
+  return iree_hal_metal_kernel_library_create(executable_cache->device, executable_params,
+                                              executable_cache->host_allocator, out_executable);
 }
 
 static const iree_hal_executable_cache_vtable_t iree_hal_metal_nop_executable_cache_vtable = {

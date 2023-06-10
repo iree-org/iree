@@ -41,13 +41,12 @@ typedef struct iree_hal_metal_kernel_params_t {
 // |out_executable| must be released by the caller (see
 // iree_hal_executable_release).
 iree_status_t iree_hal_metal_kernel_library_create(
-    iree_allocator_t host_allocator, id<MTLDevice> device,
-    const iree_hal_executable_params_t* executable_params,
-    iree_hal_executable_t** out_executable);
+    id<MTLDevice> device, const iree_hal_executable_params_t* executable_params,
+    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 
 // Returns the kernel launch parameters for the given |entry_point|.
 iree_status_t iree_hal_metal_kernel_library_entry_point_kernel_params(
-    iree_hal_executable_t* executable, int32_t entry_point,
+    const iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_metal_kernel_params_t* out_params);
 
 // Compiles the given |entry_point| in Metal |source_code| and writes the
