@@ -11,6 +11,7 @@
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "experimental/cuda2/cuda_headers.h"
 #include "experimental/cuda2/nccl_dynamic_symbols.h"
+#include "experimental/cuda2/tracing.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/collective_batch.h"
@@ -48,6 +49,7 @@ iree_status_t iree_hal_cuda2_nccl_channel_create(
 // Note that operations in the batch may apply to different channels.
 iree_status_t iree_hal_cuda2_nccl_submit_batch(
     const iree_hal_cuda2_nccl_dynamic_symbols_t* nccl_symbols,
+    iree_hal_cuda2_tracing_context_t* tracing_context,
     const iree_hal_collective_batch_t* batch, CUstream stream);
 
 #ifdef __cplusplus
