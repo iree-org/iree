@@ -10,7 +10,6 @@
 #include <stdlib.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "third_party/nccl/nccl.h"

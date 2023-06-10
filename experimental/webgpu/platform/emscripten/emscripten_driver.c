@@ -8,8 +8,6 @@
 
 #include <emscripten.h>
 
-#include "iree/base/tracing.h"
-
 #define IREE_HAL_WEBGPU_DEVICE_ID_DEFAULT 0
 
 //===----------------------------------------------------------------------===//

@@ -12,7 +12,6 @@
 
 #include "experimental/webgpu/webgpu_device.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
 // TODO(benvanik): decouple via injection.

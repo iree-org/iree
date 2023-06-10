@@ -77,8 +77,6 @@ iree_runtime_cc_library(
         ":internal",
         ":synchronization",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -110,7 +108,6 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/schemas:cpu_data",
     ],
 )
@@ -129,8 +126,6 @@ iree_runtime_cc_library(
         "//build_tools:default_linkopts",
         "//build_tools:dl",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -140,8 +135,6 @@ iree_runtime_cc_library(
     hdrs = ["file_io.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -166,8 +159,6 @@ iree_runtime_cc_library(
         ":file_io",
         ":internal",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:target_platform",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -285,7 +276,6 @@ iree_runtime_cc_library(
         "//build_tools:default_linkopts",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -330,7 +320,6 @@ iree_runtime_cc_library(
         ":synchronization",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -367,7 +356,6 @@ iree_runtime_cc_library(
         ":wait_handle",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -388,7 +376,6 @@ iree_runtime_cc_library(
         "//build_tools:dl",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -403,7 +390,6 @@ iree_runtime_cc_test(
         ":synchronization",
         ":threading",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:target_platform",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

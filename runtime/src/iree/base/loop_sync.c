@@ -8,7 +8,6 @@
 
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_loop_sync_t utilities

@@ -11,7 +11,6 @@
 #include "experimental/webgpu/buffer.h"
 #include "experimental/webgpu/webgpu_device.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 typedef struct iree_hal_webgpu_simple_allocator_t {
   iree_hal_resource_t resource;

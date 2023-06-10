@@ -31,8 +31,6 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::arena
-    iree::base::core_headers
-    iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
     iree::schemas::cuda_executable_def_c_fbs
@@ -59,9 +57,7 @@ iree_cc_library(
     "nccl_status_util.c"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree_cuda::headers
   PUBLIC
 )

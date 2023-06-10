@@ -6,7 +6,6 @@
 
 #include "iree/hal/utils/allocators.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/caching_allocator.h"
 #include "iree/hal/utils/debug_allocator.h"
 

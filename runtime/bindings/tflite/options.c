@@ -6,7 +6,6 @@
 
 #include "runtime/bindings/tflite/options.h"
 
-#include "iree/base/tracing.h"
 #include "runtime/bindings/tflite/shim.h"
 
 void _TfLiteInterpreterOptionsSetDefaults(TfLiteInterpreterOptions* options) {

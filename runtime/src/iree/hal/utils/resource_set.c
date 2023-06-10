@@ -7,7 +7,6 @@
 #include "iree/hal/utils/resource_set.h"
 
 #include "iree/base/internal/debugging.h"
-#include "iree/base/tracing.h"
 
 // Computes the total capacity in resources of a chunk allocated with a total
 // |storage_size| (including the header).

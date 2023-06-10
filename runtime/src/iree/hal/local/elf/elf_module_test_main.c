@@ -6,7 +6,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
-#include "iree/base/target_platform.h"
 #include "iree/hal/local/elf/elf_module.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"

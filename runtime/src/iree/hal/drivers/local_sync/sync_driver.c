@@ -9,8 +9,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
-
 #define IREE_HAL_SYNC_DEVICE_ID_DEFAULT 0
 
 typedef struct iree_hal_sync_driver_t {

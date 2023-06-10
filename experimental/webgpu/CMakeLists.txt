@@ -42,11 +42,9 @@ iree_cc_library(
     "webgpu_device.h"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
-    iree::base::tracing
     iree::hal
     iree::experimental::webgpu::platform
     iree::experimental::webgpu::shaders

@@ -18,7 +18,6 @@
 #include "experimental/cuda2/memory_pools.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 

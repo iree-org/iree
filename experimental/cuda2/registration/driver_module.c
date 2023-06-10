@@ -12,8 +12,6 @@
 #include "experimental/cuda2/api.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/status.h"
-#include "iree/base/tracing.h"
 
 IREE_FLAG(
     bool, cuda_async_allocations, true,

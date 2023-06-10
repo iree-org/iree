@@ -6,8 +6,6 @@
 
 #include "iree/tooling/modules/resolver.h"
 
-#include "iree/base/tracing.h"
-
 #if defined(IREE_HAVE_VMVX_MODULE)
 #include "iree/modules/vmvx/module.h"
 #endif  // IREE_HAVE_VMVX_MODULE

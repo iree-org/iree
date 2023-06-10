@@ -7,7 +7,6 @@
 #include "iree/vm/dynamic/module.h"
 
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/tracing.h"
 
 typedef struct {
   // Interface containing local function pointers.

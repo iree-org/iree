@@ -11,7 +11,6 @@
 
 #include "experimental/webgpu/executable.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 typedef struct iree_hal_webgpu_nop_executable_cache_t {
   iree_hal_resource_t resource;

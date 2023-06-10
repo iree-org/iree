@@ -139,7 +139,6 @@ iree_cc_library(
     ${_INIT_EXTERNAL_COPTS}
   DEPS
     iree::base
-    iree::base::tracing
     ${_INIT_INTERNAL_DEPS}
     ${_INIT_EXTERNAL_DEPS}
   PUBLIC

@@ -13,7 +13,6 @@
 #include "experimental/webgpu/buffer.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 
 void iree_hal_webgpu_bind_group_cache_initialize(
     WGPUDevice device, iree_hal_webgpu_bind_group_cache_t* out_cache) {

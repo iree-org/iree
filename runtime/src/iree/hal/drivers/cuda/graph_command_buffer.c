@@ -11,7 +11,6 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
