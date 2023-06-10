@@ -15,8 +15,8 @@
 // To prevent spilling pages we leave some room for the context structure.
 #define IREE_HAL_CUDA_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024 - 256)
 
-struct iree_hal_cuda_tracing_context_t {
-  iree_hal_cuda_context_wrapper_t* cuda_context;
+struct iree_hal_cuda2_tracing_context_t {
+  iree_hal_cuda2_context_wrapper_t* cuda_context;
   CUstream stream;
   iree_arena_block_pool_t* block_pool;
   iree_allocator_t host_allocator;
@@ -39,8 +39,8 @@ struct iree_hal_cuda_tracing_context_t {
   CUevent event_pool[IREE_HAL_CUDA_TRACING_DEFAULT_QUERY_CAPACITY];
 };
 
-static iree_status_t iree_hal_cuda_tracing_context_initial_calibration(
-    iree_hal_cuda_context_wrapper_t* cuda_context, CUstream stream,
+static iree_status_t iree_hal_cuda2_tracing_context_initial_calibration(
+    iree_hal_cuda2_context_wrapper_t* cuda_context, CUstream stream,
     CUevent base_event, int64_t* out_cpu_timestamp, int64_t* out_gpu_timestamp,
     float* out_timestamp_period) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -68,11 +68,11 @@ static iree_status_t iree_hal_cuda_tracing_context_initial_calibration(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_cuda_tracing_context_allocate(
-    iree_hal_cuda_context_wrapper_t* cuda_context,
+iree_status_t iree_hal_cuda2_tracing_context_allocate(
+    iree_hal_cuda2_context_wrapper_t* cuda_context,
     iree_string_view_t queue_name, CUstream stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
-    iree_hal_cuda_tracing_context_t** out_context) {
+    iree_hal_cuda2_tracing_context_t** out_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(cuda_context);
   IREE_ASSERT_ARGUMENT(stream);
@@ -80,7 +80,7 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
   IREE_ASSERT_ARGUMENT(out_context);
   *out_context = NULL;
 
-  iree_hal_cuda_tracing_context_t* context = NULL;
+  iree_hal_cuda2_tracing_context_t* context = NULL;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*context), (void**)&context);
   if (iree_status_is_ok(status)) {
@@ -94,7 +94,7 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
   // Pre-allocate all events in the event pool.
   if (iree_status_is_ok(status)) {
     IREE_TRACE_ZONE_BEGIN_NAMED(
-        z_event_pool, "iree_hal_cuda_tracing_context_allocate_event_pool");
+        z_event_pool, "iree_hal_cuda2_tracing_context_allocate_event_pool");
     IREE_TRACE_ZONE_APPEND_VALUE(z_event_pool,
                                  (int64_t)context->query_capacity);
     for (iree_host_size_t i = 0; i < context->query_capacity; ++i) {
@@ -117,7 +117,7 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
         cuEventCreate(&context->base_event, CU_EVENT_DEFAULT));
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_cuda_tracing_context_initial_calibration(
+    status = iree_hal_cuda2_tracing_context_initial_calibration(
         cuda_context, stream, context->base_event, &cpu_timestamp,
         &gpu_timestamp, &timestamp_period);
   }
@@ -133,23 +133,23 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
   if (iree_status_is_ok(status)) {
     *out_context = context;
   } else {
-    iree_hal_cuda_tracing_context_free(context);
+    iree_hal_cuda2_tracing_context_free(context);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-void iree_hal_cuda_tracing_context_free(
-    iree_hal_cuda_tracing_context_t* context) {
+void iree_hal_cuda2_tracing_context_free(
+    iree_hal_cuda2_tracing_context_t* context) {
   if (!context) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Always perform a collection on shutdown.
-  iree_hal_cuda_tracing_context_collect(context);
+  iree_hal_cuda2_tracing_context_collect(context);
 
   // Release all events; since collection completed they should all be unused.
   IREE_TRACE_ZONE_BEGIN_NAMED(z_event_pool,
-                              "iree_hal_cuda_tracing_context_free_event_pool");
+                              "iree_hal_cuda2_tracing_context_free_event_pool");
   for (iree_host_size_t i = 0; i < context->query_capacity; ++i) {
     if (context->event_pool[i]) {
       CUDA_IGNORE_ERROR(context->cuda_context->syms,
@@ -168,15 +168,15 @@ void iree_hal_cuda_tracing_context_free(
   IREE_TRACE_ZONE_END(z0);
 }
 
-void iree_hal_cuda_tracing_context_collect(
-    iree_hal_cuda_tracing_context_t* context) {
+void iree_hal_cuda2_tracing_context_collect(
+    iree_hal_cuda2_tracing_context_t* context) {
   if (!context) return;
   if (context->query_tail == context->query_head) {
     // No outstanding queries.
     return;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_hal_cuda_dynamic_symbols_t* syms = context->cuda_context->syms;
+  iree_hal_cuda2_dynamic_symbols_t* syms = context->cuda_context->syms;
 
   while (context->query_tail != context->query_head) {
     // Compute the contiguous range of queries ready to be read.
@@ -220,8 +220,8 @@ void iree_hal_cuda_tracing_context_collect(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static uint16_t iree_hal_cuda_tracing_context_insert_query(
-    iree_hal_cuda_tracing_context_t* context, CUstream stream) {
+static uint16_t iree_hal_cuda2_tracing_context_insert_query(
+    iree_hal_cuda2_tracing_context_t* context, CUstream stream) {
   // Allocate an event from the pool for use by the query.
   uint32_t query_id = context->query_head;
   context->query_head = (context->query_head + 1) % context->query_capacity;
@@ -245,51 +245,51 @@ static uint16_t iree_hal_cuda_tracing_context_insert_query(
 // many cases we could reduce this by inserting events only between zones and
 // using the differences between them.
 
-void iree_hal_cuda_tracing_zone_begin_impl(
-    iree_hal_cuda_tracing_context_t* context, CUstream stream,
+void iree_hal_cuda2_tracing_zone_begin_impl(
+    iree_hal_cuda2_tracing_context_t* context, CUstream stream,
     const iree_tracing_location_t* src_loc) {
   if (!context) return;
   uint16_t query_id =
-      iree_hal_cuda_tracing_context_insert_query(context, stream);
+      iree_hal_cuda2_tracing_context_insert_query(context, stream);
   iree_tracing_gpu_zone_begin(context->id, query_id, src_loc);
 }
 
-void iree_hal_cuda_tracing_zone_begin_external_impl(
-    iree_hal_cuda_tracing_context_t* context, CUstream stream,
+void iree_hal_cuda2_tracing_zone_begin_external_impl(
+    iree_hal_cuda2_tracing_context_t* context, CUstream stream,
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length) {
   if (!context) return;
   uint16_t query_id =
-      iree_hal_cuda_tracing_context_insert_query(context, stream);
+      iree_hal_cuda2_tracing_context_insert_query(context, stream);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
 }
 
-void iree_hal_cuda_tracing_zone_end_impl(
-    iree_hal_cuda_tracing_context_t* context, CUstream stream) {
+void iree_hal_cuda2_tracing_zone_end_impl(
+    iree_hal_cuda2_tracing_context_t* context, CUstream stream) {
   if (!context) return;
   uint16_t query_id =
-      iree_hal_cuda_tracing_context_insert_query(context, stream);
+      iree_hal_cuda2_tracing_context_insert_query(context, stream);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
 #else
 
-iree_status_t iree_hal_cuda_tracing_context_allocate(
-    iree_hal_cuda_context_wrapper_t* cuda_context,
+iree_status_t iree_hal_cuda2_tracing_context_allocate(
+    iree_hal_cuda2_context_wrapper_t* cuda_context,
     iree_string_view_t queue_name, CUstream stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
-    iree_hal_cuda_tracing_context_t** out_context) {
+    iree_hal_cuda2_tracing_context_t** out_context) {
   *out_context = NULL;
   return iree_ok_status();
 }
 
-void iree_hal_cuda_tracing_context_free(
-    iree_hal_cuda_tracing_context_t* context) {}
+void iree_hal_cuda2_tracing_context_free(
+    iree_hal_cuda2_tracing_context_t* context) {}
 
-void iree_hal_cuda_tracing_context_collect(
-    iree_hal_cuda_tracing_context_t* context) {}
+void iree_hal_cuda2_tracing_context_collect(
+    iree_hal_cuda2_tracing_context_t* context) {}
 
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
