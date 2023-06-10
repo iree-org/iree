@@ -4,14 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_CUDA_TRACING_H_
-#define IREE_HAL_DRIVERS_CUDA_TRACING_H_
+#ifndef EXPERIMENTAL_CUDA2_TRACING_H_
+#define EXPERIMENTAL_CUDA2_TRACING_H_
 
+#include "experimental/cuda2/cuda_dynamic_symbols.h"
+#include "experimental/cuda2/cuda_headers.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/cuda/context_wrapper.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,10 +45,10 @@ extern "C" {
 typedef struct iree_hal_cuda2_tracing_context_t
     iree_hal_cuda2_tracing_context_t;
 
-// Allocates a tracing context for the given CUDA stream.
+// Allocates a tracing context for the given CUDA |stream|.
 // Each context must only be used with the stream it was created for.
 iree_status_t iree_hal_cuda2_tracing_context_allocate(
-    iree_hal_cuda2_context_wrapper_t* cuda_context,
+    const iree_hal_cuda2_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, CUstream stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_cuda2_tracing_context_t** out_context);
@@ -118,4 +119,4 @@ void iree_hal_cuda2_tracing_zone_end_impl(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_CUDA_TRACING_H_
+#endif  // EXPERIMENTAL_CUDA2_TRACING_H_
