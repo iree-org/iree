@@ -52,10 +52,13 @@ iree_status_t iree_hal_metal_kernel_library_entry_point_kernel_params(
 
 // Compiles the given |entry_point| in Metal |source_code| and writes the
 // |out_library|, |out_function|, and compute pipeline |out_pso| accordingly.
-iree_status_t iree_hal_metal_compile_msl(
-    const char* source_code, const char* entry_point, id<MTLDevice> device,
-    MTLCompileOptions* compile_options, id<MTLLibrary>* out_library,
-    id<MTLFunction>* out_function, id<MTLComputePipelineState>* out_pso);
+iree_status_t iree_hal_metal_compile_msl(iree_string_view_t source_code,
+                                         iree_string_view_t entry_point,
+                                         id<MTLDevice> device,
+                                         MTLCompileOptions* compile_options,
+                                         id<MTLLibrary>* out_library,
+                                         id<MTLFunction>* out_function,
+                                         id<MTLComputePipelineState>* out_pso);
 
 #ifdef __cplusplus
 }  // extern "C"

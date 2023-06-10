@@ -72,13 +72,14 @@ iree_status_t iree_hal_metal_builtin_executable_create(
          ++i) {
       const char* entry_point = iree_hal_metal_builtin_executable_entry_points[i].entry_point;
       uint32_t file_index = iree_hal_metal_builtin_executable_entry_points[i].file_index;
-      const char* source_data = metal_buffer_kernels_create()[file_index].data;
+      iree_file_toc_t source_code = metal_buffer_kernels_create()[file_index];
 
       id<MTLLibrary> library = nil;
       id<MTLFunction> function = nil;
       id<MTLComputePipelineState> pso = nil;
-      status = iree_hal_metal_compile_msl(source_data, entry_point, device, compile_options,
-                                          &library, &function, &pso);
+      status = iree_hal_metal_compile_msl(iree_make_string_view(source_code.data, source_code.size),
+                                          IREE_SV(entry_point), device, compile_options, &library,
+                                          &function, &pso);
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.

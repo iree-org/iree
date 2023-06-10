@@ -125,47 +125,51 @@ static iree_status_t iree_hal_metal_kernel_library_flatbuffer_verify(
 static iree_status_t iree_hal_metal_get_invalid_kernel_status(const char* iree_error_template,
                                                               const char* metal_error_template,
                                                               NSError* ns_error,
-                                                              const char* entry_point,
+                                                              iree_string_view_t entry_point,
                                                               const char* shader_source) {
   iree_status_t status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, iree_error_template);
   const char* ns_c_error = [ns_error.localizedDescription
       cStringUsingEncoding:[NSString defaultCStringEncoding]];  // autoreleased
   status = iree_status_annotate_f(status, metal_error_template, ns_c_error);
   if (shader_source) {
-    return iree_status_annotate_f(status, "for entry point '%s' in MSL source:\n%s\n", entry_point,
-                                  shader_source);
+    return iree_status_annotate_f(status, "for entry point '%.*s' in MSL source:\n%s\n",
+                                  (int)entry_point.size, entry_point.data, shader_source);
   }
-  return iree_status_annotate_f(status, "for entry point '%s' in MTLLibrary\n", entry_point);
+  return iree_status_annotate_f(status, "for entry point '%.*s' in MTLLibrary\n",
+                                (int)entry_point.size, entry_point.data);
 }
 
-iree_status_t iree_hal_metal_compile_msl(const char* source_code, const char* entry_point,
-                                         id<MTLDevice> device, MTLCompileOptions* compile_options,
+iree_status_t iree_hal_metal_compile_msl(iree_string_view_t source_code,
+                                         iree_string_view_t entry_point, id<MTLDevice> device,
+                                         MTLCompileOptions* compile_options,
                                          id<MTLLibrary>* out_library, id<MTLFunction>* out_function,
                                          id<MTLComputePipelineState>* out_pso) {
   @autoreleasepool {
     NSError* error = nil;
 
     NSString* shader_source =
-        [NSString stringWithCString:source_code
-                           encoding:[NSString defaultCStringEncoding]];  // autoreleased
+        [[[NSString alloc] initWithBytes:source_code.data
+                                  length:source_code.size
+                                encoding:[NSString defaultCStringEncoding]] autorelease];
     *out_library = [device newLibraryWithSource:shader_source
                                         options:compile_options
                                           error:&error];  // +1
     if (*out_library == nil) {
       return iree_hal_metal_get_invalid_kernel_status(
           "failed to create MTLLibrary from shader source",
-          "when creating MTLLibrary with NSError: %s", error, entry_point, source_code);
+          "when creating MTLLibrary with NSError: %.*s", error, entry_point, source_code.data);
     }
 
     NSString* function_name =
-        [NSString stringWithCString:entry_point
-                           encoding:[NSString defaultCStringEncoding]];  // autoreleased
-    *out_function = [*out_library newFunctionWithName:function_name];    // +1
+        [[[NSString alloc] initWithBytes:entry_point.data
+                                  length:entry_point.size
+                                encoding:[NSString defaultCStringEncoding]] autorelease];
+    *out_function = [*out_library newFunctionWithName:function_name];  // +1
     if (*out_function == nil) {
       [*out_library release];
       return iree_hal_metal_get_invalid_kernel_status("cannot find entry point in shader source",
                                                       "when creating MTLFunction with NSError: %s",
-                                                      error, entry_point, source_code);
+                                                      error, entry_point, source_code.data);
     }
 
     // TODO(#14047): Enable async pipeline creation at runtime.
@@ -175,21 +179,21 @@ iree_status_t iree_hal_metal_compile_msl(const char* source_code, const char* en
       [*out_library release];
       return iree_hal_metal_get_invalid_kernel_status(
           "invalid shader source", "when creating MTLComputePipelineState with NSError: %s", error,
-          entry_point, source_code);
+          entry_point, source_code.data);
     }
   }
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_metal_load_mtllib(const char* source_lib, size_t length,
-                                         const char* entry_point, id<MTLDevice> device,
+iree_status_t iree_hal_metal_load_mtllib(iree_const_byte_span_t source_data,
+                                         iree_string_view_t entry_point, id<MTLDevice> device,
                                          id<MTLLibrary>* out_library, id<MTLFunction>* out_function,
                                          id<MTLComputePipelineState>* out_pso) {
   @autoreleasepool {
     NSError* error = nil;
 
-    dispatch_data_t data =
-        dispatch_data_create(source_lib, length, /*queue=*/NULL, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
+    dispatch_data_t data = dispatch_data_create(source_data.data, source_data.data_length,
+                                                /*queue=*/NULL, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
     *out_library = [device newLibraryWithData:data error:&error];  // +1
     if (*out_library == nil) {
       return iree_hal_metal_get_invalid_kernel_status(
@@ -198,9 +202,10 @@ iree_status_t iree_hal_metal_load_mtllib(const char* source_lib, size_t length,
     }
 
     NSString* function_name =
-        [NSString stringWithCString:entry_point
-                           encoding:[NSString defaultCStringEncoding]];  // autoreleased
-    *out_function = [*out_library newFunctionWithName:function_name];    // +1
+        [[[NSString alloc] initWithBytes:entry_point.data
+                                  length:entry_point.size
+                                encoding:[NSString defaultCStringEncoding]] autorelease];
+    *out_function = [*out_library newFunctionWithName:function_name];  // +1
     if (*out_function == nil) {
       [*out_library release];
       return iree_hal_metal_get_invalid_kernel_status("cannot find entry point in shader source",
@@ -288,16 +293,16 @@ iree_status_t iree_hal_metal_kernel_library_create(
       flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
       if (shader_library_count != 0) {
         flatbuffers_string_t source_library = flatbuffers_string_vec_at(shader_libraries_vec, i);
-        flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
-
-        status = iree_hal_metal_load_mtllib(source_library, flatbuffers_string_len(source_library),
-                                            entry_point, device, &library, &function, &pso);
+        status = iree_hal_metal_load_mtllib(
+            iree_make_const_byte_span(source_library, flatbuffers_string_len(source_library)),
+            iree_make_string_view(entry_point, flatbuffers_string_len(entry_point)), device,
+            &library, &function, &pso);
       } else {
         flatbuffers_string_t source_code = flatbuffers_string_vec_at(shader_sources_vec, i);
-        flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
-
-        status = iree_hal_metal_compile_msl(source_code, entry_point, device, compile_options,
-                                            &library, &function, &pso);
+        status = iree_hal_metal_compile_msl(
+            iree_make_string_view(source_code, flatbuffers_string_len(source_code)),
+            iree_make_string_view(entry_point, flatbuffers_string_len(entry_point)), device,
+            compile_options, &library, &function, &pso);
       }
       if (!iree_status_is_ok(status)) break;
 
