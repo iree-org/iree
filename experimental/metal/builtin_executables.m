@@ -77,9 +77,9 @@ iree_status_t iree_hal_metal_builtin_executable_create(
       id<MTLLibrary> library = nil;
       id<MTLFunction> function = nil;
       id<MTLComputePipelineState> pso = nil;
-      status = iree_hal_metal_compile_msl(iree_make_string_view(source_code.data, source_code.size),
-                                          IREE_SV(entry_point), device, compile_options, &library,
-                                          &function, &pso);
+      status = iree_hal_metal_compile_msl_and_create_pipeline_object(
+          iree_make_string_view(source_code.data, source_code.size), IREE_SV(entry_point), device,
+          compile_options, &library, &function, &pso);
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.
