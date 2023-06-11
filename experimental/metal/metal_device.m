@@ -246,15 +246,11 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "multi-shot command buffer not yet supported");
 
-  iree_status_t status = iree_hal_metal_direct_command_buffer_create(
+  return iree_hal_metal_direct_command_buffer_create(
       base_device, mode, command_categories, binding_capacity,
       device->command_buffer_resource_reference_mode, device->queue, &device->block_pool,
       &device->staging_buffer, device->builtin_executable, device->host_allocator,
       out_command_buffer);
-  if (iree_status_is_ok(status)) {
-    iree_hal_metal_staging_buffer_increase_refcount(&device->staging_buffer);
-  }
-  return status;
 }
 
 static iree_status_t iree_hal_metal_device_create_descriptor_set_layout(
@@ -374,9 +370,6 @@ static iree_status_t iree_hal_metal_device_queue_execute(
       id<MTLCommandBuffer> handle = iree_hal_metal_direct_command_buffer_handle(command_buffer);
       [handle addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         iree_hal_command_buffer_release(command_buffer);  // -1
-        // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
-        // resources. This is fine right now given we only support one-shot command buffers.
-        iree_hal_metal_staging_buffer_decrease_refcount(&device->staging_buffer);
       }];
       [handle commit];
     }

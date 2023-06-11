@@ -381,6 +381,10 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
 
   *out_command_buffer = &command_buffer->base;
 
+  // Increase command buffer refcount in the shared staging buffer. We tie this to the command
+  // buffer's lifetime to avoid resource leak.
+  iree_hal_metal_staging_buffer_increase_refcount(staging_buffer);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -391,6 +395,10 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_metal_command_buffer_reset(command_buffer);
+
+  // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
+  // resources. We tie this to the command buffer's lifetime to avoid resource leak.
+  iree_hal_metal_staging_buffer_decrease_refcount(command_buffer->staging_buffer);
 
   [command_buffer->state.encoder_event release];  // -1
   IREE_ASSERT_EQ(command_buffer->state.compute_encoder, nil);
