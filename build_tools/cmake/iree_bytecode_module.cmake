@@ -41,7 +41,7 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH"
+    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH;TIMEOUT"
     "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
@@ -129,11 +129,19 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
+  set(_TIMEOUT_COMMAND "timeout")
+  if(_RULE_TIMEOUT)
+    list(APPEND _TIMEOUT_COMMAND "${_RULE_TIMEOUT}")
+  else()
+    list(APPEND _TIMEOUT_COMMAND "1h")
+  endif()
+
   add_custom_command(
     OUTPUT
       ${_OUTPUT_FILES}
     COMMAND
-      ${_COMPILE_TOOL}
+      ${_TIMEOUT_COMMAND}
+      $<TARGET_FILE:${_COMPILE_TOOL}>
       ${_ARGS}
     DEPENDS
       ${_COMPILE_TOOL}
