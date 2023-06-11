@@ -365,29 +365,33 @@ static iree_status_t iree_hal_metal_device_queue_execute(
       [wait_command_buffer commit];
     }
 
-    // Then commit all recorded compute command buffers.
+    // Then commit all recorded compute command buffers, except the last one, which we will patch up
+    // with semaphore signaling.
+    id<MTLCommandBuffer> signal_command_buffer = nil;
     for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
       iree_hal_command_buffer_t* command_buffer = command_buffers[i];
       id<MTLCommandBuffer> handle = iree_hal_metal_direct_command_buffer_handle(command_buffer);
-      [handle commit];
+      if (i + 1 != command_buffer_count) [handle commit];
+      signal_command_buffer = handle;
+    }
+    if (signal_command_buffer == nil) {
+      signal_command_buffer = [device->queue
+          commandBufferWithDescriptor:device->command_buffer_descriptor];  // autoreleased
     }
 
-    // Finally create a new command buffer and encode signal commands for all signal semaphores.
-    if (signal_semaphore_list.count > 0) {
-      id<MTLCommandBuffer> signal_command_buffer = [device->queue
-          commandBufferWithDescriptor:device->command_buffer_descriptor];  // autoreleased
-      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-        id<MTLSharedEvent> handle =
-            iree_hal_metal_shared_event_handle(signal_semaphore_list.semaphores[i]);
-        [signal_command_buffer encodeSignalEvent:handle
-                                           value:signal_semaphore_list.payload_values[i]];
-      }
-      [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        // Now we can release all retained wait semaphores.
-        iree_hal_resource_set_free(resource_set);
-      }];
-      [signal_command_buffer commit];
+    // Finally encode signal commands for all signal semaphores.
+    for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      id<MTLSharedEvent> handle =
+          iree_hal_metal_shared_event_handle(signal_semaphore_list.semaphores[i]);
+      [signal_command_buffer encodeSignalEvent:handle
+                                         value:signal_semaphore_list.payload_values[i]];
     }
+
+    [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+      // Now we can release all retained resources.
+      iree_hal_resource_set_free(resource_set);
+    }];
+    [signal_command_buffer commit];
   }
 
   IREE_TRACE_ZONE_END(z0);
