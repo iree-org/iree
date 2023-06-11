@@ -18,6 +18,10 @@
 typedef struct iree_hal_metal_buffer_t {
   iree_hal_buffer_t base;
   id<MTLBuffer> buffer;
+  // The command queue that we can use to issue commands to make buffer contents visible to CPU.
+#if defined(IREE_PLATFORM_MACOS)
+  id<MTLCommandQueue> queue;
+#endif  // IREE_PLATFORM_MACOS
   iree_hal_buffer_release_callback_t release_callback;
 } iree_hal_metal_buffer_t;
 
@@ -35,6 +39,9 @@ static const iree_hal_metal_buffer_t* iree_hal_metal_buffer_const_cast(
 }
 
 iree_status_t iree_hal_metal_buffer_wrap(
+#if defined(IREE_PLATFORM_MACOS)
+    id<MTLCommandQueue> queue,
+#endif  // IREE_PLATFORM_MACOS
     id<MTLBuffer> metal_buffer, iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t allowed_usage,
     iree_device_size_t allocation_size, iree_device_size_t byte_offset,
@@ -52,6 +59,9 @@ iree_status_t iree_hal_metal_buffer_wrap(
                                byte_offset, byte_length, memory_type, allowed_access, allowed_usage,
                                &iree_hal_metal_buffer_vtable, &buffer->base);
     buffer->buffer = [metal_buffer retain];  // +1
+#if defined(IREE_PLATFORM_MACOS)
+    buffer->queue = queue;
+#endif  // IREE_PLATFORM_MACOS
     buffer->release_callback = release_callback;
     *out_buffer = &buffer->base;
   }
@@ -90,10 +100,7 @@ static iree_status_t iree_hal_metal_buffer_invalidate_range(iree_hal_buffer_t* b
   // and commit to the queue.
   iree_hal_metal_buffer_t* buffer = iree_hal_metal_buffer_cast(base_buffer);
   if (buffer->buffer.storageMode == MTLStorageModeManaged) {
-    const iree_hal_device_t* device =
-        iree_hal_metal_allocator_device(buffer->base.device_allocator);
-    id<MTLCommandQueue> queue = iree_hal_metal_device_command_queue(device);
-    id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
+    id<MTLCommandBuffer> command_buffer = [buffer->queue commandBuffer];
 
     id<MTLBlitCommandEncoder> blitCommandEncoder = [command_buffer blitCommandEncoder];
     [blitCommandEncoder synchronizeResource:buffer->buffer];

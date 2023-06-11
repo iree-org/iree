@@ -30,11 +30,6 @@ iree_status_t iree_hal_metal_device_create(
 const iree_hal_metal_device_params_t* iree_hal_metal_device_params(
     const iree_hal_device_t* device);
 
-// Returns the Metal command queue associated with the given |device|.
-// Note that right now we only support one command queue per Metal device.
-id<MTLCommandQueue> iree_hal_metal_device_command_queue(
-    const iree_hal_device_t* device);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

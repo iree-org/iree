@@ -86,11 +86,6 @@ const iree_hal_metal_device_params_t* iree_hal_metal_device_params(
   return &device->params;
 }
 
-id<MTLCommandQueue> iree_hal_metal_device_command_queue(const iree_hal_device_t* base_device) {
-  const iree_hal_metal_device_t* device = iree_hal_metal_device_const_cast(base_device);
-  return device->queue;
-}
-
 static iree_status_t iree_hal_metal_device_create_internal(
     iree_string_view_t identifier, const iree_hal_metal_device_params_t* params,
     id<MTLDevice> metal_device, iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
@@ -99,7 +94,12 @@ static iree_status_t iree_hal_metal_device_create_internal(
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, total_size, (void**)&device));
 
-  iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
+  id<MTLCommandQueue> metal_queue = [metal_device newCommandQueue];  // +1
+
+  iree_status_t status = iree_hal_metal_allocator_create(metal_device,
+#if defined(IREE_PLATFORM_MACOS)
+                                                         metal_queue,
+#endif  // IREE_PLATFORM_MACOS
                                                          params->resource_hazard_tracking_mode,
                                                          host_allocator, &device->device_allocator);
 
@@ -125,8 +125,8 @@ static iree_status_t iree_hal_metal_device_create_internal(
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator, &device->block_pool);
     device->params = *params;
     device->host_allocator = host_allocator;
-    device->device = [metal_device retain];          // +1
-    device->queue = [metal_device newCommandQueue];  // +1
+    device->device = [metal_device retain];  // +1
+    device->queue = metal_queue;
     device->command_buffer_resource_reference_mode = params->command_buffer_resource_reference_mode;
     device->builtin_executable = builtin_executable;
     dispatch_queue_attr_t queue_attr = dispatch_queue_attr_make_with_qos_class(

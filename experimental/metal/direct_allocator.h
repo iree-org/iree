@@ -17,19 +17,28 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Create a straightforward Metal allocator from the given |base_device| that
+// Creates a straightforward Metal allocator from the given |device| that
 // performs allocations separately without caching or suballocation.
+//
+// On macOS, we additionally need the command queue to encode commands to make
+// buffer contents visible to the CPU for managed storage type.
 //
 // |out_allocator| must be released by the caller (see
 // iree_hal_allocator_release).
 iree_status_t iree_hal_metal_allocator_create(
-    iree_hal_device_t* base_device, id<MTLDevice> device,
+    id<MTLDevice> device,
+#if defined(IREE_PLATFORM_MACOS)
+    id<MTLCommandQueue> queue,
+#endif  // IREE_PLATFORM_MACOS
     iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
-// Returns the underyling HAL device associated with the given |allocator|.
-const iree_hal_device_t* iree_hal_metal_allocator_device(
+#if defined(IREE_PLATFORM_MACOS)
+// Returns the underyling MetalCommandQueue associated with the given
+// |allocator|.
+id<MTLCommandQueue> iree_hal_metal_allocator_command_queue(
     const iree_hal_allocator_t* allocator);
+#endif  // IREE_PLATFORM_MACOS
 
 #ifdef __cplusplus
 }  // extern "C"

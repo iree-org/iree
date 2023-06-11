@@ -23,8 +23,11 @@ typedef struct iree_hal_metal_allocator_t {
   iree_hal_resource_t resource;
 
   // The device that this allocator is attached to.
-  iree_hal_device_t* base_device;
   id<MTLDevice> device;
+  // The command queue that we can use to issue commands to make buffer contents visible to CPU.
+#if defined(IREE_PLATFORM_MACOS)
+  id<MTLCommandQueue> queue;
+#endif  // IREE_PLATFORM_MACOS
 
   bool is_unified_memory;
   iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode;
@@ -48,10 +51,12 @@ static const iree_hal_metal_allocator_t* iree_hal_metal_allocator_const_cast(
 }
 
 iree_status_t iree_hal_metal_allocator_create(
-    iree_hal_device_t* base_device, id<MTLDevice> device,
+    id<MTLDevice> device,
+#if defined(IREE_PLATFORM_MACOS)
+    id<MTLCommandQueue> queue,
+#endif  // IREE_PLATFORM_MACOS
     iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
-  IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -61,8 +66,6 @@ iree_status_t iree_hal_metal_allocator_create(
 
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_metal_allocator_vtable, &allocator->resource);
-    allocator->base_device = base_device;
-    iree_hal_device_retain(base_device);
     allocator->device = [device retain];  // +1
     allocator->is_unified_memory = [device hasUnifiedMemory];
     allocator->resource_tracking_mode = resource_tracking_mode;
@@ -81,7 +84,6 @@ static void iree_hal_metal_allocator_destroy(iree_hal_allocator_t* IREE_RESTRICT
   IREE_TRACE_ZONE_BEGIN(z0);
 
   [allocator->device release];  // -1
-  iree_hal_device_release(allocator->base_device);
   iree_allocator_free(host_allocator, allocator);
 
   IREE_TRACE_ZONE_END(z0);
@@ -93,11 +95,13 @@ static iree_allocator_t iree_hal_metal_allocator_host_allocator(
   return allocator->host_allocator;
 }
 
-const iree_hal_device_t* iree_hal_metal_allocator_device(
+#if defined(IREE_PLATFORM_MACOS)
+id<MTLCommandQueue> iree_hal_metal_allocator_command_queue(
     const iree_hal_allocator_t* base_allocator) {
   const iree_hal_metal_allocator_t* allocator = (const iree_hal_metal_allocator_t*)base_allocator;
-  return allocator->base_device;
+  return allocator->queue;
 }
+#endif  // IREE_PLATFORM_MACOS
 
 static iree_status_t iree_hal_metal_allocator_trim(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
@@ -285,6 +289,9 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_metal_buffer_wrap(
+#if defined(IREE_PLATFORM_MACOS)
+        allocator->queue,
+#endif  // IREE_PLATFORM_MACOS
         metal_buffer, base_allocator, compat_params.type, compat_params.access, compat_params.usage,
         allocation_size, /*byte_offset=*/0,
         /*byte_length=*/allocation_size, iree_hal_buffer_release_callback_null(), &buffer);  // +1
