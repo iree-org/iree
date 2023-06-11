@@ -91,6 +91,10 @@ const iree_hal_descriptor_set_layout_t*
 iree_hal_metal_pipeline_layout_descriptor_set_layout(
     const iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set);
 
+// Returns the descriptor set count in the given |pipeline_layout|.
+iree_host_size_t iree_hal_metal_pipeline_layout_descriptor_set_count(
+    const iree_hal_pipeline_layout_t* pipeline_layout);
+
 // Returns the push constant count in the given |pipeline_layout|.
 iree_host_size_t iree_hal_metal_pipeline_layout_push_constant_count(
     const iree_hal_pipeline_layout_t* pipeline_layout);

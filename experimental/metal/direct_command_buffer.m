@@ -206,8 +206,6 @@ typedef struct iree_hal_metal_command_buffer_t {
     // So we need to cache the descriptor information by ourselves and record them at dispatch time.
     struct {
       iree_hal_metal_descriptor_t bindings[IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT];
-      // The number of binding slots (not max binding slot number) that are active.
-      uint32_t active_count;
     } descriptor_sets[IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX];
 
     // All available push constants updated each time push_constants is called. Reset only with the
@@ -855,18 +853,12 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Push a descriptor set invalidate all sets with the given number and larger ones.
   IREE_ASSERT(set < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX);
-  for (iree_host_size_t i = set + 1; i < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX; ++i) {
-    command_buffer->state.descriptor_sets[i].active_count = 0;
-  }
-
   const iree_hal_descriptor_set_layout_t* set_layout =
       iree_hal_metal_pipeline_layout_descriptor_set_layout(pipeline_layout, set);
   iree_hal_metal_descriptor_t* descriptors = command_buffer->state.descriptor_sets[set].bindings;
 
   // Update descriptors in the current set.
-  command_buffer->state.descriptor_sets[set].active_count = binding_count;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     iree_hal_metal_descriptor_t* descriptor = &descriptors[i];
 
@@ -913,10 +905,14 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   // Allocate the command segment and keep track of all necessary API data.
   uint8_t* storage_base = NULL;
   iree_hal_metal_command_segment_t* segment = NULL;
+  const iree_host_size_t set_count =
+      iree_hal_metal_pipeline_layout_descriptor_set_count(kernel_params.layout);
   iree_host_size_t descriptor_count = 0;
   // Calculate the total number of bindings across all descriptor sets.
-  for (iree_host_size_t i = 0; i < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX; ++i) {
-    descriptor_count += command_buffer->state.descriptor_sets[i].active_count;
+  for (iree_host_size_t i = 0; i < set_count; ++i) {
+    const iree_hal_descriptor_set_layout_t* set_layout =
+        iree_hal_metal_pipeline_layout_descriptor_set_layout(kernel_params.layout, i);
+    descriptor_count += iree_hal_metal_descriptor_set_layout_binding_count(set_layout);
   }
   iree_host_size_t descriptor_length = descriptor_count * sizeof(iree_hal_metal_descriptor_t);
   iree_host_size_t push_constant_count =
@@ -938,9 +934,11 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   segment->dispatch.descriptor_count = descriptor_count;
   uint8_t* descriptor_ptr = storage_base + sizeof(*segment);
   segment->dispatch.descriptors = (iree_hal_metal_descriptor_t*)descriptor_ptr;
-  for (iree_host_size_t i = 0; i < IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX; ++i) {
-    iree_host_size_t current_size =
-        command_buffer->state.descriptor_sets[i].active_count * sizeof(iree_hal_metal_descriptor_t);
+  for (iree_host_size_t i = 0; i < set_count; ++i) {
+    const iree_hal_descriptor_set_layout_t* set_layout =
+        iree_hal_metal_pipeline_layout_descriptor_set_layout(kernel_params.layout, i);
+    iree_host_size_t binding_count = iree_hal_metal_descriptor_set_layout_binding_count(set_layout);
+    iree_host_size_t current_size = binding_count * sizeof(iree_hal_metal_descriptor_t);
     memcpy(descriptor_ptr, command_buffer->state.descriptor_sets[i].bindings, current_size);
     descriptor_ptr += current_size;
   }
