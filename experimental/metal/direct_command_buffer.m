@@ -214,9 +214,6 @@ typedef struct iree_hal_metal_command_buffer_t {
     // command buffer and otherwise will maintain its values during recording to allow for partial
     // push_constants updates.
     int32_t push_constants[IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT];
-
-    // The current pipeline layout used for push descriptors and constants.
-    iree_hal_pipeline_layout_t* current_pipeline_layout;
   } state;
 } iree_hal_metal_command_buffer_t;
 
@@ -823,7 +820,6 @@ static iree_status_t iree_hal_metal_command_buffer_push_constants(
   }
 
   memcpy((uint8_t*)&command_buffer->state.push_constants + offset, values, values_length);
-  command_buffer->state.current_pipeline_layout = pipeline_layout;
 
   return iree_ok_status();
 }
@@ -884,7 +880,6 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
     }
   }
 
-  command_buffer->state.current_pipeline_layout = pipeline_layout;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &pipeline_layout));
 
@@ -916,8 +911,8 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
     descriptor_count += command_buffer->state.descriptor_sets[i].active_count;
   }
   iree_host_size_t descriptor_length = descriptor_count * sizeof(iree_hal_metal_descriptor_t);
-  iree_host_size_t push_constant_count = iree_hal_metal_pipeline_layout_push_constant_count(
-      command_buffer->state.current_pipeline_layout);
+  iree_host_size_t push_constant_count =
+      iree_hal_metal_pipeline_layout_push_constant_count(kernel_params.layout);
   iree_host_size_t push_constant_length = push_constant_count * sizeof(int32_t);
   iree_host_size_t total_size = sizeof(*segment) + descriptor_length + push_constant_length;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
