@@ -252,23 +252,30 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
     iree_string_view_t usage_str = iree_hal_buffer_usage_format(params->usage, &temp1);
     iree_string_view_t compatibility_str =
         iree_hal_buffer_compatibility_format(compatibility, &temp2);
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocator cannot allocate a buffer with the given parameters; "
                             "memory_type=%.*s, usage=%.*s, compatibility=%.*s",
                             (int)memory_type_str.size, memory_type_str.data, (int)usage_str.size,
                             usage_str.data, (int)compatibility_str.size, compatibility_str.data);
 #else
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocator cannot allocate a buffer with the given parameters");
 #endif  // IREE_STATUS_MODE
   }
 
-  iree_status_t status = iree_ok_status();
   bool has_init_data = !iree_const_byte_span_is_empty(initial_data);
-
   MTLResourceOptions options =
       iree_hal_metal_select_resource_options(compat_params.type, allocator->is_unified_memory,
                                              has_init_data, allocator->resource_tracking_mode);
+  if (has_init_data && iree_all_bits_set(options, MTLResourceStorageModePrivate)) {
+    IREE_TRACE_ZONE_END(z0);
+    // This should only happen for macOS devices with non-uniform memory; for uniform memory
+    // devices, the allocator compatibility would update it to use Shared storage mode.
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "private storage with initial data");
+  }
+
   id<MTLBuffer> metal_buffer = nil;
   // If we chose shared storage mode, we can handle initial data with newByfferWithBytes directly.
   // Otherwise we just create the buffer here, and explicitly transfer range later.
@@ -280,38 +287,29 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
   } else {
     metal_buffer = [allocator->device newBufferWithLength:allocation_size options:options];  // +1
   }
-
-  IREE_TRACE_ZONE_END(z0);
   if (!metal_buffer) {
-    status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "unable to allocate buffer");
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "unable to allocate buffer");
   }
-
   iree_hal_buffer_t* buffer = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_metal_buffer_wrap(
+  iree_status_t status = iree_hal_metal_buffer_wrap(
 #if defined(IREE_PLATFORM_MACOS)
-        allocator->queue,
+      allocator->queue,
 #endif  // IREE_PLATFORM_MACOS
-        metal_buffer, base_allocator, compat_params.type, compat_params.access, compat_params.usage,
-        allocation_size, /*byte_offset=*/0,
-        /*byte_length=*/allocation_size, iree_hal_buffer_release_callback_null(), &buffer);  // +1
-  }
+      metal_buffer, base_allocator, compat_params.type, compat_params.access, compat_params.usage,
+      allocation_size, /*byte_offset=*/0, /*byte_length=*/allocation_size,
+      iree_hal_buffer_release_callback_null(), &buffer);  // +1
 
-  if (iree_status_is_ok(status) && has_init_data) {
-    if (iree_all_bits_set(options, MTLResourceStorageModePrivate)) {
-      // This should only happen for macOS devices with non-uniform memory; for uniform memory
-      // devices, the allocator compatibility would update it to use Shared storage mode.
-      status = iree_make_status(IREE_STATUS_UNIMPLEMENTED, "private storage with initial data");
-    } else {
 #if defined(IREE_PLATFORM_MACOS)
-      // Explicitly handle synchronization for Managed storage mode.
-      if (iree_all_bits_set(options, MTLResourceStorageModeManaged)) {
-        memcpy(metal_buffer.contents, initial_data.data, initial_data.data_length);
-        [metal_buffer didModifyRange:NSMakeRange(0, initial_data.data_length)];
-      }
-#endif  // IREE_PLATFORM_MACOS
+  if (iree_status_is_ok(status) && has_init_data &&
+      !iree_all_bits_set(options, MTLResourceStorageModePrivate)) {
+    // Explicitly handle synchronization for Managed storage mode.
+    if (iree_all_bits_set(options, MTLResourceStorageModeManaged)) {
+      memcpy(metal_buffer.contents, initial_data.data, initial_data.data_length);
+      [metal_buffer didModifyRange:NSMakeRange(0, initial_data.data_length)];
     }
   }
+#endif  // IREE_PLATFORM_MACOS
 
   if (iree_status_is_ok(status)) {
     IREE_TRACE_ALLOC_NAMED(IREE_HAL_METAL_ALLOCATOR_ID, (void*)iree_hal_metal_buffer_handle(buffer),
@@ -324,6 +322,8 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
   }
 
   [metal_buffer release];  // -1
+
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
