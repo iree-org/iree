@@ -337,18 +337,24 @@ static iree_status_t iree_hal_metal_device_queue_execute(
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_resource_set_t* resource_set = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_allocate(&device->block_pool, &resource_set));
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(resource_set, command_buffer_count, command_buffers));
+  // Put the full semaphore list into a resource set, which retains them--we will need to access
+  // them until the command buffer completes.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(resource_set, wait_semaphore_list.count,
+                                       wait_semaphore_list.semaphores));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(resource_set, signal_semaphore_list.count,
+                                       signal_semaphore_list.semaphores));
+
   @autoreleasepool {
     // First create a new command buffer and encode wait commands for all wait semaphores.
     if (wait_semaphore_list.count > 0) {
-      // Put the full semaphore list into a resource set, which retains them--we will need to access
-      // them until the command buffer completes.
-      iree_hal_resource_set_t* resource_set;
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_allocate(&device->block_pool, &resource_set));
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_insert(resource_set, wait_semaphore_list.count,
-                                           wait_semaphore_list.semaphores));
-
       id<MTLCommandBuffer> wait_command_buffer = [device->queue
           commandBufferWithDescriptor:device->command_buffer_descriptor];  // autoreleased
       for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
@@ -356,35 +362,18 @@ static iree_status_t iree_hal_metal_device_queue_execute(
             iree_hal_metal_shared_event_handle(wait_semaphore_list.semaphores[i]);
         [wait_command_buffer encodeWaitForEvent:handle value:wait_semaphore_list.payload_values[i]];
       }
-      [wait_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        // Now we can release all retained wait semaphores.
-        iree_hal_resource_set_free(resource_set);
-      }];
       [wait_command_buffer commit];
     }
 
     // Then commit all recorded compute command buffers.
     for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
       iree_hal_command_buffer_t* command_buffer = command_buffers[i];
-      iree_hal_command_buffer_retain(command_buffer);  // +1
       id<MTLCommandBuffer> handle = iree_hal_metal_direct_command_buffer_handle(command_buffer);
-      [handle addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        iree_hal_command_buffer_release(command_buffer);  // -1
-      }];
       [handle commit];
     }
 
     // Finally create a new command buffer and encode signal commands for all signal semaphores.
     if (signal_semaphore_list.count > 0) {
-      // Put the full semaphore list into a resource set, which retains them--we will need to access
-      // them until the command buffer completes.
-      iree_hal_resource_set_t* resource_set;
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_allocate(&device->block_pool, &resource_set));
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_insert(resource_set, signal_semaphore_list.count,
-                                           signal_semaphore_list.semaphores));
-
       id<MTLCommandBuffer> signal_command_buffer = [device->queue
           commandBufferWithDescriptor:device->command_buffer_descriptor];  // autoreleased
       for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
