@@ -279,10 +279,10 @@ struct ReduceOpToReduceConverter final
     // apply function has a signature with tensor types, this is converted to a
     // function with element types. E.g. the signature "(tensor<f32>,
     // tensor<f32>) -> tensor<f32>" will be converted to "(f32, f32) -> f32".
-    // Also, we need to swap the operands of the function. The mhlo.reduce op
-    // expects the init values to be the first parameters of the apply function,
-    // while the linalg.reduction op expects the init values as the last
-    // parameters of the 'combiner' region apply function.
+    // Also, we need to swap the operands of the function. The stablehlo.reduce
+    // op expects the init values to be the first parameters of the apply
+    // function, while the linalg.reduction op expects the init values as the
+    // last parameters of the 'combiner' region apply function.
     TypeConverter::SignatureConversion signatureConverter(
         linalgOp.getNumDpsInputs() * 2);
     assert(linalgOp.getNumDpsInputs() == linalgOp.getNumDpsInits());
