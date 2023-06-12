@@ -10,6 +10,7 @@
 
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/Rewriters.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -17,6 +18,23 @@
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
+/// Returns true when reduction `op` is not supported and should be filtered
+/// out.
+static bool isUnsupported(mlir::stablehlo::ReduceOp op) {
+  // Empty reductions are not supported. We expect canonicalization patterns to
+  // handle them.
+  if (op.getDimensions().empty()) return true;
+
+  // We require all reduce shapes to be the same, up to the element types, so
+  // we can just the first operand and the first result as a representative.
+  if (auto inputTy =
+          dyn_cast<RankedTensorType>(op.getInputs().getType().front())) {
+    return llvm::is_contained(inputTy.getShape(), 0);
+  }
+
+  return false;
+}
+
 /// Returns a permutation AffineMap that puts all reduction dimensions to the
 /// last. The order of parallel loops and reduction loops are all sorted. E.g.,
 /// if `rank` is 4 and `reductionDims` is {1, 3}, then
@@ -85,6 +103,11 @@ struct ReduceOpToGenericConverter final
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    if (isUnsupported(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported reduce (noop or empty)");
+    }
+
     Location loc = op.getLoc();
 
     int numOperands = static_cast<int>(adaptor.getInputs().size());
@@ -154,11 +177,11 @@ struct ReduceOpToGenericConverter final
     rewriter.inlineRegionBefore(op.getBody(), region, region.end());
     TypeConverter::SignatureConversion signatureConverter(numOperands * 2);
 
-    // The mhlo ReduceOp requires that the seed be used as a LHS operand inside
-    // the region, and the seed is encoded in linalg in the intial out value, so
-    // modify the signature of the block and the value mappings, so the output
-    // args will correlate with the original LHS and the inputs correlate with
-    // the original RHS.
+    // The stablehlo ReduceOp requires that the seed be used as a LHS operand
+    // inside the region, and the seed is encoded in linalg in the initial out
+    // value, so modify the signature of the block and the value mappings, so
+    // the output args will correlate with the original LHS and the inputs
+    // correlate with the original RHS.
     for (auto [idx, val] : llvm::enumerate(op.getInputs())) {
       signatureConverter.addInputs(
           /*origInputNo=*/idx + numOperands,
@@ -188,6 +211,11 @@ struct ReduceOpToReduceConverter final
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    if (isUnsupported(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported reduce (noop or empty)");
+    }
+
     auto reductionDims =
         llvm::to_vector(op.getDimensions().getValues<int64_t>());
     // stablehlo.reduce doesn't specify the order of the reduction dimensions.
