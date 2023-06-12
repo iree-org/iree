@@ -11,7 +11,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/api.h"
 
 #ifndef NDEBUG

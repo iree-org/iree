@@ -2132,7 +2132,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
   // The root configuration setting introduces `tensor.dim` operations. Resolve
   // those away.
   RewritePatternSet patterns(moduleOp.getContext());
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
 }
 

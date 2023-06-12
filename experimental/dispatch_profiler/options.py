@@ -153,13 +153,13 @@ def add_matmul_arguments(parser):
 
   matmul_parser = parser.add_argument_group(
       'Matmul', 'Matrix-multiplication related options.')
-  matmul_parser.add_argument("--problem-m", default='256', \
+  matmul_parser.add_argument("--problem-m", default='', \
                       help="M dimension of the matrix. "\
                       "--problem-m==<value>,<value_start:value_end:increment>*")
-  matmul_parser.add_argument("--problem-n", default='256', \
+  matmul_parser.add_argument("--problem-n", default='', \
                       help="N dimension of the matrix."\
                       "--problem-n==<value>,<value_start:value_end:increment>*")
-  matmul_parser.add_argument("--problem-k", default='256', \
+  matmul_parser.add_argument("--problem-k", default='', \
                       help="K dimension of the matrix."\
                       "--problem-k==<value>,<value_start:value_end:increment>*")
 

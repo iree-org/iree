@@ -9,7 +9,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/vm/instance.h"
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_buffer, iree_vm_buffer_t);

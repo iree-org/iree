@@ -150,7 +150,11 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
       if (auto shapeType = llvm::dyn_cast<ShapedType>(elType))
         alignement =
             shapeType.getNumElements() * shapeType.getElementTypeBitWidth() / 8;
-      else
+      else if (elType.isIndex()) {
+        auto mod = allocOp->getParentOfType<ModuleOp>();
+        LowerToLLVMOptions options(mod.getContext(), DataLayout(mod));
+        alignement = options.getIndexBitwidth() / 8;
+      } else
         alignement = elType.getIntOrFloatBitWidth() / 8;
     }
     // In CUDA workgroup memory is represented by a global variable.

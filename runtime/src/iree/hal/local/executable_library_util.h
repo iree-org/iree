@@ -8,7 +8,6 @@
 #define IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_UTIL_H_
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_loader.h"

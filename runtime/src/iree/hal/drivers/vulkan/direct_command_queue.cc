@@ -8,7 +8,6 @@
 
 #include <cstdint>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/direct_command_buffer.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/native_semaphore.h"
@@ -94,7 +93,7 @@ iree_status_t DirectCommandQueue::TranslateBatchInfo(
 
 iree_status_t DirectCommandQueue::Submit(
     iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
-  IREE_TRACE_SCOPE0("DirectCommandQueue::Submit");
+  IREE_TRACE_SCOPE_NAMED("DirectCommandQueue::Submit");
 
   // Map the submission batches to VkSubmitInfos.
   // Note that we must keep all arrays referenced alive until submission
@@ -124,7 +123,7 @@ iree_status_t DirectCommandQueue::WaitIdle(iree_timeout_t timeout) {
   if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     // Fast path for using vkQueueWaitIdle, which is usually cheaper (as it
     // requires fewer calls into the driver).
-    IREE_TRACE_SCOPE0("DirectCommandQueue::WaitIdle#vkQueueWaitIdle");
+    IREE_TRACE_SCOPE_NAMED("DirectCommandQueue::WaitIdle#vkQueueWaitIdle");
     iree_slim_mutex_lock(&queue_mutex_);
     iree_status_t status =
         VK_RESULT_TO_STATUS(syms()->vkQueueWaitIdle(queue_), "vkQueueWaitIdle");
@@ -133,7 +132,7 @@ iree_status_t DirectCommandQueue::WaitIdle(iree_timeout_t timeout) {
     return status;
   }
 
-  IREE_TRACE_SCOPE0("DirectCommandQueue::WaitIdle#Fence");
+  IREE_TRACE_SCOPE_NAMED("DirectCommandQueue::WaitIdle#Fence");
 
   // Create a new fence just for this wait. This keeps us thread-safe as the
   // behavior of wait+reset is racey.

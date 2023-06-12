@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library_util.h"

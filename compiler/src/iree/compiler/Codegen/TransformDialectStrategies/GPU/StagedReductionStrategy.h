@@ -15,6 +15,7 @@ namespace iree_compiler {
 namespace gpu {
 
 struct GPUModel;
+struct ReductionConfig;
 
 /// Encode a 3-staged strategy for a 1-d reduction mapped to a block.
 ///
@@ -81,14 +82,6 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
   /// This is also the blockDim.x of the kernel.
   int64_t numThreadsXInBlock;
 };
-
-/// Entry point to build the transform IR corresponding to a staged reduction
-/// strategy.
-/// This is used for mapping a N-D parallel, 1-D reduction operation.
-/// The 1-D reduction dimensions must be in the most minor dimension.
-/// Supports an optional leading and an optional trailing elementwise operation.
-void buildStagedReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
-                                  const StagedReductionStrategy &strategy);
 
 }  // namespace gpu
 }  // namespace iree_compiler

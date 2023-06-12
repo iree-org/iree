@@ -10,8 +10,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 void iree_task_topology_group_initialize(
     uint8_t group_index, iree_task_topology_group_t* out_group) {

@@ -315,10 +315,13 @@ static void fuseDispatchBindings(
     IREE::Stream::ExecutableOp executableOp,
     IREE::Stream::ExecutableExportOp exportOp,
     ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
-    bool aliasMutableBindings, MemoizedCmdZeros &memoizedZeros) {
+    MemoizedCmdZeros &memoizedZeros) {
   if (dispatchOps.empty()) return;  // no-op if no dispatches
   auto anyDispatchOp = dispatchOps.front();
   unsigned bindingCount = anyDispatchOp.getResources().size();
+
+  auto configAttr = IREE::Stream::ResourceConfigAttr::lookup(exportOp);
+  bool aliasMutableBindings = configAttr.getAliasMutableBindings();
 
   LLVM_DEBUG({
     AsmState asmState(executableOp->getParentOp());
@@ -448,7 +451,7 @@ class FuseDispatchBindingsPass
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],
-                             aliasMutableBindings, memoizedZeros);
+                             memoizedZeros);
       }
     }
   }

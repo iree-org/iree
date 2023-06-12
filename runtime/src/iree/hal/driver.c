@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/resource.h"
 

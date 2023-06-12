@@ -61,7 +61,7 @@ COMPILE_TOOL="${INSTALL_ROOT}/bin/iree-compile"
 compile_sample() {
   echo "  Compiling '$1' sample..."
   "${COMPILE_TOOL}" "$2" \
-    --iree-input-type=mhlo_legacy \
+    --iree-input-type=stablehlo \
     --iree-hal-target-backends=llvm-cpu \
     --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
     --iree-llvmcpu-target-cpu-features=+atomics,+bulk-memory,+simd128 \
@@ -91,6 +91,7 @@ emcmake "${CMAKE_BIN}" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
+  -UIREE_EXTERNAL_HAL_DRIVERS \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   .

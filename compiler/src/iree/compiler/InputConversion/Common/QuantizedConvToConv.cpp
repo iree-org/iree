@@ -346,7 +346,7 @@ struct LinalgQuantizedConvToConvPass
     linalg::populateLinalgNamedOpConversionPatterns(patterns);
     patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
         context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
       signalPassFailure();
     }

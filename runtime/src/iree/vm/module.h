@@ -11,10 +11,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/string_builder.h"
 #include "iree/vm/ref.h"
 
 #ifdef __cplusplus

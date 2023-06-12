@@ -55,7 +55,6 @@ def iree_check_test(
         name = bytecode_module_name,
         src = src,
         flags = [
-            "--mlir-print-op-on-diagnostic=false",
             "--iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
         visibility = ["//visibility:private"],
@@ -181,16 +180,19 @@ def iree_check_test_suite(
           suites, manual is treated specially and will also apply to the test
           suite itself.
       target_cpu_features_variants: list of target cpu features variants.
-          Currently unimplemented, so each entry must be either "default" or
-          start with "aarch64:" so as Bazel builds are currently x86-only, we
-          know that it is correct to ignore this.
+          Currently unimplemented in Bazel due to difficulty of specializing
+          to target architecture in Bazel. The following describes the
+          semantics that this should have if implemented. Each
+          entry is either "default" for the architecture defaults, or a colon-
+          separated triple "arch:name:cpu_features" where "arch" filters
+          for a target CPU architecture (in IREE_ARCH format), "name" is a
+          short name for the CPU features set (used to generate target names)
+          and cpu_features is a comma-separated list of LLVM target attributes
+          to enable. Example:
+            x86_64:avx2_fma:+avx,+avx2,+fma
       **kwargs: any additional attributes to pass to the underlying tests and
           test suite.
     """
-
-    for target_cpu_features in target_cpu_features_variants:
-        if not (target_cpu_features == "default" or target_cpu_features.startswith("aarch64:")):
-            fail("Entry %s in target_cpu_features_variants: unimplemented" % target_cpu_features)
 
     # We could have complicated argument override logic for runner_args and such, or... the client
     # could just create a test suite. The latter seems simpler and more readable.

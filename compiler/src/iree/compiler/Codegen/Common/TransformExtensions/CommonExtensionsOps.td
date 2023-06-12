@@ -51,6 +51,32 @@ def ApplyBufferOptimizationsOp :
   }];
 }
 
+def ApplyFoldFillIntoPadPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.fold_fill_into_pad",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populates a pattern that folds
+    "tensor.pad(cst, tensor.extract*(linalg.fill(cst)))" into
+    "linalg.fill(cst, empty)" when the padding constant and the fill constant
+    are the same.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyFoldReshapeIntoTensorHalInterfacePatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.fold_reshape_into_tensor_hal_interface",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns that fold tensor.expand_shape/tensor.collapse_shape into
+    the source hal.interface.binding.subspan op.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
@@ -70,8 +96,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     The following additive attributes can be set, they add patterns in an
     unspecified order:
-      - additional_iree_patterns: fancy patterns we shortcut into the system,
-      will need to be sliced out better in the future.
       - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This
       must be applied separately from `bubble_expand` patterns because of some
       upstream pattern interference issue atm.
@@ -93,14 +117,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       of their effect on the metadata (sizes, offset, strides).
       - extract_address_computations: adds patterns for anchoring subview 
       accessing operations at [0, ... 0].
-      - fold_memref_aliases: adds patterns for folding ops such as
-      memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
-      - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
-      case it is the only use of extract.
-      - fold_tensor_subsets: adds patterns for folding tensor subset ops into
-      their producer and consumers.
       - licm: additionally apply loop-independent code motion and single 
       iteration loop promotion. This is not a set of patterns per se but is still
       very convenient to apply it close to canonicalization and other greedy
@@ -112,21 +130,13 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       - lower_vector_masks: Lower vector.mask ops away.
       - prepare_vector_to_mma: pre-process vector.contract op to set it in a form
       that can be mapped to nvgpu.mma operations. 
-      - rank_reducing_linalg: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations using insert/extract slices.
-      - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
-      behavior on subset-based linalg operations using expand/collapse shape ops.
-      - rank_reducing_vector: adds patterns that results in rank-reducing
-      behavior on subset-based vector operations.
-      adopts the upstream version.
       - swapping_patterns: adds patterns that swap operations for a better outcome.
       This is a catch all that can be refined further if/when needed.
       - swap_padding_elide_conditional: refines the tensor.pad +
       tensor.extract_slice swapping pattern. This injects static information
       that guarantees padding is smaller than the window size which guarantees
       we never see a tile comprised of padding-only.
-      - tiling_canonicalization: adds specific tiling-related canonicalization
-      patterns.
       - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
       size for GPUs with mma operations. The size is currently hardcoded but
       should be refactored upstream and made pluggable.
@@ -151,7 +161,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-                       UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse,
                        UnitAttr:$bubble_expand,
                        UnitAttr:$bubble_pack_un_pack,
@@ -160,22 +169,14 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$extract_address_computations,
-                       UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
-                       UnitAttr:$fold_tensor_empty_extract,
-                       UnitAttr:$fold_tensor_subsets,
-                       UnitAttr:$fold_vector_transfer_tensor_slice,
                        UnitAttr:$licm,
                        UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$lower_vector_masks,
                        UnitAttr:$prepare_vector_to_mma,
-                       UnitAttr:$rank_reducing_linalg,
-                       UnitAttr:$rank_reducing_linalg_via_reshapes,
-                       UnitAttr:$rank_reducing_vector,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,
-                       UnitAttr:$tiling_canonicalization,
                        UnitAttr:$unroll_vectors_gpu_mma_sync,
                        UnitAttr:$unroll_vectors_gpu_wmma);
   let results = (outs);

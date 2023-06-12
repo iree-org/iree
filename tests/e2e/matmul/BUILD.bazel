@@ -70,8 +70,9 @@ py_binary(
         "--shapes=large",
     ],
     tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator and TSan.
+        # "--shapes=large" can cause timeouts on riscv emulator and sanitizers.
         "noriscv",
+        "noasan",
         "notsan",
     ],
     target_backends_and_drivers = [
@@ -191,8 +192,9 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--shapes=%s" % size,
     ],
     tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator and TSan.
+        # "--shapes=large" can cause timeouts on riscv emulator and sanitizers.
         "noriscv",
+        "noasan",
         "notsan",
     ] if size == "large" else [],
     target_backends_and_drivers = [

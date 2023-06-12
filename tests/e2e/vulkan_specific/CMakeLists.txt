@@ -55,7 +55,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
-    "--iree-stablehlo-demote-i64-to-i32=false"
+    "--iree-input-demote-i64-to-i32=false"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
   LABELS
     "manual"

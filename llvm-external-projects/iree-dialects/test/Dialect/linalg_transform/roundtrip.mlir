@@ -20,11 +20,11 @@ transform.sequence failures(propagate) {
   // CHECK: transform.structured.vectorize %[[OPS2]]
   transform.structured.vectorize %5 : (!pdl.operation) -> !pdl.operation
   // CHECK: %[[FUNC:.*]] = transform.structured.match ops{["func.func"]} in %arg0
-  // CHECK: vector.lower_contraction %[[FUNC]] {{.*}}
+  // CHECK: apply_patterns.vector.lower_contraction
   %6 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-  transform.vector.lower_contraction %6
-    lowering_strategy = "outerproduct"
-      : (!pdl.operation) -> !pdl.operation
+  transform.apply_patterns to %6 {
+      transform.apply_patterns.vector.lower_contraction lowering_strategy = "outerproduct"
+  } : !pdl.operation
   // CHECK: lower_to_llvm
   lower_to_llvm %arg0 : (!pdl.operation) -> !pdl.operation
 }

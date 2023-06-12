@@ -74,6 +74,7 @@ _mlirAffineExprIsSymbolicOrConstant
 _mlirAffineExprPrint
 _mlirAffineFloorDivExprGet
 _mlirAffineMapAttrGet
+_mlirAffineMapAttrGetTypeID
 _mlirAffineMapAttrGetValue
 _mlirAffineMapCompressUnusedSymbols
 _mlirAffineMapConstantGet
@@ -110,9 +111,11 @@ _mlirAffineSymbolExprGetPosition
 _mlirArrayAttrGet
 _mlirArrayAttrGetElement
 _mlirArrayAttrGetNumElements
+_mlirArrayAttrGetTypeID
 _mlirAttributeDump
 _mlirAttributeEqual
 _mlirAttributeGetContext
+_mlirAttributeGetDialect
 _mlirAttributeGetNull
 _mlirAttributeGetType
 _mlirAttributeGetTypeID
@@ -190,6 +193,7 @@ _mlirContextIsRegisteredOperation
 _mlirContextLoadAllAvailableDialects
 _mlirContextSetAllowUnregisteredDialects
 _mlirCreateExternalPass
+_mlirDenseArrayAttrGetTypeID
 _mlirDenseArrayGetNumElements
 _mlirDenseBoolArrayGet
 _mlirDenseBoolArrayGetElement
@@ -264,6 +268,7 @@ _mlirDenseInt16ResourceElementsAttrGetValue
 _mlirDenseInt32ResourceElementsAttrGetValue
 _mlirDenseInt64ResourceElementsAttrGetValue
 _mlirDenseInt8ResourceElementsAttrGetValue
+_mlirDenseIntOrFPElementsAttrGetTypeID
 _mlirDenseUInt16ResourceElementsAttrGetValue
 _mlirDenseUInt32ResourceElementsAttrGetValue
 _mlirDenseUInt64ResourceElementsAttrGetValue
@@ -286,6 +291,7 @@ _mlirDictionaryAttrGet
 _mlirDictionaryAttrGetElement
 _mlirDictionaryAttrGetElementByName
 _mlirDictionaryAttrGetNumElements
+_mlirDictionaryAttrGetTypeID
 _mlirElementsAttrGetNumElements
 _mlirElementsAttrGetValue
 _mlirElementsAttrIsValidIndex
@@ -296,6 +302,7 @@ _mlirF16TypeGet
 _mlirF32TypeGet
 _mlirF64TypeGet
 _mlirFlatSymbolRefAttrGet
+_mlirFlatSymbolRefAttrGetTypeID
 _mlirFlatSymbolRefAttrGetValue
 _mlirFloat16TypeGetTypeID
 _mlirFloat32TypeGetTypeID
@@ -312,6 +319,7 @@ _mlirFloat8E5M2TypeGet
 _mlirFloat8E5M2TypeGetTypeID
 _mlirFloatAttrDoubleGet
 _mlirFloatAttrDoubleGetChecked
+_mlirFloatAttrGetTypeID
 _mlirFloatAttrGetValueDouble
 _mlirFunctionTypeGet
 _mlirFunctionTypeGetInput
@@ -336,9 +344,11 @@ _mlirInferShapedTypeOpInterfaceTypeID
 _mlirInferTypeOpInterfaceInferReturnTypes
 _mlirInferTypeOpInterfaceTypeID
 _mlirIntegerAttrGet
+_mlirIntegerAttrGetTypeID
 _mlirIntegerAttrGetValueInt
 _mlirIntegerAttrGetValueSInt
 _mlirIntegerAttrGetValueUInt
+_mlirIntegerSetAttrGetTypeID
 _mlirIntegerSetDump
 _mlirIntegerSetEmptyGet
 _mlirIntegerSetEqual
@@ -412,6 +422,7 @@ _mlirOpResultGetResultNumber
 _mlirOpaqueAttrGet
 _mlirOpaqueAttrGetData
 _mlirOpaqueAttrGetDialectNamespace
+_mlirOpaqueAttrGetTypeID
 _mlirOpaqueTypeGet
 _mlirOpaqueTypeGetData
 _mlirOpaqueTypeGetDialectNamespace
@@ -503,13 +514,16 @@ _mlirShapedTypeIsDynamicDim
 _mlirShapedTypeIsDynamicSize
 _mlirShapedTypeIsDynamicStrideOrOffset
 _mlirSparseElementsAttrGetIndices
+_mlirSparseElementsAttrGetTypeID
 _mlirSparseElementsAttrGetValues
 _mlirSparseElementsAttribute
 _mlirStridedLayoutAttrGet
 _mlirStridedLayoutAttrGetNumStrides
 _mlirStridedLayoutAttrGetOffset
 _mlirStridedLayoutAttrGetStride
+_mlirStridedLayoutAttrGetTypeID
 _mlirStringAttrGet
+_mlirStringAttrGetTypeID
 _mlirStringAttrGetValue
 _mlirStringAttrTypedGet
 _mlirStringRefCreateFromCString
@@ -519,6 +533,7 @@ _mlirSymbolRefAttrGetLeafReference
 _mlirSymbolRefAttrGetNestedReference
 _mlirSymbolRefAttrGetNumNestedReferences
 _mlirSymbolRefAttrGetRootReference
+_mlirSymbolRefAttrGetTypeID
 _mlirSymbolTableCreate
 _mlirSymbolTableDestroy
 _mlirSymbolTableErase
@@ -537,6 +552,7 @@ _mlirTupleTypeGetNumTypes
 _mlirTupleTypeGetType
 _mlirTupleTypeGetTypeID
 _mlirTypeAttrGet
+_mlirTypeAttrGetTypeID
 _mlirTypeAttrGetValue
 _mlirTypeDump
 _mlirTypeEqual
@@ -583,6 +599,7 @@ _mlirTypeIsAVector
 _mlirTypeParseGet
 _mlirTypePrint
 _mlirUnitAttrGet
+_mlirUnitAttrGetTypeID
 _mlirUnmanagedDenseBoolResourceElementsAttrGet
 _mlirUnmanagedDenseDoubleResourceElementsAttrGet
 _mlirUnmanagedDenseFloatResourceElementsAttrGet

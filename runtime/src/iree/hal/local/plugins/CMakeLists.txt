@@ -22,7 +22,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::file_io
-    iree::base::tracing
     iree::hal
     iree::hal::local::elf::elf_module
     iree::hal::local::executable_plugin_manager
@@ -42,7 +41,6 @@ iree_cc_library(
     "static_plugin.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
     iree::hal::local::executable_plugin_manager
   DEFINES
@@ -62,7 +60,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree::hal
     iree::hal::local::executable_plugin_manager
   DEFINES

@@ -17,13 +17,17 @@ iree_cc_library(
     "AbstractGemmLikeStrategy.h"
     "Common.h"
     "MatmulTensorCoreStrategy.h"
+    "PadStrategy.h"
     "SmallReductionStrategy.h"
     "StagedReductionStrategy.h"
+    "Strategies.h"
   SRCS
     "Common.cpp"
     "MatmulTensorCoreStrategy.cpp"
+    "PadStrategy.cpp"
     "SmallReductionStrategy.cpp"
     "StagedReductionStrategy.cpp"
+    "Strategies.cpp"
   DEPS
     IREEDialectsTransforms
     IREELinalgExtDialect

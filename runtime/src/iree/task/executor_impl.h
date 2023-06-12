@@ -11,7 +11,6 @@
 #include "iree/base/internal/prng.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/tracing.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"
@@ -29,6 +28,11 @@ extern "C" {
 struct iree_task_executor_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
+
+  // Leaked dynamically allocated name used for tracing calls.
+  // This pointer - once allocated - will be valid for the lifetime of the
+  // process and can be used for IREE_TRACE plotting/allocation calls.
+  IREE_TRACE(const char* trace_name;)
 
   // Defines how work is selected across queues.
   // TODO(benvanik): make mutable; currently always the same reserved value.

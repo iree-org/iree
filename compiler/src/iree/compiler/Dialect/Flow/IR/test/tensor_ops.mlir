@@ -80,10 +80,10 @@ func.func @tensorStoreDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2 : in
 
 // -----
 
-// CHECK-LABEL: @tensorAlloc
-func.func @tensorAlloc(%arg0: index) -> tensor<?x0x1xf32> {
-  // CHECK-NEXT: = flow.tensor.alloc : tensor<?x0x1xf32>{%arg0}
-  %0 = flow.tensor.alloc : tensor<?x0x1xf32>{%arg0}
+// CHECK-LABEL: @tensorAlloca
+func.func @tensorAlloca(%arg0: index) -> tensor<?x0x1xf32> {
+  // CHECK-NEXT: = flow.tensor.alloca : tensor<?x0x1xf32>{%arg0}
+  %0 = flow.tensor.alloca : tensor<?x0x1xf32>{%arg0}
   return %0 : tensor<?x0x1xf32>
 }
 

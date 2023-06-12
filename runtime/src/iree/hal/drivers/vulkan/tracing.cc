@@ -9,7 +9,6 @@
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
 
 // Total number of queries the per-queue query pool will contain. This
 // translates to the maximum number of outstanding queries before collection is

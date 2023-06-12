@@ -27,7 +27,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/target_platform.h"
 
 #ifdef __cplusplus
 extern "C" {

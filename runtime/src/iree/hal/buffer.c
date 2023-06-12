@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/detail.h"
 

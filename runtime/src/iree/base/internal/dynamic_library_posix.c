@@ -12,8 +12,6 @@
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_EMSCRIPTEN)

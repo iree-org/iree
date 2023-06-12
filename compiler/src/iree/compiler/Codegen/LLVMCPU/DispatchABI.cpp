@@ -1194,6 +1194,9 @@ FailureOr<LLVM::LLVMFunctionType> HALDispatchABI::getABIFunctionType(
     case IREE::HAL::CallingConvention::ParameterStruct:
       return LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(context),
                                          LLVM::LLVMPointerType::get(context));
+    default:
+      llvm_unreachable("unhandled calling convention");
+      return failure();
   }
 }
 

@@ -67,6 +67,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::Analysis
+    iree::compiler::Dialect::Stream::Builtins
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::Conversion::FlowToStream
     iree::compiler::Dialect::Stream::Conversion::HALToStream

@@ -68,7 +68,8 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
   SmallVector<Operation *, 16> allOps;
   for (Operation &op : body->without_terminator()) allOps.push_back(&op);
 
-  auto isDefinedInRegion = [](Operation *op) { return true; };
+  BackwardSliceOptions options;
+  options.filter = [](Operation *op) { return true; };
   SetVector<Operation *> padSizeOps;
 
   // Build the condition for the scf.if op: all pad sizes are zero.
@@ -77,7 +78,7 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
   SmallVector<Value> eqZeroCmpVals;
   for (OpFoldResult pad : llvm::concat<OpFoldResult>(lowPads, highPads)) {
     if (auto padValue = pad.dyn_cast<Value>()) {
-      getBackwardSlice(padValue, &padSizeOps, isDefinedInRegion);
+      getBackwardSlice(padValue, &padSizeOps, options);
       padSizeOps.insert(padValue.getDefiningOp());
     }
     if (!isZero(pad)) {

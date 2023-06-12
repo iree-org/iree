@@ -14,7 +14,6 @@
 #include <time.h>
 
 #include "iree/base/internal/wait_handle_posix.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Platform utilities

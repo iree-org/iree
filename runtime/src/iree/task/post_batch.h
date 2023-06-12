@@ -9,7 +9,7 @@
 
 #include <stdbool.h>
 
-#include "iree/base/config.h"
+#include "iree/base/api.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"

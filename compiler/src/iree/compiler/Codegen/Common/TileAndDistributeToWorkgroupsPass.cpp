@@ -387,7 +387,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // Resolve the `tensor.dim` operations in workgroup count region.
     {
       RewritePatternSet patterns(exportOp->getContext());
-      memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+      memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("`tensor.dim` resolution in exportOp failed");
         return signalPassFailure();
@@ -438,7 +438,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // After rewriting destructive updates, there might be uses of compute
     // operations only in `tensor.dim` ops. Resolve these.
     RewritePatternSet resolveDimOps(context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(resolveDimOps);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(resolveDimOps);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
       funcOp.emitOpError("resolving ranked shaped results dims failed");

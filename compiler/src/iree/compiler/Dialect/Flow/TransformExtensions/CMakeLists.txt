@@ -34,7 +34,6 @@ iree_cc_library(
     IREEDialectsTransforms
     IREELinalgTransformDialect
     MLIRArithDialect
-    MLIRBytecodeOpInterface
     MLIRIR
     MLIRPDLDialect
     MLIRSCFDialect

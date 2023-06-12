@@ -59,6 +59,10 @@ struct InputDialectOptions {
   };
   Type type = Type::auto_detect;
 
+  bool demoteI64ToI32 = true;
+  bool demoteF64ToF32 = true;
+  bool promoteBF16ToF32 = true;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<InputDialectOptions>;
 };

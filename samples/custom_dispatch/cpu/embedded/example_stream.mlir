@@ -30,7 +30,7 @@
 // selection. By fully specifying the targets here we can target multiple
 // architectures and it's always possible to embed these instead of using the
 // coarse command line compiler flags that only set single targets.
-#aarch64_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
+#arm_64_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-unknown-unknown-eabi-elf"
@@ -47,7 +47,7 @@
 // compiled binary (CPU + Vulkan, etc).
 #cpu_target = #hal.device.target<"llvm-cpu", {
   executable_targets = [
-    #aarch64_target,
+    #arm_64_target,
     #x86_64_target
   ]
 }>
@@ -71,7 +71,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
     // only included when building those. For this example we just use the
     // fully-specified targets.
     hal.executable.objects = #hal.executable.objects<{
-      #aarch64_target = [
+      #arm_64_target = [
         #hal.executable.object<{
           // Referencing a file path on disk but could also have the data
           // embedded in order to make the MLIR file hermetic/portable across
@@ -80,7 +80,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           // objects to be embedded we can support JIT scenarios where some
           // layer higher or lower may be emitting the objects to link in as
           // part of the overall compilation.
-          path = "samples/custom_dispatch/cpu/embedded/functions_aarch64.o"
+          path = "samples/custom_dispatch/cpu/embedded/functions_arm_64.o"
         }>
       ],
       #x86_64_target = [

@@ -105,7 +105,7 @@ void LLVMCPUTilePass::runOnOperation() {
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   tensor::populateFoldTensorEmptyPatterns(patterns);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

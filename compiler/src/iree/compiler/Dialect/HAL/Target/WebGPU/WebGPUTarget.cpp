@@ -64,9 +64,13 @@ class WebGPUTargetBackend : public TargetBackend {
   // NOTE: we could vary this based on the options such as 'webgpu-v2'.
   std::string name() const override { return "webgpu"; }
 
+  // TODO(scotttodd): Prune FlowDialect dep when WGSLReplacePushConstantsPass
+  //     does not use the Flow dialect (TranslateExecutables calls this
+  //     function and _does not_ query which passes are used by the dynamic
+  //     pipeline created by buildTranslationPassPipeline)
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
-                    gpu::GPUDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::Flow::FlowDialect,
+                    spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(

@@ -42,8 +42,7 @@ def iree_trace_runner_test(
             (.vmfb). Mandatory, unlike in iree_check_test, because trace files
             (.yaml) reference a specific module file path.
         timeout: timeout for the generated tests.
-        target_cpu_features: currently unimplemented (must be empty), will
-            eventually allow specifying target CPU features.
+        target_cpu_features: target CPU features. Only for llvm-cpu backend.
         **kwargs: any additional attributes to pass to the underlying tests and
             test suite.
     """
@@ -57,9 +56,10 @@ def iree_trace_runner_test(
         module_name = module_name,
         src = src,
         flags = [
-            "--mlir-print-op-on-diagnostic=false",
             "--iree-hal-target-backends=%s" % target_backend,
-        ] + compiler_flags,
+        ] + ([
+            "--iree-llvmcpu-target-cpu-features=%s" % target_cpu_features,
+        ] if target_cpu_features else []) + compiler_flags,
         visibility = ["//visibility:private"],
         testonly = True,
         **kwargs
@@ -118,14 +118,10 @@ def iree_single_backend_generated_trace_runner_test(
             added automatically.
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
-        target_cpu_features: currently unimplemented (must be empty), will
-            eventually allow specifying target CPU features.
+        target_cpu_features: target CPU features. Only for llvm-cpu backend.
         **kwargs: any additional attributes to pass to the underlying tests and
             test suite.
     """
-
-    if target_cpu_features:
-        fail("target_cpu_features must currently be empty")
 
     src = "%s.mlir" % (name)
     trace = "%s.yaml" % (name)
@@ -161,6 +157,7 @@ def iree_single_backend_generated_trace_runner_test(
         runner_args = runner_args,
         tags = tags,
         timeout = timeout,
+        target_cpu_features = target_cpu_features,
         **kwargs
     )
 
@@ -198,8 +195,16 @@ def iree_generated_trace_runner_test(
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
         target_cpu_features_variants: list of target cpu features variants.
-            Currently ignored in Bazel, where we only test default CPU features
-            for the target architecture.
+            Currently unimplemented in Bazel due to difficulty of specializing
+            to target architecture in Bazel. The following describes the
+            semantics that this should have if implemented. Each
+            entry is either "default" for the architecture defaults, or a colon-
+            separated triple "arch:name:cpu_features" where "arch" filters
+            for a target CPU architecture (in IREE_ARCH format), "name" is a
+            short name for the CPU features set (used to generate target names)
+            and cpu_features is a comma-separated list of LLVM target attributes
+            to enable. Example:
+              x86_64:avx2_fma:+avx,+avx2,+fma
         **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
 

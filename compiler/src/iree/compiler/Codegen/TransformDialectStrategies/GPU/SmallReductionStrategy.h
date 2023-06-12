@@ -17,6 +17,7 @@ namespace iree_compiler {
 namespace gpu {
 
 struct GPUModel;
+struct ReductionConfig;
 
 /// Encode a strategy targeted at (very) small reductions, for which other
 /// strategies perform poorly.
@@ -61,12 +62,6 @@ class SmallReductionStrategy : public AbstractReductionStrategy {
   /// `maxNumThreadsToUse`.
   void configure(const ReductionConfig &reductionConfig);
 };
-
-/// Build the transform IR tiling reductions for the whole GPU.
-/// Supports reductions in the last dimension, with optional leading and
-/// trailing elementwise operations.
-void buildSmallReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
-                                 const SmallReductionStrategy &strategy);
 
 }  // namespace gpu
 }  // namespace iree_compiler

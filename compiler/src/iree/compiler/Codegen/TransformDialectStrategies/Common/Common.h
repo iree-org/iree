@@ -78,15 +78,15 @@ void createTransformRegion(func::FuncOp entryPoint,
 /// `handles` is empty.
 void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
+using ApplyPatternsOpBodyBuilderFn = std::function<void(OpBuilder &, Location)>;
+
 /// Create an ApplyPatternsOp that performs a set of key canonicalizations and
 /// so-called enabling transformations to normalize the IR.
-/// Take an existing configuration by copy (cheap object) that will be augmented
-/// locally to additionally perform:
+/// In addition to the specified transform, perform the following ones:
 ///   canonicalization, tiling_canonicalization, licm and cse (in this order).
-Value buildCanonicalizationAndEnablingTransforms(
-    ImplicitLocOpBuilder &b,
-    IREE::transform_dialect::ApplyPatternsOpPatterns configuration,
-    Value variantH);
+void buildCanonicalizationAndEnablingTransforms(
+    ImplicitLocOpBuilder &b, Value variantH,
+    ApplyPatternsOpBodyBuilderFn populatePatternsFn = nullptr);
 
 /// Build transform IR to dynamically selects the first non-empty handle; i.e.
 /// if (h1, h2) is:

@@ -76,6 +76,7 @@ VER_0 {
     mlirAffineExprPrint;
     mlirAffineFloorDivExprGet;
     mlirAffineMapAttrGet;
+    mlirAffineMapAttrGetTypeID;
     mlirAffineMapAttrGetValue;
     mlirAffineMapCompressUnusedSymbols;
     mlirAffineMapConstantGet;
@@ -112,9 +113,11 @@ VER_0 {
     mlirArrayAttrGet;
     mlirArrayAttrGetElement;
     mlirArrayAttrGetNumElements;
+    mlirArrayAttrGetTypeID;
     mlirAttributeDump;
     mlirAttributeEqual;
     mlirAttributeGetContext;
+    mlirAttributeGetDialect;
     mlirAttributeGetNull;
     mlirAttributeGetType;
     mlirAttributeGetTypeID;
@@ -192,6 +195,7 @@ VER_0 {
     mlirContextLoadAllAvailableDialects;
     mlirContextSetAllowUnregisteredDialects;
     mlirCreateExternalPass;
+    mlirDenseArrayAttrGetTypeID;
     mlirDenseArrayGetNumElements;
     mlirDenseBoolArrayGet;
     mlirDenseBoolArrayGetElement;
@@ -266,6 +270,7 @@ VER_0 {
     mlirDenseInt32ResourceElementsAttrGetValue;
     mlirDenseInt64ResourceElementsAttrGetValue;
     mlirDenseInt8ResourceElementsAttrGetValue;
+    mlirDenseIntOrFPElementsAttrGetTypeID;
     mlirDenseUInt16ResourceElementsAttrGetValue;
     mlirDenseUInt32ResourceElementsAttrGetValue;
     mlirDenseUInt64ResourceElementsAttrGetValue;
@@ -288,6 +293,7 @@ VER_0 {
     mlirDictionaryAttrGetElement;
     mlirDictionaryAttrGetElementByName;
     mlirDictionaryAttrGetNumElements;
+    mlirDictionaryAttrGetTypeID;
     mlirElementsAttrGetNumElements;
     mlirElementsAttrGetValue;
     mlirElementsAttrIsValidIndex;
@@ -298,6 +304,7 @@ VER_0 {
     mlirF32TypeGet;
     mlirF64TypeGet;
     mlirFlatSymbolRefAttrGet;
+    mlirFlatSymbolRefAttrGetTypeID;
     mlirFlatSymbolRefAttrGetValue;
     mlirFloat16TypeGetTypeID;
     mlirFloat32TypeGetTypeID;
@@ -314,6 +321,7 @@ VER_0 {
     mlirFloat8E5M2TypeGetTypeID;
     mlirFloatAttrDoubleGet;
     mlirFloatAttrDoubleGetChecked;
+    mlirFloatAttrGetTypeID;
     mlirFloatAttrGetValueDouble;
     mlirFunctionTypeGet;
     mlirFunctionTypeGetInput;
@@ -338,9 +346,11 @@ VER_0 {
     mlirInferTypeOpInterfaceInferReturnTypes;
     mlirInferTypeOpInterfaceTypeID;
     mlirIntegerAttrGet;
+    mlirIntegerAttrGetTypeID;
     mlirIntegerAttrGetValueInt;
     mlirIntegerAttrGetValueSInt;
     mlirIntegerAttrGetValueUInt;
+    mlirIntegerSetAttrGetTypeID;
     mlirIntegerSetDump;
     mlirIntegerSetEmptyGet;
     mlirIntegerSetEqual;
@@ -414,6 +424,7 @@ VER_0 {
     mlirOpaqueAttrGet;
     mlirOpaqueAttrGetData;
     mlirOpaqueAttrGetDialectNamespace;
+    mlirOpaqueAttrGetTypeID;
     mlirOpaqueTypeGet;
     mlirOpaqueTypeGetData;
     mlirOpaqueTypeGetDialectNamespace;
@@ -505,13 +516,16 @@ VER_0 {
     mlirShapedTypeIsDynamicSize;
     mlirShapedTypeIsDynamicStrideOrOffset;
     mlirSparseElementsAttrGetIndices;
+    mlirSparseElementsAttrGetTypeID;
     mlirSparseElementsAttrGetValues;
     mlirSparseElementsAttribute;
     mlirStridedLayoutAttrGet;
     mlirStridedLayoutAttrGetNumStrides;
     mlirStridedLayoutAttrGetOffset;
     mlirStridedLayoutAttrGetStride;
+    mlirStridedLayoutAttrGetTypeID;
     mlirStringAttrGet;
+    mlirStringAttrGetTypeID;
     mlirStringAttrGetValue;
     mlirStringAttrTypedGet;
     mlirStringRefCreateFromCString;
@@ -521,6 +535,7 @@ VER_0 {
     mlirSymbolRefAttrGetNestedReference;
     mlirSymbolRefAttrGetNumNestedReferences;
     mlirSymbolRefAttrGetRootReference;
+    mlirSymbolRefAttrGetTypeID;
     mlirSymbolTableCreate;
     mlirSymbolTableDestroy;
     mlirSymbolTableErase;
@@ -539,6 +554,7 @@ VER_0 {
     mlirTupleTypeGetType;
     mlirTupleTypeGetTypeID;
     mlirTypeAttrGet;
+    mlirTypeAttrGetTypeID;
     mlirTypeAttrGetValue;
     mlirTypeDump;
     mlirTypeEqual;
@@ -585,6 +601,7 @@ VER_0 {
     mlirTypeParseGet;
     mlirTypePrint;
     mlirUnitAttrGet;
+    mlirUnitAttrGetTypeID;
     mlirUnmanagedDenseBoolResourceElementsAttrGet;
     mlirUnmanagedDenseDoubleResourceElementsAttrGet;
     mlirUnmanagedDenseFloatResourceElementsAttrGet;

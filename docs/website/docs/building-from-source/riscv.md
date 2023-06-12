@@ -1,3 +1,10 @@
+---
+hide:
+  - tags
+tags:
+  - CPU
+---
+
 # RISC-V cross-compilation
 
 Running on a platform like RISC-V involves cross-compiling from a _host_
@@ -141,7 +148,7 @@ ${QEMU_BIN} \
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 
 The SIMD code can be generated following the
-[IREE CPU flow](../deployment-configurations/cpu.md)
+[IREE CPU flow](../guides/deployment-configurations/cpu.md)
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"

@@ -190,11 +190,6 @@ def FuseDispatchBindings :
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createFuseDispatchBindingsPass()
   }];
-  let options = [
-    Option<"aliasMutableBindings", "alias-mutable-bindings",
-           "bool", /*default=*/"false",
-           "Fuses bindings that are mutable instead of leaving them split.">
-  ];
 }
 
 def SpecializeDispatches :

@@ -10,7 +10,6 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 
 // Defined in their respective files:
 iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance);

@@ -162,7 +162,7 @@ struct LinalgQuantizedMatmulToMatmulPass
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
     patterns.add<QuantizedMatmulToMatmul>(context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
       signalPassFailure();
     }

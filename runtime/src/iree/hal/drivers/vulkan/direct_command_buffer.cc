@@ -12,7 +12,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/descriptor_set_arena.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
@@ -224,6 +223,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
   // Flush all pending descriptor set writes (if any).
   command_buffer->descriptor_set_group =
       command_buffer->descriptor_set_arena.Flush();
+
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
 
   return iree_ok_status();
 }
