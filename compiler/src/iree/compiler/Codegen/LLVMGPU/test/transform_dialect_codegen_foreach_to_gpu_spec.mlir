@@ -14,7 +14,7 @@ transform.sequence failures(propagate) {
   // allocs will be created.
   %func = transform.structured.match ops{["func.func"]} in %variant_op
     : (!transform.any_op) -> !transform.any_op
-  transform.apply_patterns to %func0 {
+  transform.apply_patterns to %func {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
