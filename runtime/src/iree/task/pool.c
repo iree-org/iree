@@ -9,7 +9,6 @@
 #include <stdint.h>
 
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 
 // Minimum byte size of a block in bytes, including the tasks as well as the
 // allocation header. This is here to allow us to reduce the number of times

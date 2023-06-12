@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/modules/vmvx/module.h"

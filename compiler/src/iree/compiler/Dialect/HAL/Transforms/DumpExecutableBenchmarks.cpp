@@ -302,9 +302,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
                          });
 
   // Compute the workgroup parameters.
-  auto workload = llvm::to_vector(
-      llvm::map_range(dispatchParams.workload,
-                      [&](unsigned dim) { return indexSet.get(dim); }));
+  auto workload = llvm::map_to_vector(
+      dispatchParams.workload, [&](unsigned dim) { return indexSet.get(dim); });
   auto workgroupCountOp =
       funcBuilder.create<IREE::HAL::ExecutableCalculateWorkgroupsOp>(
           loc, funcBuilder.getIndexType(), funcBuilder.getIndexType(),

@@ -59,11 +59,9 @@ iree_cc_library(
     "string_util.h"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::path
     iree::base::internal::synchronization
-    iree::base::tracing
   PUBLIC
 )
 

@@ -74,3 +74,9 @@ class CudaSplitKMatmulGenerator(CudaMatmulGenerator):
     self._append_matmul_dispatch_collection(self.matmul_shapes,
                                             self.split_k_slices, data_type,
                                             configuration_list)
+
+  def generate(self):
+    """Generates a list of split-k matmul operations."""
+    self._cuda_matmul_tensor_cores_f16()
+    self._cuda_matmul_tensor_cores_f32()
+    return self.dispatches_collection_list

@@ -112,6 +112,93 @@ static Value calculateElementByteOffset(Location loc,
                                               rewriter);
 }
 
+// Canonicalizes a fill pattern into a power of 2 byte-aligned integer type.
+// The stream dialect splat/fill ops require one of I8, I16, or I32 - any other
+// type must be converted to one of those here. This prevents encoding policy
+// such as what to do with i1 or float types from leaking into lower levels of
+// the stack: fill ops are just setting bytes.
+//
+// The other reason to handle things here is that the fill pattern must be
+// <= 32-bits - if it's over that we need to insert a dispatch to perform the
+// fill and the only time we can do that in the pipeline is here.
+// This is a somewhat annoying abstraction leak from the HAL which also has a
+// 32-bit fill limit, but that is an abstraction leak from the underlying APIs
+// and hardware (Metal/Vulkan/CUDA/etc) that also don't have 64-bit fills.
+// Instead of forcing all runtime implementations to include emulation for
+// 64-bit fills we take care of that here on an as-needed basis.
+//
+// Returns the pattern converted to one of [i8, i16, i32, i64] (with i64 needing
+// to be handled via emulation) or nullptr if the type is unsupported.
+static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
+  auto loc = pattern.getLoc();
+
+  // Decompose complex numbers into the real/imag components and pack into an
+  // int. Note that this only works for 32-bit complex types today.
+  if (auto complexType = dyn_cast<ComplexType>(pattern.getType())) {
+    unsigned elementBitWidth =
+        complexType.getElementType().getIntOrFloatBitWidth();
+    assert(elementBitWidth <= 32 && "unsupported complex<f64>");
+    Type bwElemType = builder.getIntegerType(elementBitWidth);
+    Type bwType = builder.getIntegerType(elementBitWidth * 2);
+    Value shiftAmount = builder.create<arith::ConstantOp>(
+        loc, bwType, builder.getIntegerAttr(bwType, elementBitWidth));
+    Value real = builder.create<mlir::complex::ReOp>(loc, pattern);
+    Value realInt = builder.create<arith::BitcastOp>(loc, bwElemType, real);
+    Value imag = builder.create<mlir::complex::ImOp>(loc, pattern);
+    Value imagInt = builder.create<arith::BitcastOp>(loc, bwElemType, imag);
+    realInt = builder.create<arith::IndexCastOp>(loc, bwType, realInt);
+    imagInt = builder.create<arith::IndexCastOp>(loc, bwType, imagInt);
+    Value shiftReal =
+        builder.create<arith::ShLIOp>(loc, bwType, realInt, shiftAmount);
+    Value orImag = builder.create<arith::OrIOp>(loc, shiftReal, imagInt);
+    return orImag;
+  }
+
+  // Get floats into integer form first; may need additional processing below.
+  if (auto floatType = dyn_cast<FloatType>(pattern.getType())) {
+    pattern = builder.createOrFold<arith::BitcastOp>(
+        loc, builder.getIntegerType(floatType.getIntOrFloatBitWidth()),
+        pattern);
+  }
+
+  // HACK: extend i1 to i8. This is really not something we should be doing here
+  // in optimized programs as this is a super shady operation.
+  unsigned elementBitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
+  if (elementBitWidth == 1) {
+    return builder.createOrFold<arith::ExtUIOp>(loc, builder.getI8Type(),
+                                                pattern);
+  }
+
+  // For packed sub-byte patterns, duplicate the sub-byte parts into a full
+  // byte. We first extend the sub-byte parts into full bytes, and then keep
+  // shifting left and bitwise or the sub-byte parts. For example, to create an
+  // i8 pattern from i2 parts, we generate the following sequence:
+  //   %i8_val = arith.extui %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  if (needToPackSubByteElementBitWidth(elementBitWidth)) {
+    Type i8Type = builder.getI8Type();
+    Value bitwidth = builder.createOrFold<arith::ConstantOp>(
+        loc, i8Type, builder.getIntegerAttr(i8Type, elementBitWidth));
+    Value subByteVal =
+        builder.createOrFold<arith::ExtUIOp>(loc, i8Type, pattern);
+    Value i8Val = subByteVal;
+    for (unsigned i = 1, e = 8 / elementBitWidth; i < e; ++i) {
+      Value shifted = builder.createOrFold<arith::ShLIOp>(loc, i8Val, bitwidth);
+      i8Val = builder.createOrFold<arith::OrIOp>(loc, shifted, subByteVal);
+    }
+    return i8Val;
+  }
+  if ((elementBitWidth % 8) != 0) {
+    // We'd need some policy to determine how to handle non-byte-aligned widths.
+    return {};
+  }
+
+  // 8/16/32/64-bit value pass through (possibly after a bitcast).
+  return pattern;
+}
+
 //===----------------------------------------------------------------------===//
 // stream.tensor.import
 //===----------------------------------------------------------------------===//
@@ -274,92 +361,6 @@ struct EncodeTensorConstantOp
 // stream.tensor.splat
 //===----------------------------------------------------------------------===//
 
-// Canonicalizes a fill pattern into a power of 2 byte-aligned integer type.
-// The stream dialect splat/fill ops require one of I8, I16, or I32 - any other
-// type must be converted to one of those here. This prevents encoding policy
-// such as what to do with i1 or float types from leaking into lower levels of
-// the stack: fill ops are just setting bytes.
-//
-// The other reason to handle things here is that the fill pattern must be
-// <= 32-bits - if it's over that we need to insert a dispatch to perform the
-// fill and the only time we can do that in the pipeline is here.
-// This is a somewhat annoying abstraction leak from the HAL which also has a
-// 32-bit fill limit, but that is an abstraction leak from the underlying APIs
-// and hardware (Metal/Vulkan/CUDA/etc) that also don't have 64-bit fills.
-// Instead of forcing all runtime implementations to include emulation for
-// 64-bit fills we take care of that here on an as-needed basis.
-//
-// Returns the pattern converted to one of [i8, i16, i32, i64] (with i64 needing
-// to be handled via emulation) or nullptr if the type is unsupported.
-static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
-  auto loc = pattern.getLoc();
-
-  // Get floats into integer form.
-  auto patternType = pattern.getType();
-  unsigned elementBitWidth = IREE::Util::getTypeBitWidth(patternType);
-  elementBitWidth =
-      (isa<ComplexType>(patternType) ? elementBitWidth / 2 : elementBitWidth);
-  if (llvm::isa<FloatType>(patternType)) {
-    pattern = rewriter.createOrFold<arith::BitcastOp>(
-        loc, rewriter.getIntegerType(elementBitWidth), pattern);
-  }
-
-  if (isa<ComplexType>(patternType)) {
-    int64_t complexBitWidth = elementBitWidth;
-    Type bwElemType = rewriter.getIntegerType(elementBitWidth);
-    Type bwType = rewriter.getIntegerType(elementBitWidth * 2);
-    Value shiftAmount = rewriter.create<arith::ConstantOp>(
-        loc, bwType, rewriter.getIntegerAttr(bwType, complexBitWidth));
-
-    Value real = rewriter.create<mlir::complex::ReOp>(loc, pattern);
-    Value realInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, real);
-    Value imag = rewriter.create<mlir::complex::ImOp>(loc, pattern);
-    Value imagInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, imag);
-    realInt = rewriter.create<arith::IndexCastOp>(loc, bwType, realInt);
-    imagInt = rewriter.create<arith::IndexCastOp>(loc, bwType, imagInt);
-    Value shiftReal =
-        rewriter.create<arith::ShLIOp>(loc, bwType, realInt, shiftAmount);
-    Value orImag = rewriter.create<arith::OrIOp>(loc, shiftReal, imagInt);
-    return orImag;
-  }
-
-  // HACK: extend i1 to i8. This is really not something we should be doing here
-  // in optimized programs as this is a super shady operation.
-  if (patternType.isInteger(1)) {
-    return rewriter.createOrFold<arith::ExtUIOp>(loc, rewriter.getI8Type(),
-                                                 pattern);
-  }
-  // For packed sub-byte patterns, duplicate the sub-byte parts into a full
-  // byte. We first extend the sub-byte parts into full bytes, and then keep
-  // shifting left and bitwise or the sub-byte parts. For example, to create an
-  // i8 pattern from i2 parts, we generate the following sequence:
-  //   %i8_val = arith.extui %i2_val
-  //   %i8_val = (%i8_val << 2) | %i2_val
-  //   %i8_val = (%i8_val << 2) | %i2_val
-  //   %i8_val = (%i8_val << 2) | %i2_val
-  if (needToPackSubByteElementBitWidth(elementBitWidth)) {
-    Type i8Type = rewriter.getI8Type();
-    Value bitwidth = rewriter.createOrFold<arith::ConstantOp>(
-        loc, i8Type, rewriter.getIntegerAttr(i8Type, elementBitWidth));
-    Value subByteVal =
-        rewriter.createOrFold<arith::ExtUIOp>(loc, i8Type, pattern);
-    Value i8Val = subByteVal;
-    for (unsigned i = 1, e = 8 / elementBitWidth; i < e; ++i) {
-      Value shifted =
-          rewriter.createOrFold<arith::ShLIOp>(loc, i8Val, bitwidth);
-      i8Val = rewriter.createOrFold<arith::OrIOp>(loc, shifted, subByteVal);
-    }
-    return i8Val;
-  }
-  if ((elementBitWidth % 8) != 0) {
-    // We'd need some policy to determine how to handle non-byte-aligned widths.
-    return {};
-  }
-
-  // 8/16/32-bit value pass through (possibly after a bitcast).
-  return pattern;
-}
-
 struct EncodeTensorSplatOp
     : public OpRewritePattern<IREE::Stream::TensorSplatOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -371,31 +372,19 @@ struct EncodeTensorSplatOp
       return failure();
     }
 
-    // Dense:
-
-    // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
+    // Canonicalize the fill pattern into an integer type [i8, i16, i32, i64].
     auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
     if (!pattern) {
-      Type patternType = op.getValue().getType();
-      unsigned bitwdith = IREE::Util::getTypeBitWidth(patternType);
-      return rewriter.notifyMatchFailure(
-          op, llvm::formatv(
-                  "unsupported pattern type {} with non-byte-aligned bitwidth "
-                  "{}; need to update encoding policy for such case",
-                  patternType, bitwdith));
+      return op.emitOpError()
+             << "has unsupported pattern type " << op.getValue().getType()
+             << " with too large/non-byte-aligned bit width; a new builtin is "
+                "required";
     }
 
-    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
-    if (bitWidth > 32) {
-      // We emulate 64-bit support with a stream.builtin.splat.i64.
-      rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinSplatI64Op>(
-          op, op.getResult().getType(), pattern, op.getResultSize(),
-          op.getAffinityAttr());
-    } else {
-      rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
-          op, op.getResult().getType(), pattern, op.getResultSize(),
-          op.getAffinityAttr());
-    }
+    // Dense:
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
+        op, op.getResult().getType(), pattern, op.getResultSize(),
+        op.getAffinityAttr());
 
     return success();
   }
@@ -478,15 +467,13 @@ struct EncodeTensorFillOp
       return failure();
     }
 
+    // Canonicalize the fill pattern into an integer type [i8, i16, i32, i64].
     auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
     if (!pattern) {
-      Type patternType = op.getValue().getType();
-      unsigned bitwdith = IREE::Util::getTypeBitWidth(patternType);
-      return rewriter.notifyMatchFailure(
-          op, llvm::formatv(
-                  "unsupported pattern type {} with non-byte-aligned bitwidth "
-                  "{}; need to update encoding policy for such case",
-                  patternType, bitwdith));
+      return op.emitOpError()
+             << "has unsupported pattern type " << op.getValue().getType()
+             << " with too large/non-byte-aligned bit width; a new builtin is "
+                "required";
     }
 
     // Dense:
@@ -496,27 +483,9 @@ struct EncodeTensorFillOp
         op.getLoc(), targetType, targetDims, op.getLengths(), rewriter);
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), targetOffset, targetLength);
-
-    // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
-    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
-    if (bitWidth > 64) {
-      // This happens mostly when complex<f64> is used as a input type for
-      // splat. complex<type> is broken down into a 2xtype value with the real
-      // field occupying the sizeof(type) MSB bits and the imaginary field
-      // occupying the rest. At this moment, splats with size > 64 is not
-      // implemented so we error out here.
-      return rewriter.notifyMatchFailure(
-          op, "unsupported bitWidth greater than 64; encoding policy required");
-    }
-    if (bitWidth > 32) {
-      rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinFillI64Op>(
-          op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
-          targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());
-    } else {
-      rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
-          op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
-          targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());
-    }
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
+        op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
+        targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());
 
     return success();
   }
@@ -765,6 +734,7 @@ class EncodeDeviceTensorsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::complex::ComplexDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();

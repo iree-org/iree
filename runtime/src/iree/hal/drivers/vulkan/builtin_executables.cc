@@ -8,7 +8,6 @@
 
 #include <cstddef>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/builtin/builtin_shaders_spv.h"
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"

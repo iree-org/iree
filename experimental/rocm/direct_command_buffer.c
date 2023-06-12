@@ -16,7 +16,6 @@
 #include "experimental/rocm/rocm_buffer.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 // Command buffer implementation that directly maps to rocm direct.
 // This records the commands on the calling thread without additional threading

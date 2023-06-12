@@ -7,7 +7,6 @@
 #include "runtime/bindings/tflite/interpreter.h"
 
 #include "iree/base/internal/call_once.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
 #include "runtime/bindings/tflite/model.h"

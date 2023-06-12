@@ -120,9 +120,6 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
 
-  // Expand builtins to dispatches. This may introduce new executables.
-  passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
-
   addCleanupPatterns(passManager);
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
@@ -168,6 +165,12 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // of the timeline as we can shake the IR and see what timepoints we still
   // have left.
   passManager.addPass(IREE::Stream::createPropagateTimepointsPass());
+
+  // Expand builtins to dispatches. This may introduce new executables.
+  // We do this after scheduling so that we preserve the semantics of the ops
+  // for partitioning/placement before turning them into opaque dispatches.
+  passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
+
   addCleanupPatterns(passManager);
 
   // Everything must now be in stream.async.* form.

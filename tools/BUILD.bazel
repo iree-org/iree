@@ -29,7 +29,6 @@ iree_runtime_cc_binary(
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal:types",
@@ -46,7 +45,6 @@ iree_runtime_cc_binary(
     srcs = ["iree-benchmark-trace-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:atomic_slist",
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
@@ -68,8 +66,6 @@ iree_runtime_cc_binary(
     srcs = ["iree-check-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
@@ -162,7 +158,6 @@ cc_binary(
         "//compiler/src/iree/compiler/API:Impl",
         "//runtime/src:runtime_defines",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/tooling:context_util",
@@ -177,7 +172,6 @@ iree_runtime_cc_binary(
     srcs = ["iree-run-module-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/tooling:context_util",
@@ -191,7 +185,6 @@ iree_runtime_cc_binary(
     srcs = ["iree-run-trace-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal",
@@ -209,8 +202,6 @@ iree_runtime_cc_binary(
     srcs = ["iree-e2e-matmul-test.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:flags",

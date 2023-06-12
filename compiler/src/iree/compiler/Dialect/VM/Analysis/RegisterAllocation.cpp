@@ -25,8 +25,8 @@ namespace iree_compiler {
 
 static Attribute getStrArrayAttr(Builder &builder,
                                  ArrayRef<std::string> values) {
-  return builder.getStrArrayAttr(llvm::to_vector<8>(llvm::map_range(
-      values, [](const std::string &value) { return StringRef(value); })));
+  return builder.getStrArrayAttr(llvm::map_to_vector<8>(
+      values, [](const std::string &value) { return StringRef(value); }));
 }
 
 // static

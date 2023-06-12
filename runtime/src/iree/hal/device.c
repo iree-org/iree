@@ -6,7 +6,6 @@
 
 #include "iree/hal/device.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"

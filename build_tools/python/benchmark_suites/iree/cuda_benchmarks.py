@@ -86,10 +86,10 @@ class Linux_CUDA_Benchmarks(object):
         self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
         execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
         tags=[benchmark_tags.CUDA])
-    long_running_gen_configs, long_running_module_configs = self._generate_configs(
+    large_gen_configs, large_module_configs = self._generate_configs(
         model_groups.CUDA_MODELS_LONG,
         self.SM_80_COMPILE_CONFIG,
-        tags=[benchmark_tags.CUDA, benchmark_tags.LONG_RUNNING])
+        tags=[benchmark_tags.CUDA, benchmark_tags.LARGE])
     return (gen_configs + ubench_gen_configs + ubench_splitk_gen_configs +
-            long_running_gen_configs, run_configs + ubench_run_configs +
-            ubench_splitk_run_configs + long_running_module_configs)
+            large_gen_configs, run_configs + ubench_run_configs +
+            ubench_splitk_run_configs + large_module_configs)

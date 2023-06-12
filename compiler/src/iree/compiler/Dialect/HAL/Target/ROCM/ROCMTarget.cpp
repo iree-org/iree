@@ -214,10 +214,10 @@ class ROCMTargetBackend final : public TargetBackend {
         builder, reinterpret_cast<const uint8_t *>(targetHSACO.c_str()),
         targetHSACO.size());
 
-    auto entryPointNames = llvm::to_vector<8>(llvm::map_range(
+    auto entryPointNames = llvm::map_to_vector<8>(
         variantOp.getBlock()
             .getOps<iree_compiler::IREE::HAL::ExecutableExportOp>(),
-        [&](auto op) { return op.getName(); }));
+        [&](auto op) { return op.getName(); });
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
     iree_hal_rocm_BlockSizeDef_vec_start(builder);

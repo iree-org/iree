@@ -36,7 +36,6 @@ iree_runtime_cc_library(
     deps = [
         ":task",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
     ],
 )
@@ -76,8 +75,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:atomic_slist",
         "//runtime/src/iree/base/internal:cpu",
@@ -97,7 +94,6 @@ iree_runtime_cc_test(
     deps = [
         ":task",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:prng",
         "//runtime/src/iree/task/testing:test_util",
     ],

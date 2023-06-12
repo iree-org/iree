@@ -2,8 +2,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-stream-dump-statistics{output-format=csv})" %s 2>&1 | FileCheck %s --check-prefix=CHECK-CSV
 
 // CHECK-PRETTY: Aggregate Statistics
-// CHECK-PRETTY:   Constants: 1, 0 B
-// CHECK-PRETTY:   Variables: 0, 0 B
+// CHECK-PRETTY:   Constants: 1, estimated storage of 192 B
+// CHECK-PRETTY:   Variables: 0, (TBD)
 // CHECK-PRETTY:  D->H Syncs: 2
 // CHECK-PRETTY: Submissions: 3, using cumulative 0 B
 // CHECK-PRETTY:   DMA Fills: 0
@@ -14,7 +14,7 @@
 
 // CHECK-CSV: ; Aggregate Statistics
 // CHECK-CSV: "Constants","Constant Size","Variables","Variable Size","Awaits","Submissions","Transient Size","Fills","Copies","Dispatches","Async Calls","Executables"
-// CHECK-CSV: 1,0,0,0,2,3,0,0,2,3,0,2
+// CHECK-CSV: 1,192,0,0,2,3,0,0,2,3,0,2
 // CHECK-CSV: ; Execution
 // CHECK-CSV: "Depth","Command","Symbol","Length","Invocations","Workload","Operands","Resources"
 // CHECK-CSV: 0,"copy",,192,,,,

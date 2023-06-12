@@ -68,6 +68,23 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
           ),
       // clang-format on
       llvm::cl::cat(category));
+
+#ifdef IREE_HAVE_MHLO_INPUT
+  binder.opt<bool>(
+      "iree-input-demote-i64-to-i32", demoteI64ToI32,
+      llvm::cl::desc("Converts all i64 ops and values into i32 counterparts."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-input-demote-f64-to-f32", demoteF64ToF32,
+      llvm::cl::desc("Converts all f64 ops and values into f32 counterparts."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-input-promote-bf16-to-f32", promoteBF16ToF32,
+      llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts."),
+      llvm::cl::cat(category));
+#endif
 }
 
 void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {

@@ -9,8 +9,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "iree/base/tracing.h"
-
 typedef struct iree_hal_local_executable_cache_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;

@@ -6,8 +6,6 @@
 
 #include "iree/base/internal/wait_handle_posix.h"
 
-#include "iree/base/tracing.h"
-
 #if defined(IREE_WAIT_API_POSIX_LIKE)
 
 #include <errno.h>

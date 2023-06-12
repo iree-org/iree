@@ -6,8 +6,6 @@
 
 #include "iree/hal/drivers/init.h"
 
-#include "iree/base/tracing.h"
-
 #if defined(IREE_HAVE_HAL_CUDA_DRIVER_MODULE)
 #include "iree/hal/drivers/cuda/registration/driver_module.h"
 #endif  // IREE_HAVE_HAL_CUDA_DRIVER_MODULE

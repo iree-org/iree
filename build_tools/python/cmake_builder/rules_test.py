@@ -29,18 +29,12 @@ class RulesTest(unittest.TestCase):
         rule,
         textwrap.dedent("""\
         iree_bytecode_module(
-          NAME
-            "abcd"
-          SRC
-            "abcd.mlir"
-          MODULE_FILE_NAME
-            "abcd.vmfb"
-          C_IDENTIFIER
-            "abcd.c"
-          COMPILE_TOOL
-            "iree_iree-compile2"
-          STATIC_LIB_PATH
-            "libx.a"
+          NAME "abcd"
+          SRC "abcd.mlir"
+          MODULE_FILE_NAME "abcd.vmfb"
+          C_IDENTIFIER "abcd.c"
+          COMPILE_TOOL "iree_iree-compile2"
+          STATIC_LIB_PATH "libx.a"
           FLAGS
             "--backend=cpu"
             "--opt=3"
@@ -62,12 +56,9 @@ class RulesTest(unittest.TestCase):
         rule,
         textwrap.dedent("""\
         iree_bytecode_module(
-          NAME
-            "abcd"
-          SRC
-            "abcd.mlir"
-          MODULE_FILE_NAME
-            "abcd.vmfb"
+          NAME "abcd"
+          SRC "abcd.mlir"
+          MODULE_FILE_NAME "abcd.vmfb"
           FLAGS
             "--backend=cpu"
             "--opt=3"
@@ -86,12 +77,9 @@ class RulesTest(unittest.TestCase):
         rule,
         textwrap.dedent("""\
         iree_fetch_artifact(
-          NAME
-            "abcd"
-          SOURCE_URL
-            "https://example.com/abcd.tflite"
-          OUTPUT
-            "./abcd.tflite"
+          NAME "abcd"
+          SOURCE_URL "https://example.com/abcd.tflite"
+          OUTPUT "./abcd.tflite"
           UNPACK
         )
         """))
@@ -110,15 +98,12 @@ class RulesTest(unittest.TestCase):
         rule,
         textwrap.dedent("""\
         iree_import_tf_model(
-          TARGET_NAME
-            "pkg_abcd"
-          SOURCE
-            "abcd/model"
+          TARGET_NAME "pkg_abcd"
+          SOURCE "abcd/model"
           IMPORT_FLAGS
             "--tf-savedmodel-exported-names=main"
             "--tf-import-type=savedmodel_v1"
-          OUTPUT_MLIR_FILE
-            "abcd.mlir"
+          OUTPUT_MLIR_FILE "abcd.mlir"
         )
         """))
 
@@ -133,14 +118,11 @@ class RulesTest(unittest.TestCase):
         rule,
         textwrap.dedent("""\
         iree_import_tflite_model(
-          TARGET_NAME
-            "pkg_abcd"
-          SOURCE
-            "abcd.tflite"
+          TARGET_NAME "pkg_abcd"
+          SOURCE "abcd.tflite"
           IMPORT_FLAGS
             "--fake-flag=abcd"
-          OUTPUT_MLIR_FILE
-            "abcd.mlir"
+          OUTPUT_MLIR_FILE "abcd.mlir"
         )
         """))
 
@@ -162,14 +144,10 @@ class RulesTest(unittest.TestCase):
         rule,
         textwrap.dedent("""\
         iree_benchmark_suite_module_test(
-          NAME
-            "model_test"
-          DRIVER
-            "LOCAL_TASK"
-          EXPECTED_OUTPUT
-            "xyz"
-          TIMEOUT
-            "10"
+          NAME "model_test"
+          DRIVER "LOCAL_TASK"
+          EXPECTED_OUTPUT "xyz"
+          TIMEOUT "10"
           MODULES
             "x86_64=a.vmfb"
             "arm=b.vmfb"

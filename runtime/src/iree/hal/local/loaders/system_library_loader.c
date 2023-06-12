@@ -11,7 +11,6 @@
 #include <stdint.h>
 
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_library_util.h"

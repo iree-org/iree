@@ -144,7 +144,7 @@ print_iree_config() {
     return 1
   fi
 
-  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DCLANG_DIR='$clang_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF"
+  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DCLANG_DIR='$clang_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF -DLLVM_INSTALL_DIR=${LLVM_INSTALL_DIR}"
 }
 
 do_build_iree() {

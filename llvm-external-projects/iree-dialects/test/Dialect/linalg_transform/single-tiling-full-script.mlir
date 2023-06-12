@@ -29,12 +29,12 @@ transform.sequence failures(propagate) {
 
   %func = transform.structured.match ops{["func.func"]} in %module_op1
     : (!transform.any_op) -> !transform.any_op
-  %func_e_2 = transform.vector.lower_contraction %func
-    lowering_strategy = "outerproduct"
-      : (!transform.any_op) -> !transform.any_op
-  %func_e_3 = transform.vector.lower_transpose %func_e_2
-    lowering_strategy = "shuffle_1d"
-      : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func {
+      transform.apply_patterns.vector.lower_contraction lowering_strategy = "outerproduct"
+  } : !transform.any_op
+  transform.apply_patterns to %func {
+      transform.apply_patterns.vector.lower_transpose lowering_strategy = "shuffle_1d"
+  } : !transform.any_op
 
   lower_to_llvm %module_op1 : (!transform.any_op) -> !transform.any_op
 }

@@ -237,7 +237,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   tensor::populateFoldTensorEmptyPatterns(patterns);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   // Pull in tensor dialect canonicalization patterns to fold tensor.cast
   // into producers when possible.
   context->getLoadedDialect<tensor::TensorDialect>()

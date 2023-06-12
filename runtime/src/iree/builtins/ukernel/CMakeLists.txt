@@ -36,17 +36,17 @@ iree_cc_library(
   HDRS
     "common.h"
     "elementwise.h"
+    "exported_bits.h"
     "mmt4d.h"
     "mmt4d_internal.h"
     "pack.h"
     "pack_internal.h"
     "query_tile_sizes.h"
     "query_tile_sizes_internal.h"
+    "static_assert.h"
     "unpack.h"
     "unpack_internal.h"
   DEPS
-    ::exported_bits
-    ::static_assert
     iree::base::core_headers
   PUBLIC
 )
@@ -60,6 +60,7 @@ iree_cc_library(
     "common.h"
     "elementwise.c"
     "elementwise.h"
+    "exported_bits.h"
     "mmt4d.c"
     "mmt4d.h"
     "mmt4d_internal.h"
@@ -71,6 +72,7 @@ iree_cc_library(
     "query_tile_sizes.c"
     "query_tile_sizes.h"
     "query_tile_sizes_internal.h"
+    "static_assert.h"
     "unpack.c"
     "unpack.h"
     "unpack_internal.h"

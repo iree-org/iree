@@ -6,8 +6,6 @@
 
 #include "iree/hal/local/executable_loader.h"
 
-#include "iree/base/tracing.h"
-
 iree_status_t iree_hal_executable_import_provider_try_resolve(
     const iree_hal_executable_import_provider_t import_provider,
     iree_host_size_t count, const char* const* symbol_names, void** out_fn_ptrs,

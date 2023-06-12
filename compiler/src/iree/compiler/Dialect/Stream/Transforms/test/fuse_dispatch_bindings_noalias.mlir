@@ -1,13 +1,17 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=false})' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-fuse-dispatch-bindings)' %s | FileCheck %s
 
 // TODO(benvanik): remove this file when aliasing mutable bindings is fixed.
 
 // Tests that bindings that are duplicated at all dispatch sites are folded
 // so long as they are not mutable.
 
+#noaliasConfig = #stream.resource_config<{
+  alias_mutable_bindings = false
+}>
+
 // CHECK-LABEL: @deduplicateBindingsEx
 stream.executable private @deduplicateBindingsEx {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch attributes {stream.resources = #noaliasConfig}
   builtin.module  {
     // CHECK: func.func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
     // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OPERAND:.+]]: index)

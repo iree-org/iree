@@ -9,13 +9,13 @@ iree_microbenchmark_suite(
     "dynamic_shape_vectorization.mlir"
     "linalg_mmt4d.mlir"
     "linalg_transpose.mlir"
-    "mhlo_conv.mlir"
-    "mhlo_dot.mlir"
-    "mhlo_dot_general.mlir"
-    "mhlo_fft_abs.mlir"
+    "stablehlo_conv.mlir"
+    "stablehlo_dot.mlir"
+    "stablehlo_dot_general.mlir"
+    "stablehlo_fft_abs.mlir"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-cpu-features=host"
 )
 
@@ -28,6 +28,6 @@ if(IREE_TARGET_BACKEND_CUDA)
       "linalg_transpose.mlir"
     FLAGS
       "--iree-hal-target-backends=cuda"
-      "--iree-input-type=mhlo_legacy"
+      "--iree-input-type=stablehlo"
   )
 endif()

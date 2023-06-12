@@ -19,7 +19,6 @@ iree_lit_test_suite(
     "fragment_000.mlir"
     "fullyconnected.mlir"
     "mnist_fake_weights.mlir"
-    "resnet50_fake_weights.mlir"
     "unidirectional_lstm.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
@@ -30,8 +29,24 @@ iree_lit_test_suite(
     "driver=vulkan"
     "hostonly"
     "optonly"
-  TIMEOUT
-    900
+)
+
+iree_lit_test_suite(
+  NAME
+    lit_large
+  SRCS
+    "resnet50_fake_weights.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree-run-mlir
+  LABELS
+    "driver=local-task"
+    "driver=vulkan"
+    "hostonly"
+    "noasan"
+    "notsan"
+    "optonly"
 )
 
 iree_check_single_backend_test_suite(
@@ -45,7 +60,12 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
+  LABELS
+    "hostonly"
+    "noasan"
+    "notsan"
+    "optonly"
 )
 
 iree_check_single_backend_test_suite(
@@ -59,7 +79,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
   TIMEOUT
     900
 )
@@ -75,7 +95,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
   LABELS
     "noasan"
     "nomsan"
@@ -100,7 +120,7 @@ iree_static_linker_test(
   FUNCTION_INPUTS
     "1x28x28x1xf32"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
 )
 
 iree_static_linker_test(
@@ -115,7 +135,7 @@ iree_static_linker_test(
   FUNCTION_INPUTS
     "1x28x28x1xf32"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo_legacy"
+    "--iree-input-type=stablehlo"
     "--iree-vm-target-index-bits=32"
   EMITC
 )

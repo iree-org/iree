@@ -12,7 +12,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/api.h"
 
 // Force using CUDA streams until we support command buffer caching to avoid the
@@ -30,6 +29,10 @@ IREE_FLAG(
     "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
     "Severely impacts benchmark timings and should only be used when\n"
     "analyzing dispatch timings.");
+
+IREE_FLAG(
+    bool, cuda_async_allocations, true,
+    "Enables CUDA asynchronous stream-ordered allocations when supported.");
 
 IREE_FLAG(int32_t, cuda_default_index, 0, "Index of the default CUDA device.");
 
@@ -92,6 +95,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   }
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
   default_params.stream_tracing = FLAG_cuda_tracing;
+  default_params.async_allocations = FLAG_cuda_async_allocations;
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);

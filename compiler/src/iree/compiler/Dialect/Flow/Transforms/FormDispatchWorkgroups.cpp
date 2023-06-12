@@ -296,7 +296,7 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
     RewritePatternSet convertToFlowPatterns(context);
     Flow::populateTensorToFlowConversionPatterns(context,
                                                  convertToFlowPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
         convertToFlowPatterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(
         convertToFlowPatterns, context);

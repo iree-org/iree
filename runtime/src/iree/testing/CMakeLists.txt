@@ -19,7 +19,6 @@ if(IREE_ENABLE_THREADING)
     DEPS
       benchmark
       iree::base
-      iree::base::tracing
     PUBLIC
   )
 else()
@@ -32,7 +31,6 @@ else()
       "benchmark_nop.c"
     DEPS
       iree::base
-      iree::base::tracing
     PUBLIC
   )
 endif()

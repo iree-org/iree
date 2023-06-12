@@ -308,6 +308,125 @@ SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
   return {};  // No devices found; let caller decide what to do.
 }
 
+// Returns a set of all configuration attributes from all device targets with
+// a configuration set. Targets with no configuration set are ignored.
+static SmallVector<DictionaryAttr> lookupOptionalConfigAttrs(Operation *op) {
+  auto targetAttrs = IREE::HAL::DeviceTargetAttr::lookup(op);
+  if (targetAttrs.empty()) return {};
+  SmallVector<DictionaryAttr> configAttrs;
+  for (auto targetAttr : targetAttrs) {
+    auto configAttr = targetAttr.getConfiguration();
+    if (configAttr) configAttrs.push_back(configAttr);
+  }
+  return configAttrs;
+}
+
+// Returns a set of all configuration attributes from all device targets.
+// Returns nullopt if any target is missing a configuration attribute.
+static std::optional<SmallVector<DictionaryAttr>> lookupRequiredConfigAttrs(
+    Operation *op) {
+  auto targetAttrs = IREE::HAL::DeviceTargetAttr::lookup(op);
+  if (targetAttrs.empty()) return std::nullopt;
+  SmallVector<DictionaryAttr> configAttrs;
+  for (auto targetAttr : targetAttrs) {
+    auto configAttr = targetAttr.getConfiguration();
+    if (!configAttr) return std::nullopt;
+    configAttrs.push_back(configAttr);
+  }
+  return configAttrs;
+}
+
+template <typename AttrT>
+static std::optional<typename AttrT::ValueType> joinConfigAttrs(
+    ArrayRef<DictionaryAttr> configAttrs, StringRef name,
+    std::function<typename AttrT::ValueType(typename AttrT::ValueType,
+                                            typename AttrT::ValueType)>
+        join) {
+  if (configAttrs.empty()) return std::nullopt;
+  auto firstValue = configAttrs.front().getAs<AttrT>(name);
+  if (!firstValue) return std::nullopt;
+  auto result = firstValue.getValue();
+  for (auto configAttr : configAttrs.drop_front(1)) {
+    auto value = configAttr.getAs<AttrT>(name);
+    if (!value) return std::nullopt;
+    result = join(result, value.getValue());
+  }
+  return result;
+}
+
+template <typename AttrT>
+static std::optional<StaticRange<typename AttrT::ValueType>>
+joinConfigStaticRanges(ArrayRef<DictionaryAttr> configAttrs, StringRef name,
+                       std::function<StaticRange<typename AttrT::ValueType>(
+                           StaticRange<typename AttrT::ValueType>,
+                           StaticRange<typename AttrT::ValueType>)>
+                           join) {
+  if (configAttrs.empty()) return std::nullopt;
+  auto firstValue = configAttrs.front().getAs<AttrT>(name);
+  if (!firstValue) return std::nullopt;
+  StaticRange<typename AttrT::ValueType> result{firstValue.getValue()};
+  for (auto configAttr : configAttrs.drop_front(1)) {
+    auto value = configAttr.getAs<AttrT>(name);
+    if (!value) return std::nullopt;
+    result =
+        join(result, StaticRange<typename AttrT::ValueType>{value.getValue()});
+  }
+  return result;
+}
+
+// static
+bool DeviceTargetAttr::lookupConfigAttrAny(Operation *op, StringRef name) {
+  auto configAttrs = lookupOptionalConfigAttrs(op);
+  if (configAttrs.empty()) return false;
+  for (auto configAttr : configAttrs) {
+    if (configAttr.get(name)) return true;
+  }
+  return false;
+}
+
+// static
+bool DeviceTargetAttr::lookupConfigAttrAll(Operation *op, StringRef name) {
+  auto configAttrs = lookupRequiredConfigAttrs(op);
+  if (!configAttrs) return false;
+  for (auto configAttr : *configAttrs) {
+    if (!configAttr.get(name)) return false;
+  }
+  return true;
+}
+
+// static
+std::optional<bool> DeviceTargetAttr::lookupConfigAttrAnd(Operation *op,
+                                                          StringRef name) {
+  auto configAttrs = lookupRequiredConfigAttrs(op);
+  if (!configAttrs) return std::nullopt;
+  return joinConfigAttrs<BoolAttr>(
+      configAttrs.value(), name, [](bool lhs, bool rhs) { return lhs && rhs; });
+}
+
+// static
+std::optional<bool> DeviceTargetAttr::lookupConfigAttrOr(Operation *op,
+                                                         StringRef name) {
+  auto configAttrs = lookupRequiredConfigAttrs(op);
+  if (!configAttrs) return std::nullopt;
+  return joinConfigAttrs<BoolAttr>(
+      configAttrs.value(), name, [](bool lhs, bool rhs) { return lhs || rhs; });
+}
+
+// static
+std::optional<StaticRange<APInt>> DeviceTargetAttr::lookupConfigAttrRange(
+    Operation *op, StringRef name) {
+  auto configAttrs = lookupRequiredConfigAttrs(op);
+  if (!configAttrs) return std::nullopt;
+  return joinConfigStaticRanges<IntegerAttr>(
+      configAttrs.value(), name,
+      [](StaticRange<APInt> lhs, StaticRange<APInt> rhs) {
+        return StaticRange<APInt>{
+            llvm::APIntOps::smin(lhs.min, rhs.min),
+            llvm::APIntOps::smax(lhs.max, rhs.max),
+        };
+      });
+}
+
 // static
 SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::lookupExecutableTargets(
     Operation *op) {

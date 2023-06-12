@@ -8,7 +8,6 @@
 
 #include "./vm.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
@@ -84,7 +83,7 @@ py::str HalAllocator::FormattedStatistics() {
 py::object HalAllocator::AllocateBufferCopy(
     int memory_type, int allowed_usage, py::object buffer,
     std::optional<iree_hal_element_types_t> element_type) {
-  IREE_TRACE_SCOPE0("HalAllocator::AllocateBufferCopy");
+  IREE_TRACE_SCOPE_NAMED("HalAllocator::AllocateBufferCopy");
   // Request a view of the buffer (use the raw python C API to avoid
   // some allocation and copying at the pybind level).
   Py_buffer py_view;

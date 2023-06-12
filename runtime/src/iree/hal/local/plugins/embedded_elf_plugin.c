@@ -6,7 +6,6 @@
 
 #include "iree/hal/local/plugins/embedded_elf_plugin.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/local/elf/elf_module.h"
 
 #if IREE_FILE_IO_ENABLE

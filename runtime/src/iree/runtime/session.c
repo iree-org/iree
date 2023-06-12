@@ -11,7 +11,6 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/file_io.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/instance.h"

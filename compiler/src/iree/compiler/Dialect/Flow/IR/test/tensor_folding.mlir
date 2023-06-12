@@ -256,11 +256,11 @@ func.func @storeConstScalar() -> tensor<i32> {
 
 // -----
 
-// CHECK-LABEL: @allocDims
+// CHECK-LABEL: @allocaDims
 //  CHECK-SAME: (%[[DIM:.+]]: index)
-func.func @allocDims(%dim: index) -> (index, index, index) {
-  // CHECK-NOT: flow.tensor.alloc
-  %0 = flow.tensor.alloc : tensor<4x?x0xf32>{%dim}
+func.func @allocaDims(%dim: index) -> (index, index, index) {
+  // CHECK-NOT: flow.tensor.alloca
+  %0 = flow.tensor.alloca : tensor<4x?x0xf32>{%dim}
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index

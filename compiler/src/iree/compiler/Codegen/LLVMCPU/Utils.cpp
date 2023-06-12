@@ -98,5 +98,9 @@ bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2");
 }
 
+bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+sme");
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

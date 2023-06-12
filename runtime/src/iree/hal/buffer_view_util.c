@@ -10,7 +10,6 @@
 #include <stdbool.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/string_util.h"

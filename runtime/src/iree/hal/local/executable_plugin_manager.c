@@ -7,7 +7,6 @@
 #include "iree/hal/local/executable_plugin_manager.h"
 
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Plugin API compatibility checks
