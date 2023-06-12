@@ -117,7 +117,7 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
     label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
   fi
   if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE}" == 1 ]]; then
-    label_exclude_args+=("^requires-gpu-nvidia$")
+    label_exclude_args+=("^requires-gpu")
   fi
 
   label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
