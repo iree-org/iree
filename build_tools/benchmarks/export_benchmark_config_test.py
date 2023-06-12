@@ -53,8 +53,8 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         tags=[])
     device_spec_c = common_definitions.DeviceSpec.build(
-        id="dev_c",
-        device_name="dev_c",
+        id="dev_c_accel",
+        device_name="dev_c_accel",
         architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         tags=[])
@@ -63,34 +63,33 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_a,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
-        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        presets=["default"])
     unmatched_run_config_b = iree_definitions.E2EModelRunConfig.build(
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_b,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
-        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        presets=["default"])
     matched_run_config_c = iree_definitions.E2EModelRunConfig.build(
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_c,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
-        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
-    matchers = [(lambda config: config.target_device_spec.architecture.
-                 architecture == "cuda"),
-                (lambda config: config.target_device_spec.host_environment.
-                 platform == "android")]
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        presets=["large", "z80"])
 
     run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[
             matched_run_config_a, unmatched_run_config_b, matched_run_config_c
         ],
-        target_device_names={"dev_a_cpu", "dev_c"},
-        preset_matchers=matchers)
+        target_device_names={"dev_a_cpu", "dev_c_accel"},
+        presets=["default", "z80"])
 
     self.assertEqual(run_config_map, {
         "dev_a_cpu": [matched_run_config_a],
-        "dev_c": [matched_run_config_c],
+        "dev_c_accel": [matched_run_config_c],
     })
 
   def test_filter_and_group_run_configs_include_all(self):
@@ -134,8 +133,6 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b, run_config_c])
 
-    self.maxDiff = 100000
-
     self.assertEqual(run_config_map, {
         "dev_a_cpu": [run_config_a],
         "dev_a_gpu": [run_config_b, run_config_c],
@@ -176,7 +173,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         "dev_b": [run_config_b],
     })
 
-  def test_filter_and_group_run_configs_set_preset_matchers(self):
+  def test_filter_and_group_run_configs_with_presets(self):
     small_model = common_definitions.Model(
         id="small_model",
         name="small_model",
@@ -217,28 +214,26 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         tags=[])
-    run_config_a = iree_definitions.E2EModelRunConfig.build(
+    run_config_default = iree_definitions.E2EModelRunConfig.build(
         module_generation_config=small_gen_config,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_a,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
-        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
-    run_config_b = iree_definitions.E2EModelRunConfig.build(
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        presets=["riscv_64", "default"])
+    run_config_large = iree_definitions.E2EModelRunConfig.build(
         module_generation_config=big_gen_config,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_b,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
-        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        presets=["riscv_64", "large"])
 
     run_config_map = export_benchmark_config.filter_and_group_run_configs(
-        run_configs=[run_config_a, run_config_b],
-        preset_matchers=[
-            lambda config: config.module_generation_config.imported_model.model.
-            id == "small_model"
-        ])
+        run_configs=[run_config_default, run_config_large], presets=["default"])
 
     self.assertEqual(run_config_map, {
-        "dev_a": [run_config_a],
+        "dev_a": [run_config_default],
     })
 
 

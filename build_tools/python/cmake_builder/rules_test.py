@@ -12,57 +12,27 @@ import cmake_builder.rules
 
 class RulesTest(unittest.TestCase):
 
-  def test_build_iree_bytecode_module(self):
-    rule = cmake_builder.rules.build_iree_bytecode_module(
+  def test_build_iree_benchmark_suite_module(self):
+    rule = cmake_builder.rules.build_iree_benchmark_suite_module(
         target_name="abcd",
         src="abcd.mlir",
         module_name="abcd.vmfb",
         flags=["--backend=cpu", "--opt=3"],
-        compile_tool_target="iree_iree-compile2",
-        c_identifier="abcd.c",
-        static_lib_path="libx.a",
-        deps=["iree_libx", "iree_liby"],
-        testonly=True,
-        public=False)
+        presets=["default", "z80"])
 
     self.assertEqual(
         rule,
         textwrap.dedent("""\
-        iree_bytecode_module(
-          NAME "abcd"
-          SRC "abcd.mlir"
-          MODULE_FILE_NAME "abcd.vmfb"
-          C_IDENTIFIER "abcd.c"
-          COMPILE_TOOL "iree_iree-compile2"
-          STATIC_LIB_PATH "libx.a"
-          FLAGS
-            "--backend=cpu"
-            "--opt=3"
-          DEPS
-            "iree_libx"
-            "iree_liby"
-          TESTONLY
-        )
-        """))
-
-  def test_build_iree_bytecode_module_with_defaults(self):
-    rule = cmake_builder.rules.build_iree_bytecode_module(
-        target_name="abcd",
-        src="abcd.mlir",
-        module_name="abcd.vmfb",
-        flags=["--backend=cpu", "--opt=3"])
-
-    self.assertEqual(
-        rule,
-        textwrap.dedent("""\
-        iree_bytecode_module(
+        iree_benchmark_suite_module(
           NAME "abcd"
           SRC "abcd.mlir"
           MODULE_FILE_NAME "abcd.vmfb"
           FLAGS
             "--backend=cpu"
             "--opt=3"
-          PUBLIC
+          PRESETS
+            "default"
+            "z80"
         )
         """))
 
