@@ -160,17 +160,6 @@ class Fill2DOpConversion : public VMVXImportOpConversion<IREE::VMVX::Fill2DOp> {
   }
 };
 
-// Converts the vmvx.query_tile_sizes op to its import.
-class QueryTileSizesOpConversion
-    : public VMVXImportOpConversion<IREE::VMVX::QueryTileSizesOp> {
- public:
-  using VMVXImportOpConversion::VMVXImportOpConversion;
-
-  std::string getImportFqName(IREE::VMVX::QueryTileSizesOp op) const override {
-    return "vmvx.query_tile_sizes.2d";
-  }
-};
-
 class UnaryOpConversion : public VMVXImportOpConversion<IREE::VMVX::UnaryOp> {
  public:
   using VMVXImportOpConversion::VMVXImportOpConversion;
@@ -195,8 +184,7 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {
   patterns.insert<BinaryOpConversion, CopyOpConversion, Fill2DOpConversion,
-                  UnaryOpConversion, QueryTileSizesOpConversion>(
-      context, importSymbols, typeConverter);
+                  UnaryOpConversion>(context, importSymbols, typeConverter);
 }
 
 }  // namespace iree_compiler

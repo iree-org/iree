@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/VMVX/EncodingInfo.h"
@@ -55,10 +56,10 @@ static MaterializeEncodingValueFn getMaterializeEncodingValueFn(
 struct VMVXMaterializeEncodingPass
     : public VMVXMaterializeEncodingBase<VMVXMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, affine::AffineDialect,
-                    tensor::TensorDialect, IREE::Flow::FlowDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect,
-                    IREE::VMVX::VMVXDialect>();
+    registry.insert<
+        arith::ArithDialect, affine::AffineDialect, tensor::TensorDialect,
+        IREE::Flow::FlowDialect, IREE::LinalgExt::IREELinalgExtDialect,
+        IREE::VMVX::VMVXDialect, IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
 };
