@@ -24,6 +24,9 @@ declare -a excluded_files_patterns=(
   "**/node_modules/**"
 )
 
+# ${excluded_files_patterns} is expanded into
+# "--ignore pattern1 --ignore pattern2 ...", since markdownlint doesn't accept
+# "--ignore pattern1 pattern2 ...".
 markdownlint "${included_files_patterns[*]}" \
     --config ./docs/.markdownlint.yml \
-    --ignore "${excluded_files_patterns[*]}"
+    ${excluded_files_patterns[*]/#/--ignore }
