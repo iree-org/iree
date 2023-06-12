@@ -114,6 +114,7 @@ function(iree_import_tf_model)
   endif()
 endfunction()
 
+# TODO(#11076): Clean up the legacy benchmark suite.
 # iree_benchmark_suite()
 #
 # Generates benchmark suites for MLIR input modules. The generated artifacts

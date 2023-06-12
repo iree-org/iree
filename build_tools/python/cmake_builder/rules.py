@@ -87,36 +87,28 @@ def _convert_block_to_string(block: List[str]) -> str:
   return "\n".join(block + [""])
 
 
-def build_iree_bytecode_module(target_name: str,
-                               src: str,
-                               module_name: str,
-                               flags: List[str] = [],
-                               compile_tool_target: Optional[str] = None,
-                               c_identifier: Optional[str] = None,
-                               static_lib_path: Optional[str] = None,
-                               deps: List[str] = [],
-                               friendly_name: Optional[str] = None,
-                               testonly: bool = False,
-                               public: bool = True) -> str:
+def build_iree_benchmark_suite_module(
+    target_name: str,
+    src: str,
+    module_name: str,
+    flags: Sequence[str] = (),
+    presets: Sequence[str] = (),
+    friendly_name: Optional[str] = None) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
   src_block = _get_string_arg_block("SRC", src)
   module_name_block = _get_string_arg_block("MODULE_FILE_NAME", module_name)
-  c_identifier_block = _get_string_arg_block("C_IDENTIFIER", c_identifier)
-  static_lib_block = _get_string_arg_block("STATIC_LIB_PATH", static_lib_path)
-  compile_tool_target_block = _get_string_arg_block("COMPILE_TOOL",
-                                                    compile_tool_target)
   flags_block = _get_string_list_arg_block("FLAGS", flags)
-  deps_block = _get_string_list_arg_block("DEPS", deps)
+  presets_block = _get_string_list_arg_block("PRESETS", presets)
   friendly_name_block = _get_string_arg_block("FRIENDLY_NAME", friendly_name)
-  testonly_block = _get_option_arg_block("TESTONLY", testonly)
-  public_block = _get_option_arg_block("PUBLIC", public)
   return _convert_block_to_string(
-      _build_call_rule(rule_name="iree_bytecode_module",
+      _build_call_rule(rule_name="iree_benchmark_suite_module",
                        parameter_blocks=[
-                           name_block, src_block, module_name_block,
-                           c_identifier_block, compile_tool_target_block,
-                           static_lib_block, flags_block, friendly_name_block,
-                           deps_block, testonly_block, public_block
+                           name_block,
+                           src_block,
+                           module_name_block,
+                           flags_block,
+                           presets_block,
+                           friendly_name_block,
                        ]))
 
 

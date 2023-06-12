@@ -35,31 +35,24 @@ source build_tools/cmake/setup_tf_python.sh
 declare -a BUILD_TARGETS
 
 if (( "${BUILD_DEFAULT_BENCHMARK_SUITES}" ==  1 )); then
-  BUILD_TARGETS+=("iree-benchmark-suites")
+  BUILD_TARGETS+=("iree-benchmark-suites-default")
 fi
 
-# Separate the presets into the execution and compilation benchmark presets to
-# export different configs with export_benchmark_config.py.
 COMPILATION_PRESETS=""
 EXECUTION_PRESETS=""
 if [[ -n "${BENCHMARK_PRESETS}" ]]; then
   IFS=, read -r -a PRESET_ARRAY <<< "${BENCHMARK_PRESETS}"
   for PRESET in "${PRESET_ARRAY[@]}"; do
+    # Add required build targets for the selected benchmark presets.
+    BUILD_TARGETS+=("iree-benchmark-suites-${PRESET}")
+
+    # Separate the presets into the execution and compilation benchmark presets
+    # to export different configs with export_benchmark_config.py.
     case "${PRESET}" in
-      comp-stats)
-        BUILD_TARGETS+=(iree-e2e-compile-stats-suites)
+      comp-stats*)
         COMPILATION_PRESETS="${COMPILATION_PRESETS},${PRESET}"
-        ;;
-      comp-stats-large)
-        BUILD_TARGETS+=(iree-e2e-compile-stats-suites-large)
-        COMPILATION_PRESETS="${COMPILATION_PRESETS},${PRESET}"
-        ;;
-      *-large)
-        BUILD_TARGETS+=(iree-benchmark-suites-large)
-        EXECUTION_PRESETS="${EXECUTION_PRESETS},${PRESET}"
         ;;
       *)
-        # Build target of the default preset has been added above.
         EXECUTION_PRESETS="${EXECUTION_PRESETS},${PRESET}"
         ;;
     esac
