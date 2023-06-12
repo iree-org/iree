@@ -383,3 +383,31 @@ hal.executable @complex {
 //   CHECK-NOT: unrealized
 //       CHECK: llvm.return
 
+// -----
+
+// Check that we don't choke on memref of index.
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+hal.executable @shared_memory_lowering_index {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @shared_memory_lowering_index layout(#pipeline_layout)
+    builtin.module {
+      func.func @shared_memory_lowering_index() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant dense<0> : vector<4xindex>
+        %0 = memref.alloc() : memref<1x16x32xindex, #gpu.address_space<workgroup>>
+        vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xindex, #gpu.address_space<workgroup>>, vector<4xindex>
+        return
+      }
+    }
+  }
+}
+//       CHECK: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
+// CHECK-LABEL: llvm.func @shared_memory_lowering_index() {
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
