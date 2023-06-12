@@ -327,7 +327,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
-// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
 
 // alignLhs
 // CHECK:      transform.structured.masked_vectorize %[[TILED_LHS]] vector_sizes [4, 4]
@@ -391,7 +391,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      transform.structured.tile_to_forall_op %[[RHS_COPY]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
-// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
 
 // Verify we don't go down the path without the flag.
 // WITH_OPTIONS-LABEL: func @aligned_matmul
