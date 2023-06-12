@@ -51,6 +51,44 @@ def ApplyBufferOptimizationsOp :
   }];
 }
 
+def ApplyBubbleCollapsePatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.bubble_collapse",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns to fold an expanding tensor.expand_shape operation with
+    its producer generic operation by collapsing the dimensions of the generic
+    op.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyBubbleExpandPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.bubble_expand",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns to fold an expanding (collapsing) tensor_reshape
+    operation with its producer (consumer) generic operation by expanding
+    the dimensionality of the loop in the generic op.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyBubblePackUnpackPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.bubble_pack_unpack",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns to bubble up or down data layout ops across other
+    operations.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyFoldFillIntoPadPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.fold_fill_into_pad",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
@@ -77,118 +115,101 @@ def ApplyFoldReshapeIntoTensorHalInterfacePatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
+def ApplyIreeLinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.linalg_elementwise_greedy_fusion",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns to fuse `linalg.generic` -> `linalg.generic` operations
+    when both operations are fusable elementwise operations.
+
+    Note: This pattern set is parameterized for usage in IREE, therefore
+    it is called "iree.linalg_elementwise_greedy_fusion".
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyPrepareVectorToMMAPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.prepare_vector_to_mma",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns that transform vector ops into a canonical form to
+    convert to MMA matrix operations. If `useNvGpu` is true, then the patterns
+    will populated will prepare for conversion to `nvgpu` mma operations
+    rather than the `gpu` dialect WMMA operations.
+  }];
+
+  let arguments = (ins DefaultValuedAttr<BoolAttr, "true">:$useNvGpu);
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyUnrollVectorsGpuMmaSyncPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.unroll_vectors_gpu_mma_sync",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns that unroll vectors. TODO: better documentation.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.unroll_vectors_gpu_wmma_sync",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populate patterns that unroll vectors. TODO: better documentation.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyCommonSubexpressionEliminationOp : Op<Transform_Dialect, "iree.apply_cse",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Greedily applies patterns as specified by its attributes.
+    Apply common subexpression elimination. This transform is applied to all
+    ops within the target that are isolated from above.
 
-    Must be applied to an op with trait IsolatedFromAbove since the
-    GreedyPatternRewriter asserts those. Internally, uses the tracking rewriter
-    to preserve handles to payload operations nested within operations
-    associated with `target`. Fails if tracking cannot find replacement for a
-    payload operation. This may become controllable with an attribute in the
-    future.
-
-    Returns the IsolatedFromAbove op whose content it has modified for better
-    chaining APIs.
-
-    The following additive attributes can be set, they add patterns in an
-    unspecified order:
-      - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This
-      must be applied separately from `bubble_expand` patterns because of some
-      upstream pattern interference issue atm.
-      - bubble_expand: bubble `expand_shape` down across Linalg ops. This
-      must be applied separately from `bubble_collapse` patterns because of some
-      upstream pattern interference issue atm.
-      - bubble_pack_un_pack: bubble `pack` up and `unpack` down across Linalg
-      ops.
-      - canonicalization: adds all the canonicalization patterns of all
-      registered dialects and ops.
-      - cse: additionally apply common subexpression elimination. This must
-      apply on a funcOp. This is not a set of patterns per se but is still very
-      convenient to apply it close to canonicalization and other greedy pattern
-      applications.
-      - erase_unnecessary_tensor_operands: add patterns that erase unnecessary
-      tensor operands.
-      - expand_memref_strided_metadata: adds patterns that expand memref
-      operations into extract_strided_metadata operations and a materialization
-      of their effect on the metadata (sizes, offset, strides).
-      - extract_address_computations: adds patterns for anchoring subview 
-      accessing operations at [0, ... 0].
-      - fold_reassociative_reshapes: adds patterns that fold insert_slice/
-      extract_slice ops with reassociative reshape ops.
-      - licm: additionally apply loop-independent code motion and single 
-      iteration loop promotion. This is not a set of patterns per se but is still
-      very convenient to apply it close to canonicalization and other greedy
-      pattern applications.
-      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion
-      patterns using a naive default heuristic.
-      - lower_transfer_op_permutations: Lower transfer ops to transfer ops
-      with minor identity permutations.
-      - lower_vector_masks: Lower vector.mask ops away.
-      - prepare_vector_to_mma: pre-process vector.contract op to set it in a form
-      that can be mapped to nvgpu.mma operations. 
-      behavior on subset-based linalg operations using insert/extract slices.
-      - swapping_patterns: adds patterns that swap operations for a better outcome.
-      This is a catch all that can be refined further if/when needed.
-      - swap_padding_elide_conditional: refines the tensor.pad +
-      tensor.extract_slice swapping pattern. This injects static information
-      that guarantees padding is smaller than the window size which guarantees
-      we never see a tile comprised of padding-only.
-      - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
-      size for GPUs with mma operations. The size is currently hardcoded but
-      should be refactored upstream and made pluggable.
-      - unroll_vectors_gpu_wmma: adds patterns that unroll vectors to a native tile
-      size for GPUs with wmma operations. The size is currently hardcoded but
-      should be refactored upstream and made pluggable.
-
-
-    #### Return modes:
-
-    This operation applies a set of patterns specified by attributes. To apply
-    these patterns, this operation must target an operation that is isolated
-    from above, otherwise the transform definitely fails.
-
-    If the pattern application fails, or if the underlying listener fails to
-    capture op handles, the transformation definitely fails.
-
-    Otherwise the transformation is successful.
+    #### Return modes
 
     This operation does not consume the target handle and does not produce any
     handle.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$target,
-                       UnitAttr:$bubble_collapse,
-                       UnitAttr:$bubble_expand,
-                       UnitAttr:$bubble_pack_un_pack,
-                       UnitAttr:$canonicalization,
-                       UnitAttr:$cse,
-                       UnitAttr:$erase_unnecessary_tensor_operands,
-                       UnitAttr:$expand_memref_strided_metadata,
-                       UnitAttr:$extract_address_computations,
-                       UnitAttr:$fold_reassociative_reshapes,
-                       UnitAttr:$licm,
-                       UnitAttr:$linalg_elementwise_greedy_fusion,
-                       UnitAttr:$lower_transfer_op_permutations,
-                       UnitAttr:$lower_vector_masks,
-                       UnitAttr:$prepare_vector_to_mma,
-                       UnitAttr:$swap_padding_elide_conditional,
-                       UnitAttr:$swapping_patterns,
-                       UnitAttr:$unroll_vectors_gpu_mma_sync,
-                       UnitAttr:$unroll_vectors_gpu_wmma);
-  let results = (outs);
-
-  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let assemblyFormat = "$target attr-dict `:` type($target)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let builders = [
-    // TODO: Some bitvector to scale better than n-bools.
-    OpBuilder<(ins "Value":$target,
-                   "const ApplyPatternsOpPatterns &":$patterns)>
-  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def ApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Apply loop-independent code motion and single iteration loop promotion.
+    This transform is applied to all FuncOps within the target.
+
+    #### Return modes
+
+    This operation does not consume the target handle and does not produce any
+    handle.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let assemblyFormat = "$target attr-dict `:` type($target)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

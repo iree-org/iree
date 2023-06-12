@@ -11,7 +11,9 @@ func.func @select_cmp_eq_select(%arg0: i64, %arg1: i64) -> i64 {
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !transform.any_op):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %0 { canonicalization } : (!transform.any_op) -> ()
+  transform.apply_patterns to %0 {
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
 }
 
 // -----
@@ -84,7 +86,9 @@ func.func @bubble_up(%arg0: tensor<32x64xf32>) -> tensor<32x2x32xf32> {
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !transform.any_op):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %0 { bubble_expand } : (!transform.any_op) -> ()
+  transform.apply_patterns to %0 {
+    transform.apply_patterns.iree.bubble_expand
+  } : !transform.any_op
 }
 
 // -----

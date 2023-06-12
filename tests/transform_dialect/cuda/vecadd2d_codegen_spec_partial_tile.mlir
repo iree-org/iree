@@ -15,7 +15,8 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
+    transform.apply_patterns.canonicalization
   } : !transform.any_op
-  transform.iree.apply_patterns %variant_op
-    { canonicalization, licm, cse } : (!transform.any_op) -> ()
+  transform.iree.apply_licm %variant_op : !transform.any_op
+  transform.iree.apply_cse %variant_op : !transform.any_op
 }

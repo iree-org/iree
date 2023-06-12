@@ -94,8 +94,12 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: apply_patterns to %{{.*}} {
 // CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
 // CHECK: } : !transform.any_op
-// CHECK: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
-// CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_mma_sync}
+// CHECK: apply_patterns to %{{.*}} {
+// CHECK:   transform.apply_patterns.memref.extract_address_computations
+// CHECK: } : !transform.any_op
+// CHECK: apply_patterns to %{{.*}} {
+// CHECK:   transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
+// CHECK: } : !transform.any_op
 // CHECK: transform.structured.match ops{["scf.for"]} in %{{.*}} 
 // CHECK: transform.iree.synchronize_loop %{{.*}}
 // CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}}
@@ -112,11 +116,12 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.apply_patterns.vector.lower_masks
 // CHECK: transform.apply_patterns.vector.materialize_masks
 // CHECK: apply_patterns to %{{.*}} {
-// CHECK:   transform.apply_patterns.linalg.tiling_canonicalization
-// CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
+// CHECK-DAG:   transform.apply_patterns.linalg.tiling_canonicalization
+// CHECK-DAG:   transform.apply_patterns.memref.fold_memref_alias_ops
+// CHECK-DAG:   transform.apply_patterns.canonicalization
 // CHECK: } : !transform.any_op
-// CHECK: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
-
+// CHECK: transform.iree.apply_licm
+// CHECK: transform.iree.apply_cse
 
 // WITH_OPTIONS-LABEL: func @matmul
 
@@ -154,12 +159,20 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: apply_patterns to %{{.*}} {
 // WITH_OPTIONS:   transform.apply_patterns.memref.fold_memref_alias_ops
 // WITH_OPTIONS: } : !transform.any_op
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
+// WITH_OPTIONS: apply_patterns to %{{.*}} {
+// WITH_OPTIONS:   transform.apply_patterns.memref.extract_address_computations
+// WITH_OPTIONS: } : !transform.any_op
 // The unroll attribute should match td-matmul-use-mma-sync, for true: mma_sync,
 // for false:_wmma.
+<<<<<<< HEAD
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_mma_sync}
 // WITH_OPTIONS: transform.structured.match ops{["scf.for"]} in %{{.*}} 
 // WITH_OPTIONS: transform.iree.synchronize_loop %{{.*}}
+=======
+// WITH_OPTIONS: apply_patterns to %{{.*}} {
+// WITH_OPTIONS:   transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
+// WITH_OPTIONS: }
+>>>>>>> fcd02755d (Drop all remaining patterns)
 // WITH_OPTIONS: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // WITH_OPTIONS: transform.iree.apply_buffer_optimizations %{{.*}}
 // The attribute should match td-matmul-use-mma-sync.
@@ -182,7 +195,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS:   transform.apply_patterns.linalg.tiling_canonicalization
 // WITH_OPTIONS:   transform.apply_patterns.memref.fold_memref_alias_ops
 // WITH_OPTIONS: } : !transform.any_op
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
+// WITH_OPTIONS: apply_patterns to %{{.*}} {
+// WITH_OPTIONS:   transform.apply_patterns.canonicalization
+// WITH_OPTIONS  }
+// WITH_OPTIONS: transform.iree.apply_licm
+// WITH_OPTIONS: transform.iree.apply_cse
 
 
 // WITH_OPTIONS_2-LABEL: func @matmul
@@ -314,7 +331,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-SAME:   pack_paddings = [1, 1, 1]
 // CHECK-SAME:   padding_dimensions = [0, 1, 2]
 // CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
-// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
+// CHECK:      apply_patterns to %{{.*}} {
+// CHECK:        transform.apply_patterns.canonicalization
+// CHECK       }
+// CHECK:      transform.iree.apply_licm
+// CHECK:      transform.iree.apply_cse
 // CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
 // CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
@@ -325,9 +346,19 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      %{{.*}}, %[[TILED_RHS:.+]] = transform.structured.tile_to_forall_op %[[RHS_PAD]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // CHECK:      transform.structured.match ops{["scf.if"]}
 // CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
+<<<<<<< HEAD
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
+=======
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      apply_patterns to %{{.*}} {
+// CHECK:        transform.apply_patterns.canonicalization
+// CHECK       }
+// CHECK:      transform.iree.apply_licm
+// CHECK:      transform.iree.apply_cse
+>>>>>>> fcd02755d (Drop all remaining patterns)
 
 // alignLhs
 // CHECK:      transform.structured.masked_vectorize %[[TILED_LHS]] vector_sizes [4, 4]
@@ -380,7 +411,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
 
 // Canonicalization is currently required here to enable pad to dps to produce linalg.copy ops.
-// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
+// CHECK:      apply_patterns to %{{.*}} {
+// CHECK:        transform.apply_patterns.canonicalization
+// CHECK       }
+// CHECK:      transform.iree.apply_licm
+// CHECK:      transform.iree.apply_cse
 // CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
 // CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
@@ -389,9 +424,19 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      %[[RHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS_PAD]]
 // CHECK:      transform.structured.tile_to_forall_op %[[LHS_COPY]]   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
 // CHECK:      transform.structured.tile_to_forall_op %[[RHS_COPY]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
+<<<<<<< HEAD
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
+=======
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      apply_patterns to %{{.*}} {
+// CHECK:        transform.apply_patterns.canonicalization
+// CHECK       }
+// CHECK:      transform.iree.apply_licm
+// CHECK:      transform.iree.apply_cse
+>>>>>>> fcd02755d (Drop all remaining patterns)
 
 // Verify we don't go down the path without the flag.
 // WITH_OPTIONS-LABEL: func @aligned_matmul

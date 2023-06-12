@@ -18,9 +18,9 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
+    transform.apply_patterns.canonicalization
   } : !transform.any_op
-  transform.iree.apply_patterns %variant_op 
-    { canonicalization, cse } : (!transform.any_op) -> ()
+  transform.iree.apply_cse %variant_op : !transform.any_op
   %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> (!transform.any_op)
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!transform.any_op) -> !transform.any_op
@@ -28,5 +28,5 @@ transform.sequence failures(propagate) {
   transform.iree.forall_to_workgroup %memref_func : (!transform.any_op) -> ()
 
   // CSE is needed on the workgroup_count region to pass this particular test.
-  transform.iree.apply_patterns %variant_op_3 { cse } : (!transform.any_op) -> ()
+  transform.iree.apply_cse %variant_op_3 : !transform.any_op
 }

@@ -32,7 +32,6 @@ using namespace mlir;
 using iree_compiler::cpu::CPUModel;
 using iree_compiler::cpu::ReductionConfig;
 using iree_compiler::cpu::ReductionStrategy;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using transform::ApplyLowerContractionPatternsOp;
 using transform::ApplyLowerMultiReductionPatternsOp;
