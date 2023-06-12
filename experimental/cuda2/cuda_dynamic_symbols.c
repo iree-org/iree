@@ -24,8 +24,6 @@ static const char* iree_hal_cuda_dylib_names[] = {
 // 1000 * major + 10 * minor
 #define IREE_CUDA_DRIVER_API_VERSION 11030
 
-#define concat(A, B) A B
-
 // Load CUDA entry points.
 static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     iree_hal_cuda_dynamic_symbols_t* syms) {
