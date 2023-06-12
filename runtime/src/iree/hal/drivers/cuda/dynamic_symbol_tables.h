@@ -4,6 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// cuGetErrorName, cuGetErrorString should be loaded first in case there are
+// errors loading the other symbols.
+CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
+CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
 CU_PFN_DECL(cuCtxCreate, CUcontext*, unsigned int, CUdevice)
 CU_PFN_DECL(cuCtxDestroy, CUcontext)
 CU_PFN_DECL(cuDevicePrimaryCtxRetain, CUcontext*, CUdevice)
@@ -22,8 +26,7 @@ CU_PFN_DECL(cuEventElapsedTime, float*, CUevent, CUevent)
 CU_PFN_DECL(cuEventQuery, CUevent)
 CU_PFN_DECL(cuEventRecord, CUevent, CUstream)
 CU_PFN_DECL(cuEventSynchronize, CUevent)
-CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
-CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
+CU_PFN_DECL(cuGetProcAddress, const char*, void**, int, cuuint64_t)
 CU_PFN_DECL(cuGraphAddMemcpyNode, CUgraphNode*, CUgraph, const CUgraphNode*,
             size_t, const CUDA_MEMCPY3D*, CUcontext)
 CU_PFN_DECL(cuGraphAddMemsetNode, CUgraphNode*, CUgraph, const CUgraphNode*,
