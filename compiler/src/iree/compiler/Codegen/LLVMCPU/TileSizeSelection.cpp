@@ -23,17 +23,21 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   // their corresponding incremental levels. We currently support the following
   // scenarios:
   //   1. [[distribution]]
-  //   2. [[distribution], [vector-parallel]]
-  //   3. [[distribution], [vector-parallel], [vector-reduction]]
+  //   2. [[distribution], [vector-common-parallel]]
+  //   3. [[distribution], [vector-common-parallel], [vector-reduction],
+  //       [vector-inner-parallel]]
   //   4. [[distribution], [cache-parallel], [cache-reduction],
   //       [vector-parallel], [vector-reduction]]
   int numTileLevels = loweringConfig.getTileSizes().size();
   switch (numTileLevels) {
+  case 4:
+    tilingLevelToActualLevelMap[VectorInnerParallelTiles] = 3;
+    [[fallthrough]];
   case 3:
     tilingLevelToActualLevelMap[VectorReductionTiles] = 2;
     [[fallthrough]];
   case 2:
-    tilingLevelToActualLevelMap[VectorParallelTiles] = 1;
+    tilingLevelToActualLevelMap[VectorCommonParallelTiles] = 1;
     [[fallthrough]];
   case 1:
     tilingLevelToActualLevelMap[DistributionTiles] = 0;
@@ -53,11 +57,18 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
 SmallVector<int64_t> TilingConfig::getVectorTileSizes() {
   unsigned numDims = getNumDimensions();
   SmallVector<int64_t> vectorSizes(numDims);
-  SmallVector<int64_t> parallelSizes = getVectorParallelSizes();
+  SmallVector<int64_t> parallelCommonSizes = getVectorCommonParallelSizes();
   SmallVector<int64_t> reductionSizes = getVectorReductionSizes();
+  SmallVector<int64_t> parallelInnerSizes = getVectorInnerParallelSizes();
   for (int i = 0; i < numDims; ++i) {
+    bool nonZeroCnt = llvm::count_if(ArrayRef<int64_t>{parallelCommonSizes[i],
+                                                       reductionSizes[i],
+                                                       parallelInnerSizes[i]},
+                                     [](auto v) { return v != 0; });
+    assert(nonZeroCnt == 1 && "expected only one tile size can be non-zero");
+    (void)nonZeroCnt;
     vectorSizes[i] =
-        parallelSizes[i] != 0 ? parallelSizes[i] : reductionSizes[i];
+        parallelCommonSizes[i] ^ reductionSizes[i] ^ parallelInnerSizes[i];
   }
 
   return vectorSizes;
@@ -72,9 +83,10 @@ SmallVector<int64_t> TilingConfig::getFusableLevels() {
   case 1:
     // Only distribution level.
     return {0};
-  case 3:
-    // Distribution + vector parallel levels.
-    return {0, 1};
+  case 4:
+    // Distribution + vector common parallel levels + vector inner parallel
+    // levels.
+    return {0, 1, 3};
   case 5:
     // Distribution + cache parallel levels.
     return {0, 1};

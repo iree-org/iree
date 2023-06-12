@@ -19,8 +19,9 @@ namespace iree_compiler {
 ///
 /// We currently support the following scenarios:
 ///   1. [[distribution]]
-///   2. [[distribution], [vector-parallel]]
-///   3. [[distribution], [vector-parallel], [vector-reduction]]
+///   2. [[distribution], [vector-common-parallel]]
+///   3. [[distribution], [vector-common-parallel], [vector-reduction],
+///       [vector-inner-parallel]]
 ///   4. [[distribution], [cache-parallel], [cache-reduction],
 ///       [vector-parallel], [vector-reduction]]
 class TilingConfig {
@@ -38,9 +39,12 @@ public:
 
   /// Returns the number of parallel dimensions to tile at vector level.
   unsigned getNumVectorParallelTiles() {
-    return llvm::count_if(getVectorParallelSizes(),
+    return llvm::count_if(getVectorCommonParallelSizes(),
                           [](int64_t tileSize) { return tileSize != 0; });
   }
+
+  /// Returns the tiling level for cache parallel dimensions.
+  unsigned getDistributionLevel() { return getActualLevel(DistributionTiles); }
 
   /// Returns the tiling level for cache parallel dimensions.
   unsigned getCacheParallelLevel() {
@@ -52,9 +56,14 @@ public:
     return getActualLevel(CacheReductionTiles);
   }
 
-  /// Returns the tiling level for vector parallel dimensions.
-  unsigned getVectorParallelLevel() {
-    return getActualLevel(VectorParallelTiles);
+  /// Returns the tiling level for vector common parallel dimensions.
+  unsigned getVectorCommonParallelLevel() {
+    return getActualLevel(VectorCommonParallelTiles);
+  }
+
+  /// Returns the tiling level for vector inner parallel dimensions.
+  unsigned getVectorInnerParallelLevel() {
+    return getActualLevel(VectorInnerParallelTiles);
   }
 
   /// Returns the tiling level for vector parallel dimensions.
@@ -74,12 +83,16 @@ public:
     return loweringConfig.getTileSizeVals(getCacheReductionLevel());
   }
 
-  SmallVector<int64_t> getVectorParallelSizes() {
-    return loweringConfig.getTileSizeVals(getVectorParallelLevel());
+  SmallVector<int64_t> getVectorCommonParallelSizes() {
+    return loweringConfig.getTileSizeVals(getVectorCommonParallelLevel());
   }
 
   SmallVector<int64_t> getVectorReductionSizes() {
     return loweringConfig.getTileSizeVals(getVectorReductionLevel());
+  }
+
+  SmallVector<int64_t> getVectorInnerParallelSizes() {
+    return loweringConfig.getTileSizeVals(getVectorInnerParallelLevel());
   }
 
   /// Returns the tile sizes of all the vector dimensions, including parallel
@@ -106,10 +119,11 @@ private:
     DistributionTiles = 0,
     CacheParallelTiles = 1,
     CacheReductionTiles = 2,
-    VectorParallelTiles = 3,
+    VectorCommonParallelTiles = 3,
     VectorReductionTiles = 4,
-    MaxNumTileLevels = 5,
-    InvalidLevel = 6,
+    VectorInnerParallelTiles = 5,
+    MaxNumTileLevels = 6,
+    InvalidLevel = 7,
   };
 
   /// Returns the actual level in the configuration for this level of tiling.

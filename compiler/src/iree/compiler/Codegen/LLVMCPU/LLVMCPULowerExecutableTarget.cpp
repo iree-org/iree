@@ -123,38 +123,33 @@ verifyLoweringConfiguration(ModuleOp module,
 // TODO(dcaballe): We temporarily need this utility to retrieve a valid
 // lowering config. We should be able to remove this once we have a lowering
 // config attribute per op.
-static FailureOr<LoweringConfigAttr> getRootLoweringConfig(Operation *op) {
-  // Check for self first.
-  auto rootLoweringConfig = iree_compiler::getLoweringConfig(op);
-  if (rootLoweringConfig) {
-    return rootLoweringConfig;
-  }
-
-  auto result = op->walk([&](Operation *op) -> WalkResult {
-    auto loweringConfig = iree_compiler::getLoweringConfig(op);
-    if (!loweringConfig) {
-      return WalkResult::advance();
-    }
+static FailureOr<LoweringConfigAttr> getRootLoweringConfig(ModuleOp moduleOp) {
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
+      getAllEntryPoints(moduleOp);
+  for (auto &it : exportOps) {
+    auto exportOp = it.second;
+    auto rootLoweringConfig = iree_compiler::getLoweringConfig(exportOp);
     if (rootLoweringConfig) {
-      if (rootLoweringConfig != loweringConfig) {
-        return WalkResult::interrupt();
-      }
-    } else {
-      rootLoweringConfig = loweringConfig;
+      return rootLoweringConfig;
     }
-    return WalkResult::advance();
-  });
-
-  if (!rootLoweringConfig || result.wasInterrupted()) {
-    return failure();
   }
 
-  return rootLoweringConfig;
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+    getAllEntryPoints(moduleOp);
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+    // Check for self first.
+    FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+    auto rootLoweringConfig = iree_compiler::getLoweringConfig(rootOp.value());
+    if (rootLoweringConfig) {
+      return rootLoweringConfig;
+    }
+  }
+
+  return failure();
 }
 
-static TilingConfig
-getTilingConfigForPipeline(IREE::HAL::ExecutableVariantOp variantOp) {
-  auto maybeLoweringConfig = getRootLoweringConfig(variantOp);
+static TilingConfig getTilingConfigForPipeline(ModuleOp moduleOp) {
+  auto maybeLoweringConfig = getRootLoweringConfig(moduleOp);
   assert(succeeded(maybeLoweringConfig) &&
          "Pipeline requires a lowering config");
   return TilingConfig(*maybeLoweringConfig);
@@ -251,7 +246,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           break;
         case IREE::Codegen::DispatchLoweringPassPipeline::
             CPUBufferOpsTileAndVectorize: {
-          TilingConfig tilingConfig = getTilingConfigForPipeline(variantOp);
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
           addCPUBufferOpsTileAndVectorizePipeline(
               executableLoweringPipeline, tilingConfig, enableVectorMasking,
               enableAArch64SSVE);
@@ -259,7 +254,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         }
         case IREE::Codegen::DispatchLoweringPassPipeline::
             CPUDoubleTilingExpert: {
-          TilingConfig tilingConfig = getTilingConfigForPipeline(variantOp);
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
           addMultiTilingExpertPassPipeline(
               executableLoweringPipeline, tilingConfig,
               /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2);
@@ -267,14 +262,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         }
         case IREE::Codegen::DispatchLoweringPassPipeline::
             CPUDoubleTilingPadExpert: {
-          TilingConfig tilingConfig = getTilingConfigForPipeline(variantOp);
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
           addDoubleTilingPadExpertPassPipeline(
               executableLoweringPipeline, tilingConfig, enableVectorMasking);
           break;
         }
         case IREE::Codegen::DispatchLoweringPassPipeline::
             CPUDoubleTilingPeelingExpert: {
-          TilingConfig tilingConfig = getTilingConfigForPipeline(variantOp);
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
           addMultiTilingExpertPassPipeline(
               executableLoweringPipeline, tilingConfig,
               /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2,
@@ -283,20 +278,20 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         }
         case IREE::Codegen::DispatchLoweringPassPipeline::
             CPUConvTileAndDecomposeExpert: {
-          TilingConfig tilingConfig = getTilingConfigForPipeline(variantOp);
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
           addConvTileAndDecomposeExpertPassPipeline(
               executableLoweringPipeline, tilingConfig, enableVectorMasking,
               enableAArch64SSVE);
           break;
         }
         case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
-          TilingConfig tilingConfig = getTilingConfigForPipeline(variantOp);
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
           addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
                                            tilingConfig, enableMicrokernels);
           break;
         }
         case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
-          TilingConfig tilingConfig = getTilingConfigForPipeline(variantOp);
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
           addCPUDataTilingPipeline(executableLoweringPipeline, tilingConfig);
           break;
         }
@@ -310,7 +305,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           addTransformDialectPasses(executableLoweringPipeline);
           break;
         default:
-          variantOp.emitOpError("Unsupported pipeline on CPU target.");
+          moduleOp.emitOpError("Unsupported pipeline on CPU target.");
           return signalPassFailure();
         }
       }
