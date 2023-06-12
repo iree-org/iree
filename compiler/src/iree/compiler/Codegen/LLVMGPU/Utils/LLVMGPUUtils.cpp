@@ -191,7 +191,8 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
 
     VectorType vecType = llvm::cast<VectorType>(vectorVal.getType());
     if (!((vecType.getElementType().isF32() && vecType.getNumElements() <= 4) ||
-          (vecType.getElementType().isF16() &&
+          ((vecType.getElementType().isF16() ||
+            vecType.getElementType().isBF16()) &&
            vecType.getNumElements() <= 8))) {
       LDBG("----readOp is not (<=4)xf32 or (<=8)xf16 -> Skip");
       return WalkResult::advance();
