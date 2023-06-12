@@ -420,6 +420,7 @@ iree_generated_trace_runner_test(
         "--compilation_info=SPIRVVectorizeMali",
     ],
     tags = [
+        # Nvidia GPUs support a superset of Valhall features
         "requires-gpu-nvidia",
         "vulkan_uses_vk_khr_shader_float16_int8",
     ],
