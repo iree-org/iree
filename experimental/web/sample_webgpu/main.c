@@ -197,9 +197,8 @@ extern iree_status_t create_device(iree_allocator_t host_allocator,
 
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* sample_state = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(iree_allocator_system(),
-                            sizeof(iree_sample_state_t), (void**)&sample_state);
+  iree_status_t status = iree_allocator_malloc(
+      iree_allocator_system(), sizeof(*sample_state), (void**)&sample_state);
 
   iree_runtime_instance_options_t instance_options;
   iree_runtime_instance_options_initialize(&instance_options);
@@ -239,9 +238,8 @@ void cleanup_sample(iree_sample_state_t* sample_state) {
 iree_program_state_t* load_program(iree_sample_state_t* sample_state,
                                    uint8_t* vmfb_data, size_t length) {
   iree_program_state_t* program_state = NULL;
-  iree_status_t status = iree_allocator_malloc(iree_allocator_system(),
-                                               sizeof(iree_program_state_t),
-                                               (void**)&program_state);
+  iree_status_t status = iree_allocator_malloc(
+      iree_allocator_system(), sizeof(*program_state), (void**)&program_state);
   program_state->sample_state = sample_state;
 
   iree_runtime_session_options_t session_options;
@@ -812,8 +810,7 @@ static iree_status_t process_call_outputs(
 
     iree_buffer_map_userdata_t* map_userdata = NULL;
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        iree_allocator_system(), sizeof(iree_buffer_map_userdata_t),
-        (void**)&map_userdata));
+        iree_allocator_system(), sizeof(*map_userdata), (void**)&map_userdata));
 
     map_userdata->call_state = call_state;
     map_userdata->buffer_index = i;
@@ -880,8 +877,7 @@ const bool call_function(
 
   iree_call_function_state_t* call_state = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(iree_allocator_system(),
-                                   sizeof(iree_call_function_state_t),
+    status = iree_allocator_malloc(iree_allocator_system(), sizeof(*call_state),
                                    (void**)&call_state);
   }
   call_state->loop = program_state->sample_state->loop;
@@ -913,7 +909,7 @@ const bool call_function(
 
   if (iree_status_is_ok(status)) {
     status = iree_allocator_malloc(iree_allocator_system(),
-                                   sizeof(iree_vm_async_invoke_state_t),
+                                   sizeof(*(call_state->invoke_state)),
                                    (void**)&(call_state->invoke_state));
   }
 
