@@ -18,8 +18,13 @@ transform.sequence failures(propagate) {
   transform.structured.fuse_into_containing_op %fill into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 
   // Step 2. Split the reduction to get meatier parallelism.
   // This also parallelizes to threads.
@@ -41,8 +46,13 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 
   // Step 3. Rank-reduce and vectorize.
   // ===========================================================================
@@ -56,8 +66,13 @@ transform.sequence failures(propagate) {
 
   // Canonicalizations is necessary to get rid of some tensor.cast that block
   // hoisting.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
   transform.structured.hoist_redundant_tensor_subsets %func_3
     : (!transform.any_op) -> ()
 
@@ -65,8 +80,13 @@ transform.sequence failures(propagate) {
   // Step 4. Bufferize and drop HAL descriptor from memref ops.
   // ===========================================================================
   // Canonicalizations required before bufferization to avoid unnecessary allocs.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_3 { fold_reassociative_reshapes } : (!transform.any_op) -> ()
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   %func_6 = transform.structured.match ops{["func.func"]} in %variant_op
@@ -96,6 +116,11 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> ()
 
   // Late canonicalizations.
+  transform.apply_patterns to %variant_op_3 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op_3
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 }

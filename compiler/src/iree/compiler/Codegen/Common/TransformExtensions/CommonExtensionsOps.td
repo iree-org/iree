@@ -51,6 +51,20 @@ def ApplyBufferOptimizationsOp :
   }];
 }
 
+def ApplyFoldFillIntoPadPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.fold_fill_into_pad",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Populates a pattern that folds
+    "tensor.pad(cst, tensor.extract*(linalg.fill(cst)))" into
+    "linalg.fill(cst, empty)" when the padding constant and the fill constant
+    are the same.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
@@ -70,8 +84,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     The following additive attributes can be set, they add patterns in an
     unspecified order:
-      - additional_iree_patterns: fancy patterns we shortcut into the system,
-      will need to be sliced out better in the future.
       - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This
       must be applied separately from `bubble_expand` patterns because of some
       upstream pattern interference issue atm.
@@ -97,8 +109,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
-      - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
-      case it is the only use of extract.
       - fold_tensor_subsets: adds patterns for folding tensor subset ops into
       their producer and consumers.
       - licm: additionally apply loop-independent code motion and single 
@@ -125,8 +135,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       tensor.extract_slice swapping pattern. This injects static information
       that guarantees padding is smaller than the window size which guarantees
       we never see a tile comprised of padding-only.
-      - tiling_canonicalization: adds specific tiling-related canonicalization
-      patterns.
       - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
       size for GPUs with mma operations. The size is currently hardcoded but
       should be refactored upstream and made pluggable.
@@ -151,7 +159,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-                       UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse,
                        UnitAttr:$bubble_expand,
                        UnitAttr:$bubble_pack_un_pack,
@@ -162,7 +169,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$extract_address_computations,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
-                       UnitAttr:$fold_tensor_empty_extract,
                        UnitAttr:$fold_tensor_subsets,
                        UnitAttr:$fold_vector_transfer_tensor_slice,
                        UnitAttr:$licm,
@@ -175,7 +181,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$rank_reducing_vector,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,
-                       UnitAttr:$tiling_canonicalization,
                        UnitAttr:$unroll_vectors_gpu_mma_sync,
                        UnitAttr:$unroll_vectors_gpu_wmma);
   let results = (outs);

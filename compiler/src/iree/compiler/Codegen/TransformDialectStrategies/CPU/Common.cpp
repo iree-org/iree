@@ -105,18 +105,19 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
 
   // Step N-5. Fold tensor.empty to avoid large allocations.
-  ApplyPatternsOpPatterns configuration;
-  configuration.foldTensorEmptyExtract = true;
-
   // Step N-4. Perform a pass of canonicalization + enabling after tiling.
-  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, configuration, funcH);
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, funcH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyFoldTensorEmptyPatternsOp>(loc);
+      });
   funcH = iree_compiler::buildVectorize(b, funcH);
 
   // Step N-3. Perform a pass of canonicalization + enabling after vectorization
   // as well as hoisting subset operations such as vector.transfer_read/write.
-  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, configuration, funcH);
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, funcH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyFoldTensorEmptyPatternsOp>(loc);
+      });
   iree_compiler::buildHoisting(b, funcH);
 
   // Step N-2. Bufferize and drop HAL descriptor from memref ops.

@@ -39,16 +39,19 @@ iree_cc_library(
     MLIRLLVMDialect
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
+    MLIRSCFTransformOps
     MLIRSCFTransforms
     MLIRSCFUtils
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransformOps
     MLIRTensorTransforms
     MLIRTransformDialect
     MLIRVectorDialect

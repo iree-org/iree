@@ -104,6 +104,7 @@ static void eraseDeadAllocAndStores(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 // ApplyBufferOptimizationsOp
 //===---------------------------------------------------------------------===//
+
 DiagnosedSilenceableFailure
 transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
@@ -129,124 +130,10 @@ void transform_dialect::ApplyBufferOptimizationsOp::build(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyPatternsOp
+// Apply...PatternsOp
 //===---------------------------------------------------------------------===//
-void transform_dialect::ApplyPatternsOp::build(
-    OpBuilder &builder, OperationState &result, Value target,
-    const ApplyPatternsOpPatterns &patterns) {
-  result.addOperands(target);
-
-  auto unitAttr = builder.getUnitAttr();
-
-#define ADD_PATTERN(NAME, ATTR) \
-  if (patterns.NAME)            \
-    result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
-  ///
-  /// When touching something here, do not forget to update CommonExtensions.h.
-  ///
-  ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
-  ADD_PATTERN(bubbleCollapse, getBubbleCollapseAttrName)
-  ADD_PATTERN(bubbleExpand, getBubbleExpandAttrName)
-  ADD_PATTERN(bubblePackUnPack, getBubblePackUnPackAttrName)
-  ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
-  ADD_PATTERN(cse, getCseAttrName)
-  ADD_PATTERN(eraseUnnecessaryTensorOperands,
-              getEraseUnnecessaryTensorOperandsAttrName)
-  ADD_PATTERN(expandMemrefStridedMetadata,
-              getExpandMemrefStridedMetadataAttrName)
-  ADD_PATTERN(extractAddressComputations, getExtractAddressComputationsAttrName)
-  ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
-  ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
-  ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
-  ADD_PATTERN(foldTensorSubsets, getFoldTensorSubsetsAttrName)
-  ADD_PATTERN(foldVectorTransferTensorSlice,
-              getFoldVectorTransferTensorSliceAttrName)
-  ADD_PATTERN(licm, getLicmAttrName)
-  ADD_PATTERN(linalgElementwiseGreedyFusion,
-              getLinalgElementwiseGreedyFusionAttrName)
-  ADD_PATTERN(lowerTransferOpPermutations,
-              getLowerTransferOpPermutationsAttrName)
-  ADD_PATTERN(lowerVectorMasks, getLowerVectorMasksAttrName)
-  ADD_PATTERN(prepareVectorToMma, getPrepareVectorToMmaAttrName)
-  ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
-  ADD_PATTERN(rankReducingLinalgViaReshapes,
-              getRankReducingLinalgViaReshapesAttrName)
-  ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
-  ADD_PATTERN(swapPaddingElideConditional,
-              getSwapPaddingElideConditionalAttrName)
-  ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
-  ADD_PATTERN(tilingCanonicalization, getTilingCanonicalizationAttrName)
-  ADD_PATTERN(unrollVectorsGpuMmaSync, getUnrollVectorsGpuMmaSyncAttrName)
-  ADD_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
-#undef ADD_PATTERN
-}
-
-static void addOperands(Operation *op, SetVector<Value> &operandSet) {
-  if (!op) return;
-  TypeSwitch<Operation *, void>(op)
-      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-        SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
-        operandSet.insert(inputOperands.begin(), inputOperands.end());
-      })
-      .Default([&](Operation *operation) {
-        operandSet.insert(operation->operand_begin(), operation->operand_end());
-      });
-}
-
-template <int limit = 3>
-static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
-  Operation *producer = fusedOperand->get().getDefiningOp();
-  if (!producer) return false;
-  Operation *consumer = fusedOperand->getOwner();
-  SetVector<Value> fusedOpOperands;
-  if (producer->getNumResults() != 1) return false;
-  addOperands(consumer, fusedOpOperands);
-  fusedOpOperands.remove(producer->getResult(0));
-  addOperands(producer, fusedOpOperands);
-  return fusedOpOperands.size() <= limit;
-}
 
 namespace {
-/// Rewrite a tensor.generate as an arith.constant when possible.
-struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
-  using OpRewritePattern<tensor::GenerateOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::GenerateOp generateOp,
-                                PatternRewriter &rewriter) const final {
-    auto tensorType =
-        llvm::cast<RankedTensorType>(generateOp.getResult().getType());
-    if (!tensorType.hasStaticShape()) return failure();
-    auto terminatorOp =
-        cast<tensor::YieldOp>(generateOp.getBody().front().getTerminator());
-    if (terminatorOp->getNumOperands() > 1) return failure();
-    auto constantOp =
-        terminatorOp->getOperand(0).getDefiningOp<arith::ConstantOp>();
-    if (!constantOp) return failure();
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-        generateOp, tensorType,
-        DenseElementsAttr::get(tensorType, constantOp.getValueAttr()));
-    return success();
-  }
-};
-
-/// Fold tensor.empty used by extract_slice if this the only use of
-/// extract_slice and the result is static.
-struct FoldTensorEmptyExtract
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
-                                PatternRewriter &rewriter) const final {
-    auto tensorEmpty = extractOp.getSource().getDefiningOp<tensor::EmptyOp>();
-    if (!tensorEmpty || !extractOp.getType().hasStaticShape() ||
-        !tensorEmpty->hasOneUse())
-      return failure();
-    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
-        extractOp, extractOp.getType().getShape(),
-        extractOp.getType().getElementType());
-    return success();
-  }
-};
-
 /// Fold `tensor.pad(cst, tensor.extract*(linalg.fill(cst)))` into
 /// `linalg.fill(cst, empty)` when the padding constant and the fill constant
 /// are the same.
@@ -292,6 +179,87 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
 };
 }  // namespace
 
+void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  patterns.insert<FoldFillIntoPad>(patterns.getContext());
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyPatternsOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyPatternsOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    const ApplyPatternsOpPatterns &patterns) {
+  result.addOperands(target);
+
+  auto unitAttr = builder.getUnitAttr();
+
+#define ADD_PATTERN(NAME, ATTR) \
+  if (patterns.NAME)            \
+    result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
+  ///
+  /// When touching something here, do not forget to update CommonExtensions.h.
+  ///
+  ADD_PATTERN(bubbleCollapse, getBubbleCollapseAttrName)
+  ADD_PATTERN(bubbleExpand, getBubbleExpandAttrName)
+  ADD_PATTERN(bubblePackUnPack, getBubblePackUnPackAttrName)
+  ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
+  ADD_PATTERN(cse, getCseAttrName)
+  ADD_PATTERN(eraseUnnecessaryTensorOperands,
+              getEraseUnnecessaryTensorOperandsAttrName)
+  ADD_PATTERN(expandMemrefStridedMetadata,
+              getExpandMemrefStridedMetadataAttrName)
+  ADD_PATTERN(extractAddressComputations, getExtractAddressComputationsAttrName)
+  ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
+  ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
+  ADD_PATTERN(foldTensorSubsets, getFoldTensorSubsetsAttrName)
+  ADD_PATTERN(foldVectorTransferTensorSlice,
+              getFoldVectorTransferTensorSliceAttrName)
+  ADD_PATTERN(licm, getLicmAttrName)
+  ADD_PATTERN(linalgElementwiseGreedyFusion,
+              getLinalgElementwiseGreedyFusionAttrName)
+  ADD_PATTERN(lowerTransferOpPermutations,
+              getLowerTransferOpPermutationsAttrName)
+  ADD_PATTERN(lowerVectorMasks, getLowerVectorMasksAttrName)
+  ADD_PATTERN(prepareVectorToMma, getPrepareVectorToMmaAttrName)
+  ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
+  ADD_PATTERN(rankReducingLinalgViaReshapes,
+              getRankReducingLinalgViaReshapesAttrName)
+  ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
+  ADD_PATTERN(swapPaddingElideConditional,
+              getSwapPaddingElideConditionalAttrName)
+  ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
+  ADD_PATTERN(unrollVectorsGpuMmaSync, getUnrollVectorsGpuMmaSyncAttrName)
+  ADD_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
+#undef ADD_PATTERN
+}
+
+static void addOperands(Operation *op, SetVector<Value> &operandSet) {
+  if (!op) return;
+  TypeSwitch<Operation *, void>(op)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
+        operandSet.insert(inputOperands.begin(), inputOperands.end());
+      })
+      .Default([&](Operation *operation) {
+        operandSet.insert(operation->operand_begin(), operation->operand_end());
+      });
+}
+
+template <int limit = 3>
+static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
+  Operation *producer = fusedOperand->get().getDefiningOp();
+  if (!producer) return false;
+  Operation *consumer = fusedOperand->getOwner();
+  SetVector<Value> fusedOpOperands;
+  if (producer->getNumResults() != 1) return false;
+  addOperands(consumer, fusedOpOperands);
+  fusedOpOperands.remove(producer->getResult(0));
+  addOperands(producer, fusedOpOperands);
+  return fusedOpOperands.size() <= limit;
+}
+
 static void addLowerTransferOpPermutationsPatterns(
     RewritePatternSet &patterns) {
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
@@ -307,10 +275,6 @@ static void addExtractAddressComputationsPatterns(RewritePatternSet &patterns) {
 
 static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
   memref::populateFoldMemRefAliasOpPatterns(patterns);
-}
-
-static void addFoldTensorEmptyExtract(RewritePatternSet &patterns) {
-  patterns.add<FoldTensorEmptyExtract>(patterns.getContext());
 }
 
 static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
@@ -361,14 +325,6 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
       });
 }
 
-static void addTilingCanonicalizationPatterns(RewritePatternSet &patterns) {
-  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-  scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  /// This seems generally desirable as a folding but may be too intrusive, so
-  /// we only apply it selectively for now.
-  patterns.add<FoldFillIntoPad>(patterns.getContext());
-}
-
 static std::optional<SmallVector<int64_t>>
 getGPUTensorCoreNativeMmaSyncVectorSize(Operation *op) {
   return getMmaNativeVectorSize(op);
@@ -403,10 +359,6 @@ static void addUnrollVectorsGpuWmmaPatterns(RewritePatternSet &patterns) {
                     .setUnrollTraversalOrderFn(unrollOrder));
 }
 
-static void addAdditionalIreePatterns(RewritePatternSet &patterns) {
-  patterns.add<GenerateToConstant>(patterns.getContext());
-}
-
 static void addAllRegisteredCanonicalizationPatterns(
     RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
@@ -427,7 +379,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   }
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
-  if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
   if (getBubbleCollapse()) {
     linalg::populateFoldReshapeOpsByCollapsingPatterns(
         patterns, [](OpOperand *) { return true; });
@@ -448,7 +399,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addExtractAddressComputationsPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
-  if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
   if (getFoldTensorSubsets()) addFoldTensorSubsetsPatterns(patterns);
   if (getFoldVectorTransferTensorSlice())
     addFoldVectorTransferTensorExtractPatterns(patterns);
@@ -465,7 +415,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
-  if (getTilingCanonicalization()) addTilingCanonicalizationPatterns(patterns);
   if (getUnrollVectorsGpuMmaSync())
     addUnrollVectorsGpuMmaSyncPatterns(patterns);
   if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);

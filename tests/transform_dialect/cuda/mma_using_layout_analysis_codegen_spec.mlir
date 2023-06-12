@@ -31,8 +31,13 @@ transform.sequence failures(propagate) {
 
   // Step 4. Bufferize
   // ===========================================================================
+  transform.apply_patterns to %func_3 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %func_3
-    { fold_reassociative_reshapes, canonicalization, tiling_canonicalization, cse } : (!transform.any_op) -> ()
+    { fold_reassociative_reshapes, canonicalization, cse } : (!transform.any_op) -> ()
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_3 { erase_unnecessary_tensor_operands } : (!transform.any_op) -> ()
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)

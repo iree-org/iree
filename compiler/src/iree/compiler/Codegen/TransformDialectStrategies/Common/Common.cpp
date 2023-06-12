@@ -12,6 +12,9 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
+#include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
+#include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
@@ -123,18 +126,24 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
 
 /// Create an ApplyPatternsOp that performs a set of key canonicalizations and
 /// so-called enabling transformations to normalize the IR.
-/// Take an existing configuration by copy (cheap object) that will be augmented
-/// locally to additionally perform:
-///   canonicalization, tiling_canonicalization, licm and cse (in this order).
-Value mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-    ImplicitLocOpBuilder &b, ApplyPatternsOpPatterns configuration,
-    Value variantH) {
+/// In addition to the specified transform, perform the following ones:
+///   tiling-related canonicalization patterns, canonicalization, licm and cse
+///   (in this order).
+void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+    ImplicitLocOpBuilder &b, Value variantH,
+    ApplyPatternsOpBodyBuilderFn populatePatternsFn) {
+  b.create<transform::ApplyPatternsOp>(
+      variantH, [&](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyTilingCanonicalizationPatternsOp>(loc);
+        b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
+        b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
+        if (populatePatternsFn) populatePatternsFn(b, loc);
+      });
+  ApplyPatternsOpPatterns configuration;
   configuration.canonicalization = true;
   configuration.cse = true;
   configuration.licm = true;
-  configuration.tilingCanonicalization = true;
   b.create<ApplyPatternsOp>(variantH, configuration);
-  return variantH;
 }
 
 /// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
@@ -171,10 +180,8 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
   // matmuls.
   // TODO: Make padding less brittle so that this toggle is unnecessary.
   if (canonicalize) {
-    ApplyPatternsOpPatterns configuration;
-    isolatedParentOpH =
-        mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-            b, configuration, isolatedParentOpH);
+    mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+        b, isolatedParentOpH);
   }
   return result;
 }
@@ -214,10 +221,8 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   result.tiledOpH = tileToForeachOp.getTiledOp();
 
   // Perform a pass of canonicalization + enabling after tiling.
-  ApplyPatternsOpPatterns configuration;
-  isolatedParentOpH =
-      mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-          b, configuration, isolatedParentOpH);
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, isolatedParentOpH);
 
   // Batch fusion if requested.
   if (opsHToFuse.size() > 1) {
@@ -280,9 +285,7 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
                                           bool applyCleanups) {
   funcH = b.create<VectorizeOp>(funcH);
   if (applyCleanups) {
-    ApplyPatternsOpPatterns configuration;
-    funcH = iree_compiler::buildCanonicalizationAndEnablingTransforms(
-        b, configuration, funcH);
+    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   }
   return funcH;
 }
@@ -313,10 +316,10 @@ Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
         b.create<transform::ApplyMaterializeMasksPatternsOp>(loc);
       });
   {
-    ApplyPatternsOpPatterns config;
-    config.foldMemrefAliases = true;
-    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config,
-                                                              containingOpH);
+    iree_compiler::buildCanonicalizationAndEnablingTransforms(
+        b, containingOpH, [](OpBuilder &b, Location loc) {
+          b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
+        });
   }
   return containingOpH;
 }
@@ -331,11 +334,11 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
                                           Value variantH, bool targetGpu) {
   // Perform a pass of canonicalization + enabling before bufferization to avoid
   // spurious allocations.
-  ApplyPatternsOpPatterns configuration;
-  configuration.foldReassociativeReshapes = true;
-  configuration.foldVectorTransferTensorSlice = true;
-  variantH =
-      buildCanonicalizationAndEnablingTransforms(b, configuration, variantH);
+  buildCanonicalizationAndEnablingTransforms(
+      b, variantH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyReassociativeReshapeFoldingPatternsOp>(loc);
+        b.create<transform::ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
+      });
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
   Value memrefFunc =
@@ -469,9 +472,7 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
           .getFusedOp();
 
   // Perform a pass of canonicalization + enabling after fusion.
-  ApplyPatternsOpPatterns configuration;
-  variantH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, configuration, variantH);
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(b, variantH);
 
   // Step 3. Normalize to reorder results irrespective of emptiness.
   auto [blockReductionH, maybeBlockTrailingH] = buildSelectFirstNonEmpty(
@@ -483,11 +484,15 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
 Value mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
                                                     Value funcH) {
   ApplyPatternsOpPatterns configuration;
-  configuration.lowerTransferOpPermutations = true;
   configuration.rankReducingVector = true;
   // Apply canonicalizations and enablings twice as they enable each other.
-  buildCanonicalizationAndEnablingTransforms(b, configuration, funcH);
-  buildCanonicalizationAndEnablingTransforms(b, configuration, funcH);
+  for (int i = 0; i < 2; ++i) {
+    buildCanonicalizationAndEnablingTransforms(
+        b, funcH, [](OpBuilder &b, Location loc) {
+          b.create<transform::ApplyTransferPermutationPatternsOp>(loc);
+          b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
+        });
+  }
   b.create<ApplyBufferOptimizationsOp>(funcH);
   return funcH;
 }
