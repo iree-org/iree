@@ -37,15 +37,15 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
   CUresult (*cuGetProcAddress)(const char*, void**, int, cuuint64_t);
   IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(
       syms->cuda_library, "cuGetProcAddress", (void**)&cuGetProcAddress));
-#define CU_PFN_DECL(cudaSymbolName, ...)                                     \
-  {                                                                          \
-    static const char* kName = #cudaSymbolName;                              \
-    if (cuGetProcAddress(kName, (void**)&syms->cudaSymbolName,               \
-                         IREE_CUDA_DRIVER_API_VERSION,                       \
-                         CU_GET_PROC_ADDRESS_DEFAULT) != CUDA_SUCCESS) {     \
-      return iree_make_status(IREE_STATUS_INTERNAL,                          \
-          "Error loading CUDA driver symbol '%s'", kName);                   \
-    }                                                                        \
+#define CU_PFN_DECL(cudaSymbolName, ...)                                       \
+  {                                                                            \
+    static const char* kName = #cudaSymbolName;                                \
+    if (cuGetProcAddress(kName, (void**)&syms->cudaSymbolName,                 \
+                         IREE_CUDA_DRIVER_API_VERSION,                         \
+                         CU_GET_PROC_ADDRESS_DEFAULT) != CUDA_SUCCESS) {       \
+      return iree_make_status(IREE_STATUS_INTERNAL,                            \
+                              "Error loading CUDA driver symbol '%s'", kName); \
+    }                                                                          \
   }
 #define NCCL_PFN_DECL(ncclSymbolName, ...)
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
