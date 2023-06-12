@@ -25,6 +25,7 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts}}"
+SHARDING_CONFIG="${2:-1/1}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 BENCHMARK_PRESETS="${IREE_BENCHMARK_PRESETS:-}"
 BUILD_DEFAULT_BENCHMARK_SUITES="${IREE_BUILD_DEFAULT_BENCHMARK_SUITES:-1}"
@@ -73,6 +74,16 @@ if (( "${#BUILD_TARGETS[@]}" == 0 )); then
   exit 1
 fi
 
+# Configure sharding
+SHARDING_COUNT=${SHARDING_CONFIG##*/}
+SHARDING_INDEX=${SHARDING_CONFIG%%/*}
+
+if [[ ${SHARDING_COUNT} -gt 1 ]]; then
+  BUILD_TARGETS_SHARDING_SUFFIX="-${SHARDING_INDEX}-of-${SHARDING_COUNT}"
+else
+  BUILD_TARGETS_SHARDING_SUFFIX=""
+fi
+
 echo "Configuring to build e2e test artifacts"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
@@ -82,13 +93,20 @@ echo "Configuring to build e2e test artifacts"
   -DIREE_BUILD_E2E_TEST_ARTIFACTS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_TESTS=OFF
+  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_CREATE_E2E_TEST_ARTIFACTS_SHARDED_TARGETS=${SHARDING_COUNT}
+
 
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
   --build "${BUILD_DIR}" \
-  --target "${BUILD_TARGETS[@]}" \
+  --target "${BUILD_TARGETS[@]}${BUILD_TARGETS_SHARDING_SUFFIX}" \
   -- -k 0
+
+# We only need to do the config generation once, so we return early from all shards except index==1.
+if [[ ${SHARDING_INDEX} -ne 1 ]]; then
+  exit $?
+fi
 
 E2E_TEST_ARTIFACTS_DIR="${BUILD_DIR}/e2e_test_artifacts"
 COMPILATION_CONFIG="${E2E_TEST_ARTIFACTS_DIR}/compilation-benchmark-config.json"
