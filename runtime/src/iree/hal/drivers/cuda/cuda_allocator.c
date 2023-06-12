@@ -358,7 +358,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
       // Device only.
       buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_DEVICE;
       status = CU_RESULT_TO_STATUS(allocator->context->syms,
-                                   cuMemAlloc(&device_ptr, allocation_size));
+                                   cuMemAlloc_v2(&device_ptr, allocation_size));
     }
   } else {
     buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_HOST;
