@@ -60,12 +60,10 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
     iree::hal::utils::semaphore_base
@@ -91,9 +89,8 @@ iree_cc_library(
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   DEPS
-    iree::base::core_headers
+    iree::base
     iree::base::internal::dynamic_library
-    iree::base::tracing
   PUBLIC
 )
 

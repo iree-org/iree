@@ -63,7 +63,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/hal/api.h"
 #include "iree/tooling/context_util.h"
@@ -241,7 +240,7 @@ Status ConfigureTargetBackends(iree_compiler_session_t* session,
 // Runs the given .mlir file based on the current flags.
 StatusOr<int> CompileAndRunFile(iree_compiler_session_t* session,
                                 const char* mlir_filename) {
-  IREE_TRACE_SCOPE0("CompileAndRunFile");
+  IREE_TRACE_SCOPE_NAMED("CompileAndRunFile");
 
   // Configure the --iree-hal-target-backends= flag and/or get the default
   // device to use at runtime if either are not explicitly specified.
@@ -466,7 +465,7 @@ class ArgParser {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  IREE_TRACE_SCOPE0("iree-run-mlir");
+  IREE_TRACE_SCOPE_NAMED("iree-run-mlir");
 
   // Initialize the compiler once on startup before using any other APIs.
   ireeCompilerGlobalInitialize();

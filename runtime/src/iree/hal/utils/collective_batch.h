@@ -79,8 +79,9 @@ IREE_API_EXPORT void iree_hal_collective_batch_deinitialize(
 IREE_API_EXPORT bool iree_hal_collective_batch_is_empty(
     const iree_hal_collective_batch_t* batch);
 
-// Resets the collective batch and drops all storage.
-IREE_API_EXPORT void iree_hal_collective_batch_reset(
+// Clears the collective batch and discards batches while reusing the same
+// storage. Expects that the arena remains valid.
+IREE_API_EXPORT void iree_hal_collective_batch_clear(
     iree_hal_collective_batch_t* batch);
 
 // Appends a collective operation to the batch.

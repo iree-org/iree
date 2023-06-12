@@ -11,7 +11,6 @@
 
 #include "experimental/rocm/api.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 static iree_status_t iree_hal_rocm_driver_factory_enumerate(
     void *self, iree_host_size_t *out_driver_info_count,

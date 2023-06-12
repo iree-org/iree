@@ -36,14 +36,14 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
 
   def test_get_benchmark_presets_from_trailers_and_labels(self):
     presets_str = configure_ci.get_benchmark_presets(
-        trailers={"benchmark-extra": "android-cpu,cuda-long,x86_64-long"},
+        trailers={"benchmark-extra": "android-cpu,cuda-large,x86_64-large"},
         labels=["benchmarks:vulkan-nvidia"],
         is_pr=True,
         is_llvm_integrate_pr=False)
 
     self.assertEqual(
         presets_str,
-        "android-cpu,comp-stats,cuda-long,vulkan-nvidia,x86_64-long")
+        "android-cpu,comp-stats,cuda-large,vulkan-nvidia,x86_64-large")
 
   def test_get_benchmark_presets_from_default_group(self):
     presets_str = configure_ci.get_benchmark_presets(
@@ -53,8 +53,8 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
         is_llvm_integrate_pr=False)
 
     self.assertEqual(presets_str, SORTED_DEFAULT_BENCHMARK_PRESETS_STR)
-    # Sanity check to ensure no `*-long` preset in the default group.
-    self.assertNotIn("-long", presets_str)
+    # Sanity check to ensure no `*-large` preset in the default group.
+    self.assertNotIn("-large", presets_str)
 
   def test_get_benchmark_presets_for_non_pr(self):
     presets_str = configure_ci.get_benchmark_presets(trailers={},

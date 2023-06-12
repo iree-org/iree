@@ -15,7 +15,6 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/numpy_io.h"

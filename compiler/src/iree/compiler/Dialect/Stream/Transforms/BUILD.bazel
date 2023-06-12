@@ -51,6 +51,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/Stream/Analysis",
+        "//compiler/src/iree/compiler/Dialect/Stream/Builtins",
         "//compiler/src/iree/compiler/Dialect/Stream/Conversion",
         "//compiler/src/iree/compiler/Dialect/Stream/Conversion/FlowToStream",
         "//compiler/src/iree/compiler/Dialect/Stream/Conversion/HALToStream",

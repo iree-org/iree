@@ -743,10 +743,10 @@ class HloDynamicBroadcastInDimConverter
     SmallVector<AffineExpr> dimExprs(operandType.getRank(), nullptr);
 
     // Use static type info.
-    auto bcastDims = llvm::to_vector(
-        llvm::map_range(op.getBroadcastDimensions(), [](const APInt& d) {
+    auto bcastDims =
+        llvm::map_to_vector(op.getBroadcastDimensions(), [](const APInt& d) {
           return static_cast<int64_t>(d.getLimitedValue());
-        }));
+        });
     for (const auto& it : llvm::enumerate(operandType.getShape())) {
       if (ShapedType::isDynamic(it.value())) continue;
       bool isExpanding = it.value() == 1;
@@ -2426,21 +2426,21 @@ struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
 
     // Get sizes of the original operand.
     auto operandType = llvm::cast<ShapedType>(adaptor.getOperand().getType());
-    auto sizes = llvm::to_vector<4>(llvm::map_range(
+    auto sizes = llvm::map_to_vector<4>(
         llvm::seq<int64_t>(0, operandType.getRank()),
         [&](int64_t dim) -> OpFoldResult {
           if (!operandType.isDynamicDim(dim))
             return rewriter.getIndexAttr(operandType.getDimSize(dim));
           return rewriter.create<tensor::DimOp>(loc, adaptor.getOperand(), dim)
               .getResult();
-        }));
+        });
     // Map interior padding to strides.
-    auto strides = llvm::to_vector<4>(
-        llvm::map_range(op.getInteriorPadding().getValues<IntegerAttr>(),
-                        [&](IntegerAttr stride) -> OpFoldResult {
-                          return rewriter.getIntegerAttr(stride.getType(),
-                                                         stride.getValue() + 1);
-                        }));
+    auto strides =
+        llvm::map_to_vector<4>(op.getInteriorPadding().getValues<IntegerAttr>(),
+                               [&](IntegerAttr stride) -> OpFoldResult {
+                                 return rewriter.getIntegerAttr(
+                                     stride.getType(), stride.getValue() + 1);
+                               });
 
     rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
         op, adaptor.getOperand(), fill, low, sizes, strides);

@@ -14,8 +14,13 @@ transform.sequence failures(propagate) {
 
   // Canonicalization/CSE is needed before bufferization otherwise unnecessary
   // allocs will be created.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op 
-    { canonicalization, tiling_canonicalization, cse } : (!transform.any_op) -> ()
+    { canonicalization, cse } : (!transform.any_op) -> ()
   %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> (!transform.any_op)
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!transform.any_op) -> !transform.any_op

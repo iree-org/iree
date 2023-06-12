@@ -189,29 +189,6 @@ Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH);
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
-/// Structure to hold a summary of HW-derived properties to configure the
-/// reduction strategy.
-/// The objective of this struct is to act as a minimal summary of key
-/// properties derived from the hardware (e.g. by an oracle) and that are
-/// sufficient to steer the strategy to produce a good version.
-/// These can be thought of as latent variables or embeddings that directly
-/// control the strategy and can be derived from the hardware by some procedure.
-enum class ReductionStrategy { Small, Staged };
-struct ReductionConfig {
-  int64_t maxNumThreads;
-  int64_t vectorSize;
-  ReductionStrategy strategy;
-};
-
-/// Placeholder for some hardware model proxy that contains relevant information
-/// to configure the reduction strategy. In the future, this will need to be
-/// driven by some contract with the runtime.
-struct GPUModel {
-  static constexpr StringLiteral kDefaultGPU = "DefaultGPU";
-  StringRef model = kDefaultGPU;
-  bool hasWarpShuffle = false;
-  bool hasTF32TensorCore = false;
-};
 
 /// Try to find an exisiting transform dialect strategy for a given entry point.
 LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,

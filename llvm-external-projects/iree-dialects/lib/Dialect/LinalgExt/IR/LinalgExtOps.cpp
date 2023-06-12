@@ -511,8 +511,8 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {
-    resultTypes = llvm::to_vector<4>(
-        llvm::map_range(tiledOperands, [&](Value v) { return v.getType(); }));
+    resultTypes = llvm::map_to_vector<4>(tiledOperands,
+                                         [&](Value v) { return v.getType(); });
   }
   Operation *tiledSortOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);

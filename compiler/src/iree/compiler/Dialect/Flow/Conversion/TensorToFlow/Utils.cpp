@@ -32,13 +32,13 @@ static SmallVector<Value, 4> getDynamicValues(
 /// Get shape of the tensor given the sizes as a list of `OpFoldResult`.
 static SmallVector<int64_t, 4> getShapeFromSizes(
     ArrayRef<OpFoldResult> valueOrAttrList) {
-  return llvm::to_vector<4>(llvm::map_range(
+  return llvm::map_to_vector<4>(
       valueOrAttrList, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
           return llvm::cast<IntegerAttr>(attr).getInt();
         }
         return ShapedType::kDynamic;
-      }));
+      });
 }
 
 /// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the

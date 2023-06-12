@@ -10,7 +10,6 @@
 #if IREE_WAIT_API == IREE_WAIT_API_KQUEUE
 
 #include "iree/base/internal/wait_handle_posix.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_wait_set_t

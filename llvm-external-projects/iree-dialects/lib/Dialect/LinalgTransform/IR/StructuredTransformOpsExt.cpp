@@ -145,9 +145,8 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
     Region &r = linalgModelOp->getRegion(0);
     Block *bodyBlock = rewriter.createBlock(
         &r, r.end(), linalgOp.getBlock()->getArgumentTypes(),
-        llvm::to_vector<4>(
-            llvm::map_range(linalgOp.getBlock()->getArguments(),
-                            [](Value v) { return v.getLoc(); })));
+        llvm::map_to_vector<4>(linalgOp.getBlock()->getArguments(),
+                               [](Value v) { return v.getLoc(); }));
     ImplicitLocOpBuilder b(linalgModelOp.getLoc(), rewriter);
     auto regionBuilder = linalgModelOp.getRegionBuilder();
     llvm::ArrayRef<mlir::NamedAttribute> attrs = {};
@@ -358,7 +357,7 @@ void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
   }
 
   status = emitSilenceableFailure(
-      getTransformOp(), "tracking listener failed to find replacement op");
+      getTransformOp(), "!!! tracking listener failed to find replacement op");
   status.attachNote(op->getLoc()) << "replaced op";
   for (Value v : values)
     status.attachNote(v.getLoc()) << "replacement value";
@@ -535,7 +534,7 @@ void transform_ext::MatchCallbackOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
-// RegisterMatchCallbacksOp
+// Callbacks for tests driven by RegisterMatchCallbacksOp
 //===---------------------------------------------------------------------===//
 
 /// Match callback for "_test_match_callback" hook. Matches any payload
@@ -668,68 +667,9 @@ static DiagnosedSilenceableFailure testShapedValueMatcherCallback(
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
-/// Match callback for a reduction with optional leading and trailing
-/// elementwise operations. Matches *the first* occurrence of such a reduction
-/// within an op associated with the given handle.
-///
-/// Input handles:
-///
-///   - container op, must be associated with one operation.
-///
-/// Output handles:
-///
-///   - leading elementwise op, if any;
-///   - the "fill" op preceding the reduction;
-///   - reduction op;
-///   - trailing elementwise op, if any.
-static DiagnosedSilenceableFailure
-reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
-                  const mlir::transform::TransformState &state,
-                  ValueRange handles) {
-  if (handles.size() != 1 ||
-      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
-    return emitSilenceableFailure(loc)
-           << "expected one handle to one operation";
-  }
-
-  transform_ext::StructuredOpMatcher *pattern, *fill, *leading, *trailing;
-  transform_ext::MatchedReductionCaptures ignore;
-  transform_ext::MatcherContext matcherContext;
-  makeReductionMatcher(matcherContext, pattern, fill, leading, trailing,
-                       ignore);
-
-  // TODO: need a mechanism for this to go around the entire IR,
-  // potentially with list matches for each group.
-  Operation *root = *state.getPayloadOps(handles[0]).begin();
-
-  WalkResult walkResult = root->walk([&](Operation *op) {
-    pattern->resetCapture();
-    if (!matchPattern(op, *pattern))
-      return WalkResult::advance();
-
-    // TODO: notify properly.
-    LLVM_DEBUG({
-      DBGS() << "leading:\n";
-      if (leading->getCaptured())
-        DBGS() << leading->getCaptured() << "\n";
-      DBGS() << "fill: " << fill->getCaptured() << "\n";
-      DBGS() << "pattern: " << pattern->getCaptured() << "\n";
-      DBGS() << "trailing:\n";
-      if (trailing->getCaptured())
-        DBGS() << trailing->getCaptured() << "\n";
-    });
-
-    res.addPotentiallyEmptyPayloadGroup(leading->getCaptured());
-    res.addPayloadGroup({fill->getCaptured()});
-    res.addPayloadGroup({pattern->getCaptured()});
-    res.addPotentiallyEmptyPayloadGroup(trailing->getCaptured());
-    return WalkResult::interrupt();
-  });
-
-  if (walkResult.wasInterrupted())
-    return DiagnosedSilenceableFailure::success();
-  return emitSilenceableFailure(loc) << "failed to match";
-}
+//===---------------------------------------------------------------------===//
+// Callbacks for codegen driven by RegisterMatchCallbacksOp.
+//===---------------------------------------------------------------------===//
 
 /// Match callback for a convolution with optional fill and trailing
 /// elementwise operations. Matches *the first* occurrence of such a convolution
@@ -757,7 +697,8 @@ convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   transform_ext::StructuredOpMatcher *pattern, *fill, *trailing;
   transform_ext::MatchedConvolutionCaptures ignore;
   transform_ext::MatcherContext matcherContext;
-  makeConvolutionMatcher(matcherContext, pattern, fill, trailing, ignore);
+  makeConvolutionMatcher(matcherContext, pattern, fill, trailing, ignore,
+                         /*mustMatchEntireFunc=*/true);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -780,6 +721,69 @@ convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
     });
 
     res.addPotentiallyEmptyPayloadGroup(fill->getCaptured());
+    res.addPayloadGroup({pattern->getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailing->getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
+/// Match callback for a reduction with optional leading and trailing
+/// elementwise operations. Matches *the first* occurrence of such a reduction
+/// within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - leading elementwise op, if any;
+///   - the "fill" op preceding the reduction;
+///   - reduction op;
+///   - trailing elementwise op, if any.
+static DiagnosedSilenceableFailure
+reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                  const mlir::transform::TransformState &state,
+                  ValueRange handles, bool mustMatchEntireFunc) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::StructuredOpMatcher *pattern, *fill, *leading, *trailing;
+  transform_ext::MatchedReductionCaptures ignore;
+  transform_ext::MatcherContext matcherContext;
+  makeReductionMatcher(matcherContext, pattern, fill, leading, trailing, ignore,
+                       mustMatchEntireFunc);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    pattern->resetCapture();
+    if (!matchPattern(op, *pattern))
+      return WalkResult::advance();
+
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "leading:\n";
+      if (leading->getCaptured())
+        DBGS() << leading->getCaptured() << "\n";
+      DBGS() << "fill: " << fill->getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern->getCaptured() << "\n";
+      DBGS() << "trailing:\n";
+      if (trailing->getCaptured())
+        DBGS() << trailing->getCaptured() << "\n";
+    });
+
+    res.addPotentiallyEmptyPayloadGroup(leading->getCaptured());
+    res.addPayloadGroup({fill->getCaptured()});
     res.addPayloadGroup({pattern->getCaptured()});
     res.addPotentiallyEmptyPayloadGroup(trailing->getCaptured());
     return WalkResult::interrupt();
@@ -816,7 +820,8 @@ matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
   transform_ext::StructuredOpMatcher *pattern, *fill, *trailing;
   transform_ext::MatchedMatmulCaptures ignore;
   transform_ext::MatcherContext matcherContext;
-  makeMatmulMatcher(matcherContext, pattern, fill, trailing, ignore);
+  makeMatmulMatcher(matcherContext, pattern, fill, trailing, ignore,
+                    /*mustMatchEntireFunc=*/true);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -849,6 +854,58 @@ matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+/// Match callback for a tensor.pad. Matches *the first* occurrence of such pad
+/// within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - the container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - the pad op.
+static DiagnosedSilenceableFailure
+padCallback(transform_ext::MatchCallbackResult &res, Location loc,
+            const mlir::transform::TransformState &state, ValueRange handles,
+            bool mustMatchEntireFunc) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::CapturingOpMatcher *pattern;
+  transform_ext::MatchedPadCaptures ignore;
+  transform_ext::MatcherContext matcherContext;
+  makePadMatcher(matcherContext, pattern, ignore, mustMatchEntireFunc);
+
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    pattern->resetCapture();
+    if (!matchPattern(op, *pattern))
+      return WalkResult::advance();
+
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "pad:\n";
+      if (pattern->getCaptured())
+        DBGS() << pattern->getCaptured() << "\n";
+    });
+
+    res.addPayloadGroup({pattern->getCaptured()});
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
+//===---------------------------------------------------------------------===//
+// RegisterMatchCallbacksOp
+//===---------------------------------------------------------------------===//
+
 DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
@@ -860,9 +917,13 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
                             testValueMatcherCallback);
   registry.registerCallback("_test_shaped_value_matcher_callback",
                             testShapedValueMatcherCallback);
-  registry.registerCallback("reduction", reductionCallback);
   registry.registerCallback("convolution", convolutionCallback);
   registry.registerCallback("matmul", matmulCallback);
+  registry.registerCallback("pad", wrapAsEntireFuncMatch(padCallback));
+  registry.registerCallback("reduction",
+                            wrapAsEntireFuncMatch(reductionCallback));
+  registry.registerCallback("reduction_partial",
+                            wrapAsPartialMatch(reductionCallback));
   return DiagnosedSilenceableFailure::success();
 }
 

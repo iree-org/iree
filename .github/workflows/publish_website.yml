@@ -39,6 +39,7 @@ jobs:
         run: |
           pip install \
             mkdocs-material \
+            mkdocs-redirects \
             requests
       - name: Generating release index
         run: |

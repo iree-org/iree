@@ -13,7 +13,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 #include "iree/task/task.h"
 
 #ifdef __cplusplus

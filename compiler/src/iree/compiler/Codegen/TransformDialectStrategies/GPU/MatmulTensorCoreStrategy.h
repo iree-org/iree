@@ -136,9 +136,6 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   LLVM_DUMP_METHOD void dump() const;
 };
 
-void buildMatmulTensorCoreStrategy(ImplicitLocOpBuilder &b, Value variantH,
-                                   const MatmulStrategy &strategy);
-
 }  // namespace gpu
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -894,8 +894,8 @@ static LogicalResult applyAsyncAllocations(Region &region,
   // Walk the ops backwards so that we can delete them, freeing uses so that
   // producers can be deleted in turn.
   auto &block = region.getBlocks().front();
-  auto ops = llvm::to_vector<4>(llvm::map_range(
-      llvm::reverse(block), [&](Operation &op) { return &op; }));
+  auto ops = llvm::map_to_vector<4>(llvm::reverse(block),
+                                    [&](Operation &op) { return &op; });
   for (auto *op : ops) {
     if (op->hasTrait<OpTrait::IsTerminator>()) continue;
     if (failed(TypeSwitch<Operation *, LogicalResult>(op)
@@ -1615,8 +1615,8 @@ static LogicalResult allocateExecutionRegion(
   // local changes here.
   if (!joinTimepoints.empty()) {
     joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
-    auto fusedLoc = builder.getFusedLoc(llvm::to_vector<4>(llvm::map_range(
-        joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); })));
+    auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector<4>(
+        joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); }));
     auto joinOp = builder.create<IREE::Stream::TimepointJoinOp>(
         fusedLoc, newExecuteOp.getResultTimepoint().getType(), joinTimepoints);
     executeTimepointUsers.insert(joinOp);

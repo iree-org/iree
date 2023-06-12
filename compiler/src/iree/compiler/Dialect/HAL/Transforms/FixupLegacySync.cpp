@@ -153,15 +153,10 @@ struct FixupLegacySyncPass
 
     // See if any devices are marked as requiring the legacy_sync behavior.
     // If any single device does we must uniformly apply the fixups.
-    bool anyRequireFixup = false;
-    auto deviceTargetAttrs = IREE::HAL::DeviceTargetAttr::lookup(moduleOp);
-    for (auto deviceTargetAttr : deviceTargetAttrs) {
-      if (deviceTargetAttr.hasConfigurationAttr("legacy_sync")) {
-        anyRequireFixup = true;
-        break;
-      }
+    if (!IREE::HAL::DeviceTargetAttr::lookupConfigAttrAny(moduleOp,
+                                                          "legacy_sync")) {
+      return;
     }
-    if (!anyRequireFixup) return;
 
     // This could use an interface but it'd be better to remove the need for
     // this pass instead.

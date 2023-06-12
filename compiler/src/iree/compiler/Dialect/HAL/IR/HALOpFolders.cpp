@@ -649,9 +649,9 @@ static SmallVector<Location> gatherResultLocations(int numResults,
       allLocs[i].push_back(result.getLoc());
     }
   }
-  return llvm::to_vector(llvm::map_range(allLocs, [&](auto resultLocs) {
+  return llvm::map_to_vector(allLocs, [&](auto resultLocs) {
     return FusedLoc::get(region.getContext(), resultLocs);
-  }));
+  });
 }
 
 // Rewrites |region| to have a single hal.return with all prior return sites

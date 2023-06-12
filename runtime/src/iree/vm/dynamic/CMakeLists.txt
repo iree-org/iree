@@ -31,10 +31,8 @@ iree_cc_library(
   DEPS
     ::api
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree::vm
   PUBLIC
 )

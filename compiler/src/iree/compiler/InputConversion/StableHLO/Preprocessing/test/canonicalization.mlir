@@ -427,7 +427,7 @@ func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic(%arg0: tensor<4xf32>
 
 // CHECK-LABEL: func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_shape
 func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_shape(%arg0: tensor<i32>) -> tensor<4x32xi32> {
-  %0 = mhlo.constant dense<[4, 32]> : tensor<2xi32>
+  %0 = stablehlo.constant dense<[4, 32]> : tensor<2xi32>
   // CHECK: %[[RESULT:.+]] = stablehlo.broadcast_in_dim %arg0, dims = [] : (tensor<i32>) -> tensor<4x32xi32>
   %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [] : (tensor<i32>, tensor<2xi32>) -> tensor<?x32xi32>
   %2 = stablehlo.dynamic_reshape %1, %0 : (tensor<?x32xi32>, tensor<2xi32>) -> tensor<4x32xi32>
@@ -583,4 +583,49 @@ func.func @gather_to_slice_indices_clamp_lowerbound(%arg0 : tensor<4x2xui32>) ->
   // CHECK-SAME:    strides = dense<1> : tensor<2xi64>} : (tensor<4x2xui32>) -> tensor<1x2xui32>
   // CHECK-NEXT: %[[V1:.*]] = stablehlo.reshape %[[V0]] : (tensor<1x2xui32>) -> tensor<2xui32>
   // CHECK-NEXT: return %[[V1]] : tensor<2xui32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @reduce_noop_1
+// CHECK-SAME:   ([[ARG0:%.+]]: tensor<4x8xf32>)
+func.func @reduce_noop_1(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+  %0 = stablehlo.constant dense<0.000000e+00> : tensor<f32>
+  %1 = stablehlo.reduce(%arg0 init: %0) across dimensions = [] : (tensor<4x8xf32>, tensor<f32>) -> tensor<4x8xf32>
+    reducer(%arg1: tensor<f32>, %arg2: tensor<f32>) {
+    %4 = stablehlo.add %arg1, %arg2 : tensor<f32>
+    stablehlo.return %4 : tensor<f32>
+  }
+  // CHECK: return [[ARG0]] : tensor<4x8xf32>
+  func.return %1 : tensor<4x8xf32>
+}
+
+// CHECK-LABEL: func.func @reduce_noop_2
+// CHECK-SAME:   ([[ARG0:%.+]]: tensor<4x8xi32>, [[ARG1:%.+]]: tensor<i32>)
+func.func @reduce_noop_2(%arg0: tensor<4x8xi32>, %arg1: tensor<i32>) -> tensor<i32> {
+  %0 = stablehlo.constant dense<0> : tensor<i32>
+  %1 = stablehlo.reduce(%arg0 init: %0) across dimensions = [0, 1] : (tensor<4x8xi32>, tensor<i32>) -> tensor<i32>
+    reducer(%b1: tensor<i32>, %b2: tensor<i32>) {
+    stablehlo.return %arg1 : tensor<i32>
+  }
+  // CHECK: return [[ARG1]] : tensor<i32>
+  func.return %1 : tensor<i32>
+}
+
+// CHECK-LABEL: func.func @reduce_zero_ext
+func.func @reduce_zero_ext(%arg0: tensor<0xi1>) -> tensor<i32> {
+  %0 = stablehlo.constant dense<false> : tensor<i1>
+  %1 = stablehlo.constant dense<false> : tensor<0xi1>
+  %2 = stablehlo.compare  NE, %arg0, %1, UNSIGNED : (tensor<0xi1>, tensor<0xi1>) -> tensor<0xi1>
+  %3 = stablehlo.convert %2 : (tensor<0xi1>) -> tensor<0xi32>
+  %4 = stablehlo.constant dense<0> : tensor<i32>
+  %5 = stablehlo.reduce(%3 init: %4) across dimensions = [0] : (tensor<0xi32>, tensor<i32>) -> tensor<i32>
+    reducer(%arg1: tensor<i32>, %arg2: tensor<i32>)  {
+    %6 = stablehlo.add %arg1, %arg2 : tensor<i32>
+    stablehlo.return %6 : tensor<i32>
+  }
+
+  // CHECK: [[CST:%.+]] = stablehlo.constant dense<0> : tensor<i32>
+  // CHECK: return [[CST]] : tensor<i32>
+  return %5 : tensor<i32>
 }

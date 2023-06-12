@@ -10,7 +10,6 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
 
 // This file contains the ELF data structures we use in our runtime linker and
 // the definitions to support them. The structure definitions are taken from

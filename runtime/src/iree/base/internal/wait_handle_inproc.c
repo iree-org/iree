@@ -16,7 +16,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/target_platform.h"
 
 // This implementation uses iree_notification_t - backed by a futex in most
 // cases - to simulate system wait handles. When using a single handle such as

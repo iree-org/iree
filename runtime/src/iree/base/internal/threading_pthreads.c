@@ -24,7 +24,6 @@
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_EMSCRIPTEN)
 #include <emscripten/threading.h>

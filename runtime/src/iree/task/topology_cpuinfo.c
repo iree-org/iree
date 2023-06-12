@@ -8,8 +8,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 #include "iree/task/topology.h"
 
 // Initializes |out_topology| with a standardized behavior when cpuinfo is not

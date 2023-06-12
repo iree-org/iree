@@ -67,18 +67,17 @@ struct ConvertTensorReshapeOp
   }
 };
 
-struct ConvertTensorAllocOp
-    : public OpConversionPattern<IREE::Flow::TensorAllocOp> {
+struct ConvertTensorAllocaOp
+    : public OpConversionPattern<IREE::Flow::TensorAllocaOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorAllocOp op, OpAdaptor adaptor,
+      IREE::Flow::TensorAllocaOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
     auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
                                         op.getResultDims(), rewriter);
-    rewriter.replaceOpWithNewOp<IREE::Stream::ResourceAllocOp>(
-        op, unknownType, resultSize,
-        /*uninitialized*/ true, getAffinityFor(op));
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncAllocaOp>(
+        op, unknownType, resultSize, getAffinityFor(op));
     return success();
   }
 };
@@ -595,10 +594,8 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
       }
       return getTypeConverter()->convertType(type);
     };
-    auto newArgTypes =
-        llvm::to_vector(llvm::map_range(op.getArgumentTypes(), convertType));
-    auto newResultTypes =
-        llvm::to_vector(llvm::map_range(op.getResultTypes(), convertType));
+    auto newArgTypes = llvm::map_to_vector(op.getArgumentTypes(), convertType);
+    auto newResultTypes = llvm::map_to_vector(op.getResultTypes(), convertType);
     auto newType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
     SmallVector<DictionaryAttr> argAttrs;
     if (auto argAttrsAttr = adaptor.getArgAttrsAttr()) {
@@ -849,7 +846,7 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet &patterns) {
   patterns
-      .insert<ConvertTensorReshapeOp, ConvertTensorAllocOp,
+      .insert<ConvertTensorReshapeOp, ConvertTensorAllocaOp,
               ConvertTensorEmptyOp, ConvertTensorSplatOp, ConvertTensorCloneOp,
               ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
               ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter,

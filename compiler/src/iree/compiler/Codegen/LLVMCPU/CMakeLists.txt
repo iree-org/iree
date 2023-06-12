@@ -63,6 +63,7 @@ iree_cc_library(
     MLIRArithTransforms
     MLIRArmNeon2dToIntr
     MLIRArmNeonDialect
+    MLIRArmSMETransforms
     MLIRBufferizationDialect
     MLIRComplexToLLVM
     MLIRComplexToStandard

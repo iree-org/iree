@@ -10,7 +10,6 @@
 #include <stdlib.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "third_party/nccl/nccl.h"
@@ -52,6 +51,11 @@ iree_status_t iree_hal_cuda_nccl_get_unique_id_from_context(
 typedef struct iree_hal_cuda_nccl_channel_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context_wrapper;
+
+  // Parent channel this was split from, if any.
+  // This is only used to keep the parent channel live for as long as there are
+  // any split channels live (including transitive splits).
+  iree_hal_channel_t* parent_channel;
 
   // Hash of the unique ID used to create the communicator.
   // This is consistent with the hashes NCCL itself uses for logging but is not
@@ -145,6 +149,8 @@ static void iree_hal_cuda_nccl_channel_destroy(
 
   NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
                     ncclCommDestroy(channel->comm));
+
+  iree_hal_channel_release(channel->parent_channel);
   iree_allocator_free(host_allocator, channel);
 
   IREE_TRACE_ZONE_END(z0);
@@ -188,6 +194,8 @@ static iree_status_t iree_hal_cuda_nccl_channel_split(
     iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
                                  &split_channel->resource);
     split_channel->context_wrapper = channel->context_wrapper;
+    split_channel->parent_channel = base_channel;
+    iree_hal_channel_retain(base_channel);
     split_channel->rank = split_rank;
     split_channel->count = split_count;
     split_channel->comm = split_comm;

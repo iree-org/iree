@@ -105,7 +105,7 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
       operation.emitOpError("folding patterns failed");
       return signalPassFailure();

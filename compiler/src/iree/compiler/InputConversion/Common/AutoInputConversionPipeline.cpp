@@ -32,8 +32,13 @@ namespace mlir::iree_compiler {
 namespace {
 struct AutoInputConversionPipelinePass final
     : AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
+  AutoInputConversionPipelinePass(
+      const AutoInputConversionPipelineOptions& inputOptions)
+      : options(inputOptions) {}
   void runOnOperation() override;
   void getDependentDialects(DialectRegistry& registry) const override;
+
+  AutoInputConversionPipelineOptions options;
 };
 
 // All the features seen that should be handled during input conversion.
@@ -154,10 +159,14 @@ void AutoInputConversionPipelinePass::runOnOperation() {
                    OpPassManager::Nesting::Explicit);
 #ifdef IREE_HAVE_MHLO_INPUT
   if (features.hasStableHLO && !features.hasMHLO) {
+    stablehlo::StableHloOptions options;
+    options.demoteI64ToI32 = demoteI64ToI32;
+    options.demoteF64ToF32 = demoteF64ToF32;
+    options.promoteBF16ToF32 = promoteBF16ToF32;
     if (features.hasTuples) {
-      stablehlo::buildStableHLOXLAInputConversionPassPipeline(pm);
+      stablehlo::buildStableHLOXLAInputConversionPassPipeline(pm, options);
     } else {
-      stablehlo::buildStableHLOInputConversionPassPipeline(pm);
+      stablehlo::buildStableHLOInputConversionPassPipeline(pm, options);
     }
   }
   if (features.hasMHLO) {
@@ -201,8 +210,19 @@ void AutoInputConversionPipelinePass::getDependentDialects(
       };
 
 #ifdef IREE_HAVE_MHLO_INPUT
-  appendPipelineDialects(stablehlo::buildStableHLOInputConversionPassPipeline);
-  appendPipelineDialects(
+  auto appendStablehloPipelineDialects =
+      [&registry](function_ref<void(OpPassManager&,
+                                    const stablehlo::StableHloOptions& options)>
+                      buildFn) {
+        const stablehlo::StableHloOptions options;
+        OpPassManager pm;
+        buildFn(pm, options);
+        pm.getDependentDialects(registry);
+      };
+
+  appendStablehloPipelineDialects(
+      stablehlo::buildStableHLOInputConversionPassPipeline);
+  appendStablehloPipelineDialects(
       stablehlo::buildStableHLOXLAInputConversionPassPipeline);
 
   appendPipelineDialects(MHLO::buildMHLOInputConversionPassPipeline);
@@ -224,7 +244,13 @@ void AutoInputConversionPipelinePass::getDependentDialects(
 
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass() {
-  return std::make_unique<AutoInputConversionPipelinePass>();
+  AutoInputConversionPipelineOptions options;
+  return std::make_unique<AutoInputConversionPipelinePass>(options);
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> createAutoInputConversionPipelinePass(
+    const AutoInputConversionPipelineOptions& options) {
+  return std::make_unique<AutoInputConversionPipelinePass>(options);
 }
 
 }  // namespace mlir::iree_compiler

@@ -109,8 +109,10 @@ macro(iree_setup_toolchain)
     # uninitialized memory. See the extensive description in that patch that
     # originally introduced it:
     # https://reviews.llvm.org/rG14daa20be1ad89639ec209d969232d19cf698845
-    string(APPEND CMAKE_CXX_FLAGS " -ftrivial-auto-var-init=pattern")
-    string(APPEND CMAKE_C_FLAGS " -ftrivial-auto-var-init=pattern")
+    if(NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+      string(APPEND CMAKE_CXX_FLAGS " -ftrivial-auto-var-init=pattern")
+      string(APPEND CMAKE_C_FLAGS " -ftrivial-auto-var-init=pattern")
+    endif()
 
     # If doing any kind of shared library builds, then we have to link against
     # the shared libasan, and the user will be responsible for adding the

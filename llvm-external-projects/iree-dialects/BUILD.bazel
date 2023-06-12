@@ -704,6 +704,7 @@ cc_binary(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformPDLExtension",
         "@llvm-project//mlir:Transforms",

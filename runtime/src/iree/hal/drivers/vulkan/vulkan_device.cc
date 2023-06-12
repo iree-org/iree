@@ -13,7 +13,6 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/builtin_executables.h"
 #include "iree/hal/drivers/vulkan/command_queue.h"

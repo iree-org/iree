@@ -86,6 +86,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithTransforms",
         "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:ArmNeonDialect",
+        "@llvm-project//mlir:ArmSMETransforms",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ComplexToLLVM",
         "@llvm-project//mlir:ComplexToStandard",

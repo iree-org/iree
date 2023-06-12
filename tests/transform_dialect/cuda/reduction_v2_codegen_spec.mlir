@@ -41,15 +41,24 @@ transform.sequence failures(propagate) {
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
   // Canonicalization/CSE is needed before bufferization otherwise unnecessary
   // allocs will be created.
+  transform.apply_patterns to %func_3 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %func_3
-    { fold_reassociative_reshapes, canonicalization, tiling_canonicalization, cse } : (!transform.any_op) -> ()
+    { fold_reassociative_reshapes, canonicalization, cse } : (!transform.any_op) -> ()
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   %func_5 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   transform.iree.apply_patterns %func_5 { erase_unnecessary_tensor_operands } : (!transform.any_op) -> ()
@@ -66,7 +75,12 @@ transform.sequence failures(propagate) {
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  transform.iree.apply_patterns %func_7 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func_7 {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.memref.fold_memref_alias_ops
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 
     : (!transform.any_op) -> !transform.any_op
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 } : (!transform.any_op) -> !transform.any_op
@@ -74,6 +88,11 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> ()
 
   // Late canonicalizations to cleanup and pass the checks
+  transform.apply_patterns to %func_7 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %func_7
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 }

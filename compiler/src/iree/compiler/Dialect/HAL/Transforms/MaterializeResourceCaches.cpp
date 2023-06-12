@@ -309,8 +309,8 @@ class MaterializeResourceCachesPass
     auto callOp = callerBuilder.create<func::CallOp>(blockOp.getLoc(), funcOp,
                                                      callOperands);
 
-    return llvm::to_vector(llvm::map_range(
-        callOp.getResults(), [](OpResult result) -> Value { return result; }));
+    return llvm::map_to_vector(callOp.getResults(),
+                               [](OpResult result) -> Value { return result; });
   }
 
   void replaceDescriptorSetLayoutLookupOp(

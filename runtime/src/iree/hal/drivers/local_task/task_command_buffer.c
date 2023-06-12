@@ -12,7 +12,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
@@ -220,6 +219,8 @@ static iree_status_t iree_hal_task_command_buffer_end(
     iree_task_list_move(&command_buffer->leaf_tasks,
                         &command_buffer->root_tasks);
   }
+
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
 
   return iree_ok_status();
 }

@@ -15,7 +15,6 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"

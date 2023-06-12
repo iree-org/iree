@@ -6,8 +6,6 @@
 
 #include "iree/vm/bytecode/utils/block_list.h"
 
-#include "iree/base/tracing.h"
-
 iree_status_t iree_vm_bytecode_block_list_initialize(
     uint32_t capacity, iree_allocator_t allocator,
     iree_vm_bytecode_block_list_t* out_block_list) {

@@ -7,7 +7,7 @@
 #ifndef IREE_HAL_DRIVERS_VULKAN_VULKAN_HEADERS_H_
 #define IREE_HAL_DRIVERS_VULKAN_VULKAN_HEADERS_H_
 
-#include "iree/base/target_platform.h"
+#include "iree/base/api.h"
 
 // We exclusively use Vulkan via queried function pointers. To ensure that there
 // are no accidental calls to the linker-loaded implicit functions we just

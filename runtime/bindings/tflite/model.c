@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode/module.h"
 

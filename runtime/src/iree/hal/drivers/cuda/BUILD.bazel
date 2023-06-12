@@ -30,6 +30,8 @@ iree_runtime_cc_library(
         "event_semaphore.h",
         "graph_command_buffer.c",
         "graph_command_buffer.h",
+        "memory_pools.c",
+        "memory_pools.h",
         "native_executable.c",
         "native_executable.h",
         "nccl_channel.c",
@@ -49,8 +51,6 @@ iree_runtime_cc_library(
     deps = [
         ":dynamic_symbols",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/internal:synchronization",
@@ -82,8 +82,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:dynamic_library",
         "@iree_cuda//:headers",
         "@nccl//:headers",
