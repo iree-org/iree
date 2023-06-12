@@ -9,8 +9,8 @@
 
 #include <array>
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 
 namespace mlir {
 namespace iree_compiler {
