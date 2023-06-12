@@ -296,12 +296,13 @@ Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
       containingOpH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(loc);
       });
-  {
-    ApplyPatternsOpPatterns configuration;
-    configuration.rankReducingLinalg = true;
-    configuration.rankReducingVector = true;
-    b.create<ApplyPatternsOp>(containingOpH, configuration);
-  }
+  b.create<transform::ApplyPatternsOp>(
+      containingOpH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
+        b.create<transform::ApplyFoldUnitExtentDimsViaSlicesPatternsOp>(loc);
+        b.create<IREE::transform_dialect::
+                     ApplyFoldReshapeIntoTensorHalInterfacePatternsOp>(loc);
+      });
   return containingOpH;
 }
 
@@ -483,8 +484,6 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
 
 Value mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
                                                     Value funcH) {
-  ApplyPatternsOpPatterns configuration;
-  configuration.rankReducingVector = true;
   // Apply canonicalizations and enablings twice as they enable each other.
   for (int i = 0; i < 2; ++i) {
     buildCanonicalizationAndEnablingTransforms(

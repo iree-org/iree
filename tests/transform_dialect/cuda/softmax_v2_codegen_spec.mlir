@@ -86,7 +86,11 @@ transform.sequence failures(propagate) {
   // Step 3. Rank-reduce and vectorize.
   // ==================================
   %funcx_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %funcx_2 {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
+  transform.apply_patterns to %funcx_2 {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   transform.structured.vectorize %funcx_2 : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
@@ -104,7 +108,12 @@ transform.sequence failures(propagate) {
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===================================================================
-  transform.iree.apply_patterns %memref_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!transform.any_op) -> ()
+  transform.apply_patterns to %memref_func {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.memref.fold_memref_alias_ops
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
     : (!transform.any_op) -> !transform.any_op
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }

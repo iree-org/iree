@@ -153,10 +153,10 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
                                                        Value variantH,
                                                        Value funcH,
                                                        int64_t warpSize) {
-  ApplyPatternsOpPatterns patterns;
-  patterns.foldMemrefAliases = true;
-  patterns.rankReducingVector = true;
-  b.create<ApplyPatternsOp>(funcH, patterns);
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
+    b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
+  });
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
@@ -530,11 +530,9 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   // TODO: Fewer canonicalization.
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   b.create<iree_compiler::IREE::transform_dialect::HoistStaticAllocOp>(funcH);
-  {
-    ApplyPatternsOpPatterns config;
-    config.foldMemrefAliases = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
+  });
   {
     ApplyPatternsOpPatterns config;
     config.extractAddressComputations = true;
@@ -569,9 +567,9 @@ void mlir::iree_compiler::gpu::buildMultiBuffering(
     ImplicitLocOpBuilder &b, Value funcH,
     const AbstractGemmLikeStrategy &strategy) {
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
-  ApplyPatternsOpPatterns config;
-  config.foldMemrefAliases = true;
-  b.create<ApplyPatternsOp>(funcH, config);
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
+  });
   // TODO: Avoid brittle matching here.
   // TODO: Better builder after integrate.
   Value allocH = b.create<transform::MatchOp>(
