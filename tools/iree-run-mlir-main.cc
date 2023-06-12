@@ -413,11 +413,11 @@ class ArgParser {
       } else if (starts_with("-Xcompiler,", current_arg) ||
                  starts_with("--Xcompiler,", current_arg)) {
         // Split and send the rest of the flag to the compiler.
-        AppendPrefixedArgs(current_arg, &compiler_args_);
+        AppendPrefixedArg(current_arg, &compiler_args_);
       } else if (starts_with("-Xruntime,", current_arg) ||
                  starts_with("--Xruntime,", current_arg)) {
         // Split and send the rest of the flag to the runtime.
-        AppendPrefixedArgs(current_arg, &runtime_args_);
+        AppendPrefixedArg(current_arg, &runtime_args_);
       } else {
         // Route to either runtime or compiler arg sets based on which side of
         // the -- we are on.
@@ -437,24 +437,15 @@ class ArgParser {
   }
 
  private:
-  // Drops the prefix from |prefixed_arg| and appends one or more to |out_args|.
-  // Example: --Xcompiler,ab=cd,ef=gh -> --ab=cd + --ef=gh
-  void AppendPrefixedArgs(std::string_view prefixed_arg,
-                          std::vector<char*>* out_args) {
-    auto append_flag_string = [&](std::string_view slice_arg) {
-      auto stable_arg = std::make_unique<std::string>("--");
-      stable_arg->append(slice_arg);
-      temp_strings_.push_back(std::move(stable_arg));
-      out_args->push_back(temp_strings_.back()->data());
-    };
+  // Drops the prefix from |prefixed_arg| and appends the arg to |out_args|.
+  // Example: --Xcompiler,ab=cd,ef -> --ab=cd,ef
+  void AppendPrefixedArg(std::string_view prefixed_arg,
+                         std::vector<char*>* out_args) {
     std::string_view sub_arg = prefixed_arg.substr(prefixed_arg.find(',') + 1);
-    for (;;) {
-      size_t comma_pos = sub_arg.find_first_of(',');
-      if (comma_pos == std::string_view::npos) break;
-      append_flag_string(sub_arg.substr(0, comma_pos));
-      sub_arg = sub_arg.substr(comma_pos + 1);
-    }
-    append_flag_string(sub_arg);
+    auto stable_arg = std::make_unique<std::string>("--");
+    stable_arg->append(sub_arg);
+    temp_strings_.push_back(std::move(stable_arg));
+    out_args->push_back(temp_strings_.back()->data());
   }
 
   std::vector<std::unique_ptr<std::string>> temp_strings_;
