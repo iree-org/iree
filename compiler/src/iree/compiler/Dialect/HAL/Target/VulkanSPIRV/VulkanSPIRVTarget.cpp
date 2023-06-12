@@ -22,6 +22,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
@@ -141,6 +142,13 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
              << "should only contain exactly one spirv.module op";
     }
     auto spvModuleOp = *spirvModuleOps.begin();
+    if (!options.dumpIntermediatesPath.empty()) {
+      std::string assembly;
+      llvm::raw_string_ostream os(assembly);
+      spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
+      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                     variantOp.getName(), ".mlir", assembly);
+    }
 
     FlatbufferBuilder builder;
     iree_hal_spirv_ExecutableDef_start_as_root(builder);
