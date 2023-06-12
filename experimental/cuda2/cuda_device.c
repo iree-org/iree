@@ -16,6 +16,7 @@
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "experimental/cuda2/cuda_status_util.h"
 #include "experimental/cuda2/memory_pools.h"
+#include "experimental/cuda2/pipeline_layout.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
 #include "iree/hal/utils/buffer_transfer.h"
@@ -345,8 +346,10 @@ static iree_status_t iree_hal_cuda2_device_create_descriptor_set_layout(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "descriptor set layout not yet implmeneted");
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
+  return iree_hal_cuda2_descriptor_set_layout_create(
+      flags, binding_count, bindings, device->host_allocator,
+      out_descriptor_set_layout);
 }
 
 static iree_status_t iree_hal_cuda2_device_create_event(
@@ -367,8 +370,10 @@ static iree_status_t iree_hal_cuda2_device_create_pipeline_layout(
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_pipeline_layout_t** out_pipeline_layout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "pipeline layout not yet implmeneted");
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
+  return iree_hal_cuda2_pipeline_layout_create(
+      set_layout_count, set_layouts, push_constants, device->host_allocator,
+      out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_cuda2_device_create_semaphore(
