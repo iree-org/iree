@@ -26,8 +26,13 @@ transform.sequence failures(propagate) {
     %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
     %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func_3 {
+      transform.apply_patterns.iree.fold_fill_into_pad
+      transform.apply_patterns.linalg.tiling_canonicalization
+      transform.apply_patterns.scf.for_loop_canonicalization
+    } : !transform.any_op
     transform.iree.apply_patterns %variant_op
-        { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+        { canonicalization, licm, cse } : (!transform.any_op) -> ()
 
     // Bufferization
     // ==========================================

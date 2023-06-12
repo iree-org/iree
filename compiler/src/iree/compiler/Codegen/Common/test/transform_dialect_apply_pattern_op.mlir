@@ -112,7 +112,11 @@ func.func @pad_fill_to_fill(%arg0: tensor<31x62xf32>) -> tensor<32x64xf32> {
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !transform.any_op):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
+  transform.apply_patterns to %0 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
 }
 
 // -----
@@ -141,7 +145,11 @@ func.func @pad_fill_different_ssa_value_but_same_cst(%arg0: tensor<31x62xf32>) -
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !transform.any_op):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
+  transform.apply_patterns to %0 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
 }
 
 // -----
@@ -171,7 +179,11 @@ func.func @pad_extract_fill_to_fill(%arg0: tensor<31x62xf32>,
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !transform.any_op):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
+  transform.apply_patterns to %0 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
 }
 
 // -----
@@ -203,7 +215,11 @@ func.func @pad_extract_extract_fill_to_fill(%arg0: tensor<31x62xf32>,
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !transform.any_op):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
+  transform.apply_patterns to %0 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
 }
 
 // -----
@@ -233,5 +249,9 @@ func.func @pad_extract_bigger_fill_to_fill(%arg0: tensor<253x123xf32>,
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !transform.any_op):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!transform.any_op) -> ()
+  transform.apply_patterns to %0 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
 }

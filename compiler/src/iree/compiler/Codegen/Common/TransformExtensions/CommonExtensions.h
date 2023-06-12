@@ -56,7 +56,6 @@ struct ApplyPatternsOpPatterns {
   bool rankReducingVector = false;
   bool swapPaddingElideConditional = false;
   bool swappingPatterns = false;
-  bool tilingCanonicalization = false;
   bool unrollVectorsGpuMmaSync = false;
   bool unrollVectorsGpuWmma = false;
 };

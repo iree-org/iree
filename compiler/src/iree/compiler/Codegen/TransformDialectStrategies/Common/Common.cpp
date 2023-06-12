@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
+#include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -126,13 +127,16 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
 /// Create an ApplyPatternsOp that performs a set of key canonicalizations and
 /// so-called enabling transformations to normalize the IR.
 /// In addition to the specified transform, perform the following ones:
-///   canonicalization, tiling_canonicalization, licm and cse (in this order).
+///   tiling-related canonicalization patterns, canonicalization, licm and cse
+///   (in this order).
 void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
     ImplicitLocOpBuilder &b, Value variantH,
     ApplyPatternsOpBodyBuilderFn populatePatternsFn) {
   b.create<transform::ApplyPatternsOp>(
       variantH, [&](OpBuilder &b, Location loc) {
         b.create<transform::ApplyTilingCanonicalizationPatternsOp>(loc);
+        b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
+        b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
         if (populatePatternsFn) populatePatternsFn(b, loc);
       });
   ApplyPatternsOpPatterns configuration;

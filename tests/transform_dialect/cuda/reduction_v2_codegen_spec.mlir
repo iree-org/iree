@@ -48,8 +48,13 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   // Canonicalization/CSE is needed before bufferization otherwise unnecessary
   // allocs will be created.
+  transform.apply_patterns to %func_3 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %func_3
-    { fold_reassociative_reshapes, canonicalization, tiling_canonicalization, cse } : (!transform.any_op) -> ()
+    { fold_reassociative_reshapes, canonicalization, cse } : (!transform.any_op) -> ()
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   %func_5 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   transform.iree.apply_patterns %func_5 { erase_unnecessary_tensor_operands } : (!transform.any_op) -> ()
@@ -74,6 +79,11 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> ()
 
   // Late canonicalizations to cleanup and pass the checks
+  transform.apply_patterns to %func_7 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %func_7
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 }
