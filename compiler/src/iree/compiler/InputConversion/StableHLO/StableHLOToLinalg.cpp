@@ -243,7 +243,7 @@ SmallVector<AffineExpr> getExprFromConfig(
   return exprs;
 }
 
-// Convert mhlo.einsum op into linalg.generic.
+// Convert stablehlo.einsum op into linalg.generic.
 // Algorithm in general 3 steps:
 
 // Step1) Dissect entire einsum_config to different operands
@@ -719,8 +719,8 @@ class BroadcastInDimOpToBroadcastConverter
 // broadcast and go directly to `linalg.generic`.
 
 // This also covers the important case of broadcasting a scalar. Ideally the
-// pattern (`mhlo.constant` -> `mhlo.dynamic_broadcast_in_dim`) should be
-// converted to a tensor dialect op similar to TF's `ConstantLikeOp`.
+// pattern (`stablehlo.constant` -> `stablehlo.dynamic_broadcast_in_dim`) should
+// be converted to a tensor dialect op similar to TF's `ConstantLikeOp`.
 class HloDynamicBroadcastInDimConverter
     : public OpConversionPattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
  public:
@@ -1069,7 +1069,7 @@ class BitcastConvertConverter
   }
 };
 
-// Lowers mhlo.RealDynamicSliceOp to tensor.extract_slice and other
+// Lowers stablehlo.RealDynamicSliceOp to tensor.extract_slice and other
 // arith/tensor dialect ops.
 class RealDynamicSliceConverter
     : public OpConversionPattern<mlir::stablehlo::RealDynamicSliceOp> {
@@ -1573,7 +1573,7 @@ class DynamicSliceConverter
       int64_t size = std::get<1>(en.value());
       sizes.push_back(rewriter.getI64IntegerAttr(size));
 
-      // By mhlo.DynamicSlice definition:
+      // By stablehlo.DynamicSlice definition:
       //   `start_indices[i] = clamp(start_indices[i],
       //       0, operand.dimension_size[i] - size_indices[i])`
       Value startIndex = extractIndexFromTensor(
@@ -1640,7 +1640,7 @@ class DynamicUpdateSliceConverter
     SmallVector<OpFoldResult, 3> startIndices;
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     for (const auto& en : llvm::enumerate(adaptor.getStartIndices())) {
-      // By mhlo.DynamicUpdateSlice definition:
+      // By stablehlo.DynamicUpdateSlice definition:
       //   `start_indices[i] = clamp(start_indices[i],
       //       0, operand.dimension_size[i] - update.dimension_size[i])`
       Value startIndex = extractIndexFromTensor(
@@ -2036,7 +2036,7 @@ struct SelectAndScatterNoOverlapConverter
     }
 
     // The first linalg.generic operation computes the relevant index over
-    // window for the defined mhlo.select_and_scatter. This involves
+    // window for the defined stablehlo.select_and_scatter. This involves
     // iterating over the window of the operand a computing the index.
     // Rather than storing N indices we compute the row major identifier
     // in the window, to specify which location should be scattered to.
@@ -2116,7 +2116,8 @@ struct SelectAndScatterNoOverlapConverter
     rewriter.cloneRegionBefore(op.getSelect(), reduceRegion,
                                reduceRegion.end());
 
-    // This includes convert `mhlo` scalar-tensor regions to `linalg` scalars.
+    // This includes convert `stablehlo` scalar-tensor regions to `linalg`
+    // scalars.
     TypeConverter::SignatureConversion reduceSignConverter(4);
     reduceSignConverter.addInputs(0, srcETy);
     reduceSignConverter.addInputs(srcETy);
@@ -2166,7 +2167,7 @@ struct SelectAndScatterNoOverlapConverter
         b.create<arith::SelectOp>(selectPred, selectInVal, selectOutVal);
     b.create<linalg::YieldOp>(ValueRange{selectedValue, selectedIdx});
 
-    // Original terminator is an mhlo.return we no longer need.
+    // Original terminator is an stablehlo.return we no longer need.
     rewriter.eraseOp(reduceTerminator);
     b.setInsertionPoint(op);
 
@@ -2384,7 +2385,7 @@ struct PadOpNegativePaddingConversion
   }
 };
 
-/// Converts mhlo.pad operation to tensor.pad or tensor.insert_slice.
+/// Converts stablehlo.pad operation to tensor.pad or tensor.insert_slice.
 struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
   using OpConversionPattern::OpConversionPattern;
 

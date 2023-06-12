@@ -59,7 +59,7 @@ option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topolog
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
-option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
+option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
@@ -372,14 +372,14 @@ cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler
 # Compiler Input Dialects
 #-------------------------------------------------------------------------------
 
-cmake_dependent_option(IREE_INPUT_MHLO "Builds support for compiling MHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_STABLEHLO "Builds support for compiling StableHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
 
 if(IREE_BUILD_COMPILER)
   message(STATUS "IREE compiler input dialects:")
-  if(IREE_INPUT_MHLO)
-    message(STATUS "  - MHLO")
+  if(IREE_INPUT_STABLEHLO)
+    message(STATUS "  - StableHLO")
   endif()
   if(IREE_INPUT_TORCH)
     message(STATUS "  - Torch MLIR")
@@ -700,9 +700,8 @@ if(IREE_BUILD_MICROBENCHMARKS)
 endif()
 
 if(IREE_BUILD_DOCS)
-  # Add a top-level custom target to drive generating all documentation.
-  # Register it to the default target given that IREE_BUILD_DOCS is explicitly
-  # requested.
+  # Define a top-level custom target to drive generating documentation files.
+  # Add to the default target given that docs were explicitly requested.
   add_custom_target(iree-doc ALL)
 endif()
 

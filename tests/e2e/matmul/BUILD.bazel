@@ -409,20 +409,18 @@ iree_generated_trace_runner_test(
 ]]
 
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_{0}_gpu_large_{1}".format(
-        lhs_rhs_type,
-        vulkan_target_and_pipeline[0],
-    ),
+    name = "e2e_matmul_direct_{0}_gpu_large_valhall".format(lhs_rhs_type),
     compiler_flags = [
-        "--iree-vulkan-target-triple=%s" % vulkan_target_and_pipeline[0],
+        "--iree-vulkan-target-triple=valhall-unknown-android31",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=gpu_large_aligned",
-        "--compilation_info=%s" % vulkan_target_and_pipeline[1],
+        "--compilation_info=SPIRVVectorizeMali",
     ],
     tags = [
+        # Nvidia GPUs support a superset of Valhall features
         "requires-gpu-nvidia",
         "vulkan_uses_vk_khr_shader_float16_int8",
     ],
@@ -430,10 +428,33 @@ iree_generated_trace_runner_test(
         ("vulkan-spirv", "vulkan"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for vulkan_target_and_pipeline in [
-    ("valhall-unknown-android31", "SPIRVVectorizeMali"),
-    ("ampere-unknown-linux", "SPIRVVectorizeNVIDIA"),
-] for lhs_rhs_type in [
+) for lhs_rhs_type in [
+    "i8",
+    "f16",
+    "f32",
+]]
+
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_{0}_gpu_large_ampere".format(lhs_rhs_type),
+    compiler_flags = [
+        "--iree-vulkan-target-triple=ampere-unknown-linux",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=SPIRVVectorizeNVIDIA",
+    ],
+    tags = [
+        "requires-gpu-nvidia",
+        "requires-gpu-sm80",
+        "vulkan_uses_vk_khr_shader_float16_int8",
+    ],
+    target_backends_and_drivers = [
+        ("vulkan-spirv", "vulkan"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for lhs_rhs_type in [
     "i8",
     "f16",
     "f32",

@@ -60,7 +60,7 @@ FailureOr<PointwiseConversionInfo> checkOperandsAndResults(
   int64_t maxRank = getMaxRank(operands);
 
   // Apply only if all operands are scalar or have the same rank. Some ops,
-  // like `mhlo.select`, support implicit broadcasting of scalars.
+  // like `stablehlo.select`, support implicit broadcasting of scalars.
   if (!llvm::all_of(operands, [&](Value v) {
         int64_t r = getRank(v);
         return r == 0 || r == maxRank;

@@ -132,7 +132,15 @@ class WebGPUTargetBackend : public TargetBackend {
       return variantOp.emitError()
              << "should only contain exactly one spirv.module op";
     }
+
     auto spvModuleOp = *spirvModuleOps.begin();
+    if (!options.dumpIntermediatesPath.empty()) {
+      std::string assembly;
+      llvm::raw_string_ostream os(assembly);
+      spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
+      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                     variantOp.getName(), ".mlir", assembly);
+    }
 
     // The schema expects each shader module to have entry points named "dN",
     // where N is the entry point ordinal.

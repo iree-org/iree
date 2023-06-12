@@ -45,7 +45,8 @@ async function ireeUnloadProgram(programState) {
 //
 // Resolves with a parsed JSON object on success:
 // {
-//   "total_invoke_time_ms": [number],
+//   "invoke_time_ms": [number],
+//   "readback_time_ms": [number],
 //   "outputs": [semicolon delimited list of formatted outputs]
 // }
 async function ireeCallFunction(
@@ -191,9 +192,7 @@ function _ireeUnloadProgram(programState) {
   return Promise.resolve();
 }
 
-function _ireeCallFunction(programState, functionName, inputs, iterations) {
-  iterations = iterations !== undefined ? iterations : 1;
-
+function _ireeCallFunction(programState, functionName, inputs) {
   let inputsJoined;
   if (Array.isArray(inputs)) {
     inputsJoined = inputs.join(';');
@@ -204,16 +203,22 @@ function _ireeCallFunction(programState, functionName, inputs, iterations) {
         'Expected \'inputs\' to be a String or an array of Strings');
   }
 
-  // Receive as a pointer, convert, then free. This avoids a memory leak, see
-  // https://github.com/emscripten-core/emscripten/issues/6484
-  const returnValuePtr =
-      wasmCallFunctionFn(programState, functionName, inputsJoined, iterations);
-  const returnValue = Module.UTF8ToString(returnValuePtr);
+  return new Promise((resolve, reject) => {
+    const completionCallbackFunction = addFunction((resultPtr) => {
+      if (resultPtr === 0) {
+        reject('Error from callback when calling function');
+        return;
+      }
 
-  if (returnValue === '') {
-    return Promise.reject('Wasm module error calling function');
-  } else {
-    Module._free(returnValuePtr);
-    return Promise.resolve(JSON.parse(returnValue));
-  }
+      const resultStr = Module.UTF8ToString(resultPtr);
+      Module._free(resultPtr);
+      resolve(JSON.parse(resultStr));
+    }, 'vi');
+
+    const immediateResult = wasmCallFunctionFn(
+        programState, functionName, inputsJoined, completionCallbackFunction);
+    if (!immediateResult) {
+      reject('Immediate error calling function');
+    }
+  });
 }

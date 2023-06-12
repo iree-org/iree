@@ -20,5 +20,7 @@ iree_hal_cts_test_suite(
   INCLUDED_TESTS
     "allocator"
     "buffer_mapping"
+    "descriptor_set_layout"
     "driver"
+    "pipeline_layout"
 )

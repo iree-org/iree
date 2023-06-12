@@ -6,11 +6,10 @@
 
 #include "iree/compiler/Tools/init_input_dialects.h"
 
-#ifdef IREE_HAVE_MHLO_INPUT
-#include "mhlo/IR/hlo_ops.h"
+#ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
-#endif  // IREE_HAVE_MHLO_INPUT
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
 #endif
@@ -22,10 +21,9 @@ namespace mlir {
 namespace iree_compiler {
 
 void registerInputDialects(DialectRegistry &registry) {
-#ifdef IREE_HAVE_MHLO_INPUT
-  registry.insert<mlir::chlo::ChloDialect, mlir::mhlo::MhloDialect,
-                  mlir::stablehlo::StablehloDialect>();
-#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_STABLEHLO_INPUT
+  registry.insert<mlir::chlo::ChloDialect, mlir::stablehlo::StablehloDialect>();
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
   registry.insert<mlir::torch::TMTensor::TMTensorDialect>();
 #endif  // IREE_HAVE_TORCH_INPUT

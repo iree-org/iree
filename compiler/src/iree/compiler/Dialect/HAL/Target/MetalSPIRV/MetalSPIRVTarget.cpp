@@ -124,6 +124,13 @@ class MetalSPIRVTargetBackend : public TargetBackend {
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
+    if (!options.dumpIntermediatesPath.empty()) {
+      std::string assembly;
+      llvm::raw_string_ostream os(assembly);
+      spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
+      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                     variantOp.getName(), ".mlir", assembly);
+    }
 
     // The runtime use ordinals instead of names but Metal requires function
     // names for constructing pipeline states. Get an ordered list of the entry
