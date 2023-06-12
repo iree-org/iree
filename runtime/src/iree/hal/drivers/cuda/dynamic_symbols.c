@@ -37,10 +37,6 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     static const char* kName = #cudaSymbolName;                              \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(                 \
         syms->cuda_library, kName, (void**)&syms->cudaSymbolName));          \
-    static const char* kNameV2 = concat(#cudaSymbolName, "_v2");             \
-    void* funV2;                                                             \
-    iree_dynamic_library_lookup_symbol(syms->cuda_library, kNameV2, &funV2); \
-    if (funV2) syms->cudaSymbolName = funV2;                                 \
   }
 #define NCCL_PFN_DECL(ncclSymbolName, ...)
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)

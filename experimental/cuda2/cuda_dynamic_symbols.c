@@ -31,10 +31,6 @@ static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
     static const char* name = #cuda_symbol_name;                        \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(            \
         syms->dylib, name, (void**)&syms->cuda_symbol_name));           \
-    static const char* name_v2 = IREE_CONCAT(#cuda_symbol_name, "_v2"); \
-    void* fptr_v2;                                                      \
-    iree_dynamic_library_lookup_symbol(syms->dylib, name_v2, &fptr_v2); \
-    if (fptr_v2) syms->cuda_symbol_name = fptr_v2;                      \
   }
 #include "experimental/cuda2/cuda_dynamic_symbol_table.h"  // IWYU pragma: keep
 #undef IREE_CU_PFN_DECL
