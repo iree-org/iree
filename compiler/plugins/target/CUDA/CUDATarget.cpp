@@ -56,7 +56,7 @@ namespace HAL {
 namespace {
 struct CUDAOptions {
   bool dumpPtx = false;
-  std::string clTargetChip = "sm_35";
+  std::string clTargetChip = "sm_60";
   std::string clTargetFeature = "+ptx76";
   bool clUsePtxas = false;
   std::string clUsePtxasFrom;
