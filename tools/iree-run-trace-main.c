@@ -197,6 +197,21 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
 
   yaml_parser_delete(&parser);
 
+  // Transfer outputs to the host so they can be processed.
+  if (iree_status_is_ok(status) && replay.device != NULL) {
+    iree_hal_buffer_params_t target_params = {
+        .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+        .access = IREE_HAL_MEMORY_ACCESS_ALL,
+        .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        .queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
+        .min_alignment = 0,
+    };
+    status = iree_tooling_transfer_variant_list(
+        replay.device, replay.outputs, iree_hal_device_allocator(replay.device),
+        target_params, /*wait_fence=*/NULL, /*signal_fence=*/NULL);
+  }
+
   // Optionally process outputs from the replay session.
   if (iree_status_is_ok(status)) {
     if (FLAG_output_list().count == 0) {

@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -22,6 +23,14 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<bool> clExternalResourcesMappable(
+    "iree-stream-external-resources-mappable",
+    llvm::cl::desc("Allocates external resources as host-visible and mappable. "
+                   "This can degrade performance and introduce allocation "
+                   "overhead and staging buffers for readback on the host "
+                   "should be managed by the calling application instead."),
+    llvm::cl::init(false));
 
 namespace {
 
@@ -263,17 +272,21 @@ deriveAllowedResourceBufferBits(Location loc,
   default:
     break;
   case IREE::Stream::Lifetime::External:
-    // #yolo; these come from/go to outside the program.
-    // Today we assume they are device-local|host-visible just for
-    // practical purposes but that does not have to be true. We really
-    // want this to be something we analyze and handle on the edges
-    // (transferring devices/etc if needed).
-    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                  IREE::HAL::MemoryTypeBitfield::HostVisible;
-    // NOTE: we may not map it but users may after they get them back.
-    // Another reason we should annotate this - having a buffer be
-    // mappable is potentially expensive (may get a 2nd copy in memory!).
-    bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+    if (clExternalResourcesMappable) {
+      // #yolo; these come from/go to outside the program.
+      // Today we assume they are device-local|host-visible just for
+      // practical purposes but that does not have to be true. We really
+      // want this to be something we analyze and handle on the edges
+      // (transferring devices/etc if needed).
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
+                    IREE::HAL::MemoryTypeBitfield::HostVisible;
+      // NOTE: we may not map it but users may after they get them back.
+      // Another reason we should annotate this - having a buffer be
+      // mappable is potentially expensive (may get a 2nd copy in memory!).
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+    } else {
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+    }
     break;
   }
   return success();

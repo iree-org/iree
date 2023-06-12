@@ -15,15 +15,18 @@ vm.import private optional @expect_false(
 )
 
 vm.import private optional @expect_all_true(
+  %device : !vm.ref<!hal.device>,
   %operand : !vm.ref<!hal.buffer_view>,
 )
 
 vm.import private optional @expect_eq(
+  %device : !vm.ref<!hal.device>,
   %lhs : !vm.ref<!hal.buffer_view>,
   %rhs : !vm.ref<!hal.buffer_view>
 )
 
 vm.import private optional @expect_almost_eq(
+  %device : !vm.ref<!hal.device>,
   %lhs : !vm.ref<!hal.buffer_view>,
   %rhs : !vm.ref<!hal.buffer_view>
 )
