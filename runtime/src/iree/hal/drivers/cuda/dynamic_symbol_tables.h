@@ -40,9 +40,7 @@ CU_PFN_DECL(cuGraphLaunch, CUgraphExec, CUstream)
 CU_PFN_DECL(cuInit, unsigned int)
 CU_PFN_DECL(cuMemAllocManaged, CUdeviceptr*, size_t, unsigned int)
 CU_PFN_DECL(cuMemPrefetchAsync, CUdeviceptr, size_t, CUdevice, CUstream)
-#undef cuMemAlloc
 CU_PFN_DECL(cuMemAlloc, CUdeviceptr*, size_t)
-CU_PFN_DECL(cuMemAlloc_v2, CUdeviceptr*, size_t)
 CU_PFN_DECL(cuMemFree, CUdeviceptr)
 CU_PFN_DECL(cuMemFreeHost, void*)
 CU_PFN_DECL(cuMemHostAlloc, void**, size_t, unsigned int)
@@ -73,7 +71,7 @@ CU_PFN_DECL(cuMemsetD16Async, unsigned long long, unsigned short, size_t,
 CU_PFN_DECL(cuMemsetD8Async, unsigned long long, unsigned char, size_t,
             CUstream)
 CU_PFN_DECL(cuMemcpyAsync, CUdeviceptr, CUdeviceptr, size_t, CUstream)
-CU_PFN_DECL(cuMemcpyHtoDAsync_v2, CUdeviceptr, const void*, size_t, CUstream)
+CU_PFN_DECL(cuMemcpyHtoDAsync, CUdeviceptr, const void*, size_t, CUstream)
 CU_PFN_DECL(cuFuncSetAttribute, CUfunction, CUfunction_attribute, int)
 CU_PFN_DECL(cuLaunchKernel, CUfunction, unsigned int, unsigned int,
             unsigned int, unsigned int, unsigned int, unsigned int,

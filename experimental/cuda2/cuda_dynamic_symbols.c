@@ -20,17 +20,27 @@ static const char* iree_hal_cuda_dylib_names[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-#define IREE_CONCAT(A, B) A B
+// CUDA API version for cuGetProcAddress.
+// 1000 * major + 10 * minor
+#define IREE_CUDA_DRIVER_API_VERSION 11030
 
-// Resolves all CUDA dynamic symbols in `dynamic_symbol_tables.h`, prefer _v2
-// version if it exists.
-static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
-    iree_hal_cuda2_dynamic_symbols_t* syms) {
-#define IREE_CU_PFN_DECL(cuda_symbol_name, ...)                         \
-  {                                                                     \
-    static const char* name = #cuda_symbol_name;                        \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(            \
-        syms->dylib, name, (void**)&syms->cuda_symbol_name));           \
+#define concat(A, B) A B
+
+// Load CUDA entry points.
+static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
+    iree_hal_cuda_dynamic_symbols_t* syms) {
+  CUresult (*cuGetProcAddress)(const char*, void**, int, cuuint64_t);
+  IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(
+      syms->cuda_library, "cuGetProcAddress", (void**)&cuGetProcAddress));
+#define CU_PFN_DECL(cudaSymbolName, ...)                                     \
+  {                                                                          \
+    static const char* kName = #cudaSymbolName;                              \
+    if (cuGetProcAddress(kName, (void**)&syms->cudaSymbolName,               \
+                         IREE_CUDA_DRIVER_API_VERSION,                       \
+                         CU_GET_PROC_ADDRESS_DEFAULT) != CUDA_SUCCESS) {     \
+      return iree_make_status(IREE_STATUS_INTERNAL,                          \
+          "Error loading CUDA driver symbol '%s'", kName);                   \
+    }                                                                        \
   }
 #include "experimental/cuda2/cuda_dynamic_symbol_table.h"  // IWYU pragma: keep
 #undef IREE_CU_PFN_DECL
