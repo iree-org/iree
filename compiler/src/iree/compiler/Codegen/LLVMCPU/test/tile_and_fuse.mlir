@@ -87,6 +87,10 @@ func.func @multi_config(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 
     } -> tensor<?x?xf32>
   return %2 : tensor<?x?xf32>
 }
+// Both linalg.matmul op and linalg.generic op have lowering_config. Test that
+// the lowering_config of linalg.generic op is picked in the pass. In this case,
+// scf.for ops are created. If the lowering_config of linalg.matmul op is
+// picked, there are no scf.for ops. Because the tiling sizes are zeros.
 //      CHECK: func.func @multi_config(
 //      CHECK:   scf.for
 //      CHECK:     scf.for

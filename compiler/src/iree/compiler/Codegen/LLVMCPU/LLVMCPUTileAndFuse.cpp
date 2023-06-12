@@ -201,21 +201,23 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   LLVM_DEBUG(llvm::dbgs() << "consumerOp: " << consumerOp << "\n");
   LLVM_DEBUG(llvm::dbgs() << "tilingLevel: " << tilingLevel << "\n");
 
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-      getLoweringConfig(getComputeOps(funcOp));
-  if (failed(maybeLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip TileAndFuse");
-    return;
-  }
-
-  int numLoops = consumerOp.getLoopIteratorTypes().size();
+  // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
+  // fallback to find a lowering_config from other operations.
   SmallVector<int64_t> tileSizes;
   if (auto loweringConfig = getLoweringConfig(consumerOp)) {
     tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
   } else {
+    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+        getLoweringConfig(getComputeOps(funcOp));
+    if (failed(maybeLoweringConfig)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "can't find lowering_config, skip TileAndFuse");
+      return;
+    }
     tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
   }
 
+  int numLoops = consumerOp.getLoopIteratorTypes().size();
   if (numLoops > tileSizes.size()) {
     tileSizes.append(numLoops - tileSizes.size(), 0);
   }
