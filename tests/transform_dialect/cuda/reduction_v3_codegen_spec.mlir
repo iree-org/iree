@@ -60,8 +60,11 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> !transform.any_op
   // TODO: masked vectorization on block_more_parallel_op_2 if we want
   // vector<4> to work as intended.
-  transform.iree.apply_patterns %func
-    { rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
 
   // Canonicalizations is necessary to get rid of some tensor.cast that block
@@ -108,7 +111,12 @@ transform.sequence failures(propagate) {
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  transform.iree.apply_patterns %func_m { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func_m {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.memref.fold_memref_alias_ops
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
     : (!transform.any_op) -> !transform.any_op
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 } : (!transform.any_op) -> !transform.any_op

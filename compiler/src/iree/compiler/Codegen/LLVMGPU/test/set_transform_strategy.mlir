@@ -72,13 +72,17 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.iree.forall_to_workgroup %{{.*}}
 // CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
 // CHECK: transform.iree.hoist_static_alloc %{{.*}}
-// CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
+// CHECK: apply_patterns to %{{.*}} {
+// CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
+// CHECK: } : !transform.any_op
 // CHECK: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
 // CHECK: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_wmma}
 // CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // CHECK: transform.iree.apply_buffer_optimizations %{{.*}}
 // CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_wmma}
-// CHECK: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
+// CHECK: apply_patterns to %{{.*}} {
+// CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
+// CHECK: } : !transform.any_op
 // CHECK: transform.memref.multibuffer %{{.*}} {factor = 3 : i64, skip_analysis}
 // CHECK: transform.apply_patterns.vector.transfer_to_scf max_transfer_rank = 1 full_unroll = true
 // CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync = false}
@@ -125,7 +129,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // The warp dimensions are controled by td-matmul-strategy-num-warps-XX.
 // WITH_OPTIONS: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [32, 4, 1] warp_dims = [1, 4, 1]
 // WITH_OPTIONS: transform.iree.hoist_static_alloc %{{.*}}
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
+// WITH_OPTIONS: apply_patterns to %{{.*}} {
+// WITH_OPTIONS:   transform.apply_patterns.memref.fold_memref_alias_ops
+// WITH_OPTIONS: } : !transform.any_op
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {extract_address_computations}
 // The unroll attribute should match td-matmul-use-mma-sync, for true: mma_sync,
 // for false:_wmma.
@@ -134,7 +140,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.iree.apply_buffer_optimizations %{{.*}}
 // The attribute should match td-matmul-use-mma-sync.
 // WITH_OPTIONS: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync}
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases}
+// WITH_OPTIONS: apply_patterns to %{{.*}} {
+// WITH_OPTIONS:   transform.apply_patterns.memref.fold_memref_alias_ops
+// WITH_OPTIONS: } : !transform.any_op
 // The multibuffer pass is only run when we set use-async-copies.
 // The factor should match td-matmul-strategy-pipeline-depth: 5.
 // WITH_OPTIONS: transform.memref.multibuffer %{{.*}} {factor = 5 : i64, skip_analysis}

@@ -184,6 +184,11 @@ void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
   patterns.insert<FoldFillIntoPad>(patterns.getContext());
 }
 
+void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::
+    populatePatterns(RewritePatternSet &patterns) {
+  populateReshapeToInterfaceTensorPatterns(patterns);
+}
+
 //===---------------------------------------------------------------------===//
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
@@ -211,11 +216,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(expandMemrefStridedMetadata,
               getExpandMemrefStridedMetadataAttrName)
   ADD_PATTERN(extractAddressComputations, getExtractAddressComputationsAttrName)
-  ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
-  ADD_PATTERN(foldTensorSubsets, getFoldTensorSubsetsAttrName)
-  ADD_PATTERN(foldVectorTransferTensorSlice,
-              getFoldVectorTransferTensorSliceAttrName)
   ADD_PATTERN(licm, getLicmAttrName)
   ADD_PATTERN(linalgElementwiseGreedyFusion,
               getLinalgElementwiseGreedyFusionAttrName)
@@ -223,10 +224,6 @@ void transform_dialect::ApplyPatternsOp::build(
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(lowerVectorMasks, getLowerVectorMasksAttrName)
   ADD_PATTERN(prepareVectorToMma, getPrepareVectorToMmaAttrName)
-  ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
-  ADD_PATTERN(rankReducingLinalgViaReshapes,
-              getRankReducingLinalgViaReshapesAttrName)
-  ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
@@ -273,23 +270,8 @@ static void addExtractAddressComputationsPatterns(RewritePatternSet &patterns) {
   memref::populateExtractAddressComputationsPatterns(patterns);
 }
 
-static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
-  memref::populateFoldMemRefAliasOpPatterns(patterns);
-}
-
 static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
-}
-
-static void addFoldTensorSubsetsPatterns(RewritePatternSet &patterns) {
-  tensor::populateFoldTensorSubsetOpPatterns(patterns);
-  // TODO: upstream should move these to populateFoldTensorSubsetOpPatterns.
-  tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-}
-
-static void addFoldVectorTransferTensorExtractPatterns(
-    RewritePatternSet &patterns) {
-  vector::populateVectorTransferTensorSliceTransforms(patterns);
 }
 
 static void addEraseUnnecessaryTensorOperandsPatterns(
@@ -299,21 +281,6 @@ static void addEraseUnnecessaryTensorOperandsPatterns(
 
 static void addPrepareVectorToMmaPatterns(RewritePatternSet &patterns) {
   populatePrepareVectorToMMAPatterns(patterns, /*useNvGpu=*/true);
-}
-
-static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
-  populateReshapeToInterfaceTensorPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
-}
-
-static void addRankReducingLinalgViaReshapesPatterns(
-    RewritePatternSet &patterns) {
-  populateReshapeToInterfaceTensorPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
-}
-
-static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
-  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -397,11 +364,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     memref::populateExpandStridedMetadataPatterns(patterns);
   if (getExtractAddressComputations())
     addExtractAddressComputationsPatterns(patterns);
-  if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
-  if (getFoldTensorSubsets()) addFoldTensorSubsetsPatterns(patterns);
-  if (getFoldVectorTransferTensorSlice())
-    addFoldVectorTransferTensorExtractPatterns(patterns);
   if (getLinalgElementwiseGreedyFusion())
     linalg::populateElementwiseOpsFusionPatterns(patterns,
                                                  setFusedOpOperandLimit<3>);
@@ -409,10 +372,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addLowerTransferOpPermutationsPatterns(patterns);
   if (getLowerVectorMasks()) addLowerVectorMasksPatterns(patterns);
   if (getPrepareVectorToMma()) addPrepareVectorToMmaPatterns(patterns);
-  if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
-  if (getRankReducingLinalgViaReshapes())
-    addRankReducingLinalgViaReshapesPatterns(patterns);
-  if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
   if (getUnrollVectorsGpuMmaSync())

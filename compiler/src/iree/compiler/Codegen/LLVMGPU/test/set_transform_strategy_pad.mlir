@@ -59,7 +59,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       CHECK:   transform.structured.masked_vectorize {{.*}} vector_sizes [4, 4] : !transform.any_op
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:     transform.apply_patterns.vector.lower_masked_transfers
-//       CHECK:   transform.iree.apply_patterns {{.*}} {rank_reducing_linalg, rank_reducing_vector} : (!transform.any_op) -> ()
+//       CHECK:   apply_patterns to %{{.*}} {
+//   CHECK-DAG:     transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+//   CHECK-DAG:     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+//   CHECK-DAG:     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+//       CHECK:   } : !transform.any_op
 //       CHECK:   {{.*}} = transform.structured.vectorize {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.iree.apply_patterns {{.*}} {canonicalization, cse, licm} : (!transform.any_op) -> ()
 //       CHECK:   transform.iree.eliminate_empty_tensors {{.*}} : (!transform.any_op) -> ()
