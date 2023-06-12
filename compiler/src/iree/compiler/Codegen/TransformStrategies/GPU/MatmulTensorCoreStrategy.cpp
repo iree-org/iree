@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/MappingInfo.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -45,6 +46,7 @@ using iree_compiler::gpu::buildMatmulVectorization;
 using iree_compiler::gpu::buildMultiBuffering;
 using iree_compiler::gpu::buildPipelineSharedMemoryCopies;
 using iree_compiler::gpu::kCudaWarpSize;
+using iree_compiler::gpu::MappingInfo;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
@@ -117,15 +119,6 @@ void MatmulStrategy::initDefaultValues() {
 
 LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
 
-void mlir::iree_compiler::gpu::AbstractGemmLikeStrategy::MappingInfo::print(
-    llvm::raw_ostream &os) const {
-  os << "MappingInfo{";
-  llvm::interleaveComma(numThreads, os << "numThreads: {");
-  llvm::interleaveComma(tileSizes, os << "}, tileSizes: {");
-  llvm::interleaveComma(threadMapping, os << "}, threadMapping: {");
-  os << "}}";
-}
-
 void MatmulStrategy::print(llvm::raw_ostream &os) const {
   os << "\n--- Matmul strategy ---\n";
   os << "- forced by CLI specification: "
@@ -163,13 +156,10 @@ void MatmulStrategy::print(llvm::raw_ostream &os) const {
 
   os << "\n-- Derived quantities --\n";
   os << "- lhs copy:\n";
-  os << "    -> vector size (num elements): " << lhsCopyVectorSize() << '\n';
   lhsCopyMapping().print(os << "    -> ");
   os << "\n- rhs copy:\n";
-  os << "    -> vector size (num elements): " << rhsCopyVectorSize() << '\n';
   rhsCopyMapping().print(os << "    -> ");
   os << "\n- res copy:\n";
-  os << "    -> vector size (num elements): " << resCopyVectorSize() << '\n';
   resCopyMapping().print(os << "    -> ");
   os << "\n";
 }
@@ -186,7 +176,7 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
   // Step 2. Create the block/mapping tiling level and fusee.
   // auto [fusionTargetH, fusionGroupH] =
   //     buildSelectFirstNonEmpty(b, maybeTrailingH, matmulH);
-  MatmulStrategy::MappingInfo blockMapping = strategy.getBlockMapping();
+  MappingInfo blockMapping = strategy.getBlockMapping();
   TileToForallAndFuseAndDistributeResult tileResult =
       buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
@@ -251,7 +241,7 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   // Step 5. Distribute to warps: SIMD programming model.
   // TODO: get the number of warps from strategy.
-  MatmulStrategy::MappingInfo computeMapping = strategy.computeMapping();
+  MappingInfo computeMapping = strategy.computeMapping();
   buildTileFuseDistToForallWithNumThreads(
       b, variantH, paddedMatmulOpH, ValueRange(),
       getAsOpFoldResult(b.getI64ArrayAttr(computeMapping.numThreads)),

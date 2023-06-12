@@ -16,6 +16,8 @@ iree_cc_library(
   HDRS
     "AbstractGemmLikeStrategy.h"
     "Common.h"
+    "CopyMapping.h"
+    "MappingInfo.h"
     "MatmulTensorCoreStrategy.h"
     "PadStrategy.h"
     "SmallReductionStrategy.h"
@@ -23,6 +25,8 @@ iree_cc_library(
     "Strategies.h"
   SRCS
     "Common.cpp"
+    "CopyMapping.cpp"
+    "MappingInfo.cpp"
     "MatmulTensorCoreStrategy.cpp"
     "PadStrategy.cpp"
     "SmallReductionStrategy.cpp"
