@@ -42,7 +42,7 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::init(2), llvm::cl::cat(halTargetOptionsCategory));
 
   binder.opt<std::string>(
-      "iree-hal-dump-executable-sources-to", sourceListingPath,
+      "iree-hal-dump-executable-sources-to", executableSourcesPath,
       llvm::cl::desc("Path to write individual hal.executable input "
                      "source listings into (- for stdout)."),
       llvm::cl::cat(halTargetOptionsCategory));
