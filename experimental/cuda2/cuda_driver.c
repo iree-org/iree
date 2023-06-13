@@ -489,7 +489,7 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_id(
   // Attempt to create the device now.
   iree_status_t status = iree_hal_cuda2_device_create(
       base_driver, device_name, &driver->device_params, &driver->cuda_symbols,
-      device, host_allocator, out_device);
+      &driver->nccl_symbols, device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

@@ -20,6 +20,11 @@ extern "C" {
 // iree_hal_cuda2_device_t
 //===----------------------------------------------------------------------===//
 
+// ncclUniqueId exposed without exporting the NCCL headers.
+typedef struct {
+  char data[128];
+} iree_hal_cuda2_nccl_id_t;
+
 // Parameters defining a CUmemoryPool.
 typedef struct iree_hal_cuda2_memory_pool_params_t {
   // Minimum number of bytes to keep in the pool when trimming with
