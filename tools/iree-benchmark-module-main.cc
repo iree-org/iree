@@ -589,6 +589,7 @@ class IREEBenchmark {
 }  // namespace iree
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-module");
 
   // Pass through flags to benchmark (allowing --help to fall through).

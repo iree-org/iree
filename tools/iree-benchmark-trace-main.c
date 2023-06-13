@@ -257,6 +257,8 @@ static void iree_replay_benchmark_register_trace_files(
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   iree_allocator_t host_allocator = iree_allocator_system();
 
   // Pass through flags to benchmark (allowing --help to fall through).

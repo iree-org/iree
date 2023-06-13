@@ -1218,12 +1218,14 @@ static iree_status_t run_trace_files(int file_count, char** file_paths,
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   if (argc <= 1) {
     fprintf(stderr,
             "no trace files provided; pass one or more yaml file paths\n");
-    IREE_TRACE_APP_EXIT(1);
-    return 1;
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   iree_vm_instance_t* instance = NULL;

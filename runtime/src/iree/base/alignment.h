@@ -49,6 +49,18 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 // Alignment utilities
 //===----------------------------------------------------------------------===//
 
+// Returns the number of elements in an array as a compile-time constant, which
+// can be used in defining new arrays. Fails at compile-time if |arr| is not a
+// static array (such as if used on a pointer type). Similar to `countof()`.
+//
+// Example:
+//  uint8_t kConstantArray[512];
+//  assert(IREE_ARRAYSIZE(kConstantArray) == 512);
+#define IREE_ARRAYSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
+
+#define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
+#define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
+
 // https://en.cppreference.com/w/c/types/max_align_t
 #if defined(IREE_PLATFORM_WINDOWS)
 // NOTE: 16 is a specified Microsoft API requirement for some functions.

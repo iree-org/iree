@@ -38,7 +38,6 @@ iree_runtime_cc_library(
         "string_view.c",
         "string_view.h",
         "time.c",
-        "time.h",
         "wait_source.c",
         "wait_source.h",
     ],
@@ -46,7 +45,7 @@ iree_runtime_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":core_headers",
-        "//runtime/src/iree/base/tracing:tracy",
+        "//runtime/src/iree/base/tracing:provider",
     ],
 )
 
@@ -128,6 +127,7 @@ iree_runtime_cc_library(
         "attributes.h",
         "config.h",
         "target_platform.h",
+        "time.h",
         "tracing.h",
     ],
 )

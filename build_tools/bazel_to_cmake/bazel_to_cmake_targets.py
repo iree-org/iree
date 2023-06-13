@@ -91,7 +91,7 @@ class TargetConverter:
         ],
 
         # Tracy.
-        "@tracy_client//:runtime_impl": ["tracy_client::runtime_impl"],
+        "@tracy_client//:runtime": ["tracy_client::runtime"],
 
         # Vulkan
         "@vulkan_headers": ["Vulkan::Headers"],

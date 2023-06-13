@@ -20,6 +20,11 @@
 //===----------------------------------------------------------------------===//
 // NOTE: order matters here as we are including files that require/define.
 
+// Filter to only supported features (today everything)
+#if !defined(IREE_TRACING_FEATURES)
+#define IREE_TRACING_FEATURES (IREE_TRACING_FEATURES_REQUESTED)
+#endif  // !IREE_TRACING_FEATURES
+
 // Enable Tracy only when we are using tracing features.
 #if IREE_TRACING_FEATURES != 0
 #define TRACY_ENABLE 1
@@ -99,9 +104,6 @@ typedef struct ___tracy_source_location_data iree_tracing_location_t;
   (TracyCZoneCtx) { zone_id, 1 }
 #endif  // __cplusplus
 
-int64_t iree_tracing_time(void);
-int64_t iree_tracing_frequency(void);
-
 IREE_MUST_USE_RESULT iree_zone_id_t
 iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
                              const char* name, size_t name_length);
@@ -110,6 +112,26 @@ IREE_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length);
 void iree_tracing_zone_end(iree_zone_id_t zone_id);
+
+void iree_tracing_set_plot_type_impl(const char* name_literal,
+                                     uint8_t plot_type, bool step, bool fill,
+                                     uint32_t color);
+void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value);
+void iree_tracing_plot_value_f32_impl(const char* name_literal, float value);
+void iree_tracing_plot_value_f64_impl(const char* name_literal, double value);
+
+void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
+                                 uint32_t* out_lock_id);
+void iree_tracing_mutex_terminate(uint32_t lock_id);
+void iree_tracing_mutex_before_lock(uint32_t lock_id);
+void iree_tracing_mutex_after_lock(uint32_t lock_id);
+void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired);
+void iree_tracing_mutex_after_unlock(uint32_t lock_id);
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+
+int64_t iree_tracing_time(void);
+int64_t iree_tracing_frequency(void);
 
 // Matches GpuContextType.
 // TODO(benvanik): upstream a few more enum values for CUDA/Metal/etc.
@@ -145,20 +167,7 @@ void iree_tracing_gpu_zone_end(uint8_t context_id, uint16_t query_id);
 void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
                                   int64_t gpu_timestamp);
 
-void iree_tracing_set_plot_type_impl(const char* name_literal,
-                                     uint8_t plot_type, bool step, bool fill,
-                                     uint32_t color);
-void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value);
-void iree_tracing_plot_value_f32_impl(const char* name_literal, float value);
-void iree_tracing_plot_value_f64_impl(const char* name_literal, double value);
-
-void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
-                                 uint32_t* out_lock_id);
-void iree_tracing_mutex_terminate(uint32_t lock_id);
-void iree_tracing_mutex_before_lock(uint32_t lock_id);
-void iree_tracing_mutex_after_lock(uint32_t lock_id);
-void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired);
-void iree_tracing_mutex_after_unlock(uint32_t lock_id);
+#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #endif  // IREE_TRACING_FEATURES
 
@@ -174,10 +183,11 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 #define IREE_TRACE(expr) expr
 
+#define IREE_TRACE_APP_ENTER()
+#define IREE_TRACE_APP_EXIT(exit_code)
 #define IREE_TRACE_SET_APP_INFO(value, value_length) \
   ___tracy_emit_message_appinfo(value, value_length)
 #define IREE_TRACE_SET_THREAD_NAME(name) ___tracy_set_thread_name(name)
-#define IREE_TRACE_APP_EXIT(exit_code)
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
 #define IREE_TRACE_FIBER_ENTER(fiber) ___tracy_fiber_enter((const char*)fiber)
