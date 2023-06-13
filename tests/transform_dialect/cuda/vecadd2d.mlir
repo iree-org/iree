@@ -39,7 +39,7 @@ func.func @vecadd2d() -> (!type2) {
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec.mlir | \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec_typo.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
