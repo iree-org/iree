@@ -17,7 +17,7 @@ iree_status_t iree_hal_executable_import_provider_try_resolve(
   IREE_ASSERT_ARGUMENT(out_fn_contexts);
   if (out_resolution) *out_resolution = 0;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
 
   // It's fine for there to be no registered provider if all symbols are
   // optional. This is a special case for NULL import providers.

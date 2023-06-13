@@ -358,6 +358,42 @@ func.func @variadic_diff_type_reduce(%arg0: tensor<128x10xf32>, %arg1: tensor<12
 
 // -----
 
+// Make sure we do not crash on unsupported reductions.
+
+// CHECK-LABEL: func.func @reduce_noop
+// CHECK:         stablehlo.reduce
+// CHECK-PRIMITIVE-LABEL: func.func @reduce_noop
+// CHECK-PRIMITIVE:         stablehlo.reduce
+func.func @reduce_noop(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+  %0 = stablehlo.constant dense<0.000000e+00> : tensor<f32>
+  %1 = stablehlo.reduce(%arg0 init: %0) across dimensions = [] : (tensor<4x8xf32>, tensor<f32>) -> tensor<4x8xf32>
+    reducer(%arg1: tensor<f32>, %arg2: tensor<f32>) {
+    %4 = stablehlo.add %arg1, %arg2 : tensor<f32>
+    stablehlo.return %4 : tensor<f32>
+  }
+  func.return %1 : tensor<4x8xf32>
+}
+
+// CHECK-LABEL: func.func @reduce_zero_ext
+// CHECK:         stablehlo.reduce
+// CHECK-PRIMITIVE-LABEL: func.func @reduce_zero_ext
+// CHECK-PRIMITIVE:         stablehlo.reduce
+func.func @reduce_zero_ext(%arg0: tensor<0xi1>) -> tensor<i32> {
+  %0 = stablehlo.constant dense<false> : tensor<i1>
+  %1 = stablehlo.constant dense<false> : tensor<0xi1>
+  %2 = stablehlo.compare  NE, %arg0, %1, UNSIGNED : (tensor<0xi1>, tensor<0xi1>) -> tensor<0xi1>
+  %3 = stablehlo.convert %2 : (tensor<0xi1>) -> tensor<0xi32>
+  %4 = stablehlo.constant dense<0> : tensor<i32>
+  %5 = stablehlo.reduce(%3 init: %4) across dimensions = [0] : (tensor<0xi32>, tensor<i32>) -> tensor<i32>
+    reducer(%arg1: tensor<i32>, %arg2: tensor<i32>)  {
+    %6 = stablehlo.add %arg1, %arg2 : tensor<i32>
+    stablehlo.return %6 : tensor<i32>
+  }
+  return %5 : tensor<i32>
+}
+
+// -----
+
 // CHECK-LABEL: func @reduce_window_min_nhwc
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]

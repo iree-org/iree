@@ -506,7 +506,7 @@ static iree_status_t iree_hal_cmd_fill_tile(
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_fill(
       cmd->target_buffer, cmd->target_offset + slice_offset, slice_length,
@@ -645,7 +645,7 @@ static iree_status_t iree_hal_cmd_copy_tile(
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_copy(
       cmd->source_buffer, cmd->source_offset + slice_offset, cmd->target_buffer,

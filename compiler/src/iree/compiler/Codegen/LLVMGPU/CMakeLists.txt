@@ -97,7 +97,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::LLVMGPU::Utils
     iree::compiler::Codegen::PassHeaders
-    iree::compiler::Codegen::TransformDialectStrategies::GPU::TransformDialectStrategies
+    iree::compiler::Codegen::TransformStrategies::GPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR

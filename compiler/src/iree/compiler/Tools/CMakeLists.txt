@@ -42,12 +42,9 @@ endif()
 
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
-if(IREE_INPUT_MHLO)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
-  list(APPEND IREE_INPUT_DEPS tensorflow::external_mhlo_includes)
   list(APPEND IREE_INPUT_DEPS ChloOps)
-  list(APPEND IREE_INPUT_DEPS MhloDialect)
   list(APPEND IREE_INPUT_DEPS StablehloOps)
 endif()
 if(IREE_INPUT_TORCH)

@@ -387,6 +387,25 @@ static iree_status_t iree_hal_cuda2_driver_dump_device_info(
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
       builder, "\n- memory-l2-cache-size: %d bytes", l2_cache_size));
 
+  int supports_64bit_memops = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(CAN_USE_64_BIT_STREAM_MEM_OPS,
+                            supports_64bit_memops);
+  int supports_timeline_semaphore_interop = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(TIMELINE_SEMAPHORE_INTEROP_SUPPORTED,
+                            supports_timeline_semaphore_interop);
+  int mem_sync_domain_count = 0;
+  IREE_CUDA_QUERY_ATTRIBUTE(MEM_SYNC_DOMAIN_COUNT, mem_sync_domain_count);
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- sync-supports-64-bit-stream-mem-ops: %d",
+      supports_64bit_memops));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- sync-supports-timeline-semaphore-interop: %d",
+      supports_timeline_semaphore_interop));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- sync-mem-domain-count: %d", mem_sync_domain_count));
+
   // Other GPU characteristics.
   int multiprocessor_count = 0;
   IREE_CUDA_QUERY_ATTRIBUTE(MULTIPROCESSOR_COUNT, multiprocessor_count);

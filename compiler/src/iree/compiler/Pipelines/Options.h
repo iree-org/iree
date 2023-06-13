@@ -36,18 +36,13 @@ struct InputDialectOptions {
     none,
     // Analyses the input to determine what input dialect pipeline to use.
     auto_detect,
-#ifdef IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_STABLEHLO_INPUT
     // Legalizes input defined over StableHLO ops.
     stablehlo,
     // Special case of 'stablehlo' legalization which also performs some XLA
     // preprocessing, e.g., flattening of tuples.
     stablehlo_xla,
-    // Legalizes input defined over MHLO ops. (Deprecated.)
-    mhlo_legacy,
-    // Special case of 'mhlo' legalization which also performs some XLA
-    // cleanup activities. (Deprecated.)
-    xla_legacy,
-#endif  // IREE_HAVE_MHLO_INPUT
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
     // Legalizes input defined over TMTensor ops.
     tm_tensor,
@@ -61,7 +56,7 @@ struct InputDialectOptions {
 
   bool demoteI64ToI32 = true;
   bool demoteF64ToF32 = true;
-  bool promoteBF16ToF32 = true;
+  bool promoteBF16ToF32 = false;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<InputDialectOptions>;

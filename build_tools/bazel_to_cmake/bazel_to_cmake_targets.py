@@ -77,47 +77,9 @@ class TargetConverter:
         "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
         "@llvm-project//mlir:VectorOps": ["MLIRVector"],
 
-        # MHLO.
-        # TODO: Rework this upstream so that Bazel and CMake rules match up
-        # better.
-        # All of these have to depend on tensorflow::external_mhlo_includes to
-        # ensure that include directories are inherited.
-        "@mlir-hlo//:chlo_legalize_to_hlo": [
-            "tensorflow::external_mhlo_includes",
-            "ChloPasses",
-        ],
-        "@mlir-hlo//:mlir_hlo": [
-            "tensorflow::external_mhlo_includes",
-            "MhloDialect",
-            "MLIRMhloUtils",
-        ],
-        "@mlir-hlo//:map_chlo_to_hlo_op": [
-            "ChloOps",
-            "MhloDialect",
-        ],
-        "@mlir-hlo//:map_mhlo_to_scalar_op": [
-            "tensorflow::external_mhlo_includes",
-            "MhloDialect",
-        ],
-        "@mlir-hlo//:mhlo_passes": [
-            "tensorflow::external_mhlo_includes",
-            "MhloPasses",
-            "MhloShapeOpsToStandard",
-            "MhloToLinalg",
-            "MhloToStablehlo",
-            "MhloToStandard",
-            "StablehloToMhlo",
-            # Note: We deliberately omit some passes that we do not use in IREE,
-            # e.g.: MhloToArithmeticConversion, MhloToLhloConversion, or
-            # MhloToMemrefConversion.
-        ],
-        "@mlir-hlo//:unfuse_batch_norm": [
-            "tensorflow::external_mhlo_includes",
-            "MhloPasses",
-        ],
+        # StableHLO.
         "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
         "@mlir-hlo//stablehlo:stablehlo_ops": ["StablehloOps",],
-        "@mlir-hlo//:stablehlo_legalize_to_hlo_pass": ["StablehloToMhlo",],
         "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
 
         # NCCL
