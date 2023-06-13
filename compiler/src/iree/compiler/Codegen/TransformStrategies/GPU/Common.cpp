@@ -542,7 +542,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
       b.create<iree_compiler::IREE::transform_dialect::
                    ApplyUnrollVectorsGpuMmaSyncPatternsOp>(loc);
     else
-        b.create<iree_compiler::IREE::transform_dialect::
+      b.create<iree_compiler::IREE::transform_dialect::
                    ApplyUnrollVectorsGpuWmmaSyncPatternsOp>(loc);
   });
 
