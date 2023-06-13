@@ -79,3 +79,14 @@ jobs:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: master
           repository: iree-org/iree-tf-fork
+
+  # Since this is a proper fork we can just use the sync method.
+  advance_stablehlo:
+    name: "Advance StableHLO fork"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Sync Fork
+        env:
+          # The normal GITHUB_TOKEN wouldn't have access to this other repo.
+          GH_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        run: gh repo sync iree-org/stablehlo -b main
