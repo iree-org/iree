@@ -119,7 +119,6 @@ Generate the compilation statistics:
 
 ```sh
 build_tools/benchmarks/collect_compilation_statistics.py \
-  alpha \
   --compilation_benchmark_config=comp_config.json \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --build_log="${IREE_BUILD_DIR?}/.ninja_log" \
