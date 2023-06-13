@@ -52,7 +52,7 @@ class TileConsumerAndFuseInputProducer final
     auto plOp = dyn_cast<PartitionableLoopsInterface>(*op);
     if (!plOp) return failure();
     auto partitionedLoops = plOp.getPartitionableLoops(kNumMaxParallelDims);
-    SmallVector<int64_t, 4> tileSizes = getTileSizes(op, 0);
+    SmallVector<int64_t> tileSizes = getTileSizes(op, 0);
     if (tileSizes.empty()) return failure();
     // Mask out non reduction dimensions.
     for (unsigned depth : partitionedLoops) {
@@ -307,10 +307,9 @@ struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
       op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
 
-    auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(), [&](Attribute attr) {
-          return llvm::cast<IntegerAttr>(attr).getInt();
-        }));
+    auto workgroupSize = llvm::map_to_vector(
+        getEntryPoint(funcOp)->getWorkgroupSize().value(),
+        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
     if (failed(tileParallelDims(funcOp, workgroupSize, distributeToWarp))) {
       return signalPassFailure();
     }

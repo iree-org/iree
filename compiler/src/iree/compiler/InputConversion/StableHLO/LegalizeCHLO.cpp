@@ -290,7 +290,7 @@ struct ConvertRankedDynamicBroadcastBinaryOp final
     // because, in the dynamic case, there are many corner cases regarding
     // when it is safe to omit, and some of them require analysis to prove
     // properly.
-    auto lhsBroadcastDimensions = llvm::to_vector<4>(
+    auto lhsBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - lhsType.getRank(), resultRank));
     Value broadcastedLhs =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -299,7 +299,7 @@ struct ConvertRankedDynamicBroadcastBinaryOp final
                                   lhsType.getElementType()),
             lhs, resultExtents,
             rewriter.getI64TensorAttr(lhsBroadcastDimensions));
-    auto rhsBroadcastDimensions = llvm::to_vector<4>(
+    auto rhsBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - rhsType.getRank(), resultRank));
     Value broadcastedRhs =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -396,7 +396,7 @@ struct ConvertSelectOp final
     Value broadcastedPred = pred;
     // Pred has an implicit broadcast for scalars, so use that when convenient.
     if (predType.getRank() > 0) {
-      auto predBroadcastDimensions = llvm::to_vector<4>(
+      auto predBroadcastDimensions = llvm::to_vector(
           llvm::seq<int64_t>(resultRank - predType.getRank(), resultRank));
       broadcastedPred =
           rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -406,7 +406,7 @@ struct ConvertSelectOp final
               pred, resultExtents,
               rewriter.getI64TensorAttr(predBroadcastDimensions));
     }
-    auto onTrueBroadcastDimensions = llvm::to_vector<4>(
+    auto onTrueBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - onTrueType.getRank(), resultRank));
     Value broadcastedOnTrue =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -415,7 +415,7 @@ struct ConvertSelectOp final
                                   onTrueType.getElementType()),
             onTrue, resultExtents,
             rewriter.getI64TensorAttr(onTrueBroadcastDimensions));
-    auto onFalseBroadcastDimensions = llvm::to_vector<4>(
+    auto onFalseBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - onFalseType.getRank(), resultRank));
     Value broadcastedOnFalse =
         rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -864,14 +864,14 @@ static Value materializeErfcApproximationF32ForMagnitudeGeOne(
          "expect f32 element type");
   const double kMaxlog = 88.72283905206835;
   const float kErfcPCoefficients[] = {
-      +2.326819970068386E-2, -1.387039388740657E-1, +3.687424674597105E-1,
-      -5.824733027278666E-1, +6.210004621745983E-1, -4.944515323274145E-1,
-      +3.404879937665872E-1, -2.741127028184656E-1, +5.638259427386472E-1,
+      +2.326819970068386E-2f, -1.387039388740657E-1f, +3.687424674597105E-1f,
+      -5.824733027278666E-1f, +6.210004621745983E-1f, -4.944515323274145E-1f,
+      +3.404879937665872E-1f, -2.741127028184656E-1f, +5.638259427386472E-1f,
   };
   const float kErfcRCoefficients[] = {
-      -1.047766399936249E+1, +1.297719955372516E+1, -7.495518717768503E+0,
-      +2.921019019210786E+0, -1.015265279202700E+0, +4.218463358204948E-1,
-      -2.820767439740514E-1, +5.641895067754075E-1,
+      -1.047766399936249E+1f, +1.297719955372516E+1f, -7.495518717768503E+0f,
+      +2.921019019210786E+0f, -1.015265279202700E+0f, +4.218463358204948E-1f,
+      -2.820767439740514E-1f, +5.641895067754075E-1f,
   };
 
   // Let z = -x^2.
@@ -929,9 +929,9 @@ static Value materializeErfApproximationF32ForMagnitudeLeOne(
   assert(x.getType().cast<ShapedType>().getElementType().isF32() &&
          "expect f32 element type");
   const float kErfTCoefficients[] = {
-      +7.853861353153693E-5, -8.010193625184903E-4, +5.188327685732524E-3,
-      -2.685381193529856E-2, +1.128358514861418E-1, -3.761262582423300E-1,
-      +1.128379165726710E+0,
+      +7.853861353153693E-5f, -8.010193625184903E-4f, +5.188327685732524E-3f,
+      -2.685381193529856E-2f, +1.128358514861418E-1f, -3.761262582423300E-1f,
+      +1.128379165726710E+0f,
   };
 
   // Materialize polynomial approximation for |x| <= 1 as
@@ -2095,10 +2095,10 @@ struct ConvertTopKOp final : OpConversionPattern<mlir::chlo::TopKOp> {
     Value tupleFirstElement = sortOp.getResult(0);
     Value tupleSecondElement = sortOp.getResult(1);
 
-    SmallVector<int64_t, 4> beginIndices(operandRank, 0);
-    auto endIndices = llvm::to_vector<4>(operandType.getShape());
+    SmallVector<int64_t> beginIndices(operandRank, 0);
+    auto endIndices = llvm::to_vector(operandType.getShape());
     endIndices.back() = lastDimResultSize;
-    SmallVector<int64_t, 4> strides(operandRank, 1);
+    SmallVector<int64_t> strides(operandRank, 1);
 
     // Get the slice for the top K elements.
     auto indicesTy = RankedTensorType::get(operandRank, rewriter.getI64Type());
@@ -2111,8 +2111,8 @@ struct ConvertTopKOp final : OpConversionPattern<mlir::chlo::TopKOp> {
       Value stridesOp = rewriter.create<mlir::stablehlo::ConstantOp>(
           op.getLoc(), DenseIntElementsAttr::get(indicesTy, strides));
 
-      SmallVector<int64_t, 4> resultShape =
-          llvm::to_vector<4>(operandType.getShape());
+      SmallVector<int64_t> resultShape =
+          llvm::to_vector(operandType.getShape());
       resultShape.back() = lastDimResultSize;
       RankedTensorType resultType = RankedTensorType::get(
           resultShape, elementType, operandType.getEncoding());

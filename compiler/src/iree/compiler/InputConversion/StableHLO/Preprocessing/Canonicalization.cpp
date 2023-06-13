@@ -653,7 +653,7 @@ struct ChainedDynamicBroadcastInDimCanonicalization final
     DenseIntElementsAttr precedingBcastDims =
         precedingBcast.getBroadcastDimensions();
     DenseIntElementsAttr bcastDims = bcast.getBroadcastDimensions();
-    SmallVector<APInt, 4> composition;
+    SmallVector<APInt> composition;
     for (APInt precedingDim : precedingBcastDims) {
       composition.push_back(
           *(bcastDims.value_begin<APInt>() + precedingDim.getZExtValue()));
@@ -690,6 +690,80 @@ struct DynamicBroadcastInDimAllDimsNonExpanding final
     auto cast = rewriter.createOrFold<tensor::CastOp>(op.getLoc(), resultType,
                                                       op.getOperand());
     rewriter.replaceOp(op, cast);
+    return success();
+  }
+};
+
+struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
+                                PatternRewriter &rewriter) const override {
+    // No dimensions to reduce.
+    if (op.getDimensions().empty()) {
+      rewriter.replaceOp(op, op.getInputs());
+      return success();
+    }
+
+    // If all returned values in the ReduceOp region exists outside the
+    // region, replace the ReduceOp with those values.
+    if (auto retOp = dyn_cast<mlir::stablehlo::ReturnOp>(
+            op.getBody().front().getTerminator())) {
+      Region *retRegion = retOp->getParentRegion();
+      if (llvm::any_of(retOp.getResults(), [retRegion](Value result) {
+            return result.getParentRegion() == retRegion;
+          })) {
+        return failure();
+      }
+
+      rewriter.replaceOp(op, retOp.getResults());
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
+                                PatternRewriter &rewriter) const override {
+    // We require all reduce shapes to be the same, up to the element types, so
+    // we can just the first operand and the first result as a representative.
+    auto elemTy = dyn_cast<RankedTensorType>(op.getInputs().getType().front());
+    if (!elemTy) {
+      return rewriter.notifyMatchFailure(op.getLoc(),
+                                         "unranked input unsupported");
+    }
+
+    if (!llvm::is_contained(elemTy.getShape(), 0)) return failure();
+
+    Location loc = op.getLoc();
+    DenseIntElementsAttr empty = rewriter.getI64TensorAttr({});
+    if (elemTy.hasStaticShape()) {
+      SmallVector<Value> broadcasts(op.getNumResults());
+      for (auto [bcast, init, outTy] : llvm::zip_equal(
+               broadcasts, op.getInitValues(), op.getResultTypes())) {
+        bcast = rewriter.create<mlir::stablehlo::BroadcastInDimOp>(loc, outTy,
+                                                                   init, empty);
+      }
+      rewriter.replaceOp(op, broadcasts);
+      return success();
+    }
+
+    SmallVector<Value> shapes;
+    if (failed(op.reifyReturnTypeShapes(rewriter, op.getOperands(), shapes))) {
+      return failure();
+    }
+
+    SmallVector<Value> broadcasts(op.getNumResults());
+    for (auto [bcast, init, shape, outTy] : llvm::zip_equal(
+             broadcasts, op.getInitValues(), shapes, op.getResultTypes())) {
+      bcast = rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
+          loc, outTy, init, shape, empty);
+    }
+    rewriter.replaceOp(op, broadcasts);
     return success();
   }
 };
@@ -922,6 +996,8 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       BroadcastInDimOpCanon, DynamicBroadcastInDimOpNotActuallyDynamic,
       ChainedDynamicBroadcastInDimCanonicalization,
       DynamicBroadcastInDimAllDimsNonExpanding,
+      // Reduce op.
+      NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
       ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
       ReshapeOpCanon, TransposeOpCanon>(context, benefit);

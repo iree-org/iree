@@ -297,8 +297,8 @@ static void propagateLayoutToReduceBroadcastTranspose(
   Value reductionSrc = reductionOp.getSource();
   if (!layoutMap.count(reductionSrc)) return;
   // Get the reduction dims
-  auto reductionDims = llvm::to_vector<4>(
-      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  auto reductionDims =
+      llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
   // Get the transpose permutation
   SmallVector<int64_t> perm;
   transposeOp.getTransp(perm);
@@ -797,8 +797,8 @@ static void distributeReductionBroadcastTranspose(
   if (!transposeOp) return;
   Location loc = reductionOp.getLoc();
   Layout layout = layoutMap.at(source);
-  auto reductionDims = llvm::to_vector<4>(
-      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  auto reductionDims =
+      llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
   vector::CombiningKind combiningKind = reductionOp.getKind();
   // Only support reduction on one dimension
   if (reductionDims.size() > 1) return;
@@ -926,7 +926,7 @@ static void replaceForOpWithNewSignature(RewriterBase &rewriter,
   // We will be using dummy values instead of the old operands
   // only for those operands that are being distributed
   SmallVector<Value> newOperands;
-  auto operands = llvm::to_vector<4>(loop.getIterOperands());
+  auto operands = llvm::to_vector(loop.getIterOperands());
   for (auto operand : operands) {
     if (!layoutMap.count(operand)) {
       newOperands.push_back(operand);
@@ -1003,7 +1003,7 @@ static void distributeYield(scf::YieldOp yieldOp,
 
   // Update yield op with additional operand
   auto loop = cast<scf::ForOp>(yieldOp->getParentOp());
-  auto yieldOperands = llvm::to_vector<4>(yieldOp.getOperands());
+  auto yieldOperands = llvm::to_vector(yieldOp.getOperands());
   for (const auto &operand : llvm::enumerate(yieldOp.getOperands())) {
     if (!simdToSimtMap.count(operand.value())) continue;
     // Replace the yield of old value with the for op argument to make it easier
@@ -1236,7 +1236,7 @@ static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
         vector::isParallelIterator(iteratorTypes[1]) &&
         vector::isReductionIterator(iteratorTypes[2])))
     return false;
-  SmallVector<AffineMap, 4> maps = contractOp.getIndexingMapsArray();
+  SmallVector<AffineMap> maps = contractOp.getIndexingMapsArray();
   return maps == infer({{m, k}, {n, k}, {m, n}});
 }
 

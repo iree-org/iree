@@ -179,7 +179,7 @@ struct QuantizedConvToConv
                                    /*reduce_dim*/ {false, false, false, true});
 
       // Materialize a length-1 dimension at the end of the summation.
-      SmallVector<ReassociationExprs, 4> reassociationMap(3);
+      SmallVector<ReassociationExprs> reassociationMap(3);
       for (int i = 0; i < 3; i++)
         reassociationMap[i].push_back(builder.getAffineDimExpr(i));
       reassociationMap.back().push_back(builder.getAffineDimExpr(3));
@@ -346,7 +346,7 @@ struct LinalgQuantizedConvToConvPass
     linalg::populateLinalgNamedOpConversionPatterns(patterns);
     patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
         context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
       signalPassFailure();
     }

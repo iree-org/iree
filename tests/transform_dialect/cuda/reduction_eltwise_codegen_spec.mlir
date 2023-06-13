@@ -17,8 +17,13 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
 
   // Canonicalizations.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 
   // Step 2. First level of tiling + fusion parallelizes to blocks. Tile the
   // trailing elementwise the same way we want to tile the reduction.
@@ -32,8 +37,13 @@ transform.sequence failures(propagate) {
   transform.structured.fuse_into_containing_op %not_eltwise into %grid_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 
   // Step 3. Second level of tiling + fusion parallelizes to threads.
   // ===========================================================================
@@ -50,8 +60,13 @@ transform.sequence failures(propagate) {
   transform.structured.fuse_into_containing_op %combined_and_fill into %eltwise_block_loop : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op
     : (!transform.any_op) -> !transform.any_op
@@ -65,13 +80,22 @@ transform.sequence failures(propagate) {
   transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
@@ -92,7 +116,12 @@ transform.sequence failures(propagate) {
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  transform.iree.apply_patterns %func_5 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func_5 {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.memref.fold_memref_alias_ops
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
     : (!transform.any_op) -> !transform.any_op
   // Don't complain about unsupported if (threadIdx.x == 0 && threadIdx.y == 0)
@@ -106,6 +135,11 @@ transform.sequence failures(propagate) {
 
 
   // Late canonicalizations.
+  transform.apply_patterns to %variant_op_3 {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+  } : !transform.any_op
   transform.iree.apply_patterns %variant_op_3
-    { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+    { canonicalization, licm, cse } : (!transform.any_op) -> ()
 }

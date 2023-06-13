@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_rocm_descriptor_set_layout_t

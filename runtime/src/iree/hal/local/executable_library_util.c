@@ -52,7 +52,7 @@ iree_status_t iree_hal_executable_library_initialize_imports(
   IREE_ASSERT_ARGUMENT(import_thunk);
   if (!import_table || !import_table->count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, import_table->count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, import_table->count);
 
   // The thunk is used to give the loader a chance to intercept import calls
   // in cases where it needs to JIT, perform FFI/ABI conversion, etc.

@@ -201,27 +201,34 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   LLVM_DEBUG(llvm::dbgs() << "consumerOp: " << consumerOp << "\n");
   LLVM_DEBUG(llvm::dbgs() << "tilingLevel: " << tilingLevel << "\n");
 
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-      getLoweringConfig(getComputeOps(funcOp));
-  if (failed(maybeLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip TileAndFuse");
-    return;
+  // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
+  // fallback to find a lowering_config from other operations.
+  SmallVector<int64_t> tileSizes;
+  if (auto loweringConfig = getLoweringConfig(consumerOp)) {
+    tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+  } else {
+    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+        getLoweringConfig(getComputeOps(funcOp));
+    if (failed(maybeLoweringConfig)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "can't find lowering_config, skip TileAndFuse");
+      return;
+    }
+    tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
   }
 
   int numLoops = consumerOp.getLoopIteratorTypes().size();
-  SmallVector<int64_t> tilingSizes =
-      maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
-  if (numLoops > tilingSizes.size()) {
-    tilingSizes.append(numLoops - tilingSizes.size(), 0);
+  if (numLoops > tileSizes.size()) {
+    tileSizes.append(numLoops - tileSizes.size(), 0);
   }
-  tilingSizes.resize(numLoops);
+  tileSizes.resize(numLoops);
 
-  if (llvm::all_of(tilingSizes, [&](int64_t size) { return size == 0; })) {
+  if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
     return;
   }
 
-  auto options = scf::SCFTilingOptions().setTileSizes(tilingSizes);
+  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
   IRRewriter rewriter(context);
   if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
@@ -232,7 +239,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   tensor::populateFoldTensorEmptyPatterns(patterns);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   // Pull in tensor dialect canonicalization patterns to fold tensor.cast
   // into producers when possible.
   context->getLoadedDialect<tensor::TensorDialect>()

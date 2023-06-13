@@ -11,7 +11,6 @@
 #include <string>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 
@@ -24,7 +23,7 @@
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
     void* vkGetInstanceProcAddr_fn, iree_allocator_t host_allocator,
     iree_hal_vulkan_syms_t** out_syms) {
-  IREE_TRACE_SCOPE0("iree_hal_vulkan_syms_create");
+  IREE_TRACE_SCOPE_NAMED("iree_hal_vulkan_syms_create");
   IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 
@@ -47,7 +46,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create_from_system_loader(
     iree_allocator_t host_allocator, iree_hal_vulkan_syms_t** out_syms) {
-  IREE_TRACE_SCOPE0("iree_hal_vulkan_syms_create_from_system_loader");
+  IREE_TRACE_SCOPE_NAMED("iree_hal_vulkan_syms_create_from_system_loader");
   IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 

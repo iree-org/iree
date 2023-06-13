@@ -302,9 +302,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
                          });
 
   // Compute the workgroup parameters.
-  auto workload = llvm::to_vector(
-      llvm::map_range(dispatchParams.workload,
-                      [&](unsigned dim) { return indexSet.get(dim); }));
+  auto workload = llvm::map_to_vector(
+      dispatchParams.workload, [&](unsigned dim) { return indexSet.get(dim); });
   auto workgroupCountOp =
       funcBuilder.create<IREE::HAL::ExecutableCalculateWorkgroupsOp>(
           loc, funcBuilder.getIndexType(), funcBuilder.getIndexType(),
@@ -475,7 +474,7 @@ class DumpExecutableBenchmarksPass
             buildBenchmarkModule(executableOp, variantOp, dispatchParamsMap);
         if (!benchmarkModuleOp) continue;
         auto fileName = (moduleName + "_" + executableOp.getName() + "_" +
-                         variantOp.getName() + ".mlir")
+                         variantOp.getName() + "_benchmark.mlir")
                             .str();
         if (path.empty() || path == "-") {
           dumpModuleToStream(*benchmarkModuleOp, fileName, llvm::outs());

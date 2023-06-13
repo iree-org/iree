@@ -64,9 +64,13 @@ class WebGPUTargetBackend : public TargetBackend {
   // NOTE: we could vary this based on the options such as 'webgpu-v2'.
   std::string name() const override { return "webgpu"; }
 
+  // TODO(scotttodd): Prune FlowDialect dep when WGSLReplacePushConstantsPass
+  //     does not use the Flow dialect (TranslateExecutables calls this
+  //     function and _does not_ query which passes are used by the dynamic
+  //     pipeline created by buildTranslationPassPipeline)
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
-                    gpu::GPUDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::Flow::FlowDialect,
+                    spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
@@ -128,7 +132,15 @@ class WebGPUTargetBackend : public TargetBackend {
       return variantOp.emitError()
              << "should only contain exactly one spirv.module op";
     }
+
     auto spvModuleOp = *spirvModuleOps.begin();
+    if (!options.dumpIntermediatesPath.empty()) {
+      std::string assembly;
+      llvm::raw_string_ostream os(assembly);
+      spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
+      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                     variantOp.getName(), ".mlir", assembly);
+    }
 
     // The schema expects each shader module to have entry points named "dN",
     // where N is the entry point ordinal.
@@ -136,8 +148,8 @@ class WebGPUTargetBackend : public TargetBackend {
     // that convention and keep track of the mapping between entry point
     // ordinals to which shader module they reference.
     auto exportOps =
-        llvm::to_vector<4>(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
-    llvm::SmallVector<uint32_t, 4> entryPointOrdinals(exportOps.size());
+        llvm::to_vector(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    llvm::SmallVector<uint32_t> entryPointOrdinals(exportOps.size());
     SymbolTableCollection symbolTable;
     SymbolUserMap symbolUsers(symbolTable, variantOp);
     for (auto exportOp : exportOps) {

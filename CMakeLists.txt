@@ -59,7 +59,7 @@ option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topolog
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
-option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
+option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
@@ -309,6 +309,15 @@ if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 endif()
 
 #-------------------------------------------------------------------------------
+# Experimental next-generation CUDA HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2")
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/cuda2")
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_TARGET "iree::experimental::cuda2::registration")
+set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_REGISTER "iree_hal_cuda2_driver_module_register")
+
+#-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver
 #-------------------------------------------------------------------------------
 
@@ -316,6 +325,15 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experi
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
+
+#-------------------------------------------------------------------------------
+# Experimental WebGPU HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_TARGET "iree::experimental::webgpu::registration")
+set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_REGISTER "iree_hal_webgpu_driver_module_register")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
@@ -354,14 +372,14 @@ cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler
 # Compiler Input Dialects
 #-------------------------------------------------------------------------------
 
-cmake_dependent_option(IREE_INPUT_MHLO "Builds support for compiling MHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_STABLEHLO "Builds support for compiling StableHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
 
 if(IREE_BUILD_COMPILER)
   message(STATUS "IREE compiler input dialects:")
-  if(IREE_INPUT_MHLO)
-    message(STATUS "  - MHLO")
+  if(IREE_INPUT_STABLEHLO)
+    message(STATUS "  - StableHLO")
   endif()
   if(IREE_INPUT_TORCH)
     message(STATUS "  - Torch MLIR")
@@ -394,6 +412,7 @@ endif()
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
+option(IREE_BYTECODE_MODULE_ENABLE_ASAN "Enable address sanitizer in IREE modules in tests" OFF)
 option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules in tests" OFF)
 option(IREE_ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
@@ -412,12 +431,12 @@ if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
       "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
 endif()
 
-if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
   if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
     message(SEND_ERROR
-        "When IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+        "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
         "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
-        "TSAN instrumentation is not currently supported in embedded modules.")
+        "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
   endif()
 endif()
 
@@ -645,21 +664,23 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   # iree-benchmark-import-models imports benchmark models from their source
   # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
   add_custom_target(iree-benchmark-import-models)
+  # Build for large benchmark suites.
+  add_custom_target(iree-benchmark-import-models-large)
 
   # iree-benchmark-suites* fully prepares benchmark models for benchmarking:
   #   * importing from source formats to IREE-compatible .mlir files
   #   * compiling from .mlir files to benchmark-ready .vmfb files
   # Build default benchmark suites.
   add_custom_target(iree-benchmark-suites)
-  # Build long-running benchmark suites.
-  add_custom_target(iree-benchmark-suites-long)
+  # Build large benchmark suites.
+  add_custom_target(iree-benchmark-suites-large)
 
   # iree-e2e-compile-stats-suites* compiles the benchmark models with specific
   # flags to collect the compilation statistics.
   # Build for default benchmark suites.
   add_custom_target(iree-e2e-compile-stats-suites)
-  # Build for long-running benchmark suites.
-  add_custom_target(iree-e2e-compile-stats-suites-long)
+  # Build for large benchmark suites.
+  add_custom_target(iree-e2e-compile-stats-suites-large)
 
   # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
   # and model tests.
@@ -667,9 +688,9 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   add_dependencies(iree-e2e-test-artifacts
     iree-benchmark-import-models
     iree-benchmark-suites
-    iree-benchmark-suites-long
+    iree-benchmark-suites-large
     iree-e2e-compile-stats-suites
-    iree-e2e-compile-stats-suites-long
+    iree-e2e-compile-stats-suites-large
   )
 endif()
 
@@ -679,9 +700,8 @@ if(IREE_BUILD_MICROBENCHMARKS)
 endif()
 
 if(IREE_BUILD_DOCS)
-  # Add a top-level custom target to drive generating all documentation.
-  # Register it to the default target given that IREE_BUILD_DOCS is explicitly
-  # requested.
+  # Define a top-level custom target to drive generating documentation files.
+  # Add to the default target given that docs were explicitly requested.
   add_custom_target(iree-doc ALL)
 endif()
 
@@ -857,14 +877,23 @@ if(IREE_BUILD_PYTHON_BINDINGS)
 endif()
 
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
-  iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
+  iree_set_spirv_cross_cmake_options()
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_TARGET_BACKEND_WEBGPU)
   # Tint is needed to compile SPIR-V into WGSL source code.
   # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+
+  # NOTE: these can be synced by referencing one of these repositories:
+  #   * https://dawn.googlesource.com/dawn/
+  #   * https://dawn.googlesource.com/tint/
+  #   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
+  # or they can be updated independently
+  set(IREE_TINT_TAG         "fdb8787e9c1b79770bd98a8faf37fbe48a3077a4")  # 2023-03-06
+  set(IREE_SPIRV_TOOLS_TAG  "95f93810bbae12e1a601a3a5a5d975e5558a2994")  # 2023-02-15
+
   iree_set_spirv_headers_cmake_options()
   add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)

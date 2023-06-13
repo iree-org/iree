@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 typedef struct iree_hal_cuda_buffer_t {
   iree_hal_buffer_t base;
@@ -42,13 +41,10 @@ iree_status_t iree_hal_cuda_buffer_wrap(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_cuda_buffer_type_t buffer_type, CUdeviceptr device_ptr,
     void* host_ptr, iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(allocator);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(allocator);
   iree_hal_cuda_buffer_t* buffer = NULL;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
@@ -149,6 +145,12 @@ void* iree_hal_cuda_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
   const iree_hal_cuda_buffer_t* buffer =
       iree_hal_cuda_buffer_const_cast(base_buffer);
   return buffer->host_ptr;
+}
+
+void iree_hal_cuda_buffer_drop_release_callback(
+    iree_hal_buffer_t* base_buffer) {
+  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
+  buffer->release_callback = iree_hal_buffer_release_callback_null();
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable = {

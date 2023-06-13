@@ -60,7 +60,7 @@ class OrdinalAllocationPass
     int nextExportOrdinal = 0;
     int nextGlobalRefOrdinal = 0;
     int nextRodataOrdinal = 0;
-    SmallVector<SmallVector<IREE::Util::GlobalOpInterface, 4>, 8>
+    SmallVector<SmallVector<IREE::Util::GlobalOpInterface>, 8>
         primitiveGlobalOps(sizeof(int64_t) + 1);
     for (auto &op : getOperation().getBlock().getOperations()) {
       std::optional<int> ordinal = std::nullopt;

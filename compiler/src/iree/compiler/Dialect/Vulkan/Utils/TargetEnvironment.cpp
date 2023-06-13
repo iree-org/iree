@@ -179,7 +179,7 @@ spirv::ResourceLimitsAttr convertResourceLimits(
   }
   auto sizeValues =
       vkCapabilities.getMaxComputeWorkGroupSize().getValues<int32_t>();
-  SmallVector<int64_t, 4> sizes;
+  SmallVector<int64_t> sizes;
   sizes.insert(sizes.end(), sizeValues.begin(), sizeValues.end());
   return spirv::ResourceLimitsAttr::get(
       context, vkCapabilities.getMaxComputeSharedMemorySize(),
@@ -198,7 +198,7 @@ Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext *context,
 spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
   auto spvVersion = convertVersion(vkTargetEnv);
 
-  SmallVector<spirv::Extension, 4> spvExtensions;
+  SmallVector<spirv::Extension> spvExtensions;
   convertExtensions(vkTargetEnv, spvExtensions);
 
   SmallVector<spirv::Capability, 8> spvCapabilities;

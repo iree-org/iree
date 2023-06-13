@@ -36,7 +36,7 @@ Builds IREE unit tests. Defaults to `ON`.
 
 #### `IREE_BUILD_DOCS`:BOOL
 
-Builds IREE documentation. Defaults to `OFF`.
+Builds IREE documentation files. Defaults to `OFF`.
 
 #### `IREE_BUILD_SAMPLES`:BOOL
 

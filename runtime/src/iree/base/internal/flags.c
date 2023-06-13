@@ -18,7 +18,6 @@
 #if IREE_FLAGS_ENABLE_CLI == 1
 
 #include "iree/base/internal/debugging.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Flag manipulation utilities

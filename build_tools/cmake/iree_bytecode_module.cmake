@@ -68,7 +68,10 @@ function(iree_bytecode_module)
     set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
   endif()
 
-  set(_ARGS "--output-format=vm-bytecode")
+  set(_ARGS
+    "--output-format=vm-bytecode"
+    "--mlir-print-op-on-diagnostic=false"
+  )
   list(APPEND _ARGS "${_RULE_FLAGS}")
 
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
@@ -90,6 +93,10 @@ function(iree_bytecode_module)
 
   if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
     list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
+  endif()
+
+  if(IREE_BYTECODE_MODULE_ENABLE_ASAN)
+    list(APPEND _ARGS "--iree-llvmcpu-sanitize=address")
   endif()
 
   # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an

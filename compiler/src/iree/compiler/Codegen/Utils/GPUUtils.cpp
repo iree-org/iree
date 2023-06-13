@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -18,6 +19,7 @@
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define DBGSNL() (llvm::dbgs() << "\n")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
@@ -673,13 +675,19 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       mmaShapeK = 16;
     else if (sourceType.isF32())
       mmaShapeK = 8;
-    else
+    else {
+      LDBG("unsupported shape for vector.contract: ");
       return std::nullopt;
+    }
 
     // Initialize/set the starting dims of the ranked shape, such as batch,
     // to 1.
     SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
     mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
+    LLVM_DEBUG({
+      llvm::interleaveComma(mmaShape, DBGS() << "shape for vector.contract: ");
+      llvm::dbgs() << "\n";
+    });
     return mmaShape;
   }
 
@@ -687,6 +695,11 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
+    LLVM_DEBUG({
+      llvm::interleaveComma(outputShape,
+                            DBGS() << "shape for vector.xfer_write: ");
+      llvm::dbgs() << "\n";
+    });
     return outputShape;
   }
 
@@ -700,7 +713,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
       LLVM_DEBUG({
-        DBGS() << "Failed to get operandId for vector::TransferReadOp: " << *op
+        DBGS() << "Failed to get operandId for vector::xfer_read: " << *op
                << "\n";
       });
       return std::nullopt;
@@ -712,6 +725,11 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
 
@@ -732,6 +750,11 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
         SmallVector<int64_t> readShape;
         readShape.append({16, 16});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
     }
@@ -745,12 +768,22 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
       // For matrixA.
       if (*operandId == 0) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeK});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
       // For matrixB.
@@ -767,10 +800,16 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
           if (sliceType && sliceType != vecType) return std::nullopt;
           sliceType = vecType;
         }
+        LLVM_DEBUG({
+          llvm::interleaveComma(sliceType.getShape(),
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return llvm::to_vector(sliceType.getShape());
       }
     }
   }
+  LDBG("unsupported shape for " << op->getName().getStringRef());
   return std::nullopt;
 }
 

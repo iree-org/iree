@@ -63,6 +63,7 @@ iree_cc_library(
     MLIRArithTransforms
     MLIRArmNeon2dToIntr
     MLIRArmNeonDialect
+    MLIRArmSMETransforms
     MLIRBufferizationDialect
     MLIRComplexToLLVM
     MLIRComplexToStandard
@@ -109,7 +110,7 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::PassHeaders
-    iree::compiler::Codegen::TransformDialectStrategies::CPU::TransformDialectStrategies
+    iree::compiler::Codegen::TransformStrategies::CPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::VMVX

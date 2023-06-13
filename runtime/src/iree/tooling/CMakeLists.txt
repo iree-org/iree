@@ -20,7 +20,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -53,7 +52,6 @@ iree_cc_library(
     iree::base
     iree::base::internal::flags
     iree::base::internal::span
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::vm
@@ -90,7 +88,6 @@ iree_cc_library(
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::hal::local::loaders::registration
     iree::hal::local::plugins::registration
@@ -115,7 +112,6 @@ iree_cc_library(
     iree::base
     iree::base::internal::flags
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
     iree::hal::drivers
     iree::hal::utils::allocators
@@ -133,7 +129,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::hal::types
     iree::schemas::instruments
@@ -150,7 +145,6 @@ iree_cc_library(
     "numpy_io.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -186,7 +180,6 @@ iree_cc_library(
     ::vm_util
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::hal::types
     iree::vm
@@ -205,7 +198,6 @@ iree_cc_library(
     ::numpy_io
     iree::base
     iree::base::internal::file_io
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::vm
@@ -248,7 +240,6 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::file_io
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::vm

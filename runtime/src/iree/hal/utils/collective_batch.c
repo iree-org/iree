@@ -6,8 +6,6 @@
 
 #include "iree/hal/utils/collective_batch.h"
 
-#include "iree/base/tracing.h"
-
 //===----------------------------------------------------------------------===//
 // Collective batching utility
 //===----------------------------------------------------------------------===//
@@ -28,7 +26,9 @@ IREE_API_EXPORT void iree_hal_collective_batch_deinitialize(
     iree_hal_collective_batch_t* batch) {
   // Since we are just allocating from the arena we don't need to do anything
   // but clear our pointers for debugging clarity.
-  iree_hal_collective_batch_reset(batch);
+  batch->capacity = 0;
+  batch->count = 0;
+  batch->entries = NULL;
 }
 
 IREE_API_EXPORT bool iree_hal_collective_batch_is_empty(
@@ -36,7 +36,7 @@ IREE_API_EXPORT bool iree_hal_collective_batch_is_empty(
   return batch->count == 0;
 }
 
-IREE_API_EXPORT void iree_hal_collective_batch_reset(
+IREE_API_EXPORT void iree_hal_collective_batch_clear(
     iree_hal_collective_batch_t* batch) {
   // Reset the count to zero but keep the arena storage for reuse.
   // We could memset the contents if we wanted to make debugging easier as ASAN
@@ -55,7 +55,7 @@ static iree_status_t iree_hal_collective_batch_grow(
   iree_host_size_t new_capacity =
       batch->capacity == 0 ? IREE_HAL_COLLECTIVE_BATCH_INITIAL_CAPACITY
                            : batch->capacity * 2;
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, new_capacity);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_capacity);
 
   // Allocate new storage - this may fail if the system (or block pool) is over
   // capacity.

@@ -56,7 +56,7 @@ struct InsertSliceOpTiedOpInterface
     return {1};  // dest
   }
 
-  SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op) const {
+  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
     return {1};  // dest
   }
 };
@@ -77,8 +77,8 @@ struct LinalgOpTiedOpInterface
     return {linalgOp.getDpsInitOperands()[resultIndex]->getOperandNumber()};
   }
 
-  SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op) const {
-    SmallVector<int64_t, 4> result;
+  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
+    SmallVector<int64_t> result;
     for (unsigned i = 0; i < op->getNumResults(); ++i)
       result.push_back(*getTiedResultOperandIndex(op, i));
     return result;

@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_UTILS_TRACINGUTILS_H_
 #define IREE_COMPILER_UTILS_TRACINGUTILS_H_
 
-#include "iree/base/tracing.h"
+#include "iree/base/api.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassInstrumentation.h"

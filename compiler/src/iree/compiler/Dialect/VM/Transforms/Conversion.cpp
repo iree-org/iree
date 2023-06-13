@@ -57,7 +57,7 @@ struct MaxMinIOpConverter : public OpRewritePattern<OpTy> {
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
 template <typename T>
-SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
+SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
   moduleOp.walk([&](Operation *op) {
     // Special case for declarations which may reference builtins.
@@ -80,7 +80,7 @@ SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 
   // NOTE: to ensure deterministic output we sort the result so that imports are
   // always added in a consistent order.
-  SmallVector<const T *, 4> results = {resultSet.begin(), resultSet.end()};
+  SmallVector<const T *> results = {resultSet.begin(), resultSet.end()};
   llvm::sort(
       results, +[](const T *a, const T *b) {
         return a->getDialect()->getNamespace().compare(

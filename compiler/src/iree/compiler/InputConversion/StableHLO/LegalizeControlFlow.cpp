@@ -119,7 +119,8 @@ struct WhileOpPattern final : OpConversionPattern<mlir::stablehlo::WhileOp> {
           extractTensorValue(rewriter, bounds->step), adaptor.getOperands());
 
       rewriter.setInsertionPointToEnd(newForOp.getBody());
-      // Inline while body, and only replace the mhlo.return with an scf.yield.
+      // Inline while body, and only replace the stablehlo.return with an
+      // scf.yield.
       inlineStableHloRegionIntoSCFRegion(rewriter, op.getBody(),
                                          newForOp.getRegion());
       BlockArgument indexArg = newForOp.getRegion().insertArgument(
@@ -149,7 +150,8 @@ struct WhileOpPattern final : OpConversionPattern<mlir::stablehlo::WhileOp> {
     rewriter.replaceOpWithNewOp<scf::ConditionOp>(
         conditionReturn, i1, newWhileOp.getBeforeArguments());
 
-    // Inline while body, and only replace the mhlo.return with an scf.yield.
+    // Inline while body, and only replace the stablehlo.return with an
+    // scf.yield.
     inlineStableHloRegionIntoSCFRegion(rewriter, op.getBody(),
                                        newWhileOp.getAfter());
 

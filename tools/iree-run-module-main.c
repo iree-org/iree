@@ -6,7 +6,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/run_module.h"
 #include "iree/vm/api.h"
@@ -53,5 +52,6 @@ int main(int argc, char** argv) {
   }
 
   IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(exit_code);
   return exit_code;
 }

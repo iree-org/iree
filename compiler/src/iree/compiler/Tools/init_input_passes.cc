@@ -8,10 +8,9 @@
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
 
-#ifdef IREE_HAVE_MHLO_INPUT
-#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
-#endif  // IREE_HAVE_MHLO_INPUT
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
 #endif  // IREE_HAVE_TORCH_INPUT
@@ -27,10 +26,9 @@ namespace iree_compiler {
 void registerInputPasses() {
   registerCommonInputConversionPasses();
 
-#ifdef IREE_HAVE_MHLO_INPUT
-  MHLO::registerMHLOConversionPasses();
+#ifdef IREE_HAVE_STABLEHLO_INPUT
   stablehlo::registerStableHLOConversionPasses();
-#endif  // IREE_HAVE_MHLO_INPUT
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
   TMTensor::registerTMTensorConversionPasses();
 #endif

@@ -11,7 +11,6 @@
 #include <utility>
 
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
@@ -130,7 +129,7 @@ iree_status_t DescriptorSetArena::BindDescriptorSet(
     return iree_ok_status();
   }
 
-  IREE_TRACE_SCOPE0("DescriptorSetArena::BindDescriptorSet");
+  IREE_TRACE_SCOPE_NAMED("DescriptorSetArena::BindDescriptorSet");
 
   auto* set_layout =
       iree_hal_vulkan_native_pipeline_layout_set(pipeline_layout, set);
@@ -220,7 +219,7 @@ void DescriptorSetArena::PushDescriptorSet(
     VkCommandBuffer command_buffer, iree_hal_pipeline_layout_t* pipeline_layout,
     uint32_t set, iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
-  IREE_TRACE_SCOPE0("DescriptorSetArena::PushDescriptorSet");
+  IREE_TRACE_SCOPE_NAMED("DescriptorSetArena::PushDescriptorSet");
   VkPipelineLayout device_pipeline_layout =
       iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout);
 
@@ -239,7 +238,7 @@ void DescriptorSetArena::PushDescriptorSet(
 }
 
 DescriptorSetGroup DescriptorSetArena::Flush() {
-  IREE_TRACE_SCOPE0("DescriptorSetArena::Flush");
+  IREE_TRACE_SCOPE_NAMED("DescriptorSetArena::Flush");
 
   if (used_descriptor_pools_.empty()) {
     // No resources to free.

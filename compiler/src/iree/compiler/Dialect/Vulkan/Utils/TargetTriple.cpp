@@ -229,7 +229,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
   bool variablePointers = false, variablePointersStorageBuffer = false;
 
-  SmallVector<Attribute, 4> coopmatCases;
+  SmallVector<Attribute> coopmatCases;
 
   Builder builder(context);
 

@@ -630,7 +630,7 @@ struct DepthwiseConvolutionOpConversion final
                                     rewriter);
 
     auto filterDims =
-        llvm::to_vector<4>(cast<ShapedType>(op.getRhs().getType()).getShape());
+        llvm::to_vector(cast<ShapedType>(op.getRhs().getType()).getShape());
 
     auto getReassociationIndicesToCollapseLastTwoDims = [](Value v) {
       SmallVector<ReassociationIndices> reassociations;

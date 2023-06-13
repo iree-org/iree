@@ -343,9 +343,9 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     SmallVector<Location> resultLocs(resultTypes.size(), loc);
     auto *exitBlock = rewriter.splitBlock(rewriter.getInsertionBlock(),
                                           rewriter.getInsertionPoint());
-    auto exitResults = llvm::to_vector(
-        llvm::map_range(exitBlock->addArguments(resultTypes, resultLocs),
-                        [](BlockArgument arg) -> Value { return arg; }));
+    auto exitResults =
+        llvm::map_to_vector(exitBlock->addArguments(resultTypes, resultLocs),
+                            [](BlockArgument arg) -> Value { return arg; });
 
     auto *resolvedBlock = rewriter.createBlock(exitBlock);
     auto *fallbackBlock = rewriter.createBlock(exitBlock);

@@ -177,9 +177,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   let extraClassDeclaration = [{
     FunctionType getDispatchType() {
       return FunctionType::get(
-          getContext(),
-          llvm::to_vector<4>(llvm::map_range(
-              getArguments(), [](Value value) { return value.getType(); })),
+          getContext(), llvm::map_to_vector(getArguments(), [](Value value) {
+            return value.getType();
+          }),
           getResultTypes());
     }
 
@@ -1205,7 +1205,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   let hasFolder = 1;
 }
 
-def FLOW_TensorAllocOp : FLOW_Op<"tensor.alloc", [
+def FLOW_TensorAllocaOp : FLOW_Op<"tensor.alloca", [
   Util_ShapeAwareOp,
   MemoryEffects<[MemAlloc]>,
 ]> {

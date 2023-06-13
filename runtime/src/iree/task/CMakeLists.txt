@@ -33,7 +33,6 @@ iree_cc_library(
     ::task
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
   PUBLIC
 )
 
@@ -72,7 +71,6 @@ iree_cc_library(
   DEPS
     ${IREE_CPUINFO_TARGET}
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::atomic_slist
     iree::base::internal::cpu
@@ -82,7 +80,6 @@ iree_cc_library(
     iree::base::internal::synchronization
     iree::base::internal::threading
     iree::base::internal::wait_handle
-    iree::base::tracing
   PUBLIC
 )
 
@@ -95,7 +92,6 @@ iree_cc_test(
     ::task
     iree::base
     iree::base::internal::prng
-    iree::base::tracing
     iree::task::testing::test_util
 )
 

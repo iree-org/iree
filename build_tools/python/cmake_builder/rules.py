@@ -52,7 +52,7 @@ def _get_string_arg_block(keyword: str,
     return []
   if quote:
     value = f'"{value}"'
-  return [keyword] + _get_block_body([value])
+  return [f"{keyword} {value}"]
 
 
 def _get_string_list_arg_block(keyword: str,

@@ -36,10 +36,9 @@ static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
   newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
 
   OpBuilder::InsertionGuard guard(b);
-  return llvm::to_vector(map_range(newTileSizes, [&](int64_t size) {
-    Value v = b.create<arith::ConstantIndexOp>(tilingOp->getLoc(), size);
-    return v;
-  }));
+  return llvm::map_to_vector(newTileSizes, [&](int64_t size) -> Value {
+    return b.create<arith::ConstantIndexOp>(tilingOp->getLoc(), size);
+  });
 }
 
 /// This pass tiles all the TilingInterface operations. The `tilingLevel` must
@@ -66,16 +65,10 @@ void LLVMCPUTilePass::runOnOperation() {
   auto funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+  FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
       getLoweringConfig(computeOps);
-  if (failed(maybeLoweringConfig)) {
+  if (failed(rootLoweringConfig)) {
     LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
-    return;
-  }
-  SmallVector<int64_t> tileSizes =
-      maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
-  if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
-    LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
     return;
   }
 
@@ -90,6 +83,17 @@ void LLVMCPUTilePass::runOnOperation() {
     if (isa<tensor::PadOp>(computeOp)) continue;
 
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
+    SmallVector<int64_t> tileSizes;
+    if (auto loweringConfig = getLoweringConfig(op)) {
+      tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+    } else {
+      tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
+    }
+
+    if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
+      LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
+      continue;
+    }
 
     IRRewriter rewriter(context);
     auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
@@ -106,7 +110,7 @@ void LLVMCPUTilePass::runOnOperation() {
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   tensor::populateFoldTensorEmptyPatterns(patterns);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

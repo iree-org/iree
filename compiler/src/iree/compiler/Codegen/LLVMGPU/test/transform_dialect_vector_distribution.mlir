@@ -7,7 +7,7 @@
 // RUN: FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]>]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 
 hal.executable private @reduce_dispatch_0 {
   hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {

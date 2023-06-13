@@ -24,6 +24,8 @@
 //
 //===---------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -320,6 +322,90 @@ struct TensorExtractTypePropagation
   }
 };
 
+/// Pattern to legalize `iree_linalg_ext.scatter` operations.
+struct IREELinalgExtScatterTypePropagation
+    : TypePropagationPattern<IREE::LinalgExt::ScatterOp> {
+  using TypePropagationPattern<
+      IREE::LinalgExt::ScatterOp>::TypePropagationPattern;
+  LogicalResult matchAndRewrite(
+      IREE::LinalgExt::ScatterOp scatterOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
+    auto opOperands = scatterOp->getOpOperands();
+    Type inputType = opOperands[0].get().getType();
+    Type legalizedInputType = this->getTypeConverter()->convertType(inputType);
+
+    if (inputType == legalizedInputType) {
+      return scatterOp.emitOpError(
+          "unexpected all types legal within conversion pattern");
+    }
+
+    Type resultType = opOperands[2].get().getType();
+    Type legalizedResultType =
+        this->getTypeConverter()->convertType(resultType);
+
+    // Create a clone of the operation without cloning its regions.
+    auto modifiedOp =
+        cast<IREE::LinalgExt::ScatterOp>(mlir::cloneWithoutRegions(
+            rewriter, scatterOp, {legalizedResultType}, adaptor.getOperands()));
+
+    // Inline the region from the original operation into the new operation.
+    rewriter.inlineRegionBefore(scatterOp->getRegions().front(),
+                                modifiedOp->getRegions().front(),
+                                modifiedOp->getRegions().front().begin());
+    Region &modifiedOpRegion = modifiedOp->getRegions().front();
+
+    // Convert the signature of the region to use the corresponding element
+    // type.
+    TypeConverter::SignatureConversion signatureConverter(
+        modifiedOpRegion.getNumArguments());
+    Type argType = modifiedOpRegion.getArguments()[0].getType();
+    std::optional<Type> legalizedArgType = legalizeStorageElementType(argType);
+    if (!legalizedArgType) {
+      return scatterOp.emitOpError("failed to get legalized type for argument");
+    }
+    signatureConverter.addInputs(0, legalizedArgType.value());
+    signatureConverter.addInputs(1, legalizedArgType.value());
+    rewriter.applySignatureConversion(&modifiedOpRegion, signatureConverter);
+
+    {
+      // Introduce scalar conversion operations to convert back to the original
+      // scalar type.
+      OpBuilder::InsertionGuard g(rewriter);
+      Block *entryBlock = &modifiedOp->getRegion(0).getBlocks().front();
+      BlockArgument inputArg = entryBlock->getArgument(0);
+      BlockArgument outputArg = entryBlock->getArgument(1);
+
+      auto destType = getElementTypeOrSelf(inputType);
+      rewriter.setInsertionPointToStart(entryBlock);
+
+      Value replacementInput =
+          convertElementType(rewriter, inputArg.getLoc(), destType, inputArg);
+      rewriter.replaceUsesOfBlockArgument(entryBlock->getArgument(0),
+                                          replacementInput);
+      Value replacementOutput =
+          convertElementType(rewriter, outputArg.getLoc(), destType, outputArg);
+      rewriter.replaceUsesOfBlockArgument(entryBlock->getArgument(1),
+                                          replacementOutput);
+
+      // If the output is of an illegal type, the yield value needs to be
+      // modified
+      auto yieldOp = entryBlock->getTerminator();
+
+      rewriter.setInsertionPoint(yieldOp);
+      OpOperand *modifiedOpOperand = &yieldOp->getOpOperand(0);
+
+      auto yieldOperand = convertElementType(rewriter, yieldOp->getLoc(),
+                                             legalizedArgType.value(),
+                                             modifiedOpOperand->get());
+
+      rewriter.replaceOpWithNewOp<IREE::LinalgExt::YieldOp>(yieldOp,
+                                                            yieldOperand);
+    }
+    rewriter.replaceOp(scatterOp, modifiedOp->getResults());
+    return success();
+  }
+};
+
 /// Simple rewrite pattern that just forwards the source as the result if the
 /// result type is not legal (but source type is)
 template <typename OpTy>
@@ -407,8 +493,8 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
         NamedOpTypePropagation<linalg::BatchMatmulOp>,
         NamedOpTypePropagation<linalg::MatmulOp>,
         NamedOpTypePropagation<linalg::MatvecOp>,
-        NamedOpTypePropagation<linalg::DotOp>, TensorExtractTypePropagation>(
-        typeConverter, context);
+        NamedOpTypePropagation<linalg::DotOp>, TensorExtractTypePropagation,
+        IREELinalgExtScatterTypePropagation>(typeConverter, context);
 
     ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {

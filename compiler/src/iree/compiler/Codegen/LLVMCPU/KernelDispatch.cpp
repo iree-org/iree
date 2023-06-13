@@ -12,7 +12,7 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -176,16 +176,16 @@ static void getBoundsFromRange(ArrayRef<Range> loopRange,
     if (!intVal) return ShapedType::kDynamic;
     return intVal.value();
   };
-  lb = llvm::to_vector(llvm::map_range(
-      loopRange, [&](Range r) { return getStaticValue(r.offset); }));
-  ub = llvm::to_vector(llvm::map_range(
-      loopRange, [&](Range r) { return getStaticValue(r.size); }));
+  lb = llvm::map_to_vector(loopRange,
+                           [&](Range r) { return getStaticValue(r.offset); });
+  ub = llvm::map_to_vector(loopRange,
+                           [&](Range r) { return getStaticValue(r.size); });
 }
 
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
-  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
   return llvm::all_of(loopRanges,
                       [](int64_t size) { return ShapedType::isDynamic(size); });
 }
@@ -661,7 +661,7 @@ static void splitParallelAndReductionTiles(
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &parallelSizes,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
-  SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
   for (auto [index, valuePair] : llvm::enumerate(
            llvm::zip_equal(staticLoopRanges, op.getIteratorTypesArray()))) {
     auto [size, iterType] = valuePair;
@@ -1236,7 +1236,7 @@ static void setX86VectorTileSizes(linalg::GenericOp genericOp,
                                   VectorPreProcStrategy vecPreProcStrategy,
                                   SmallVectorImpl<int64_t> &vecTileSizes) {
   vecTileSizes.append(numLoops, 0);
-  SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
+  SmallVector<int64_t> staticLoopRanges = genericOp.getStaticLoopRanges();
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (distTileSizes[loopNum]) {
       vecTileSizes[loopNum] = getMaxVectorTileSize(
@@ -1621,7 +1621,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
       vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
-  SmallVector<int64_t, 4> shapes = convOp.getStaticLoopRanges();
+  SmallVector<int64_t> shapes = convOp.getStaticLoopRanges();
   SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
                                          targetTileSizes.end());
   for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
@@ -1800,10 +1800,10 @@ static LogicalResult setRootConfig(
     if (!intVal) return ShapedType::kDynamic;
     return intVal.value();
   };
-  auto lbs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
-  auto ubs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
+  auto lbs = llvm::map_to_vector(
+      iterationDomain, [&](Range r) { return getStaticValue(r.offset); });
+  auto ubs = llvm::map_to_vector(
+      iterationDomain, [&](Range r) { return getStaticValue(r.size); });
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(), pipeline);
   if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
@@ -2123,7 +2123,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
   // The root configuration setting introduces `tensor.dim` operations. Resolve
   // those away.
   RewritePatternSet patterns(moduleOp.getContext());
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
 }
 

@@ -9,8 +9,6 @@
 #include <string.h>
 
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 
 static const char* kCUDALoaderSearchNames[] = {

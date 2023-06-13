@@ -73,7 +73,7 @@ extern "C" {
 
 #if defined(_MSC_VER)
 #define IREE_UK_COMPILER_MSVC
-#define IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(msc_ver) (msc_ver >= _MSC_VER)
+#define IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(msc_ver) (_MSC_VER >= msc_ver)
 #else  // defined(_MSC_VER)
 #define IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(msc_ver) 0
 #endif  // defined(_MSC_VER)

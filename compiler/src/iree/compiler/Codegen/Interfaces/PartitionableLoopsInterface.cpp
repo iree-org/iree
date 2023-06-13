@@ -36,8 +36,7 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
   llvm::SmallVector<unsigned> parallelLoops;
   linalgOp.getParallelDims(parallelLoops);
   // Get the static loop ranges.
-  llvm::SmallVector<int64_t, 4> staticLoopRanges =
-      linalgOp.getStaticLoopRanges();
+  llvm::SmallVector<int64_t> staticLoopRanges = linalgOp.getStaticLoopRanges();
   parallelLoops = pruneUnitTripParallelLoops(parallelLoops, staticLoopRanges);
   // TODO(ravishankarm): For now the outer parallel loops are dropped. This is
   // a pragmatic choice for now but might need to be revisited.
@@ -52,10 +51,10 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
 
 static llvm::SmallVector<utils::IteratorType> getIteratorTypesFromAttr(
     ArrayAttr iteratorTypesAttr) {
-  return llvm::to_vector(llvm::map_range(iteratorTypesAttr, [](Attribute attr) {
+  return llvm::map_to_vector(iteratorTypesAttr, [](Attribute attr) {
     return utils::symbolizeIteratorType(llvm::cast<StringAttr>(attr).getValue())
         .value();
-  }));
+  });
 }
 
 /// External model implementation for all LinalgOps.

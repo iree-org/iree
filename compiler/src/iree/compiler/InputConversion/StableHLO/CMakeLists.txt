@@ -134,6 +134,8 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::InputConversion::Common
     iree::compiler::InputConversion::StableHLO::Preprocessing
+  DEFINES
+    "IREE_HAVE_STABLEHLO_INPUT"
   PUBLIC
 )
 

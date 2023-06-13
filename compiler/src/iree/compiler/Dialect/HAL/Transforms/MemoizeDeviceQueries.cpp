@@ -40,7 +40,7 @@ class MemoizeDeviceQueriesPass
 
     // Find all query ops we want to memoize and group them together.
     // This lets us easily replace all usages of a match with a single variable.
-    SmallVector<Attribute, 4> deviceQueryKeys;
+    SmallVector<Attribute> deviceQueryKeys;
     DenseMap<Attribute, std::vector<IREE::HAL::DeviceQueryOp>> deviceQueryOps;
     for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
       callableOp.walk([&](IREE::HAL::DeviceQueryOp queryOp) {
@@ -72,9 +72,8 @@ class MemoizeDeviceQueriesPass
       auto queryType = anyQueryOp.getValue().getType();
 
       // Merge all the locs as we are deduping the original query ops.
-      auto fusedLoc =
-          moduleBuilder.getFusedLoc(llvm::to_vector<4>(llvm::map_range(
-              queryOps, [&](Operation *op) { return op->getLoc(); })));
+      auto fusedLoc = moduleBuilder.getFusedLoc(llvm::map_to_vector(
+          queryOps, [&](Operation *op) { return op->getLoc(); }));
 
       // The initializer will perform the query once and store it in the
       // variable.

@@ -12,7 +12,6 @@
 #include "experimental/rocm/rocm_buffer.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 typedef struct iree_hal_rocm_allocator_t {
   iree_hal_resource_t resource;

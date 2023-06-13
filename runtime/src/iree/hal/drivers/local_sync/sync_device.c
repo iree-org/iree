@@ -12,7 +12,6 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_sync/sync_event.h"
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
 #include "iree/hal/local/executable_environment.h"

@@ -7,7 +7,6 @@
 #include "iree/hal/buffer_view.h"
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer_view_util.h"
 #include "iree/hal/resource.h"

@@ -6,11 +6,9 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 
-#include "iree/compiler/Dialect/Stream/Builtins/Builtins.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -258,7 +256,7 @@ static void eraseStreamRegionResults(Region &region,
   for (auto &block : region.getBlocks()) {
     auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
     if (!yieldOp) continue;
-    llvm::SmallVector<Value, 4> newOperands;
+    llvm::SmallVector<Value> newOperands;
     for (auto i : llvm::reverse(excludedResultIndices)) {
       yieldOp.getResourceOperandsMutable().erase(i);
       yieldOp.getResourceOperandSizesMutable().erase(i);
@@ -750,7 +748,7 @@ Value ResourceSubviewOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> ResourceSubviewOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> ResourceSubviewOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -802,7 +800,7 @@ Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorImportOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorImportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -829,7 +827,7 @@ Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorExportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -972,7 +970,7 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -999,7 +997,7 @@ Value TensorFillOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> TensorFillOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorFillOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1048,163 +1046,8 @@ Value TensorStoreOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> TensorStoreOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorStoreOp::getTiedResultOperandIndices() {
   return {0};  // target
-}
-
-//===----------------------------------------------------------------------===//
-// stream.builtin.* utilities
-//===----------------------------------------------------------------------===//
-
-// Merges a builtin module from iree/compiler/Dialect/Stream/Builtins/*.mlir
-// into the user module; this allows for host functions and multiple
-// executables.
-//
-// Fails if there's a name conflict; we have a __ prefix and things outside the
-// compiler shouldn't use it.
-static LogicalResult mergeBuiltinModuleSource(Location loc, StringRef fileName,
-                                              Operation *targetOp,
-                                              OpBuilder &targetBuilder) {
-  // Find the file in the embedded data.
-  const iree_file_toc_t *toc = iree_compiler_Stream_Builtins_create();
-  const iree_file_toc_t *file = nullptr;
-  for (size_t i = 0; i < iree_compiler_Stream_Builtins_size(); ++i) {
-    if (fileName == toc[i].name) {
-      file = &toc[i];
-      break;
-    }
-  }
-  if (!file) {
-    return mlir::emitError(
-        loc, "unable to merge builtin module; file not found " + fileName);
-  }
-  return mergeSourceModuleInto(loc, StringRef(file->data, file->size), targetOp,
-                               targetBuilder);
-}
-
-//===----------------------------------------------------------------------===//
-// stream.builtin.splat.i64
-//===----------------------------------------------------------------------===//
-
-LogicalResult BuiltinSplatI64Op::verify() {
-  BuiltinSplatI64Op op = *this;
-  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-LogicalResult BuiltinSplatI64Op::mergeBuiltinModule(Operation *targetOp,
-                                                    OpBuilder &targetBuilder) {
-  return mergeBuiltinModuleSource(getLoc(), "splat_i64.mlir", targetOp,
-                                  targetBuilder);
-}
-
-LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
-  auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
-  auto count =
-      builder.createOrFold<arith::DivUIOp>(getLoc(), getResultSize(), c8);
-  Value workload[] = {count};
-  SmallVector<Value> operands = {
-      getValue(),
-      count,
-  };
-  SmallVector<Value> operandSizes;
-  SmallVector<Value> operandOffsets;
-  SmallVector<Value> operandEnds;
-  SmallVector<Value> operandLengths;
-  SmallVector<int64_t> tiedOperands = {
-      -1,
-  };
-  SmallVector<Value> resultSizes = {
-      getResultSize(),
-  };
-  SmallVector<Type> resultTypes{
-      getResult().getType(),
-  };
-  auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      getLoc(), resultTypes, workload,
-      SymbolRefAttr::get(
-          builder.getStringAttr("__builtin_splat_i64"),
-          FlatSymbolRefAttr::get(builder.getContext(), "__builtin_splat_i64")),
-      operands, operandSizes, operandOffsets, operandEnds, operandLengths,
-      resultSizes, builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
-  getResult().replaceAllUsesWith(dispatchOp.getResults().front());
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.builtin.fill.i64
-//===----------------------------------------------------------------------===//
-
-LogicalResult BuiltinFillI64Op::verify() {
-  BuiltinFillI64Op op = *this;
-  if (failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-Value BuiltinFillI64Op::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
-}
-
-::std::optional<unsigned> BuiltinFillI64Op::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
-}
-
-SmallVector<int64_t, 4> BuiltinFillI64Op::getTiedResultOperandIndices() {
-  return {0};  // target
-}
-
-LogicalResult BuiltinFillI64Op::mergeBuiltinModule(Operation *targetOp,
-                                                   OpBuilder &targetBuilder) {
-  return mergeBuiltinModuleSource(getLoc(), "fill_i64.mlir", targetOp,
-                                  targetBuilder);
-}
-
-LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
-  auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
-  auto count =
-      builder.createOrFold<arith::DivUIOp>(getLoc(), getTargetLength(), c8);
-  Value workload[] = {count};
-  SmallVector<Value> operands = {
-      getTarget(),
-      getValue(),
-      getTargetOffset(),
-      count,
-  };
-  SmallVector<Value> operandSizes = {
-      getTargetSize(),
-  };
-  SmallVector<Value> operandOffsets = {
-      getTargetOffset(),
-  };
-  SmallVector<Value> operandEnds = {
-      getTargetEnd(),
-  };
-  SmallVector<Value> operandLengths = {
-      getTargetLength(),
-  };
-  SmallVector<int64_t> tiedOperands = {
-      0,
-  };
-  SmallVector<Value> resultSizes = {
-      getTargetSize(),
-  };
-  SmallVector<Type> resultTypes{
-      getResult().getType(),
-  };
-  auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      getLoc(), resultTypes, workload,
-      SymbolRefAttr::get(
-          builder.getStringAttr("__builtin_fill_i64"),
-          FlatSymbolRefAttr::get(builder.getContext(), "__builtin_fill_i64")),
-      operands, operandSizes, operandOffsets, operandEnds, operandLengths,
-      resultSizes, builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
-  getResult().replaceAllUsesWith(dispatchOp.getResults().front());
-  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1324,7 +1167,7 @@ Value AsyncFillOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncFillOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncFillOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1358,7 +1201,7 @@ Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncUpdateOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncUpdateOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1401,7 +1244,7 @@ Value AsyncCopyOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncCopyOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncCopyOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1498,7 +1341,7 @@ Value AsyncCollectiveOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncCollectiveOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncCollectiveOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1566,7 +1409,7 @@ Value AsyncStoreOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncStoreOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncStoreOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1864,8 +1707,8 @@ LogicalResult AsyncCallOp::verifySymbolUses(
 }
 
 FunctionType AsyncCallOp::getCalleeType() {
-  auto operandTypes = llvm::to_vector(llvm::map_range(
-      getArgOperands(), [](Value arg) { return arg.getType(); }));
+  auto operandTypes = llvm::map_to_vector(
+      getArgOperands(), [](Value arg) { return arg.getType(); });
   return FunctionType::get(getContext(), operandTypes, getResultTypes());
 }
 
@@ -2036,17 +1879,16 @@ IREE::Util::ClosureOpInterface
 AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  auto newResultTypes = llvm::to_vector<4>(llvm::map_range(
-      getResults(), [](auto value) { return value.getType(); }));
-  auto newResultSizes = llvm::to_vector<4>(getResultSizes());
-  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
-  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
+  auto newResultTypes = llvm::map_to_vector(
+      getResults(), [](auto value) { return value.getType(); });
+  auto newResultSizes = llvm::to_vector(getResultSizes());
+  auto newOperandsValues = llvm::to_vector(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
 
-  auto newTiedOperandIndices =
-      llvm::to_vector<4>(getTiedResultOperandIndices());
+  auto newTiedOperandIndices = llvm::to_vector(getTiedResultOperandIndices());
   IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
   assert(getTiedOperandsIndexAndLength().first == 0 &&
@@ -2159,16 +2001,15 @@ IREE::Util::ClosureOpInterface
 AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  auto newResultTypes = llvm::to_vector<4>(getResultTypes());
-  auto newResultSizes = llvm::to_vector<4>(getResultSizes());
-  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
-  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
+  auto newResultTypes = llvm::to_vector(getResultTypes());
+  auto newResultSizes = llvm::to_vector(getResultSizes());
+  auto newOperandsValues = llvm::to_vector(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
 
-  auto newTiedOperandIndices =
-      llvm::to_vector<4>(getTiedResultOperandIndices());
+  auto newTiedOperandIndices = llvm::to_vector(getTiedResultOperandIndices());
   IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
   assert(getTiedOperandsIndexAndLength().first == 0 &&
@@ -2596,7 +2437,7 @@ static ParseResult parseDispatchFunctionResultList(
     OpAsmParser &parser, SmallVectorImpl<Type> &resultTypes,
     ArrayAttr &resultAttrs) {
   SmallVector<Attribute> resultAttrsVec;
-  SmallVector<int64_t, 4> tiedOperandIndices;
+  SmallVector<int64_t> tiedOperandIndices;
   do {
     Type type;
     if (failed(parser.parseType(type))) {
@@ -2946,10 +2787,10 @@ IREE::Util::ClosureOpInterface
 CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  SmallVector<Type, 4> newResultTypes;
-  SmallVector<Value, 4> newResultSizes;
-  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
-  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
+  SmallVector<Type> newResultTypes;
+  SmallVector<Value> newResultSizes;
+  auto newOperandsValues = llvm::to_vector(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
@@ -3048,7 +2889,7 @@ Value TimepointBarrierOp::getTiedResult(unsigned resultIndex) {
   return {0};
 }
 
-SmallVector<int64_t, 4> TimepointBarrierOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TimepointBarrierOp::getTiedResultOperandIndices() {
   return {0};
 }
 
@@ -3096,9 +2937,8 @@ LogicalResult TimepointAwaitOp::verify() {
   return {resultIndex};
 }
 
-SmallVector<int64_t, 4> TimepointAwaitOp::getTiedResultOperandIndices() {
-  return llvm::to_vector<4>(
-      llvm::seq<int64_t>(0, getResourceOperands().size()));
+SmallVector<int64_t> TimepointAwaitOp::getTiedResultOperandIndices() {
+  return llvm::to_vector(llvm::seq<int64_t>(0, getResourceOperands().size()));
 }
 
 //===----------------------------------------------------------------------===//

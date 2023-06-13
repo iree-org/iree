@@ -59,8 +59,13 @@ LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
 // `getSharedMemoryLimit` is for querying the shared memory limit (in bytes);
 // it takes the current entry function as the argument. 64KB will be used if
 // nullptr.
+// `getIndexBitwidth` is for querying the bitwidth for the `index` type.
+// This size is used to check the allocation space required for memrefs of
+// indices. If this function is nullptr, this pass will query the datalayout to
+// get the index size.
 std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
-    std::function<unsigned(func::FuncOp)> getSharedMemoryLimit = nullptr);
+    std::function<unsigned(func::FuncOp)> getSharedMemoryLimit = nullptr,
+    std::function<unsigned(func::FuncOp)> getIndexBitwidth = nullptr);
 
 /// Creates a pass to distribute scf.forall ops to GPU processors.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute();

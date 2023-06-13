@@ -238,53 +238,6 @@ def Stream_SubviewEffectOp : OpInterface<"SubviewEffectOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::Stream::BuiltinOpInterface
-//===----------------------------------------------------------------------===//
-
-def Stream_BuiltinOp : OpInterface<"BuiltinOpInterface"> {
-  let description = [{
-    Interface for ops that can be asynchronous executed in a streaming context.
-  }];
-
-  let methods = [
-    InterfaceMethod<
-      /*desc=*/[{
-        Merges the builtin module for the op into the target user module. By
-        doing a top level module merge the builtin can provide host functions
-        and multiple executables as needed.
-
-        This should not specialize the executable yet as callers currently
-        assume all builtin ops of the same type will have the same module IR.
-        If we want to specialize the executables based on usage we'll need a
-        more complex interface.
-
-        Fails if there's a name conflict; we have a __ prefix and things outside
-        the compiler shouldn't use it.
-      }],
-      /*retTy=*/"LogicalResult",
-      /*methodName=*/"mergeBuiltinModule",
-      /*args=*/(ins "Operation *":$targetOp, "OpBuilder &":$targetBuilder)
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Converts a stream.builtin.* op to its stream.async.* form. Any number of
-        ops may be inserted such as transfers and resource operations.
-
-        This is called in the stream.async.* phase of lowering and before
-        resource refinement or copy-on-write materialization has happened; this
-        enables the conversion to create new tensors as `!stream.resource<*>`.
-
-        The original op must remain valid after the call completes; the caller
-        of this needs to erase it themselves.
-      }],
-      /*retTy=*/"LogicalResult",
-      /*methodName=*/"convertBuiltinOp",
-      /*args=*/(ins "OpBuilder &":$builder)
-    >,
-  ];
-}
-
-//===----------------------------------------------------------------------===//
 // IREE::Stream::TimelineOpInterface
 //===----------------------------------------------------------------------===//
 

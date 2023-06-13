@@ -675,9 +675,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
       auto &bodyBlock = (*parsedModule)->getRegion(0).front();
       auto executableOps =
-          llvm::to_vector<4>(bodyBlock.getOps<IREE::HAL::ExecutableOp>());
+          llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableOp>());
       auto sourceOps =
-          llvm::to_vector<4>(bodyBlock.getOps<IREE::HAL::ExecutableSourceOp>());
+          llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableSourceOp>());
       size_t usableOpCount = executableOps.size() + sourceOps.size();
       if (usableOpCount != 1) {
         (*parsedModule)->emitError()
@@ -760,7 +760,7 @@ Error *Invocation::outputHALExecutable(Output &output) {
   auto &block = (*parsedModule)->getRegion(0).front();
   auto executableOp = *(block.getOps<IREE::HAL::ExecutableOp>().begin());
   auto binaryOps =
-      llvm::to_vector<4>(executableOp.getOps<IREE::HAL::ExecutableBinaryOp>());
+      llvm::to_vector(executableOp.getOps<IREE::HAL::ExecutableBinaryOp>());
   if (binaryOps.size() != 1) {
     executableOp.emitError() << "executable translation failed to "
                                 "produce exactly 1 binary for "

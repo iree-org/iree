@@ -28,7 +28,7 @@ namespace iree_compiler {
 /// Compose map with apply affine ops and try to simplify it.
 static void combineAndSimplifyMap(AffineMap &map, SmallVectorImpl<Value> &dims,
                                   SmallVectorImpl<Value> &symbols) {
-  SmallVector<Value, 4> operands(dims.begin(), dims.end());
+  SmallVector<Value> operands(dims.begin(), dims.end());
   operands.append(symbols.begin(), symbols.end());
   // Pull in affine.apply operations and compose them fully into the
   // result.
@@ -46,7 +46,7 @@ static AffineMap substituteMin(AffineMap map, SmallVectorImpl<Value> &dims,
                                SmallVectorImpl<Value> &symbols,
                                GetMinMaxExprFn getMinMaxExpr) {
   combineAndSimplifyMap(map, dims, symbols);
-  auto exprs = llvm::to_vector<4>(map.getResults());
+  auto exprs = llvm::to_vector(map.getResults());
   for (AffineExpr &expr : exprs) {
     bool substituted = true;
     while (substituted) {
@@ -117,8 +117,8 @@ static bool alwaysRunsFirstIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   // Calculate the minimum value of ub - lb. If it is strictly positive it
   // means the loop will always run at least once.
   MLIRContext *ctx = op->getContext();
-  SmallVector<Value, 4> dims;
-  SmallVector<Value, 4> symbols;
+  SmallVector<Value> dims;
+  SmallVector<Value> symbols;
   AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
   dims.push_back(op.getLowerBound());
   AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
@@ -139,8 +139,8 @@ static bool neverRunsSecondIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   // Calculate the minimum of lb + step - ub. If it is positive it means the
   // loop never run more than once.
   MLIRContext *ctx = op->getContext();
-  SmallVector<Value, 4> dims;
-  SmallVector<Value, 4> symbols;
+  SmallVector<Value> dims;
+  SmallVector<Value> symbols;
   AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
   dims.push_back(op.getLowerBound());
   AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
@@ -176,7 +176,7 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
 
     // The first iteration is always run and the second iteration is never run
     // so the loop always have 1 iteration. Inline its body and remove the loop.
-    SmallVector<Value, 4> blockArgs;
+    SmallVector<Value> blockArgs;
     blockArgs.reserve(op.getNumIterOperands() + 1);
     blockArgs.push_back(op.getLowerBound());
     llvm::append_range(blockArgs, op.getIterOperands());

@@ -57,7 +57,6 @@ iree_cc_binary(
     benchmark
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::hal::types
     iree::tooling::context_util
@@ -77,7 +76,6 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::testing::benchmark
@@ -96,10 +94,8 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::check
     iree::testing::gtest
@@ -178,7 +174,6 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::tooling::context_util
     iree::tooling::run_module
@@ -194,7 +189,6 @@ iree_cc_binary(
     iree::base
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::tooling::device_util
@@ -215,7 +209,6 @@ iree_cc_binary(
     iree::base::internal::cpu
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::tooling::device_util
@@ -300,7 +293,6 @@ if(IREE_BUILD_COMPILER)
     DEPS
       iree::base
       iree::base::internal::flags
-      iree::base::tracing
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
       iree::hal

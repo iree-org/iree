@@ -12,7 +12,6 @@
 #include "experimental/rocm/pipeline_layout.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"

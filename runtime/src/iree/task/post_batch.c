@@ -12,7 +12,6 @@
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/tracing.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/queue.h"
 #include "iree/task/worker.h"
@@ -98,7 +97,7 @@ void iree_task_post_batch_enqueue(iree_task_post_batch_t* post_batch,
 static void iree_task_post_batch_wake_workers(
     iree_task_post_batch_t* post_batch, iree_task_affinity_set_t wake_mask) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, iree_math_count_ones_u64(wake_mask));
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, iree_math_count_ones_u64(wake_mask));
 
   // TODO(#4016): use a FUTEX_WAKE_BITSET here to wake all of the workers that
   // have pending work in a single syscall (vs. popcnt(worker_pending_mask)

@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/semaphore_base.h"
 
 typedef struct iree_hal_cuda_semaphore_t {

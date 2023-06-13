@@ -30,6 +30,7 @@ static bool isContiguousStore(Operation* write) {
   if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(write)) {
     if (!transferWrite.getPermutationMap().isMinorIdentity() ||
         !transferWrite.isDimInBounds(0) || transferWrite.getMask()) {
+      LDBG("--not a contiguous store op: " << *write);
       return false;
     }
     return true;
@@ -37,6 +38,7 @@ static bool isContiguousStore(Operation* write) {
   if (isa<vector::StoreOp>(write)) {
     return true;
   }
+  LDBG("--not a store op: " << write->getName().getStringRef());
   return false;
 }
 
@@ -44,6 +46,7 @@ static bool isContiguousRead(Operation* read) {
   if (auto transferRead = dyn_cast<vector::TransferReadOp>(read)) {
     if (!transferRead.isDimInBounds(0) ||
         !transferRead.getPermutationMap().isMinorIdentity()) {
+      LDBG("--not a contiguous load op: " << *read);
       return false;
     }
     return true;
@@ -51,6 +54,7 @@ static bool isContiguousRead(Operation* read) {
   if (isa<vector::LoadOp>(read)) {
     return true;
   }
+  LDBG("--not a load op: " << read->getName().getStringRef());
   return false;
 }
 
@@ -149,10 +153,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
   llvm::SmallSetVector<Operation*, 16> copyToSharedMem;
   // Look for all the copy that can be converted to async copy ops.
   funcOp.walk([&](Operation* writeOp) {
-    if (!isContiguousStore(writeOp)) {
-      LDBG("--not a contiguous store: " << *writeOp);
-      return WalkResult::advance();
-    }
+    if (!isContiguousStore(writeOp)) return WalkResult::advance();
     LDBG("--candidate writeOp: " << *writeOp);
     Value vectorVal = getValueStored(writeOp);
     if (llvm::cast<VectorType>(vectorVal.getType()).getRank() != 1) {

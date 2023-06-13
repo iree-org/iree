@@ -63,6 +63,11 @@ static llvm::cl::opt<unsigned> clResourceIndexBits(
     "iree-stream-resource-index-bits",
     llvm::cl::desc("Bit width of indices used to reference resource offsets."),
     llvm::cl::init(32));
+static llvm::cl::opt<bool> clResourceAliasMutableBindings(
+    "iree-stream-resource-alias-mutable-bindings",
+    llvm::cl::desc(
+        "Fuses bindings that are mutable instead of leaving them split."),
+    llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
@@ -77,6 +82,7 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
   int64_t maxBufferRange = 0;
   int64_t minBufferRangeAlignment = 0;
   int64_t indexBits = 32;
+  bool aliasMutableBindings = false;
   while (failed(p.parseOptionalRBrace())) {
     StringRef key;
     int64_t value = 0;
@@ -94,14 +100,16 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
       minBufferRangeAlignment = value;
     } else if (key == "index_bits") {
       indexBits = value;
+    } else if (key == "alias_mutable_bindings") {
+      aliasMutableBindings = (bool)value;
     }
     (void)p.parseOptionalComma();
   }
   if (failed(p.parseGreater())) return {};
 
-  return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
-                                 minBufferOffsetAlignment, maxBufferRange,
-                                 minBufferRangeAlignment, indexBits);
+  return ResourceConfigAttr::get(
+      p.getContext(), maxAllocationSize, minBufferOffsetAlignment,
+      maxBufferRange, minBufferRangeAlignment, indexBits, aliasMutableBindings);
 }
 
 void ResourceConfigAttr::print(AsmPrinter &p) const {
@@ -112,7 +120,8 @@ void ResourceConfigAttr::print(AsmPrinter &p) const {
      << ", ";
   os << "max_buffer_range = " << getMaxBufferRange() << ", ";
   os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment() << ", ";
-  os << "index_bits = " << getIndexBits();
+  os << "index_bits = " << getIndexBits() << ", ";
+  os << "alias_mutable_bindings = " << getAliasMutableBindings();
   os << "}>";
 }
 
@@ -130,7 +139,8 @@ ResourceConfigAttr ResourceConfigAttr::intersectBufferConstraints(
       std::min(lhs.getMaxBufferRange(), rhs.getMaxBufferRange()),
       std::max(lhs.getMinBufferRangeAlignment(),
                rhs.getMinBufferRangeAlignment()),
-      std::max(lhs.getIndexBits(), rhs.getIndexBits()));
+      std::max(lhs.getIndexBits(), rhs.getIndexBits()),
+      rhs.getAliasMutableBindings() && lhs.getAliasMutableBindings());
 }
 
 // static
@@ -141,7 +151,8 @@ ResourceConfigAttr ResourceConfigAttr::getDefaultHostConstraints(
   // only use this during testing by ensuring affinities are always assigned.
   return ResourceConfigAttr::get(
       context, clResourceMaxAllocationSize, clResourceMinOffsetAlignment,
-      clResourceMaxRange, clResourceMinOffsetAlignment, clResourceIndexBits);
+      clResourceMaxRange, clResourceMinOffsetAlignment, clResourceIndexBits,
+      clResourceAliasMutableBindings);
 }
 
 // static
