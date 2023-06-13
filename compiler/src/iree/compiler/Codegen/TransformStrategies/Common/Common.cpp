@@ -24,6 +24,7 @@ using namespace mlir;
 
 #define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
@@ -107,9 +108,8 @@ void mlir::iree_compiler::createTransformRegion(
         b.create<transform::YieldOp>(loc);
       });
   (void)sequence;
-  LLVM_DEBUG(DBGS() << "transformation script:\n");
-  LLVM_DEBUG(DBGS() << "verification: " << sequence.verify().succeeded()
-                    << "\n");
+  LDBG("transformation script:\n");
+  LDBG("verification: " << sequence.verify().succeeded() << "\n");
   LLVM_DEBUG(sequence.print(DBGS()));
 }
 
@@ -291,23 +291,26 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
 }
 
 Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
-    ImplicitLocOpBuilder &b, Value containingOpH) {
+    ImplicitLocOpBuilder &b, Value containingOpH, bool cleanup) {
+  // TODO: avoid functional style transform so we can apply to the variant.
   b.create<transform::ApplyPatternsOp>(
       containingOpH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(loc);
       });
-  b.create<transform::ApplyPatternsOp>(
-      containingOpH, [](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
-        b.create<transform::ApplyFoldUnitExtentDimsViaSlicesPatternsOp>(loc);
-        b.create<IREE::transform_dialect::
-                     ApplyFoldReshapeIntoTensorHalInterfacePatternsOp>(loc);
-      });
+  if (cleanup) {
+    b.create<transform::ApplyPatternsOp>(
+        containingOpH, [](OpBuilder &b, Location loc) {
+          b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
+          b.create<transform::ApplyFoldUnitExtentDimsViaSlicesPatternsOp>(loc);
+          b.create<IREE::transform_dialect::
+                       ApplyFoldReshapeIntoTensorHalInterfacePatternsOp>(loc);
+        });
+  }
   return containingOpH;
 }
 
 Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
-    ImplicitLocOpBuilder &b, Value containingOpH) {
+    ImplicitLocOpBuilder &b, Value containingOpH, bool cleanup) {
   b.create<transform::ApplyPatternsOp>(
       containingOpH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyLowerMasksPatternsOp>(loc);
@@ -316,7 +319,7 @@ Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
       containingOpH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyMaterializeMasksPatternsOp>(loc);
       });
-  {
+  if (cleanup) {
     iree_compiler::buildCanonicalizationAndEnablingTransforms(
         b, containingOpH, [](OpBuilder &b, Location loc) {
           b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);

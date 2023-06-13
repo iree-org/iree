@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -28,6 +29,7 @@ using namespace mlir;
 
 #define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 // TODO: significantly better namespacing.
 using iree_compiler::buildPad;
@@ -46,6 +48,7 @@ using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
+using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::MatchOp;
@@ -53,83 +56,46 @@ using transform_ext::RegisterMatchCallbacksOp;
 
 /// Options to set the default values of the matmul strategy.
 
-/// Block tile size X, Y, Z.
-static llvm::cl::opt<int64_t> clBlockTileSizeX(
-    "td-matmul-strategy-blk-size-x",
-    llvm::cl::desc("block tile size for dim X (x,y,z) for the transform "
+static llvm::cl::list<int64_t> clBlockTileSizes(
+    "td-matmul-strategy-blk-sizes",
+    llvm::cl::desc("block tile size for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::init(128));
-static llvm::cl::opt<int64_t> clBlockTileSizeY(
-    "td-matmul-strategy-blk-size-y",
-    llvm::cl::desc("block tile size for dim Y (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(128));
-static llvm::cl::opt<int64_t> clBlockTileSizeZ(
-    "td-matmul-strategy-blk-size-z",
-    llvm::cl::desc("block tile size for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
+    llvm::cl::list_init(ArrayRef<int64_t>{128, 128, 1}),
+    llvm::cl::CommaSeparated);
 static llvm::cl::opt<int64_t> clReductionTileSize(
     "td-matmul-strategy-reduc-size",
     llvm::cl::desc(
         "reduction tile sized for the transform dialect matmul strategy"),
     llvm::cl::init(16));
-
-/// Number of threads X, Y, Z.
-static llvm::cl::opt<int64_t> clNumThreadsX(
-    "td-matmul-strategy-num-threads-x",
-    llvm::cl::desc("number of threads for dim X (x,y,z) for the transform "
+static llvm::cl::list<int64_t> clNumThreads(
+    "td-matmul-strategy-num-threads",
+    llvm::cl::desc("number of threads for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::init(64));
-static llvm::cl::opt<int64_t> clNumThreadsY(
-    "td-matmul-strategy-num-threads-y",
-    llvm::cl::desc("number of threads for dim Y (x,y,z) for the transform "
+    llvm::cl::list_init(ArrayRef<int64_t>{64, 2, 1}), llvm::cl::CommaSeparated);
+static llvm::cl::list<int64_t> clNumWarps(
+    "td-matmul-strategy-num-warps",
+    llvm::cl::desc("number of warps for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumThreadsZ(
-    "td-matmul-strategy-num-threads-z",
-    llvm::cl::desc("number of threads for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
-/// Number of warps X, Y, Z.
-static llvm::cl::opt<int64_t> clNumWarpsX(
-    "td-matmul-strategy-num-warps-x",
-    llvm::cl::desc("number of warps for dim X (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumWarpsY(
-    "td-matmul-strategy-num-warps-y",
-    llvm::cl::desc("number of warps for dim Y (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumWarpsZ(
-    "td-matmul-strategy-num-warps-z",
-    llvm::cl::desc("number of warps for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
+    llvm::cl::list_init(ArrayRef<int64_t>{2, 2, 1}), llvm::cl::CommaSeparated);
 static llvm::cl::opt<bool> clUseAsyncCopies(
     "td-matmul-strategy-use-async-copies",
     llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
     llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clUseMmaSync(
     "td-matmul-strategy-use-mma-sync",
     llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
-    llvm::cl::init(false));
-
+    llvm::cl::init(true));
 static llvm::cl::opt<int64_t> clPipelineDepth(
     "td-matmul-strategy-pipeline-depth",
     llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"),
     llvm::cl::init(3));
 
 void MatmulStrategy::initDefaultValues() {
-  blockTileSizes = {clBlockTileSizeX, clBlockTileSizeY, clBlockTileSizeZ};
+  blockTileSizes =
+      SmallVector<int64_t>{clBlockTileSizes.begin(), clBlockTileSizes.end()};
+  numThreads = SmallVector<int64_t>{clNumThreads.begin(), clNumThreads.end()};
+  numWarps = SmallVector<int64_t>{clNumWarps.begin(), clNumWarps.end()};
   reductionTileSize = clReductionTileSize;
-  numThreads = {clNumThreadsX, clNumThreadsY, clNumThreadsZ};
-  numWarps = {clNumWarpsX, clNumThreadsY, clNumThreadsZ};
   useAsyncCopies = clUseAsyncCopies;
   useMmaSync = clUseMmaSync;
   pipelineDepth = clPipelineDepth;
@@ -139,12 +105,32 @@ void MatmulStrategy::initDefaultValues() {
   paddingValues = {0.0f, 0.0f, 0.0f};
   paddingDimensions = {0, 1, 2};
   packingDimensions = {1, 1, 1};
+
+  if (!clBlockTileSizes.isDefaultAssigned() ||
+      !clNumThreads.isDefaultAssigned() || !clNumWarps.isDefaultAssigned() ||
+      reductionTileSize != clReductionTileSize.getDefault().getValue() ||
+      useAsyncCopies != clUseAsyncCopies.getDefault().getValue() ||
+      useMmaSync != clUseMmaSync.getDefault().getValue() ||
+      pipelineDepth != clPipelineDepth.getDefault().getValue()) {
+    cliOptionsSpecified = true;
+  }
 }
 
 LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
 
+void mlir::iree_compiler::gpu::AbstractGemmLikeStrategy::MappingInfo::print(
+    llvm::raw_ostream &os) const {
+  os << "MappingInfo{";
+  llvm::interleaveComma(numThreads, os << "numThreads: {");
+  llvm::interleaveComma(tileSizes, os << "}, tileSizes: {");
+  llvm::interleaveComma(threadMapping, os << "}, threadMapping: {");
+  os << "}}";
+}
+
 void MatmulStrategy::print(llvm::raw_ostream &os) const {
   os << "\n--- Matmul strategy ---\n";
+  os << "- forced by CLI specification: "
+     << (cliOptionsSpecified ? "true" : "false") << "\n";
   os << "- block tile sizes: {";
   bool isFirst = true;
   for (int64_t blockTileSize : blockTileSizes) {
@@ -172,10 +158,21 @@ void MatmulStrategy::print(llvm::raw_ostream &os) const {
     isFirst = false;
   }
   os << "}\n";
-
   os << "- use async copies: " << useAsyncCopies << '\n';
   os << "- use mma sync: " << useMmaSync << '\n';
   os << "- pipeline depth: " << pipelineDepth << '\n';
+
+  os << "\n-- Derived quantities --\n";
+  os << "- lhs copy:\n";
+  os << "    -> vector size (num elements): " << lhsCopyVectorSize() << '\n';
+  lhsCopyMapping().print(os << "    -> ");
+  os << "\n- rhs copy:\n";
+  os << "    -> vector size (num elements): " << rhsCopyVectorSize() << '\n';
+  rhsCopyMapping().print(os << "    -> ");
+  os << "\n- res copy:\n";
+  os << "    -> vector size (num elements): " << resCopyVectorSize() << '\n';
+  resCopyMapping().print(os << "    -> ");
+  os << "\n";
 }
 
 static std::tuple<Value, Value, Value, Value>
@@ -213,10 +210,12 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
 
 void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
     ImplicitLocOpBuilder &b, Value variantH, const MatmulStrategy &strategy) {
-  assert(strategy.totalNumThreads() ==
-             strategy.totalNumWarps() * kCudaWarpSize &&
-         "Number of threads specified by warps must match total number of "
-         "threads");
+  if (failed(strategy.validate())) {
+    strategy.print(llvm::errs());
+    assert(false && "invalid strategy");
+  }
+  LLVM_DEBUG(strategy.print(DBGS()));
+
   // Step 1. Apply block-level part of the strategy, keeps everything fused.
   auto [fillH, matmulH, maybeTiledTrailingHBlock, forall] =
       buildMatmulStrategyBlockDistribution(b, variantH, strategy);
@@ -276,6 +275,7 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
                                     strategy.numWarps);
+  funcH = b.create<EliminateGpuBarriersOp>(funcH);
 
   // Step 9. Convert to tensor core ops.
   // TODO: avoid consuming handles and returning here.
@@ -283,14 +283,15 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   if (strategy.useAsyncCopies) {
     // Step 10. Multi-buffering.
-    buildMultiBuffering(b, funcH, strategy);
+    if (strategy.pipelineDepth > 1) buildMultiBuffering(b, funcH, strategy);
 
     // Step 11. Convert to async copies.
     // TODO: avoid consuming handles and returning here.
     funcH = buildConvertToAsyncCopies(b, funcH, strategy);
 
     // Step 12. Pipeline shared memory copies.
-    buildPipelineSharedMemoryCopies(b, funcH, strategy);
+    if (strategy.pipelineDepth > 1)
+      buildPipelineSharedMemoryCopies(b, funcH, strategy);
   }
 
   // Step 13. Late lowerings and cleanups.

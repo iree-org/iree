@@ -52,6 +52,7 @@ using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
 using iree_compiler::gpu::GPUModel;
 using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
+using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
@@ -59,6 +60,7 @@ using iree_compiler::IREE::transform_dialect::
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
+using iree_compiler::IREE::transform_dialect::SynchronizeLoopOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
 using transform::RewriteInDestinationPassingStyleOp;
@@ -507,7 +509,7 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // TODO: don't rematch, apply on the variant op directly.
   Value funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH);
+  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 
   // Apply vectorization + cleanups to what remains.
   funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true);
@@ -547,6 +549,20 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
       config.unrollVectorsGpuWmma = true;
     b.create<ApplyPatternsOp>(funcH, config);
   }
+
+  Value forH = b.create<transform::MatchOp>(
+      transform::OperationType::get(b.getContext(), "scf.for"), funcH,
+      b.getStrArrayAttr({scf::ForOp::getOperationName()}),
+      /*matchInterfaceEnum=*/transform::MatchInterfaceEnumAttr(),
+      /*opAttrs=*/DictionaryAttr(),
+      /*filterResultType=*/TypeAttr());
+  // TODO: At this time, this synchronization is needed for applying the
+  // HoistRedundantVectorTransfersOp transform correctly. This is because the
+  // transform does not take parallelism into accound.
+  // In the future, HoistRedundantVectorTransfersOp + SynchronizeLoopOp need to
+  // be replaced by a single transform.
+  b.create<SynchronizeLoopOp>(forH);
+
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
       transform::AnyOpType::get(b.getContext()), funcH);
@@ -560,6 +576,9 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
     vectorToMMaConversionOp.setUseMmaSync(true);
   else
     vectorToMMaConversionOp.setUseWmma(true);
+
+  // Post-hoc elimiation of barriers.
+  funcH = b.create<EliminateGpuBarriersOp>(funcH);
   return funcH;
 }
 
@@ -630,6 +649,7 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
       transform::AnyOpType::get(b.getContext()), forOpH);
   // TODO: depth from strategy, or directly from individual buffers.
   pipelineOp.setDepth(strategy.pipelineDepth);
+  pipelineOp.setUseMmaSync(strategy.useMmaSync);
 }
 
 Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,

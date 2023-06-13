@@ -12,6 +12,8 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/AbstractGemmLikeStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/MathExtras.h"
 
 namespace llvm {
 class raw_ostream;
@@ -27,7 +29,10 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
  public:
   MatmulStrategy(MLIRContext *context,
                  const transform_ext::MatchedMatmulCaptures &captures)
-      : AbstractGemmLikeStrategy(), ctx(context), captures(captures) {
+      : AbstractGemmLikeStrategy(),
+        ctx(context),
+        captures(captures),
+        cliOptionsSpecified(false) {
     initDefaultValues();
   }
 
@@ -38,6 +43,13 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   MLIRContext *ctx;
   transform_ext::MatchedMatmulCaptures captures;
 
+  /// Encodes whether the user has specified any CLI options. When true, the
+  /// strategy should just run what was specified and is not allowed to
+  /// override the user's choices.
+  bool cliOptionsSpecified;
+
+  /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
+  /// default CLI values have been overriden.
   void initDefaultValues();
 
   LogicalResult verify() const;
@@ -64,6 +76,15 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     return blockTileSizes[1];
   }
 
+  int64_t numWarpsM() const override {
+    assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
+    return numWarps[0];
+  }
+  int64_t numWarpsN() const override {
+    assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
+    return numWarps[1];
+  }
+
   using AbstractGemmLikeStrategy::MappingInfo;
 
   MappingInfo getBlockMapping() const override {
@@ -74,62 +95,170 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // LHS copy is of size mxk.
   MappingInfo lhsCopyMapping() const override {
-    assert(reductionTileSize % lhsCopyVectorSize() == 0 &&
-           "vector size must divide reductionTileSize");
-    int64_t numThreadsK = reductionTileSize / lhsCopyVectorSize();
-    assert(totalNumThreads() % numThreadsK == 0 &&
-           "num threads must be divisible by num threads along k");
-    int64_t numThreadsM = totalNumThreads() / numThreadsK;
-    assert(blockTileM() % numThreadsM == 0 &&
-           "blockTileSizes[0] must be divisible by numThreadsM");
-    assert(reductionTileSize % numThreadsK == 0 &&
-           "reductionTileSize must be divisible by numThreadsK");
-    return MappingInfo{
-        /*numThreads=*/{numThreadsM, numThreadsK},
-        /*tileSizes=*/
-        {blockTileM() / numThreadsM, reductionTileSize / numThreadsK},
-        /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
+    int64_t numThreadsK = mlir::ceilDiv(reductionTileSize, lhsCopyVectorSize());
+    int64_t numThreadsM =
+        std::min(blockTileM(), mlir::ceilDiv(totalNumThreads(), numThreadsK));
+    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsK},
+                       /*tileSizes=*/
+                       {mlir::ceilDiv(blockTileM(), numThreadsM),
+                        mlir::ceilDiv(reductionTileSize, numThreadsK)},
+                       /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
   }
+
+  LogicalResult validateLhsCopyMapping() const override {
+    MappingInfo mapping = lhsCopyMapping();
+    // It is fine to use fewer threads to copy the LHS.
+    if (totalNumThreads() < mapping.numThreads[0] * mapping.numThreads[1]) {
+      llvm::errs() << "too many threads used for transferring lhs: "
+                   << mapping.numThreads[0] << " * " << mapping.numThreads[1]
+                   << " > " << totalNumThreads() << "\n";
+      return failure();
+    }
+    return success();
+  }
+
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
-    assert(blockTileN() % rhsCopyVectorSize() == 0 &&
-           "vector size must divide blockTileSizes[1]");
-    int64_t numThreadsN = blockTileN() / rhsCopyVectorSize();
-    assert(totalNumThreads() % numThreadsN == 0 &&
-           "num threads must be divisible by num threads along n");
-    int64_t numThreadsK = totalNumThreads() / numThreadsN;
-    assert(reductionTileSize % numThreadsK == 0 &&
-           "blockTileSizes[0] must be divisible by numThreadsK");
-    assert(blockTileN() % numThreadsN == 0 &&
-           "reductionTileSize must be divisible by numThreadsN");
-    return MappingInfo{
-        /*numThreads=*/{numThreadsK, numThreadsN},
-        /*tileSizes=*/
-        {reductionTileSize / numThreadsK, blockTileN() / numThreadsN},
-        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
-  }
-  // RES copy is of size mxn.
-  MappingInfo resCopyMapping() const override {
-    assert(blockTileN() % resCopyVectorSize() == 0 &&
-           "vector size must divide n");
-    int64_t numThreadsN = blockTileSizes[1] / resCopyVectorSize();
-    assert(totalNumThreads() % numThreadsN == 0 &&
-           "num threads must be divisible by num threads along n");
-    int64_t numThreadsM = totalNumThreads() / numThreadsN;
-    assert(blockTileM() % numThreadsM == 0 &&
-           "blockTileSizes[0] must be divisible by numThreadsM");
-    assert(blockTileN() % numThreadsN == 0 &&
-           "blockTileSizes[1] must be divisible by numThreadsN");
-    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
+    int64_t numThreadsN = mlir::ceilDiv(blockTileN(), rhsCopyVectorSize());
+    int64_t numThreadsK = std::min(
+        reductionTileSize, mlir::ceilDiv(totalNumThreads(), numThreadsN));
+    return MappingInfo{/*numThreads=*/{numThreadsK, numThreadsN},
                        /*tileSizes=*/
-                       {blockTileM() / numThreadsM, blockTileN() / numThreadsN},
+                       {mlir::ceilDiv(reductionTileSize, numThreadsK),
+                        mlir::ceilDiv(blockTileN(), numThreadsN)},
                        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
+
+  LogicalResult validateRhsCopyMapping() const override {
+    MappingInfo mapping = rhsCopyMapping();
+    // It is fine to use fewer threads to copy the RHS.
+    if (totalNumThreads() < mapping.numThreads[0] * mapping.numThreads[1]) {
+      llvm::errs() << "too many threads used for transferring rhs: "
+                   << mapping.numThreads[0] << " * " << mapping.numThreads[1]
+                   << " > " << totalNumThreads() << "\n";
+      return failure();
+    }
+    return success();
+  }
+
+  // RES copy is of size mxn.
+  MappingInfo resCopyMapping() const override {
+    int64_t numThreadsN = mlir::ceilDiv(blockTileN(), resCopyVectorSize());
+    int64_t numThreadsM =
+        std::min(blockTileM(), mlir::ceilDiv(totalNumThreads(), numThreadsN));
+    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
+                       /*tileSizes=*/
+                       {std::max(1l, mlir::ceilDiv(blockTileM(), numThreadsM)),
+                        std::max(1l, mlir::ceilDiv(blockTileN(), numThreadsN))},
+                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+  }
+
+  LogicalResult validateResCopyMapping() const override {
+    MappingInfo mapping = resCopyMapping();
+    // It is fine to use fewer threads to copy the RES.
+    if (totalNumThreads() < mapping.numThreads[0] * mapping.numThreads[1]) {
+      llvm::errs() << "too many threads used for transferring res: "
+                   << mapping.numThreads[0] << " * " << mapping.numThreads[1]
+                   << " > " << totalNumThreads() << "\n";
+      return failure();
+    }
+    return success();
+  }
+
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {
-    return MappingInfo{/*numThreads=*/{numWarps[0], numWarps[1]},
+    // Warps along M and N need to properly be ordered along the X and Y
+    // dimensions respectively, otherwise we would improperly generate
+    // predicated code.
+    return MappingInfo{/*numThreads=*/{numWarpsM(), numWarpsN()},
                        /*tileSizes=*/{},
-                       /*threadMapping=*/{warpY(ctx), warpX(ctx)}};
+                       /*threadMapping=*/{warpX(ctx), warpY(ctx)}};
+  }
+
+  LogicalResult validate() const override {
+    if (totalNumThreads() != totalNumWarps() * kCudaWarpSize) {
+      llvm::errs() << "Number of threads specified by warps must match total "
+                      "number of threads\n";
+      return failure();
+    }
+    if (m() < blockTileM()) {
+      llvm::errs() << "m(" << m() << ") < blockTileM(" << blockTileM() << ") ";
+      llvm::errs() << "this is at risk of not vectorizing and is NYI";
+      return failure();
+    }
+    if (n() < blockTileN()) {
+      llvm::errs() << "n(" << n() << ") < blockTileN(" << blockTileN() << ") ";
+      llvm::errs() << "this is at risk of not vectorizing and is NYI";
+      return failure();
+    }
+    if (k() < reductionTileSize) {
+      llvm::errs() << "k(" << k() << ") < reductionTileSize("
+                   << reductionTileSize << ") ";
+      llvm::errs() << "this is at risk of not vectorizing and is NYI";
+      return failure();
+    }
+
+    if (failed(validateLhsCopyMapping())) {
+      llvm::errs() << "invalid lhs copy mapping";
+      return failure();
+    }
+    if (failed(validateRhsCopyMapping())) {
+      llvm::errs() << "invalid rhs copy mapping";
+      return failure();
+    }
+    if (failed(validateResCopyMapping())) {
+      llvm::errs() << "invalid res copy mapping";
+      return failure();
+    }
+
+    if (pipelineDepth > 1 && reductionTileSize * pipelineDepth > k()) {
+      llvm::errs() << "pipeline depth too large for reduction tile size";
+      return failure();
+    }
+    if (useMmaSync) {
+      if (blockTileM() < kMinMmaSyncMinM) {
+        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinM
+                     << " block tile size in M";
+        return failure();
+      }
+      if (blockTileN() < kMinMmaSyncMinN) {
+        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinN
+                     << " block tile size in N";
+        return failure();
+      }
+      if (reductionTileSize < kMinMmaSyncMinK) {
+        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinK
+                     << " block tile size in K";
+        return failure();
+      }
+      if (pipelineDepth > 1 && pipelineDepth < kMinMmaSyncPipelineDepth) {
+        llvm::errs() << "mma.sync pipelining requires at least "
+                     << kMinMmaSyncPipelineDepth << " stages";
+        return failure();
+      }
+      if (pipelineDepth > 1 && reductionTileSize * kMinMmaSyncGroups > k()) {
+        llvm::errs() << "mma.sync pipelining requires at least "
+                     << kMinMmaSyncGroups << " k groups";
+        return failure();
+      }
+    } else {
+      if (blockTileM() < kMinWmmaMinM) {
+        llvm::errs() << "wmma requires at least " << kMinWmmaMinM
+                     << " block tile size in M";
+        return failure();
+      }
+      if (blockTileN() < kMinWmmaMinN) {
+        llvm::errs() << "wmma requires at least " << kMinWmmaMinN
+                     << " block tile size in N";
+        return failure();
+      }
+      if (reductionTileSize < kMinWmmaMinK) {
+        llvm::errs() << "wmma requires at least " << kMinWmmaMinK
+                     << " block tile size in K";
+        return failure();
+      }
+    }
+    return success();
   }
 
   void print(llvm::raw_ostream &os) const;
