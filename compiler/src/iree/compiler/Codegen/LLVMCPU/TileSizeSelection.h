@@ -20,11 +20,8 @@ class TilingConfig {
  public:
   TilingConfig(IREE::Codegen::LoweringConfigAttr lc) : loweringConfig(lc) {
     // Initialize indices to invalid.
-    constexpr unsigned invalidIdx = std::numeric_limits<unsigned>::max();
-    int numTileLevels = loweringConfig.getTileSizes().size();
-    for (int i = 0; i < (int)TilingLevel::MaxNumTileLevels; ++i) {
-      tilingLevelToActualLevelMap[i] = (unsigned)invalidIdx;
-    }
+    std::fill(tilingLevelToActualLevelMap.begin(),
+              tilingLevelToActualLevelMap.end(), InvalidLevel);
 
     // Map the tiling levels that are defined in the actual configuration to
     // their corresponding incremental levels. We currently support the
@@ -34,18 +31,19 @@ class TilingConfig {
     //   3. [[distribution], [vector-parallel], [vector-reduction]]
     //   4. [[distribution], [cache-parallel], [cache-reduction],
     //       [vector-parallel], [vector-reduction]]
+    int numTileLevels = loweringConfig.getTileSizes().size();
     switch (numTileLevels) {
       case 3:
-        tilingLevelToActualLevelMap[(int)TilingLevel::VectorReductionTiles] = 2;
+        tilingLevelToActualLevelMap[VectorReductionTiles] = 2;
         [[fallthrough]];
       case 2:
-        tilingLevelToActualLevelMap[(int)TilingLevel::VectorParallelTiles] = 1;
+        tilingLevelToActualLevelMap[VectorParallelTiles] = 1;
         [[fallthrough]];
       case 1:
-        tilingLevelToActualLevelMap[(int)TilingLevel::DistributionTiles] = 0;
+        tilingLevelToActualLevelMap[DistributionTiles] = 0;
         break;
-      case (int)TilingLevel::MaxNumTileLevels:
-        for (int i = 0; i < (int)TilingLevel::MaxNumTileLevels; ++i) {
+      case MaxNumTileLevels:
+        for (int i = 0; i < MaxNumTileLevels; ++i) {
           tilingLevelToActualLevelMap[i] = i;
         }
         break;
@@ -71,22 +69,22 @@ class TilingConfig {
 
   /// Returns the tiling level for cache parallel dimensions.
   unsigned getCacheParallelLevel() {
-    return getActualLevel(TilingLevel::CacheParallelTiles);
+    return getActualLevel(CacheParallelTiles);
   }
 
   /// Returns the tiling level for cache reduction dimensions.
   unsigned getCacheReductionLevel() {
-    return getActualLevel(TilingLevel::CacheReductionTiles);
+    return getActualLevel(CacheReductionTiles);
   }
 
   /// Returns the tiling level for vector parallel dimensions.
   unsigned getVectorParallelLevel() {
-    return getActualLevel(TilingLevel::VectorParallelTiles);
+    return getActualLevel(VectorParallelTiles);
   }
 
   /// Returns the tiling level for vector parallel dimensions.
   unsigned getVectorReductionLevel() {
-    return getActualLevel(TilingLevel::VectorReductionTiles);
+    return getActualLevel(VectorReductionTiles);
   }
 
   /// Returns all the tile sizes of all the levels of the configuration.
@@ -94,8 +92,7 @@ class TilingConfig {
 
   /// Returns the distribution tile sizes of the configuration.
   SmallVector<int64_t> getDistributionTileSizes() {
-    return loweringConfig.getTileSizeVals(
-        getActualLevel(TilingLevel::DistributionTiles));
+    return loweringConfig.getTileSizeVals(getActualLevel(DistributionTiles));
   }
 
   SmallVector<int64_t> getCacheReductionSizes() {
@@ -157,7 +154,7 @@ class TilingConfig {
  private:
   /// Internal representation for all the supported tiling levels. All or just
   /// a subset of them may be available in a valid configuration.
-  enum class TilingLevel {
+  enum TilingLevel : unsigned {
     DistributionTiles = 0,
     CacheParallelTiles = 1,
     CacheReductionTiles = 2,
@@ -169,10 +166,9 @@ class TilingConfig {
 
   /// Returns the actual level in the configuration for this level of tiling.
   unsigned getActualLevel(TilingLevel level) {
-    assert(level < TilingLevel::InvalidLevel &&
-           "Unexpected invalid tiling level");
-    unsigned actualLevel = tilingLevelToActualLevelMap[(unsigned)level];
-    assert(actualLevel != (unsigned)TilingLevel::InvalidLevel &&
+    assert(level < InvalidLevel && "Unexpected invalid tiling level");
+    unsigned actualLevel = tilingLevelToActualLevelMap[level];
+    assert(actualLevel != InvalidLevel &&
            "Searching for unavailable tiling level");
     return actualLevel;
   }
@@ -181,7 +177,7 @@ class TilingConfig {
   IREE::Codegen::LoweringConfigAttr loweringConfig;
 
   /// Maps `TilingLevel`'s to the actual number of levels in this configuration.
-  std::array<unsigned, (size_t)TilingLevel::MaxNumTileLevels>
+  std::array<unsigned, TilingLevel::MaxNumTileLevels>
       tilingLevelToActualLevelMap;
 };
 
