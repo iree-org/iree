@@ -382,6 +382,17 @@ function(iree_add_data_dependencies)
 endfunction()
 
 #-------------------------------------------------------------------------------
+# iree_make_empty_file
+#-------------------------------------------------------------------------------
+
+# Creates an empty file by copying an in-tree empty file. Unlike `file(WRITE)`
+# or `file(TOUCH)`, this does not update the timestamp every time CMake is run,
+# avoiding unnecessary rebuilds when the empty file is used as a rule input.
+function(iree_make_empty_file _FILENAME)
+  configure_file("${PROJECT_SOURCE_DIR}/build_tools/cmake/empty_file" "${_FILENAME}" COPYONLY)
+endfunction()
+
+#-------------------------------------------------------------------------------
 # Emscripten
 #-------------------------------------------------------------------------------
 
