@@ -19,9 +19,6 @@ from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
-# All benchmarks' relative path against root build directory.
-BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
-
 MODEL_FLAGFILE_NAME = "flagfile"
 MODEL_TOOLFILE_NAME = "tool"
 

@@ -10,10 +10,8 @@ from dataclasses import dataclass
 from typing import Optional
 import pathlib
 
-BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
 CAPTURES_REL_PATH = "captures"
-E2E_TEST_ARTIFACTS_REL_PATH = "e2e_test_artifacts"
 
 
 @dataclass
