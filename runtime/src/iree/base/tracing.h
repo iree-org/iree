@@ -157,58 +157,145 @@ enum {
 };
 
 #if !(IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION)
-#define IREE_TRACE_SET_APP_INFO(value, value_length)
-#define IREE_TRACE_SET_THREAD_NAME(name)
+
+// Evaluates the expression code only if tracing is enabled.
+//
+// Example:
+//  struct {
+//    IREE_TRACE(uint32_t trace_only_value);
+//  } my_object;
+//  IREE_TRACE(my_object.trace_only_value = 5);
 #define IREE_TRACE(expr)
+
+// Sets an application-specific payload that will be stored in the trace.
+// This can be used to fingerprint traces to particular versions and denote
+// compilation options or configuration. The given string value will be copied.
+#define IREE_TRACE_SET_APP_INFO(value, value_length)
+
+// Sets the current thread name to the given string value.
+// This will only set the thread name as it appears in the tracing backend and
+// not set the OS thread name as it would appear in a debugger.
+// The C-string |name| will be copied and does not need to be a literal.
+#define IREE_TRACE_SET_THREAD_NAME(name)
+
+// Notifies the tracing implementation that the app is about to exit.
+// This allows implementations to flush their buffers. |exit_code| may be
+// provided to indicate the application exit code if available.
+#define IREE_TRACE_APP_EXIT(exit_code)
+
+// Enters a fiber context.
+// |fiber| must be a unique pointer and remain live for the process lifetime.
 #define IREE_TRACE_FIBER_ENTER(fiber)
+// Exits a fiber context.
 #define IREE_TRACE_FIBER_LEAVE()
+
+// Begins a new zone with the parent function name.
 #define IREE_TRACE_ZONE_BEGIN(zone_id) \
   iree_zone_id_t zone_id = 0;          \
   (void)zone_id;
+// Begins a new zone with the given compile-time |name_literal|.
+// The literal must be static const and will be embedded in the trace buffer by
+// reference.
 #define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal) \
   IREE_TRACE_ZONE_BEGIN(zone_id)
+// Begins a new zone with the given runtime dynamic string |name|.
+// The |name| string will be copied into the trace buffer and does not require
+// a NUL terminator.
 #define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length) \
   IREE_TRACE_ZONE_BEGIN(zone_id)
+// Begins an externally defined zone with a dynamic source location.
+// The |file_name|, |function_name|, and optional |name| strings will be copied
+// into the trace buffer and do not need to persist or have a NUL terminator.
 #define IREE_TRACE_ZONE_BEGIN_EXTERNAL(                        \
     zone_id, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)                   \
   IREE_TRACE_ZONE_BEGIN(zone_id)
+
+// Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
+#define IREE_TRACE_ZONE_END(zone_id)
+
+// Ends the current zone before returning on a failure.
+// Sugar for IREE_TRACE_ZONE_END + IREE_RETURN_IF_ERROR.
+#define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
+  IREE_RETURN_IF_ERROR(__VA_ARGS__)
+
+// Sets the dynamic color of the zone to an XXBBGGRR value.
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
-#define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
+
+// Appends an int64_t value to the parent zone. May be called multiple times.
+#define IREE_TRACE_ZONE_APPEND_VALUE_I64(zone_id, value)
+
+// Appends a string value to the parent zone. May be called multiple times.
+// The provided NUL-terminated C string or string view will be copied into the
+// trace buffer.
 #define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)
 #define IREE_TRACE_ZONE_APPEND_TEXT_CSTRING(zone_id, value)
 #define IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(zone_id, value, value_length)
-#define IREE_TRACE_ZONE_END(zone_id)
-#define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
-  IREE_RETURN_IF_ERROR(__VA_ARGS__)
+
+// Configures the named plot with an IREE_TRACING_PLOT_TYPE_* representation.
 #define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type, step, fill, color)
+// Plots a value in the named plot group as an int64_t.
 #define IREE_TRACE_PLOT_VALUE_I64(name_literal, value)
+// Plots a value in the named plot group as a single-precision float.
 #define IREE_TRACE_PLOT_VALUE_F32(name_literal, value)
+// Plots a value in the named plot group as a double-precision float.
 #define IREE_TRACE_PLOT_VALUE_F64(name_literal, value)
+
+// Demarcates an advancement of the top-level unnamed frame group.
 #define IREE_TRACE_FRAME_MARK()
+// Demarcates an advancement of a named frame group.
 #define IREE_TRACE_FRAME_MARK_NAMED(name_literal)
+// Begins a discontinuous frame in a named frame group.
+// Must be properly matched with a IREE_TRACE_FRAME_MARK_NAMED_END.
 #define IREE_TRACE_FRAME_MARK_BEGIN_NAMED(name_literal)
+// Ends a discontinuous frame in a named frame group.
 #define IREE_TRACE_FRAME_MARK_END_NAMED(name_literal)
+
+// Logs a message at the given logging level to the trace.
+// The message text must be a compile-time string literal.
 #define IREE_TRACE_MESSAGE(level, value_literal)
+// Logs a message with the given color to the trace.
+// Standard colors are defined as IREE_TRACING_MESSAGE_LEVEL_* values.
+// The message text must be a compile-time string literal.
 #define IREE_TRACE_MESSAGE_COLORED(color, value_literal)
+// Logs a dynamically-allocated message at the given logging level to the trace.
+// The string |value| will be copied into the trace buffer.
 #define IREE_TRACE_MESSAGE_DYNAMIC(level, value, value_length)
+// Logs a dynamically-allocated message with the given color to the trace.
+// Standard colors are defined as IREE_TRACING_MESSAGE_LEVEL_* values.
+// The string |value| will be copied into the trace buffer.
 #define IREE_TRACE_MESSAGE_DYNAMIC_COLORED(color, value, value_length)
+
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
 
 //===----------------------------------------------------------------------===//
 // Allocation tracking macros (C/C++)
 //===----------------------------------------------------------------------===//
-//
-// IREE_TRACE_ALLOC: records an malloc.
-// IREE_TRACE_FREE: records a free.
-//
-// NOTE: realloc must be recorded as a FREE/ALLOC pair.
 
 #if !(IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING)
+
+// Traces a new memory allocation with host |ptr| and the given |size|.
+// A balanced IREE_TRACE_FREE on the same |ptr| is required for proper memory
+// tracking. Allocations will be attributed to their parent zone.
+// Reallocations must be recorded as an IREE_TRACE_ALLOC/IREE_TRACE_FREE pair.
 #define IREE_TRACE_ALLOC(ptr, size)
+
+// Traces a free of an existing allocation traced with IREE_TRACE_ALLOC.
 #define IREE_TRACE_FREE(ptr)
-#define IREE_TRACE_ALLOC_NAMED(name, ptr, size)
-#define IREE_TRACE_FREE_NAMED(name, ptr)
+
+// Traces a new memory allocation in a named memory pool.
+// The |name_literal| pointer must be static const and be identical to the
+// one passed to a balanced IREE_TRACE_FREE_NAMED. This is best accomplished
+// with a compilation-unit scoped `static const char* MY_POOL_ID = "foo";` as
+// in debug modes compilers may not deduplicate local literals.
+// Reallocations must be recorded as an
+// IREE_TRACE_ALLOC_NAMED/IREE_TRACE_FREE_NAMED pair.
+#define IREE_TRACE_ALLOC_NAMED(name_literal, ptr, size)
+
+// Traces a free of an existing allocation traced with IREE_TRACE_ALLOC_NAMED.
+// Note that the |name_literal| must be the same pointer as passed to the alloc.
+#define IREE_TRACE_FREE_NAMED(name_literal, ptr)
+
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 //===----------------------------------------------------------------------===//
@@ -218,8 +305,23 @@ enum {
 #ifdef __cplusplus
 
 #if !(IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION)
+
+// Automatically instruments the calling scope as if calling
+// IREE_TRACE_ZONE_BEGIN/IREE_TRACE_ZONE_END.
+// The scope's zone ID can be retrieved with IREE_TRACE_SCOPE_ID for use with
+// other tracing macros.
 #define IREE_TRACE_SCOPE()
+
+// Automatically instruments the calling scope as if calling
+// IREE_TRACE_ZONE_BEGIN_NAMED/IREE_TRACE_ZONE_END.
+// The scope's zone ID can be retrieved with IREE_TRACE_SCOPE_ID for use with
+// other tracing macros.
 #define IREE_TRACE_SCOPE_NAMED(name_literal)
+
+// The zone ID of the current scope as set by IREE_TRACE_SCOPE.
+// This can be passed to other tracing macros like IREE_TRACE_ZONE_APPEND_TEXT.
+#define IREE_TRACE_SCOPE_ID
+
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #endif  // __cplusplus

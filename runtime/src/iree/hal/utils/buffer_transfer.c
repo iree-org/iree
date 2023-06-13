@@ -331,7 +331,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_map_range(
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)local_byte_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)local_byte_length);
 
   // NOTE: this is assuming that the host is going to be doing a lot of work
   // on the mapped memory and wants read/write caching and such. If the user
@@ -410,7 +410,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_unmap_range(
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(mapping);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)local_byte_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)local_byte_length);
   iree_hal_emulated_buffer_mapping_t* emulation_state =
       (iree_hal_emulated_buffer_mapping_t*)((uintptr_t)
                                                 mapping->impl.reserved[0]);

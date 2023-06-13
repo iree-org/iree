@@ -576,7 +576,7 @@ static void iree_loop_wait_list_handle_wake(iree_loop_wait_list_t* wait_list,
   int woken_tasks = 0;
 
   (void)woken_tasks;
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, woken_tasks);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, woken_tasks);
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -647,7 +647,7 @@ static iree_status_t iree_loop_wait_list_commit(
 
   // Real system wait.
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)wait_list->count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)wait_list->count);
 
   // Enter the system wait API.
   iree_wait_handle_t wake_handle = iree_wait_handle_immediate();

@@ -499,7 +499,7 @@ static iree_status_t iree_hal_executable_plugin_manager_resolve(
   IREE_ASSERT_ARGUMENT(out_fn_contexts);
   if (out_resolution) *out_resolution = 0;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
 
   // Fetch the valid provider count.
   // This may end up missing providers that get registered during/after we scan

@@ -267,8 +267,8 @@ static iree_task_poller_prepare_result_t iree_task_poller_prepare_task(
     // An actual wait. Ensure that the deadline has not been exceeded yet.
     // If it hasn't yet been hit we'll propagate the deadline to the system wait
     // API - then on the next pump we'll hit this case and retire the task.
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, task->deadline_ns);
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, now_ns);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, task->deadline_ns);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, now_ns);
     if (task->deadline_ns <= now_ns) {
       wait_status_code = IREE_STATUS_DEADLINE_EXCEEDED;
     } else {
@@ -420,7 +420,7 @@ static void iree_task_poller_wake_task(iree_task_poller_t* poller,
   int woken_tasks = 0;
 
   (void)woken_tasks;
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, woken_tasks);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, woken_tasks);
   IREE_TRACE_ZONE_END(z0);
 }
 

@@ -1222,6 +1222,7 @@ int main(int argc, char** argv) {
   if (argc <= 1) {
     fprintf(stderr,
             "no trace files provided; pass one or more yaml file paths\n");
+    IREE_TRACE_APP_EXIT(1);
     return 1;
   }
 
@@ -1232,11 +1233,13 @@ int main(int argc, char** argv) {
     status = run_trace_files(argc - 1, argv + 1, instance);
   }
   iree_vm_instance_release(instance);
+  int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     bool is_unavailable = iree_status_is_unavailable(status);
     iree_status_free(status);
-    return is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
+    exit_code = is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
+  IREE_TRACE_APP_EXIT(exit_code);
+  return exit_code;
 }

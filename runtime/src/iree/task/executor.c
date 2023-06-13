@@ -59,7 +59,8 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   options.worker_local_memory_size =
       iree_host_align(options.worker_local_memory_size,
                       iree_hardware_destructive_interference_size);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)options.worker_local_memory_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0,
+                                   (int64_t)options.worker_local_memory_size);
   iree_host_size_t executor_base_size =
       iree_host_align(sizeof(iree_task_executor_t),
                       iree_hardware_destructive_interference_size);
