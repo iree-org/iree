@@ -110,7 +110,7 @@ FailureOr<IREE::Codegen::LoweringConfigAttr> getLoweringConfig(
 /// Returns the tile sizes for a particular operation if the
 /// `iree_codegen.lowering_config` attribute is set on it.
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level);
-SmallVector<Value, 4> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
+SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 
 /// Returns the number of tiling levels defined in the
 /// `iree_codegen.lowering_config` of this operation.

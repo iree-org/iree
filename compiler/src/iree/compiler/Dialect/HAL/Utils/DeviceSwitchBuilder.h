@@ -70,7 +70,7 @@ class DeviceSwitchCaseBuilder {
 
  private:
   Location loc_;
-  SmallVector<Type, 4> resultTypes_;
+  SmallVector<Type> resultTypes_;
   Value device_;
   Attribute initialCondition_;
   SmallVectorImpl<IREE::HAL::DeviceSwitchOp> &caseOps_;
@@ -120,7 +120,7 @@ class DeviceSwitchBuilder {
 
   // Constructs a single hal.device.switch from all added regions.
   IREE::HAL::DeviceSwitchOp build() {
-    SmallVector<Attribute, 4> conditionAttrs;
+    SmallVector<Attribute> conditionAttrs;
     llvm::SetVector<Value> capturedFromAbove;
     for (auto caseOp : caseOps_) {
       conditionAttrs.push_back(caseOp.getConditions().getValue()[0]);
@@ -136,9 +136,9 @@ class DeviceSwitchBuilder {
 
  private:
   Location loc_;
-  SmallVector<Type, 4> resultTypes_;
+  SmallVector<Type> resultTypes_;
   Value device_;
-  SmallVector<IREE::HAL::DeviceSwitchOp, 4> caseOps_;
+  SmallVector<IREE::HAL::DeviceSwitchOp> caseOps_;
   OpBuilder builder_;
 };
 
@@ -167,7 +167,7 @@ class DeviceSwitchRewriter {
 
   // Constructs a single hal.device.switch from all added regions.
   IREE::HAL::DeviceSwitchOp build() {
-    SmallVector<Attribute, 4> conditionAttrs;
+    SmallVector<Attribute> conditionAttrs;
     llvm::SetVector<Value> capturedFromAbove;
     for (auto caseOp : caseOps_) {
       conditionAttrs.push_back(caseOp.getConditions().getValue()[0]);
@@ -200,9 +200,9 @@ class DeviceSwitchRewriter {
 
  private:
   Location loc_;
-  SmallVector<Type, 4> resultTypes_;
+  SmallVector<Type> resultTypes_;
   Value device_;
-  SmallVector<IREE::HAL::DeviceSwitchOp, 4> caseOps_;
+  SmallVector<IREE::HAL::DeviceSwitchOp> caseOps_;
   ConversionPatternRewriter &rewriter_;
 };
 

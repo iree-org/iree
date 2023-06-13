@@ -62,7 +62,7 @@ class ConvertToHALPass
 
     // Gather all interfaces from registered dialects.
     // These will perform the tensor->buffer mapping for their ops.
-    SmallVector<const HALConversionDialectInterface *, 4> conversionInterfaces;
+    SmallVector<const HALConversionDialectInterface *> conversionInterfaces;
     for (auto *dialect : context->getLoadedDialects()) {
       if (auto *conversionInterface =
               dialect

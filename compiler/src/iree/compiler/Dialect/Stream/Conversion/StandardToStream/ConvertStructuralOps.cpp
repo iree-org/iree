@@ -42,7 +42,7 @@ struct FuncOpSignatureConversion
         return failure();
       }
     }
-    SmallVector<Type, 4> newResultTypes;
+    SmallVector<Type> newResultTypes;
     if (failed(typeConverter.convertTypes(originalType.getResults(),
                                           newResultTypes))) {
       return failure();

@@ -894,8 +894,8 @@ static LogicalResult applyAsyncAllocations(Region &region,
   // Walk the ops backwards so that we can delete them, freeing uses so that
   // producers can be deleted in turn.
   auto &block = region.getBlocks().front();
-  auto ops = llvm::map_to_vector<4>(llvm::reverse(block),
-                                    [&](Operation &op) { return &op; });
+  auto ops = llvm::map_to_vector(llvm::reverse(block),
+                                 [&](Operation &op) { return &op; });
   for (auto *op : ops) {
     if (op->hasTrait<OpTrait::IsTerminator>()) continue;
     if (failed(TypeSwitch<Operation *, LogicalResult>(op)
@@ -1090,7 +1090,7 @@ static std::optional<ConstantAllocation> extractConstants(
     IREE::Stream::AsyncExecuteOp executeOp, OpBuilder &externalBuilder) {
   // Gather all constant ops from the region, if any.
   auto constantOps =
-      llvm::to_vector<4>(executeOp.getOps<IREE::Stream::AsyncConstantOp>());
+      llvm::to_vector(executeOp.getOps<IREE::Stream::AsyncConstantOp>());
   if (constantOps.empty()) return std::nullopt;
 
   // Allocate a new constant upload op and insert a subview for each constant.
@@ -1615,7 +1615,7 @@ static LogicalResult allocateExecutionRegion(
   // local changes here.
   if (!joinTimepoints.empty()) {
     joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
-    auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector<4>(
+    auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector(
         joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); }));
     auto joinOp = builder.create<IREE::Stream::TimepointJoinOp>(
         fusedLoc, newExecuteOp.getResultTimepoint().getType(), joinTimepoints);

@@ -120,7 +120,7 @@ static std::string operandTypeToString(Value operandValue) {
 static std::string getLinalgDataTypes(linalg::LinalgOp op) {
   std::string firstToken = "";
   bool allTokensSame = true;
-  SmallVector<std::string, 4> datatypeTokens;
+  SmallVector<std::string> datatypeTokens;
 
   for (Value operandValue : op->getOperands()) {
     datatypeTokens.push_back(operandTypeToString(operandValue));
@@ -344,7 +344,7 @@ static mlir::func::FuncOp createWorkgroupFunc(Location loc,
     if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
       OpBuilder builder(returnOp);
       builder.create<mlir::func::ReturnOp>(
-          returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
+          returnOp.getLoc(), llvm::to_vector(returnOp.getOperands()));
       returnOp.erase();
     }
   }

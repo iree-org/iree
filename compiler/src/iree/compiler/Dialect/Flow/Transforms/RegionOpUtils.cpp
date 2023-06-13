@@ -548,7 +548,7 @@ static SmallVector<Operation *> getCloneableOps(
   // SSA use-def chain).
   SmallVector<Operation *> result;
   llvm::SetVector<Value> visited;
-  SmallVector<Value, 4> worklist;
+  SmallVector<Value> worklist;
   worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
   while (!worklist.empty()) {
     Value outsideValue = worklist.pop_back_val();

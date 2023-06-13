@@ -299,7 +299,7 @@ class LastUseAnalysis {
     explorer.initialize();
 
     assert(rootOp->getNumRegions() == 1 && "expected module-like root op");
-    topLevelOps = llvm::to_vector<4>(
+    topLevelOps = llvm::to_vector(
         rootOp->getRegions().front().getOps<mlir::CallableOpInterface>());
   }
 

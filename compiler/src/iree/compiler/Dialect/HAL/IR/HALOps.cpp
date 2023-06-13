@@ -195,7 +195,7 @@ Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorImportOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorImportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -273,7 +273,7 @@ Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorExportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -309,9 +309,9 @@ Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
   return {resultIndex};  // sources[i]
 }
 
-SmallVector<int64_t, 4> TensorBarrierOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorBarrierOp::getTiedResultOperandIndices() {
   size_t numSources = getSources().size();
-  return llvm::to_vector<4>(llvm::seq<int64_t>(0, numSources));
+  return llvm::to_vector(llvm::seq<int64_t>(0, numSources));
 }
 
 //===----------------------------------------------------------------------===//
@@ -477,10 +477,10 @@ void CommandBufferPushDescriptorSetOp::build(
     Value pipelineLayout, Value set,
     ArrayRef<DescriptorSetBindingValue> bindings) {
   state.addOperands({commandBuffer, pipelineLayout, set});
-  SmallVector<Value, 4> bindingOrdinals;
-  SmallVector<Value, 4> bindingBuffers;
-  SmallVector<Value, 4> bindingOffsets;
-  SmallVector<Value, 4> bindingLengths;
+  SmallVector<Value> bindingOrdinals;
+  SmallVector<Value> bindingBuffers;
+  SmallVector<Value> bindingOffsets;
+  SmallVector<Value> bindingLengths;
   for (auto binding : bindings) {
     bindingOrdinals.push_back(binding.ordinal);
     bindingBuffers.push_back(binding.buffer);
@@ -567,7 +567,7 @@ ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
   // #hal.device.match.id<"vulkan-v1.?-*"> {
   //   hal.return %c1 : i32
   // }, ...
-  SmallVector<Attribute, 4> conditionAttrs;
+  SmallVector<Attribute> conditionAttrs;
   do {
     Attribute conditionAttr;
     NamedAttrList dummyAttrs;
@@ -732,7 +732,7 @@ ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
   result.addAttribute("layout", layoutAttr);
 
   std::unique_ptr<Region> region;
-  SmallVector<OpAsmParser::Argument, 4> regionOperands;
+  SmallVector<OpAsmParser::Argument> regionOperands;
   // A missing optional region is materialized as an empty region.
   (void)parser.parseOptionalRegion(region, regionOperands);
   result.addRegion(std::move(region));

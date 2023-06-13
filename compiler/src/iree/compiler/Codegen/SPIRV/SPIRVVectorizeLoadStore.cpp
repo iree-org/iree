@@ -234,7 +234,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 }
 
 void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
-  SmallVector<Operation *, 4> vectorUses;
+  SmallVector<Operation *> vectorUses;
   LLVM_DEBUG(llvm::dbgs() << "analyzing value: " << value << "\n");
   if (unsigned vectorSize = isMemRefVectorizable(value, vectorUses)) {
     valueToVectorBitsMap.insert(std::make_pair(value, vectorSize));
@@ -614,7 +614,7 @@ struct ScalarizeVectorTransferRead final
     // The result vector is 1-D and we have a projected permutation.
     unsigned dimPos = map.getDimPosition(0);
 
-    auto indices = llvm::to_vector<4>(readOp.getIndices());
+    auto indices = llvm::to_vector(readOp.getIndices());
     Value oldIndex = indices[dimPos];
 
     Value newVector = rewriter.create<arith::ConstantOp>(
@@ -656,7 +656,7 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
     // The result vector is 1-D so we just unroll the load along the last index.
     unsigned dimPos = loadOp.getBase().getType().getRank() - 1;
 
-    auto indices = llvm::to_vector<4>(loadOp.getIndices());
+    auto indices = llvm::to_vector(loadOp.getIndices());
     Value oldIndex = indices[dimPos];
 
     Value newVector = rewriter.create<arith::ConstantOp>(
@@ -703,7 +703,7 @@ struct ScalarizeVectorTransferWrite final
     // The result vector is 1-D and we have a projected permutation.
     unsigned dimPos = map.getDimPosition(0);
 
-    auto indices = llvm::to_vector<4>(writeOp.getIndices());
+    auto indices = llvm::to_vector(writeOp.getIndices());
     Value oldIndex = indices[dimPos];
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);

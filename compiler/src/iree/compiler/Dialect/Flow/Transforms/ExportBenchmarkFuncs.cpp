@@ -203,7 +203,7 @@ static LogicalResult createEntryPointBenchmarkFunc(
 
   // Create one dummy input variable per input. We may need to do some
   // analysis to find the actual type and initial value.
-  SmallVector<IREE::Util::GlobalOp, 4> dummyInputVariableOps;
+  SmallVector<IREE::Util::GlobalOp> dummyInputVariableOps;
   for (auto arg : entryFuncOp.getArguments()) {
     auto dummyVar =
         createDummyInput(funcName, arg, symbolTable, moduleBuilder, explorer);
@@ -227,7 +227,7 @@ static LogicalResult createEntryPointBenchmarkFunc(
 
   // Call the existing function with dummy arguments.
   auto blockBuilder = OpBuilder::atBlockBegin(block);
-  SmallVector<Value, 4> args;
+  SmallVector<Value> args;
   for (int i = 0, e = entryFuncOp.getNumArguments(); i < e; ++i) {
     args.push_back(blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
         loc, dummyInputVariableOps[i]));
@@ -270,7 +270,7 @@ class ExportBenchmarkFuncsPass
     // Gather the functions we want to wrap for benchmarking and wrap them.
     // Since we are inserting new functions as part of this pass we must perform
     // the wrapping for only the inputs.
-    SmallVector<mlir::func::FuncOp, 4> entryFuncOps;
+    SmallVector<mlir::func::FuncOp> entryFuncOps;
     for (auto entryFuncOp : moduleOp.getOps<mlir::func::FuncOp>()) {
       if (entryFuncOp.isPublic()) {
         entryFuncOps.push_back(entryFuncOp);

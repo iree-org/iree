@@ -25,8 +25,8 @@ namespace IREE {
 namespace Flow {
 
 // Filters out non-tensor values for tracing.
-static SmallVector<Value, 4> filterNonTensorValues(ValueRange &&range) {
-  SmallVector<Value, 4> result;
+static SmallVector<Value> filterNonTensorValues(ValueRange &&range) {
+  SmallVector<Value> result;
   for (auto value : range) {
     if (llvm::isa<TensorType>(value.getType())) result.push_back(value);
   }

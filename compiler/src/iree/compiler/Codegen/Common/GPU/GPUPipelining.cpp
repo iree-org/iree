@@ -261,7 +261,7 @@ struct MainLoopInfo {
   // Warp-level syncronous operations:
   // `ldmatrix, ld.shared` SharedMemory -> Registers
   // `mma.sync` Registers -> Tensor Cores.
-  llvm::SmallVector<WarpMmaOp, 4> warpOperations;
+  llvm::SmallVector<WarpMmaOp> warpOperations;
 
   // Set to track the dependencies already seen to a backward slice.
   llvm::SetVector<Operation*> seenDepOps;

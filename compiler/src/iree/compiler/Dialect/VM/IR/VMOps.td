@@ -3970,7 +3970,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
                               $_builder.getIntegerType(16)),
               segmentSizes));
       $_state.addAttribute("segment_types", $_builder.getArrayAttr(
-          llvm::map_to_vector<4>(segmentTypes, [&](Type type) {
+          llvm::map_to_vector(segmentTypes, [&](Type type) {
               return TypeAttr::get(type).cast<Attribute>();
           })));
       $_state.addOperands(operands);

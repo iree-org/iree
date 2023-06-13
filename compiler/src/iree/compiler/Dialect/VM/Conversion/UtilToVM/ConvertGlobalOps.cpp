@@ -64,7 +64,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
         IREE::VM::RefType::isCompatible(convertedType)) {
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
           op, op.getSymName(), op.getIsMutable(), convertedType,
-          llvm::to_vector<4>(op->getDialectAttrs()));
+          llvm::to_vector(op->getDialectAttrs()));
     } else if (convertedType.isInteger(32)) {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
@@ -73,7 +73,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
-          llvm::to_vector<4>(op->getDialectAttrs()));
+          llvm::to_vector(op->getDialectAttrs()));
     } else if (convertedType.isInteger(64)) {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
@@ -82,7 +82,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
-          llvm::to_vector<4>(op->getDialectAttrs()));
+          llvm::to_vector(op->getDialectAttrs()));
     } else if (convertedType.isF32()) {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
@@ -92,7 +92,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
-          llvm::to_vector<4>(op->getDialectAttrs()));
+          llvm::to_vector(op->getDialectAttrs()));
     } else if (convertedType.isF64()) {
       std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
@@ -102,7 +102,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
-          llvm::to_vector<4>(op->getDialectAttrs()));
+          llvm::to_vector(op->getDialectAttrs()));
     } else {
       return op.emitOpError("unsupported global type");
     }

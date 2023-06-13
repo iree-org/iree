@@ -345,10 +345,10 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // Configure the linalg options.
     // Tile size selection function.
     auto tileSizeFn = [&](OpBuilder &builder,
-                          Operation *op) -> SmallVector<Value, 4> {
+                          Operation *op) -> SmallVector<Value> {
       // Check if tile sizes are deduced from the configuration. If so use
       // those.
-      return llvm::map_to_vector<4>(tileSizes, [&](int64_t ts) -> Value {
+      return llvm::map_to_vector(tileSizes, [&](int64_t ts) -> Value {
         return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
       });
     };
@@ -359,7 +359,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         linalg::LinalgTilingOptions()
             .setDistributionOptions(getIREELinalgLoopDistributionOptions(
                 tileSizes, distributionMethodValue, maxWorkgroupParallelDims))
-            .setInterchange(llvm::map_to_vector<4>(
+            .setInterchange(llvm::map_to_vector(
                 interchange,
                 [](int64_t v) -> unsigned { return static_cast<unsigned>(v); }))
             .setLoopType(linalg::LinalgTilingLoopType::Loops)

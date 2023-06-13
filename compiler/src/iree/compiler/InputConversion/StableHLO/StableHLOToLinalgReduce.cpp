@@ -44,7 +44,7 @@ AffineMap getTransposeMapForReduction(MLIRContext *context, int rank,
                                       ArrayRef<int64_t> reductionDims) {
   llvm::SmallSetVector<int, 4> s(reductionDims.begin(), reductionDims.end());
 
-  SmallVector<unsigned, 4> permutation;
+  SmallVector<unsigned> permutation;
   for (int i = 0; i < rank; ++i) {
     if (!s.contains(i)) {
       permutation.push_back(i);
@@ -61,7 +61,7 @@ SmallVector<Value, 8> getReduceOpEmptyTensorDynSizes(
     ArrayRef<int64_t> reductionDims) {
   llvm::SmallSetVector<int, 4> s(reductionDims.begin(), reductionDims.end());
 
-  SmallVector<unsigned, 4> parallelDims;
+  SmallVector<unsigned> parallelDims;
   SmallVector<Value, 8> dynShape;
   int rank = cast<RankedTensorType>(arg.getType()).getRank();
   for (int i = 0, j = 0; i < rank; ++i) {
@@ -84,7 +84,7 @@ struct ReduceRegionReturnOpConversion final
       return failure();
     }
 
-    SmallVector<Value, 4> operands(adaptor.getOperands());
+    SmallVector<Value> operands(adaptor.getOperands());
     for (Value &operand : operands) {
       if (isa<ShapedType>(operand.getType())) {
         Location loc = operand.getLoc();
@@ -119,7 +119,7 @@ struct ReduceOpToGenericConverter final
     }
     auto srcRank = cast<ShapedType>(adaptor.getInputs()[0].getType()).getRank();
 
-    SmallVector<int64_t, 4> reductionDims = extract1DVector(op.getDimensions());
+    SmallVector<int64_t> reductionDims = extract1DVector(op.getDimensions());
 
     SmallVector<Type> resultTypes;
     if (failed(typeConverter->convertTypes(op.getResultTypes(), resultTypes)))
@@ -154,7 +154,7 @@ struct ReduceOpToGenericConverter final
     // reduction loops now are all in the innermost, drops
     // `reduction_dims.size()` dimensions. We don't need an inverse
     // permutation here because they are the same.
-    SmallVector<AffineExpr, 4> exprs;
+    SmallVector<AffineExpr> exprs;
     for (int i = 0, e = srcRank - reductionDims.size(); i < e; ++i) {
       exprs.push_back(rewriter.getAffineDimExpr(i));
     }
@@ -379,13 +379,13 @@ struct ReduceWindowOpOnTensorsGenericConversion final
       dstExprs.push_back(mlir::getAffineDimExpr(i, ctx));
     }
 
-    SmallVector<AffineMap, 4> inferredMaps(3, AffineMap::get(ctx));
+    SmallVector<AffineMap> inferredMaps(3, AffineMap::get(ctx));
     if (rank > 0) {
       inferredMaps =
           AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs});
     }
 
-    SmallVector<AffineMap, 4> indexingMaps;
+    SmallVector<AffineMap> indexingMaps;
 
     indexingMaps.append(numOperands, inferredMaps[0]);
     indexingMaps.append(1, inferredMaps[1]);

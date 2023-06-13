@@ -456,8 +456,8 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
     unsigned operandIndex = operand->getOperandNumber();
     Value distributedVal = warpOp.getResult(operandIndex);
 
-    SmallVector<Value, 4> indices(load.getIndices().begin(),
-                                  load.getIndices().end());
+    SmallVector<Value> indices(load.getIndices().begin(),
+                               load.getIndices().end());
     if (!indices.empty()) return failure();
 
     OpBuilder::InsertionGuard g(rewriter);

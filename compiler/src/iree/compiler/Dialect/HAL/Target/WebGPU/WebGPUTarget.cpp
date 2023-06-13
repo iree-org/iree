@@ -148,8 +148,8 @@ class WebGPUTargetBackend : public TargetBackend {
     // that convention and keep track of the mapping between entry point
     // ordinals to which shader module they reference.
     auto exportOps =
-        llvm::to_vector<4>(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
-    llvm::SmallVector<uint32_t, 4> entryPointOrdinals(exportOps.size());
+        llvm::to_vector(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    llvm::SmallVector<uint32_t> entryPointOrdinals(exportOps.size());
     SymbolTableCollection symbolTable;
     SymbolUserMap symbolUsers(symbolTable, variantOp);
     for (auto exportOp : exportOps) {
