@@ -39,7 +39,7 @@ If you only need the imported MLIR models:
 
 ```sh
 cmake --build "${IREE_BUILD_DIR?}" --target \
-  iree-benchmark-import-models
+  iree-benchmark-import-models-default
   # For large benchmarks (this will take > 100G disk space)
   # iree-benchmark-import-models-large
 ```
