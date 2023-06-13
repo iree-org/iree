@@ -807,7 +807,7 @@ else()
 
   # Add default external projects.
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
-  iree_llvm_add_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
   if(IREE_INPUT_TORCH)
     iree_llvm_add_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
   endif()
@@ -860,7 +860,7 @@ if(IREE_HAL_DRIVER_VULKAN)
 endif()
 
 if(IREE_BUILD_COMPILER)
-  add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/stablehlo EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_BUILD_TESTS)

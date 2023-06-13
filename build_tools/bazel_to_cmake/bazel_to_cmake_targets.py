@@ -78,9 +78,9 @@ class TargetConverter:
         "@llvm-project//mlir:VectorOps": ["MLIRVector"],
 
         # StableHLO.
-        "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
-        "@mlir-hlo//stablehlo:stablehlo_ops": ["StablehloOps",],
-        "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
+        "@stablehlo//:chlo_ops": ["ChloOps",],
+        "@stablehlo//:stablehlo_ops": ["StablehloOps",],
+        "@stablehlo//:broadcast_utils": ["StablehloBroadcastUtils",],
 
         # NCCL
         "@nccl//:headers": ["nccl::headers",],
