@@ -474,7 +474,7 @@ class DumpExecutableBenchmarksPass
             buildBenchmarkModule(executableOp, variantOp, dispatchParamsMap);
         if (!benchmarkModuleOp) continue;
         auto fileName = (moduleName + "_" + executableOp.getName() + "_" +
-                         variantOp.getName() + ".mlir")
+                         variantOp.getName() + "_benchmark.mlir")
                             .str();
         if (path.empty() || path == "-") {
           dumpModuleToStream(*benchmarkModuleOp, fileName, llvm::outs());
