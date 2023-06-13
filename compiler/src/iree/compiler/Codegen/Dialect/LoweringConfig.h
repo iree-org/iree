@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
-#define IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
+#ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
+#define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -164,4 +164,4 @@ void eraseCompilationInfo(Operation *op);
 } // namespace iree_compiler
 } // namespace mlir
 
-#endif // IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
+#endif // IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_

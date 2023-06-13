@@ -153,6 +153,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
+      addGPUDefaultPassPipeline(executableLoweringPipeline);
+      break;
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
       addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
       break;

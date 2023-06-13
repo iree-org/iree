@@ -452,6 +452,13 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 }
 
+void addGPUDefaultPassPipeline(OpPassManager &pm) {
+  tileAndBufferize(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+}
+
 // Sub pipeline to make the address computation more explicit and
 // optimize them.
 // The idea here is to be less dependent on what the backend is able to
@@ -477,6 +484,8 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  pm.addPass(createLowerUKernelOpsToCallsPass());
 
   // LinalgExt -> SCF
   pm.addNestedPass<func::FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());

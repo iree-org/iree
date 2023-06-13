@@ -313,8 +313,6 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
   SmallVector<OpAsmParser::UnresolvedOperand> allOperands;
   std::unique_ptr<Region> bodyRegion = std::make_unique<Region>();
   std::unique_ptr<Region> workloadCountRegion = std::make_unique<Region>();
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
   SmallVector<OpAsmParser::UnresolvedOperand> workloadOperands;
   SMLoc workloadOperandsLoc;
   (void)workloadOperandsLoc;
@@ -346,6 +344,8 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
     if (typeListResult)
       return failure();
   }
+  if (parser.parseOptionalAttrDictWithKeyword(result.attributes))
+    return failure();
   if (parser.parseRegion(*bodyRegion))
     return failure();
   ensureTerminator(*bodyRegion, parser.getBuilder(), result.location);
@@ -377,7 +377,6 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
 void DispatchRegionOp::print(OpAsmPrinter &p) {
   SmallVector<StringRef, 1> elidedAttrs;
   elidedAttrs.push_back("operand_segment_sizes");
-  p.printOptionalAttrDictWithKeyword((*this)->getAttrs(), elidedAttrs);
   if (!getWorkload().empty()) {
     p << "[" << getWorkload() << "]";
   }
@@ -398,7 +397,9 @@ void DispatchRegionOp::print(OpAsmPrinter &p) {
     if (it.index() < getNumResults() - 1)
       p << ", ";
   }
-  p << ") ";
+  p << ")";
+  p.printOptionalAttrDictWithKeyword((*this)->getAttrs(), elidedAttrs);
+  p << " ";
 
   bool printTerminator = true;
   if (auto *term =
@@ -1106,6 +1107,7 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   auto newOp = rewriter.create<DispatchWorkgroupsOp>(
       getLoc(), getWorkload(), newResultTypes, newResultDims, newArguments,
       newArgumentDims, newTiedOperandIndices, getOperation()->getAttrs());
+  newOp->setDialectAttrs(getOperation()->getDialectAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
 

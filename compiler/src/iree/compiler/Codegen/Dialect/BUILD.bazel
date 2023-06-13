@@ -102,7 +102,7 @@ iree_gentbl_cc_library(
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREECodegenAttributes.td",
+    td_file = "IREECodegenDialect.td",
     deps = [":td_files"],
 )
 

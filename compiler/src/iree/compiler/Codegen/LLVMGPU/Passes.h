@@ -49,6 +49,9 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
+/// Default pass pipeline on GPU, currently used only for the ukernel path.
+void addGPUDefaultPassPipeline(OpPassManager &pm);
+
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via
 /// the structured ops path. The pass manager `pm` in here should operate on
 /// the module within the IREE::HAL::ExecutableOp.

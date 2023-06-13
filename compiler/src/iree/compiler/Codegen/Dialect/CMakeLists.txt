@@ -59,7 +59,7 @@ iree_tablegen_library(
   NAME
     IREECodegenDialectGen
   TD_FILE
-    "IREECodegenAttributes.td"
+    "IREECodegenDialect.td"
   OUTS
     --gen-dialect-decls IREECodegenDialect.h.inc
     --gen-dialect-defs IREECodegenDialect.cpp.inc
