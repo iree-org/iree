@@ -43,6 +43,7 @@ iree_cc_library(
     "LLVMCPUVectorization.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
+    "TileSizeSelection.cpp"
     "TileSizeSelection.h"
     "Utils.cpp"
     "VectorContractCustomKernels.cpp"

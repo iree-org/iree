@@ -224,6 +224,11 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       }
 
       auto maybeLoweringConfig = getRootLoweringConfig(variantOp);
+      TilingConfig tilingConfig;
+      if (succeeded(maybeLoweringConfig)) {
+        tilingConfig = {*maybeLoweringConfig};
+      }
+
       auto target = variantOp.getTarget();
       bool lowerToAVX2 = hasAVX2Feature(target);
       bool enableVectorMasking =
@@ -240,63 +245,42 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addCPUDefaultPassPipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUBufferOpsTileAndVectorize: {
-            assert(succeeded(maybeLoweringConfig) && "Expected root operation");
-            TilingConfig tilingConfig(*maybeLoweringConfig);
+              CPUBufferOpsTileAndVectorize:
             addCPUBufferOpsTileAndVectorizePipeline(
                 executableLoweringPipeline, tilingConfig, enableVectorMasking,
                 enableAArch64SSVE);
             break;
-          }
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUDoubleTilingExpert: {
-            assert(succeeded(maybeLoweringConfig) && "Expected root operation");
-            TilingConfig tilingConfig(*maybeLoweringConfig);
+              CPUDoubleTilingExpert:
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline, tilingConfig,
                 /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2);
             break;
-          }
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUDoubleTilingPadExpert: {
-            assert(succeeded(maybeLoweringConfig) && "Expected root operation");
-            TilingConfig tilingConfig(*maybeLoweringConfig);
+              CPUDoubleTilingPadExpert:
             addDoubleTilingPadExpertPassPipeline(
                 executableLoweringPipeline, tilingConfig, enableVectorMasking);
             break;
-          }
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUDoubleTilingPeelingExpert: {
-            assert(succeeded(maybeLoweringConfig) && "Expected root operation");
-            TilingConfig tilingConfig(*maybeLoweringConfig);
+              CPUDoubleTilingPeelingExpert:
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline, tilingConfig,
                 /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2,
                 enableAArch64SSVE);
             break;
-          }
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUConvTileAndDecomposeExpert: {
-            assert(succeeded(maybeLoweringConfig) && "Expected root operation");
-            TilingConfig tilingConfig(*maybeLoweringConfig);
+              CPUConvTileAndDecomposeExpert:
             addConvTileAndDecomposeExpertPassPipeline(
                 executableLoweringPipeline, tilingConfig, enableVectorMasking,
                 enableAArch64SSVE);
             break;
-          }
-          case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
-            assert(succeeded(maybeLoweringConfig) && "Expected root operation");
-            TilingConfig tilingConfig(*maybeLoweringConfig);
+          case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
             addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
                                              tilingConfig, enableMicrokernels);
             break;
-          }
-          case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
-            assert(succeeded(maybeLoweringConfig) && "Expected root operation");
-            TilingConfig tilingConfig(*maybeLoweringConfig);
+          case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
             addCPUDataTilingPipeline(executableLoweringPipeline, tilingConfig);
             break;
-          }
           case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
             addVMVXDefaultPassPipeline(executableLoweringPipeline,
                                        enableMicrokernels);
