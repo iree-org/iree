@@ -66,10 +66,8 @@ class BenchmarkDriver(object):
       self.config.trace_capture_config.capture_tmp_dir.mkdir(parents=True,
                                                              exist_ok=True)
 
-    use_legacy_name = self.benchmark_suite.legacy_suite
-
-    cpu_target_arch = self.device_info.get_iree_cpu_arch_name(use_legacy_name)
-    gpu_target_arch = self.device_info.get_iree_gpu_arch_name(use_legacy_name)
+    cpu_target_arch = self.device_info.get_cpu_arch()
+    gpu_target_arch = self.device_info.get_gpu_arch()
     detected_architectures = [
         arch for arch in [cpu_target_arch, gpu_target_arch] if arch is not None
     ]

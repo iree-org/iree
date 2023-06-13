@@ -21,25 +21,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from e2e_test_framework.definitions import common_definitions
 
-# A map from CPU ABI to IREE's legacy benchmark target architecture.
-CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP = {
-    "arm64-v8a": "cpu-arm64-v8a",
-    "x86_64-cascadeLake": "cpu-x86_64-cascadelake",
-}
-
-# A map from GPU name to IREE's legacy benchmark target architecture.
-GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP = {
-    "adreno-640": "gpu-adreno",
-    "adreno-650": "gpu-adreno",
-    "adreno-660": "gpu-adreno",
-    "adreno-730": "gpu-adreno",
-    "mali-g77": "gpu-mali-valhall",
-    "mali-g78": "gpu-mali-valhall",
-    "tesla-v100-sxm2-16gb": "gpu-cuda-sm_70",
-    "nvidia-a100-sxm4-40gb": "gpu-cuda-sm_80",
-    "nvidia-geforce-rtx-3090": "gpu-cuda-sm_80",
-}
-
 # A map from CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
     "arm64-v8a":
@@ -252,29 +233,16 @@ class DeviceInfo:
     params = ", ".join(params)
     return f"{self.platform_type.value} device <{params}>"
 
-  def get_iree_cpu_arch_name(self,
-                             use_legacy_name: bool = False) -> Optional[str]:
+  def get_cpu_arch(self) -> Optional[common_definitions.DeviceArchitecture]:
     name = self.cpu_abi.lower()
     if self.cpu_uarch:
       name += f"-{self.cpu_uarch.lower()}"
 
-    if use_legacy_name:
-      return CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP.get(name)
+    return CPU_ABI_TO_TARGET_ARCH_MAP.get(name)
 
-    arch = CPU_ABI_TO_TARGET_ARCH_MAP.get(name)
-    # TODO(#11076): Return common_definitions.DeviceArchitecture instead after
-    # removing the legacy path.
-    return None if arch is None else str(arch)
-
-  def get_iree_gpu_arch_name(self,
-                             use_legacy_name: bool = False) -> Optional[str]:
+  def get_gpu_arch(self) -> Optional[common_definitions.DeviceArchitecture]:
     name = self.gpu_name.lower()
-
-    if use_legacy_name:
-      return GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP.get(name)
-
-    arch = GPU_NAME_TO_TARGET_ARCH_MAP.get(name)
-    return None if arch is None else str(arch)
+    return GPU_NAME_TO_TARGET_ARCH_MAP.get(name)
 
   def get_detailed_cpu_arch_name(self) -> str:
     """Returns the detailed architecture name."""

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
 from e2e_test_artifacts import iree_artifacts
-from e2e_test_framework.definitions import iree_definitions
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -33,7 +33,7 @@ class BenchmarkCase:
     model_name: the source model, e.g., 'MobileSSD'.
     model_tags: the source model tags, e.g., ['f32'].
     bench_mode: the benchmark mode, e.g., '1-thread,big-core'.
-    target_arch: the target CPU/GPU architature, e.g., 'GPU-Adreno'.
+    target_arch: the target CPU/GPU architature.
     driver_info: the IREE driver configuration.
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
     benchmark_case_dir: the path to benchmark case directory.
@@ -43,7 +43,7 @@ class BenchmarkCase:
   model_name: str
   model_tags: Sequence[str]
   bench_mode: Sequence[str]
-  target_arch: str
+  target_arch: common_definitions.DeviceArchitecture
   driver_info: DriverInfo
   benchmark_tool_name: str
   benchmark_case_dir: pathlib.Path
@@ -97,15 +97,13 @@ class BenchmarkSuite(object):
     category_list.sort(key=lambda category: category[0])
     return category_list
 
-  # TODO(#11076): target_architectures should be a list of
-  # common_definitions.DeviceArchitecture instead of string, after removing the
-  # legacy path.
   def filter_benchmarks_for_category(
       self,
       category: str,
       available_drivers: Optional[Sequence[str]] = None,
       available_loaders: Optional[Sequence[str]] = None,
-      target_architectures: Optional[Sequence[str]] = None,
+      target_architectures: Optional[Sequence[
+          common_definitions.DeviceArchitecture]] = None,
       driver_filter: Optional[str] = None,
       mode_filter: Optional[str] = None,
       model_name_filter: Optional[str] = None) -> Sequence[BenchmarkCase]:
@@ -143,11 +141,10 @@ class BenchmarkSuite(object):
       matched_loader = not driver_info.loader_name or available_loaders is None or (
           driver_info.loader_name in available_loaders)
 
-      target_arch = benchmark_case.target_arch.lower()
       if target_architectures is None:
         matched_arch = True
       else:
-        matched_arch = target_arch in target_architectures
+        matched_arch = benchmark_case.target_arch in target_architectures
 
       bench_mode = ','.join(benchmark_case.bench_mode)
       matched_mode = (mode_filter is None or
@@ -198,7 +195,7 @@ class BenchmarkSuite(object):
             f"Can't map execution config to driver info: {module_exec_config}.")
       driver_info = IREE_DRIVERS_INFOS[driver_info_key]
 
-      target_arch = str(target_device_spec.architecture)
+      target_arch = target_device_spec.architecture
       model = module_gen_config.imported_model.model
 
       module_dir_path = iree_artifacts.get_module_dir_path(
