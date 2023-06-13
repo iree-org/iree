@@ -65,14 +65,12 @@ void LLVMCPUTilePass::runOnOperation() {
   auto funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+  FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
       getLoweringConfig(computeOps);
-  if (failed(maybeLoweringConfig)) {
+  if (failed(rootLoweringConfig)) {
     LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
     return;
   }
-  SmallVector<int64_t> rootTileSizes =
-      maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
 
   for (auto computeOp : computeOps) {
     auto op = cast<TilingInterface>(computeOp);
@@ -89,7 +87,7 @@ void LLVMCPUTilePass::runOnOperation() {
     if (auto loweringConfig = getLoweringConfig(op)) {
       tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
     } else {
-      tileSizes = rootTileSizes;
+      tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
     }
 
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
