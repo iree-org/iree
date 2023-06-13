@@ -34,6 +34,8 @@ iree_cc_library(
     "nccl_channel.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
+    "tracing.c"
+    "tracing.h"
   DEPS
     ::dynamic_symbols
     iree::base

@@ -544,10 +544,28 @@ static iree_status_t iree_hal_cuda2_nccl_submit_batch_entry(
 
 iree_status_t iree_hal_cuda2_nccl_submit_batch(
     const iree_hal_cuda2_nccl_dynamic_symbols_t* symbols,
+    iree_hal_cuda2_tracing_context_t* tracing_context,
     const iree_hal_collective_batch_t* batch, CUstream stream) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(batch);
   IREE_ASSERT_ARGUMENT(stream);
+
+  // Begin one zone for each entry in the batch. Each entry will show stacked on
+  // top of each other and unfortunately use independent CUDA events. We could
+  // optimize this by changing the tracing context to expose an API with event
+  // reservation and then zone commit using an existing event.
+  IREE_TRACE({
+    iree_bitfield_string_temp_t string_temp;
+    for (iree_host_size_t i = 0; i < batch->count; ++i) {
+      iree_hal_collective_batch_entry_t* entry = &batch->entries[i];
+      iree_string_view_t collective_str =
+          iree_hal_collective_op_format(&entry->op, &string_temp);
+      IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+          tracing_context, stream, __FILE__, strlen(__FILE__),
+          (uint32_t)__LINE__, __FUNCTION__, strlen(__FUNCTION__),
+          collective_str.data, collective_str.size);
+    }
+  });
 
   // Issue all collective operations in the batch as part of a group.
   // NCCL may be able to fuse or reduce overheads by issuing like this.
@@ -557,6 +575,14 @@ iree_status_t iree_hal_cuda2_nccl_submit_batch(
         iree_hal_cuda2_nccl_submit_batch_entry(&batch->entries[i], stream));
   }
   IREE_NCCL_RETURN_IF_ERROR(symbols, ncclGroupEnd(), "ncclGroupEnd");
+
+  // End all zones we began above - note that these are just simply nested so
+  // order doesn't matter so long as we end the right number of zones.
+  IREE_TRACE({
+    for (iree_host_size_t i = 0; i < batch->count; ++i) {
+      IREE_CUDA_TRACE_ZONE_END(tracing_context, stream);
+    }
+  });
 
   return iree_ok_status();
 }
