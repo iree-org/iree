@@ -17,6 +17,7 @@
 #include "experimental/cuda2/memory_pools.h"
 #include "experimental/cuda2/nccl_channel.h"
 #include "experimental/cuda2/nccl_dynamic_symbols.h"
+#include "experimental/cuda2/nop_executable_cache.h"
 #include "experimental/cuda2/pipeline_layout.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
@@ -454,8 +455,10 @@ static iree_status_t iree_hal_cuda2_device_create_event(
 static iree_status_t iree_hal_cuda2_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "executable cache not yet implmeneted");
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
+  return iree_hal_cuda2_nop_executable_cache_create(
+      identifier, device->cuda_symbols, device->cu_device,
+      device->host_allocator, out_executable_cache);
 }
 
 static iree_status_t iree_hal_cuda2_device_create_pipeline_layout(
