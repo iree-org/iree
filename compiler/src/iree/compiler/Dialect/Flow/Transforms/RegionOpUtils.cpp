@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -477,25 +478,30 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
   // with bufferization. Make them clonable when fixed.
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
           tensor::EmptyOp, tensor::CastOp, tensor::ExtractOp,
-          tensor::ExtractSliceOp>(op)) {
+          tensor::ExtractSliceOp, complex::CreateOp>(op)) {
     return true;
   }
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
+  if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
     if (clInlineConstantByteLength == 0) return false;
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
+    Attribute constantValueAttr;
+    if (!matchPattern(op->getResult(0), m_Constant(&constantValueAttr))) {
+      return false;
+    }
+
+    auto constantType = op->getResult(0).getType();
     if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
       return true;
     } else if (auto denseAttr =
                    llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
-      auto shapedType = llvm::cast<ShapedType>(constantOp.getType());
+      auto shapedType = llvm::cast<ShapedType>(constantType);
       uint64_t estimatedByteLength =
           (shapedType.getNumElements() *
            IREE::Util::getTypeBitWidth(shapedType.getElementType())) /
           8;
       return denseAttr.isSplat() ||
              estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
+    } else if (constantType.isIntOrIndexOrFloat() ||
+               isa<ComplexType>(constantType)) {
       return true;
     }
   }
