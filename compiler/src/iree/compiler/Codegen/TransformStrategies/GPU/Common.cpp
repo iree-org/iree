@@ -556,6 +556,11 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
       /*matchInterfaceEnum=*/transform::MatchInterfaceEnumAttr(),
       /*opAttrs=*/DictionaryAttr(),
       /*filterResultType=*/TypeAttr());
+  // TODO: At this time, this synchronization is needed for applying the
+  // HoistRedundantVectorTransfersOp transform correctly. This is because the
+  // transform does not take parallelism into accound.
+  // In the future, HoistRedundantVectorTransfersOp + SynchronizeLoopOp need to
+  // be replaced by a single transform.
   b.create<SynchronizeLoopOp>(forH);
 
   // TODO: not a functional style transform and avoid returning funcH.
