@@ -184,11 +184,11 @@ class BenchmarkDriverTest(unittest.TestCase):
         benchmark_case_dir=pathlib.Path("incompatible_case"),
         benchmark_tool_name="tool",
         run_config=run_config_incompatible)
-    self.benchmark_suite = BenchmarkSuite({
-        pathlib.Path("suite/TFLite"): [
-            self.case1, self.case2, self.incompatible_case
-        ],
-    })
+    self.benchmark_suite = BenchmarkSuite([
+        self.case1,
+        self.case2,
+        self.incompatible_case,
+    ])
 
   def tearDown(self) -> None:
     self._tmp_dir_obj.cleanup()

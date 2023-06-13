@@ -69,34 +69,16 @@ EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP: Dict[Tuple[
 class BenchmarkSuite(object):
   """Represents the benchmarks in benchmark suite directory."""
 
-  def __init__(self,
-               suite_map: Dict[pathlib.Path, List[BenchmarkCase]],
-               legacy_suite: bool = False):
+  def __init__(self, benchmark_cases: Sequence[BenchmarkCase]):
     """Construct a benchmark suite.
 
     Args:
-      suites: the map of benchmark cases keyed by category directories.
-      legacy_suite: true if this is a legacy benchmark suite.
+      benchmark_cases: list of benchmark cases.
     """
-    self.suite_map = suite_map
-    self.category_map = dict((category_dir.name, category_dir)
-                             for category_dir in self.suite_map.keys())
-    self.legacy_suite = legacy_suite
+    self.benchmark_cases = list(benchmark_cases)
 
-  def list_categories(self) -> List[Tuple[str, pathlib.Path]]:
-    """Returns all categories and their directories.
-
-    Returns:
-      A tuple of (category name, category dir).
-    """
-    category_list = [(name, path) for name, path in self.category_map.items()]
-    # Fix the order of category list.
-    category_list.sort(key=lambda category: category[0])
-    return category_list
-
-  def filter_benchmarks_for_category(
+  def filter_benchmarks(
       self,
-      category: str,
       available_drivers: Optional[Sequence[str]] = None,
       available_loaders: Optional[Sequence[str]] = None,
       target_architectures: Optional[Sequence[
@@ -104,9 +86,8 @@ class BenchmarkSuite(object):
       driver_filter: Optional[str] = None,
       mode_filter: Optional[str] = None,
       model_name_filter: Optional[str] = None) -> Sequence[BenchmarkCase]:
-    """Filters benchmarks in a specific category for the given device.
+    """Filters benchmarks.
       Args:
-        category: the specific benchmark category.
         available_drivers: list of drivers supported by the tools. None means to
           match any driver.
         available_loaders: list of executable loaders supported by the tools.
@@ -120,12 +101,8 @@ class BenchmarkSuite(object):
         A list of matched benchmark cases.
     """
 
-    category_dir = self.category_map.get(category)
-    if category_dir is None:
-      return []
-
     chosen_cases = []
-    for benchmark_case in self.suite_map[category_dir]:
+    for benchmark_case in self.benchmark_cases:
       driver_info = benchmark_case.driver_info
 
       driver_name = driver_info.driver_name
@@ -150,16 +127,8 @@ class BenchmarkSuite(object):
       model_name_with_tags = benchmark_case.model_name
       if len(benchmark_case.model_tags) > 0:
         model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
-      if self.legacy_suite:
-        # For backward compatibility, model_name_filter matches against the string:
-        #   <model name with tags>/<benchmark case name>
-        model_and_case_name = f"{model_name_with_tags}/{benchmark_case.benchmark_case_dir.name}"
-      else:
-        # For the new run option, we drop the obscure old semantic and only
-        # search on model name and its tags.
-        model_and_case_name = model_name_with_tags
       matched_model_name = (model_name_filter is None or re.match(
-          model_name_filter, model_and_case_name) is not None)
+          model_name_filter, model_name_with_tags) is not None)
 
       if (matched_driver and matched_loader and matched_arch and
           matched_model_name and matched_mode):
@@ -179,7 +148,7 @@ class BenchmarkSuite(object):
       A benchmark suite.
     """
 
-    suite_map = collections.defaultdict(list)
+    benchmark_cases = []
     for run_config in run_configs:
       module_gen_config = run_config.module_generation_config
       module_exec_config = run_config.module_execution_config
@@ -208,7 +177,6 @@ class BenchmarkSuite(object):
                                      benchmark_tool_name=run_config.tool.value,
                                      benchmark_case_dir=module_dir_path,
                                      run_config=run_config)
-      category = pathlib.Path(model.source_type.value)
-      suite_map[category].append(benchmark_case)
+      benchmark_cases.append(benchmark_case)
 
-    return BenchmarkSuite(suite_map=suite_map)
+    return BenchmarkSuite(benchmark_cases=benchmark_cases)

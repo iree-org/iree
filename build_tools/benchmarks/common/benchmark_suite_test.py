@@ -15,7 +15,7 @@ from e2e_test_artifacts import iree_artifacts
 
 class BenchmarkSuiteTest(unittest.TestCase):
 
-  def test_filter_benchmarks_for_category(self):
+  def test_filter_benchmarks(self):
     model = common_definitions.Model(
         id="model",
         name="model",
@@ -77,12 +77,9 @@ class BenchmarkSuiteTest(unittest.TestCase):
         benchmark_case_dir=pathlib.Path("case3"),
         benchmark_tool_name="tool",
         run_config=dummy_run_config)
-    suite = BenchmarkSuite({
-        pathlib.Path("suite/TFLite"): [case1, case2, case3],
-    })
+    suite = BenchmarkSuite([case1, case2, case3])
 
-    cpu_and_gpu_benchmarks = suite.filter_benchmarks_for_category(
-        category="TFLite",
+    cpu_and_gpu_benchmarks = suite.filter_benchmarks(
         available_drivers=["local-task", "vulkan"],
         available_loaders=["embedded-elf"],
         target_architectures=[
@@ -92,8 +89,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         driver_filter=None,
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*")
-    gpu_benchmarks = suite.filter_benchmarks_for_category(
-        category="TFLite",
+    gpu_benchmarks = suite.filter_benchmarks(
         available_drivers=["local-task", "vulkan"],
         available_loaders=["embedded-elf"],
         target_architectures=[
@@ -102,13 +98,11 @@ class BenchmarkSuiteTest(unittest.TestCase):
         driver_filter="vulkan",
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*")
-    all_benchmarks = suite.filter_benchmarks_for_category(
-        category="TFLite",
-        available_drivers=None,
-        target_architectures=None,
-        driver_filter=None,
-        mode_filter=None,
-        model_name_filter=None)
+    all_benchmarks = suite.filter_benchmarks(available_drivers=None,
+                                             target_architectures=None,
+                                             driver_filter=None,
+                                             mode_filter=None,
+                                             model_name_filter=None)
 
     self.assertEqual(cpu_and_gpu_benchmarks, [case1, case2])
     self.assertEqual(gpu_benchmarks, [case2])
@@ -193,49 +187,24 @@ class BenchmarkSuiteTest(unittest.TestCase):
 
     suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs,
                                                  root_benchmark_dir=root_dir)
-    self.assertEqual(
-        suite.list_categories(),
-        [("exported_stablehlo_mlir", pathlib.Path("exported_stablehlo_mlir")),
-         ("exported_tflite", pathlib.Path("exported_tflite"))])
-    run_config_a_case_dir = pathlib.Path(
-        iree_artifacts.get_module_dir_path(
-            run_config_a.module_generation_config, root_dir))
-    run_config_b_case_dir = pathlib.Path(
-        iree_artifacts.get_module_dir_path(
-            run_config_b.module_generation_config, root_dir))
+
+    loaded_run_configs = [case.run_config for case in suite.filter_benchmarks()]
+    self.assertEqual(loaded_run_configs, [
+        run_config_a,
+        run_config_b,
+        run_config_c,
+    ])
     run_config_c_case_dir = pathlib.Path(
         iree_artifacts.get_module_dir_path(
             run_config_c.module_generation_config, root_dir))
     self.assertEqual(
-        suite.filter_benchmarks_for_category(category="exported_tflite"), [
-            BenchmarkCase(
-                model_name=model_tflite.name,
-                model_tags=model_tflite.tags,
-                bench_mode=exec_config_a.tags,
-                target_arch=common_definitions.DeviceArchitecture.RV32_GENERIC,
-                driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
-                benchmark_tool_name="iree-benchmark-module",
-                benchmark_case_dir=run_config_a_case_dir,
-                run_config=run_config_a),
-            BenchmarkCase(
-                model_name=model_tflite.name,
-                model_tags=model_tflite.tags,
-                bench_mode=exec_config_b.tags,
-                target_arch=common_definitions.DeviceArchitecture.RV64_GENERIC,
-                driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-                benchmark_tool_name="iree-benchmark-module",
-                benchmark_case_dir=run_config_b_case_dir,
-                run_config=run_config_b)
-        ])
-    self.assertEqual(
-        suite.filter_benchmarks_for_category(
-            category="exported_stablehlo_mlir",
+        suite.filter_benchmarks(
             target_architectures=[
                 common_definitions.DeviceArchitecture.RV32_GENERIC
             ],
             model_name_filter="model_tf.*fp32",
-            mode_filter="defaults"),
-        [
+            mode_filter="defaults",
+        ), [
             BenchmarkCase(
                 model_name=model_tf.name,
                 model_tags=model_tf.tags,
@@ -246,13 +215,6 @@ class BenchmarkSuiteTest(unittest.TestCase):
                 benchmark_case_dir=run_config_c_case_dir,
                 run_config=run_config_c)
         ])
-    self.assertEqual(
-        suite.filter_benchmarks_for_category(
-            category="exported_stablehlo_mlir",
-            target_architectures=[
-                common_definitions.DeviceArchitecture.RV32_GENERIC
-            ],
-            mode_filter="experimental"), [])
 
 
 if __name__ == "__main__":
