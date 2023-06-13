@@ -66,3 +66,25 @@ func.func @unsigned_integer_input_output(%arg0: tensor<2x2xui32>, %arg1: tensor<
 func.func @aliasing_output(%arg0: tensor<3x4xf32> {tf.aliasing_output = 1 : i32}, %arg1: tensor<4xui32>) -> (tensor<4xui32>, tensor<3x4xf32>) {
   return %arg1, %arg0 : tensor<4xui32>, tensor<3x4xf32>
 }
+
+// -----
+
+// Tests that frontend attributes are stripped from the module and functions.
+
+// CHECK: module @jax_module
+module @jax_module attributes {
+  // CHECK-NOT: mhlo.num_partitions
+  mhlo.num_partitions = 1 : i32,
+  // CHECK-NOT: mhlo.num_replicas
+  mhlo.num_replicas = 1 : i32
+} {
+  // CHECK: func.func public @main
+  func.func public @main(
+      // CHECK-NOT: jax.arg_info
+      // CHECK-NOT: mhlo.sharding
+      %arg0: tensor<5x6xcomplex<f32>> {jax.arg_info = "array", mhlo.sharding = "{replicated}"})
+      // CHECK-NOT: jax.result_info
+      -> (tensor<5x6xcomplex<f32>> {jax.result_info = ""}) {
+    return %arg0 : tensor<5x6xcomplex<f32>>
+  }
+}

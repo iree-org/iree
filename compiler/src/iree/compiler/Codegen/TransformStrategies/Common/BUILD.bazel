@@ -13,26 +13,17 @@ package(
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectStrategies",
+    name = "TransformStrategies",
     srcs = [
         "Common.cpp",
-        "MatmulTensorCoreStrategy.cpp",
-        "PadStrategy.cpp",
-        "SmallReductionStrategy.cpp",
-        "StagedReductionStrategy.cpp",
-        "Strategies.cpp",
     ],
     hdrs = [
-        "AbstractGemmLikeStrategy.h",
+        "AbstractReductionStrategy.h",
         "Common.h",
-        "MatmulTensorCoreStrategy.h",
-        "PadStrategy.h",
-        "SmallReductionStrategy.h",
-        "StagedReductionStrategy.h",
-        "Strategies.h",
     ],
     deps = [
         # Dialects
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
@@ -47,35 +38,36 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LLVMDialect",
-        "@llvm-project//mlir:MemRefDialect",
-        "@llvm-project//mlir:MemRefTransformOps",
-        "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:SCFTransformOps",
         "@llvm-project//mlir:SCFUtils",
         "@llvm-project//mlir:TensorDialect",
-        "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:VectorDialect",
-        "@llvm-project//mlir:VectorTransformOps",
         # IR
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
+        # Interfaces
+        # Transforms (needed mostly for the BufferizableOpInterfaceImpl)
+        "@llvm-project//mlir:ArithTransforms",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MemRefTransformOps",
+        "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:SCFTransformOps",
+        "@llvm-project//mlir:TensorTransforms",
+        "@llvm-project//mlir:TensorTransformOps",
+        "@llvm-project//mlir:VectorTransforms",
+        "@llvm-project//mlir:VectorTransformOps",
         # Other Stuff
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:DialectUtils",
-        # TransformDialectStrategies
-        "//compiler/src/iree/compiler/Codegen/TransformDialectStrategies/Common:TransformDialectStrategies",
         # TransformExtensions
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
-        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
-        "@llvm-project//mlir:LinalgTransformOps",
         # TransformMatchers and other stuff
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
     ],

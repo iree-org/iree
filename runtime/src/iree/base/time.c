@@ -169,7 +169,7 @@ bool iree_wait_until(iree_time_t deadline_ns) {
   if (deadline_ns == IREE_TIME_INFINITE_PAST) return true;
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (uint64_t)iree_absolute_deadline_to_timeout_ns(deadline_ns));
 
   // NOTE: we want to use sleep APIs with absolute times as that makes retrying

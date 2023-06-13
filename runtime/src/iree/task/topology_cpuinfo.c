@@ -15,7 +15,7 @@
 static void iree_task_topology_initialize_fallback(
     iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_group_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_group_count);
   // TODO(benvanik): implement our own query... but that seems not so great.
   // For now we default to a single group: if a user wants more then they can
   // either get cpuinfo working for their platform or manually construct the
@@ -241,7 +241,7 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_core_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_core_count);
 
   // Count cores that match the filter.
   iree_host_size_t core_count = 0;

@@ -393,7 +393,7 @@ TFL_CAPI_EXPORT extern TfLiteInterpreter* TfLiteInterpreterCreate(
       _TfLiteInterpreterCreate(model, optional_options, &interpreter);
   if (iree_status_is_ok(iree_status_consume_code(status))) {
     IREE_TRACE_ZONE_APPEND_TEXT(z0, "num_threads=", strlen("num_threads="));
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, interpreter->options.num_threads);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, interpreter->options.num_threads);
   } else {
     IREE_TRACE_MESSAGE(ERROR, "failed interpreter creation");
     TfLiteInterpreterDelete(interpreter);
@@ -563,7 +563,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteInterpreterAllocateTensors(
     total_input_size +=
         iree_hal_buffer_byte_length(interpreter->input_tensors[i].buffer);
   }
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, total_input_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, total_input_size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   IREE_TRACE_ZONE_END(z0);
@@ -608,7 +608,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteInterpreterInvoke(
     total_output_size +=
         iree_hal_buffer_byte_length(interpreter->output_tensors[i].buffer);
   }
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, total_output_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, total_output_size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   IREE_TRACE_ZONE_END(z0);

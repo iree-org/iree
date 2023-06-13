@@ -7,10 +7,10 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/MatmulTensorCoreStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/PadStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/PadStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/SmallReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/StagedReductionStrategy.h"
 
 namespace mlir {
 class ImplicitLocOpBuilder;

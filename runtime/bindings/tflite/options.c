@@ -43,7 +43,7 @@ TFL_CAPI_EXPORT extern void TfLiteInterpreterOptionsDelete(
 TFL_CAPI_EXPORT extern void TfLiteInterpreterOptionsSetNumThreads(
     TfLiteInterpreterOptions* options, int32_t num_threads) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, num_threads);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, num_threads);
   options->num_threads = num_threads;
   IREE_TRACE_ZONE_END(z0);
 }

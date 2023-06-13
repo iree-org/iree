@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/ReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/CPU/ReductionStrategy.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

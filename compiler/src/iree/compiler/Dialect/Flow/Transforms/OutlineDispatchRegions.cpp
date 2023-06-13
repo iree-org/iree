@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -256,6 +257,9 @@ static std::string summarizeDispatchWorkgroupsOp(
         // No summarization implemented, default to the op's name.
         bestSummary = op->getName().getStringRef().str();
       });
+
+  // Sanitize the string so that it contains only C literal-compatible chars.
+  bestSummary = sanitizeSymbolName(bestSummary);
 
   LLVM_DEBUG(llvm::dbgs() << "// best op summary: '" << bestSummary << "'\n");
   return bestSummary;
