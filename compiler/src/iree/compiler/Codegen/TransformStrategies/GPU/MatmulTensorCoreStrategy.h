@@ -146,12 +146,13 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     int64_t numThreadsN = mlir::ceilDiv(blockTileN(), resCopyVectorSize());
     int64_t numThreadsM =
         std::min(blockTileM(), mlir::ceilDiv(totalNumThreads(), numThreadsN));
-    return MappingInfo{
-        /*numThreads=*/{numThreadsM, numThreadsN},
-        /*tileSizes=*/
-        {std::max(1ll, mlir::ceilDiv(blockTileM(), numThreadsM)),
-         std::max(1ll, mlir::ceilDiv(blockTileN(), numThreadsN))},
-        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
+                       /*tileSizes=*/
+                       {std::max(static_cast<int64_t>(1),
+                                 mlir::ceilDiv(blockTileM(), numThreadsM)),
+                        std::max(static_cast<int64_t>(1),
+                                 mlir::ceilDiv(blockTileN(), numThreadsN))},
+                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
 
   LogicalResult validateResCopyMapping() const override {
