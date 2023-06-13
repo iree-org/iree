@@ -164,15 +164,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: } : !transform.any_op
 // The unroll attribute should match td-matmul-use-mma-sync, for true: mma_sync,
 // for false:_wmma.
-<<<<<<< HEAD
-// WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {unroll_vectors_gpu_mma_sync}
-// WITH_OPTIONS: transform.structured.match ops{["scf.for"]} in %{{.*}} 
-// WITH_OPTIONS: transform.iree.synchronize_loop %{{.*}}
-=======
 // WITH_OPTIONS: apply_patterns to %{{.*}} {
 // WITH_OPTIONS:   transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
 // WITH_OPTIONS: }
->>>>>>> fcd02755d (Drop all remaining patterns)
+// WITH_OPTIONS: transform.structured.match ops{["scf.for"]} in %{{.*}} 
+// WITH_OPTIONS: transform.iree.synchronize_loop %{{.*}}
 // WITH_OPTIONS: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // WITH_OPTIONS: transform.iree.apply_buffer_optimizations %{{.*}}
 // The attribute should match td-matmul-use-mma-sync.
@@ -346,19 +342,12 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      %{{.*}}, %[[TILED_RHS:.+]] = transform.structured.tile_to_forall_op %[[RHS_PAD]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // CHECK:      transform.structured.match ops{["scf.if"]}
 // CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
-<<<<<<< HEAD
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
-// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
-=======
-// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK:      apply_patterns to %{{.*}} {
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
 // CHECK:      transform.iree.apply_cse
->>>>>>> fcd02755d (Drop all remaining patterns)
 
 // alignLhs
 // CHECK:      transform.structured.masked_vectorize %[[TILED_LHS]] vector_sizes [4, 4]
@@ -424,19 +413,12 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      %[[RHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS_PAD]]
 // CHECK:      transform.structured.tile_to_forall_op %[[LHS_COPY]]   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
 // CHECK:      transform.structured.tile_to_forall_op %[[RHS_COPY]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
-<<<<<<< HEAD
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
 // CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<x>, #gpu.warp<y>])
-// CHECK:      transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm}
-=======
-// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK:      transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK:      apply_patterns to %{{.*}} {
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
 // CHECK:      transform.iree.apply_cse
->>>>>>> fcd02755d (Drop all remaining patterns)
 
 // Verify we don't go down the path without the flag.
 // WITH_OPTIONS-LABEL: func @aligned_matmul
