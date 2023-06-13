@@ -205,16 +205,6 @@ class BenchmarkDriver(object):
   def __get_benchmark_info_from_case(
       self, category: str, benchmark_case: BenchmarkCase) -> BenchmarkInfo:
     run_config = benchmark_case.run_config
-    if run_config is None:
-      # TODO(#11076): Remove legacy path.
-      return BenchmarkInfo.build_with_legacy_name(
-          model_name=benchmark_case.model_name,
-          model_tags=benchmark_case.model_tags,
-          model_source=category,
-          bench_mode=benchmark_case.bench_mode,
-          driver_info=benchmark_case.driver_info,
-          device_info=self.device_info)
-
     run_tags = run_config.module_execution_config.tags
     compile_tags = run_config.module_generation_config.compile_config.tags
     return BenchmarkInfo(name=run_config.name,

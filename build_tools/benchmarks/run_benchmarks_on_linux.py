@@ -21,8 +21,7 @@ import subprocess
 import tarfile
 
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
-                                    BenchmarkSuite)
+from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import (execute_cmd,
                                          execute_cmd_and_get_output,
@@ -57,35 +56,9 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
       self.__run_capture(benchmark_case=benchmark_case,
                          capture_filename=capture_filename)
 
-  def __parse_flagfile(self, case_dir: pathlib.Path) -> List[str]:
-    return [
-        line.strip()
-        for line in (case_dir / MODEL_FLAGFILE_NAME).read_text().splitlines()
-    ]
-
   def __build_tool_cmds(self, benchmark_case: BenchmarkCase,
                         tool_path: pathlib.Path) -> List[Any]:
     run_config = benchmark_case.run_config
-    if run_config is None:
-      # TODO(#11076): Remove legacy path.
-      if benchmark_case.benchmark_case_dir is None:
-        raise ValueError(
-            "benchmark_case_dir can't be None if run_config is None.")
-
-      # TODO(pzread): Taskset should be derived from CPU topology.
-      # Only use the low 8 cores.
-      cmds = ["taskset", "0xFF", tool_path]
-
-      run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
-      # Replace the CUDA device flag with the specified GPU.
-      if benchmark_case.driver_info.driver_name == "cuda":
-        run_flags = [
-            flag for flag in run_flags if not flag.startswith("--device")
-        ]
-        run_flags.append(f"--device=cuda://{self.gpu_id}")
-
-      return cmds + run_flags
-
     cmds: List[Any] = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
         run_config.target_device_spec)
     cmds.append(tool_path)
@@ -113,11 +86,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
-    cwd = (benchmark_case.benchmark_case_dir
-           if benchmark_case.run_config is None else None)
     benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
-        cmd, cwd=cwd, verbose=self.verbose)
+        cmd, verbose=self.verbose)
     benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout,
                                                      benchmark_stderr)
     if self.verbose:
@@ -135,12 +105,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
                                  tool_path=tool_path)
 
-    # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
-    cwd = (benchmark_case.benchmark_case_dir
-           if benchmark_case.run_config is None else None)
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
-                               cwd=cwd,
                                stdout=subprocess.PIPE,
                                text=True)
 
@@ -162,21 +128,16 @@ def main(args):
   commit = get_git_commit_hash("HEAD")
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
-  if args.execution_benchmark_config is None:
-    # TODO(#11076): Remove legacy path.
-    benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
-        benchmark_config.root_benchmark_dir)
-  else:
-    benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    benchmark_group = benchmark_groups.get(args.target_device_name)
-    if benchmark_group is None:
-      raise ValueError("Target device not found in the benchmark config.")
-    run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
-        root_type=typing.List[iree_definitions.E2EModelRunConfig])
-    benchmark_suite = BenchmarkSuite.load_from_run_configs(
-        run_configs=run_configs,
-        root_benchmark_dir=benchmark_config.root_benchmark_dir)
+  benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+  benchmark_group = benchmark_groups.get(args.target_device_name)
+  if benchmark_group is None:
+    raise ValueError("Target device not found in the benchmark config.")
+  run_configs = serialization.unpack_and_deserialize(
+      data=benchmark_group["run_configs"],
+      root_type=typing.List[iree_definitions.E2EModelRunConfig])
+  benchmark_suite = BenchmarkSuite.load_from_run_configs(
+      run_configs=run_configs,
+      root_benchmark_dir=benchmark_config.root_benchmark_dir)
 
   benchmark_driver = LinuxBenchmarkDriver(gpu_id=args.gpu_id,
                                           device_info=device_info,
