@@ -107,6 +107,6 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
   } : !transform.any_op
-  transform.iree.apply_licm %variant_op : !transform.any_op
-  transform.iree.apply_cse %variant_op : !transform.any_op
+  transform.iree.apply_licm %variant_op_3 : !transform.any_op
+  transform.iree.apply_cse %variant_op_3 : !transform.any_op
 }
