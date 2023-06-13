@@ -456,7 +456,7 @@ class ArgParser {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  IREE_TRACE_SCOPE_NAMED("iree-run-mlir");
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-run-mlir");
 
   // Initialize the compiler once on startup before using any other APIs.
   ireeCompilerGlobalInitialize();
@@ -465,7 +465,9 @@ extern "C" int main(int argc, char** argv) {
   ArgParser arg_parser;
   if (!arg_parser.Parse(argc, argv)) {
     ireeCompilerGlobalShutdown();
-    return 1;
+    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   // Pass along compiler flags.
@@ -497,7 +499,9 @@ extern "C" int main(int argc, char** argv) {
             "Pass either the path to a .mlir/mlirbc file or `-` to read from "
             "stdin.\n");
     fflush(stderr);
-    return 1;
+    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
   const char* source_filename = runtime_argv[1];
 
@@ -507,15 +511,15 @@ extern "C" int main(int argc, char** argv) {
   // The process return code is 0 for success and non-zero otherwise.
   // We don't differentiate between compiler or runtime error codes here but
   // could if someone found it useful.
-  int rc = EXIT_SUCCESS;
+  int exit_code = EXIT_SUCCESS;
 
   // Compile and run the provided source file and get the exit code determined
   // based on the run mode.
   auto status_or = CompileAndRunFile(session, source_filename);
   if (status_or.ok()) {
-    rc = status_or.value();
+    exit_code = status_or.value();
   } else {
-    rc = 2;
+    exit_code = 2;
     iree_status_fprint(stderr, status_or.status().get());
     fflush(stderr);
   }
@@ -524,7 +528,10 @@ extern "C" int main(int argc, char** argv) {
 
   // No more compiler APIs can be called after this point.
   ireeCompilerGlobalShutdown();
-  return rc;
+
+  IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(exit_code);
+  return exit_code;
 }
 
 }  // namespace iree

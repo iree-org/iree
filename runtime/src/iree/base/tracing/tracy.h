@@ -172,43 +172,24 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-// Sets an application-specific payload that will be stored in the trace.
-// This can be used to fingerprint traces to particular versions and denote
-// compilation options or configuration. The given string value will be copied.
-#define IREE_TRACE_SET_APP_INFO(value, value_length) \
-  ___tracy_emit_message_appinfo(value, value_length)
-
-// Sets the current thread name to the given string value.
-// This will only set the thread name as it appears in the tracing backend and
-// not set the OS thread name as it would appear in a debugger.
-// The C-string |name| will be copied and does not need to be a literal.
-#define IREE_TRACE_SET_THREAD_NAME(name) ___tracy_set_thread_name(name)
-
-// Evalutes the expression code only if tracing is enabled.
-//
-// Example:
-//  struct {
-//    IREE_TRACE(uint32_t trace_only_value);
-//  } my_object;
-//  IREE_TRACE(my_object.trace_only_value = 5);
 #define IREE_TRACE(expr) expr
 
+#define IREE_TRACE_SET_APP_INFO(value, value_length) \
+  ___tracy_emit_message_appinfo(value, value_length)
+#define IREE_TRACE_SET_THREAD_NAME(name) ___tracy_set_thread_name(name)
+#define IREE_TRACE_APP_EXIT(exit_code)
+
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
-// Enters a fiber context.
-// |fiber| must be unique and remain live for the process lifetime.
 #define IREE_TRACE_FIBER_ENTER(fiber) ___tracy_fiber_enter((const char*)fiber)
-// Exits a fiber context.
 #define IREE_TRACE_FIBER_LEAVE() ___tracy_fiber_leave()
 #else
 #define IREE_TRACE_FIBER_ENTER(fiber)
 #define IREE_TRACE_FIBER_LEAVE()
 #endif  // IREE_TRACING_FEATURE_FIBERS
 
-// Begins a new zone with the parent function name.
 #define IREE_TRACE_ZONE_BEGIN(zone_id) \
   IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, NULL)
 
-// Begins a new zone with the given compile-time literal name.
 #define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal)                    \
   static const iree_tracing_location_t TracyConcat(                           \
       __tracy_source_location, __LINE__) = {name_literal, __FUNCTION__,       \
@@ -216,8 +197,6 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
   iree_zone_id_t zone_id = iree_tracing_zone_begin_impl(                      \
       &TracyConcat(__tracy_source_location, __LINE__), NULL, 0);
 
-// Begins a new zone with the given runtime dynamic string name.
-// The |value| string will be copied into the trace buffer.
 #define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length) \
   static const iree_tracing_location_t TracyConcat(                     \
       __tracy_source_location, __LINE__) = {0, __FUNCTION__, __FILE__,  \
@@ -225,9 +204,6 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
   iree_zone_id_t zone_id = iree_tracing_zone_begin_impl(                \
       &TracyConcat(__tracy_source_location, __LINE__), (name), (name_length));
 
-// Begins an externally defined zone with a dynamic source location.
-// The |file_name|, |function_name|, and optional |name| strings will be copied
-// into the trace buffer and do not need to persist.
 #define IREE_TRACE_ZONE_BEGIN_EXTERNAL(                                       \
     zone_id, file_name, file_name_length, line, function_name,                \
     function_name_length, name, name_length)                                  \
@@ -235,16 +211,18 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
       file_name, file_name_length, line, function_name, function_name_length, \
       name, name_length)
 
-// Sets the dynamic color of the zone to an XXBBGGRR value.
+#define IREE_TRACE_ZONE_END(zone_id) iree_tracing_zone_end(zone_id)
+
+#define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
+  IREE_RETURN_AND_EVAL_IF_ERROR(IREE_TRACE_ZONE_END(zone_id), __VA_ARGS__)
+
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xbgr) \
-  ___tracy_emit_zone_color(iree_tracing_make_zone_ctx(zone_id), color_xbgr);
+  ___tracy_emit_zone_color(iree_tracing_make_zone_ctx(zone_id), color_xbgr)
 
-// Appends an integer value to the parent zone. May be called multiple times.
-#define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value) \
-  ___tracy_emit_zone_value(iree_tracing_make_zone_ctx(zone_id), value);
+#define IREE_TRACE_ZONE_APPEND_VALUE_I64(zone_id, value)        \
+  ___tracy_emit_zone_value(iree_tracing_make_zone_ctx(zone_id), \
+                           (int64_t)(value))
 
-// Appends a string value to the parent zone. May be called multiple times.
-// The |value| string will be copied into the trace buffer.
 #define IREE_TRACE_ZONE_APPEND_TEXT(...)                                  \
   IREE_TRACE_IMPL_GET_VARIADIC_((__VA_ARGS__,                             \
                                  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW, \
@@ -256,57 +234,30 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
   ___tracy_emit_zone_text(iree_tracing_make_zone_ctx(zone_id), value,         \
                           value_length)
 
-// Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
-#define IREE_TRACE_ZONE_END(zone_id) iree_tracing_zone_end(zone_id)
-
-// Ends the current zone before returning on a failure.
-// Sugar for IREE_TRACE_ZONE_END+IREE_RETURN_IF_ERROR.
-#define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
-  IREE_RETURN_AND_EVAL_IF_ERROR(IREE_TRACE_ZONE_END(zone_id), __VA_ARGS__)
-
-// Configures the named plot with an IREE_TRACING_PLOT_TYPE_* representation.
 #define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type, step, fill, color) \
   iree_tracing_set_plot_type_impl(name_literal, plot_type, step, fill, color)
-// Plots a value in the named plot group as an integer.
 #define IREE_TRACE_PLOT_VALUE_I64(name_literal, value) \
   iree_tracing_plot_value_i64_impl(name_literal, value)
-// Plots a value in the named plot group as a single-precision float.
 #define IREE_TRACE_PLOT_VALUE_F32(name_literal, value) \
   iree_tracing_plot_value_f32_impl(name_literal, value)
-// Plots a value in the named plot group as a double-precision float.
 #define IREE_TRACE_PLOT_VALUE_F64(name_literal, value) \
   iree_tracing_plot_value_f64_impl(name_literal, value)
 
-// Demarcates an advancement of the top-level unnamed frame group.
 #define IREE_TRACE_FRAME_MARK() ___tracy_emit_frame_mark(NULL)
-// Demarcates an advancement of a named frame group.
 #define IREE_TRACE_FRAME_MARK_NAMED(name_literal) \
   ___tracy_emit_frame_mark(name_literal)
-// Begins a discontinuous frame in a named frame group.
-// Must be properly matched with a IREE_TRACE_FRAME_MARK_NAMED_END.
 #define IREE_TRACE_FRAME_MARK_BEGIN_NAMED(name_literal) \
   ___tracy_emit_frame_mark_start(name_literal)
-// Ends a discontinuous frame in a named frame group.
 #define IREE_TRACE_FRAME_MARK_END_NAMED(name_literal) \
   ___tracy_emit_frame_mark_end(name_literal)
 
-// Logs a message at the given logging level to the trace.
-// The message text must be a compile-time string literal.
 #define IREE_TRACE_MESSAGE(level, value_literal) \
   ___tracy_emit_messageLC(value_literal, IREE_TRACING_MESSAGE_LEVEL_##level, 0)
-// Logs a message with the given color to the trace.
-// Standard colors are defined as IREE_TRACING_MESSAGE_LEVEL_* values.
-// The message text must be a compile-time string literal.
 #define IREE_TRACE_MESSAGE_COLORED(color, value_literal) \
   ___tracy_emit_messageLC(value_literal, color, 0)
-// Logs a dynamically-allocated message at the given logging level to the trace.
-// The string |value| will be copied into the trace buffer.
 #define IREE_TRACE_MESSAGE_DYNAMIC(level, value, value_length) \
   ___tracy_emit_messageC(value, value_length,                  \
                          IREE_TRACING_MESSAGE_LEVEL_##level, 0)
-// Logs a dynamically-allocated message with the given color to the trace.
-// Standard colors are defined as IREE_TRACING_MESSAGE_LEVEL_* values.
-// The string |value| will be copied into the trace buffer.
 #define IREE_TRACE_MESSAGE_DYNAMIC_COLORED(color, value, value_length) \
   ___tracy_emit_messageC(value, value_length, color, 0)
 
@@ -341,10 +292,10 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 #define IREE_TRACE_ALLOC(ptr, size) ___tracy_emit_memory_alloc(ptr, size, 0)
 #define IREE_TRACE_FREE(ptr) ___tracy_emit_memory_free(ptr, 0)
-#define IREE_TRACE_ALLOC_NAMED(name, ptr, size) \
-  ___tracy_emit_memory_alloc_named(ptr, size, 0, name)
-#define IREE_TRACE_FREE_NAMED(name, ptr) \
-  ___tracy_emit_memory_free_named(ptr, 0, name)
+#define IREE_TRACE_ALLOC_NAMED(name_literal, ptr, size) \
+  ___tracy_emit_memory_alloc_named(ptr, size, 0, name_literal)
+#define IREE_TRACE_FREE_NAMED(name_literal, ptr) \
+  ___tracy_emit_memory_free_named(ptr, 0, name_literal)
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS
 
@@ -363,9 +314,7 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 #define IREE_TRACE_SCOPE() ZoneScoped
 #define IREE_TRACE_SCOPE_NAMED(name_literal) ZoneScopedN(name_literal)
-#else
-#define IREE_TRACE_SCOPE()
-#define IREE_TRACE_SCOPE_NAMED(name_literal)
+#define IREE_TRACE_SCOPE_ID ___tracy_scoped_zone
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #endif  // __cplusplus

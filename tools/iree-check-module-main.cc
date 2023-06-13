@@ -158,11 +158,12 @@ extern "C" int main(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-check-module");
   int exit_code = 1;
   iree_status_t status = Run(iree_allocator_system(), &exit_code);
-  int ret = iree_status_is_ok(status) ? exit_code : 1;
+  exit_code = iree_status_is_ok(status) ? exit_code : EXIT_FAILURE;
   IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(exit_code);
 
   if (FLAG_expect_failure) {
-    if (ret == 0) {
+    if (exit_code == 0) {
       printf("Test passed but expected failure\n");
       return 1;
     }
@@ -170,11 +171,11 @@ extern "C" int main(int argc, char** argv) {
     return 0;
   }
 
-  if (ret != 0) {
+  if (exit_code != 0) {
     printf("Test failed\n%s\n", Status(std::move(status)).ToString().c_str());
   }
 
-  return ret;
+  return exit_code;
 }
 
 }  // namespace iree

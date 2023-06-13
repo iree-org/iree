@@ -201,7 +201,7 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
   // mappedAtCreation and populating it before unmapping.
   if (has_initial_data) {
     IREE_TRACE_ZONE_BEGIN(z1);
-    IREE_TRACE_ZONE_APPEND_VALUE(z1, (uint64_t)initial_data.data_length);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z1, (uint64_t)initial_data.data_length);
     void* mapped_ptr =
         wgpuBufferGetMappedRange(buffer_handle, 0, initial_data.data_length);
     memcpy(mapped_ptr, initial_data.data, initial_data.data_length);

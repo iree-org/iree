@@ -214,7 +214,7 @@ iree_status_t iree_hal_cuda2_memory_pools_alloca(
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
 
   iree_hal_buffer_params_canonicalize(&params);
 
@@ -272,7 +272,7 @@ iree_status_t iree_hal_cuda2_memory_pools_dealloca(
     iree_hal_cuda2_memory_pools_t* pools, CUstream stream,
     iree_hal_buffer_t* buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(buffer));
 
   // Only process the request if the buffer came from an async pool.

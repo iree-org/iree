@@ -116,8 +116,8 @@ iree_status_t iree_task_pool_initialize(iree_allocator_t allocator,
                                         iree_host_size_t initial_capacity,
                                         iree_task_pool_t* out_pool) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, task_size);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, initial_capacity);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, task_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, initial_capacity);
 
   out_pool->allocator = allocator;
   out_pool->task_size = task_size;
