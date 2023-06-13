@@ -332,12 +332,12 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
   // We are very peculiar about the dispatches we want to match for now:
   //   - f32 only atm.
-  //   - Mandatory fill op.
+  //   - Optional fill op.
   //   - No trailing op.
   //   - If the matmul is "too aligned", then guard on the alignment flag.
   //   - If the matmul is "too small", then use the default IREE strategy.
   //   - Otherwise, we take it.
-  if (!fill->getCaptured() || trailing->getCaptured()) {
+  if (trailing->getCaptured()) {
     LDBG("--Matmul strategy fill / trailing preconditions failed\n");
     return failure();
   }
