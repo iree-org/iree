@@ -77,7 +77,7 @@ clone the repository, initialize its submodules, and configure:
 Run all core tests:
 
 ```powershell
-> bazel test -k iree/...
+> bazel test -k //...
 ```
 
 In general, build artifacts will be under the `bazel-bin` directory at the top

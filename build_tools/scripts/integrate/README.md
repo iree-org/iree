@@ -140,7 +140,7 @@ Bazel can help, especially for catching nit-picky strict things:
 
 ```
 bazel build tools:iree-compile
-bazel test iree/compiler/...
+bazel test compiler/...
 ```
 
 Once Bazel is good, remember to run
