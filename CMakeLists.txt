@@ -59,7 +59,7 @@ option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topolog
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
-option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
+option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
@@ -700,9 +700,8 @@ if(IREE_BUILD_MICROBENCHMARKS)
 endif()
 
 if(IREE_BUILD_DOCS)
-  # Add a top-level custom target to drive generating all documentation.
-  # Register it to the default target given that IREE_BUILD_DOCS is explicitly
-  # requested.
+  # Define a top-level custom target to drive generating documentation files.
+  # Add to the default target given that docs were explicitly requested.
   add_custom_target(iree-doc ALL)
 endif()
 

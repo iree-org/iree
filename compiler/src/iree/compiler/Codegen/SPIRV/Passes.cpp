@@ -190,7 +190,10 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
     spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
     return target.getResourceLimits().getMaxComputeSharedMemorySize();
   };
-  pm.addPass(createGPUCheckResourceUsagePass(getSharedMemoryLimit));
+  // TODO: query this from the target.
+  auto getIndexBitwidth = [](func::FuncOp) { return 32; };
+  pm.addPass(
+      createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle

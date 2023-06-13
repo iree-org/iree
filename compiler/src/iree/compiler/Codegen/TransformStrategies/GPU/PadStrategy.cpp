@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/PadStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/PadStrategy.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Strategies.h"
+#include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"

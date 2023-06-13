@@ -10,7 +10,7 @@
 #include <array>
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 
 namespace mlir {
 namespace iree_compiler {

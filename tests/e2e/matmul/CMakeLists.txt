@@ -620,7 +620,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-vulkan-target-triple=ampere-unknown-linux"
   LABELS
-    "requires-gpu-nvidia"
     "requires-gpu-sm80"
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
@@ -643,7 +642,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-vulkan-target-triple=ampere-unknown-linux"
   LABELS
-    "requires-gpu-nvidia"
     "requires-gpu-sm80"
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
@@ -666,7 +664,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-vulkan-target-triple=ampere-unknown-linux"
   LABELS
-    "requires-gpu-nvidia"
     "requires-gpu-sm80"
     "vulkan_uses_vk_khr_shader_float16_int8"
 )

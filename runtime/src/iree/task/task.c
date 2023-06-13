@@ -564,7 +564,7 @@ void iree_task_dispatch_issue(iree_task_dispatch_t* dispatch_task,
                               iree_task_submission_t* pending_submission,
                               iree_task_post_batch_t* post_batch) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, dispatch_task->dispatch_id);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, dispatch_task->dispatch_id);
 
   // Mark the dispatch as having been issued; the next time it retires it'll be
   // because all work has completed.
@@ -653,7 +653,7 @@ void iree_task_dispatch_issue(iree_task_dispatch_t* dispatch_task,
 void iree_task_dispatch_retire(iree_task_dispatch_t* dispatch_task,
                                iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, dispatch_task->dispatch_id);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, dispatch_task->dispatch_id);
 
   // TODO(benvanik): attach statistics to the tracy zone.
 
@@ -716,7 +716,7 @@ void iree_task_dispatch_shard_execute(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_task_dispatch_t* dispatch_task = iree_task_dispatch_shard_parent(task);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, dispatch_task->dispatch_id);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, dispatch_task->dispatch_id);
   IREE_TRACE_ZONE_SET_COLOR(
       z0, iree_math_ptr_to_xrgb(dispatch_task->closure.user_context));
 
@@ -789,10 +789,10 @@ void iree_task_dispatch_shard_execute(
 #ifndef NDEBUG
       // NOTE: these are useful for debugging but dramatically increase our
       // cost here; only enable if needed for tracking work distribution:
-      IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[0]);
-      IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[1]);
-      IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[2]);
-      // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z_tile, tile_context.workgroup_xyz[0]);
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z_tile, tile_context.workgroup_xyz[1]);
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z_tile, tile_context.workgroup_xyz[2]);
+      // IREE_TRACE_ZONE_APPEND_VALUE_I64(z_tile, (uint64_t)task->closure.fn);
 #endif  // !NDEBUG
 
       iree_status_t status =

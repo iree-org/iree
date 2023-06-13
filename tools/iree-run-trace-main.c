@@ -359,7 +359,8 @@ int main(int argc, char** argv) {
   if (argc <= 1) {
     fprintf(stderr,
             "no trace files provided; pass one or more yaml file paths");
-    return 1;
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   iree_vm_instance_t* instance = NULL;
@@ -369,10 +370,12 @@ int main(int argc, char** argv) {
     status = iree_run_trace_files(argc - 1, argv + 1, instance);
   }
   iree_vm_instance_release(instance);
+  int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
-    return 1;
+    exit_code = EXIT_FAILURE;
   }
-  return 0;
+  IREE_TRACE_APP_EXIT(exit_code);
+  return exit_code;
 }

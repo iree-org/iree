@@ -91,9 +91,9 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_TRACE(const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id));
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, id_hash);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, rank);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, id_hash);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, rank);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
 
   ncclComm_t comm = NULL;
   ncclConfig_t config = NCCL_CONFIG_INITIALIZER;
@@ -128,9 +128,9 @@ static void iree_hal_cuda_nccl_channel_destroy(
       iree_hal_cuda_nccl_channel_cast(base_channel);
   iree_allocator_t host_allocator = channel->context_wrapper->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->id_hash);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->rank);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, channel->id_hash);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, channel->rank);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, channel->count);
 
   // TODO(#9580): support async tear down
   // We could be smarter about starting finalization of all channels async and

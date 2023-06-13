@@ -32,7 +32,7 @@ CPU_IMAGE_SIZE_GB=10
 # We need enough space to fetch Docker images that we test with
 # TODO(gcmn): See if we can make the image smaller, e.g. by resizing after setup
 # or using a local ssd for scratch space during setup.
-GPU_IMAGE_SIZE_GB=50
+GPU_IMAGE_SIZE_GB=100
 
 # It takes a little bit to bring up ssh on the instance. I haven't found a
 # better way to wait for this than just polling.

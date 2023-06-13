@@ -52,5 +52,6 @@ int main(int argc, char** argv) {
   }
 
   IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(exit_code);
   return exit_code;
 }

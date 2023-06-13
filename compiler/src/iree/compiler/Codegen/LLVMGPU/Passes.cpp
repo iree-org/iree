@@ -507,7 +507,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // Run checks on shared memory usage.
   // TODO: query this from the target.
   auto getSharedMemoryLimit = [](func::FuncOp) { return 163 * 1024; };
-  pm.addPass(createGPUCheckResourceUsagePass(getSharedMemoryLimit));
+  auto getIndexBitwidth = [](func::FuncOp) { return 64; };
+  pm.addPass(
+      createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 
   // SCF -> STD
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());

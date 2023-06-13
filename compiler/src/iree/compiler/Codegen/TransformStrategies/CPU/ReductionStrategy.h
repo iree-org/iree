@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_REDUCTION_STRATEGY_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_REDUCTION_STRATEGY_H_
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
 
 namespace mlir {
 namespace iree_compiler {
