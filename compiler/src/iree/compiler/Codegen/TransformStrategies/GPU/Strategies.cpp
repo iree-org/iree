@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Strategies.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 
 #include <tuple>
 
@@ -12,12 +12,12 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/MatmulTensorCoreStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Strategies.h"
+#include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/SmallReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/StagedReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"

@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 
 namespace mlir {
 namespace iree_compiler {
