@@ -142,11 +142,33 @@ def main(args):
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+
     benchmark_group = benchmark_groups.get(args.target_device_name)
     if benchmark_group is None:
-        raise ValueError("Target device not found in the benchmark config.")
+        raise ValueError(
+            "Target device '{}' not found in the benchmark config.".format(
+                args.target_device_name
+            )
+        )
+
+    benchmark_shard = next(
+        (
+            shard
+            for shard in benchmark_group
+            if shard["shard"]["index"] == args.shard_index
+        ),
+        None,
+    )
+    if benchmark_shard is None:
+        raise ValueError(
+            "Given shard (index={}) not found in the benchmark config group. Available indexes: [{}].".format(
+                args.shard_index,
+                ", ".join(str(shard["shard"]["index"]) for shard in benchmark_group),
+            )
+        )
+
     run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
+        data=benchmark_shard["run_configs"],
         root_type=typing.List[iree_definitions.E2EModelRunConfig],
     )
     benchmark_suite = BenchmarkSuite.load_from_run_configs(

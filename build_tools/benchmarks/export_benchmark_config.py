@@ -87,6 +87,7 @@ def _get_distinct_module_dir_paths(
 def _export_execution_handler(
     presets: Optional[Sequence[str]] = None,
     target_device_names: Optional[Sequence[str]] = None,
+    shard_count: Dict[str, int] = {},
     **_unused_args,
 ):
     _, all_run_configs = benchmark_collections.generate_benchmarks()
@@ -99,6 +100,8 @@ def _export_execution_handler(
         presets=None if presets is None else set(presets),
     )
 
+    default_shard_count = shard_count.get("default", 1)
+
     output_map = {}
     for device_name, run_configs in grouped_run_config_map.items():
         host_environments = set(
@@ -110,15 +113,27 @@ def _export_execution_handler(
             )
         host_environment = host_environments.pop()
 
-        distinct_module_dir_paths = _get_distinct_module_dir_paths(
-            config.module_generation_config for config in run_configs
-        )
+        current_shard_count = int(shard_count.get(device_name, default_shard_count))
+        sharded_run_configs = [
+            run_configs[shard_idx::current_shard_count]
+            for shard_idx in range(current_shard_count)
+        ]
 
-        output_map[device_name] = {
-            "host_environment": dataclasses.asdict(host_environment),
-            "module_dir_paths": distinct_module_dir_paths,
-            "run_configs": serialization.serialize_and_pack(run_configs),
-        }
+        for shard_idx, shard in enumerate(sharded_run_configs):
+            distinct_module_dir_paths = _get_distinct_module_dir_paths(
+                config.module_generation_config for config in shard
+            )
+
+            serialized_run_configs = serialization.serialize_and_pack(shard)
+            output_map.setdefault(device_name, [])
+            output_map[device_name].append(
+                {
+                    "shard": {"index": shard_idx + 1, "count": current_shard_count},
+                    "host_environment": dataclasses.asdict(host_environment),
+                    "module_dir_paths": distinct_module_dir_paths,
+                    "run_configs": serialized_run_configs,
+                }
+            )
 
     return output_map
 
@@ -163,6 +178,15 @@ def _parse_benchmark_presets(arg: str, available_presets: Sequence[str]) -> List
             )
         presets.append(preset)
     return presets
+
+
+def _parse_shard_count(arg: str):
+    try:
+        # First we se if we were given a single integer, so we use that as a default
+        return {"default": int(arg)}
+    except:
+        # If that fails we assume we have a list of key value pairs with the key being a device name
+        return dict(map(str.strip, el.split("=", 1)) for el in arg.split(","))
 
 
 def _parse_arguments():
@@ -227,6 +251,12 @@ def _parse_arguments():
             "multiple presets will be union. Available options: "
             f"{','.join(benchmark_presets.ALL_EXECUTION_PRESETS)}"
         ),
+    )
+    execution_parser.add_argument(
+        "--shard_count",
+        type=_parse_shard_count,
+        default={},
+        help="When set to any number higher than 1 then all benchmarks are sharded into <shard_count> parallel jobs. It also accepts a comma-separated list of device-name to shard-count mappings.",
     )
 
     compilation_parser = subparser.add_parser(

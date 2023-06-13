@@ -67,12 +67,14 @@ jobs:
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Generating benchmark matrix"
         id: generate
-        run: |
-          gcloud storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}"
-          echo benchmark-matrix=$(jq \
-              'to_entries | map({"device_name": .key, "host_environment": .value.host_environment})' \
-              "${BENCHMARK_CONFIG}") \
-            >> "${GITHUB_OUTPUT}"
+        run: >
+          gcloud storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}";
+          echo benchmark-matrix=$(jq 'to_entries[] | .key as $device_name | .value[] |
+               {
+                 "device_name": $device_name,
+                 "host_environment": .host_environment,
+                 "shard": .shard
+               }' "${BENCHMARK_CONFIG}" | jq -s '.') >> "${GITHUB_OUTPUT}"
 
   run_benchmarks:
     needs: [generate_matrix]
@@ -91,10 +93,13 @@ jobs:
       - machine-type=${{ matrix.benchmark.device_name }}
     env:
       DEVICE_NAME: ${{ matrix.benchmark.device_name }}
+      SHARD_INDEX: ${{ matrix.benchmark.shard.index }}
+      SHARD_COUNT: ${{ matrix.benchmark.shard.count }}
       PLATFORM_ARCH: ${{ matrix.benchmark.host_environment.platform }}-${{ matrix.benchmark.host_environment.architecture }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ inputs.e2e-test-artifacts-gcs-artifact-dir }}
       E2E_TEST_ARTIFACTS_DIR: ${{ inputs.e2e-test-artifacts-dir }}
       BENCHMARK_RESULTS_DIR: benchmark-results
+      SHARDING_SUFFIX: ${{ matrix.benchmark.shard.count > 1 && format('-shard{0}of{1}', matrix.benchmark.shard.index, matrix.benchmark.shard.count) || '' }}
     outputs:
       benchmark-results-dir: ${{ env.BENCHMARK_RESULTS_DIR }}
       # Ideally this should be defined in env, so it can be used in the upload
@@ -122,8 +127,9 @@ jobs:
           mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
           jq -r \
             --arg DEVICE_NAME "${DEVICE_NAME}" \
+            --arg SHARD_INDEX "${SHARD_INDEX}" \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-            '.[$DEVICE_NAME] | .module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
+            '.[$DEVICE_NAME][] | select((.shard.index | tostring) == $SHARD_INDEX) | .module_dir_paths[] | "\($GCS_ARTIFACT_DIR)/\(.)"' \
             "${BENCHMARK_CONFIG}" | \
             gcloud storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
@@ -147,9 +153,10 @@ jobs:
           IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
           IREE_TRACY_CAPTURE_TOOL: ${{ steps.unpack-tools.outputs.tracy-capture-tool }}
           IREE_TARGET_DEVICE_NAME: ${{ env.DEVICE_NAME }}
+          IREE_SHARD_INDEX: ${{ env.SHARD_INDEX }}
           IREE_E2E_TEST_ARTIFACTS_DIR: ${{ env.E2E_TEST_ARTIFACTS_DIR }}
-          IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}.json
-          IREE_BENCHMARK_TRACES: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-traces-${{ matrix.benchmark.device_name }}.tar.gz
+          IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}${{ env.SHARDING_SUFFIX }}.json
+          IREE_BENCHMARK_TRACES: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-traces-${{ matrix.benchmark.device_name }}${{ env.SHARDING_SUFFIX }}.tar.gz
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
           ./build_tools/benchmarks/run_benchmarks.sh

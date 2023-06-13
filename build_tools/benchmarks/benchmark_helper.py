@@ -113,24 +113,31 @@ def _dump_cmds_handler(
 
     if execution_benchmark_config is not None:
         benchmark_groups = json.loads(execution_benchmark_config.read_text())
-        for target_device, benchmark_group in benchmark_groups.items():
-            run_configs = serialization.unpack_and_deserialize(
-                data=benchmark_group["run_configs"],
-                root_type=List[iree_definitions.E2EModelRunConfig],
-            )
-            for run_config in run_configs:
-                if benchmark_id is not None and benchmark_id != run_config.composite_id:
-                    continue
-
-                lines.append("################")
-                lines.append("")
-                lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
-                lines.append(f"Name: {run_config}")
-                lines.append(f"Target Device: {target_device}")
-                lines.append("")
-                lines += _dump_cmds_from_run_config(
-                    run_config=run_config, root_path=e2e_test_artifacts_dir
+        for target_device, benchmark_shards in benchmark_groups.items():
+            for benchmark_shard in benchmark_shards:
+                run_configs = serialization.unpack_and_deserialize(
+                    data=benchmark_shard["run_configs"],
+                    root_type=List[iree_definitions.E2EModelRunConfig],
                 )
+                for run_config in run_configs:
+                    if (
+                        benchmark_id is not None
+                        and benchmark_id != run_config.composite_id
+                    ):
+                        continue
+
+                    lines.append("################")
+                    lines.append("")
+                    lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
+                    lines.append(f"Name: {run_config}")
+                    lines.append(f"Target Device: {target_device}")
+                    lines.append(
+                        f"Shard: {benchmark_shard['shard']['index']} / {benchmark_shard['shard']['count']}"
+                    )
+                    lines.append("")
+                    lines += _dump_cmds_from_run_config(
+                        run_config=run_config, root_path=e2e_test_artifacts_dir
+                    )
 
     if compilation_benchmark_config is not None:
         benchmark_config = json.loads(compilation_benchmark_config.read_text())

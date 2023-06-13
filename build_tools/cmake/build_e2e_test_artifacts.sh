@@ -101,7 +101,8 @@ FLAG_DUMP="${E2E_TEST_ARTIFACTS_DIR}/benchmark-flag-dump.txt"
 ./build_tools/benchmarks/export_benchmark_config.py \
   execution \
   --benchmark_presets="${EXECUTION_PRESETS}" \
-  --output="${EXECUTION_CONFIG}"
+  --output="${EXECUTION_CONFIG}" \
+  --shard_count="a2-highgpu-1g=2" # Just an experiment for now
 ./build_tools/benchmarks/benchmark_helper.py dump-cmds \
   --execution_benchmark_config="${EXECUTION_CONFIG}" \
   --compilation_benchmark_config="${COMPILATION_CONFIG}" \
