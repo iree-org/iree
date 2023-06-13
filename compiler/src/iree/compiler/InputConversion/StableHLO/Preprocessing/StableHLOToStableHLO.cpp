@@ -1543,23 +1543,20 @@ struct CustomCallIsTopK final
 // Recursive helper function that identifies an Iota followed by a set of
 // broadcasts where the last dimension of the iota is preserved throughout.
 bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
-  auto iotaOp =
-      dyn_cast_or_null<mlir::stablehlo::IotaOp>(input.getDefiningOp());
-  if (iotaOp) {
+  if (auto iotaOp =
+          dyn_cast_or_null<mlir::stablehlo::IotaOp>(input.getDefiningOp())) {
     int64_t iotaDim = iotaOp.getIotaDimension();
     auto iotaLastDim = cast<ShapedType>(iotaOp.getType()).getRank() - 1;
     if (iotaDim == iotaLastDim) {
       return true;
-    } else {
-      (void)rewriter.notifyMatchFailure(iotaOp,
-                                        "Iota must be on last dimension");
-      return false;
     }
+
+    (void)rewriter.notifyMatchFailure(iotaOp, "Iota must be on last dimension");
+    return false;
   }
 
-  auto broadcastOp = dyn_cast_or_null<mlir::stablehlo::BroadcastInDimOp>(
-      input.getDefiningOp());
-  if (broadcastOp) {
+  if (auto broadcastOp = dyn_cast_or_null<mlir::stablehlo::BroadcastInDimOp>(
+          input.getDefiningOp())) {
     auto broadcastLastDim =
         cast<ShapedType>(broadcastOp.getType()).getRank() - 1;
     SmallVector<int64_t> broadcastDimensions = llvm::to_vector(
@@ -1571,6 +1568,7 @@ bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
     }
     return isIotaOrIotaBroadcast(rewriter, broadcastOp.getOperand());
   }
+
   return false;
 }
 
