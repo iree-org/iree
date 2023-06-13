@@ -319,10 +319,11 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *fill;
   StructuredOpMatcher *matmul;
+  StructuredOpMatcher *leading;
   StructuredOpMatcher *trailing;
   transform_ext::MatchedMatmulCaptures captures;
   transform_ext::MatcherContext matcherContext;
-  makeMatmulMatcher(matcherContext, matmul, fill, trailing, captures,
+  makeMatmulMatcher(matcherContext, matmul, fill, leading, trailing, captures,
                     /*mustMatchEntireFunc=*/true);
   if (!matchPattern(op, *matmul)) {
     LDBG("--Matmul strategy fail to match\n");

@@ -1371,6 +1371,7 @@ void transform_ext::makeMatmulMatcher(
     transform_ext::MatcherContext &matcherContext,
     transform_ext::StructuredOpMatcher *&matmulCapture,
     transform_ext::StructuredOpMatcher *&fillCapture,
+    transform_ext::StructuredOpMatcher *&leadingCapture,
     transform_ext::StructuredOpMatcher *&trailingCapture,
     transform_ext::MatchedMatmulCaptures &captures, bool mustMatchEntireFunc) {
   auto &matmul = transform_ext::m_StructuredOp<linalg::MatmulOp>(matcherContext)
@@ -1383,10 +1384,15 @@ void transform_ext::makeMatmulMatcher(
   matmulCapture = &matmul;
   // Mandatory FillOp must create the unique output of the reduction.
   auto &fill = transform_ext::m_StructuredOp<linalg::FillOp>(matcherContext);
-  matmul = matmul.output(transform_ext::NumEqualsTo(1)).output(0, fill);
+  matmul = matmul.output(transform_ext::NumEqualsTo(1)).output(0, fill, OptionalMatch());
   fillCapture = &fill;
 
-  auto &trailing = m_StructuredOp<linalg::GenericOp>(matcherContext);
+  auto &commonLeadingOrTrailing = m_StructuredOp<linalg::GenericOp>(matcherContext);
+  auto &leading = m_StructuredOp(matcherContext, commonLeadingOrTrailing);
+  matmul = matmul.input(0, leading, OptionalMatch());
+  leadingCapture = &leading;
+
+  auto &trailing = m_StructuredOp(matcherContext, commonLeadingOrTrailing);
   matmul = matmul.result(0, HasAnyUse(), trailing, OptionalMatch());
   if (mustMatchEntireFunc)
     matmul = matmul.allTilableOpsCaptured<func::FuncOp>();

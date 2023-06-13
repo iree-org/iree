@@ -1042,6 +1042,7 @@ void makeReductionMatcher(MatcherContext &context,
 void makeMatmulMatcher(MatcherContext &matcherContext,
                        StructuredOpMatcher *&matmulCapture,
                        StructuredOpMatcher *&fillCapture,
+                       StructuredOpMatcher *&leadingCapture,
                        StructuredOpMatcher *&trailingCapture,
                        MatchedMatmulCaptures &captures,
                        bool mustMatchEntireFunc);
