@@ -48,8 +48,6 @@ static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
   return iree_ok_status();
 }
 
-#undef IREE_CONCAT
-
 iree_status_t iree_hal_cuda2_dynamic_symbols_initialize(
     iree_allocator_t host_allocator,
     iree_hal_cuda2_dynamic_symbols_t* out_syms) {
