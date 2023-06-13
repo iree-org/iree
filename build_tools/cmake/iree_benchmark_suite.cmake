@@ -6,8 +6,7 @@
 
 # iree_import_tflite_model()
 #
-# Generates MLIR file from a TFLite model file. The generated target will be
-# also added to the iree-benchmark-import-models.
+# Generates MLIR file from a TFLite model file.
 #
 # Parameters:
 #   TARGET_NAME: The target name to be created for this module.
@@ -55,14 +54,12 @@ function(iree_import_tflite_model)
       COMMENT
         "Importing ${_MODEL_BASENAME} into MLIR"
     )
-    add_dependencies(iree-benchmark-import-models "${_RULE_TARGET_NAME}")
   endif()
 endfunction()
 
 # iree_import_tf_model()
 #
-# Generates MLIR file from a TensorFlow SavedModel. The generated target will
-# be also added to the iree-benchmark-import-models.
+# Generates MLIR file from a TensorFlow SavedModel.
 #
 # Parameters:
 #   TARGET_NAME: The target name to be created for this module.
@@ -110,7 +107,6 @@ function(iree_import_tf_model)
       COMMENT
         "Importing ${_MODEL_BASENAME} into MLIR"
     )
-    add_dependencies(iree-benchmark-import-models "${_RULE_TARGET_NAME}")
   endif()
 endfunction()
 
