@@ -411,12 +411,10 @@ static iree_status_t iree_hal_cuda2_device_create_channel(
                          "exchanging NCCL ID with other participants");
   } else if (params.id.data_length != IREE_ARRAYSIZE(id.data)) {
     // User provided something but it's not what we expect.
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "NCCL ID must be %" PRIhsz
-        " bytes matching the ncclUniqueId struct but caller provided %" PRIhsz
-        " bytes",
-        IREE_ARRAYSIZE(id.data), sizeof(id));
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "NCCL ID must be %zu bytes matching the "
+                            "ncclUniqueId struct but caller provided %zu bytes",
+                            IREE_ARRAYSIZE(id.data), sizeof(id));
   } else {
     // User provided the ID - we treat it as opaque here and let NCCL validate.
     memcpy(id.data, params.id.data, IREE_ARRAYSIZE(id.data));
