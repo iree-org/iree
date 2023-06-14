@@ -28,6 +28,9 @@ using namespace mlir;
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
+using iree_compiler::IREE::transform_dialect::
+    ApplyCommonSubexpressionEliminationOp;
+using iree_compiler::IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
@@ -95,17 +98,23 @@ void mlir::iree_compiler::createTransformRegion(
   OpBuilder b(ctx);
   b.setInsertionPointAfter(entryPoint);
   auto topLevelTransformModule = b.create<ModuleOp>(loc);
+  topLevelTransformModule->setAttr(
+      b.getStringAttr(transform::TransformDialect::kWithNamedSequenceAttrName),
+      b.getUnitAttr());
   Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
   b.setInsertionPointToStart(&topLevelTransformRegion.front());
   auto anyOpType = transform::AnyOpType::get(b.getContext());
   auto sequence = b.create<transform::SequenceOp>(
       loc, TypeRange{}, transform::FailurePropagationMode::Propagate, anyOpType,
       [&](OpBuilder &b, Location loc, Value variantH) {
-        ImplicitLocOpBuilder ib(loc, b);
-        buildStrategy(ib, variantH);
         b.create<transform::YieldOp>(loc);
       });
-  (void)sequence;
+
+  // Populate sequence after inserting it, so that helper functions can find
+  // the enclosing module.
+  ImplicitLocOpBuilder ib(loc, ctx);
+  ib.setInsertionPointToStart(&sequence.getBody().front());
+  buildStrategy(ib, sequence.getBody().getArgument(0));
   LDBG("transformation script:\n");
   LDBG("verification: " << sequence.verify().succeeded() << "\n");
   LLVM_DEBUG(sequence.print(DBGS()));
@@ -127,20 +136,56 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
 /// In addition to the specified transform, perform the following ones:
 ///   tiling-related canonicalization patterns, canonicalization, licm and cse
 ///   (in this order).
+/// For better readability, these transforms are added to a named sequence.
+// TODO: Do not create duplicate named sequences.
 void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
     ImplicitLocOpBuilder &b, Value variantH,
     ApplyPatternsOpBodyBuilderFn populatePatternsFn) {
-  b.create<transform::ApplyPatternsOp>(
-      variantH, [&](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyTilingCanonicalizationPatternsOp>(loc);
-        b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
-        b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
-        b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
-        if (populatePatternsFn) populatePatternsFn(b, loc);
-      });
-  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(variantH);
-  b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
-      variantH);
+  auto ip = b.saveInsertionPoint();
+  ModuleOp transformModule =
+      b.getInsertionBlock()->getParent()->getParentOfType<ModuleOp>();
+  assert(transformModule && "could not find enclosing module");
+
+  // Create transform.named_sequence op.
+  SmallVector<Type> funcInputTypes(1, variantH.getType());
+  SmallVector<Location> locs(1, variantH.getLoc());
+  FunctionType funcType = FunctionType::get(b.getContext(), funcInputTypes,
+                                            /*results=*/TypeRange());
+  b.clearInsertionPoint();
+  auto namedSequence = b.create<transform::NamedSequenceOp>(
+      /*sym_name=*/b.getStringAttr("canonicalization"),
+      /*function_type=*/TypeAttr::get(funcType),
+      /*sym_visibility=*/StringAttr(),
+      /*arg_attrs=*/
+      b.getArrayAttr({b.getDictionaryAttr(
+          {b.getNamedAttr(transform::TransformDialect::kArgReadOnlyAttrName,
+                          b.getUnitAttr())})}),
+      /*res_attrs=*/ArrayAttr());
+  Block *block =
+      b.createBlock(&namedSequence.getBody(), namedSequence.getBody().begin(),
+                    funcInputTypes, locs);
+  SymbolTable symbolTable(transformModule);
+  StringAttr insertedName = symbolTable.insert(namedSequence);
+
+  // Add ops to the named sequence.
+  BlockArgument bbArg = block->getArgument(0);
+  b.create<transform::ApplyPatternsOp>(bbArg, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyTilingCanonicalizationPatternsOp>(loc);
+    b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
+    b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
+    b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+    if (populatePatternsFn) populatePatternsFn(b, loc);
+  });
+  b.create<ApplyLoopIndependentCodeMotionOp>(bbArg);
+  b.create<ApplyCommonSubexpressionEliminationOp>(bbArg);
+  b.create<transform::YieldOp>();
+
+  // Create transform.include op/
+  b.restoreInsertionPoint(ip);
+  SmallVector<Value> args(1, variantH);
+  b.create<transform::IncludeOp>(TypeRange(), SymbolRefAttr::get(insertedName),
+                                 transform::FailurePropagationMode::Propagate,
+                                 args);
 }
 
 /// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
