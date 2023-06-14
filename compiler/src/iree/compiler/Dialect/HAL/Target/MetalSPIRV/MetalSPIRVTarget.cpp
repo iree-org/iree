@@ -8,10 +8,14 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
+#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MSLToMetalLib.h"
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/metal_executable_def_builder.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -26,6 +30,22 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+llvm::cl::opt<MetalTargetPlatform> clTargetPlatform(
+    "iree-metal-target-platform", llvm::cl::desc("Apple platform to target"),
+    llvm::cl::values(
+        clEnumValN(MetalTargetPlatform::macOS, "macos", "macOS platform"),
+        clEnumValN(MetalTargetPlatform::iOS, "ios", "iOS platform"),
+        clEnumValN(MetalTargetPlatform::iOSSimulator, "ios-simulator",
+                   "iOS simulator platform")),
+    llvm::cl::init(MetalTargetPlatform::macOS));
+
+static llvm::cl::opt<bool> clCompileToMetalLib(
+    "iree-metal-compile-to-metallib",
+    llvm::cl::desc(
+        "Compile to .metallib and embed in IREE deployable flatbuffer if true; "
+        "otherwise stop at and embed MSL source code"),
+    llvm::cl::init(true));
 
 static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
   using spirv::Capability;
@@ -72,7 +92,7 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
       /*max_subgroup_size=*/std::nullopt,
       /*cooperative_matrix_properties_nv=*/ArrayAttr());
 
-  auto triple = spirv::VerCapExtAttr::get(spirv::Version::V_1_0, capabilities,
+  auto triple = spirv::VerCapExtAttr::get(spirv::Version::V_1_3, capabilities,
                                           extensions, context);
   // Further assuming Apple GPUs.
   return spirv::TargetEnvAttr::get(
@@ -88,18 +108,14 @@ class MetalSPIRVTargetBackend : public TargetBackend {
   std::string name() const override { return "metal"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
-                    gpu::GPUDialect>();
+    registry.insert<gpu::GPUDialect, IREE::Codegen::IREECodegenDialect,
+                    IREE::Flow::FlowDialect, spirv::SPIRVDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
       MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-
-    // Indicates that the runtime HAL driver operates only in the legacy
-    // synchronous mode.
-    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
 
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
@@ -135,9 +151,9 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // The runtime use ordinals instead of names but Metal requires function
     // names for constructing pipeline states. Get an ordered list of the entry
     // point names.
-    SmallVector<StringRef, 8> entryPointNames;
+    SmallVector<StringRef, 8> spirvEntryPointNames;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
-      entryPointNames.push_back(exportOp.getFn());
+      spirvEntryPointNames.push_back(exportOp.getFn());
     });
 
     // 1. Serialize the spirv::ModuleOp into binary format.
@@ -152,32 +168,51 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     }
 
     // 2. Cross compile SPIR-V to MSL source code.
-    llvm::SmallVector<MetalShader, 2> mslShaders;
-    for (const auto &entryPoint : entryPointNames) {
-      std::optional<MetalShader> mslShader = crossCompileSPIRVToMSL(
-          // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
-          llvm::ArrayRef(spvBinary.data(), spvBinary.size()), entryPoint);
-      if (!mslShader) {
+    SmallVector<MetalShader, 2> mslShaders;
+    SmallVector<std::string, 2> mslEntryPointNames;
+    mslShaders.reserve(spirvEntryPointNames.size());
+    mslEntryPointNames.reserve(spirvEntryPointNames.size());
+    for (const auto &entryPoint : spirvEntryPointNames) {
+      // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
+      ArrayRef spvData(spvBinary.data(), spvBinary.size());
+      std::optional<std::pair<MetalShader, std::string>> msl =
+          crossCompileSPIRVToMSL(clTargetPlatform, spvData, entryPoint);
+      if (!msl) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";
       }
-      mslShaders.push_back(std::move(*mslShader));
+      mslShaders.push_back(std::move(msl->first));
+      mslEntryPointNames.push_back(std::move(msl->second));
     }
-
-    // 3. Compile MSL to MTLLibrary.
-    // TODO(antiagainst): provide the option to compile the shaders into a
-    // library and embed in the FlatBuffer. Metal provides APIs for compiling
-    // shader sources into a MTLLibrary at run-time, but does not provie
-    // a way to serialize the generated MTLLibrary. The only way available is
-    // to use command-line tools like `metal` and `metallib`. Likely we need
-    // to invoke them in C++.
 
     if (!options.dumpBinariesPath.empty()) {
       for (auto shader : llvm::enumerate(mslShaders)) {
         dumpDataToPath(
             options.dumpBinariesPath, options.dumpBaseName,
             (variantOp.getName() + std::to_string(shader.index())).str(),
-            ".msl", shader.value().source);
+            ".metal", shader.value().source);
+      }
+    }
+
+    // 3. Compile MSL to MTLLibrary.
+    SmallVector<std::unique_ptr<llvm::MemoryBuffer>> metalLibs;
+    if (clCompileToMetalLib) {
+      // We need to use offline Metal shader compilers.
+      // TODO(#14048): The toolchain can also exist on other platforms. Probe
+      // the PATH instead.
+      auto hostTriple = llvm::Triple(llvm::sys::getProcessTriple());
+      if (hostTriple.isMacOSX()) {
+        for (auto [shader, entryPoint] :
+             llvm::zip(mslShaders, mslEntryPointNames)) {
+          std::unique_ptr<llvm::MemoryBuffer> lib =
+              compileMSLToMetalLib(clTargetPlatform, shader.source, entryPoint);
+          if (!lib) {
+            return variantOp.emitError()
+                   << "failed to compile to MTLLibrary from MSL:\n\n"
+                   << shader.source << "\n\n";
+          }
+          metalLibs.push_back(std::move(lib));
+        }
       }
     }
 
@@ -185,8 +220,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     FlatbufferBuilder builder;
     iree_hal_metal_ExecutableDef_start_as_root(builder);
 
-    auto shaderSourcesRef = builder.createStringVec(llvm::map_range(
-        mslShaders, [&](const MetalShader &shader) { return shader.source; }));
+    auto entryPointNamesRef = builder.createStringVec(mslEntryPointNames);
+    iree_hal_metal_ExecutableDef_entry_points_add(builder, entryPointNamesRef);
 
     iree_hal_metal_ThreadgroupSize_vec_start(builder);
     for (auto &shader : mslShaders) {
@@ -195,13 +230,26 @@ class MetalSPIRVTargetBackend : public TargetBackend {
           shader.threadgroupSize.z);
     }
     auto threadgroupSizesRef = iree_hal_metal_ThreadgroupSize_vec_end(builder);
-
-    auto entryPointNamesRef = builder.createStringVec(entryPointNames);
-
-    iree_hal_metal_ExecutableDef_entry_points_add(builder, entryPointNamesRef);
     iree_hal_metal_ExecutableDef_threadgroup_sizes_add(builder,
                                                        threadgroupSizesRef);
-    iree_hal_metal_ExecutableDef_shader_sources_add(builder, shaderSourcesRef);
+
+    if (metalLibs.empty()) {
+      auto shaderSourcesRef = builder.createStringVec(llvm::map_range(
+          mslShaders,
+          [&](const MetalShader &shader) { return shader.source; }));
+      iree_hal_metal_ExecutableDef_shader_sources_add(builder,
+                                                      shaderSourcesRef);
+    } else {
+      auto refs = llvm::to_vector<8>(llvm::map_range(
+          metalLibs, [&](const std::unique_ptr<llvm::MemoryBuffer> &buffer) {
+            return flatbuffers_string_create(builder, buffer->getBufferStart(),
+                                             buffer->getBufferSize());
+          }));
+      auto libsRef =
+          flatbuffers_string_vec_create(builder, refs.data(), refs.size());
+      iree_hal_metal_ExecutableDef_shader_libraries_add(builder, libsRef);
+    }
+
     iree_hal_metal_ExecutableDef_end_as_root(builder);
 
     // 5. Add the binary data to the target executable.
