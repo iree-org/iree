@@ -94,3 +94,4 @@ func.func @main(%x : tensor<2xi64>, %y : tensor<2xf64>) -> tensor<2xf64> {
   %1 = func.call @extern_func(%y, %x) : (tensor<2xf64>, tensor<2xi64>) -> tensor<2xf64>
   return %1 : tensor<2xf64>
 }
+
