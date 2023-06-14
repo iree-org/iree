@@ -1540,6 +1540,38 @@ struct CustomCallIsTopK final
   }
 };
 
+// Recursive helper function that identifies an Iota followed by a set of
+// broadcasts where the last dimension of the iota is preserved throughout.
+bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
+  if (auto iotaOp =
+          dyn_cast_or_null<mlir::stablehlo::IotaOp>(input.getDefiningOp())) {
+    int64_t iotaDim = iotaOp.getIotaDimension();
+    auto iotaLastDim = cast<ShapedType>(iotaOp.getType()).getRank() - 1;
+    if (iotaDim == iotaLastDim) {
+      return true;
+    }
+
+    (void)rewriter.notifyMatchFailure(iotaOp, "Iota must be on last dimension");
+    return false;
+  }
+
+  if (auto broadcastOp = dyn_cast_or_null<mlir::stablehlo::BroadcastInDimOp>(
+          input.getDefiningOp())) {
+    auto broadcastLastDim =
+        cast<ShapedType>(broadcastOp.getType()).getRank() - 1;
+    SmallVector<int64_t> broadcastDimensions = llvm::to_vector(
+        broadcastOp.getBroadcastDimensions().getValues<int64_t>());
+    if (broadcastDimensions.back() != broadcastLastDim) {
+      (void)rewriter.notifyMatchFailure(
+          broadcastOp, "Last dimension must be maintained in broadcast");
+      return false;
+    }
+    return isIotaOrIotaBroadcast(rewriter, broadcastOp.getOperand());
+  }
+
+  return false;
+}
+
 struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1557,10 +1589,8 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     // Check that one of the inputs is iota, assume that the other one is the
     // input.
     for (Value operand : opOperands) {
-      auto iotaOp =
-          dyn_cast_or_null<mlir::stablehlo::IotaOp>(operand.getDefiningOp());
-      if (iotaOp) {
-        inputIota = iotaOp.getResult();
+      if (isIotaOrIotaBroadcast(rewriter, operand)) {
+        inputIota = operand;
       } else {
         topKInput = operand;
       }

@@ -409,3 +409,43 @@ func.func @iota_sort_slice_is_topk(%in : tensor<16x16xf32>) -> (tensor<16x8xf32>
 // CHECK-SAME: %[[IN:[a-z0-9]+]]
 // CHECK: %[[VALUES:.+]], %[[INDICES:.+]] = chlo.top_k(%[[IN]], k = 8) : tensor<16x16xf32> -> (tensor<16x8xf32>, tensor<16x8xi32>)
 // CHECK: return %[[VALUES]], %[[INDICES]] : tensor<16x8xf32>, tensor<16x8xi32>
+
+// -----
+
+func.func @broadcast_iota_sort_slice_is_topk(%in : tensor<16x16x16xf32>) -> (tensor<16x16x8xf32>, tensor<16x16x8xi32>) {
+  %iota = "stablehlo.iota"() { iota_dimension = 0 : i64 } : () -> tensor<16xi32>
+  %broadcasted_0 = "stablehlo.broadcast_in_dim"(%iota) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<16xi32>) -> tensor<16x16xi32>
+  %broadcasted_1 = "stablehlo.broadcast_in_dim"(%broadcasted_0) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<16x16xi32>) -> tensor<16x16x16xi32>
+  %0:2 = "stablehlo.sort"(%in, %broadcasted_1) ({
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>):
+    %7 = "stablehlo.compare"(%arg0, %arg1) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    "stablehlo.return"(%7) : (tensor<i1>) -> ()
+  }) {dimension = 2 : i64, is_stable = true} : (tensor<16x16x16xf32>, tensor<16x16x16xi32>) -> (tensor<16x16x16xf32>, tensor<16x16x16xi32>)
+  %1 = "stablehlo.slice"(%0#0) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xf32>) -> tensor<16x16x8xf32> 
+  %2 = "stablehlo.slice"(%0#1) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xi32>) -> tensor<16x16x8xi32>
+  return %1, %2 : tensor<16x16x8xf32>, tensor<16x16x8xi32>
+}
+
+// CHECK-LABEL: @broadcast_iota_sort_slice_is_topk
+// CHECK-SAME: %[[IN:[a-z0-9]+]]
+// CHECK: %[[VALUES:.+]], %[[INDICES:.+]] = chlo.top_k(%[[IN]], k = 8) : tensor<16x16x16xf32> -> (tensor<16x16x8xf32>, tensor<16x16x8xi32>)
+// CHECK: return %[[VALUES]], %[[INDICES]] : tensor<16x16x8xf32>, tensor<16x16x8xi32>
+
+// -----
+
+func.func @broadcast_iota_sort_slice_incorrect_dims(%in : tensor<16x16x16xf32>) -> (tensor<16x16x8xf32>, tensor<16x16x8xi32>) {
+  %iota = "stablehlo.iota"() { iota_dimension = 0 : i64 } : () -> tensor<16xi32>
+  %broadcasted_0 = "stablehlo.broadcast_in_dim"(%iota) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<16xi32>) -> tensor<16x16xi32>
+  %broadcasted_1 = "stablehlo.broadcast_in_dim"(%broadcasted_0) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>} : (tensor<16x16xi32>) -> tensor<16x16x16xi32>
+  %0:2 = "stablehlo.sort"(%in, %broadcasted_1) ({
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>):
+    %7 = "stablehlo.compare"(%arg0, %arg1) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    "stablehlo.return"(%7) : (tensor<i1>) -> ()
+  }) {dimension = 2 : i64, is_stable = true} : (tensor<16x16x16xf32>, tensor<16x16x16xi32>) -> (tensor<16x16x16xf32>, tensor<16x16x16xi32>)
+  %1 = "stablehlo.slice"(%0#0) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xf32>) -> tensor<16x16x8xf32> 
+  %2 = "stablehlo.slice"(%0#1) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xi32>) -> tensor<16x16x8xi32>
+  return %1, %2 : tensor<16x16x8xf32>, tensor<16x16x8xi32>
+}
+
+// CHECK-LABEL: @broadcast_iota_sort_slice_incorrect_dims
+// CHECK-NOT: chlo.top_k
