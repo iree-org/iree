@@ -149,6 +149,8 @@ iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   // Pass through flags to gtest (allowing --help to fall through).
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
@@ -160,6 +162,7 @@ extern "C" int main(int argc, char** argv) {
   iree_status_t status = Run(iree_allocator_system(), &exit_code);
   exit_code = iree_status_is_ok(status) ? exit_code : EXIT_FAILURE;
   IREE_TRACE_ZONE_END(z0);
+
   IREE_TRACE_APP_EXIT(exit_code);
 
   if (FLAG_expect_failure) {

@@ -29,12 +29,11 @@ iree_cc_library(
     "string_view.c"
     "string_view.h"
     "time.c"
-    "time.h"
     "wait_source.c"
     "wait_source.h"
   DEPS
     ::core_headers
-    iree::base::tracing::tracy
+    iree::base::tracing::provider
   PUBLIC
 )
 
@@ -46,6 +45,7 @@ iree_cc_library(
     "attributes.h"
     "config.h"
     "target_platform.h"
+    "time.h"
     "tracing.h"
   PUBLIC
 )

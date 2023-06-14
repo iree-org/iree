@@ -159,6 +159,28 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #endif  // !IREE_STATISTICS_ENABLE
 
 //===----------------------------------------------------------------------===//
+// Tracing
+//===----------------------------------------------------------------------===//
+// A user include file is included in the main iree/base/tracing.h to allow
+// users to override the default provider include. Note that additional deps
+// may need to be linked in to binaries when using an out-of-tree provider.
+//
+// Specify a custom header with `-DIREE_TRACING_PROVIDER_H="my_provider.h"`.
+// Specify a dependency with `-DIREE_TRACING_PROVIDER=my_provider_target`.
+
+// Set IREE_TRACING_FEATURES based on IREE_TRACING_MODE if the user hasn't
+// overridden it with more specific settings.
+//
+// IREE_TRACING_MODE = 0: tracing disabled
+// IREE_TRACING_MODE = 1: instrumentation, log messages, and basic statistics
+// IREE_TRACING_MODE = 2: same as 1 with added allocation tracking
+// IREE_TRACING_MODE = 3: same as 2 with callstacks for allocations
+// IREE_TRACING_MODE = 4: same as 3 with callstacks for all instrumentation
+#if !defined(IREE_TRACING_MODE)
+#define IREE_TRACING_MODE 0
+#endif  // !IREE_TRACING_MODE
+
+//===----------------------------------------------------------------------===//
 // IREE HAL configuration
 //===----------------------------------------------------------------------===//
 // Enables optional HAL features. Each of these may add several KB to the final
