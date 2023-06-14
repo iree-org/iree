@@ -18,6 +18,7 @@ iree_cc_library(
     "KernelDispatch.h"
     "LLVMCPUPasses.h"
     "TargetMLTransformInfo.h"
+    "TileSizeSelection.h"
     "Utils.h"
   SRCS
     "ConvertToLLVM.cpp"
@@ -44,7 +45,6 @@ iree_cc_library(
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
     "TileSizeSelection.cpp"
-    "TileSizeSelection.h"
     "Utils.cpp"
     "VectorContractCustomKernels.cpp"
     "VerifyLinalgTransformLegality.cpp"

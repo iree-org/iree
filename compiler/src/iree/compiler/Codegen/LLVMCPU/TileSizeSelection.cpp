@@ -11,6 +11,12 @@ using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 namespace mlir {
 namespace iree_compiler {
 
+TilingConfig::TilingConfig() {
+  // Initialize indices to invalid.
+  std::fill(tilingLevelToActualLevelMap.begin(),
+            tilingLevelToActualLevelMap.end(), InvalidLevel);
+}
+
 TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
     : loweringConfig(lc) {
   // Initialize indices to invalid.
