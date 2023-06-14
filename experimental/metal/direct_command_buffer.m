@@ -322,6 +322,11 @@ static id<MTLBlitCommandEncoder> iree_hal_metal_get_or_begin_blit_encoder(
   return command_buffer->state.blit_encoder;
 }
 
+// Destroys the given |base_command_buffer| itself, without decreasing refcount in the shared
+// staging buffer yet.
+static void iree_hal_metal_command_buffer_destroy_internal(
+    iree_hal_command_buffer_t* base_command_buffer);
+
 iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, iree_host_size_t binding_capacity,
@@ -356,48 +361,50 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
   command_buffer->staging_buffer = staging_buffer;
   command_buffer->host_allocator = host_allocator;
   iree_status_t status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
-  iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
-  @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
-    // We track resource lifetime by ourselves in IREE; so just do unretained references to
-    // resources in Metal command buffer, which avoids overhead and gives better performance.
-    MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
-    descriptor.retainedReferences =
-        resource_reference_mode == IREE_HAL_METAL_COMMAND_BUFFER_RESOURCE_REFERENCE_MODE_RETAINED;
-    descriptor.errorOptions = MTLCommandBufferErrorOptionNone;
-    command_buffer->command_buffer = [[queue commandBufferWithDescriptor:descriptor] retain];  // +1
-    [descriptor release];                                                                      // -1
+  if (iree_status_is_ok(status)) {
+    iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
+    @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
+      // We track resource lifetime by ourselves in IREE; so just do unretained references to
+      // resources in Metal command buffer, which avoids overhead and gives better performance.
+      MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
+      descriptor.retainedReferences =
+          resource_reference_mode == IREE_HAL_METAL_COMMAND_BUFFER_RESOURCE_REFERENCE_MODE_RETAINED;
+      descriptor.errorOptions = MTLCommandBufferErrorOptionNone;
+      command_buffer->command_buffer =
+          [[queue commandBufferWithDescriptor:descriptor] retain];  // +1
+      [descriptor release];                                         // -1
+    }
+    const iree_hal_metal_device_params_t* params = iree_hal_metal_device_params(device);
+    command_buffer->dispatch_type =
+        params->command_dispatch_type == IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT
+            ? MTLDispatchTypeConcurrent
+            : MTLDispatchTypeSerial;
+    command_buffer->state.compute_encoder = nil;
+    command_buffer->state.blit_encoder = nil;
+    command_buffer->state.encoder_event = [queue.device newEvent];  // +1
+    command_buffer->state.next_encoder_event_value = 1;
   }
-  const iree_hal_metal_device_params_t* params = iree_hal_metal_device_params(device);
-  command_buffer->dispatch_type =
-      params->command_dispatch_type == IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT
-          ? MTLDispatchTypeConcurrent
-          : MTLDispatchTypeSerial;
-  command_buffer->state.compute_encoder = nil;
-  command_buffer->state.blit_encoder = nil;
-  command_buffer->state.encoder_event = [queue.device newEvent];  // +1
-  command_buffer->state.next_encoder_event_value = 1;
 
-  *out_command_buffer = &command_buffer->base;
+  if (iree_status_is_ok(status)) {
+    *out_command_buffer = &command_buffer->base;
 
-  // Increase command buffer refcount in the shared staging buffer. We tie this to the command
-  // buffer's lifetime to avoid resource leak.
-  iree_hal_metal_staging_buffer_increase_refcount(staging_buffer);
+    // Increase command buffer refcount in the shared staging buffer. We tie this to the command
+    // buffer's lifetime to avoid resource leak.
+    iree_hal_metal_staging_buffer_increase_refcount(staging_buffer);
+  } else {
+    iree_hal_metal_command_buffer_destroy_internal(&command_buffer->base);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* base_command_buffer) {
+static void iree_hal_metal_command_buffer_destroy_internal(
+    iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_metal_command_buffer_reset(command_buffer);
-
-  // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
-  // resources. We tie this to the command buffer's lifetime to avoid resource leak.
-  iree_hal_metal_staging_buffer_decrease_refcount(command_buffer->staging_buffer);
-
   [command_buffer->state.encoder_event release];  // -1
   IREE_ASSERT_EQ(command_buffer->state.compute_encoder, nil);
   IREE_ASSERT_EQ(command_buffer->state.blit_encoder, nil);
@@ -406,6 +413,20 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(command_buffer->host_allocator, command_buffer);
+}
+
+static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
+  // resources. We tie this to the command buffer's lifetime to avoid resource leak.
+  if (command_buffer->staging_buffer) {
+    iree_hal_metal_staging_buffer_decrease_refcount(command_buffer->staging_buffer);
+  }
+
+  iree_hal_metal_command_buffer_destroy_internal(base_command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
 }
