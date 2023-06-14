@@ -1170,6 +1170,7 @@ static iree_status_t iree_trace_replay_parse_item(
 static iree_status_t iree_trace_replay_parse_item_sequence(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* sequence_node, iree_vm_list_t* target_list) {
+  if (!sequence_node) return iree_ok_status();
   for (yaml_node_item_t* item = sequence_node->data.sequence.items.start;
        item != sequence_node->data.sequence.items.top; ++item) {
     yaml_node_t* item_node = yaml_document_get_node(document, *item);
@@ -1209,6 +1210,7 @@ static iree_status_t iree_trace_replay_parse_result_item(
 static iree_status_t iree_trace_replay_parse_result_item_sequence(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* sequence_node, iree_vm_list_t* source_list) {
+  if (!sequence_node) return iree_ok_status();
   iree_host_size_t i = 0;
   for (yaml_node_item_t* item = sequence_node->data.sequence.items.start;
        item != sequence_node->data.sequence.items.top; ++item, ++i) {

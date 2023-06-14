@@ -97,7 +97,7 @@ class WGSLReplacePushConstantsPass
     auto funcOp = getOperation();
     auto loc = funcOp.getLoc();
     auto constantLoadOps =
-        llvm::to_vector<4>(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
+        llvm::to_vector(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
     if (constantLoadOps.empty()) return;
 
     OpBuilder builder(funcOp);

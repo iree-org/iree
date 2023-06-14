@@ -32,7 +32,7 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
 
 namespace detail {
 size_t getSegmentSpanSize(Type spanType);
-std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
+std::optional<SmallVector<Value>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter);
 }  // namespace detail
@@ -64,13 +64,13 @@ std::optional<SmallVector<Value>> rewriteToCall(
   OperationState state{
       op.getLoc(), isOpVariadic ? IREE::VM::CallVariadicOp::getOperationName()
                                 : IREE::VM::CallOp::getOperationName()};
-  state.addAttributes(llvm::to_vector<4>(operation->getDialectAttrs()));
+  state.addAttributes(llvm::to_vector(operation->getDialectAttrs()));
   state.addAttribute("callee", SymbolRefAttr::get(importOp));
 
   auto importType = importOp.getFunctionType();
   state.addTypes(importType.getResults());
 
-  SmallVector<uint16_t, 4> segmentSizes;
+  SmallVector<uint16_t> segmentSizes;
   int inputSetIndex = 0;
   for (auto input : llvm::enumerate(importType.getInputs())) {
     auto inputType = input.value();
@@ -89,9 +89,8 @@ std::optional<SmallVector<Value>> rewriteToCall(
         segmentSizes.push_back(kFixedSingleValue);
       }
     } else {
-      auto oldOperands = llvm::to_vector<4>(op.getODSOperands(inputSetIndex));
-      auto newOperands =
-          llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex));
+      auto oldOperands = llvm::to_vector(op.getODSOperands(inputSetIndex));
+      auto newOperands = llvm::to_vector(adaptor.getODSOperands(inputSetIndex));
       ++inputSetIndex;
       if (auto inputTupleType = inputType.template dyn_cast<TupleType>()) {
         // Unpack a tuple<...> from the variadic.
@@ -125,7 +124,7 @@ std::optional<SmallVector<Value>> rewriteToCall(
                             rewriter.getIntegerType(16)),
             segmentSizes));
     state.addAttribute("segment_types",
-                       rewriter.getArrayAttr(llvm::map_to_vector<4>(
+                       rewriter.getArrayAttr(llvm::map_to_vector(
                            importType.getInputs(), [&](Type type) {
                              return TypeAttr::get(type).cast<Attribute>();
                            })));

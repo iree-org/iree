@@ -127,7 +127,7 @@ static Value createTotalElementCountValue(ShapedType type,
   }
 
   int dynamicDimIndex = 0;
-  SmallVector<Value, 4> dims;
+  SmallVector<Value> dims;
   auto shape = type.getShape();
   AffineExpr sizeExpr = getAffineConstantExpr(1, context);
   for (int i = 0; i < shape.size(); ++i) {
@@ -359,7 +359,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   // Then try to see if the source op carries the dynamic dimensions itself.
   // If so we can still get the strides for dimensions to linearize.
   Operation *sourceOp = sourceValue.getDefiningOp();
-  SmallVector<Value, 4> dims;
+  SmallVector<Value> dims;
   dims.reserve(rank);
   if (auto shapeAwareOp =
           dyn_cast<IREE::Util::ShapeAwareOpInterface>(sourceOp)) {

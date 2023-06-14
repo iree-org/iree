@@ -57,7 +57,7 @@ class GenericTypeConvert : public ConversionPattern {
   LogicalResult matchAndRewrite(
       Operation* op, ArrayRef<Value> operands,
       ConversionPatternRewriter& rewriter) const override {
-    llvm::SmallVector<Type, 4> newResults;
+    llvm::SmallVector<Type> newResults;
     if (isa<FunctionOpInterface>(op)) {
       return failure();
     }

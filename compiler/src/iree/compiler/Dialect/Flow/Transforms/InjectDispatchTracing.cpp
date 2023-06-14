@@ -20,8 +20,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-static SmallVector<Value, 4> filterTensorValues(ValueRange&& range) {
-  SmallVector<Value, 4> result;
+static SmallVector<Value> filterTensorValues(ValueRange&& range) {
+  SmallVector<Value> result;
   for (auto value : range) {
     if (llvm::isa<TensorType>(value.getType())) result.push_back(value);
   }

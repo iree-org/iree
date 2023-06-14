@@ -186,7 +186,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::ContractionOp op,
       lowerToInnerProd ? getReductionDim(op) : getInnermostParallelDim(op);
   auto iteratorTypes = op.getIteratorTypes().getValue();
   SmallVector<int64_t> nativeSize(iteratorTypes.size(), 1);
-  SmallVector<int64_t, 4> bounds;
+  SmallVector<int64_t> bounds;
   op.getIterationBounds(bounds);
   nativeSize[unrollDim] = getComputeVectorSize(bounds[unrollDim]);
   return nativeSize;

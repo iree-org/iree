@@ -265,7 +265,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     if (!llvmInputTypes.empty()) signatureConverter.addInputs(llvmInputTypes);
 
     // Construct newFunc with all attributes except return type & symbol name.
-    SmallVector<NamedAttribute, 4> funcAttrs;
+    SmallVector<NamedAttribute> funcAttrs;
     for (auto attr : funcOp->getAttrs()) {
       if (attr.getName() == SymbolTable::getSymbolAttrName() ||
           attr.getName() == funcOp.getFunctionTypeAttrName()) {

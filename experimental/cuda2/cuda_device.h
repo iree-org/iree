@@ -9,6 +9,7 @@
 
 #include "experimental/cuda2/api.h"
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
+#include "experimental/cuda2/nccl_dynamic_symbols.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
@@ -20,7 +21,8 @@ extern "C" {
 iree_status_t iree_hal_cuda2_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda2_device_params_t* params,
-    const iree_hal_cuda2_dynamic_symbols_t* symbols, CUdevice device,
+    const iree_hal_cuda2_dynamic_symbols_t* symbols,
+    const iree_hal_cuda2_nccl_dynamic_symbols_t* nccl_symbols, CUdevice device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 // Returns the CUDA context bound to the given |device| if it is a CUDA device

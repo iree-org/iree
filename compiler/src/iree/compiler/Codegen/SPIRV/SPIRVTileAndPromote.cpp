@@ -197,7 +197,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  auto workgroupSize = llvm::map_to_vector<4>(
+  auto workgroupSize = llvm::map_to_vector(
       exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];

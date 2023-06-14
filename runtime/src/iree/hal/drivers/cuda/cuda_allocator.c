@@ -334,7 +334,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda_buffer_allocate");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.

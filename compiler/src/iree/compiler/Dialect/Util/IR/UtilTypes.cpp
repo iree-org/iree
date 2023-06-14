@@ -386,8 +386,8 @@ void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
               Builder(op).getIndexArrayAttr(indices));
 }
 
-SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {
-  SmallVector<int64_t, 4> indices;
+SmallVector<int64_t> detail::getTiedResultOperandIndices(Operation *op) {
+  SmallVector<int64_t> indices;
   auto storageAttr =
       op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
   if (!storageAttr) return indices;
@@ -468,8 +468,8 @@ LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
 void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices,
-    SmallVector<int64_t, 4> &tiedOperandIndices) {
-  SmallVector<int64_t, 4> oldTiedOperandIndices = tiedOperandIndices;
+    SmallVector<int64_t> &tiedOperandIndices) {
+  SmallVector<int64_t> oldTiedOperandIndices = tiedOperandIndices;
   tiedOperandIndices.clear();
 
   // To adjust operand indices we need to know the how many operands to offset
@@ -682,7 +682,7 @@ SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
   auto foundDynamicDims = IREE::Util::findDynamicDims(
       value, builder.getBlock(), builder.getInsertionPoint());
   if (foundDynamicDims.has_value()) {
-    return llvm::to_vector<4>(foundDynamicDims.value());
+    return llvm::to_vector(foundDynamicDims.value());
   }
 
   // Slower path that materializes the entire shape for a result. Some

@@ -83,8 +83,8 @@ class Convert1x1FilterConvToMatmul : public OpRewritePattern<Conv2DOpType> {
       return a * b;
     };
 
-    SmallVector<ReassociationIndices, 4> reassociationInputOutputIndices;
-    SmallVector<ReassociationIndices, 4> reassociationFilterIndices;
+    SmallVector<ReassociationIndices> reassociationInputOutputIndices;
+    SmallVector<ReassociationIndices> reassociationFilterIndices;
     SmallVector<int64_t> reshapedInputShape(2, 0);
     SmallVector<int64_t> reshapedFilterShape(2, 0);
     SmallVector<int64_t> reshapedOutputShape(2, 0);

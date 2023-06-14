@@ -634,7 +634,12 @@ hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
       hal.return %arg1, %arg2, %arg2 : index, index, index
     }
     builtin.module {
-      func.func @dispatch() { return }
+      func.func @dispatch() { 
+        %cst_0 = arith.constant 0.000000e+00 : f32
+        %0 = tensor.empty() : tensor<1xf32>
+        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        return
+      }
     }
   }
 }
@@ -651,7 +656,12 @@ hal.executable private @aarch64_ssve__cpu_double_tiling_peeling_expert {
       hal.return %arg1, %arg2, %arg2 : index, index, index
     }
     builtin.module {
-      func.func @dispatch() { return }
+      func.func @dispatch() { 
+        %cst_0 = arith.constant 0.000000e+00 : f32
+        %0 = tensor.empty() : tensor<1xf32>
+        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        return
+      }
     }
   }
 }
@@ -668,7 +678,12 @@ hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
       hal.return %arg1, %arg2, %arg2 : index, index, index
     }
     builtin.module {
-      func.func @dispatch() { return }
+      func.func @dispatch() {
+        %cst_0 = arith.constant 0.000000e+00 : f32
+        %0 = tensor.empty() : tensor<1xf32>
+        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        return
+      }
     }
   }
 }
@@ -695,7 +710,12 @@ hal.executable private @aarch64_ssve_sve_disabled {
       hal.return %arg1, %arg2, %arg2 : index, index, index
     }
     builtin.module {
-      func.func @dispatch() { return }
+      func.func @dispatch() {
+        %cst_0 = arith.constant 0.000000e+00 : f32
+        %0 = tensor.empty() : tensor<1xf32>
+        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        return
+      }
     }
   }
 }

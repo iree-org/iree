@@ -177,7 +177,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   let extraClassDeclaration = [{
     FunctionType getDispatchType() {
       return FunctionType::get(
-          getContext(), llvm::map_to_vector<4>(getArguments(), [](Value value) {
+          getContext(), llvm::map_to_vector(getArguments(), [](Value value) {
             return value.getType();
           }),
           getResultTypes());

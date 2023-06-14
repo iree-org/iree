@@ -331,7 +331,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
       /*resultDims=*/resultTensorsDynamicDims.getArrayRef(),
       /*operands=*/nonDimOperands,
       /*operandDims=*/allTensorDynamicDims,
-      /*tiedOperands=*/llvm::to_vector<4>(tiedOperandsSequence));
+      /*tiedOperands=*/llvm::to_vector(tiedOperandsSequence));
   // clang-format on
 
   // Step 4. Outline the compute workload region and set up the workload

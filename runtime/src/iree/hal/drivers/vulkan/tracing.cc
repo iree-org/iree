@@ -321,13 +321,13 @@ static void iree_hal_vulkan_tracing_prepare_query_pool(
   pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
   pool_info.queryCount = IREE_HAL_VULKAN_TRACING_DEFAULT_QUERY_CAPACITY;
   pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, pool_info.queryCount);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, pool_info.queryCount);
   while (context->logical_device->syms()->vkCreateQueryPool(
              *context->logical_device, &pool_info,
              context->logical_device->allocator(),
              &context->query_pool) != VK_SUCCESS) {
     pool_info.queryCount /= 2;
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, pool_info.queryCount);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, pool_info.queryCount);
   }
   context->query_capacity = pool_info.queryCount;
 

@@ -1240,7 +1240,7 @@ struct SinkAllocaLikeOpToConsumers : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op producerOp,
                                 PatternRewriter &rewriter) const override {
-    auto users = llvm::to_vector<4>(producerOp->getUsers());
+    auto users = llvm::to_vector(producerOp->getUsers());
     if (users.size() == 0) return failure();
 
     // If we have a single user then we can sink right to it.

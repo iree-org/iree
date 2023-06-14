@@ -368,10 +368,10 @@ struct GenericTypeConvert final : ConversionPattern {
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    llvm::SmallVector<NamedAttribute, 4> newAttr;
+    llvm::SmallVector<NamedAttribute> newAttr;
     llvm::append_range(newAttr, op->getAttrs());
 
-    llvm::SmallVector<Type, 4> newResults;
+    llvm::SmallVector<Type> newResults;
     if (failed(getTypeConverter()->convertTypes(op->getResultTypes(),
                                                 newResults))) {
       return rewriter.notifyMatchFailure(op, "result type conversion failed");
@@ -407,6 +407,53 @@ std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
           loc, RankedTensorType::get({}, inputs.front().getType()),
           inputs.front())
       .getResult();
+}
+
+// Strips attributes from common StableHLO frontends (JAX, TF, etc) that are not
+// used after conversion into the IREE input dialects. Leaving these attributes
+// is confusing as they can become inconsistent during subsequent conversions or
+// leak frontend details lower into the pipeline than should be allowed.
+static void stripFrontendAttrs(mlir::ModuleOp moduleOp) {
+  auto isAttrFiltered = [](NamedAttribute attr) {
+    auto fullName = attr.getName().getValue();
+    return fullName.starts_with("mhlo.") || fullName.starts_with("jax.") ||
+           fullName.starts_with("tf.");
+  };
+  auto filterOpAttrs = [&](Operation *op) {
+    SmallVector<NamedAttribute> newAttrs;
+    for (auto attr : op->getDialectAttrs()) {
+      if (!isAttrFiltered(attr)) newAttrs.push_back(attr);
+    }
+    op->setDialectAttrs(newAttrs);
+  };
+  auto filterAttrDicts = [&](ArrayAttr allOldAttrs,
+                             SmallVectorImpl<DictionaryAttr> &newAttrs) {
+    if (!allOldAttrs) return false;
+    for (auto oldAttrs : allOldAttrs.getAsRange<DictionaryAttr>()) {
+      SmallVector<NamedAttribute> preservedAttrs;
+      preservedAttrs.reserve(oldAttrs.size());
+      for (auto attr : oldAttrs) {
+        if (!isAttrFiltered(attr)) preservedAttrs.push_back(attr);
+      }
+      newAttrs.push_back(
+          DictionaryAttr::get(allOldAttrs.getContext(), preservedAttrs));
+    }
+    return true;
+  };
+  filterOpAttrs(moduleOp);
+  for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
+    filterOpAttrs(callableOp);
+    if (auto funcOp = dyn_cast<func::FuncOp>(callableOp.getOperation())) {
+      SmallVector<DictionaryAttr> newArgAttrs;
+      if (filterAttrDicts(funcOp.getAllArgAttrs(), newArgAttrs)) {
+        funcOp.setAllArgAttrs(newArgAttrs);
+      }
+      SmallVector<DictionaryAttr> newResultAttrs;
+      if (filterAttrDicts(funcOp.getAllResultAttrs(), newResultAttrs)) {
+        funcOp.setAllResultAttrs(newResultAttrs);
+      }
+    }
+  }
 }
 
 struct ConvertStableHloToIreeInputDialects final
@@ -525,6 +572,9 @@ struct ConvertStableHloToIreeInputDialects final
         return signalPassFailure();
       }
     }
+
+    // Drop module/function attributes now that they are no longer required.
+    stripFrontendAttrs(getOperation());
   }
 };
 

@@ -118,7 +118,7 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)capacity);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)capacity);
   *out_set = NULL;
 
   iree_wait_set_t* set = NULL;

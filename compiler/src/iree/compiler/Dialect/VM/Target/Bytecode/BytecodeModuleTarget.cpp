@@ -238,7 +238,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeFunctionSignatureDef(
   // Reflection attributes.
   iree_vm_AttrDef_vec_ref_t attrsRef = 0;
   if (auto attrs = funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
-    SmallVector<iree_vm_AttrDef_ref_t, 4> attrRefs;
+    SmallVector<iree_vm_AttrDef_ref_t> attrRefs;
     for (auto attr : attrs) {
       auto key = attr.getName().strref();
       auto value = llvm::dyn_cast<StringAttr>(attr.getValue());

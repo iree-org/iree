@@ -697,7 +697,7 @@ static iree_status_t iree_vm_context_notify_reverse(iree_vm_stack_t* stack,
 IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
                                                      iree_vm_signal_t signal) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)signal);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)signal);
 
   // VM stack used to call into module __init methods.
   IREE_VM_INLINE_STACK_INITIALIZE(

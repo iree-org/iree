@@ -17,8 +17,8 @@ SetVector<IREE::HAL::ExecutableTargetAttr> gatherExecutableTargets(
     ArrayRef<IREE::HAL::ExecutableOp> executableOps) {
   SetVector<IREE::HAL::ExecutableTargetAttr> result;
   for (auto executableOp : executableOps) {
-    auto variantOps = llvm::to_vector<4>(
-        executableOp.getOps<IREE::HAL::ExecutableVariantOp>());
+    auto variantOps =
+        llvm::to_vector(executableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       result.insert(variantOp.getTarget());
     }
@@ -205,7 +205,7 @@ LogicalResult linkExecutablesInto(
     symbolReplacements.executableRefs[SymbolRefAttr::get(sourceExecutableOp)] =
         SymbolRefAttr::get(linkedExecutableOp);
 
-    auto variantOps = llvm::to_vector<4>(
+    auto variantOps = llvm::to_vector(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       // Only process compatible targets.

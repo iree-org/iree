@@ -133,7 +133,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
       newAttrs.append(op->getAttrs().begin(), op->getAttrs().end());
     }
 
-    llvm::SmallVector<Type, 4> newResults;
+    llvm::SmallVector<Type> newResults;
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
     OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
