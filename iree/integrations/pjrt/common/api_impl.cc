@@ -9,7 +9,6 @@
 #include <iostream>
 #include <optional>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/iree_helpers.h"
 #include "iree/integrations/pjrt/common/tensor_utils.h"
@@ -366,7 +365,7 @@ BufferInstance::BufferInstance(
 void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_Destroy =
       +[](PJRT_Buffer_Destroy_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_Destroy");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_Destroy");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
     iree_status_t status = buffer->AsyncDeallocate();
     delete buffer;
@@ -374,7 +373,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_OnDeviceTrimmedShape =
       +[](PJRT_Buffer_OnDeviceTrimmedShape_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_OnDeviceTrimmedShape");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_OnDeviceTrimmedShape");
     auto impl = [&]() -> iree_status_t {
       // TODO: This function is terrible and not exposed properly to C.
       // It is slated to be deleted...
@@ -400,7 +399,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_ToHostBuffer =
       +[](PJRT_Buffer_ToHostBuffer_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_ToHostBuffer");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_ToHostBuffer");
     BufferInstance* buffer = BufferInstance::Unwrap(args->src);
     if (!args->dst) {
       // Size query.
@@ -414,7 +413,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_OnDeviceSizeInBytes =
       +[](PJRT_Buffer_OnDeviceSizeInBytes_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_OnDeviceSizeInBytes");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_OnDeviceSizeInBytes");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
     iree_device_size_t size =
         iree_hal_buffer_view_byte_length(buffer->buffer_view());
@@ -422,21 +421,21 @@ void BufferInstance::BindApi(PJRT_Api* api) {
     return nullptr;
   };
   api->PJRT_Buffer_Delete = +[](PJRT_Buffer_Delete_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_Delete");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_Delete");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
     buffer->AsyncDeallocate();
     return nullptr;
   };
   api->PJRT_Buffer_IsDeleted =
       +[](PJRT_Buffer_IsDeleted_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_IsDeleted");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_IsDeleted");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
     args->is_deleted = buffer->is_deleted();
     return nullptr;
   };
   api->PJRT_Buffer_CopyToDevice =
       +[](PJRT_Buffer_CopyToDevice_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_CopyToDevice");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_CopyToDevice");
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Buffer_CopyToDevice"));
   };
@@ -451,7 +450,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_ReadyEvent =
       +[](PJRT_Buffer_ReadyEvent_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Buffer_ReadyEvent");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_ReadyEvent");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
     args->event =
         reinterpret_cast<PJRT_Event*>(new EventInstance(buffer->ready_fence()));
@@ -968,7 +967,7 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   // PJRT_Client_Create is polymorphic
   api->PJRT_Client_Destroy =
       +[](PJRT_Client_Destroy_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Client_Destroy");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Client_Destroy");
     delete ClientInstance::Unwrap(args->client);
     return nullptr;
   };
@@ -1022,7 +1021,7 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Client_Compile =
       +[](PJRT_Client_Compile_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Client_Compile");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Client_Compile");
     // TODO: It is not great that we only get a client here vs a list of
     // devices to consider (or something). The issue is that systems often
     // have unrelated devices that will not actually be scheduled and those
@@ -1062,7 +1061,7 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Client_BufferFromHostBuffer =
       +[](PJRT_Client_BufferFromHostBuffer_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Client_BufferFromHostBuffer");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Client_BufferFromHostBuffer");
     auto status =
         DeviceInstance::Unwrap(args->device)
             ->HostBufferToDevice(
@@ -1361,26 +1360,26 @@ EventInstance::~EventInstance() {
 
 void EventInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Event_Destroy = +[](PJRT_Event_Destroy_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Event_Destroy");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Event_Destroy");
     delete EventInstance::Unwrap(args->event);
     return nullptr;
   };
   api->PJRT_Event_IsReady = +[](PJRT_Event_IsReady_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Event_IsReady");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Event_IsReady");
     args->is_ready = EventInstance::Unwrap(args->event)->is_ready();
     return nullptr;
   };
   api->PJRT_Event_Error = +[](PJRT_Event_Error_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Event_Error");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Event_Error");
     return (PJRT_Error*)EventInstance::Unwrap(args->event)->error();
   };
   api->PJRT_Event_Await = +[](PJRT_Event_Await_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Event_Await");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Event_Await");
     return MakeError(
         iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Event_Await"));
   };
   api->PJRT_Event_OnReady = +[](PJRT_Event_OnReady_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Event_OnReady");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Event_OnReady");
     return MakeError(EventInstance::Unwrap(args->event)
                          ->OnReady(args->callback, args->user_arg));
   };
@@ -1438,7 +1437,7 @@ void EventInstance::SignalReady(iree_status_t status) {
   // Note that the callback may destroy the event - so must only operate on
   // locals.
   for (auto& cb : local_callbacks) {
-    IREE_TRACE_SCOPE0("PJRT_User_Callback_Invoke");
+    IREE_TRACE_SCOPE_NAMED("PJRT_User_Callback_Invoke");
     cb.first(
         iree_status_is_ok(local_status)
             ? nullptr
@@ -1454,13 +1453,13 @@ void EventInstance::SignalReady(iree_status_t status) {
 void ExecutableImage::BindApi(PJRT_Api* api) {
   api->PJRT_Executable_Destroy =
       +[](PJRT_Executable_Destroy_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Executable_Destroy");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Executable_Destroy");
     ExecutableImage::Unwrap(args->executable)->DecRef();
     return nullptr;
   };
   api->PJRT_Executable_Name =
       +[](PJRT_Executable_Name_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0(PJRT_Executable_Name);
+    IREE_TRACE_SCOPE_NAMED(PJRT_Executable_Name);
     const char* dummy_name = "iree_vmfb";
     args->executable_name = dummy_name;
     args->executable_name_size = strlen(dummy_name);
@@ -1469,14 +1468,14 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
   api->PJRT_Executable_SizeOfGeneratedCodeInBytes =
       +[](PJRT_Executable_SizeOfGeneratedCodeInBytes_Args* args)
       -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Executable_SizeOfGeneratedCodeInBytes");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Executable_SizeOfGeneratedCodeInBytes");
     args->size_in_bytes =
         ExecutableImage::Unwrap(args->executable)->binary->GetDataSize();
     return nullptr;
   };
   api->PJRT_Executable_NumOutputs =
       +[](PJRT_Executable_NumOutputs_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Executable_NumOutputs");
+    IREE_TRACE_SCOPE_NAMED("PJRT_Executable_NumOutputs");
     auto* exec = ExecutableImage::Unwrap(args->executable);
     assert(exec->metadata_initialized);
     args->num_outputs = exec->result_count;
@@ -1519,7 +1518,7 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
 void LoadedExecutableInstance::BindApi(PJRT_Api* api) {
   api->PJRT_LoadedExecutable_Destroy =
       +[](PJRT_LoadedExecutable_Destroy_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_LoadedExecutable_Destroy");
+    IREE_TRACE_SCOPE_NAMED("PJRT_LoadedExecutable_Destroy");
     delete LoadedExecutableInstance::Unwrap(args->executable);
     return nullptr;
   };
@@ -1544,7 +1543,7 @@ void LoadedExecutableInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_LoadedExecutable_Execute =
       +[](PJRT_LoadedExecutable_Execute_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_LoadedExecutable_Execute");
+    IREE_TRACE_SCOPE_NAMED("PJRT_LoadedExecutable_Execute");
     return MakeError(
         LoadedExecutableInstance::Unwrap(args->executable)->BatchExecute(args));
   };
@@ -1555,7 +1554,7 @@ void LoadedExecutableInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_LoadedExecutable_GetExecutable =
       +[](PJRT_LoadedExecutable_GetExecutable_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_LoadedExecutable_GetExecutable");
+    IREE_TRACE_SCOPE_NAMED("PJRT_LoadedExecutable_GetExecutable");
     auto* loaded_exe =
         LoadedExecutableInstance::Unwrap(args->loaded_executable);
     ExecutableImage* image = loaded_exe->image_;
