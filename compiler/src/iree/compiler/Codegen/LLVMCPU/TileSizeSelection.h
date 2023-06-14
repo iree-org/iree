@@ -25,7 +25,6 @@ namespace iree_compiler {
 ///       [vector-parallel], [vector-reduction]]
 class TilingConfig {
  public:
-  TilingConfig();
   TilingConfig(IREE::Codegen::LoweringConfigAttr lc);
 
   /// Returns the number of tiling levels of the configuration.
