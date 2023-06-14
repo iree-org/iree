@@ -82,3 +82,15 @@ func.func @complexTypesF64(%arg0 : complex<f64>) -> complex<f64> {
   return %arg0 : complex<f64>
 }
 
+// -----
+
+// Check if Demotion is disabled for external functions.
+
+func.func private @extern_func(tensor<2xf64>, tensor<2xi64>) -> tensor<2xf64>
+// CHECK-LABEL: func.func @main
+// CHECK-SAME: (%[[ARG0:.*]]: tensor<2xi64>, %[[ARG1:.*]]: tensor<2xf64>) -> tensor<2xf64>
+func.func @main(%x : tensor<2xi64>, %y : tensor<2xf64>) -> tensor<2xf64> {
+  // CHECK-DAG: call @extern_func(%[[ARG1]], %[[ARG0]]) : (tensor<2xf64>, tensor<2xi64>) -> tensor<2xf64>
+  %1 = func.call @extern_func(%y, %x) : (tensor<2xf64>, tensor<2xi64>) -> tensor<2xf64>
+  return %1 : tensor<2xf64>
+}

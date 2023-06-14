@@ -224,6 +224,19 @@ struct ConvertTypesPass : public Base {
   using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
+    bool foundExternalFunc = false;
+
+    // For external functions - functions whose body are not visible during
+    // compliation - e.g. a library function, should not be down/up converted. I
+    // tried a finer granularity (at caller function level and even the
+    // function-call level) but was unsuccessful because this pass just does a
+    // pattern match and does not have the full concept of control/data flow.
+    // Thus, doing it in finer-granularity causes type-mismatches.
+    this->getOperation().walk([&](mlir::CallOpInterface callOp) {
+      foundExternalFunc |= (callOp->getRegions().empty());
+    });
+    if (foundExternalFunc) return;
+
     RewritePatternSet patterns(context);
     patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
     patterns.insert<ConvertTypeSensitiveArithCastOp<arith::TruncFOp, FloatType,
