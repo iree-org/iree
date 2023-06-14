@@ -196,19 +196,11 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         benchmark_case_dir.relative_to(self.config.root_benchmark_dir))
 
     run_config = benchmark_case.run_config
-    if run_config is None:
-      # TODO(#11076): Remove legacy path.
-      self.__push_vmfb_file(benchmark_case_dir)
-      self.__check_and_push_file(benchmark_case_dir / MODEL_FLAGFILE_NAME,
-                                 android_case_dir)
-      taskset = self.__deduce_taskset(benchmark_case.bench_mode)
-      run_args = [f"--flagfile={MODEL_FLAGFILE_NAME}"]
-    else:
-      self.__check_and_push_file(
-          benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir)
-      taskset = self.__deduce_taskset_from_run_config(run_config)
-      run_args = run_config.materialize_run_flags()
-      run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
+    self.__check_and_push_file(
+        benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir)
+    taskset = self.__deduce_taskset_from_run_config(run_config)
+    run_args = run_config.materialize_run_flags()
+    run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
 
     if benchmark_results_filename is not None:
       self.__run_benchmark(android_case_dir=android_case_dir,
@@ -286,7 +278,6 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     stdout_redirect = None if self.verbose else subprocess.DEVNULL
     execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
 
-
   # TODO(#13187): These logics are inherited from the legacy benchmark suites,
   # which only work for a few specific phones. We should define the topology
   # in their device specs.
@@ -307,22 +298,6 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
       return "08" if single_thread else "0f"
 
     raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
-
-  # TODO(#11076): Remove legacy path.
-  def __deduce_taskset(self, bench_mode: Sequence[str]) -> str:
-    """Deduces the CPU affinity taskset mask according to benchmark modes."""
-    # TODO: we actually should check the number of cores the phone have.
-    if "big-core" in bench_mode:
-      return "80" if "1-thread" in bench_mode else "f0"
-    if "little-core" in bench_mode:
-      return "08" if "1-thread" in bench_mode else "0f"
-    # Not specified: use the 7th core.
-    return "80"
-
-  def __push_vmfb_file(self, benchmark_case_dir: pathlib.Path):
-    vmfb_path = get_vmfb_full_path_for_benchmark_case(benchmark_case_dir)
-    vmfb_rel_dir = vmfb_path.parent.relative_to(self.config.root_benchmark_dir)
-    self.__check_and_push_file(vmfb_path, pathlib.PurePosixPath(vmfb_rel_dir))
 
   def __check_and_push_file(self, host_path: pathlib.Path,
                             relative_dir: pathlib.PurePosixPath):
@@ -369,21 +344,16 @@ def main(args):
 
   commit = get_git_commit_hash("HEAD")
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
-  if args.execution_benchmark_config is None:
-    # TODO(#11076): Remove legacy path.
-    benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
-        benchmark_config.root_benchmark_dir)
-  else:
-    benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    benchmark_group = benchmark_groups.get(args.target_device_name)
-    if benchmark_group is None:
-      raise ValueError("Target device not found in the benchmark config.")
-    run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
-        root_type=List[iree_definitions.E2EModelRunConfig])
-    benchmark_suite = BenchmarkSuite.load_from_run_configs(
-        run_configs=run_configs,
-        root_benchmark_dir=benchmark_config.root_benchmark_dir)
+  benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+  benchmark_group = benchmark_groups.get(args.target_device_name)
+  if benchmark_group is None:
+    raise ValueError("Target device not found in the benchmark config.")
+  run_configs = serialization.unpack_and_deserialize(
+      data=benchmark_group["run_configs"],
+      root_type=List[iree_definitions.E2EModelRunConfig])
+  benchmark_suite = BenchmarkSuite.load_from_run_configs(
+      run_configs=run_configs,
+      root_benchmark_dir=benchmark_config.root_benchmark_dir)
 
   benchmark_driver = AndroidBenchmarkDriver(device_info=device_info,
                                             benchmark_config=benchmark_config,

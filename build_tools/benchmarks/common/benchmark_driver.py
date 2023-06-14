@@ -55,10 +55,9 @@ class BenchmarkDriver(object):
     """Execute the benchmark flow.
 
     It performs the following steps:
-      1. Enumerate all categories in the benchmark suites.
-      2. For each category, enumerate and filter benchmark cases.
-      3. Call 'run_benchmark_case' for each benchmark case.
-      4. Collect the benchmark results and captures.
+      1. Enumerate and filter benchmark cases.
+      2. Call 'run_benchmark_case' for each benchmark case.
+      3. Collect the benchmark results and captures.
     """
 
     self.config.benchmark_results_dir.mkdir(parents=True, exist_ok=True)
@@ -66,10 +65,8 @@ class BenchmarkDriver(object):
       self.config.trace_capture_config.capture_tmp_dir.mkdir(parents=True,
                                                              exist_ok=True)
 
-    use_legacy_name = self.benchmark_suite.legacy_suite
-
-    cpu_target_arch = self.device_info.get_iree_cpu_arch_name(use_legacy_name)
-    gpu_target_arch = self.device_info.get_iree_gpu_arch_name(use_legacy_name)
+    cpu_target_arch = self.device_info.get_cpu_arch()
+    gpu_target_arch = self.device_info.get_gpu_arch()
     detected_architectures = [
         arch for arch in [cpu_target_arch, gpu_target_arch] if arch is not None
     ]
@@ -87,76 +84,74 @@ class BenchmarkDriver(object):
 
     drivers, loaders = self.__get_available_drivers_and_loaders()
 
-    for category, _ in self.benchmark_suite.list_categories():
-      benchmark_cases = self.benchmark_suite.filter_benchmarks_for_category(
-          category=category,
-          available_drivers=drivers,
-          available_loaders=loaders,
-          target_architectures=compatible_arch_filter,
-          driver_filter=self.config.driver_filter,
-          mode_filter=self.config.mode_filter,
-          model_name_filter=self.config.model_name_filter)
+    benchmark_cases = self.benchmark_suite.filter_benchmarks(
+        available_drivers=drivers,
+        available_loaders=loaders,
+        target_architectures=compatible_arch_filter,
+        driver_filter=self.config.driver_filter,
+        mode_filter=self.config.mode_filter,
+        model_name_filter=self.config.model_name_filter)
 
-      for benchmark_case in benchmark_cases:
-        benchmark_info = self.__get_benchmark_info_from_case(
-            category=category, benchmark_case=benchmark_case)
-        benchmark_name = str(benchmark_info)
+    for benchmark_case in benchmark_cases:
+      benchmark_info = self.__get_benchmark_info_from_case(
+          benchmark_case=benchmark_case)
+      benchmark_name = str(benchmark_info)
 
-        if benchmark_case.target_arch not in detected_architectures:
-          print(f"WARNING: Benchmark '{benchmark_name}' may be incompatible"
-                f" with the detected architectures '{detected_architectures}'"
-                f" on the device. Pass --compatible-only to skip incompatible"
-                f" benchmarks.")
+      if benchmark_case.target_arch not in detected_architectures:
+        print(f"WARNING: Benchmark '{benchmark_name}' may be incompatible"
+              f" with the detected architectures '{detected_architectures}'"
+              f" on the device. Pass --compatible-only to skip incompatible"
+              f" benchmarks.")
 
-        # Sanity check for the uniqueness of benchmark names.
-        if benchmark_name in self._seen_benchmark_names:
-          raise ValueError(
-              f"Found duplicate benchmark {benchmark_name} in the suites.")
-        self._seen_benchmark_names.add(benchmark_name)
+      # Sanity check for the uniqueness of benchmark names.
+      if benchmark_name in self._seen_benchmark_names:
+        raise ValueError(
+            f"Found duplicate benchmark {benchmark_name} in the suites.")
+      self._seen_benchmark_names.add(benchmark_name)
 
-        results_path, capture_path = self.__get_output_paths(benchmark_name)
-        # If we continue from the previous results, check and skip if the result
-        # files exist.
-        if self.config.continue_from_previous:
-          if results_path is not None and results_path.exists():
-            self.finished_benchmarks.append((benchmark_info, results_path))
-            results_path = None
-
-          if capture_path is not None and capture_path.exists():
-            self.finished_captures.append(capture_path)
-            capture_path = None
-
-        # Skip if no need to benchmark and capture.
-        if results_path is None and capture_path is None:
-          continue
-
-        print(f"--> Benchmark started: {benchmark_name} <--")
-
-        try:
-          self.run_benchmark_case(benchmark_case, results_path, capture_path)
-        except Exception as e:
-          # Delete unfinished results if they exist.
-          if results_path is not None:
-            results_path.unlink(missing_ok=True)
-          if capture_path is not None:
-            capture_path.unlink(missing_ok=True)
-
-          if not self.config.keep_going:
-            raise e
-
-          print(f"Processing of benchmark failed with: {e}")
-          self.benchmark_errors.append(e)
-          continue
-        finally:
-          # Some grace time.
-          time.sleep(self.benchmark_grace_time)
-
-        print("Benchmark completed")
-
-        if results_path:
+      results_path, capture_path = self.__get_output_paths(benchmark_name)
+      # If we continue from the previous results, check and skip if the result
+      # files exist.
+      if self.config.continue_from_previous:
+        if results_path is not None and results_path.exists():
           self.finished_benchmarks.append((benchmark_info, results_path))
-        if capture_path:
+          results_path = None
+
+        if capture_path is not None and capture_path.exists():
           self.finished_captures.append(capture_path)
+          capture_path = None
+
+      # Skip if no need to benchmark and capture.
+      if results_path is None and capture_path is None:
+        continue
+
+      print(f"--> Benchmark started: {benchmark_name} <--")
+
+      try:
+        self.run_benchmark_case(benchmark_case, results_path, capture_path)
+      except Exception as e:
+        # Delete unfinished results if they exist.
+        if results_path is not None:
+          results_path.unlink(missing_ok=True)
+        if capture_path is not None:
+          capture_path.unlink(missing_ok=True)
+
+        if not self.config.keep_going:
+          raise e
+
+        print(f"Processing of benchmark failed with: {e}")
+        self.benchmark_errors.append(e)
+        continue
+      finally:
+        # Some grace time.
+        time.sleep(self.benchmark_grace_time)
+
+      print("Benchmark completed")
+
+      if results_path:
+        self.finished_benchmarks.append((benchmark_info, results_path))
+      if capture_path:
+        self.finished_captures.append(capture_path)
 
   def get_benchmark_results(self) -> BenchmarkResults:
     """Returns the finished benchmark results."""
@@ -203,24 +198,16 @@ class BenchmarkDriver(object):
     return (benchmark_results_filename, capture_filename)
 
   def __get_benchmark_info_from_case(
-      self, category: str, benchmark_case: BenchmarkCase) -> BenchmarkInfo:
+      self, benchmark_case: BenchmarkCase) -> BenchmarkInfo:
     run_config = benchmark_case.run_config
-    if run_config is None:
-      # TODO(#11076): Remove legacy path.
-      return BenchmarkInfo.build_with_legacy_name(
-          model_name=benchmark_case.model_name,
-          model_tags=benchmark_case.model_tags,
-          model_source=category,
-          bench_mode=benchmark_case.bench_mode,
-          driver_info=benchmark_case.driver_info,
-          device_info=self.device_info)
-
     run_tags = run_config.module_execution_config.tags
-    compile_tags = run_config.module_generation_config.compile_config.tags
+    gen_config = run_config.module_generation_config
+    model_source = str(gen_config.imported_model.model.source_type)
+    compile_tags = gen_config.compile_config.tags
     return BenchmarkInfo(name=run_config.name,
                          model_name=benchmark_case.model_name,
                          model_tags=benchmark_case.model_tags,
-                         model_source=category,
+                         model_source=model_source,
                          bench_mode=run_tags,
                          compile_tags=compile_tags,
                          driver_info=benchmark_case.driver_info,

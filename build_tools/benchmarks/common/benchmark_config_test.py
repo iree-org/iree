@@ -17,32 +17,42 @@ from common import benchmark_config, common_arguments
 class BenchmarkConfigTest(unittest.TestCase):
 
   def setUp(self):
-    self._build_dir_manager = tempfile.TemporaryDirectory()
     self._tmp_dir_manager = tempfile.TemporaryDirectory()
-    self.build_dir = pathlib.Path(self._build_dir_manager.name).resolve()
     self.tmp_dir = pathlib.Path(self._tmp_dir_manager.name).resolve()
+    self._build_dir_manager = tempfile.TemporaryDirectory()
+    self.build_dir = pathlib.Path(self._build_dir_manager.name).resolve()
+    self.e2e_test_artifacts_dir = self.build_dir / "e2e_test_artifacts"
+    self.e2e_test_artifacts_dir.mkdir()
     self.normal_tool_dir = self.build_dir / "normal_tool"
     self.normal_tool_dir.mkdir()
     self.traced_tool_dir = self.build_dir / "traced_tool"
     self.traced_tool_dir.mkdir()
-    self.trace_capture_tool = tempfile.NamedTemporaryFile()
-    os.chmod(self.trace_capture_tool.name, stat.S_IEXEC)
+    self.trace_capture_tool = self.build_dir / "tracy_capture"
+    # Create capture tool with executable file mode.
+    self.trace_capture_tool.touch(mode=0o755)
+    self.execution_config = self.build_dir / "execution_config.json"
+    self.execution_config.touch()
 
   def tearDown(self):
-    self.trace_capture_tool.close()
-    self._tmp_dir_manager.cleanup()
     self._build_dir_manager.cleanup()
+    self._tmp_dir_manager.cleanup()
 
   def test_build_from_args(self):
     args = common_arguments.Parser().parse_args([
         f"--tmp_dir={self.tmp_dir}",
         f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
         f"--traced_benchmark_tool_dir={self.traced_tool_dir}",
-        f"--trace_capture_tool={self.trace_capture_tool.name}",
-        f"--capture_tarball=capture.tar", f"--driver_filter_regex=a",
-        f"--model_name_regex=b", f"--mode_regex=c", f"--keep_going",
-        f"--benchmark_min_time=10", f"--compatible_only",
-        str(self.build_dir)
+        f"--trace_capture_tool={self.trace_capture_tool}",
+        f"--capture_tarball=capture.tar",
+        f"--driver_filter_regex=a",
+        f"--model_name_regex=b",
+        f"--mode_regex=c",
+        f"--keep_going",
+        f"--benchmark_min_time=10",
+        f"--compatible_only",
+        f"--e2e_test_artifacts_dir={self.e2e_test_artifacts_dir}",
+        f"--execution_benchmark_config={self.execution_config}",
+        "--target_device=test",
     ])
 
     config = benchmark_config.BenchmarkConfig.build_from_args(
@@ -51,11 +61,11 @@ class BenchmarkConfigTest(unittest.TestCase):
     per_commit_tmp_dir = self.tmp_dir / "abcd"
     expected_trace_capture_config = benchmark_config.TraceCaptureConfig(
         traced_benchmark_tool_dir=self.traced_tool_dir,
-        trace_capture_tool=pathlib.Path(self.trace_capture_tool.name).resolve(),
+        trace_capture_tool=pathlib.Path(self.trace_capture_tool).resolve(),
         capture_tarball=pathlib.Path("capture.tar").resolve(),
         capture_tmp_dir=per_commit_tmp_dir / "captures")
     expected_config = benchmark_config.BenchmarkConfig(
-        root_benchmark_dir=self.build_dir / "benchmark_suites",
+        root_benchmark_dir=self.e2e_test_artifacts_dir,
         benchmark_results_dir=per_commit_tmp_dir / "benchmark-results",
         git_commit_hash="abcd",
         normal_benchmark_tool_dir=self.normal_tool_dir,
@@ -72,7 +82,9 @@ class BenchmarkConfigTest(unittest.TestCase):
     args = common_arguments.Parser().parse_args([
         f"--tmp_dir={self.tmp_dir}",
         f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
-        str(self.build_dir)
+        f"--e2e_test_artifacts_dir={self.e2e_test_artifacts_dir}",
+        f"--execution_benchmark_config={self.execution_config}",
+        "--target_device=test",
     ])
 
     config = benchmark_config.BenchmarkConfig.build_from_args(
@@ -85,51 +97,14 @@ class BenchmarkConfigTest(unittest.TestCase):
         f"--tmp_dir={self.tmp_dir}",
         f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
         f"--traced_benchmark_tool_dir={self.traced_tool_dir}",
-        str(self.build_dir)
+        f"--e2e_test_artifacts_dir={self.e2e_test_artifacts_dir}",
+        f"--execution_benchmark_config={self.execution_config}",
+        "--target_device=test",
     ])
 
     self.assertRaises(
         ValueError, lambda: benchmark_config.BenchmarkConfig.build_from_args(
             args=args, git_commit_hash="abcd"))
-
-  def test_build_from_args_with_e2e_test_artifacts_dir(self):
-    with tempfile.TemporaryDirectory() as e2e_test_artifacts_dir:
-      exec_bench_config = pathlib.Path(
-          e2e_test_artifacts_dir) / "exec_bench_config.json"
-      exec_bench_config.touch()
-      args = common_arguments.Parser().parse_args([
-          f"--tmp_dir={self.tmp_dir}",
-          f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
-          f"--e2e_test_artifacts_dir={e2e_test_artifacts_dir}",
-          f"--execution_benchmark_config={exec_bench_config}",
-          f"--target_device_name=device_a",
-      ])
-
-      config = benchmark_config.BenchmarkConfig.build_from_args(
-          args=args, git_commit_hash="abcd")
-
-      self.assertEqual(config.root_benchmark_dir,
-                       pathlib.Path(e2e_test_artifacts_dir))
-
-  def test_build_from_args_with_execution_benchmark_config_and_build_dir(self):
-    with tempfile.TemporaryDirectory() as e2e_test_artifacts_dir:
-      exec_bench_config = pathlib.Path(
-          e2e_test_artifacts_dir) / "exec_bench_config.json"
-      exec_bench_config.touch()
-      args = common_arguments.Parser().parse_args([
-          f"--tmp_dir={self.tmp_dir}",
-          f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
-          f"--execution_benchmark_config={exec_bench_config}",
-          f"--target_device_name=device_a",
-          str(self.build_dir)
-      ])
-
-      config = benchmark_config.BenchmarkConfig.build_from_args(
-          args=args, git_commit_hash="abcd")
-
-      self.assertEqual(
-          config.root_benchmark_dir,
-          self.build_dir / benchmark_config.E2E_TEST_ARTIFACTS_REL_PATH)
 
 
 if __name__ == "__main__":

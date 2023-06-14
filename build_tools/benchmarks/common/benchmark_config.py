@@ -10,10 +10,8 @@ from dataclasses import dataclass
 from typing import Optional
 import pathlib
 
-BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
 CAPTURES_REL_PATH = "captures"
-E2E_TEST_ARTIFACTS_REL_PATH = "e2e_test_artifacts"
 
 
 @dataclass
@@ -112,17 +110,7 @@ class BenchmarkConfig:
           capture_tarball=args.capture_tarball.resolve(),
           capture_tmp_dir=per_commit_tmp_dir / CAPTURES_REL_PATH)
 
-    if args.e2e_test_artifacts_dir is not None:
-      root_benchmark_dir = args.e2e_test_artifacts_dir
-    else:
-      # TODO(#11076): Remove legacy path.
-      build_dir = args.build_dir.resolve()
-      if args.execution_benchmark_config is not None:
-        root_benchmark_dir = build_dir / E2E_TEST_ARTIFACTS_REL_PATH
-      else:
-        root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
-
-    return BenchmarkConfig(root_benchmark_dir=root_benchmark_dir,
+    return BenchmarkConfig(root_benchmark_dir=args.e2e_test_artifacts_dir,
                            benchmark_results_dir=per_commit_tmp_dir /
                            BENCHMARK_RESULTS_REL_PATH,
                            git_commit_hash=git_commit_hash,
