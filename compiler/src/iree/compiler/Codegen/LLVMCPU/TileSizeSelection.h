@@ -16,10 +16,17 @@ namespace iree_compiler {
 /// Provides unified API to get access to all the tile size needed during the
 /// CPU lowering process, while abstracting the representation and verification
 /// details of such information in the IR.
+///
+/// We currently support the following scenarios:
+///   1. [[distribution]]
+///   2. [[distribution], [vector-parallel]]
+///   3. [[distribution], [vector-parallel], [vector-reduction]]
+///   4. [[distribution], [cache-parallel], [cache-reduction],
+///       [vector-parallel], [vector-reduction]]
 class TilingConfig {
  public:
   TilingConfig() {}
-  TilingConfig(IREE::Codegen::LoweringConfigAttr lc) : loweringConfig(lc);
+  TilingConfig(IREE::Codegen::LoweringConfigAttr lc);
 
   /// Returns the number of tiling levels of the configuration.
   unsigned getNumTilingLevels() {

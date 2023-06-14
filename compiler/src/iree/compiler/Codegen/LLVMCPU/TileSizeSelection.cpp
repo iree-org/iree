@@ -82,7 +82,7 @@ SmallVector<int64_t> TilingConfig::getFusableLevels() {
 }
 
 /// Returns the actual level in the configuration for this level of tiling.
-unsigned TileConfig::getActualLevel(TilingLevel level) {
+unsigned TilingConfig::getActualLevel(TilingLevel level) {
   assert(level < InvalidLevel && "Unexpected invalid tiling level");
   unsigned actualLevel = tilingLevelToActualLevelMap[level];
   assert(actualLevel != InvalidLevel &&
