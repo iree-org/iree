@@ -82,6 +82,7 @@ class BufferInstance {
   iree_hal_buffer_view_t* buffer_view() { return buffer_view_.get(); }
   DeviceInstance& device() { return device_; }
   iree_status_t AsyncDeallocate();
+  iree_status_t Delete();
   bool is_deleted() { return is_deleted_; }
   bool is_on_cpu() {
     // TODO: Plumb through an indication if running on CPU and then implement

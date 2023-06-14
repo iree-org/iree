@@ -367,9 +367,8 @@ void BufferInstance::BindApi(PJRT_Api* api) {
       +[](PJRT_Buffer_Destroy_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_Destroy");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
-    iree_status_t status = buffer->AsyncDeallocate();
     delete buffer;
-    return MakeError(status);
+    return nullptr;
   };
   api->PJRT_Buffer_OnDeviceTrimmedShape =
       +[](PJRT_Buffer_OnDeviceTrimmedShape_Args* args) -> PJRT_Error* {
@@ -423,7 +422,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_Delete = +[](PJRT_Buffer_Delete_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_Delete");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
-    buffer->AsyncDeallocate();
+    buffer->Delete();
     return nullptr;
   };
   api->PJRT_Buffer_IsDeleted =
@@ -484,6 +483,13 @@ iree_status_t BufferInstance::AsyncDeallocate() {
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(done_fence()),
       /*signal_semaphore_list=*/iree_hal_semaphore_list_empty(),
       iree_hal_buffer_view_buffer(buffer_view_.get()));
+}
+
+iree_status_t BufferInstance::Delete() {
+  IREE_TRACE_SCOPE();
+  is_deleted_ = true;
+  buffer_view_.release();
+  return iree_ok_status();
 }
 
 iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
