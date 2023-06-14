@@ -814,6 +814,8 @@ iree_status_t DeviceInstance::HostBufferToDevice(
     is_splat &= (byte_strides[i] == 0) || (dims[i] == 1);
   }
 
+  const bool needs_staging_buffer = !is_splat && !has_zero_length;
+
   iree_device_size_t byte_length = element_type_byte_size;
   for (size_t i = 0; i < num_dims; ++i) {
     byte_length *= dims[i];
@@ -861,13 +863,15 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   // We only need a staging buffer if we cannot splat the data.
   iree::vm::ref<iree_hal_buffer_t> host_staging_buffer;
-  IREE_RETURN_IF_ERROR(AcquireHostStagingBuffer(
-      iree_make_const_byte_span(data, byte_length), require_snapshot_now,
-      &caller_data_done, &host_staging_buffer));
-  if (!caller_data_done) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "deferred snapshot of host data not yet implemented");
+  if (needs_staging_buffer) {
+    IREE_RETURN_IF_ERROR(AcquireHostStagingBuffer(
+        iree_make_const_byte_span(data, byte_length), require_snapshot_now,
+        &caller_data_done, &host_staging_buffer));
+    if (!caller_data_done) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "deferred snapshot of host data not yet implemented");
+    }
   }
 
   // Allocate on stream. We serialize across 3 timepoints:
