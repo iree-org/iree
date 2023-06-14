@@ -37,7 +37,7 @@ def add_typical_arguments(parser):
                       help="Comma delimited list to filter dispatches by name. "\
                       "A dispatch is a combination of operation and tuning "\
                       "configuration.")
-  parser.add_argument("--mlir-dialect", default='linalg', \
+  parser.add_argument("--operation-dialect", default='linalg', \
                       help="MLIR dialect entry point at which operation is emitter.",
                       choices=["linalg"])
   parser.add_argument("--verbose", action='store_true', \

@@ -119,7 +119,7 @@ class Manifest:
 
     # Paths to the generated directory (e.g. `./generated/linalg`).
     self.generated_path = Path(self.args.generated_dir, 'generated',
-                               self.args.mlir_dialect)
+                               self.args.operation_dialect)
 
     # Create the directories in self.generated_path, if it does not exist.
     if not self.generated_path.exists():
@@ -221,7 +221,7 @@ class Manifest:
 
   def emit(self):
     """Emits the operations in the Manifest to the build directory as MLIR source files.
-        The operations are emitted in the dialect specified by the `mlir_dialect` flag.
+        The operations are emitted in the dialect specified by the `operation_dialect` flag.
     """
 
     # For each operation_kind create a directory and emit the operations with

@@ -37,7 +37,7 @@ class EmitLinalgBatchMatmulDispatch:
   """Emitters for the `linalg.batch_matmul` dispatch."""
 
   def __init__(self):
-    self.mlir_dialect = MlirDialect.Linalg
+    self.operation_dialect = OperationDialect.Linalg
 
     self.linalg_row_row_matmul_template = """
 // Dispatch linalg.batch_matmul row-row layout 

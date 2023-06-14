@@ -18,7 +18,7 @@ class IreeToolsLauncher:
     self.operation = operation
 
     self.generated_path = Path(args.generated_dir, 'generated',
-                               args.mlir_dialect)
+                               args.operation_dialect)
 
     self.args = args
     self.benchmark_dispatch_repeat_count = args.batch_size

@@ -242,7 +242,7 @@ class EmitLinalgMatmulDispatch:
   """Emitters for the `linalg.matmul` dispatch."""
 
   def __init__(self):
-    self.mlir_dialect = MlirDialect.Linalg
+    self.operation_dialect = OperationDialect.Linalg
 
     # linalg.matmul mlir template
     self.linalg_row_row_matmul_template = """

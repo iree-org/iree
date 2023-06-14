@@ -69,14 +69,14 @@ OperationKindNames = {
 
 # MLIR dialects
 ###################################################################################################
-class MlirDialect(enum.Enum):
+class OperationDialect(enum.Enum):
   Linalg = auto()
   Mhlo = auto()
 
 
-MlirDialectNames = {
-    MlirDialect.Linalg: 'linalg',
-    MlirDialect.Mhlo: 'mhlo',
+OperationDialectNames = {
+    OperationDialect.Linalg: 'linalg',
+    OperationDialect.Mhlo: 'mhlo',
 }
 
 
