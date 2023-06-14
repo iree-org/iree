@@ -165,7 +165,7 @@ jobs:
 
   build_test_all_macos_x86_64:
     needs: setup
-    if: true
+    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on: macos-12-xl
     env:
       BUILD_DIR: build-macos
@@ -173,14 +173,6 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: "Update Xcode command line tools path"
-        run: |
-          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-          xcode-select --print-path
-          find  $(xcode-select -p)/Toolchains/ -name "metal"
-          find  $(xcode-select -p)/Toolchains/ -name "metallib"
-          xcrun metal --version
-          xcrun metallib --version
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - id: "gcp-auth"
@@ -193,6 +185,13 @@ jobs:
           create_credentials_file: false
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
+      # There are multiple versions of Xcode and SDKs installed on the macOS runner.
+      # Select the latest Xcode app to enable using Metal offline toolchain.
+      - name: "Update Xcode command line tools path"
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+          xcrun metal --version
+          xcrun metallib --version
       - name: "Setting up Python"
         uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
         with:
