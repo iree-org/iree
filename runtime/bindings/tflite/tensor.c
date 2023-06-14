@@ -6,7 +6,6 @@
 
 #include "runtime/bindings/tflite/tensor.h"
 
-#include "iree/base/tracing.h"
 #include "runtime/bindings/tflite/shim.h"
 
 iree_status_t _TfLiteTensorParseNameAttr(TfLiteTensor* tensor,
@@ -246,7 +245,8 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteTensorCopyFromBuffer(
     return kTfLiteApplicationError;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, tensor->buffer_mapping.contents.data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0,
+                                   tensor->buffer_mapping.contents.data_length);
 
   // NOTE: we could use a iree_hal_buffer_map_write here but we already
   // have the buffer mapped. If we knew the user would never use
@@ -265,7 +265,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteTensorCopyToBuffer(
     return kTfLiteApplicationError;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, output_tensor->buffer_mapping.contents.data_length);
 
   // NOTE: as with above we should use an iree_hal_buffer_map_read here.

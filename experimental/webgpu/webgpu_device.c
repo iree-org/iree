@@ -20,7 +20,6 @@
 #include "experimental/webgpu/simple_allocator.h"
 #include "experimental/webgpu/staging_buffer.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
 //===----------------------------------------------------------------------===//

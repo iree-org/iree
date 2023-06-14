@@ -8,7 +8,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/comparison.h"
@@ -254,6 +253,8 @@ static iree_status_t iree_tooling_run_function(
         "processing function outputs");
   }
   iree_vm_list_release(outputs);
+
+  fflush(stdout);
 
   return status;
 }

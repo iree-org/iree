@@ -63,8 +63,6 @@ iree_cc_library(
     ::internal
     ::synchronization
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -103,7 +101,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::core_headers
-    iree::base::tracing
     iree::schemas::cpu_data
   PUBLIC
 )
@@ -122,8 +119,6 @@ iree_cc_library(
     ::path
     ::synchronization
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -136,8 +131,6 @@ iree_cc_library(
     "file_io.c"
   DEPS
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -167,8 +160,6 @@ iree_cc_library(
     ::file_io
     ::internal
     iree::base
-    iree::base::target_platform
-    iree::base::tracing
   PUBLIC
 )
 
@@ -303,7 +294,6 @@ iree_cc_library(
     ::internal
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -351,7 +341,6 @@ iree_cc_library(
     ::synchronization
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -383,7 +372,6 @@ iree_cc_library(
     ::wait_handle
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -404,7 +392,6 @@ iree_cc_library(
     ::synchronization
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -419,7 +406,6 @@ iree_cc_test(
     ::synchronization
     ::threading
     iree::base
-    iree::base::target_platform
     iree::testing::gtest
     iree::testing::gtest_main
 )

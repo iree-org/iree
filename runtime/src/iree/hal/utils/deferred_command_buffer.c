@@ -7,7 +7,6 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 
 #include "iree/base/internal/arena.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/resource_set.h"
 
 //===----------------------------------------------------------------------===//

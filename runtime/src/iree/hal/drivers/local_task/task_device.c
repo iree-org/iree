@@ -12,7 +12,6 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"

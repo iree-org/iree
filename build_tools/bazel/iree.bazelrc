@@ -43,9 +43,9 @@ build --force_pic
 ###############################################################################
 build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
 build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:link_shared
-# Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING.
+# Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING + IREE_TRACING_PROVIDER.
 # Builds the runtime with tracing support enabled.
-build --flag_alias=iree_enable_runtime_tracing=@tracy_client//:runtime_enable
+build --flag_alias=iree_enable_runtime_tracing=//runtime/src/iree/base/tracing:tracing_provider
 
 ###############################################################################
 # Options for "generic_gcc" builds

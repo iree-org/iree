@@ -49,7 +49,6 @@ iree_pyext_module(
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::hal::drivers
     iree::hal::utils::allocators

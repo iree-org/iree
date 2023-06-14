@@ -66,7 +66,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
       [](OpBuilder &builder, Operation *operation) {
         // We tile to 4 as we want each thread to load 4 element in a cyclic
         // distribution.
-        SmallVector<Value, 4> tileSizesVal;
+        SmallVector<Value> tileSizesVal;
         MemRefType dstMemRefType =
             llvm::cast<MemRefType>(cast<linalg::GenericOp>(operation)
                                        .getDpsInitOperand(0)
@@ -114,7 +114,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 /// workgroup size.
 static std::optional<SmallVector<int64_t>> getTileToDistributableSize(
     linalg::GenericOp copyOp, int64_t flatWorkgroupSize) {
-  SmallVector<int64_t, 4> shape = copyOp.getStaticLoopRanges();
+  SmallVector<int64_t> shape = copyOp.getStaticLoopRanges();
   unsigned bitWidth =
       llvm::cast<MemRefType>(copyOp.getDpsInitOperand(0)->get().getType())
           .getElementTypeBitWidth();
@@ -143,7 +143,7 @@ static void populateTileToUnroll(RewritePatternSet &patterns,
                                  int64_t flatWorkgroupSize) {
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
       [flatWorkgroupSize](OpBuilder &builder, Operation *operation) {
-        SmallVector<Value, 4> tileSizesVal;
+        SmallVector<Value> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
         if (!copyOp) return tileSizesVal;
         std::optional<SmallVector<int64_t>> staticSize =
@@ -220,7 +220,7 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
                                         Value flatThreadId) {
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
       [](OpBuilder &builder, Operation *operation) {
-        SmallVector<Value, 4> tileSizesVal;
+        SmallVector<Value> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
         if (!copyOp) return tileSizesVal;
         SmallVector<int64_t> staticSize = getNativeDstShape(copyOp);

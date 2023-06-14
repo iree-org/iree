@@ -20,7 +20,9 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   
   %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.apply_patterns %func { bubble_expand } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func {
+    transform.apply_patterns.iree.bubble_expand
+  } : !transform.any_op
 
   // Excessively eager canonicalization results in `fill`s being "fused" due to
   // swapping with `extract_slice`, which confuses the fusion operation below.
@@ -60,7 +62,11 @@ transform.sequence failures(propagate) {
   
   // Step 3. Rank-reduce.
   // ===========================================================================
-  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func {
+    transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+    transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+  } : !transform.any_op
 
   // We don't perform any following transformation (vectorization, bufferizaton,
   // mapping) because this schedule is applied to Linalg-only code without the

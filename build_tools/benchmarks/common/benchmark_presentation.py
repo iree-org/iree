@@ -99,12 +99,6 @@ class MetricsToTableMapper(ABC, Generic[T]):
 
   def get_series_id(self, benchmark_id: str) -> str:
     """Returns the dashboard series id."""
-    # TODO(#11076): Remove legacy path.
-    # Whitespace is used in the legacy benchmark id as the delimiter, while not
-    # used in the new benchmark id. This is a temporary solution to generate
-    # both ids during the migration.
-    if " " in benchmark_id:
-      return self.get_series_name(benchmark_id)
     return f"{benchmark_id}-{self.get_metric_id()}"
 
   @abstractmethod
@@ -317,11 +311,7 @@ def aggregate_all_benchmarks(
         raise ValueError(f"Duplicated benchmark name: {series_name}")
       benchmark_names.add(series_name)
 
-      # TODO(#11076): Remove legacy path.
       series_id = benchmark_run.info.run_config_id
-      if series_id is None:
-        series_id = series_name
-
       if series_id in aggregate_results:
         raise ValueError(f"Duplicated benchmark id: {series_id}")
 
@@ -369,10 +359,6 @@ def collect_all_compilation_metrics(
       target_names.add(target_name)
 
       target_id = compile_stats.compilation_info.gen_config_id
-      # TODO(#11076): Remove legacy path.
-      if target_id is None:
-        target_id = target_name
-
       if target_id in compile_metrics:
         raise ValueError(f"Duplicated target id: {target_id}")
 

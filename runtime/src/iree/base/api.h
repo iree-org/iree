@@ -90,6 +90,7 @@
 #include "iree/base/string_builder.h"  // IWYU pragma: export
 #include "iree/base/string_view.h"     // IWYU pragma: export
 #include "iree/base/time.h"            // IWYU pragma: export
+#include "iree/base/tracing.h"         // IWYU pragma: export
 #include "iree/base/wait_source.h"     // IWYU pragma: export
 
 #ifdef __cplusplus

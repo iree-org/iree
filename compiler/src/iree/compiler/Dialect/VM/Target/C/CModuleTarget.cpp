@@ -177,7 +177,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "\n";
 
   // imports
-  SmallVector<IREE::VM::ImportOp, 4> importOps(
+  SmallVector<IREE::VM::ImportOp> importOps(
       moduleOp.getOps<IREE::VM::ImportOp>());
   std::string importName = moduleName + "_imports_";
   output << "static const iree_vm_native_import_descriptor_t " << importName
@@ -202,7 +202,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "\n";
 
   // exports
-  SmallVector<func::FuncOp, 4> exportedFunctions;
+  SmallVector<func::FuncOp> exportedFunctions;
   for (auto func : moduleOp.getOps<func::FuncOp>()) {
     if (func.getOperation()->hasAttr("vm.export_name")) {
       exportedFunctions.push_back(func);

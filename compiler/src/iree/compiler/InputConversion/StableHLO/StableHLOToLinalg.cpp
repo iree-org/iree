@@ -243,7 +243,7 @@ SmallVector<AffineExpr> getExprFromConfig(
   return exprs;
 }
 
-// Convert mhlo.einsum op into linalg.generic.
+// Convert stablehlo.einsum op into linalg.generic.
 // Algorithm in general 3 steps:
 
 // Step1) Dissect entire einsum_config to different operands
@@ -347,7 +347,7 @@ class EinsumToLinalgConverter
 
     // From einsum_config of each operand in vector<string>, generate
     // the equivalent vector<AffineExpr>.
-    SmallVector<AffineMap, 4> maps;
+    SmallVector<AffineMap> maps;
     for (const SmallVector<std::string>& loopOperand :
          {lhsEin, rhsEin, outEin}) {
       auto exprs = getExprFromConfig(loopOperand, strAffineDimUmap);
@@ -510,7 +510,7 @@ class BroadcastConverter
     // BroadcastOp prepends the dimensions in the `broadcast_sizes` attribute to
     // the input's dimensions.
     unsigned numPrependedDims = llvm::size(broadcastOp.getBroadcastSizes());
-    SmallVector<AffineExpr, 4> inputDimExprs;
+    SmallVector<AffineExpr> inputDimExprs;
     inputDimExprs.reserve(inputRank);
     for (unsigned i = 0; i < inputRank; ++i) {
       inputDimExprs.push_back(b->getAffineDimExpr(numPrependedDims + i));
@@ -576,7 +576,7 @@ class HloBroadcastInDimConverter
     }
 
     auto operandShape = operandType.getShape();
-    SmallVector<AffineExpr, 4> dimExprs;
+    SmallVector<AffineExpr> dimExprs;
     dimExprs.reserve(nloops);
 
     if (broadcastOp.getBroadcastDimensions()) {
@@ -719,8 +719,8 @@ class BroadcastInDimOpToBroadcastConverter
 // broadcast and go directly to `linalg.generic`.
 
 // This also covers the important case of broadcasting a scalar. Ideally the
-// pattern (`mhlo.constant` -> `mhlo.dynamic_broadcast_in_dim`) should be
-// converted to a tensor dialect op similar to TF's `ConstantLikeOp`.
+// pattern (`stablehlo.constant` -> `stablehlo.dynamic_broadcast_in_dim`) should
+// be converted to a tensor dialect op similar to TF's `ConstantLikeOp`.
 class HloDynamicBroadcastInDimConverter
     : public OpConversionPattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
  public:
@@ -1069,7 +1069,7 @@ class BitcastConvertConverter
   }
 };
 
-// Lowers mhlo.RealDynamicSliceOp to tensor.extract_slice and other
+// Lowers stablehlo.RealDynamicSliceOp to tensor.extract_slice and other
 // arith/tensor dialect ops.
 class RealDynamicSliceConverter
     : public OpConversionPattern<mlir::stablehlo::RealDynamicSliceOp> {
@@ -1111,7 +1111,7 @@ class RealDynamicSliceConverter
     auto resultType = llvm::cast<RankedTensorType>(
         this->typeConverter->convertType(realDynamicSliceOp.getType()));
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<OpFoldResult, 4> offsets, sizes, strides;
+    SmallVector<OpFoldResult> offsets, sizes, strides;
     SmallVector<Type, 3> clampType(3, arithType);
     for (auto i : llvm::seq<unsigned>(0, argType.getRank())) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(loc, i);
@@ -1250,7 +1250,7 @@ class ReshapeOpConverter
     Value collapsedOp = operand;
     Location loc = reshapeOp.getLoc();
     auto getIdentityExprs = [&rewriter](int64_t n) {
-      SmallVector<AffineExpr, 4> exprs;
+      SmallVector<AffineExpr> exprs;
       for (int i = 0; i < n; ++i) exprs.push_back(rewriter.getAffineDimExpr(i));
       return exprs;
     };
@@ -1259,7 +1259,7 @@ class ReshapeOpConverter
     // source dimension, the reduce step can be skipped. TensorCollapseShape
     // expects a different rank of operand and result.
     if (operandType.getRank() != 1) {
-      SmallVector<ReassociationExprs, 4> collapsingMap = {
+      SmallVector<ReassociationExprs> collapsingMap = {
           // Use operand_type here because we need to collapse all operands
           // dimensions.
           getIdentityExprs(operandType.getRank())};
@@ -1275,7 +1275,7 @@ class ReshapeOpConverter
     if (resultType.getRank() == 1) {
       rewriter.replaceOp(reshapeOp, collapsedOp);
     } else {
-      SmallVector<ReassociationExprs, 4> expandingMap = {
+      SmallVector<ReassociationExprs> expandingMap = {
           // Use resultType here because we need to expand to all result
           // dimensions.
           getIdentityExprs(resultType.getRank())};
@@ -1416,7 +1416,7 @@ struct ConcatenateConverter
           Value concatDimSize = zero;
           Value result;
 
-          SmallVector<Value, 4> extractIndices;
+          SmallVector<Value> extractIndices;
           extractIndices.reserve(nloops);
           for (int64_t i = 0; i < nloops; i++) {
             extractIndices.push_back(b.create<linalg::IndexOp>(loc, i));
@@ -1573,7 +1573,7 @@ class DynamicSliceConverter
       int64_t size = std::get<1>(en.value());
       sizes.push_back(rewriter.getI64IntegerAttr(size));
 
-      // By mhlo.DynamicSlice definition:
+      // By stablehlo.DynamicSlice definition:
       //   `start_indices[i] = clamp(start_indices[i],
       //       0, operand.dimension_size[i] - size_indices[i])`
       Value startIndex = extractIndexFromTensor(
@@ -1640,7 +1640,7 @@ class DynamicUpdateSliceConverter
     SmallVector<OpFoldResult, 3> startIndices;
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     for (const auto& en : llvm::enumerate(adaptor.getStartIndices())) {
-      // By mhlo.DynamicUpdateSlice definition:
+      // By stablehlo.DynamicUpdateSlice definition:
       //   `start_indices[i] = clamp(start_indices[i],
       //       0, operand.dimension_size[i] - update.dimension_size[i])`
       Value startIndex = extractIndexFromTensor(
@@ -2036,14 +2036,14 @@ struct SelectAndScatterNoOverlapConverter
     }
 
     // The first linalg.generic operation computes the relevant index over
-    // window for the defined mhlo.select_and_scatter. This involves
+    // window for the defined stablehlo.select_and_scatter. This involves
     // iterating over the window of the operand a computing the index.
     // Rather than storing N indices we compute the row major identifier
     // in the window, to specify which location should be scattered to.
 
     // Output specifies the `rank` parallel iterators that correspond to
     // output values.
-    SmallVector<AffineExpr, 4> outputExprs;
+    SmallVector<AffineExpr> outputExprs;
     for (int i = 0, s = rank; i < s; ++i)
       outputExprs.push_back(b.getAffineDimExpr(i));
 
@@ -2052,8 +2052,8 @@ struct SelectAndScatterNoOverlapConverter
     // adding the additional reduction iterators. We skip length-1 dimensions
     // as the reduction is degenerate.
     SmallVector<int64_t> filteredWindows, filteredStrides;
-    SmallVector<AffineExpr, 4> sourceExprs(outputExprs);
-    SmallVector<AffineExpr, 4> windowExprs;
+    SmallVector<AffineExpr> sourceExprs(outputExprs);
+    SmallVector<AffineExpr> windowExprs;
     for (int i = 0, s = rank; i < s; ++i) {
       sourceExprs[i] = sourceExprs[i] * strides[i];
       if (strides[i] != 1) {
@@ -2083,7 +2083,7 @@ struct SelectAndScatterNoOverlapConverter
 
     // Output sizes should match the dimensions of the `source` tensor, even if
     // dynamic.
-    SmallVector<Value, 4> reduceDynSizes;
+    SmallVector<Value> reduceDynSizes;
     for (int i = 0, s = rank; i < s; ++i)
       if (sourceTy.isDynamicDim(i))
         reduceDynSizes.push_back(b.create<tensor::DimOp>(source, i));
@@ -2116,7 +2116,8 @@ struct SelectAndScatterNoOverlapConverter
     rewriter.cloneRegionBefore(op.getSelect(), reduceRegion,
                                reduceRegion.end());
 
-    // This includes convert `mhlo` scalar-tensor regions to `linalg` scalars.
+    // This includes convert `stablehlo` scalar-tensor regions to `linalg`
+    // scalars.
     TypeConverter::SignatureConversion reduceSignConverter(4);
     reduceSignConverter.addInputs(0, srcETy);
     reduceSignConverter.addInputs(srcETy);
@@ -2166,7 +2167,7 @@ struct SelectAndScatterNoOverlapConverter
         b.create<arith::SelectOp>(selectPred, selectInVal, selectOutVal);
     b.create<linalg::YieldOp>(ValueRange{selectedValue, selectedIdx});
 
-    // Original terminator is an mhlo.return we no longer need.
+    // Original terminator is an stablehlo.return we no longer need.
     rewriter.eraseOp(reduceTerminator);
     b.setInsertionPoint(op);
 
@@ -2336,9 +2337,9 @@ struct PadOpNegativePaddingConversion
   LogicalResult matchAndRewrite(
       mlir::stablehlo::PadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
-    SmallVector<int64_t, 4> padLow;
-    SmallVector<int64_t, 4> padHigh;
-    SmallVector<OpFoldResult, 4> sliceStarts;
+    SmallVector<int64_t> padLow;
+    SmallVector<int64_t> padHigh;
+    SmallVector<OpFoldResult> sliceStarts;
 
     bool hasNegativePadding = false;
     for (int64_t low : op.getEdgePaddingLow().getValues<int64_t>()) {
@@ -2373,18 +2374,18 @@ struct PadOpNegativePaddingConversion
     // Then slice according to the negative edge padding. Static shapes only for
     // now.
     if (!op.getType().hasStaticShape()) return failure();
-    SmallVector<OpFoldResult, 4> sizes(llvm::map_range(
+    SmallVector<OpFoldResult> sizes(llvm::map_range(
         op.getType().getShape(),
         [&](int64_t dim) { return rewriter.getIndexAttr(dim); }));
-    SmallVector<OpFoldResult, 4> strides(sliceStarts.size(),
-                                         rewriter.getIndexAttr(1));
+    SmallVector<OpFoldResult> strides(sliceStarts.size(),
+                                      rewriter.getIndexAttr(1));
     rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(op, pad, sliceStarts,
                                                         sizes, strides);
     return success();
   }
 };
 
-/// Converts mhlo.pad operation to tensor.pad or tensor.insert_slice.
+/// Converts stablehlo.pad operation to tensor.pad or tensor.insert_slice.
 struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -2403,13 +2404,13 @@ struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
     Value paddingVal = rewriter.createOrFold<tensor::ExtractOp>(
         loc, adaptor.getPaddingValue());
 
-    SmallVector<OpFoldResult, 4> low(
+    SmallVector<OpFoldResult> low(
         op.getEdgePaddingLow().getValues<IntegerAttr>());
 
     // If there is no interior padding lower to tensor.pad directly.
     if (llvm::all_of(op.getInteriorPadding().getValues<APInt>(),
                      [](const APInt& intVal) { return intVal.isZero(); })) {
-      SmallVector<OpFoldResult, 4> high(
+      SmallVector<OpFoldResult> high(
           op.getEdgePaddingHigh().getValues<IntegerAttr>());
       auto padTensorOp = rewriter.create<tensor::PadOp>(
           loc, resultType, adaptor.getOperand(), low, high, paddingVal);
@@ -2426,7 +2427,7 @@ struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
 
     // Get sizes of the original operand.
     auto operandType = llvm::cast<ShapedType>(adaptor.getOperand().getType());
-    auto sizes = llvm::map_to_vector<4>(
+    auto sizes = llvm::map_to_vector(
         llvm::seq<int64_t>(0, operandType.getRank()),
         [&](int64_t dim) -> OpFoldResult {
           if (!operandType.isDynamicDim(dim))
@@ -2436,11 +2437,11 @@ struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
         });
     // Map interior padding to strides.
     auto strides =
-        llvm::map_to_vector<4>(op.getInteriorPadding().getValues<IntegerAttr>(),
-                               [&](IntegerAttr stride) -> OpFoldResult {
-                                 return rewriter.getIntegerAttr(
-                                     stride.getType(), stride.getValue() + 1);
-                               });
+        llvm::map_to_vector(op.getInteriorPadding().getValues<IntegerAttr>(),
+                            [&](IntegerAttr stride) -> OpFoldResult {
+                              return rewriter.getIntegerAttr(
+                                  stride.getType(), stride.getValue() + 1);
+                            });
 
     rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
         op, adaptor.getOperand(), fill, low, sizes, strides);
@@ -2472,7 +2473,7 @@ struct TorchIndexSelectOpConversion
 
     // The output shape is
     //   `params[:axis] + indices[batch_dims:] + params[axis + 1:]`
-    SmallVector<Value, 4> dynSizes;
+    SmallVector<Value> dynSizes;
     for (int i = 0; i < rank; ++i) {
       if (!resultType.isDynamicDim(i)) continue;
       if (i < axis) {
@@ -2491,8 +2492,8 @@ struct TorchIndexSelectOpConversion
 
     // Generate dummy tensor to preserve slice shape information.
     SmallVector<int64_t> sliceShape;
-    SmallVector<Value, 4> dynSliceSizes;
-    SmallVector<AffineExpr, 4> sliceExprs;
+    SmallVector<Value> dynSliceSizes;
+    SmallVector<AffineExpr> sliceExprs;
     auto resultShape = resultType.getShape();
     for (int i = 0; i < axis; ++i) {
       sliceExprs.push_back(rewriter.getAffineDimExpr(i));
@@ -2511,7 +2512,7 @@ struct TorchIndexSelectOpConversion
     }
 
     // Setup AffineMap for operand tensor.
-    SmallVector<AffineExpr, 4> exprs;
+    SmallVector<AffineExpr> exprs;
     for (int i = 0; i < batch; ++i) {
       exprs.push_back(rewriter.getAffineDimExpr(i));
     }
@@ -2537,7 +2538,7 @@ struct TorchIndexSelectOpConversion
         /*outputs=*/emptyOp, indexingMaps, getNParallelLoopsAttrs(rank),
         /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
 
-    SmallVector<Type, 4> bodyArgTypes;
+    SmallVector<Type> bodyArgTypes;
     SmallVector<Value, 2> linalgOpArgs = {adaptor.getIndex(), sliceOp};
     // Add a block to the region.
     auto* region = &linalgOp.getRegion();
@@ -2555,7 +2556,7 @@ struct TorchIndexSelectOpConversion
     Value castedValue = rewriter.create<arith::IndexCastOp>(
         loc, rewriter.getIndexType(), block->getArgument(0));
 
-    SmallVector<Value, 4> indices;
+    SmallVector<Value> indices;
     for (int i = 0; i < axis; ++i) {
       indices.push_back(rewriter.create<linalg::IndexOp>(loc, i));
     }

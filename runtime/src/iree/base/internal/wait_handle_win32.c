@@ -13,13 +13,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/api.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/target_platform.h"
 
 #if IREE_WAIT_API == IREE_WAIT_API_WIN32
-
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Platform utilities

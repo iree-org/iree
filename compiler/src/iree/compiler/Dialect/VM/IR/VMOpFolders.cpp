@@ -144,7 +144,7 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
     auto visibility = op.getVisibility();
     auto newOp = rewriter.replaceOpWithNewOp<T>(
         op, op.getSymName(), op.getIsMutable(), op.getType(),
-        llvm::to_vector<4>(op->getDialectAttrs()));
+        llvm::to_vector(op->getDialectAttrs()));
     newOp.setVisibility(visibility);
     return success();
   }
@@ -545,7 +545,7 @@ static TypedAttr constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
     if (!rhs || lhs.getType() != rhs.getType()) return {};
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
-    SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
+    SmallVector<Attribute> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldBinaryOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
@@ -596,7 +596,7 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
     auto aIt = a.getValues<AttrElementT>().begin();
     auto bIt = b.getValues<AttrElementT>().begin();
     auto cIt = c.getValues<AttrElementT>().begin();
-    SmallVector<Attribute, 4> resultAttrs(a.getNumElements());
+    SmallVector<Attribute> resultAttrs(a.getNumElements());
     for (int64_t i = 0; i < a.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldTernaryOp<AttrElementT>(*aIt, *bIt, *cIt, calculate);
@@ -2207,7 +2207,7 @@ static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
     if (!rhs || lhs.getType() != rhs.getType()) return {};
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
-    SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
+    SmallVector<Attribute> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldBinaryCmpFOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
@@ -2909,7 +2909,7 @@ struct SimplifyPassThroughBr : public OpRewritePattern<BranchOp> {
                                 PatternRewriter &rewriter) const override {
     Block *dest = op.getDest();
     ValueRange destOperands = op.getOperands();
-    SmallVector<Value, 4> destOperandStorage;
+    SmallVector<Value> destOperandStorage;
 
     // Try to collapse the successor if it points somewhere other than this
     // block.
@@ -2967,8 +2967,8 @@ struct SimplifySameTargetCondBranchOp : public OpRewritePattern<CondBranchOp> {
 
     // If all operands match between the targets then we can become a normal
     // branch to the shared target.
-    auto trueOperands = llvm::to_vector<4>(op.getTrueOperands());
-    auto falseOperands = llvm::to_vector<4>(op.getFalseOperands());
+    auto trueOperands = llvm::to_vector(op.getTrueOperands());
+    auto falseOperands = llvm::to_vector(op.getFalseOperands());
     if (trueOperands == falseOperands) {
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getTrueDest(), trueOperands);
       return success();
@@ -3068,7 +3068,7 @@ struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
       }
     }
     rewriter.replaceOpWithNewOp<CallOp>(op, op.getCallee(),
-                                        llvm::to_vector<4>(op.getResultTypes()),
+                                        llvm::to_vector(op.getResultTypes()),
                                         op.getOperands());
     return success();
   }

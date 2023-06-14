@@ -132,7 +132,7 @@ std::optional<unsigned> getTiedResultOperandIndex(Operation *op,
                                                   unsigned resultIndex);
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
                                std::optional<unsigned> operandIndex);
-SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
+SmallVector<int64_t> getTiedResultOperandIndices(Operation *op);
 bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
 SmallVector<Value> getOperandTiedResults(Operation *op, unsigned operandIndex);
 LogicalResult verifyTiedOp(TiedOpInterface tiedOp);
@@ -144,7 +144,7 @@ LogicalResult verifyTiedOp(TiedOpInterface tiedOp);
 void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices,
-    SmallVector<int64_t, 4> &tiedOperandIndices);
+    SmallVector<int64_t> &tiedOperandIndices);
 
 //===----------------------------------------------------------------------===//
 // Shape-aware interface utilities

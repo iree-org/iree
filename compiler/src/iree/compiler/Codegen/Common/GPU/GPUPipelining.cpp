@@ -261,7 +261,7 @@ struct MainLoopInfo {
   // Warp-level syncronous operations:
   // `ldmatrix, ld.shared` SharedMemory -> Registers
   // `mma.sync` Registers -> Tensor Cores.
-  llvm::SmallVector<WarpMmaOp, 4> warpOperations;
+  llvm::SmallVector<WarpMmaOp> warpOperations;
 
   // Set to track the dependencies already seen to a backward slice.
   llvm::SetVector<Operation*> seenDepOps;
@@ -353,6 +353,7 @@ struct MainLoopInfo {
         // Pipeline and schedule the most inner for op ,i.e., the mainloop that
         // should be a flat region.
         isSchedulable = false;
+        LDBG("-- found op with regions -> not schedulable: " << op);
         return;
       }
       if (isa<nvgpu::DeviceAsyncCopyOp>(op)) {
@@ -399,11 +400,23 @@ struct MainLoopInfo {
     // If one of the ingredients (`cp.async`, `cp.commit_group`,
     // `cp.wait_group`, `bar.sync`, `mma.sync`, `ldmatrix` or `ld.shared`) for
     // scheduling is missing, the mainloop cannot be scheduled.
-    if (copyGlobalToSharedOps.empty() || asyncCreateGroupOp.empty() ||
-        asyncWaitOps.empty() || barrierOps.empty() || warpOperations.empty()) {
+    if (copyGlobalToSharedOps.empty()) {
+      LDBG("-- missing copyGlobalToSharedOps -> not schedulable");
       isSchedulable = false;
-      return;
+    } else if (asyncCreateGroupOp.empty()) {
+      LDBG("-- missing asyncCreateGroupOp -> not schedulable");
+      isSchedulable = false;
+    } else if (asyncWaitOps.empty()) {
+      LDBG("-- missing asyncWaitOps -> not schedulable");
+      isSchedulable = false;
+    } else if (barrierOps.empty()) {
+      LDBG("-- missing barrierOps -> not schedulable");
+      isSchedulable = false;
+    } else if (warpOperations.empty()) {
+      LDBG("-- missing warpOperations -> not schedulable");
+      isSchedulable = false;
     }
+    if (!isSchedulable) return;
 
     // Collect the dependent operations for `cp.async` in the mainloop order for
     // coarse-grained software pipeling. The deps are collected in stage order,
@@ -480,12 +493,12 @@ static void getNvidiaAmpereTensorCorePipeline(
     unsigned numStages) {
   // Analyze the main loop and obtain information for coarse-grained pipelining
   // and fine-grained instruction scheduling.
-  MainLoopInfo mainloop(forOp);
   LDBG("Start getNvidiaAmpereTensorCorePipeline");
+  MainLoopInfo mainloop(forOp);
 
   // If the mainloop is not schedulable, return an empty schedule.
   if (!mainloop.isSchedulable) {
-    LDBG("--main loop is not schedulable");
+    LDBG("--main loop is not schedulable -> " << forOp);
     return;
   }
 

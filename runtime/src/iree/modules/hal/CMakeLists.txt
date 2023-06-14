@@ -22,7 +22,6 @@ iree_cc_library(
   DEPS
     ::types
     iree::base
-    iree::base::tracing
     iree::hal
     iree::modules::hal::utils::buffer_diagnostics
     iree::vm

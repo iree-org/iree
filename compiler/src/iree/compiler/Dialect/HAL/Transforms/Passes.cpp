@@ -179,9 +179,9 @@ void buildHALConfigurationPassPipeline(
   // locations in the IR. This will allow us to easily inspect each executable
   // and give downstream tools that can display source information something
   // more useful and slim than the entire original source model.
-  if (!targetOptions.sourceListingPath.empty()) {
+  if (!targetOptions.executableSourcesPath.empty()) {
     passManager.addPass(
-        createDumpExecutableSourcesPass(targetOptions.sourceListingPath));
+        createDumpExecutableSourcesPass(targetOptions.executableSourcesPath));
   }
 
   // Substitute hal.executables we've generated from earlier phases of

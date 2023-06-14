@@ -1,5 +1,5 @@
 # Add this tablegen include to support stablehlo rewrites with DRR.
-list(APPEND IREE_COMPILER_TABLEGEN_INCLUDE_DIRS "${IREE_SOURCE_DIR}/third_party/mlir-hlo/stablehlo")
+list(APPEND IREE_COMPILER_TABLEGEN_INCLUDE_DIRS "${IREE_SOURCE_DIR}/third_party/stablehlo")
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_ABOVE_THIS_LINE ###
 ################################################################################

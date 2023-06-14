@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/detail.h"
 
@@ -683,7 +682,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_read(
   IREE_ASSERT_ARGUMENT(target_buffer);
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
   iree_hal_buffer_mapping_t source_mapping = {{0}};
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_buffer_map_range(source_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
@@ -707,7 +706,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
   IREE_ASSERT_ARGUMENT(source_buffer);
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
   iree_hal_buffer_mapping_t target_mapping;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
@@ -750,7 +749,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
 
   // Map source, which may have IREE_WHOLE_BUFFER length.
   iree_hal_buffer_mapping_t source_mapping;

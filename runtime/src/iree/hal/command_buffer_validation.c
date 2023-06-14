@@ -11,7 +11,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/detail.h"

@@ -849,7 +849,7 @@ Value MatchAlwaysAttr::buildConditionExpression(Location loc, Value value,
 
 static ArrayAttr parseMultiMatchAttrArray(AsmParser &p) {
   auto b = p.getBuilder();
-  SmallVector<Attribute, 4> conditionAttrs;
+  SmallVector<Attribute> conditionAttrs;
   if (failed(p.parseLess()) || failed(p.parseLSquare())) {
     return {};
   }

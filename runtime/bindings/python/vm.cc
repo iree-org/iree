@@ -8,7 +8,6 @@
 
 #include "./status_utils.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 // TODO: We shouldn't need the HAL API but it is used for direct printing
 // summaries of HAL objects in lists. We should have a better way of doing this
 // dynamically vs hard depending on a type switch here.
@@ -57,7 +56,7 @@ py::dict GetFunctionReflectionDict(iree_vm_function_t& f) {
 //------------------------------------------------------------------------------
 
 VmInstance VmInstance::Create() {
-  IREE_TRACE_SCOPE0("VmInstance::Create");
+  IREE_TRACE_SCOPE_NAMED("VmInstance::Create");
 
   iree_vm_instance_t* instance = NULL;
   auto status = iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
@@ -79,7 +78,7 @@ VmInstance VmInstance::Create() {
 
 VmContext VmContext::Create(VmInstance* instance,
                             std::optional<std::vector<VmModule*>> modules) {
-  IREE_TRACE_SCOPE0("VmContext::Create");
+  IREE_TRACE_SCOPE_NAMED("VmContext::Create");
   iree_vm_context_t* context;
   if (!modules) {
     // Simple create with open allowed modules.
@@ -134,7 +133,7 @@ void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
 VmModule VmModule::ResolveModuleDependency(VmInstance* instance,
                                            const std::string& name,
                                            uint32_t minimum_version) {
-  IREE_TRACE_SCOPE0("VmModule::ResolveModuleDependency");
+  IREE_TRACE_SCOPE_NAMED("VmModule::ResolveModuleDependency");
   iree_vm_module_t* module = nullptr;
 
   iree_vm_module_dependency_t dependency = {
@@ -153,7 +152,7 @@ VmModule VmModule::ResolveModuleDependency(VmInstance* instance,
 
 VmModule VmModule::FromFlatbufferBlob(VmInstance* instance,
                                       py::object flatbuffer_blob_object) {
-  IREE_TRACE_SCOPE0("VmModule::FromFlatbufferBlob");
+  IREE_TRACE_SCOPE_NAMED("VmModule::FromFlatbufferBlob");
   auto flatbuffer_blob = py::cast<py::buffer>(flatbuffer_blob_object);
   auto buffer_info = flatbuffer_blob.request();
   iree_vm_module_t* module = nullptr;

@@ -101,6 +101,7 @@ int main(int argc, char **argv) {
   mlir::scf::registerTransformDialectExtension(registry);
   mlir::tensor::registerFindPayloadReplacementOpInterfaceExternalModels(
       registry);
+  mlir::tensor::registerTransformDialectExtension(registry);
   mlir::vector::registerTransformDialectExtension(registry);
 
   // Dialect extensions.

@@ -56,7 +56,7 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
 
 #map = affine_map<(d0) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#executable_target_cuda_nvptx_fb], legacy_sync}>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @vectorized_dispatch_0 {

@@ -25,7 +25,6 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::flatcc::parsing
-    iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm
   PUBLIC

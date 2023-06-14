@@ -10,7 +10,6 @@
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/debug_reporter.h"
@@ -493,7 +492,7 @@ static iree_status_t iree_hal_vulkan_driver_find_device_by_index(
     iree_hal_driver_t* base_driver, uint32_t device_index,
     iree_allocator_t host_allocator, VkPhysicalDevice* found_physical_device) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)device_index);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)device_index);
 
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
 

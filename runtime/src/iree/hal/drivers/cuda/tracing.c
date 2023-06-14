@@ -6,7 +6,7 @@
 
 #include "iree/hal/drivers/cuda/tracing.h"
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #include "iree/hal/drivers/cuda/status_util.h"
 
@@ -95,8 +95,8 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
   if (iree_status_is_ok(status)) {
     IREE_TRACE_ZONE_BEGIN_NAMED(
         z_event_pool, "iree_hal_cuda_tracing_context_allocate_event_pool");
-    IREE_TRACE_ZONE_APPEND_VALUE(z_event_pool,
-                                 (int64_t)context->query_capacity);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z_event_pool,
+                                     (int64_t)context->query_capacity);
     for (iree_host_size_t i = 0; i < context->query_capacity; ++i) {
       status = CU_RESULT_TO_STATUS(
           cuda_context->syms,
@@ -185,7 +185,7 @@ void iree_hal_cuda_tracing_context_collect(
         context->query_head < context->query_tail
             ? context->query_capacity - context->query_tail
             : context->query_head - context->query_tail;
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)try_query_count);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)try_query_count);
 
     // Scan and feed the times to tracy, stopping when we hit the first
     // unavailable query.
@@ -209,7 +209,7 @@ void iree_hal_cuda_tracing_context_collect(
 
       read_query_count = i + 1;
     }
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)read_query_count);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)read_query_count);
 
     context->query_tail += read_query_count;
     if (context->query_tail >= context->query_capacity) {
@@ -292,4 +292,4 @@ void iree_hal_cuda_tracing_context_free(
 void iree_hal_cuda_tracing_context_collect(
     iree_hal_cuda_tracing_context_t* context) {}
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE

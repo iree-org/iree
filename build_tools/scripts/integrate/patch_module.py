@@ -16,7 +16,7 @@
 #      git cherry-pick <some commit>
 # 3. Run this script from the main IREE repository (one of the following):
 #      patch_module.py --module=llvm-project
-#      patch_module.py --module=mlir-hlo
+#      patch_module.py --module=stablehlo
 # 4. Send a PR on the main IREE repo to bump the submodule. Be sure to include
 #    the name of the patch branch for posterity.
 

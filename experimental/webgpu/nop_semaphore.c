@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 typedef struct iree_hal_webgpu_nop_semaphore_t {
   iree_hal_resource_t resource;

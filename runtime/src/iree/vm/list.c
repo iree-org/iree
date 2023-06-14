@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/vm/instance.h"
 
 static uint8_t iree_vm_value_type_size(iree_vm_type_def_t type) {

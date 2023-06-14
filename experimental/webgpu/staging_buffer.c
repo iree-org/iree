@@ -10,7 +10,6 @@
 
 #include "experimental/webgpu/buffer.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 iree_status_t iree_hal_webgpu_staging_buffer_initialize(
     WGPUDevice device, const WGPULimits* limits,

@@ -13,7 +13,6 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
 #include "iree/modules/hal/inline/module.h"

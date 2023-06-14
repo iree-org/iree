@@ -7,7 +7,6 @@
 #include "iree/hal/local/plugins/registration/init.h"
 
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_SYSTEM_LIBRARY_PLUGIN)
 #include "iree/hal/local/plugins/system_library_plugin.h"

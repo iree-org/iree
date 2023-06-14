@@ -7,7 +7,6 @@
 #include "iree/hal/utils/caching_allocator.h"
 
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 
 // Default capacity of a pool free list when not specified by the user.
 #define IREE_HAL_CACHING_ALLOCATOR_DEFAULT_FREE_LIST_CAPACITY 64
@@ -193,7 +192,7 @@ static iree_hal_buffer_t* iree_hal_caching_allocator_pool_find_and_take_buffer(
 static void iree_hal_caching_allocator_pool_trim_to_size(
     iree_hal_caching_allocator_pool_t* pool, iree_device_size_t target_size) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)target_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)target_size);
 
   iree_slim_mutex_lock(&pool->mutex);
 
@@ -243,7 +242,7 @@ static iree_status_t iree_hal_caching_allocator_pool_acquire(
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
     iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
 
   // Scan the free list to find an appropriate block.
   // If found we pop it off the list and return it without needing to allocate.
@@ -309,7 +308,7 @@ static iree_status_t iree_hal_caching_allocator_pool_acquire(
 static void iree_hal_caching_allocator_pool_release(
     iree_hal_caching_allocator_pool_t* pool, iree_hal_buffer_t* buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(buffer));
 
   // Try to add the buffer to the pool. If the pool is at capacity we'll just

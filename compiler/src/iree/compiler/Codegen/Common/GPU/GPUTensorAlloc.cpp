@@ -57,7 +57,7 @@ static bool contractOpFilter(Operation *op) {
 
   SmallVector<unsigned> dims;
   linalgOp.getParallelDims(dims);
-  SmallVector<int64_t, 4> shapes = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> shapes = linalgOp.getStaticLoopRanges();
   // Don't promote vector*matrix kind of case.
   int numNonUnitParallelLoop = 0;
   for (unsigned parallelDim : dims) {

@@ -159,8 +159,8 @@ bool isInBodyOfLinalgOps(Operation* op) {
          parentOp->getContext()->getLoadedDialect<linalg::LinalgDialect>();
 }
 
-SmallVector<int64_t, 4> extract1DVector(DenseIntElementsAttr elements) {
-  SmallVector<int64_t, 4> ret;
+SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
+  SmallVector<int64_t> ret;
   for (const APInt& element : elements) {
     ret.push_back(element.getLimitedValue());
   }

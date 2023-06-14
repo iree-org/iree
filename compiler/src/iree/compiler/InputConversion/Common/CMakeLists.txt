@@ -6,8 +6,7 @@
 
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
-if(IREE_INPUT_MHLO)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
 endif()
 if(IREE_INPUT_TORCH)

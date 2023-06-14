@@ -705,7 +705,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         Note that the index returned is into the full range of all operands of
         the current op.
       }],
-      /*retTy=*/"SmallVector<int64_t, 4>",
+      /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getTiedResultOperandIndices",
       /*args=*/(ins),
       /*methodBody=*/[{}],

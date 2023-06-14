@@ -241,7 +241,7 @@ struct DotGeneralOpConversion final
            rhsBatchingDims.size() + lhsExtraDims);
 
     {
-      SmallVector<AffineExpr, 4> dimExprs;
+      SmallVector<AffineExpr> dimExprs;
       dimExprs.reserve(targetRank);
       for (unsigned i = 0; i < targetRank; ++i)
         dimExprs.push_back(rewriter.getAffineDimExpr(i));

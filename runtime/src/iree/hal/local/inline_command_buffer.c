@@ -14,7 +14,6 @@
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_pipeline_layout.h"

@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/vm/bytecode/archive.h"
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/bytecode/verifier.h"

@@ -73,7 +73,7 @@ static void deduplicateOperands(
   llvm::BitVector sameValues(operandCount);
   llvm::BitVector deadOperandsMap(operandCount);
   auto uniformDupeIndexMap =
-      llvm::to_vector<4>(llvm::seq(0u, operandCount));  // old -> new
+      llvm::to_vector(llvm::seq(0u, operandCount));  // old -> new
   for (unsigned idx = 0; idx < operandCount; ++idx) {
     if (deadOperandsMap.test(idx)) continue;
     // Each bit represents an operand that duplicates the operand at idx.
@@ -105,8 +105,8 @@ static void deduplicateOperands(
   }
 
   // Build a map of old duplicate arguments to their base arguments.
-  auto argReplacementMap = llvm::to_vector<4>(
-      llvm::seq(0u, funcOp.getNumArguments()));  // old -> new
+  auto argReplacementMap =
+      llvm::to_vector(llvm::seq(0u, funcOp.getNumArguments()));  // old -> new
   auto operandToArgMap =
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
   for (auto dupe : llvm::enumerate(uniformDupeIndexMap)) {

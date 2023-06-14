@@ -15,7 +15,6 @@
 #include "experimental/webgpu/pipeline_layout.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Segmented submission management

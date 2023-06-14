@@ -6,13 +6,12 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/run_module.h"
 #include "iree/vm/api.h"
 
 int main(int argc, char** argv) {
-  int exit_code = EXIT_SUCCESS;
+  IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Parse command line flags.
@@ -39,6 +38,7 @@ int main(int argc, char** argv) {
   // method is only useful in these IREE tools that want consistent flags -
   // a real application will need to do what this is doing with its own setup
   // and I/O handling.
+  int exit_code = EXIT_SUCCESS;
   if (iree_status_is_ok(status)) {
     status = iree_tooling_run_module_from_flags(instance, host_allocator,
                                                 &exit_code);
@@ -53,5 +53,6 @@ int main(int argc, char** argv) {
   }
 
   IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(exit_code);
   return exit_code;
 }

@@ -12,7 +12,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/numpy_io.h"
@@ -392,6 +391,7 @@ static iree_status_t iree_variant_fprint(iree_vm_variant_t variant,
     if (written != iree_string_builder_size(&builder)) {
       status = iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
     }
+    fflush(file);
   }
   iree_string_builder_deinitialize(&builder);
   return status;
@@ -428,6 +428,7 @@ iree_status_t iree_tooling_variant_list_fprint(
     if (written != iree_string_builder_size(&builder)) {
       status = iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
     }
+    fflush(file);
   }
   iree_string_builder_deinitialize(&builder);
   return status;

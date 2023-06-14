@@ -101,7 +101,7 @@ function(iree_cc_binary)
     )
   else()
     set(_DUMMY_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_NAME}_dummy.cc")
-    file(WRITE ${_DUMMY_SRC} "")
+    iree_make_empty_file("${_DUMMY_SRC}")
     target_sources(${_NAME}
       PRIVATE
         ${_DUMMY_SRC}

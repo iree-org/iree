@@ -8,7 +8,6 @@
 
 #include <string>
 
-#include "iree/base/target_platform.h"
 #include "iree/testing/gtest.h"
 
 static bool operator==(const iree_string_pair_t& lhs,

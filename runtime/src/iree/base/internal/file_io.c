@@ -6,16 +6,11 @@
 
 #include "iree/base/internal/file_io.h"
 
-#include "iree/base/config.h"
-
 #if IREE_FILE_IO_ENABLE
 
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 #include <fcntl.h>

@@ -9,7 +9,6 @@
 #include "./hal.h"
 #include "./vm.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
@@ -163,22 +162,22 @@ class InvokeStatics {
                 abi_shape = std::move(abi_shape)](InvokeContext &c,
                                                   iree_vm_list_t *list,
                                                   py::handle py_value) {
-          IREE_TRACE_SCOPE0("ArgumentPacker::ReflectionNdarray");
+          IREE_TRACE_SCOPE_NAMED("ArgumentPacker::ReflectionNdarray");
           HalBufferView *bv = nullptr;
           py::object retained_bv;
           if (py::isinstance(py_value, device_array_type())) {
             // Short-circuit: If a DeviceArray is provided, assume it is
             // correct.
-            IREE_TRACE_SCOPE0("PackDeviceArray");
+            IREE_TRACE_SCOPE_NAMED("PackDeviceArray");
             bv = py::cast<HalBufferView *>(py_value.attr(kAttrBufferView));
           } else if (py::isinstance(py_value, hal_buffer_view_type())) {
             // Short-circuit: If a HalBufferView is provided directly.
-            IREE_TRACE_SCOPE0("PackBufferView");
+            IREE_TRACE_SCOPE_NAMED("PackBufferView");
             bv = py::cast<HalBufferView *>(py_value);
           } else {
             // Fall back to the array protocol to generate a host side
             // array and then convert that.
-            IREE_TRACE_SCOPE0("PackHostArray");
+            IREE_TRACE_SCOPE_NAMED("PackHostArray");
             py::object host_array;
             try {
               host_array = numpy_module().attr(kAsArray)(py_value, target_dtype,
@@ -380,7 +379,7 @@ class InvokeStatics {
  private:
   PackCallback GetGenericPackCallbackForNdarray() {
     return [this](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
-      IREE_TRACE_SCOPE0("ArgumentPacker::GenericNdarray");
+      IREE_TRACE_SCOPE_NAMED("ArgumentPacker::GenericNdarray");
       py::object host_array;
       try {
         host_array = numpy_module().attr(kAsArray)(
@@ -550,7 +549,7 @@ class ArgumentPacker {
  public:
   ArgumentPacker(InvokeStatics &statics, std::optional<py::list> arg_descs)
       : statics_(statics) {
-    IREE_TRACE_SCOPE0("ArgumentPacker::Init");
+    IREE_TRACE_SCOPE_NAMED("ArgumentPacker::Init");
     if (!arg_descs) {
       dynamic_dispatch_ = true;
     } else {
@@ -594,7 +593,7 @@ class ArgumentPacker {
                      py::dict kw_args) {
     // Dynamic dispatch.
     if (dynamic_dispatch_) {
-      IREE_TRACE_SCOPE0("ArgumentPacker::PackDynamic");
+      IREE_TRACE_SCOPE_NAMED("ArgumentPacker::PackDynamic");
       if (!kw_args.empty()) {
         throw std::invalid_argument(
             "kwargs not supported for dynamic dispatch functions");
@@ -614,7 +613,7 @@ class ArgumentPacker {
       }
       return arg_list;
     } else {
-      IREE_TRACE_SCOPE0("ArgumentPacker::PackReflection");
+      IREE_TRACE_SCOPE_NAMED("ArgumentPacker::PackReflection");
 
       // Reflection based dispatch.
       std::vector<py::handle> py_args(flat_arg_packers_.size());

@@ -12,7 +12,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/api.h"
 
 // Force using CUDA streams until we support command buffer caching to avoid the

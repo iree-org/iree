@@ -256,7 +256,7 @@ static void eraseStreamRegionResults(Region &region,
   for (auto &block : region.getBlocks()) {
     auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
     if (!yieldOp) continue;
-    llvm::SmallVector<Value, 4> newOperands;
+    llvm::SmallVector<Value> newOperands;
     for (auto i : llvm::reverse(excludedResultIndices)) {
       yieldOp.getResourceOperandsMutable().erase(i);
       yieldOp.getResourceOperandSizesMutable().erase(i);
@@ -748,7 +748,7 @@ Value ResourceSubviewOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> ResourceSubviewOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> ResourceSubviewOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -800,7 +800,7 @@ Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorImportOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorImportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -827,7 +827,7 @@ Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorExportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
@@ -970,7 +970,7 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -997,7 +997,7 @@ Value TensorFillOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> TensorFillOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorFillOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1046,7 +1046,7 @@ Value TensorStoreOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> TensorStoreOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TensorStoreOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1167,7 +1167,7 @@ Value AsyncFillOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncFillOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncFillOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1201,7 +1201,7 @@ Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncUpdateOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncUpdateOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1244,7 +1244,7 @@ Value AsyncCopyOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncCopyOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncCopyOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1341,7 +1341,7 @@ Value AsyncCollectiveOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncCollectiveOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncCollectiveOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1409,7 +1409,7 @@ Value AsyncStoreOp::getTiedResult(unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AsyncStoreOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> AsyncStoreOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
@@ -1879,17 +1879,16 @@ IREE::Util::ClosureOpInterface
 AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  auto newResultTypes = llvm::map_to_vector<4>(
+  auto newResultTypes = llvm::map_to_vector(
       getResults(), [](auto value) { return value.getType(); });
-  auto newResultSizes = llvm::to_vector<4>(getResultSizes());
-  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
-  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
+  auto newResultSizes = llvm::to_vector(getResultSizes());
+  auto newOperandsValues = llvm::to_vector(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
 
-  auto newTiedOperandIndices =
-      llvm::to_vector<4>(getTiedResultOperandIndices());
+  auto newTiedOperandIndices = llvm::to_vector(getTiedResultOperandIndices());
   IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
   assert(getTiedOperandsIndexAndLength().first == 0 &&
@@ -2002,16 +2001,15 @@ IREE::Util::ClosureOpInterface
 AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  auto newResultTypes = llvm::to_vector<4>(getResultTypes());
-  auto newResultSizes = llvm::to_vector<4>(getResultSizes());
-  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
-  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
+  auto newResultTypes = llvm::to_vector(getResultTypes());
+  auto newResultSizes = llvm::to_vector(getResultSizes());
+  auto newOperandsValues = llvm::to_vector(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
 
-  auto newTiedOperandIndices =
-      llvm::to_vector<4>(getTiedResultOperandIndices());
+  auto newTiedOperandIndices = llvm::to_vector(getTiedResultOperandIndices());
   IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
   assert(getTiedOperandsIndexAndLength().first == 0 &&
@@ -2439,7 +2437,7 @@ static ParseResult parseDispatchFunctionResultList(
     OpAsmParser &parser, SmallVectorImpl<Type> &resultTypes,
     ArrayAttr &resultAttrs) {
   SmallVector<Attribute> resultAttrsVec;
-  SmallVector<int64_t, 4> tiedOperandIndices;
+  SmallVector<int64_t> tiedOperandIndices;
   do {
     Type type;
     if (failed(parser.parseType(type))) {
@@ -2789,10 +2787,10 @@ IREE::Util::ClosureOpInterface
 CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  SmallVector<Type, 4> newResultTypes;
-  SmallVector<Value, 4> newResultSizes;
-  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
-  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
+  SmallVector<Type> newResultTypes;
+  SmallVector<Value> newResultSizes;
+  auto newOperandsValues = llvm::to_vector(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
@@ -2891,7 +2889,7 @@ Value TimepointBarrierOp::getTiedResult(unsigned resultIndex) {
   return {0};
 }
 
-SmallVector<int64_t, 4> TimepointBarrierOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> TimepointBarrierOp::getTiedResultOperandIndices() {
   return {0};
 }
 
@@ -2939,9 +2937,8 @@ LogicalResult TimepointAwaitOp::verify() {
   return {resultIndex};
 }
 
-SmallVector<int64_t, 4> TimepointAwaitOp::getTiedResultOperandIndices() {
-  return llvm::to_vector<4>(
-      llvm::seq<int64_t>(0, getResourceOperands().size()));
+SmallVector<int64_t> TimepointAwaitOp::getTiedResultOperandIndices() {
+  return llvm::to_vector(llvm::seq<int64_t>(0, getResourceOperands().size()));
 }
 
 //===----------------------------------------------------------------------===//

@@ -334,8 +334,8 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
-    auto bindingBuffers = llvm::to_vector<4>(op.getBindingBuffers());
-    auto bindingOffsets = llvm::to_vector<4>(op.getBindingOffsets());
+    auto bindingBuffers = llvm::to_vector(op.getBindingBuffers());
+    auto bindingOffsets = llvm::to_vector(op.getBindingOffsets());
     for (size_t i = 0; i < bindingBuffers.size(); ++i) {
       auto *definingOp = bindingBuffers[i].getDefiningOp();
       if (!definingOp) continue;

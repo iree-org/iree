@@ -23,7 +23,7 @@ namespace vulkan {
 class CommandQueue {
  public:
   virtual ~CommandQueue() {
-    IREE_TRACE_SCOPE0("CommandQueue::dtor");
+    IREE_TRACE_SCOPE_NAMED("CommandQueue::dtor");
     iree_slim_mutex_lock(&queue_mutex_);
     syms()->vkQueueWaitIdle(queue_);
     iree_slim_mutex_unlock(&queue_mutex_);

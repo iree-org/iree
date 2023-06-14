@@ -146,8 +146,8 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
     Value realInt = builder.create<arith::BitcastOp>(loc, bwElemType, real);
     Value imag = builder.create<mlir::complex::ImOp>(loc, pattern);
     Value imagInt = builder.create<arith::BitcastOp>(loc, bwElemType, imag);
-    realInt = builder.create<arith::IndexCastOp>(loc, bwType, realInt);
-    imagInt = builder.create<arith::IndexCastOp>(loc, bwType, imagInt);
+    realInt = builder.create<arith::ExtUIOp>(loc, bwType, realInt);
+    imagInt = builder.create<arith::ExtUIOp>(loc, bwType, imagInt);
     Value shiftReal =
         builder.create<arith::ShLIOp>(loc, bwType, realInt, shiftAmount);
     Value orImag = builder.create<arith::OrIOp>(loc, shiftReal, imagInt);
@@ -596,6 +596,7 @@ class EncodeHostTensorsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::complex::ComplexDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }

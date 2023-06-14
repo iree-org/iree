@@ -110,7 +110,7 @@ class ConvertConv2DNhwcHwcf final
 
     auto loc = convOp.getLoc();
 
-    SmallVector<int64_t, 4> colTensorShape = {n, oh, ow, fh, fw, ic};
+    SmallVector<int64_t> colTensorShape = {n, oh, ow, fh, fw, ic};
 
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
@@ -123,8 +123,8 @@ class ConvertConv2DNhwcHwcf final
     auto swSym = rewriter.getAffineConstantExpr(
         convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr, 4> inputExprs = {nDim, ohDim * shSym + khDim,
-                                             owDim * swSym + kwDim, icDim};
+    SmallVector<AffineExpr> inputExprs = {nDim, ohDim * shSym + khDim,
+                                          owDim * swSym + kwDim, icDim};
 
     auto nloops = colTensorShape.size();
 
@@ -132,7 +132,7 @@ class ConvertConv2DNhwcHwcf final
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
 
-    SmallVector<AffineMap, 4> img2colIndexingMaps = {
+    SmallVector<AffineMap> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
@@ -254,12 +254,12 @@ class ConvertDepthwiseConv2DNhwcHwc final
       auto nloops = indices.size();
       auto inputShape = operandTensorType.getShape();
 
-      SmallVector<AffineExpr, 4> exprs =
-          llvm::map_to_vector<4>(indices, [&](int64_t index) -> AffineExpr {
+      SmallVector<AffineExpr> exprs =
+          llvm::map_to_vector(indices, [&](int64_t index) -> AffineExpr {
             return rewriter.getAffineDimExpr(index);
           });
 
-      SmallVector<int64_t> targetShape = llvm::map_to_vector<4>(
+      SmallVector<int64_t> targetShape = llvm::map_to_vector(
           indices, [&](int64_t index) -> int64_t { return inputShape[index]; });
 
       Value outputTensor = rewriter.create<tensor::EmptyOp>(
@@ -302,7 +302,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
     const int fh = filterTShape[1];
     const int fw = filterTShape[2];
 
-    SmallVector<int64_t, 4> colTensorShape = {n, c, oh, ow, fh, fw};
+    SmallVector<int64_t> colTensorShape = {n, c, oh, ow, fh, fw};
     Value transposedOutputTensor = transposeOperand(output, {0, 3, 1, 2});
 
     AffineExpr nDim, cDim, ohDim, owDim, khDim, kwDim;
@@ -417,7 +417,7 @@ class ConvertConv2DNchwFchw final
 
     auto loc = convOp.getLoc();
 
-    SmallVector<int64_t, 4> colTensorShape = {n, ic, fh, fw, oh, ow};
+    SmallVector<int64_t> colTensorShape = {n, ic, fh, fw, oh, ow};
 
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
@@ -430,8 +430,8 @@ class ConvertConv2DNchwFchw final
     auto swSym = rewriter.getAffineConstantExpr(
         convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr, 4> inputExprs = {nDim, icDim, ohDim * shSym + khDim,
-                                             owDim * swSym + kwDim};
+    SmallVector<AffineExpr> inputExprs = {nDim, icDim, ohDim * shSym + khDim,
+                                          owDim * swSym + kwDim};
 
     auto nloops = colTensorShape.size();
 
@@ -439,7 +439,7 @@ class ConvertConv2DNchwFchw final
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
 
-    SmallVector<AffineMap, 4> img2colIndexingMaps = {
+    SmallVector<AffineMap> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 

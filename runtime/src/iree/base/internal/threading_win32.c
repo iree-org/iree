@@ -15,11 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 // Great documentation:
 // https://www.microsoftpressstore.com/articles/article.aspx?p=2233328

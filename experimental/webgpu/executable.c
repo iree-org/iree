@@ -10,7 +10,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
-#include "iree/base/tracing.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"

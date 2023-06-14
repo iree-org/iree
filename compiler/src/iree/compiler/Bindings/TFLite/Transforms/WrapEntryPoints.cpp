@@ -79,7 +79,7 @@ class WrapEntryPointsPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    SmallVector<func::FuncOp, 4> entryFuncOps;
+    SmallVector<func::FuncOp> entryFuncOps;
     for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
       if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
         entryFuncOps.push_back(funcOp);
@@ -150,8 +150,8 @@ class WrapEntryPointsPass
     // TFLite requires the tensor names at runtime. If they've previously been
     // extracted into iree.identifiers we use those and otherwise fallback to
     // a generic naming scheme that matches the IR (somewhat).
-    SmallVector<std::string, 4> inputNames;
-    SmallVector<std::string, 4> outputNames;
+    SmallVector<std::string> inputNames;
+    SmallVector<std::string> outputNames;
     for (unsigned i = 0; i < funcType.getNumInputs(); ++i) {
       auto identifier = getArgId(funcOp, i);
       if (identifier) {
@@ -247,7 +247,7 @@ class WrapEntryPointsPass
     // Replace each exit from the function with a storage back to the shape
     // variables.
     for (auto returnOp :
-         llvm::to_vector<4>(calcFuncOp.getOps<mlir::func::ReturnOp>())) {
+         llvm::to_vector(calcFuncOp.getOps<mlir::func::ReturnOp>())) {
       auto exitLoc = returnOp.getLoc();
       OpBuilder exitBuilder(returnOp);
 
@@ -293,8 +293,8 @@ class WrapEntryPointsPass
       builder.create<mlir::cf::BranchOp>(loc, exitBlock);
       return exitBlock;
     }
-    SmallVector<Block *, 4> compareBlocks;
-    SmallVector<Block *, 4> caseBlocks;
+    SmallVector<Block *> compareBlocks;
+    SmallVector<Block *> caseBlocks;
     for (size_t i = 0; i < caseCount; ++i) {
       compareBlocks.push_back(builder.createBlock(exitBlock));
       caseBlocks.push_back(builder.createBlock(exitBlock));
@@ -498,10 +498,10 @@ class WrapEntryPointsPass
     wrapperFuncOp.getOperation()->setAttr("iree.abi.stub",
                                           moduleBuilder.getUnitAttr());
 
-    SmallVector<DictionaryAttr, 4> argAttrDict;
+    SmallVector<DictionaryAttr> argAttrDict;
     entryFuncOp.getAllArgAttrs(argAttrDict);
     wrapperFuncOp.setAllArgAttrs(argAttrDict);
-    SmallVector<DictionaryAttr, 4> resultAttrDict;
+    SmallVector<DictionaryAttr> resultAttrDict;
     entryFuncOp.getAllResultAttrs(resultAttrDict);
     wrapperFuncOp.setAllResultAttrs(resultAttrDict);
 
@@ -609,7 +609,7 @@ class WrapEntryPointsPass
   // IO tensor names and quantization information.
   void populateReflectionAttrs(mlir::func::FuncOp entryFuncOp,
                                mlir::func::FuncOp wrapperFuncOp) {
-    SmallVector<NamedAttribute, 4> attrs;
+    SmallVector<NamedAttribute> attrs;
     attrs.push_back(buildIONamesAttr(entryFuncOp));
     // TODO(#3972): tfl.io.quant: quantization information.
     // TODO(#3978): tfl.io.types: tensor types (complex/strings/etc).
@@ -622,7 +622,7 @@ class WrapEntryPointsPass
   //
   // Default names will be used if no identifiers are set on the function.
   NamedAttribute buildIONamesAttr(mlir::func::FuncOp entryFuncOp) {
-    SmallVector<std::string, 4> pieces;
+    SmallVector<std::string> pieces;
     for (int i = 0; i < entryFuncOp.getNumArguments(); ++i) {
       auto identifierAttr = getArgId(entryFuncOp, i);
       if (!identifierAttr || identifierAttr.getValue().empty()) {

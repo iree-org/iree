@@ -10,7 +10,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/target_platform.h"
 
 // This implementation for the web platform via Emscripten uses JavaScript
 // Promise objects for asynchronous waiting:

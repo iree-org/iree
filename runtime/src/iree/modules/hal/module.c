@@ -12,7 +12,6 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/utils/buffer_diagnostics.h"
 #include "iree/vm/api.h"
@@ -310,6 +309,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
   // result being nullptr to indicate to the caller that things failed.
   memset(&rets->r0, 0, sizeof(rets->r0));
   if (is_try) {
+    IREE_TRACE_MESSAGE(WARNING, "try import failed");
     iree_status_ignore(status);
     return iree_ok_status();
   }

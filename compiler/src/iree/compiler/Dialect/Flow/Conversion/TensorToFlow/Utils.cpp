@@ -18,9 +18,9 @@ namespace IREE {
 namespace Flow {
 
 /// Gets the list of non-static values from a list of `OpFoldResult`.
-static SmallVector<Value, 4> getDynamicValues(
+static SmallVector<Value> getDynamicValues(
     ArrayRef<OpFoldResult> valueOrAttrList) {
-  SmallVector<Value, 4> dynamicDims;
+  SmallVector<Value> dynamicDims;
   for (auto valueOrAttr : valueOrAttrList) {
     if (auto value = valueOrAttr.dyn_cast<Value>()) {
       dynamicDims.push_back(value);
@@ -30,9 +30,9 @@ static SmallVector<Value, 4> getDynamicValues(
 }
 
 /// Get shape of the tensor given the sizes as a list of `OpFoldResult`.
-static SmallVector<int64_t, 4> getShapeFromSizes(
+static SmallVector<int64_t> getShapeFromSizes(
     ArrayRef<OpFoldResult> valueOrAttrList) {
-  return llvm::map_to_vector<4>(
+  return llvm::map_to_vector(
       valueOrAttrList, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
           return llvm::cast<IntegerAttr>(attr).getInt();
@@ -99,9 +99,9 @@ LogicalResult convertInsertSliceOpToFlowUpdateOp(
     return failure();
   }
 
-  SmallVector<OpFoldResult, 4> offsets = insertOp.getMixedOffsets();
-  SmallVector<OpFoldResult, 4> sizes = insertOp.getMixedSizes();
-  SmallVector<OpFoldResult, 4> strides = insertOp.getMixedStrides();
+  SmallVector<OpFoldResult> offsets = insertOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = insertOp.getMixedSizes();
+  SmallVector<OpFoldResult> strides = insertOp.getMixedStrides();
   ArrayRef<int64_t> dstShape = insertOp.getType().getShape();
   if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides, dstShape)) {
     return failure();
@@ -142,9 +142,9 @@ LogicalResult convertExtractSliceOpToFlowSliceOp(
     return failure();
   }
 
-  SmallVector<OpFoldResult, 4> offsets = sliceOp.getMixedOffsets();
-  SmallVector<OpFoldResult, 4> sizes = sliceOp.getMixedSizes();
-  SmallVector<OpFoldResult, 4> strides = sliceOp.getMixedStrides();
+  SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+  SmallVector<OpFoldResult> strides = sliceOp.getMixedStrides();
   ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
   if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides, srcShape)) {
     return failure();

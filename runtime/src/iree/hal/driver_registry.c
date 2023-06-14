@@ -12,7 +12,6 @@
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_driver_registry_t

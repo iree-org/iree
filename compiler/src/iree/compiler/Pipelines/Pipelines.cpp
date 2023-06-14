@@ -19,10 +19,9 @@
 #include "iree/compiler/Preprocessing/Passes.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 
-#ifdef IREE_HAVE_MHLO_INPUT
-#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
-#endif  // IREE_HAVE_MHLO_INPUT
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
 #endif  // IREE_HAVE_TORCH_INPUT
@@ -62,19 +61,20 @@ void buildIREEVMTransformPassPipeline(
   }
   AutoInputConversionPipelineOptions autoOptions;
 
-#ifdef IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_STABLEHLO_INPUT
   stablehlo::StableHloOptions stablehloOptions;
   stablehloOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
   stablehloOptions.demoteF64ToF32 = inputOptions.demoteF64ToF32;
   stablehloOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
-#endif
+#endif  // IREE_HAVE_STABLEHLO_INPUT
+
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
     case InputDialectOptions::Type::auto_detect:
       passManager.addPass(createAutoInputConversionPipelinePass(autoOptions));
       break;
-#ifdef IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_STABLEHLO_INPUT
     case InputDialectOptions::Type::stablehlo:
       stablehlo::buildStableHLOInputConversionPassPipeline(passManager,
                                                            stablehloOptions);
@@ -83,13 +83,7 @@ void buildIREEVMTransformPassPipeline(
       stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager,
                                                               stablehloOptions);
       break;
-    case InputDialectOptions::Type::mhlo_legacy:
-      MHLO::buildMHLOInputConversionPassPipeline(passManager);
-      break;
-    case InputDialectOptions::Type::xla_legacy:
-      MHLO::buildXLAInputConversionPassPipeline(passManager);
-      break;
-#endif  // IREE_HAVE_MHLO_INPUT
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
     case InputDialectOptions::Type::tm_tensor:
       passManager.addNestedPass<func::FuncOp>(

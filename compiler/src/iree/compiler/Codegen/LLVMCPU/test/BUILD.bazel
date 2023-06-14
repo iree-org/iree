@@ -50,6 +50,7 @@ iree_lit_test_suite(
             "synchronize_symbol_visibility.mlir",
             "tensor_pad.mlir",
             "test_config_mmt4d.mlir",
+            "tile.mlir",
             "tile_and_fuse.mlir",
             "transform_dialect_bufferize.mlir",
             "transform_dialect_iree_tile_to_forall.mlir",

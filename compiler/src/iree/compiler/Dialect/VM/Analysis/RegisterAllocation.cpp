@@ -405,9 +405,9 @@ struct FeedbackArcSet {
     }
 
     auto removeNode = [&](FASNode *node) {
-      SmallVector<FASEdge, 4> inEdges;
+      SmallVector<FASEdge> inEdges;
       inEdges.reserve(node->indegree);
-      SmallVector<FASEdge, 4> outEdges;
+      SmallVector<FASEdge> outEdges;
       outEdges.reserve(node->outdegree);
       for (auto &edge : edges) {
         if (edge.sink == node) inEdges.push_back(edge);
@@ -416,7 +416,7 @@ struct FeedbackArcSet {
       bool collectInEdges = node->indegree <= node->outdegree;
       bool collectOutEdges = !collectInEdges;
 
-      SmallVector<Edge, 4> results;
+      SmallVector<Edge> results;
       for (auto &edge : inEdges) {
         if (edge.source == node) continue;
         if (collectInEdges) {

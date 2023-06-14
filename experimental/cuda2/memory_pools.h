@@ -38,9 +38,9 @@ typedef struct iree_hal_cuda2_memory_pools_t {
 
 // Initializes |out_pools| by configuring new CUDA memory pools.
 iree_status_t iree_hal_cuda2_memory_pools_initialize(
-    iree_allocator_t host_allocator,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols, CUdevice cu_device,
     const iree_hal_cuda2_memory_pooling_params_t* pooling_params,
+    iree_allocator_t host_allocator,
     iree_hal_cuda2_memory_pools_t* IREE_RESTRICT out_pools);
 
 // Deinitializes the |pools| and releases the underlying CUDA resources.

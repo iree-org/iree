@@ -107,6 +107,7 @@ class TransformDialectInterpreterPass
     linalg::registerTransformDialectExtension(registry);
     memref::registerTransformDialectExtension(registry);
     scf::registerTransformDialectExtension(registry);
+    tensor::registerTransformDialectExtension(registry);
     vector::registerTransformDialectExtension(registry);
   }
 
