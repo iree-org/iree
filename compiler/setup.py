@@ -355,7 +355,7 @@ def find_git_versions():
     print(f"ERROR: Could not get IREE revision: {e}", file=sys.stderr)
   revisions["LLVM_PROJECT"] = find_git_submodule_revision(
       "third_party/llvm-project")
-  revisions["MLIR_HLO"] = find_git_submodule_revision("third_party/mlir-hlo")
+  revisions["STABLEHLO"] = find_git_submodule_revision("third_party/stablehlo")
   return revisions
 
 

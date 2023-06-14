@@ -30,14 +30,14 @@ MODULE_INFOS = {
         fork_repository_pull="https://github.com/iree-org/iree-llvm-fork.git",
         branch_prefix="patched-llvm-project-",
     ),
-    "mlir-hlo":
+    "stablehlo":
     ModuleInfo(
-        name="mlir-hlo",
-        path="third_party/mlir-hlo",
-        branch_pin_file="third_party/mlir-hlo.branch-pin",
-        default_repository_url="https://github.com/iree-org/iree-mhlo-fork.git",
-        fork_repository_push="git@github.com:iree-org/iree-mhlo-fork.git",
-        fork_repository_pull="https://github.com/iree-org/iree-mhlo-fork.git",
-        branch_prefix="patched-mlir-hlo-",
+        name="stablehlo",
+        path="third_party/stablehlo",
+        branch_pin_file="third_party/stablehlo.branch-pin",
+        default_repository_url="https://github.com/iree-org/stablehlo.git",
+        fork_repository_push="git@github.com:iree-org/stablehlo.git",
+        fork_repository_pull="https://github.com/iree-org/stablehlo.git",
+        branch_prefix="patched-stablehlo-",
     )
 }
