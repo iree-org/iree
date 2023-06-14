@@ -1086,13 +1086,14 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
     if (isa<ComplexType>(getElementTypeOrSelf(splatAttr.getType()))) {
       auto splatElementAttr = splatAttr.getSplatValue<ArrayAttr>();
       splatValue = rewriter.create<complex::ConstantOp>(
-        constantOp.getLoc(), getElementTypeOrSelf(splatAttr.getType()), cast<ArrayAttr>(splatElementAttr));
+          constantOp.getLoc(), getElementTypeOrSelf(splatAttr.getType()),
+          cast<ArrayAttr>(splatElementAttr));
     } else {
       auto splatElementAttr = splatAttr.getSplatValue<TypedAttr>();
       splatValue = rewriter.create<arith::ConstantOp>(
-        constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
+          constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
     }
-        
+
     auto resultType = IREE::Stream::ResourceType::get(constantOp.getContext());
     auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
         constantOp.getLoc(), rewriter.getIndexType(),
