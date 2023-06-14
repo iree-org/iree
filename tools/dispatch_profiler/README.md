@@ -31,8 +31,8 @@ tuning configuration.
 IREE dispatch profiler provides [`generator.py`](generator.py) that can be used
 to generate dispatches. Please find a sample run below:
 
-```bash
-$ python3 dispatch_profiler/generator.py --generated-dir </path/to/create/`generated`/dir>
+```shell
+$ python3 dispatch_profiler/generator.py --generated-dir </path/to/create/generated/folder>
 [Generating]: ./generated/linalg/matmul/matmul_128x128x256_f16t_f16t_f16t/matmul_128x128x256_f16t_f16t_f16t.mlir
     Emitting tuning configuration : tile_config_128x128_64x4_tensorcore_mmasync
     Emitting tuning configuration : tile_config_128x128_32x5_tensorcore_mmasync
@@ -43,8 +43,8 @@ $ python3 dispatch_profiler/generator.py --generated-dir </path/to/create/`gener
 ```
 
 This creates a `generated` folder containing dispatches organized in folders as
-`mlir_dialect/operation_name/`. The folder includes an .mlir file with all the
-dispatches for an operation.
+`operation_dialect/operation_name/`. The folder includes an .mlir file with all
+the dispatches for an operation.
 
 The `generator.py` script serves as a generator for implemented operation data
 types, using a predefined list of problem shapes. You can also provide specific
@@ -52,8 +52,12 @@ matrix multiplication shapes of interest. Examples are provided below.
 
 #### Generating user-specified matmul shape `768x512x1024`
 
-```bash
-python3 ../iree/tools/dispatch_profiler/generator.py --generated-dir </path/to/create/`generated`/dir> --problem-m=768 --problem-n=512 --problem-k=1024
+```shell
+python3 ../iree/tools/dispatch_profiler/generator.py \
+        --generated-dir </path/to/create/generated/dir> \
+        --problem-m=768 \
+        --problem-n=512 \
+        --problem-k=1024 
 ...
 [Generating]: ./generated/linalg/matmul/matmul_768x512x1024_f16t_f16t_f16t/matmul_768x512x1024_f16t_f16t_f16t.mlir
 [Generating]: ./generated/linalg/matmul/matmul_768x512x1024_f32t_f32t_f32t/matmul_768x512x1024_f32t_f32t_f32t.mlir
@@ -65,8 +69,12 @@ python3 ../iree/tools/dispatch_profiler/generator.py --generated-dir </path/to/c
 Generate matmuls where M ranges from 64 to 1024 in increments of 128, N varies
 from 64 to 1024 in steps of 128, and K is fixed at 4096.
 
-```bash
-$ python3 ../iree/tools/dispatch_profiler/generator.py --generated-dir </path/to/create/`generated`/dir> --problem-m=64:1024:128 --problem-n=64:1024:128 --problem-k=4096
+```shell
+$ python3 ../iree/tools/dispatch_profiler/generator.py \
+          --generated-dir </path/to/create/generated/dir> \
+          --problem-m=64:1024:128 \
+          --problem-n=64:1024:128 \
+          --problem-k=4096
 ...
 ```
 
@@ -74,20 +82,25 @@ $ python3 ../iree/tools/dispatch_profiler/generator.py --generated-dir </path/to
 
 IREE dispatch profiler provies `compile.py` that trigges `iree-compile` with
 appropiate compilation flags. The output of `iree-compile` vmfb files are placed
-in `mlir_dialect/operation_path/operation_name.mlir`. The `compiler.py` uses all
-the possible cpus on your machine to compile all different generated mlir source
- files.
+in `operation_dialect/operation_path/operation_name.mlir`. The `compiler.py`
+uses all the possible cpus on your machine to compile all different generated
+mlir source files.
 
-```bash
-python3 ../iree/tools/dispatch_profiler/compile.py --build-dir </path/to/iree/build/dir> --generated-dir </path/to/create/`generated`/dir>
+```shell
+python3 ../iree/tools/dispatch_profiler/compile.py \
+        --iree-bin-dir </path/to/iree/build/dir> \
+        --generated-dir </path/to/create/generated/dir>
 ```
 
 Compiles all the generated source mlir dispatches. One can check the generated
 dispatched folder to find the vmfb files.
 
-```bash
+```shell
 $ ls ./generated/linalg/matmul/matmul_64x64x4096_f16t_f16t_f16t/
-iree_compile_cmd_stdout.mlir  matmul_64x64x4096_f16t_f16t_f16t.mlir  matmul_64x64x4096_f16t_f16t_f16t_profile.vmfb  matmul_64x64x4096_f16t_f16t_f16t_verify.vmfb
+iree_compile_cmd_stdout.mlir  
+matmul_64x64x4096_f16t_f16t_f16t.mlir  
+matmul_64x64x4096_f16t_f16t_f16t_profile.vmfb  
+matmul_64x64x4096_f16t_f16t_f16t_verify.vmfb
 ```
 
 ## Functional verification and performance profiling
@@ -98,8 +111,12 @@ find some example profiling commandlines below:
 
 ### Functional verification and performance profiling of a _single_ dispatch
 
-```bash
-$ python3 profiler.py --build-dir </path/to/iree/build/dir> --generated-dir </path/to/create/`generated`/dir> --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync --verification-enabled=true --profiling-enabled=true
+```shell
+$ python3 profiler.py --iree-bin-dir </path/to/iree/build/dir> \
+         --generated-dir </path/to/create/generated/dir> \
+         --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync \
+         --verification-enabled=true \
+         --profiling-enabled=true
 ---------------------------------------------------------------- 
 Dispatch      : matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync
 Provider      : IREE Codegen
@@ -120,8 +137,12 @@ time-consuming when using a CPU-based numpy reference. To prioritize profiling
 speed and when functional correctness is assured, disable verification using
 `--verification-enabled=false`.
 
-```bash
-python3 profiler.py --build-dir </path/to/iree/build/dir> --generated-dir </path/to/create/`generated`/dir> --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync --verification-enabled=false --profiling-enabled=true
+```shell
+python3 profiler.py --iree-bin-dir </path/to/iree/build/dir> \ 
+                   --generated-dir </path/to/create/generated/dir> \
+                   --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync \
+                   --verification-enabled=false \
+                   --profiling-enabled=true
 ```
 
 ### Performance profile _single_ operation and _sweep_ tunning configurations
@@ -132,8 +153,12 @@ argument is formatted as `--dispatch=<regex>,<regex>`. Additionally, you can
 export the profiled output to a CSV file for further analysis using
 `--output=<filepath>`.
 
-```bash
-$ python3 profiler.py --build-dir </path/to/iree/build/dir> --generated-dir </path/to/create/`generated`/dir> --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_*_tensorcore_mmasync --verification-enabled=false --profiling-enabled=true --output=data.csv
+```shell
+$ python3 profiler.py --iree-bin-dir </path/to/iree/build/dir> \
+                      --generated-dir </path/to/create/generated/dir> --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_*_tensorcore_mmasync \
+                      --verification-enabled=false \
+                      --profiling-enabled=true \
+                      --output=data.csv
 ---------------------------------------------------------------- 
 Dispatch      : matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x256_32x3_tensorcore_mmasync
 Provider      : IREE Codegen
@@ -179,8 +204,10 @@ Writing performance report to data.csv
 Another example showcasing the use of `--dispatch` to profile a
 matmul_3456x1024x2048 targetting F16 and F32 NVIDIA A100 Tensor Cores.
 
-```bash
-$ python3 profiler.py --build-dir </path/to/iree/build/dir> --generated-dir </path/to/create/`generated`/dir>  --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync,matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_128x128_16x5_tensorcore_mmasync 
+```shell
+$ python3 profiler.py --iree-bin-dir </path/to/iree/build/dir> \
+         --generated-dir </path/to/create/generated/dir> \
+         --dispatches=matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync,matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_128x128_16x5_tensorcore_mmasync 
 ---------------------------------------------------------------- 
 Dispatch      : matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_128x128_32x5_tensorcore_mmasync
 Provider      : IREE Codegen
