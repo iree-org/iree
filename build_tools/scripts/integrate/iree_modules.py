@@ -35,9 +35,9 @@ MODULE_INFOS = {
         name="stablehlo",
         path="third_party/stablehlo",
         branch_pin_file="third_party/stablehlo.branch-pin",
-        default_repository_url="https://github.com/iree-org/iree-stablehlo-fork.git",
-        fork_repository_push="git@github.com:iree-org/iree-stablehlo-fork.git",
-        fork_repository_pull="https://github.com/iree-org/iree-stablehlo-fork.git",
+        default_repository_url="https://github.com/iree-org/stablehlo.git",
+        fork_repository_push="git@github.com:iree-org/stablehlo.git",
+        fork_repository_pull="https://github.com/iree-org/stablehlo.git",
         branch_prefix="patched-stablehlo-",
     )
 }
