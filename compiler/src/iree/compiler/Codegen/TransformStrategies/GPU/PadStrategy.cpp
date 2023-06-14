@@ -43,8 +43,6 @@ using iree_compiler::gpu::buildDistributeOnePadOrCopyWithNumThreads;
 using iree_compiler::gpu::buildDistributeOnePadOrCopyWithTileSizes;
 using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::PadStrategy;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::MatchOp;
