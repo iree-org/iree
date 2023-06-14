@@ -38,7 +38,8 @@ table ExecutableDef {
   // form of source code strings.
 
   // Serialized Metal shader library.
-  shader_library:[uint8];
+  // TODO(#14047): enable linking and consolidate into one library.
+  shader_libraries:[string];
   // Original Metal shader source code.
   shader_sources:[string];
 }

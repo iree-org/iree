@@ -28,8 +28,6 @@ using namespace mlir;
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
@@ -137,13 +135,12 @@ void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
         b.create<transform::ApplyTilingCanonicalizationPatternsOp>(loc);
         b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
         b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
+        b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
         if (populatePatternsFn) populatePatternsFn(b, loc);
       });
-  ApplyPatternsOpPatterns configuration;
-  configuration.canonicalization = true;
-  configuration.cse = true;
-  configuration.licm = true;
-  b.create<ApplyPatternsOp>(variantH, configuration);
+  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(variantH);
+  b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
+      variantH);
 }
 
 /// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
@@ -390,9 +387,11 @@ static ReductionSplitResult createBubbleExpand(
   }
 
   auto funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  ApplyPatternsOpPatterns configuration;
-  configuration.bubbleExpand = true;
-  b.create<ApplyPatternsOp>(funcH, configuration);
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<
+        iree_compiler::IREE::transform_dialect::ApplyBubbleExpandPatternsOp>(
+        loc);
+  });
   std::tie(result.originalFillH, result.splitFillH) =
       matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());
   if (hasTrailingEltwise) {
