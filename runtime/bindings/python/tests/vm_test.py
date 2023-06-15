@@ -115,14 +115,13 @@ class VmTest(unittest.TestCase):
           return %0 : i32
         }
         """,
-        target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS
-    )
+        target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS)
     with tempfile.NamedTemporaryFile() as tf:
       tf.write(binary)
       tf.flush()
       m = iree.runtime.VmModule.mmap(self.instance, tf.name)
       context = iree.runtime.VmContext(self.instance,
-                                      modules=[self.hal_module, m])
+                                       modules=[self.hal_module, m])
       f = m.lookup_function("add_scalar")
       finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
       result = finv(5, 6)
