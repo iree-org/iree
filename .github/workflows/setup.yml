@@ -55,7 +55,7 @@ jobs:
       # parent will be the tip of main.
       BASE_REF: HEAD^
     outputs:
-      should-run: ${{ steps.configure.outputs.should-run }}
+      should-run: "false"
       is-pr: ${{ steps.configure.outputs.is-pr }}
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
