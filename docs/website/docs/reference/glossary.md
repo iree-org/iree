@@ -74,7 +74,7 @@ as a hardware agnostic assembly format for distributing complex,
 computationally intensive programs.
 
 IREE uses the
-[SPIR-V MLIR Dialect](https://mlir.llvm.org/docs/Dialects/SPIR-V/) in it's code
+[SPIR-V MLIR Dialect](https://mlir.llvm.org/docs/Dialects/SPIR-V/) in its code
 generation pipeline for Vulkan and other compute APIs.
 
 ## StableHLO
@@ -88,7 +88,7 @@ StableHLO has both a
 [specification](https://github.com/openxla/stablehlo/blob/main/docs/spec.md)
 and an MLIR dialect.
 
-IREE uses the StableHLO MLIR Dialect as one of it's input formats.
+IREE uses the StableHLO MLIR Dialect as one of its input formats.
 
 ## TOSA
 
@@ -101,7 +101,7 @@ hardware targets.
 TOSA has both a [specification](https://www.mlplatform.org/tosa/tosa_spec.html)
 and an [MLIR dialect](https://mlir.llvm.org/docs/Dialects/TOSA/).
 
-IREE uses the TOSA MLIR dialect as one of it's input formats.
+IREE uses the TOSA MLIR dialect as one of its input formats.
 
 ## TFLite
 
