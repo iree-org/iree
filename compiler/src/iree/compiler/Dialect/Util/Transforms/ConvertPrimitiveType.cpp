@@ -223,6 +223,11 @@ template <typename Base, typename Converter>
 struct ConvertTypesPass : public Base {
   using Base::Base;
   void runOnOperation() override {
+    llvm::SetVector<mlir::CallOpInterface> calls;
+    this->getOperation().walk([&](mlir::CallOpInterface callOp) {
+      if (callOp->getRegions().empty()) calls.insert(callOp);
+    });
+
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
     patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
@@ -257,6 +262,8 @@ struct ConvertTypesPass : public Base {
         for (Type type : funcOp.getFunctionType().getResults()) {
           if (!typeConverter.isLegal(type)) return false;
         }
+      } else if (auto callOp = dyn_cast<mlir::CallOpInterface>(op)) {
+        if (calls.contains(callOp)) return true;
       }
       for (Type type : op->getResultTypes()) {
         if (!typeConverter.isLegal(type)) return false;
@@ -273,6 +280,8 @@ struct ConvertTypesPass : public Base {
     // Note that this will fail if we can't convert any types.
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
+      llvm::errs() << "Failed Module: ";
+      this->getOperation().dump();
       return this->signalPassFailure();
     }
   }
