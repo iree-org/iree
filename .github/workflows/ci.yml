@@ -133,7 +133,6 @@ jobs:
 
   build_test_all_macos_arm64:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_macos_arm64')
     runs-on:
       - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }} # must come first
       - runner-group=postsubmit
@@ -170,7 +169,6 @@ jobs:
 
   build_test_all_macos_x86_64:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_macos_x86_64')
     runs-on: macos-13-xl
     env:
       BUILD_DIR: build-macos
