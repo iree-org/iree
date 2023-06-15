@@ -150,6 +150,23 @@ VmModule VmModule::ResolveModuleDependency(VmInstance* instance,
   return py_module;
 }
 
+VmModule VmModule::MMap(VmInstance* instance, std::string filepath) {
+  IREE_TRACE_SCOPE_NAMED("VmModule::MMap");
+  auto mmap_module = py::module::import("mmap");
+  auto open_func = py::module::import("io").attr("open");
+  auto file_obj = open_func(filepath, "r+b");
+  auto flags = py::cast<int64_t>(mmap_module.attr("MAP_SHARED"));
+  // MAP_POPULATE isn't available on all versions/platforms.
+  if (py::hasattr(mmap_module, "MAP_POPULATE")) {
+    flags |= py::cast<int64_t>(mmap_module.attr("MAP_POPULATE"));
+  }
+  auto prot = py::cast<int64_t>(mmap_module.attr("PROT_READ"));
+  auto mapped_file =
+      mmap_module.attr("mmap")(file_obj.attr("fileno")(), 0, flags, prot);
+  mapped_file.attr("madvise")(mmap_module.attr("MADV_RANDOM"));
+  return FromFlatbufferBlob(instance, mapped_file);
+}
+
 VmModule VmModule::FromFlatbufferBlob(VmInstance* instance,
                                       py::object flatbuffer_blob_object) {
   IREE_TRACE_SCOPE_NAMED("VmModule::FromFlatbufferBlob");
@@ -661,6 +678,7 @@ void SetupVmBindings(pybind11::module m) {
       .def_static("resolve_module_dependency",
                   &VmModule::ResolveModuleDependency)
       .def_static("from_flatbuffer", &VmModule::FromFlatbufferBlob)
+      .def_static("mmap", &VmModule::MMap)
       .def_property_readonly("name", &VmModule::name)
       .def_property_readonly("version",
                              [](VmModule& self) {
