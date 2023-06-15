@@ -66,6 +66,9 @@ declare -a label_exclude_args=(
   #   ^bindings/
 )
 
+
+
+
 if (( IREE_VULKAN_DISABLE == 1 )); then
   label_exclude_args+=("^driver=vulkan$")
 fi
@@ -91,7 +94,7 @@ label_exclude_args+=(${extra_label_exclude_args[@]})
 # platforms it doesn't support, but that would require editing through layers
 # of CMake functions. Hopefully this list stays very short.
 declare -a excluded_tests=()
-if [[ "$OSTYPE" =~ ^msys ]]; then
+if [[ "${OSTYPE}" =~ ^msys ]]; then
   # These tests are failing on Windows.
   excluded_tests+=(
     # TODO(#11077): INVALID_ARGUMENT: argument/result signature mismatch
@@ -107,7 +110,7 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
   )
-elif [[ "$OSTYPE" =~ ^darwin ]]; then
+elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
     #TODO(#12496): Remove after fixing the test on macOS
     "iree/compiler/bindings/c/loader_test"
