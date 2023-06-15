@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensorDialect
+    MLIRTransformDialect
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
