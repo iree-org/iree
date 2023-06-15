@@ -433,13 +433,14 @@ option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler co
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
 # alternative. https://github.com/openxla/iree/pull/8474#discussion_r840790062
-if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
+if(NOT IREE_ENABLE_ASAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_ASAN OR
+   NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
   message(SEND_ERROR
-      "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
+      "IREE_ENABLE_*SAN and IREE_BYTECODE_MODULE_ENABLE_*SAN must be "
       "simultaneously ON or OFF. "
       "A discrepancy between the two would cause tests to crash as IREE "
-      "runtime code (controlled by IREE_ENABLE_TSAN) calls into test IREE "
-      "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
+      "runtime code (controlled by IREE_ENABLE_*SAN) calls into test IREE "
+      "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_*SAN).")
 endif()
 
 if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
