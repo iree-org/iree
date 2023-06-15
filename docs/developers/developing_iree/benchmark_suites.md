@@ -22,6 +22,40 @@ Install `iree-import-tf` and `iree-import-tflite` in your Python environment
 and
 [TFLite Integration](https://openxla.github.io/iree/guides/ml-frameworks/tflite/)).
 
+### Choose Benchmark Presets
+
+IREE Benchmark Suites contain many benchmarks for different devices and model
+sizes, which can take lots of space and time to build all of them. So benchmarks
+are grouped into presets to allow building and running only a subset of them.
+The available presets are:
+
+Execution benchmarks:
+
+-   `android-cpu`: benchmarks for mobile CPUs
+-   `android-gpu`: benchmarks for mobile GPUs
+-   `cuda`: benchmarks for CUDA with a small model set
+-   `cuda-large`: benchmarks for CUDA with a large model set
+-   `vulkan-nvidia`: benchmarks for Vulkan on NVIDIA graphics cards
+-   `x86_64`: benchmarks for x86_64 CPUs with a small model set
+-   `x86_64-large`: benchmarks for x86_64 with a large model set
+
+Compilation benchmarks (to collect compilation statistics, such as module
+sizes):
+
+-   `comp-stats`: compilation benchmarks with a small model set
+-   `comp-stats-large`: compilation benchmark with a large model set
+
+Note that `*-large` presets will download and build a few hundreds GBs of
+artifacts.
+
+Set the environment variables of benchmark presets for the steps below, for
+example:
+
+```sh
+export EXECUTION_BENCHMARK_PRESETS="cuda,x86_64"
+export COMPILATION_BENCHMARK_PRESETS="comp-stats"
+```
+
 ### Build Benchmark Suites
 
 Configure IREE with `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON`:
@@ -48,17 +82,24 @@ Otherwise, compile the benchmark suites and tools for benchmarking:
 
 ```sh
 cmake --build "${IREE_BUILD_DIR?}" --target \
-  iree-e2e-test-artifacts \
+  iree-benchmark-suites \
+  # If any *-large preset is enabled, also build this target:
+  # iree-benchmark-suites-large \
   iree-benchmark-module
 export E2E_TEST_ARTIFACTS_DIR="${IREE_BUILD_DIR?}/e2e_test_artifacts"
 ```
+
+> TODO(#13683): Each preset should have its own target to further reduce
+> unnecessary builds
 
 ### Run Benchmarks
 
 Export the execution benchmark config:
 
 ```sh
-build_tools/benchmarks/export_benchmark_config.py execution > "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
+build_tools/benchmarks/export_benchmark_config.py execution \
+  --benchmark_presets="${EXECUTION_BENCHMARK_PRESETS?}" \
+  > "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
 ```
 
 Run benchmarks (currently only support running on a Linux host):
@@ -112,7 +153,9 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
 Export the compilation benchmark config:
 
 ```sh
-build_tools/benchmarks/export_benchmark_config.py compilation > "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
+build_tools/benchmarks/export_benchmark_config.py compilation \
+  --benchmark_presets="${COMPILATION_BENCHMARK_PRESETS?}" \
+  > "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 Generate the compilation statistics:

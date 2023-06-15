@@ -427,7 +427,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
   for (iree_host_size_t i = 0; i < module_count; ++i) {
     if (!modules[i]) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "modules[%zu] is null", i);
+                              "modules[%" PRIhsz "] is null", i);
     }
   }
   if (!module_count) return iree_ok_status();

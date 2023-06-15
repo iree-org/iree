@@ -485,7 +485,8 @@ class IREEBenchmark {
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
         main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
+        iree_string_view_t{function_name.data(),
+                           (iree_host_size_t)function_name.size()},
         &function));
 
     IREE_CHECK_OK(iree_tooling_parse_to_variant_list(

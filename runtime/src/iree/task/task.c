@@ -729,7 +729,7 @@ void iree_task_dispatch_shard_execute(
         &dispatch_task->status,
         iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                          "dispatch requires %ub of local memory but only "
-                         "%zub is available per-worker",
+                         "%" PRIhsz "b is available per-worker",
                          dispatch_task->local_memory_size,
                          worker_local_memory.data_length));
     iree_task_retire(&task->header, pending_submission, iree_ok_status());

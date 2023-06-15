@@ -36,9 +36,9 @@ StatusOr<Shape> ParseShape(const std::string& value) {
   iree_host_size_t actual_rank = 0;
   iree_status_t status = iree_ok_status();
   do {
-    status =
-        iree_hal_parse_shape(iree_string_view_t{value.data(), value.size()},
-                             shape.size(), &actual_rank, shape.data());
+    status = iree_hal_parse_shape(
+        iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+        shape.size(), &actual_rank, shape.data());
     shape.resize(actual_rank);
   } while (iree_status_is_out_of_range(status));
   IREE_RETURN_IF_ERROR(std::move(status));
@@ -65,7 +65,8 @@ StatusOr<std::string> FormatShape(iree::span<const iree_hal_dim_t> value) {
 StatusOr<iree_hal_element_type_t> ParseElementType(const std::string& value) {
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_status_t status = iree_hal_parse_element_type(
-      iree_string_view_t{value.data(), value.size()}, &element_type);
+      iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+      &element_type);
   IREE_RETURN_IF_ERROR(status, "Failed to parse element type '%.*s'",
                        (int)value.size(), value.data());
   return element_type;
@@ -106,8 +107,8 @@ StatusOr<ShapeAndType> ParseShapeAndElementType(const std::string& value) {
   iree_status_t status = iree_ok_status();
   do {
     status = iree_hal_parse_shape_and_element_type(
-        iree_string_view_t{value.data(), value.size()}, shape.size(),
-        &actual_rank, shape.data(), &element_type);
+        iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+        shape.size(), &actual_rank, shape.data(), &element_type);
     shape.resize(actual_rank);
   } while (iree_status_is_out_of_range(status));
   IREE_RETURN_IF_ERROR(std::move(status));
@@ -123,9 +124,11 @@ Status ParseElement(const std::string& value,
                     iree_hal_element_type_t element_type,
                     iree::span<T> buffer) {
   return iree_hal_parse_element(
-      iree_string_view_t{value.data(), value.size()}, element_type,
-      iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
-                       buffer.size() * sizeof(T)});
+      iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+      element_type,
+      iree_byte_span_t{
+          reinterpret_cast<uint8_t*>(buffer.data()),
+          static_cast<iree_host_size_t>(buffer.size() * sizeof(T))});
 }
 
 // Converts a single element of |element_type| to a string.
@@ -157,9 +160,11 @@ Status ParseBufferElements(const std::string& value,
                            iree::span<T> buffer) {
   IREE_RETURN_IF_ERROR(
       iree_hal_parse_buffer_elements(
-          iree_string_view_t{value.data(), value.size()}, element_type,
-          iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
-                           buffer.size() * sizeof(T)}),
+          iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+          element_type,
+          iree_byte_span_t{
+              reinterpret_cast<uint8_t*>(buffer.data()),
+              static_cast<iree_host_size_t>(buffer.size() * sizeof(T))}),
       "failed to parse buffer elements '%.*s'",
       iree_min(256, (int)value.size()), value.data());
   return OkStatus();
@@ -182,7 +187,7 @@ StatusOr<std::string> FormatBufferElements(iree::span<const T> data,
     iree_host_size_t actual_length = 0;
     status = iree_hal_format_buffer_elements(
         iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(data.data()),
-                               data.size() * sizeof(T)},
+                               (iree_host_size_t)(data.size() * sizeof(T))},
         shape.size(), shape.data(), element_type, max_element_count,
         result.size() + 1, &result[0], &actual_length);
     result.resize(actual_length);
@@ -513,8 +518,8 @@ struct BufferView final
                                     Allocator allocator) {
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_parse(
-        iree_string_view_t{value.data(), value.size()}, allocator,
-        &buffer_view);
+        iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+        allocator, &buffer_view);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }

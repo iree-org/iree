@@ -233,8 +233,9 @@ static iree_status_t iree_hal_vmvx_executable_create(
   if (executable_params->pipeline_layout_count > 0 &&
       entry_count != executable_params->pipeline_layout_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "executable provides %zu entry points but caller "
-                            "provided %zu; must match",
+                            "executable provides %" PRIhsz
+                            " entry points but caller "
+                            "provided %" PRIhsz "; must match",
                             entry_count,
                             executable_params->pipeline_layout_count);
   }

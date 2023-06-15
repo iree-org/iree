@@ -22,7 +22,7 @@ extern "C" {
 
 typedef struct iree_status_handle_t* iree_status_t;
 
-#define IREE_STRING_VIEW_NPOS SIZE_MAX
+#define IREE_STRING_VIEW_NPOS IREE_HOST_SIZE_MAX
 
 // A string view (ala std::string_view) into a non-NUL-terminated string.
 typedef struct iree_string_view_t {
@@ -164,8 +164,8 @@ IREE_API_EXPORT iree_string_view_t
 iree_string_view_trim(iree_string_view_t value);
 
 // Returns a substring of the string view at offset |pos| and length |n|.
-// Use |n| == INTPTR_MAX to take the remainder of the string after |pos|.
-// Returns empty string on failure.
+// Use |n| == IREE_HOST_SIZE_MAX to take the remainder of the string after
+// |pos|. Returns empty string on failure.
 IREE_API_EXPORT iree_string_view_t iree_string_view_substr(
     iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n);
 

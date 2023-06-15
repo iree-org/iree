@@ -756,7 +756,7 @@ static iree_status_t iree_trace_replay_parse_hal_shape(
     }
     if (shape_rank >= shape_capacity) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "(%zu): shape rank overflow (>%zu)",
+                              "(%zu): shape rank overflow (>%" PRIhsz ")",
                               shape_node->start_mark.line, shape_capacity);
     }
     shape[shape_rank++] = (iree_hal_dim_t)dim;
