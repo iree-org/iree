@@ -39,11 +39,8 @@ cp -r \
 rm "${THIS_DIR}/docs/reference/mlir-dialects/SimpleIODialect.md"
 
 # Trim "Dialect" suffix from file names, e.g. FlowDialect.md -> Flow.md.
-regex='(.*)Dialect.md'
-for f in ${THIS_DIR}/docs/reference/mlir-dialects/*.md; do
-  if [[ $f =~ $regex ]]; then
-    mv "$f" "${BASH_REMATCH[1]}.md"
-  fi
+for f in ${THIS_DIR}/docs/reference/mlir-dialects/*Dialect.md; do
+  mv "$f" "${f/%Dialect.md/.md}"
 done
 
 # Note: any post-processing on the .md files could go here.
