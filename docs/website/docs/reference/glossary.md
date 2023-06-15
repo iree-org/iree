@@ -41,11 +41,12 @@ For general discussion on MLIR see the project's
 ## Linalg
 
 [Linalg](https://mlir.llvm.org/docs/Dialects/Linalg/) is an MLIR dialect
-that defines how Linear Algebra operations can be described in a
-generalized fashion, including a set of commonly used operations.
-IREE's code generation defines tensor operations using the Linalg
-dialect, then uses it to generate the loop structures for the CPU and
-GPU backends.
+that defines Linear Algebra operations in a generalized fashion by modeling
+iteration spaces together with compute payloads. Linalg includes a set of
+commonly used operations as well as generic interfaces.
+
+IREE uses the Linalg dialect during its code generation pipeline to define
+tensor operations then generate loop structures for its various backend targets.
 
 ## OpenXLA
 
