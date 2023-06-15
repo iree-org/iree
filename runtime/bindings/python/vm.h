@@ -133,7 +133,6 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
                                           const std::string& name,
                                           uint32_t minimum_version);
 
-  static VmModule MMap(VmInstance* instance, std::string filepath);
   static VmModule FromFlatbufferBlob(VmInstance* instance,
                                      py::object flatbuffer_blob_object);
 

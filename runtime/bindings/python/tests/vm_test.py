@@ -8,7 +8,6 @@
 
 import logging
 import numpy as np
-import tempfile
 import unittest
 
 import iree.compiler
@@ -106,27 +105,6 @@ class VmTest(unittest.TestCase):
     result = finv(5, 6)
     logging.info("result: %s", result)
     self.assertEqual(result, 11)
-
-  def test_mmap(self):
-    binary = iree.compiler.compile_str(
-        """
-        func.func @add_scalar(%arg0: i32, %arg1: i32) -> i32 {
-          %0 = arith.addi %arg0, %arg1 : i32
-          return %0 : i32
-        }
-        """,
-        target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS)
-    with tempfile.NamedTemporaryFile() as tf:
-      tf.write(binary)
-      tf.flush()
-      m = iree.runtime.VmModule.mmap(self.instance, tf.name)
-      context = iree.runtime.VmContext(self.instance,
-                                       modules=[self.hal_module, m])
-      f = m.lookup_function("add_scalar")
-      finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
-      result = finv(5, 6)
-      logging.info("result: %s", result)
-      self.assertEqual(result, 11)
 
   def test_synchronous_dynamic_shape_invoke_function_new_abi(self):
     m = create_simple_dynamic_abs_module(self.instance)
