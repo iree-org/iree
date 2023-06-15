@@ -20,5 +20,6 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for Metal right now.
     "event"
+  LABELS
+    driver=metal
 )
-
