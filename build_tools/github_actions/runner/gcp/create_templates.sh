@@ -17,7 +17,7 @@ TESTING="${TEMPLATE_TESTING:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
-GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-06-02-1685724247}"
+GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-06-14-1686786580}"
 GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-1000}"
 CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-06-02-1685725199}"
 CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-1000}"
@@ -128,9 +128,9 @@ function create_template() {
 
   if [[ "${type}" == gpu ]]; then
     cmd+=(
-      --machine-type=a2-highgpu-1g
+      --machine-type=n1-standard-16
       --maintenance-policy=TERMINATE
-      --accelerator=count=1,type=nvidia-tesla-a100
+      --accelerator=count=1,type=nvidia-tesla-t4
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-ssd"
     )
   elif [[ "${type}" == cpu ]]; then
