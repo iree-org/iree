@@ -17,7 +17,7 @@
         <link rel="next" href="../optimization-options/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.15">
+      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.16">
     
     
       
@@ -380,6 +380,8 @@
         <div class="md-main__inner md-grid">
           
             
+              
+                
               
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
@@ -1105,7 +1107,21 @@
       
         <li class="md-nav__item">
   <a href="#linalg" class="md-nav__link">
-    LinAlg
+    Linalg
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#openxla" class="md-nav__link">
+    OpenXLA
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pytorch" class="md-nav__link">
+    PyTorch
   </a>
   
 </li>
@@ -1113,6 +1129,13 @@
         <li class="md-nav__item">
   <a href="#spir-v" class="md-nav__link">
     SPIR-V
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stablehlo" class="md-nav__link">
+    StableHLO
   </a>
   
 </li>
@@ -1338,6 +1361,8 @@
             
             
               
+                
+              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -1372,7 +1397,21 @@
       
         <li class="md-nav__item">
   <a href="#linalg" class="md-nav__link">
-    LinAlg
+    Linalg
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#openxla" class="md-nav__link">
+    OpenXLA
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pytorch" class="md-nav__link">
+    PyTorch
   </a>
   
 </li>
@@ -1380,6 +1419,13 @@
         <li class="md-nav__item">
   <a href="#spir-v" class="md-nav__link">
     SPIR-V
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stablehlo" class="md-nav__link">
+    StableHLO
   </a>
   
 </li>
@@ -1412,6 +1458,27 @@
                 
                   
   
+  
+
+
+  <nav class="md-tags" hidden>
+    
+      
+      
+        <span class="md-tag">JAX</span>
+      
+    
+      
+      
+        <span class="md-tag">PyTorch</span>
+      
+    
+      
+      
+        <span class="md-tag">TensorFlow</span>
+      
+    
+  </nav>
 
 
 
@@ -1420,50 +1487,88 @@
 
 
 <h1 id="glossary">Glossary<a class="headerlink" href="#glossary" title="Permanent link">link</a></h1>
-<p>IREE exists in an ecosystem of projects, each using their own terminology
-and interacting in various ways. Below is a summation of these projects
-with the problems they are built to address.</p>
+<p>IREE exists in an ecosystem of projects and acts as a bridge between machine
+learning frameworks and a variety of hardware platforms. This glossary outlines
+some of those projects and technologies.</p>
+<div class="admonition question -">
+<p class="admonition-title">Something missing?</p>
+<p>Don't see a project of technology here that you think should be? We welcome
+contributions on <a href="https://github.com/openxla/iree">our GitHub page</a>!</p>
+</div>
 <h2 id="jax">JAX<a class="headerlink" href="#jax" title="Permanent link">link</a></h2>
-<p><a href="https://github.com/google/jax">JAX</a> is a front-end for writing and
-executing Machine Learning models, including support for Google
-Cloud TPUs.</p>
+<p><a href="https://github.com/google/jax">JAX</a> is Python framework supporting
+high-performance machine learning research by bridging automatic differentiation
+and ML compilers like <a href="https://github.com/openxla/xla">XLA</a> and IREE.</p>
+<p>See the
+<a href="../../guides/ml-frameworks/jax/">JAX Integration guide</a> for details on how to
+use JAX programs with IREE.</p>
 <h2 id="mlir">MLIR<a class="headerlink" href="#mlir" title="Permanent link">link</a></h2>
-<p><a href="https://mlir.llvm.org/">Multi Level Intermediate Representation</a> is
+<p><a href="https://mlir.llvm.org/">Multi-Level Intermediate Representation (MLIR)</a> is
 the compiler framework that IREE is built around. Beyond the tooling
 this includes a set of common dialects and transformations that IREE
 utilizes for its code generation system.</p>
 <p>For general discussion on MLIR see the project's
-<a href="https://discourse.llvm.org/c/mlir/31">discourse</a> group.</p>
-<h2 id="linalg">LinAlg<a class="headerlink" href="#linalg" title="Permanent link">link</a></h2>
+<a href="https://discourse.llvm.org/c/mlir/31">discourse</a> forum.</p>
+<h2 id="linalg">Linalg<a class="headerlink" href="#linalg" title="Permanent link">link</a></h2>
 <p><a href="https://mlir.llvm.org/docs/Dialects/Linalg/">Linalg</a> is an MLIR dialect
-that defines how Linear Algebra operations can be described in a
-generalized fashion, including a set of commonly used operations.
-IREE's code generation defines tensor operations using the Linalg
-dialect, then uses it to generate the loop structures for the CPU and
-GPU backends.</p>
+that defines Linear Algebra operations in a generalized fashion by modeling
+iteration spaces together with compute payloads. Linalg includes a set of
+commonly used operations as well as generic interfaces.</p>
+<p>IREE uses the Linalg dialect during its code generation pipeline to define
+tensor operations then generate loop structures for its various backend targets.</p>
+<h2 id="openxla">OpenXLA<a class="headerlink" href="#openxla" title="Permanent link">link</a></h2>
+<p><a href="https://github.com/openxla/community">OpenXLA</a> is a community-driven, open
+source ML compiler ecosystem.</p>
+<p>IREE is one project under the
+<a href="https://github.com/openxla">OpenXLA GitHub Organization</a>, and it interfaces
+with many of the other projects, such as <a href="#stablehlo">StableHLO</a>.</p>
+<h2 id="pytorch">PyTorch<a class="headerlink" href="#pytorch" title="Permanent link">link</a></h2>
+<p><a href="https://pytorch.org/">PyTorch</a> is an optimized tensor library for deep
+learning.</p>
+<p>PyTorch uses the <a href="https://github.com/llvm/torch-mlir">Torch-MLIR</a> project to
+interface with projects like IREE. See the
+<a href="../../guides/ml-frameworks/pytorch/">PyTorch Integration guide</a> for details on
+how to use PyTorch programs with IREE.</p>
 <h2 id="spir-v">SPIR-V<a class="headerlink" href="#spir-v" title="Permanent link">link</a></h2>
 <p><a href="https://www.khronos.org/spir/">SPIR-V</a> is a shader and kernel intermediate
 language for expressing parallel computation typically used for GPUs. It serves
 as a hardware agnostic assembly format for distributing complex,
-computationally intensive programs. It is the preferred method for
-shipping platform agnostic binaries to run on GPUs.</p>
+computationally intensive programs.</p>
+<p>IREE uses the
+<a href="https://mlir.llvm.org/docs/Dialects/SPIR-V/">SPIR-V MLIR Dialect</a> in its code
+generation pipeline for Vulkan and other compute APIs.</p>
+<h2 id="stablehlo">StableHLO<a class="headerlink" href="#stablehlo" title="Permanent link">link</a></h2>
+<p><a href="https://github.com/openxla/stablehlo">StableHLO</a> is a set of versioned
+high-level operations (HLOs) for ML models with backward and forward
+compatibility guarantees. StableHLO aims to improve interoperability between
+frameworks (such as TensorFlow, JAX, and PyTorch) and ML compilers.</p>
+<p>StableHLO has both a
+<a href="https://github.com/openxla/stablehlo/blob/main/docs/spec.md">specification</a>
+and an MLIR dialect.</p>
+<p>IREE uses the StableHLO MLIR Dialect as one of its input formats.</p>
 <h2 id="tosa">TOSA<a class="headerlink" href="#tosa" title="Permanent link">link</a></h2>
-<p>The <a href="https://developer.mlplatform.org/w/tosa/">TOSA</a> specification defines a
-set of common tensor operations to most machine learning frameworks.
-This simplifies model compilation as separate front-end frameworks can target
-TOSA's intermediate representation without compromising on the ability to
-achieve efficient execution across multiple device types.</p>
-<p>IREE uses the TOSA MLIR dialect as a prioritized ingestion format, transforming
-multiple ML-platform ingestion formats into a TOSA compatible set of operations.</p>
-<p>Changes to the TOSA specification require submitting a proposal on TOSA's
-<a href="https://developer.mlplatform.org/w/tosa/#:~:text=Specification%20Contributions">platform development page</a></p>
+<p><a href="https://www.mlplatform.org/tosa">Tensor Operator Set Architecture (TOSA)</a>
+provides a set of tensor operations commonly employed by Deep Neural Networks.
+TOSA defines accuracy and compatibility constraints so frameworks that use it
+can trust that applications will produce similar results on a variety of
+hardware targets.</p>
+<p>TOSA has both a <a href="https://www.mlplatform.org/tosa/tosa_spec.html">specification</a>
+and an <a href="https://mlir.llvm.org/docs/Dialects/TOSA/">MLIR dialect</a>.</p>
+<p>IREE uses the TOSA MLIR dialect as one of its input formats.</p>
 <h2 id="tflite">TFLite<a class="headerlink" href="#tflite" title="Permanent link">link</a></h2>
-<p><a href="https://www.tensorflow.org/lite">TensorFlow lite</a> is a model format and
-execution system for performing on device inference. IREE supports TFLite
-FlatBuffers translation into <a href="#tosa">TOSA</a> operations and compilation
-into the LinAlg dialect.</p>
+<p><a href="https://www.tensorflow.org/lite">TensorFlow Lite (TFLite)</a> is a library
+for deploying models on mobile and other edge devices.</p>
+<p>IREE supports running TFLite programs that have been imported into MLIR using
+the TOSA dialect. See the
+<a href="../../guides/ml-frameworks/tflite/">TFLite Integration guide</a> for details on how
+to use TFLite programs with IREE.</p>
+<p>IREE also provides runtime bindings for the
+<a href="https://github.com/tensorflow/tensorflow/tree/master/tensorflow/lite/c">TFLite C API</a>,
+see the <a href="../bindings/tensorflow-lite/">TensorFlow Lite bindings</a> page.</p>
 
 
+
+  
 
 
 
@@ -1541,7 +1646,7 @@ into the LinAlg dialect.</p>
     <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.sections", "navigation.tabs", "navigation.top", "navigation.indexes", "toc.follow"], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.b4d07000.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a51614de.min.js"></script>
       
     
   </body>
