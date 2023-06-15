@@ -25,9 +25,9 @@ and
 ### Choose Benchmark Presets
 
 IREE Benchmark Suites contain many benchmarks for different devices and model
-sizes, which can take lots of disk space to build all of them. So benchmarks are
-grouped into presets to allow building and running only a subset of them. The
-available presets are:
+sizes, which can take lots of space and time to build all of them. So benchmarks
+are grouped into presets to allow building and running only a subset of them.
+The available presets are:
 
 Execution benchmarks:
 
@@ -75,7 +75,7 @@ If you only need the imported MLIR models:
 cmake --build "${IREE_BUILD_DIR?}" --target \
   iree-benchmark-import-models
   # For large benchmarks (this will take > 100G disk space)
-  # iree-benchmark-import-models-large.
+  # iree-benchmark-import-models-large
 ```
 
 Otherwise, compile the benchmark suites and tools for benchmarking:
