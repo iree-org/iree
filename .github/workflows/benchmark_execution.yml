@@ -69,12 +69,14 @@ jobs:
         id: generate
         run: >
           gcloud storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}";
-          echo benchmark-matrix=$(jq 'to_entries[] | .key as $device_name | .value[] |
-               {
-                 "device_name": $device_name,
-                 "host_environment": .host_environment,
-                 "shard": .shard
-               }' "${BENCHMARK_CONFIG}" | jq -s '.') >> "${GITHUB_OUTPUT}"
+          echo benchmark-matrix=$(jq 'to_entries[]
+          | .key as $device_name
+          | .value.host_environment as $host_environment
+          | (.value.shards | length) as $shard_count
+          | .value.shards[]
+          | { device_name: $device_name, host_environment: $host_environment,
+          shard: { index: .shard_index, count: $shard_count }
+          }' "${BENCHMARK_CONFIG}" | jq -s '.') >> "${GITHUB_OUTPUT}"
 
   run_benchmarks:
     needs: [generate_matrix]
@@ -99,7 +101,10 @@ jobs:
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ inputs.e2e-test-artifacts-gcs-artifact-dir }}
       E2E_TEST_ARTIFACTS_DIR: ${{ inputs.e2e-test-artifacts-dir }}
       BENCHMARK_RESULTS_DIR: benchmark-results
-      SHARDING_SUFFIX: ${{ matrix.benchmark.shard.count > 1 && format('-shard{0}of{1}', matrix.benchmark.shard.index, matrix.benchmark.shard.count) || '' }}
+      SHARDING_SUFFIX: |-
+        ${{ matrix.benchmark.shard.count > 1
+        && format('-shard{0}of{1}', matrix.benchmark.shard.index,
+        matrix.benchmark.shard.count) || '' }}
     outputs:
       benchmark-results-dir: ${{ env.BENCHMARK_RESULTS_DIR }}
       # Ideally this should be defined in env, so it can be used in the upload
@@ -129,7 +134,13 @@ jobs:
             --arg DEVICE_NAME "${DEVICE_NAME}" \
             --arg SHARD_INDEX "${SHARD_INDEX}" \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-            '.[$DEVICE_NAME][] | select((.shard.index | tostring) == $SHARD_INDEX) | .module_dir_paths[] | "\($GCS_ARTIFACT_DIR)/\(.)"' \
+            '.[$DEVICE_NAME].shards[] | select((.shard_index | tostring) == $SHARD_INDEX) | .module_dir_paths[] | "\($GCS_ARTIFACT_DIR)/\(.)"' \
+            "${BENCHMARK_CONFIG}"
+          jq -r \
+            --arg DEVICE_NAME "${DEVICE_NAME}" \
+            --arg SHARD_INDEX "${SHARD_INDEX}" \
+            --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
+            '.[$DEVICE_NAME].shards[] | select((.shard_index | tostring) == $SHARD_INDEX) | .module_dir_paths[] | "\($GCS_ARTIFACT_DIR)/\(.)"' \
             "${BENCHMARK_CONFIG}" | \
             gcloud storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"

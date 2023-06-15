@@ -185,7 +185,7 @@ class Parser(argparse.ArgumentParser):
         self.add_argument(
             "--shard_index",
             type=int,
-            default=1,
+            default=None,
             help="Shard in benchmark config to run",
         )
 

@@ -113,10 +113,11 @@ def _dump_cmds_handler(
 
     if execution_benchmark_config is not None:
         benchmark_groups = json.loads(execution_benchmark_config.read_text())
-        for target_device, benchmark_shards in benchmark_groups.items():
-            for benchmark_shard in benchmark_shards:
+        for target_device, benchmark_group in benchmark_groups.items():
+            shard_count = len(benchmark_group["shards"])
+            for shard in benchmark_group["shards"]:
                 run_configs = serialization.unpack_and_deserialize(
-                    data=benchmark_shard["run_configs"],
+                    data=shard["run_configs"],
                     root_type=List[iree_definitions.E2EModelRunConfig],
                 )
                 for run_config in run_configs:
@@ -131,9 +132,7 @@ def _dump_cmds_handler(
                     lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
                     lines.append(f"Name: {run_config}")
                     lines.append(f"Target Device: {target_device}")
-                    lines.append(
-                        f"Shard: {benchmark_shard['shard']['index']} / {benchmark_shard['shard']['count']}"
-                    )
+                    lines.append(f"Shard: {shard['shard_index']} / {shard_count}")
                     lines.append("")
                     lines += _dump_cmds_from_run_config(
                         run_config=run_config, root_path=e2e_test_artifacts_dir
