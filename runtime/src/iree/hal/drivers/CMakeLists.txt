@@ -126,6 +126,10 @@ if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(vulkan)
   list(APPEND _INIT_INTERNAL_DEPS iree::hal::drivers::vulkan::registration)
 endif()
+if(IREE_HAL_DRIVER_METAL)
+  add_subdirectory(metal)
+  list(APPEND _INIT_INTERNAL_DEPS iree::hal::drivers::metal::registration)
+endif()
 
 iree_cc_library(
   NAME
