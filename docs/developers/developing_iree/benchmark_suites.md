@@ -75,7 +75,7 @@ If you only need the imported MLIR models:
 cmake --build "${IREE_BUILD_DIR?}" --target \
   iree-benchmark-import-models
   # For large benchmarks (this will take > 100G disk space)
-  # iree-benchmark-import-models-large
+  # iree-benchmark-import-models-large.
 ```
 
 Otherwise, compile the benchmark suites and tools for benchmarking:
@@ -88,6 +88,9 @@ cmake --build "${IREE_BUILD_DIR?}" --target \
   iree-benchmark-module
 export E2E_TEST_ARTIFACTS_DIR="${IREE_BUILD_DIR?}/e2e_test_artifacts"
 ```
+
+> TODO(#13683): Each preset should have its own target to further reduce
+> unnecessary builds
 
 ### Run Benchmarks
 
