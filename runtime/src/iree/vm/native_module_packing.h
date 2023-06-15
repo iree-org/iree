@@ -347,7 +347,8 @@ struct Unpacker {
     if (IREE_UNLIKELY(ptr != limit)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "argument buffer unpacking failure; consumed %zu of %zu bytes",
+          "argument buffer unpacking failure; consumed %" PRIhsz " of %" PRIhsz
+          " bytes",
           (reinterpret_cast<intptr_t>(ptr) -
            reinterpret_cast<intptr_t>(storage.data)),
           storage.data_length);

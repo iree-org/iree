@@ -674,9 +674,10 @@ IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
               transfer_command->update.length);
           break;
         default:
-          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                    "unknown transfer_commands[%zu] type %d", i,
-                                    (int)transfer_command->type);
+          status =
+              iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                               "unknown transfer_commands[%" PRIhsz "] type %d",
+                               i, (int)transfer_command->type);
           break;
       }
       if (!iree_status_is_ok(status)) break;

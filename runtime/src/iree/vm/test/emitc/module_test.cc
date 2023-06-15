@@ -144,7 +144,8 @@ class VMCModuleTest : public ::testing::Test,
     iree_vm_function_t function;
     IREE_CHECK_OK(iree_vm_context_resolve_function(
         context_,
-        iree_string_view_t{qualified_name.data(), qualified_name.size()},
+        iree_string_view_t{qualified_name.data(), static_cast<iree_host_size_t>(
+                                                      qualified_name.size())},
         &function));
 
     return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,

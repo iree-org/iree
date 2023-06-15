@@ -334,7 +334,7 @@ static iree_status_t print_outputs_from_call(
         // Query total length (excluding NUL terminator).
         iree_host_size_t result_length = 0;
         iree_status_t status = iree_hal_buffer_view_format(
-            buffer_view, SIZE_MAX, 0, NULL, &result_length);
+            buffer_view, IREE_HOST_SIZE_MAX, 0, NULL, &result_length);
         if (!iree_status_is_out_of_range(status)) return status;
         ++result_length;  // include NUL
 
@@ -343,7 +343,8 @@ static iree_status_t print_outputs_from_call(
         IREE_RETURN_IF_ERROR(iree_allocator_malloc(
             iree_allocator_system(), result_length, (void**)&result_str));
         IREE_RETURN_IF_ERROR(iree_hal_buffer_view_format(
-            buffer_view, SIZE_MAX, result_length, result_str, &result_length));
+            buffer_view, IREE_HOST_SIZE_MAX, result_length, result_str,
+            &result_length));
         IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
             outputs_builder, "%.*s", (int)result_length, result_str));
         iree_allocator_free(iree_allocator_system(), result_str);

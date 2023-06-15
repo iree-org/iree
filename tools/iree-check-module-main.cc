@@ -103,7 +103,7 @@ iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_ordinal(
             main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function),
-        "looking up function export %zu", ordinal);
+        "looking up function export %" PRIhsz, ordinal);
     iree_string_view_t function_name = iree_vm_function_name(&function);
 
     if (iree_string_view_starts_with(function_name,

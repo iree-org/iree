@@ -128,7 +128,7 @@ iree_hal_webgpu_simple_allocator_query_buffer_compatibility(
 static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_host_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(base_allocator);
   IREE_ASSERT_ARGUMENT(params);

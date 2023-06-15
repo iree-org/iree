@@ -76,7 +76,8 @@ static iree_status_t iree_create_buffer_from_file_generator_callback(
                             mapping->contents.data_length, read_params->file);
   if (bytes_read != mapping->contents.data_length) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "file contents truncated; expected %zu bytes "
+                            "file contents truncated; expected %" PRIhsz
+                            " bytes "
                             "based on buffer view size",
                             mapping->contents.data_length);
   }
@@ -102,9 +103,10 @@ static iree_status_t iree_create_buffer_view_from_file(
       !iree_status_is_out_of_range(shape_result)) {
     return shape_result;
   } else if (shape_rank > 128) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "a shape rank of %zu is just a little bit excessive, eh?", shape_rank);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "a shape rank of %" PRIhsz
+                            " is just a little bit excessive, eh?",
+                            shape_rank);
   }
   iree_status_ignore(shape_result);
   iree_hal_dim_t* shape =
@@ -403,7 +405,7 @@ iree_status_t iree_tooling_append_variant_list_lines(
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_vm_list_get_variant_assign(list, i, &variant),
-        "variant %zu not present", i);
+        "variant %" PRIhsz " not present", i);
     iree_string_builder_append_format(
         builder, "%.*s[%" PRIhsz "]: ", (int)list_name.size, list_name.data, i);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
