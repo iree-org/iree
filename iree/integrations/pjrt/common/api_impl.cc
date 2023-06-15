@@ -1606,11 +1606,13 @@ void LoadedExecutableInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_LoadedExecutable_Delete =
       +[](PJRT_LoadedExecutable_Delete_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE_NAMED("PJRT_LoadedExecutable_Delete");
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_LoadedExecutable_Delete"));
   };
   api->PJRT_LoadedExecutable_IsDeleted =
       +[](PJRT_LoadedExecutable_IsDeleted_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE_NAMED("PJRT_LoadedExecutable_IsDeleted");
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_LoadedExecutable_IsDeleted"));
   };
