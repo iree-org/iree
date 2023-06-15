@@ -28,7 +28,7 @@ on:
 
 jobs:
   publish_website:
-    # Note: building `iree-tblgen` takes ~5 minutes on standard sized runners.
+    # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout out repository
@@ -50,17 +50,18 @@ jobs:
             mkdocs-material \
             mkdocs-redirects \
             requests
-          sudo apt-get install -y ninja-build
       - name: Generating release index
         run: |
           ./build_tools/scripts/generate_release_index.py \
             --repo="${GITHUB_REPOSITORY}" \
             --output=docs/website/docs/pip-release-links.html
-      # We could run this script under Docker, to avoid the need to install
-      # certain dependencies explicitly (e.g. ninja-build). The Docker image
-      # gives a consistent, tested environment... but fetching takes 1 minute+
       - name: Building documentation files
-        run: ./docs/website/generate_extra_files.sh
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:7dbb7e97e0baa6d4512822b5cd4f601d840a6f950f67c2df497a24cae64a0595" \
+            gcr.io/iree-oss/base@sha256:7dbb7e97e0baa6d4512822b5cd4f601d840a6f950f67c2df497a24cae64a0595 \
+            ./docs/website/generate_extra_files.sh
       - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
