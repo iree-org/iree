@@ -67,8 +67,6 @@ declare -a label_exclude_args=(
 )
 
 
-
-
 if (( IREE_VULKAN_DISABLE == 1 )); then
   label_exclude_args+=("^driver=vulkan$")
 fi
