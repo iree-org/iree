@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
+    MLIRTransformDialect
     iree::base::internal::flatcc::building
     iree::compiler::Codegen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
