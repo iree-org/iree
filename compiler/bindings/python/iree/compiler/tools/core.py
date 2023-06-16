@@ -185,8 +185,9 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
     cl.append(f"-o={options.output_file}")
 
   # Tool paths.
-  lld_path = find_tool("iree-lld")
-  cl.append(f"--iree-llvmcpu-embedded-linker-path={lld_path}")
+  if "llvm-cpu" in options.target_backends:
+    lld_path = find_tool("iree-lld")
+    cl.append(f"--iree-llvmcpu-embedded-linker-path={lld_path}")
 
   # MLIR flags.
   if options.output_mlir_debuginfo:
