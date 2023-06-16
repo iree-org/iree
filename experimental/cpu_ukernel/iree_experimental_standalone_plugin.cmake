@@ -78,11 +78,11 @@ function(iree_experimental_standalone_plugin_arch)
       DEPENDS
         "${_SRC_FILE}"
         "${IREE_CLANG_TARGET}"
-      COMMAND "${IREE_CLANG_TARGET}"
+      COMMAND "${IREE_CLANG_BINARY}"
         # Flags copied from
         # compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/internal/EmbeddedLinkerTool.cpp
         -target "${LLVM_ARCH}-unknown-unknown-eabi-elf"
-        -isystem "${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include"
+        -isystem "${IREE_CLANG_BUILTIN_HEADERS_PATH}"
         -std=c17
         -fasm  # Added for inline-asm support.
         -fPIC
@@ -110,7 +110,7 @@ function(iree_experimental_standalone_plugin_arch)
     DEPENDS
       ${_OBJECT_FILES}
       ${IREE_LLD_TARGET}
-    COMMAND ${IREE_LLD_TARGET}
+    COMMAND ${IREE_LLD_BINARY}
       -flavor gnu
       --build-id=none
       -nostdlib

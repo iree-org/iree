@@ -92,7 +92,8 @@ iree_cc_library(
 set(_lld_copts)
 set(_lld_deps)
 
-if(IREE_LLD_TARGET)
+# TODO(#14086): implement linking in the installed-LLVM case.
+if(IREE_BUILD_BUNDLED_LLVM)
   # Use generator expressions to conditionally include LLD targets, providing
   # a compiler definition if not available.
   macro(_add_dependent_lld_target target not_definition)

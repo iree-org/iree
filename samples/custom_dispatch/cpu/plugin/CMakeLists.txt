@@ -100,9 +100,9 @@ function(standalone_plugin_library _DST_VAR_ARCH_LIBRARIES _ARCH)
     DEPENDS
       standalone_plugin.c
       ${IREE_CLANG_TARGET}
-    COMMAND ${IREE_CLANG_TARGET}
+    COMMAND ${IREE_CLANG_BINARY}
       -target ${LLVM_ARCH}-unknown-unknown-eabi-elf
-      -isystem ${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include
+      -isystem ${IREE_CLANG_BUILTIN_HEADERS_PATH}
       -std=c17
       -fPIC
       -ffreestanding
@@ -125,7 +125,7 @@ function(standalone_plugin_library _DST_VAR_ARCH_LIBRARIES _ARCH)
     DEPENDS
       standalone_plugin_${_ARCH}.o
       ${IREE_LLD_TARGET}
-    COMMAND ${IREE_LLD_TARGET}
+    COMMAND ${IREE_LLD_BINARY}
       -flavor gnu
       --build-id=none
       -nostdlib
