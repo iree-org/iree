@@ -456,6 +456,7 @@ class ArgParser {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-run-mlir");
 
   // Initialize the compiler once on startup before using any other APIs.

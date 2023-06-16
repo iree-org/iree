@@ -628,16 +628,22 @@ hal.executable private @ukernel_pass_through {
 hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       hal.return %arg1, %arg2, %arg2 : index, index, index
     }
     builtin.module {
-      func.func @dispatch() { 
+      func.func @dispatch() {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
         %cst_0 = arith.constant 0.000000e+00 : f32
-        %0 = tensor.empty() : tensor<1xf32>
-        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        %0 = hal.interface.constant.load[0] : i32
+        %6 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
+        %7 = tensor.empty() : tensor<1xf32>
+        %8 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<1xf32>) -> tensor<1xf32>
+        flow.dispatch.tensor.store %8, %6, offsets = [0], sizes = [1], strides = [1] : tensor<1xf32> -> !flow.dispatch.tensor<readwrite:tensor<1xf32>>
         return
       }
     }
@@ -650,16 +656,22 @@ hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
 hal.executable private @aarch64_ssve__cpu_double_tiling_peeling_expert {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       hal.return %arg1, %arg2, %arg2 : index, index, index
     }
     builtin.module {
-      func.func @dispatch() { 
+      func.func @dispatch() {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
         %cst_0 = arith.constant 0.000000e+00 : f32
-        %0 = tensor.empty() : tensor<1xf32>
-        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        %0 = hal.interface.constant.load[0] : i32
+        %6 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
+        %7 = tensor.empty() : tensor<1xf32>
+        %8 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<1xf32>) -> tensor<1xf32>
+        flow.dispatch.tensor.store %8, %6, offsets = [0], sizes = [1], strides = [1] : tensor<1xf32> -> !flow.dispatch.tensor<readwrite:tensor<1xf32>>
         return
       }
     }
@@ -672,6 +684,7 @@ hal.executable private @aarch64_ssve__cpu_double_tiling_peeling_expert {
 hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -679,9 +692,14 @@ hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
     }
     builtin.module {
       func.func @dispatch() {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
         %cst_0 = arith.constant 0.000000e+00 : f32
-        %0 = tensor.empty() : tensor<1xf32>
-        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        %0 = hal.interface.constant.load[0] : i32
+        %6 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
+        %7 = tensor.empty() : tensor<1xf32>
+        %8 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<1xf32>) -> tensor<1xf32>
+        flow.dispatch.tensor.store %8, %6, offsets = [0], sizes = [1], strides = [1] : tensor<1xf32> -> !flow.dispatch.tensor<readwrite:tensor<1xf32>>
         return
       }
     }
@@ -704,6 +722,7 @@ hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
 hal.executable private @aarch64_ssve_sve_disabled {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_no_sve {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -711,9 +730,14 @@ hal.executable private @aarch64_ssve_sve_disabled {
     }
     builtin.module {
       func.func @dispatch() {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
         %cst_0 = arith.constant 0.000000e+00 : f32
-        %0 = tensor.empty() : tensor<1xf32>
-        %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+        %0 = hal.interface.constant.load[0] : i32
+        %6 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
+        %7 = tensor.empty() : tensor<1xf32>
+        %8 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<1xf32>) -> tensor<1xf32>
+        flow.dispatch.tensor.store %8, %6, offsets = [0], sizes = [1], strides = [1] : tensor<1xf32> -> !flow.dispatch.tensor<readwrite:tensor<1xf32>>
         return
       }
     }

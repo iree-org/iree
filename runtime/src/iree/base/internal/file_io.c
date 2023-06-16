@@ -146,7 +146,8 @@ static iree_status_t iree_file_read_contents_impl(
   if (fread(contents->buffer.data, 1, file_size, file) != file_size) {
     iree_allocator_free(allocator, contents);
     return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
-                            "unable to read entire %zu file bytes", file_size);
+                            "unable to read entire %" PRIhsz " file bytes",
+                            file_size);
   }
 
   // Add trailing NUL to make the contents C-string compatible.
@@ -199,10 +200,10 @@ iree_status_t iree_file_write_contents(const char* path,
   if (content.data_length > 0) {
     int ret = fwrite((char*)content.data, content.data_length, 1, file);
     if (ret != 1) {
-      status =
-          iree_make_status(IREE_STATUS_DATA_LOSS,
-                           "unable to write file contents of %zu bytes to '%s'",
-                           content.data_length, path);
+      status = iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "unable to write file contents of %" PRIhsz
+                                " bytes to '%s'",
+                                content.data_length, path);
     }
   }
 

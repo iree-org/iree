@@ -139,19 +139,20 @@ class BenchmarkDriverTest(unittest.TestCase):
         model_name="model_tflite",
         model_tags=[],
         bench_mode=["sync"],
-        target_arch="x86_64-cascadelake",
+        target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
         driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
         benchmark_case_dir=pathlib.Path("case1"),
         benchmark_tool_name="tool",
         run_config=run_config_a)
-    self.case2 = BenchmarkCase(model_name="model_tflite",
-                               model_tags=[],
-                               bench_mode=["task"],
-                               target_arch="x86_64-cascadelake",
-                               driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-                               benchmark_case_dir=pathlib.Path("case2"),
-                               benchmark_tool_name="tool",
-                               run_config=run_config_b)
+    self.case2 = BenchmarkCase(
+        model_name="model_tflite",
+        model_tags=[],
+        bench_mode=["task"],
+        target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
+        driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
+        benchmark_case_dir=pathlib.Path("case2"),
+        benchmark_tool_name="tool",
+        run_config=run_config_b)
 
     compile_target_rv64 = iree_definitions.CompileTarget(
         target_backend=iree_definitions.TargetBackend.LLVM_CPU,
@@ -178,16 +179,16 @@ class BenchmarkDriverTest(unittest.TestCase):
         model_name="model_tflite",
         model_tags=[],
         bench_mode=["task"],
-        target_arch="riscv_64-generic",
+        target_arch=common_definitions.DeviceArchitecture.RV64_GENERIC,
         driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
         benchmark_case_dir=pathlib.Path("incompatible_case"),
         benchmark_tool_name="tool",
         run_config=run_config_incompatible)
-    self.benchmark_suite = BenchmarkSuite({
-        pathlib.Path("suite/TFLite"): [
-            self.case1, self.case2, self.incompatible_case
-        ],
-    })
+    self.benchmark_suite = BenchmarkSuite([
+        self.case1,
+        self.case2,
+        self.incompatible_case,
+    ])
 
   def tearDown(self) -> None:
     self._tmp_dir_obj.cleanup()

@@ -54,6 +54,12 @@ option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the R
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 
+set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
+set(IREE_TRACING_PROVIDER ${IREE_TRACING_PROVIDER_DEFAULT} CACHE STRING "Chooses which built-in tracing implementation is used when tracing is enabled.")
+set(IREE_TRACING_PROVIDER_H "" CACHE STRING "Header file for custom tracing providers.")
+set(IREE_TRACING_MODE_DEFAULT "2" CACHE STRING "Default tracing feature/verbosity mode. See iree/base/tracing.h for more.")
+set(IREE_TRACING_MODE ${IREE_TRACING_MODE_DEFAULT} CACHE STRING "Tracing feature/verbosity mode. See iree/base/tracing.h for more.")
+
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ON)
 
@@ -325,6 +331,11 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experi
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
+
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/metal")
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/metal")
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_TARGET "iree::experimental::metal::registration")
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_REGISTER "iree_hal_metal_driver_module_register")
 
 #-------------------------------------------------------------------------------
 # Experimental WebGPU HAL driver
@@ -807,7 +818,7 @@ else()
 
   # Add default external projects.
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
-  iree_llvm_add_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
   if(IREE_INPUT_TORCH)
     iree_llvm_add_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
   endif()
@@ -860,7 +871,7 @@ if(IREE_HAL_DRIVER_VULKAN)
 endif()
 
 if(IREE_BUILD_COMPILER)
-  add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/stablehlo EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_BUILD_TESTS)

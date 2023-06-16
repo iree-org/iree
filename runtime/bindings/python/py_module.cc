@@ -58,7 +58,8 @@ class PyModuleInterface {
 
   static iree_string_view_t ModuleName(void* vself) {
     auto self = AsSelf(vself);
-    return {self->module_name_.data(), self->module_name_.size()};
+    return {self->module_name_.data(),
+            static_cast<iree_host_size_t>(self->module_name_.size())};
   }
 
   static iree_vm_module_signature_t ModuleSignature(void* vself) {
@@ -93,11 +94,12 @@ class PyModuleInterface {
           out_function->ordinal = ordinal;
         }
         if (IREE_LIKELY(out_name)) {
-          *out_name = {f->name.data(), f->name.size()};
+          *out_name = {f->name.data(),
+                       static_cast<iree_host_size_t>(f->name.size())};
         }
         if (IREE_LIKELY(out_signature)) {
-          out_signature->calling_convention = {f->cconv.data(),
-                                               f->cconv.size()};
+          out_signature->calling_convention = {
+              f->cconv.data(), static_cast<iree_host_size_t>(f->cconv.size())};
         }
         return iree_ok_status();
       }
@@ -239,9 +241,11 @@ class PyModuleInterface {
         std::move(name), std::move(cconv), std::move(callable));
     exports_.push_back({});
     iree_vm_native_export_descriptor_t& d = exports_.back();
-    d.local_name = {py_function->name.data(), py_function->name.size()};
-    d.calling_convention = {py_function->cconv.data(),
-                            py_function->cconv.size()};
+    d.local_name = {py_function->name.data(),
+                    static_cast<iree_host_size_t>(py_function->name.size())};
+    d.calling_convention = {
+        py_function->cconv.data(),
+        static_cast<iree_host_size_t>(py_function->cconv.size())};
     d.attr_count = 0;
     d.attrs = nullptr;
     std::string& alloced_name = py_function->name;
@@ -261,7 +265,8 @@ class PyModuleInterface {
     AssertMutable();
     initialized_ = true;
     memset(&descriptor_, 0, sizeof(descriptor_));
-    descriptor_.name = {module_name_.data(), module_name_.size()};
+    descriptor_.name = {module_name_.data(),
+                        static_cast<iree_host_size_t>(module_name_.size())};
     descriptor_.version = version_;
     descriptor_.attr_count = attrs_.size();
     descriptor_.attrs = attrs_.empty() ? nullptr : attrs_.data();
@@ -298,7 +303,8 @@ class PyModuleInterface {
     iree_status_t ParseCconv() {
       iree_vm_function_signature_t signature;
       memset(&signature, 0, sizeof(signature));
-      signature.calling_convention = {cconv.data(), cconv.size()};
+      signature.calling_convention = {
+          cconv.data(), static_cast<iree_host_size_t>(cconv.size())};
       IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
           &signature, &cconv_arguments, &cconv_results));
 
@@ -324,10 +330,11 @@ class PyModuleInterface {
         &packed_arguments_required_size));
     if (IREE_UNLIKELY(packed_arguments_required_size !=
                       call.arguments.data_length)) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "mismatched packed argument size: actual=%zu, required=%zu",
-          call.arguments.data_length, packed_arguments_required_size);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "mismatched packed argument size: actual=%" PRIhsz
+                              ", required=%" PRIhsz,
+                              call.arguments.data_length,
+                              packed_arguments_required_size);
     }
 
     // Unpack arguments.

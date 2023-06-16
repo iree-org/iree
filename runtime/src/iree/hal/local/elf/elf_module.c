@@ -37,10 +37,10 @@ static iree_status_t iree_elf_module_verify_ehdr(
     iree_const_byte_span_t raw_data) {
   // Size must be larger than the header we are trying to load.
   if (raw_data.data_length < sizeof(iree_elf_ehdr_t)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "ELF data provided (%zu) is smaller than ehdr (%zu)",
-        raw_data.data_length, sizeof(iree_elf_ehdr_t));
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "ELF data provided (%" PRIhsz
+                            ") is smaller than ehdr (%zu)",
+                            raw_data.data_length, sizeof(iree_elf_ehdr_t));
   }
 
   // Check for ELF identifier.

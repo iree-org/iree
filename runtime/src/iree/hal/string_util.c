@@ -51,20 +51,20 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
       int32_t parsed_value = 0;
       if (!iree_string_view_atoi_int32(lhs, &parsed_value) ||
           parsed_value < 0) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "shape[%zu] invalid value '%.*s' of '%.*s'",
-                                dim_index, (int)lhs.size, lhs.data,
-                                (int)value.size, value.data);
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "shape[%" PRIhsz "] invalid value '%.*s' of '%.*s'", dim_index,
+            (int)lhs.size, lhs.data, (int)value.size, value.data);
       }
       dim_value = parsed_value;
     } else {
       int64_t parsed_value = 0;
       if (!iree_string_view_atoi_int64(lhs, &parsed_value) ||
           parsed_value < 0) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "shape[%zu] invalid value '%.*s' of '%.*s'",
-                                dim_index, (int)lhs.size, lhs.data,
-                                (int)value.size, value.data);
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "shape[%" PRIhsz "] invalid value '%.*s' of '%.*s'", dim_index,
+            (int)lhs.size, lhs.data, (int)value.size, value.data);
       }
       dim_value = parsed_value;
     }
@@ -93,7 +93,7 @@ iree_hal_format_shape(iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
                  (i < shape_rank - 1) ? "%" PRIdim "x" : "%" PRIdim, shape[i]);
     if (IREE_UNLIKELY(n < 0)) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "snprintf failed to write dimension %zu", i);
+                              "snprintf failed to write dimension %" PRIhsz, i);
     } else if (buffer && n >= buffer_capacity - buffer_length) {
       buffer = NULL;
     }
@@ -389,7 +389,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
       if (data_str.size != element_size * 2) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "binary hex element count mismatch: buffer "
-                                "length=%zu < expected=%zu",
+                                "length=%" PRIhsz " < expected=%" PRIhsz,
                                 data_str.size, element_size * 2);
       }
       iree_hal_hex_string_to_bytes(data_str.data, out_data, element_size);
@@ -404,10 +404,10 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element(
   iree_host_size_t element_size =
       iree_hal_element_dense_byte_count(element_type);
   if (data_ptr.data_length < element_size) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "output data buffer overflow: data_length=%zu < element_size=%zu",
-        data_ptr.data_length, element_size);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "output data buffer overflow: data_length=%" PRIhsz
+                            " < element_size=%" PRIhsz,
+                            data_ptr.data_length, element_size);
   }
   return iree_hal_parse_element_unsafe(data_str, element_type, data_ptr.data);
 }
@@ -446,10 +446,10 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
   iree_host_size_t element_size =
       iree_hal_element_dense_byte_count(element_type);
   if (data.data_length < element_size) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "data buffer underflow: data_length=%zu < element_size=%zu",
-        data.data_length, element_size);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "data buffer underflow: data_length=%" PRIhsz
+                            " < element_size=%" PRIhsz,
+                            data.data_length, element_size);
   }
   int n = 0;
   switch (element_type) {
@@ -532,9 +532,9 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
     memset(data_ptr.data, 0, data_ptr.data_length);
     return iree_ok_status();
   }
-  size_t src_i = 0;
-  size_t dst_i = 0;
-  size_t token_start = IREE_STRING_VIEW_NPOS;
+  iree_host_size_t src_i = 0;
+  iree_host_size_t dst_i = 0;
+  iree_host_size_t token_start = IREE_STRING_VIEW_NPOS;
   while (src_i < data_str.size) {
     char c = data_str.data[src_i++];
     bool is_separator = isspace(c) || c == ',' || c == '[' || c == ']';
@@ -549,7 +549,8 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
     if (dst_i >= element_capacity) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
-          "output data buffer overflow: element_capacity=%zu < dst_i=%zu+",
+          "output data buffer overflow: element_capacity=%" PRIhsz
+          " < dst_i=%" PRIhsz "+",
           element_capacity, dst_i);
     }
     IREE_RETURN_IF_ERROR(iree_hal_parse_element_unsafe(
@@ -561,10 +562,10 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
   }
   if (token_start != IREE_STRING_VIEW_NPOS) {
     if (dst_i >= element_capacity) {
-      return iree_make_status(
-          IREE_STATUS_OUT_OF_RANGE,
-          "output data overflow: element_capacity=%zu < dst_i=%zu",
-          element_capacity, dst_i);
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "output data overflow: element_capacity=%" PRIhsz
+                              " < dst_i=%" PRIhsz,
+                              element_capacity, dst_i);
     }
     IREE_RETURN_IF_ERROR(iree_hal_parse_element_unsafe(
         iree_make_string_view(data_str.data + token_start,
@@ -579,10 +580,10 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
       memcpy(p, data_ptr.data, element_size);
     }
   } else if (dst_i < element_capacity) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "input data string underflow: dst_i=%zu < element_capacity=%zu", dst_i,
-        element_capacity);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "input data string underflow: dst_i=%" PRIhsz
+                            " < element_capacity=%" PRIhsz,
+                            dst_i, element_capacity);
   }
   return iree_ok_status();
 }
@@ -623,7 +624,7 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
     if (data.data_length < dim_stride * shape[0]) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
-          "input data underflow: data_length=%zu < expected=%zu",
+          "input data underflow: data_length=%" PRIhsz " < expected=%" PRIhsz,
           data.data_length, (iree_host_size_t)(dim_stride * shape[0]));
     }
     iree_const_byte_span_t subdata;
@@ -654,7 +655,7 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
     if (data.data_length < max_count * element_stride) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
-          "input data underflow; data_length=%zu < expected=%zu",
+          "input data underflow; data_length=%" PRIhsz " < expected=%" PRIhsz,
           data.data_length, (iree_host_size_t)(max_count * element_stride));
     }
     *max_element_count -= max_count;

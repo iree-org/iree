@@ -140,8 +140,7 @@ static iree_status_t iree_numpy_consume_dict_key_value(
     iree_string_view_t* dict, iree_string_view_t* out_key,
     iree_string_view_t* out_value) {
   // Split `'key':` from the remainder of the string.
-  if (iree_string_view_split(*dict, ':', out_key, dict) ==
-      IREE_STRING_VIEW_NPOS) {
+  if (iree_string_view_split(*dict, ':', out_key, dict) == -1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "malformed header dict");
   }

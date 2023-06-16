@@ -42,24 +42,11 @@ class Parser(argparse.ArgumentParser):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    artifacts_dir_group = self.add_mutually_exclusive_group(required=True)
-    # TODO(#11076): Replace build-dir argument with e2e-test-artifacts-dir.
-    artifacts_dir_group.add_argument(
-        "build_dir",
-        metavar="<build-dir>",
-        type=_check_dir_path,
-        default=None,
-        nargs="?",
-        help="Path to the build directory containing benchmark suites")
-    artifacts_dir_group.add_argument(
-        "--e2e_test_artifacts_dir",
-        metavar="<e2e-test-artifacts-dir>",
-        type=_check_dir_path,
-        default=None,
-        help=(
-            "Path to the IREE e2e test artifacts directory. This will override "
-            "<build-dir> and eventually replace it. For now must use with "
-            "--execution_benchmark_config"))
+    self.add_argument("--e2e_test_artifacts_dir",
+                      metavar="<e2e-test-artifacts-dir>",
+                      type=_check_dir_path,
+                      required=True,
+                      help="Path to the IREE e2e test artifacts directory.")
 
     self.add_argument(
         "--normal_benchmark_tool_dir",
@@ -160,33 +147,12 @@ class Parser(argparse.ArgumentParser):
         "information")
     self.add_argument("--execution_benchmark_config",
                       type=_check_file_path,
-                      default=None,
+                      required=True,
                       help="JSON config for the execution benchmarks")
     self.add_argument("--target_device_name",
                       type=str,
-                      default=None,
+                      required=True,
                       help="Target device in benchmark config to run")
-
-  def parse_args(
-      self, arg_strs: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    args = super().parse_args(arg_strs)
-
-    # TODO(#11076): Remove these checks and make --execution_benchmark_config
-    # and --target_device_name required args.
-    use_new_benchmark_suite = (args.execution_benchmark_config is not None or
-                               args.target_device_name is not None)
-    if use_new_benchmark_suite:
-      if (args.execution_benchmark_config is None or
-          args.target_device_name is None):
-        self.error(
-            "--execution_benchmark_config and --target_device_name must be set together."
-        )
-    elif args.e2e_test_artifacts_dir is not None:
-      self.error(
-          "--e2e_test_artifacts_dir requires --execution_benchmark_config and --target_device_name."
-      )
-
-    return args
 
 
 def expand_and_check_file_paths(paths: Sequence[str]) -> List[pathlib.Path]:

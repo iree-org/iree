@@ -254,6 +254,8 @@ static iree_status_t iree_tooling_run_function(
   }
   iree_vm_list_release(outputs);
 
+  fflush(stdout);
+
   return status;
 }
 

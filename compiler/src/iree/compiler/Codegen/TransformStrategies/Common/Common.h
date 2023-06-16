@@ -30,12 +30,6 @@ inline Attribute blockZ(MLIRContext *ctx) {
   return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimZ);
 }
 
-namespace IREE {
-namespace transform_dialect {
-struct ApplyPatternsOpPatterns;
-}  // namespace transform_dialect
-}  // namespace IREE
-
 struct AbstractReductionStrategy;
 
 //===----------------------------------------------------------------------===//

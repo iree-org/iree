@@ -78,9 +78,9 @@ class TargetConverter:
         "@llvm-project//mlir:VectorOps": ["MLIRVector"],
 
         # StableHLO.
-        "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
-        "@mlir-hlo//stablehlo:stablehlo_ops": ["StablehloOps",],
-        "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
+        "@stablehlo//:chlo_ops": ["ChloOps",],
+        "@stablehlo//:stablehlo_ops": ["StablehloOps",],
+        "@stablehlo//:broadcast_utils": ["StablehloBroadcastUtils",],
 
         # NCCL
         "@nccl//:headers": ["nccl::headers",],
@@ -91,7 +91,7 @@ class TargetConverter:
         ],
 
         # Tracy.
-        "@tracy_client//:runtime_impl": ["tracy_client::runtime_impl"],
+        "@tracy_client//:runtime": ["tracy_client::runtime"],
 
         # Vulkan
         "@vulkan_headers": ["Vulkan::Headers"],

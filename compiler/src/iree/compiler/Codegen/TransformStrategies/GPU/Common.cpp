@@ -34,8 +34,6 @@
 using namespace mlir;
 
 // TODO: significantly better namespacing.
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::MapNestedForallToGpuThreadsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
@@ -535,20 +533,18 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
     b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
   });
-  {
-    ApplyPatternsOpPatterns config;
-    config.extractAddressComputations = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyExtractAddressComputationsPatternsOp>(loc);
+  });
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
-  {
-    ApplyPatternsOpPatterns config;
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
     if (strategy.useMmaSync)
-      config.unrollVectorsGpuMmaSync = true;
+      b.create<iree_compiler::IREE::transform_dialect::
+                   ApplyUnrollVectorsGpuMmaSyncPatternsOp>(loc);
     else
-      config.unrollVectorsGpuWmma = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
+      b.create<iree_compiler::IREE::transform_dialect::
+                   ApplyUnrollVectorsGpuWmmaSyncPatternsOp>(loc);
+  });
 
   Value forH = b.create<transform::MatchOp>(
       transform::OperationType::get(b.getContext(), "scf.for"), funcH,
@@ -654,11 +650,13 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
 
 Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
                                                Value variantH) {
-  ApplyPatternsOpPatterns patterns;
-  patterns.canonicalization = true;
-  patterns.cse = true;
-  patterns.licm = true;
-  b.create<ApplyPatternsOp>(variantH, patterns);
+  b.create<transform::ApplyPatternsOp>(
+      variantH, [](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+      });
+  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(variantH);
+  b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
+      variantH);
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   auto bufferizeOp = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
   bufferizeOp.setTargetGpu(true);

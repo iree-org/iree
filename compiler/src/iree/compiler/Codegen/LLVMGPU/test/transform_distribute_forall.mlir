@@ -53,8 +53,11 @@ hal.executable private @distribute {
 
         // Late canonicalizations to cleanup and pass the checks.
         // Needs to occur on the whole variant to perform cse on the workgroup_count region
-        transform.iree.apply_patterns %variant_op
-          { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+        transform.apply_patterns to %variant_op {
+          transform.apply_patterns.canonicalization
+        } : !transform.any_op
+        transform.iree.apply_licm %variant_op : !transform.any_op
+        transform.iree.apply_cse %variant_op : !transform.any_op
       }
     }
   }

@@ -47,7 +47,6 @@ using iree_compiler::gpu::buildPipelineSharedMemoryCopies;
 using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;

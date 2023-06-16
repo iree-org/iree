@@ -21,7 +21,7 @@ extern "C" int main(int argc, char** argv) {
       instance,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
-          module_file_toc->size},
+          static_cast<iree_host_size_t>(module_file_toc->size)},
       iree_allocator_null(), iree_allocator_system(), &module);
 
   iree_vm_context_t* context = nullptr;

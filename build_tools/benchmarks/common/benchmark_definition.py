@@ -21,25 +21,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from e2e_test_framework.definitions import common_definitions
 
-# A map from CPU ABI to IREE's legacy benchmark target architecture.
-CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP = {
-    "arm64-v8a": "cpu-arm64-v8a",
-    "x86_64-cascadeLake": "cpu-x86_64-cascadelake",
-}
-
-# A map from GPU name to IREE's legacy benchmark target architecture.
-GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP = {
-    "adreno-640": "gpu-adreno",
-    "adreno-650": "gpu-adreno",
-    "adreno-660": "gpu-adreno",
-    "adreno-730": "gpu-adreno",
-    "mali-g77": "gpu-mali-valhall",
-    "mali-g78": "gpu-mali-valhall",
-    "tesla-v100-sxm2-16gb": "gpu-cuda-sm_70",
-    "nvidia-a100-sxm4-40gb": "gpu-cuda-sm_80",
-    "nvidia-geforce-rtx-3090": "gpu-cuda-sm_80",
-}
-
 # A map from CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
     "arm64-v8a":
@@ -252,29 +233,16 @@ class DeviceInfo:
     params = ", ".join(params)
     return f"{self.platform_type.value} device <{params}>"
 
-  def get_iree_cpu_arch_name(self,
-                             use_legacy_name: bool = False) -> Optional[str]:
+  def get_cpu_arch(self) -> Optional[common_definitions.DeviceArchitecture]:
     name = self.cpu_abi.lower()
     if self.cpu_uarch:
       name += f"-{self.cpu_uarch.lower()}"
 
-    if use_legacy_name:
-      return CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP.get(name)
+    return CPU_ABI_TO_TARGET_ARCH_MAP.get(name)
 
-    arch = CPU_ABI_TO_TARGET_ARCH_MAP.get(name)
-    # TODO(#11076): Return common_definitions.DeviceArchitecture instead after
-    # removing the legacy path.
-    return None if arch is None else str(arch)
-
-  def get_iree_gpu_arch_name(self,
-                             use_legacy_name: bool = False) -> Optional[str]:
+  def get_gpu_arch(self) -> Optional[common_definitions.DeviceArchitecture]:
     name = self.gpu_name.lower()
-
-    if use_legacy_name:
-      return GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP.get(name)
-
-    arch = GPU_NAME_TO_TARGET_ARCH_MAP.get(name)
-    return None if arch is None else str(arch)
+    return GPU_NAME_TO_TARGET_ARCH_MAP.get(name)
 
   def get_detailed_cpu_arch_name(self) -> str:
     """Returns the detailed architecture name."""
@@ -341,10 +309,12 @@ class BenchmarkInfo:
   - model_source: the source of the model, e.g., 'TensorFlow'
   - bench_mode: a list of tags for benchmark mode,
       e.g., ['1-thread', 'big-core', 'full-inference']
+  - device_info: an DriverInfo object describing the IREE runtime dirver.
+  - device_info: an DeviceInfo object describing the device where benchmarks run
   - compile_tags: an optional list of tags to describe the compile configs,
       e.g., ['fuse-padding']
   - runner: which runner is used for benchmarking, e.g., 'iree_vulkan', 'tflite'
-  - device_info: an DeviceInfo object describing the device where benchmarks run
+  - run_config_id: ID of the corresponding iree_definitions.E2EModelRunConfig.
   """
 
   name: str
@@ -359,48 +329,6 @@ class BenchmarkInfo:
 
   def __str__(self):
     return self.name
-
-  @classmethod
-  def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
-                             model_source: str, bench_mode: Sequence[str],
-                             driver_info: DriverInfo, device_info: DeviceInfo):
-    """Build legacy name by combining the components of the BenchmarkInfo.
-
-    This is the legacy way to construct the name and still used as primary key
-    in the legacy benchmark system. It's deprecated and the new benchmark suites
-    use a human-defined name which can be more concise.
-    """
-    # TODO(#11076): Remove when we drop the legacy path in
-    # BenchmarkDriver.__get_benchmark_info_from_case
-
-    # Get the target architecture and better driver name depending on the runner.
-    target_arch = None
-    if driver_info.device_type == 'GPU':
-      target_arch = "GPU-" + device_info.gpu_name
-    elif driver_info.device_type == 'CPU':
-      target_arch = "CPU-" + device_info.get_detailed_cpu_arch_name()
-    else:
-      raise ValueError(f"Unrecognized device type '{driver_info.device_type}' "
-                       f"of the driver '{driver_info.pretty_name}'")
-
-    if model_tags:
-      tags = ",".join(model_tags)
-      model_part = f"{model_name} [{tags}] ({model_source})"
-    else:
-      model_part = f"{model_name} ({model_source})"
-    device_part = f"{device_info.model} ({target_arch})"
-
-    mode_tags = ",".join(bench_mode)
-    name = (f"{model_part} {mode_tags} with {driver_info.pretty_name} "
-            f"@ {device_part}")
-
-    return cls(name=name,
-               model_name=model_name,
-               model_tags=model_tags,
-               model_source=model_source,
-               bench_mode=bench_mode,
-               driver_info=driver_info,
-               device_info=device_info)
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
@@ -657,32 +585,6 @@ class CompilationInfo(object):
 
   def __str__(self):
     return self.name
-
-  @classmethod
-  def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
-                             model_source: str, target_arch: str,
-                             compile_tags: Sequence[str]):
-    """Build legacy name by combining the components of the CompilationInfo.
-
-    This is the legacy way to construct the name and still used as primary key
-    in the legacy benchmark system. It's deprecated and the new benchmark suites
-    use a human-defined name which can be more concise.
-    """
-    # TODO(#11076): Remove when we drop
-    # collect_compilation_statistics.get_module_map_from_benchmark_suite
-    if model_tags:
-      tags = ",".join(model_tags)
-      model_part = f"{model_name} [{tags}] ({model_source})"
-    else:
-      model_part = f"{model_name} ({model_source})"
-    compile_tags_str = ",".join(compile_tags)
-    name = f"{model_part} {target_arch} {compile_tags_str}"
-    return cls(name=name,
-               model_name=model_name,
-               model_tags=tuple(model_tags),
-               model_source=model_source,
-               target_arch=target_arch,
-               compile_tags=tuple(compile_tags))
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
