@@ -87,7 +87,7 @@ def _get_distinct_module_dir_paths(
 def _export_execution_handler(
     presets: Optional[Sequence[str]] = None,
     target_device_names: Optional[Sequence[str]] = None,
-    shard_count: Dict[str, int] = {},
+    shard_count: Optional[Dict[str, int]] = None,
     **_unused_args,
 ):
     _, all_run_configs = benchmark_collections.generate_benchmarks()
@@ -100,6 +100,7 @@ def _export_execution_handler(
         presets=None if presets is None else set(presets),
     )
 
+    shard_count = {} if shard_count is None else shard_count
     default_shard_count = shard_count.get("default", 1)
 
     output_map = {}

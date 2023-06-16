@@ -29,7 +29,6 @@ IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 BENCHMARK_PRESETS="${IREE_BENCHMARK_PRESETS:-}"
 BUILD_DEFAULT_BENCHMARK_SUITES="${IREE_BUILD_DEFAULT_BENCHMARK_SUITES:-1}"
 SHARD_COUNT="${IREE_SHARD_COUNT:-default=1}"
-SHARD_COUNT="c2-standard-16=2,default=1" # DO NOT SUBMIT: Hard coded for testing
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_tf_python.sh

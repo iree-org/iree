@@ -13,11 +13,13 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import argparse
+import io
 import json
 import os
 import shlex
 import subprocess
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
+import functools
 
 from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework import serialization
@@ -160,12 +162,73 @@ def _dump_cmds_handler(
     print(*lines, sep="\n")
 
 
+def merge_results(benchmark_results_files: List[io.TextIOWrapper]):
+    # Merges the benchmark results from `right` into `left` and returns the updated `left`
+    def _merge_two_resultsets(left, right):
+        # Parses a JSON benchmark results file and makes some sanity checks
+        def _load(file):
+            try:
+                content = json.load(file)
+            except json.JSONDecodeError as e:
+                raise RuntimeError(
+                    '"{}" seems not to be a valid JSON file: {}'.format(
+                        file.name, e.msg
+                    )
+                )
+            if not isinstance(content, dict):
+                raise RuntimeError(
+                    '"{}" seems not to be a valid benchmark-results-file (No JSON struct as root element).'.format(
+                        file.name
+                    )
+                )
+            if "commit" not in content:
+                raise RuntimeError(
+                    '"{}" seems not to be a valid benchmark-results-file ("commit" field not found).'.format(
+                        file.name
+                    )
+                )
+            if "benchmarks" not in content:
+                raise RuntimeError(
+                    '"{}" seems not to be a valid benchmark-results-file ("benchmarks" field not found).'.format(
+                        file.name
+                    )
+                )
+            return content
+
+        left_content = left if isinstance(left, dict) else _load(left)
+        right_content = right if isinstance(right, dict) else _load(right)
+
+        if left_content["commit"] != right_content["commit"]:
+            raise RuntimeError(
+                '"{}" and the previous files are based on different commits ({} != {}). Merging not supported.'.format(
+                    left.name, left_content["commit"], right_content["commit"]
+                )
+            )
+
+        left_content["benchmarks"].extend(right_content["benchmarks"])
+        return left_content
+
+    return functools.reduce(_merge_two_resultsets, benchmark_results_files)
+
+
+def _merge_results_handler(
+    benchmark_results_files: List[io.TextIOWrapper], **_unused_args
+):
+    try:
+        print(json.dumps(merge_results(benchmark_results_files)))
+    except Exception as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Miscellaneous tool to help work with benchmark suite and benchmark CI."
     )
 
-    subparser = parser.add_subparsers(required=True, title="operation")
+    subparser = parser.add_subparsers(
+        required=True, title="operation", dest="operation"
+    )
     dump_cmds_parser = subparser.add_parser(
         "dump-cmds", help="Dump the commands to compile and run benchmarks manually."
     )
@@ -190,9 +253,22 @@ def _parse_arguments() -> argparse.Namespace:
     )
     dump_cmds_parser.set_defaults(handler=_dump_cmds_handler)
 
+    merge_results_parser = subparser.add_parser(
+        "merge-results",
+        help="Merges the results from multiple benchmark results JSON files into a single JSON structure.",
+    )
+    merge_results_parser.add_argument(
+        "benchmark_results_files",
+        type=argparse.FileType(),
+        nargs="+",
+        help="One or more benchmark results JSON file paths",
+    )
+    merge_results_parser.set_defaults(handler=_merge_results_handler)
+
     args = parser.parse_args()
     if (
-        args.execution_benchmark_config is None
+        args.operation == "dump-cmds"
+        and args.execution_benchmark_config is None
         and args.compilation_benchmark_config is None
     ):
         parser.error(
