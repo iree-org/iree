@@ -233,7 +233,8 @@ endif()
 
 # Metal support is enabled if it's one of the Apple platforms.
 set(IREE_HAL_DRIVER_METAL_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
-if(NOT APPLE)
+# Right now only support Apple silicon devices.
+if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
   set(IREE_HAL_DRIVER_METAL_DEFAULT OFF)
 endif()
 
