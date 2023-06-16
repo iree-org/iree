@@ -200,7 +200,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
                                                  MLIRContext *context,
                                                  DominanceInfo &dominanceInfo) {
   OpBuilder builder(context);
-  DenseMap<Operation *, llvm::SetVector<Operation *>> fusedOps;
+  llvm::MapVector<Operation *, llvm::SetVector<Operation *>> fusedOps;
   DenseMap<Operation *, Operation *> opToRootMap;
   funcOp->walk<WalkOrder::PostOrder, ReverseIterator>(
       [&](linalg::GenericOp genericOp) {
@@ -275,7 +275,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
   }
 
   IRRewriter rewriter(context);
-  for (auto it = fusedOps.begin(), ie = fusedOps.end(); it != ie; ++it) {
+  for (auto it = fusedOps.rbegin(), ie = fusedOps.rend(); it != ie; ++it) {
     if (failed(doMultiUseFusion(it->first, it->second, rewriter))) {
       return funcOp->emitOpError("failed multi use fusion");
     }
