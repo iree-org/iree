@@ -12,6 +12,24 @@ IREE supports compiling and running TensorFlow Lite programs stored as [TFLite
 FlatBuffers](https://www.tensorflow.org/lite/guide). These files can be
 imported into an IREE-compatible format then compiled to a series of backends.
 
+``` mermaid
+graph LR
+  subgraph A[TFLite]
+    A1[FlatBuffer]
+  end
+
+  subgraph B[MLIR]
+    B1[TOSA]
+  end
+
+  C[IREE compiler]
+  D[Runtime deployment]
+
+  A -- iree-import-tflite --> B
+  B --> C
+  C --> D
+```
+
 ## Prerequisites
 
 Install TensorFlow by following the

@@ -13,7 +13,27 @@ IREE supports compiling and running TensorFlow programs represented as
 or stored in the `SavedModel`
 [format](https://www.tensorflow.org/guide/saved_model).
 
-<!-- TODO(??): notes about TensorFlow 2.0, supported features? -->
+``` mermaid
+graph LR
+  subgraph A[TensorFlow]
+    direction TB
+    A1[SavedModel]
+    A2[tf.Module]
+
+    A1 --- A2
+  end
+
+  subgraph B[MLIR]
+    B1[StableHLO]
+  end
+
+  C[IREE compiler]
+  D[Runtime deployment]
+
+  A -- iree-import-tf --> B
+  B --> C
+  C --> D
+```
 
 ## Prerequisites
 
