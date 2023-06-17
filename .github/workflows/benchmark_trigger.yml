@@ -90,6 +90,7 @@ jobs:
           echo "${CREATED_AT}"
           echo "${UPDATED_AT}"
           echo "${RUN_STARTED_AT}"
+          cat "${GITHUB_EVENT_PATH}"
       - name: "Cancelling the previous workflow run"
         # If the workflow isn't completed, we need to cancel it first; otherwise
         # the API can't rerun it.
