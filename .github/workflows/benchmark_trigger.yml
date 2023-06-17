@@ -57,9 +57,11 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     concurrency:
-      # This cancels queued and in-progress trigger runs for the same PR.
+      # Only allows a single trigger runs for a PR at the same time.
+      # Timestamp-based check below makes sure we don't trigger benchmark twice.
+      # We don't use `cancel-in-progress` because cancelled jobs are always
+      # considered as failures and show red on Github CI.
       group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
     steps:
       - name: "Checking out repository"
         # This checkouts from the base branch instead of the pull request. See
@@ -75,6 +77,19 @@ jobs:
             > "${RUN_JSON}"
           echo "workflow-url=$(jq '.url' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
           echo "run-status=$(jq --raw-output '.status' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "created-at=$(jq --raw-output '.created_at' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "updated-at=$(jq --raw-output '.updated_at' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "run-started-at=$(jq --raw-output '.run_started_at' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
+      - name: "Checking if the workflow has been restarted"
+        id: should-run
+        env:
+          CREATED_AT: ${{ steps.find-workflow.outputs.created-at }}
+          UPDATED_AT: ${{ steps.find-workflow.outputs.updated-at }}
+          RUN_STARTED_AT: ${{ steps.find-workflow.outputs.run-started-at }}
+        run: |
+          echo "${CREATED_AT}"
+          echo "${UPDATED_AT}"
+          echo "${RUN_STARTED_AT}"
       - name: "Cancelling the previous workflow run"
         # If the workflow isn't completed, we need to cancel it first; otherwise
         # the API can't rerun it.
