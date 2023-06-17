@@ -35,21 +35,23 @@ jobs:
   check:
     runs-on: ubuntu-20.04
     outputs:
-      should-rerun: ${{ steps.precondition.outputs.should-rerun }}
+      label-found: ${{ steps.precondition.outputs.label-found }}
+      triggered-at: ${{ steps.precondition.outputs.triggered-at }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: "Checking labels"
         id: precondition
         run: |
-          echo "should-rerun=$(jq --raw-output \
+          echo "label-found=$(jq \
             --arg label_prefix ${BENCHMARK_LABEL_PREFIX} \
             '.label.name | startswith($label_prefix)' \
             ${GITHUB_EVENT_PATH})" >> "${GITHUB_OUTPUT}"
+          echo "triggered-at=$(date +%s)" >> "${GITHUB_OUTPUT}"
 
   trigger:
     needs: check
-    if: needs.check.outputs.should-rerun == 'true'
+    if: fromJSON(needs.check.outputs.label-found)
     runs-on: ubuntu-20.04
     # Required for cancel and rerun APIs.
     permissions:
@@ -81,21 +83,28 @@ jobs:
           echo "updated-at=$(jq --raw-output '.updated_at' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
           echo "run-started-at=$(jq --raw-output '.run_started_at' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
       - name: "Checking if the workflow has been restarted"
-        id: should-run
+        id: check
+        if: fromJSON(steps.find-workflow.outputs.workflow-url) != null
         env:
           CREATED_AT: ${{ steps.find-workflow.outputs.created-at }}
           UPDATED_AT: ${{ steps.find-workflow.outputs.updated-at }}
           RUN_STARTED_AT: ${{ steps.find-workflow.outputs.run-started-at }}
+          TRIGGERED_AT: ${{ needs.check.outputs.triggered-at }}
         run: |
           echo "${CREATED_AT}"
           echo "${UPDATED_AT}"
-          echo "${RUN_STARTED_AT}"
-          cat "${GITHUB_EVENT_PATH}"
+          RUN_STARTED_AT_EPOCH="$(date --date="${RUN_STARTED_AT}" +%s)"
+          if (( "${RUN_STARTED_AT_EPOCH}" < "${TRIGGERED_AT}" )); then
+            SHOULD_RERUN="true"
+          else
+            SHOULD_RERUN="false"
+          fi
+          echo "should-rerun=${SHOULD_RERUN}" >> "${GITHUB_OUTPUT}"
       - name: "Cancelling the previous workflow run"
         # If the workflow isn't completed, we need to cancel it first; otherwise
         # the API can't rerun it.
         if: |
-          fromJSON(steps.find-workflow.outputs.workflow-url) != null &&
+          fromJSON(steps.check.outputs.should-rerun) &&
           steps.find-workflow.outputs.run-status != 'completed'
         env:
           IREE_WORKFLOW_RUN_URL: ${{ fromJSON(steps.find-workflow.outputs.workflow-url) }}
@@ -109,14 +118,14 @@ jobs:
         # commit. Even if that happens, users will see their CI run fails and
         # can rerun it manually from the UI.
         id: get-sha
-        if: fromJSON(steps.find-workflow.outputs.workflow-url) != null
+        if: fromJSON(steps.check.outputs.should-rerun)
         run: |
           echo "latest-sha=$(gh api /repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER} \
             | jq --raw-output '.head.sha')" \
             >> "${GITHUB_OUTPUT}"
       - name: "Rerequesting the workflow"
         if: |
-          fromJSON(steps.find-workflow.outputs.workflow-url) != null &&
+          fromJSON(steps.check.outputs.should-rerun) &&
           steps.get-sha.outputs.latest-sha == env.HEAD_SHA
         env:
           WORKFLOW_RUN_URL: ${{ fromJSON(steps.find-workflow.outputs.workflow-url) }}
