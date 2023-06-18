@@ -106,7 +106,7 @@ hal.executable private @preset_pad_config_matmul  {
   }
 }
 // CHECK-LABEL: func.func @preset_pad_config_matmul
-//       CHECK:     vector.outerproduct
+//       CHECK:     vector.fma
 
 // -----
 
@@ -166,7 +166,7 @@ hal.executable private @preset_pad_config_dynamic_matmul  {
 //   CHECK-DAG:   memref.alloca() {{.+}} memref<8x16xf32>
 //   CHECK-DAG:   memref.alloca() {{.+}} memref<16x32xf32>
 //   CHECK-DAG:   memref.alloca() {{.+}} memref<8x32xf32>
-//       CHECK:     vector.outerproduct
+//       CHECK:     vector.fma
 
 // -----
 
@@ -226,7 +226,7 @@ hal.executable private @pad_partially_unaligned_matmul {
 //   CHECK-DAG:   memref.alloca() {{.+}} memref<1x32xf32>
 //   CHECK-DAG:   memref.alloca() {{.+}} memref<1x32xf32>
 //   CHECK-NOT:   memref.alloca
-//       CHECK:     vector.outerproduct
+//       CHECK:     vector.fma
 //       CHECK:     arith.addf {{.*}} : vector<
 //       CHECK:     arith.maxf {{.*}} : vector<
 
@@ -281,7 +281,7 @@ hal.executable private @batch_matmul_dynamic {
   }
 }
 // CHECK-LABEL: func.func @batch_matmul_dynamic
-//       CHECK:   vector.outerproduct
+//       CHECK:   vector.fma
 
 // -----
 
@@ -392,7 +392,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
 // CHECK-LABEL:  func.func @vectorize_fill_conv2d_generic
 //   CHECK-NOT:    memref.alloca
 //   CHECK-NOT:    linalg.fill
-//       CHECK:    vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
+//       CHECK:    vector.fma
 //   CHECK-NOT:    linalg.generic
 //       CHECK:    arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x4xf32>
 
@@ -441,7 +441,7 @@ hal.executable private @multi_result {
 //          CHECK:   scf.for
 //          CHECK:     scf.for
 //          CHECK:       scf.for
-// CHECK-COUNT-16:         vector.outerproduct
+// CHECK-COUNT-16:         vector.fma
 //          CHECK:       arith.addf %{{.+}}, %{{.+}} : vector<8x32xf32>
 
 // -----
@@ -501,7 +501,22 @@ hal.executable private @quant_matmul_fusion {
 //          CHECK:   scf.for
 //          CHECK:     scf.for
 //          CHECK:       scf.for
-//          CHECK:         vector.outerproduct
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
+//          CHECK:         arith.muli
+//     CHECK-NEXT:         arith.addi
 //          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) <{double_round = true}> : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
 
 // -----
