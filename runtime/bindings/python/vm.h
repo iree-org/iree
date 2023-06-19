@@ -133,8 +133,13 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
                                           const std::string& name,
                                           uint32_t minimum_version);
 
-  static VmModule FromFlatbufferBlob(VmInstance* instance,
-                                     py::object flatbuffer_blob_object);
+  static VmModule WrapBuffer(VmInstance* instance, py::object buffer_obj,
+                             py::object destroy_callback, bool close_buffer);
+  static VmModule MMap(VmInstance* instance, std::string filepath,
+                       py::object destroy_callback);
+  static VmModule CopyBuffer(VmInstance* instance, py::object buffer_obj);
+  static VmModule FromBuffer(VmInstance* instance, py::object buffer_obj,
+                             bool warn_if_copy);
 
   std::optional<iree_vm_function_t> LookupFunction(
       const std::string& name, iree_vm_function_linkage_t linkage);
