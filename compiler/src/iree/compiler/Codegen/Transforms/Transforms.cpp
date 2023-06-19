@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
 // TODO(#13038): Remove this dependency on VMVX dialect.
+#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
@@ -311,7 +312,7 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     // TODO(#13038) This is a WAR for the these ops ending up in workgroup count
     // computation. They should not. Some pre-processing at MaterializeEncoding
     // time might make these go away.
-    if (isa<IREE::VMVX::QueryTileSizesOp>(op)) {
+    if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
       Value constVal =
           rewriter.create<arith::ConstantIndexOp>(op->getLoc(), 16);
       for (auto result : op->getResults()) {
