@@ -76,8 +76,6 @@ iree_cc_test(
     ::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
-  TIMEOUT
-    60
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

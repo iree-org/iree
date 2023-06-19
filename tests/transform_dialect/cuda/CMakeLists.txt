@@ -48,10 +48,6 @@ iree_lit_test_suite(
     vecadd2d_codegen_spec.mlir
     vecadd2d_codegen_spec_partial_tile.mlir
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
     "driver=cuda"
 )
@@ -77,10 +73,6 @@ iree_lit_test_suite(
     mma_reduction_layout_analysis_dispatch_spec.mlir
     mma_using_layout_analysis_codegen_spec.mlir
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-sm80"
     "driver=cuda"
 )

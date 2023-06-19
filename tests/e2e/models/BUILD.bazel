@@ -21,7 +21,7 @@ CHECK_FRAMEWORK_TESTS = [
 ]
 
 iree_lit_test_suite(
-    name = "lit",
+    name = "lit_large",
     srcs = enforce_glob(
         [
             "collatz.mlir",
@@ -34,16 +34,19 @@ iree_lit_test_suite(
         include =
             ["*.mlir"],
         exclude = CHECK_FRAMEWORK_TESTS + [
-            # Part of lit_large below.
+            # Part of lit_enormous below.
             "resnet50_fake_weights.mlir",
         ],
     ),
     cfg = "//tests:lit.cfg.py",
+    # These tests are too large for some slow configurations (emulators...).
+    size = "large",
     tags = [
+        # These tests use `iree-run-mlir`, so they require the `hostonly` tag.
+        "hostonly",
+        # These tests explicitly use these drivers.
         "driver=local-task",
         "driver=vulkan",
-        "hostonly",
-        "optonly",  # swiftshader is too slow in dbg
     ],
     tools = [
         "//tools:iree-run-mlir",
@@ -52,19 +55,19 @@ iree_lit_test_suite(
     ],
 )
 
-# Larger tests requiring tags skipping them in slow configurations such as
-# sanitizers.
 iree_lit_test_suite(
-    name = "lit_large",
+    name = "lit_enormous",
     srcs = ["resnet50_fake_weights.mlir"],
     cfg = "//tests:lit.cfg.py",
+    # These tests are too large for even moderately slow configurations
+    # (sanitizers...).
+    size = "enormous",
     tags = [
+        # These tests use `iree-run-mlir`, so they require the `hostonly` tag.
+        "hostonly",
+        # These tests explicitly use these drivers.
         "driver=local-task",
         "driver=vulkan",
-        "hostonly",
-        "noasan",
-        "notsan",
-        "optonly",  # swiftshader is too slow in dbg
     ],
     tools = [
         "//tools:iree-run-mlir",
@@ -78,13 +81,7 @@ iree_check_single_backend_test_suite(
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
-    tags = [
-        # Large models, skip on slow targets.
-        "hostonly",
-        "noasan",
-        "notsan",
-        "optonly",  # swiftshader is too slow in dbg
-    ],
+    size = "large",
     target_backend = "llvm-cpu",
 )
 
@@ -112,11 +109,6 @@ iree_check_single_backend_test_suite(
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "cuda",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",

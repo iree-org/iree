@@ -61,7 +61,7 @@ def lit_test(
         data = None,
         visibility = None,
         env = None,
-        timeout = None,
+        size = None,
         **kwargs):
     """Runs a single test file with LLVM's lit tool.
 
@@ -83,7 +83,9 @@ def lit_test(
       visibility: visibility of the generated test target.
       env: string_dict. Environment variables available during test execution.
         See the common Bazel test attribute.
-      timeout: bazel test timeout string, as per common bazel definitions.
+      size: Optional value identifying heavy tests. Allowed values are
+        like in Bazel but the focus is less in controlling test timeouts
+        and more on altogether skipping heavy tests in slow configs.
       **kwargs: additional keyword arguments to pass to all generated rules.
 
     See https://llvm.org/docs/CommandGuide/lit.html for details on lit
@@ -122,7 +124,7 @@ def lit_test(
         data = [test_file, cfg, tools_on_path_target_name] + data,
         visibility = visibility,
         env = env,
-        timeout = timeout,
+        size = size,
         **kwargs
     )
 
@@ -134,9 +136,8 @@ def lit_test_suite(
         args = None,
         data = None,
         visibility = None,
-        size = "small",
+        size = None,
         env = None,
-        timeout = None,
         **kwargs):
     """Creates one lit test per source file and a test suite that bundles them.
 
@@ -156,10 +157,11 @@ def lit_test_suite(
         targets in `cfg` and `tools`, as well as their data dependencies, are
         added automatically.
       visibility: visibility of the generated test targets and test suite.
-      size: string. size of the generated tests.
+      size: Optional value identifying heavy tests. Allowed values are
+        like in Bazel but the focus is less in controlling test timeouts
+        and more on altogether skipping heavy tests in slow configs.
       env: string_dict. Environment variables available during test execution.
         See the common Bazel test attribute.
-      timeout: timeout argument passed to the individual tests.
       **kwargs: additional keyword arguments to pass to all generated rules.
 
     See https://llvm.org/docs/CommandGuide/lit.html for details on lit
@@ -187,7 +189,7 @@ def lit_test_suite(
             data = data,
             visibility = visibility,
             env = env,
-            timeout = timeout,
+            size = size,
             **kwargs
         )
 

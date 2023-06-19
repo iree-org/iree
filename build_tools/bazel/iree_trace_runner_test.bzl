@@ -19,9 +19,9 @@ def iree_trace_runner_test(
         trace,
         compiler_flags = [],
         runner_args = [],
+        size = None,
         tags = [],
         target_cpu_features = None,
-        timeout = None,
         **kwargs):
     """Creates a test running a custom trace-runner on a trace file (yaml).
 
@@ -34,6 +34,9 @@ def iree_trace_runner_test(
             output format and backend flags are passed automatically.
         runner_args: additional args to pass to the trace-runner program. The
             driver and input file flags are passed automatically.
+        size: Optional value identifying heavy tests. Allowed values are
+            like in Bazel but the focus is less in controlling test timeouts
+            and more on altogether skipping heavy tests in slow configs.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is
             added automatically.
         trace_runner: trace-runner program to run.
@@ -41,7 +44,6 @@ def iree_trace_runner_test(
         module_name: specifies the  path to use for the enerated IREE module
             (.vmfb). Mandatory, unlike in iree_check_test, because trace files
             (.yaml) reference a specific module file path.
-        timeout: timeout for the generated tests.
         target_cpu_features: target CPU features. Only for llvm-cpu backend.
         **kwargs: any additional attributes to pass to the underlying tests and
             test suite.
@@ -77,7 +79,7 @@ def iree_trace_runner_test(
         ],
         src = trace_runner,
         tags = tags + ["driver=%s" % driver],
-        timeout = timeout,
+        size = size,
         **kwargs
     )
 
@@ -90,9 +92,9 @@ def iree_single_backend_generated_trace_runner_test(
         generator_args = [],
         compiler_flags = [],
         runner_args = [],
+        size = None,
         tags = [],
         target_cpu_features = None,
-        timeout = None,
         **kwargs):
     """Generates an iree_trace_runner_test using a custom python generator script.
 
@@ -114,10 +116,12 @@ def iree_single_backend_generated_trace_runner_test(
             output format and backend flags are passed automatically.
         runner_args: additional args to pass to the trace-runner program. The
             driver and input file flags are passed automatically.
+        size: Optional value identifying heavy tests. Allowed values are
+            like in Bazel but the focus is less in controlling test timeouts
+            and more on altogether skipping heavy tests in slow configs.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is
             added automatically.
         trace_runner: trace-runner program to run.
-        timeout: timeout for the generated tests.
         target_cpu_features: target CPU features. Only for llvm-cpu backend.
         **kwargs: any additional attributes to pass to the underlying tests and
             test suite.
@@ -156,7 +160,7 @@ def iree_single_backend_generated_trace_runner_test(
         compiler_flags = compiler_flags,
         runner_args = runner_args,
         tags = tags,
-        timeout = timeout,
+        size = size,
         target_cpu_features = target_cpu_features,
         **kwargs
     )
@@ -169,8 +173,8 @@ def iree_generated_trace_runner_test(
         generator_args = [],
         compiler_flags = [],
         runner_args = [],
+        size = None,
         tags = [],
-        timeout = None,
         target_cpu_features_variants = [],
         **kwargs):
     """Generates a suite of iree_trace_runner_test on multiple backends/drivers.
@@ -190,10 +194,12 @@ def iree_generated_trace_runner_test(
             output format and backend flags are passed automatically.
         runner_args: additional args to pass to the trace-runner program. The
             driver and input file flags are passed automatically.
+        size: Optional value identifying heavy tests. Allowed values are
+            like in Bazel but the focus is less in controlling test timeouts
+            and more on altogether skipping heavy tests in slow configs.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is
             added automatically.
         trace_runner: trace-runner program to run.
-        timeout: timeout for the generated tests.
         target_cpu_features_variants: list of target cpu features variants.
             Currently unimplemented in Bazel due to difficulty of specializing
             to target architecture in Bazel. The following describes the
@@ -224,7 +230,7 @@ def iree_generated_trace_runner_test(
             compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
-            timeout = timeout,
+            size = size,
             **kwargs
         )
         tests.append(suite_entry_name)

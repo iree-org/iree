@@ -68,6 +68,8 @@ iree_lit_test_suite(
     iree-opt
   DATA
     transform_dialect_dummy_spec.mlir
+  SIZE
+    "large"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

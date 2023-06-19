@@ -56,7 +56,7 @@ function(iree_native_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;DRIVER;WILL_FAIL"
+    "NAME;SRC;DRIVER;WILL_FAIL;SIZE"
     "ARGS;LABELS;DATA;TIMEOUT"
     ${ARGN}
   )

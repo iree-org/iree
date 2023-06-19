@@ -371,10 +371,6 @@ iree_check_single_backend_test_suite(
   RUNNER_ARGS
     "--cuda_use_streams=false"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -451,10 +447,6 @@ iree_check_single_backend_test_suite(
   RUNNER_ARGS
     "--cuda_use_streams=true"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 

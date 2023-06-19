@@ -42,13 +42,22 @@ function(iree_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME"
+    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME;SIZE"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
@@ -102,6 +111,8 @@ function(iree_trace_runner_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
   )
 endfunction()
 
@@ -153,13 +164,22 @@ function(iree_single_backend_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER"
+    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER;SIZE"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
@@ -247,6 +267,8 @@ function(iree_single_backend_generated_trace_runner_test)
       ${_RULE_LABELS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
+    SIZE
+      ${_RULE_SIZE}
   )
 
   # Note we are relying on the fact that the target created by
@@ -304,15 +326,10 @@ function(iree_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TRACE_RUNNER"
+    "NAME;GENERATOR;TRACE_RUNNER;SIZE"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
-
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
-    return()
-  endif()
 
   if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
     set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
@@ -371,6 +388,8 @@ function(iree_generated_trace_runner_test)
           ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
+        SIZE
+          ${_RULE_SIZE}
       )
     endforeach()
   endforeach()

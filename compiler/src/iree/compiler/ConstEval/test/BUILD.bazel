@@ -21,6 +21,8 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
+    # These tests can take long on some slow configurations.
+    size = "large",
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

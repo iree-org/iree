@@ -6,17 +6,6 @@
 
 include(CMakeParseArguments)
 
-function(iree_is_bytecode_module_test_excluded_by_labels _DST_IS_EXCLUDED_VAR _SRC_LABELS)
-  string(TOLOWER "${CMAKE_BUILD_TYPE}" _LOWERCASE_BUILD_TYPE)
-  if(((IREE_ARCH MARCHES "^riscv_") AND ("noriscv" IN_LIST _SRC_LABELS)) OR
-     (IREE_ENABLE_ASAN AND ("noasan" IN_LIST _SRC_LABELS)) OR
-     (IREE_ENABLE_TSAN AND ("notsan" IN_LIST _SRC_LABELS)) OR
-     (CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS) OR
-     ((_LOWERCASE_BUILD_TYPE STREQUAL "debug") AND ( "optonly" IN_LIST _RULE_LABELS)))
-    set("${_DST_IS_EXCLUDED_VAR}" TRUE PARENT_SCOPE)
-  endif()
-endfunction()
-
 # iree_check_test()
 #
 # Creates a test using iree-check-module for the specified source file.
@@ -56,13 +45,22 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME;SIZE"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
@@ -126,8 +124,8 @@ function(iree_check_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
-    TIMEOUT
-      ${_RULE_TIMEOUT}
+    SIZE
+      ${_RULE_SIZE}
   )
 endfunction()
 
@@ -166,13 +164,22 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "NAME;TARGET_BACKEND;DRIVER;SIZE"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
@@ -239,8 +246,8 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_LABELS}
       TARGET_CPU_FEATURES
         ${_RULE_TARGET_CPU_FEATURES}
-      TIMEOUT
-        ${_RULE_TIMEOUT}
+      SIZE
+        ${_RULE_SIZE}
     )
   endforeach()
 endfunction()
@@ -336,15 +343,10 @@ function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
-    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS;TIMEOUT"
+    "NAME;SIZE"
+    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
-
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
-    return()
-  endif()
 
   if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
     set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
@@ -399,8 +401,8 @@ function(iree_check_test_suite)
           ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
-        TIMEOUT
-          ${_RULE_TIMEOUT}
+        SIZE
+          ${_RULE_SIZE}
       )
     endforeach()
   endforeach()

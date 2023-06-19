@@ -45,8 +45,10 @@ iree_lit_test_suite(
     ],
     cfg = "//tests:lit.cfg.py",
     tags = [
+        # Some of these tests explicitly use these drivers.
         "driver=local-task",
         "driver=vulkan",
+        # Some of these tests run iree-run-mlir, requiring `hostonly`.
         "hostonly",
     ],
     tools = [
@@ -111,11 +113,6 @@ iree_check_single_backend_test_suite(
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "cuda",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
@@ -132,11 +129,6 @@ iree_check_single_backend_test_suite(
     ],
     driver = "cuda",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",

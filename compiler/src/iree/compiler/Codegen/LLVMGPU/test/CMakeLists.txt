@@ -30,7 +30,6 @@ iree_lit_test_suite(
     "linalg_transform.mlir"
     "nvvm_extract_address_computation.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"
-    "nvvm_pipeline_test.mlir"
     "pack_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "reduction_pipeline.mlir"
@@ -59,6 +58,18 @@ iree_lit_test_suite(
     transform_dialect_codegen_foreach_to_gpu_spec.mlir
     transform_dialect_codegen_vector_distribution_spec.mlir
     transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir
+)
+
+iree_lit_test_suite(
+  NAME
+    lit_large
+  SRCS
+    "nvvm_pipeline_test.mlir"
+  TOOLS
+    FileCheck
+    iree-opt
+  SIZE
+    "large"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

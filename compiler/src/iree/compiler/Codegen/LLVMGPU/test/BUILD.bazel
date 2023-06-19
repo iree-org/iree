@@ -29,7 +29,6 @@ iree_lit_test_suite(
             "extract_address_computation_gpu.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_extract_address_computation.mlir",
-            "nvvm_pipeline_test.mlir",
             "nvvm_mma_sync_pipeline_test.mlir",
             "reduction_pipeline_transform.mlir",
             "reduction_pipeline.mlir",
@@ -57,9 +56,11 @@ iree_lit_test_suite(
             "workgroup_specialization_pipeline_test.mlir",
         ],
         include = ["*.mlir"],
-        # tensor_dialect_*_spec is a an MLIR file that specifies a
-        # transformation, it needs to be included as data.
         exclude = [
+            # Part of lit_large below.
+            "nvvm_pipeline_test.mlir",
+            # tensor_dialect_*_spec is a an MLIR file that specifies a
+            # transformation, it needs to be included as data.
             "transform_dialect_codegen_bufferize_spec.mlir",
             "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
             "transform_dialect_codegen_vector_distribution_spec.mlir",
@@ -73,6 +74,19 @@ iree_lit_test_suite(
         "transform_dialect_codegen_vector_distribution_spec.mlir",
         "transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir",
     ],
+    tools = [
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_lit_test_suite(
+    name = "lit_large",
+    srcs = [
+        "nvvm_pipeline_test.mlir",
+    ],
+    cfg = "//compiler:lit.cfg.py",
+    size = "large",
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

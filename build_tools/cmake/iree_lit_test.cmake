@@ -34,12 +34,22 @@ function(iree_lit_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_FILE"
-    "DATA;TOOLS;LABELS;TIMEOUT"
+    "NAME;TEST_FILE;SIZE"
+    "DATA;TOOLS;LABELS"
     ${ARGN}
   )
 
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
@@ -80,7 +90,6 @@ function(iree_lit_test)
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
     "LIT_OPTS=-v"
     "FILECHECK_OPTS=--enable-var-scope")
-  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
   iree_configure_test(${_NAME_PATH})
 
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
@@ -112,14 +121,10 @@ function(iree_lit_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
-    "SRCS;DATA;TOOLS;LABELS;TIMEOUT"
+    "NAME;SIZE"
+    "SRCS;DATA;TOOLS;LABELS"
     ${ARGN}
   )
-
-  if (NOT DEFINED _RULE_TIMEOUT)
-    set(_RULE_TIMEOUT 60)
-  endif()
 
   foreach(_TEST_FILE ${_RULE_SRCS})
     get_filename_component(_TEST_BASENAME ${_TEST_FILE} NAME)
@@ -134,8 +139,8 @@ function(iree_lit_test_suite)
         "${_RULE_TOOLS}"
       LABELS
         "${_RULE_LABELS}"
-      TIMEOUT
-        ${_RULE_TIMEOUT}
+      SIZE
+        ${_RULE_SIZE}
     )
   endforeach()
 endfunction()

@@ -69,10 +69,12 @@ py_binary(
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",
     ],
+    # "--shapes=large" can cause timeouts on riscv emulator.
+    size = "large",
     tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator and sanitizers.
-        "noriscv",
-        "noasan",
+        # "--shapes=large" can cause timeouts on TSAN CI.
+        # Revisit when the CI build hosts get an upgraded toolchain,
+        # as that seems to be fine locally with a recent Clang.
         "notsan",
     ],
     target_backends_and_drivers = [
@@ -191,10 +193,12 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=%s" % size,
     ],
+    # "--shapes=large" can cause timeouts on riscv emulator.
+    size = "large" if size == "large" else None,
     tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator and sanitizers.
-        "noriscv",
-        "noasan",
+        # "--shapes=large" can cause timeouts on TSAN CI.
+        # Revisit when the CI build hosts get an upgraded toolchain,
+        # as that seems to be fine locally with a recent Clang.
         "notsan",
     ] if size == "large" else [],
     target_backends_and_drivers = [
@@ -227,11 +231,6 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -256,11 +255,6 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -282,11 +276,6 @@ iree_generated_trace_runner_test(
         "--shapes=gpu_large",
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -308,11 +297,6 @@ iree_generated_trace_runner_test(
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -336,11 +320,6 @@ iree_generated_trace_runner_test(
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -364,11 +343,6 @@ iree_generated_trace_runner_test(
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -389,15 +363,10 @@ iree_generated_trace_runner_test(
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",
     ],
+    # "--shapes=large" can cause timeouts on riscv emulator.
+    size = "large",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
-        # "--shapes=large" can cause timeouts on riscv emulator.
-        "noriscv",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),

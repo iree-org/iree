@@ -30,11 +30,8 @@ iree_lit_test_suite(
     attention_codegen_spec.mlir
     matmul_codegen_custom_dispatch_formation_spec.mlir
     matmul_codegen_default_spec.mlir
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
+  SIZE
+    "large"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
