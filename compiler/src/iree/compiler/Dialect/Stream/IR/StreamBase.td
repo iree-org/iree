@@ -106,6 +106,7 @@ def Stream_Dialect : Dialect {
   }];
 
   let dependentDialects = [
+    "mlir::complex::ComplexDialect",
     "IREE::Util::UtilDialect",
   ];
 

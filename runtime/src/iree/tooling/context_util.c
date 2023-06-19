@@ -13,7 +13,6 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
 #include "iree/modules/hal/inline/module.h"
@@ -108,8 +107,9 @@ iree_status_t iree_tooling_load_modules_from_flags(
   iree_host_size_t new_count = list->count + FLAG_module_list().count;
   if (new_count > list->capacity) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "too many modules; currently only %zu are "
-                            "supported but at least %zu are requested",
+                            "too many modules; currently only %" PRIhsz
+                            " are supported but at least %" PRIhsz
+                            " are requested",
                             list->capacity, new_count);
   }
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -496,7 +496,7 @@ iree_status_t iree_tooling_find_single_exported_function(
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_ordinal(
             module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function),
-        "looking up function export %zu", i);
+        "looking up function export %" PRIhsz, i);
     iree_string_view_t function_name = iree_vm_function_name(&function);
     if (iree_string_view_starts_with(function_name,
                                      iree_make_cstring_view("__")) ||

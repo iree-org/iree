@@ -6,7 +6,6 @@
 
 #include "iree/hal/device.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
@@ -120,7 +119,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_range(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, is_source_host ? "h2d" : (is_target_host ? "d2h" : "d2d"));
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
 
   // Defer to the backing implementation.
   iree_status_t status = _VTABLE_DISPATCH(device, transfer_range)(

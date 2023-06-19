@@ -75,7 +75,7 @@ struct LinalgFillToFlowTensorSplat final
       // Don't convert linalg.fill ops that were fused together with other ops.
       return failure();
     }
-    SmallVector<Value, 4> dynamicDims = tensor::createDynamicDimValues(
+    SmallVector<Value> dynamicDims = tensor::createDynamicDimValues(
         rewriter, fillOp.getLoc(), fillOp.output());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(
         fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);

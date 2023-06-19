@@ -338,7 +338,7 @@ ParseResult parseShapedTiedResult(
   if (failed(parser.parseType(resultType))) return failure();
   if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
     if (!shapedType.hasStaticShape()) {
-      SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
+      SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
       if (failed(parser.parseLBrace()) ||
           failed(parser.parseOperandList(dynamicDims,
                                          shapedType.getNumDynamicDims(),
@@ -413,7 +413,7 @@ static ParseResult parseShapedOperandList(
     if (failed(parser.parseType(type))) return failure();
     if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
+        SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
         if (failed(parser.parseLBrace()) ||
             failed(parser.parseOperandList(dynamicDims,
                                            shapedType.getNumDynamicDims(),
@@ -460,7 +460,7 @@ ParseResult parseShapedResultList(
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
-  SmallVector<int64_t, 4> tiedOperandIndices;
+  SmallVector<int64_t> tiedOperandIndices;
   do {
     OpAsmParser::UnresolvedOperand tiedResult;
     auto res = parser.parseOptionalOperand(tiedResult);
@@ -485,7 +485,7 @@ ParseResult parseShapedResultList(
     }
     if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
+        SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
         if (failed(parser.parseLBrace()) ||
             failed(parser.parseOperandList(dynamicDims,
                                            shapedType.getNumDynamicDims(),
@@ -667,7 +667,7 @@ static ParseResult parseShapedFunctionResultList(
     TypeRange argTypes, SmallVectorImpl<Type> &resultTypes,
     ArrayAttr &resultAttrs, ArrayAttr &tiedOperands) {
   SmallVector<Attribute> resultAttrsVec;
-  SmallVector<int64_t, 4> tiedOperandIndices;
+  SmallVector<int64_t> tiedOperandIndices;
   do {
     OpAsmParser::UnresolvedOperand tiedResult;
     auto res = parser.parseOptionalOperand(tiedResult);
@@ -926,7 +926,7 @@ Value CastOp::getTiedResultOperand(Value result) { return getOperand(); }
   return {0};  // operand
 }
 
-SmallVector<int64_t, 4> CastOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> CastOp::getTiedResultOperandIndices() {
   return {0};  // operand
 }
 
@@ -1296,7 +1296,7 @@ void BufferSubspanOp::setSubrangeOperand(unsigned operandIndex,
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> BufferSubspanOp::getTiedResultOperandIndices() {
+SmallVector<int64_t> BufferSubspanOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 

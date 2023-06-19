@@ -1,4 +1,3 @@
-// XFAIL: *
 
 !A_size = tensor<3x5xf32>
 !B_size = tensor<5x3xf32>

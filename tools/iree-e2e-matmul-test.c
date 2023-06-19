@@ -15,7 +15,6 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
@@ -169,7 +168,7 @@ static iree_status_t get_item_as_buffer_view(
   IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_assign(list, i, &variant));
   if (!iree_vm_variant_is_ref(variant)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected list item %zu to be a ref", i);
+                            "expected list item %" PRIhsz " to be a ref", i);
   }
   return iree_hal_buffer_view_check_deref(variant.ref, out_value);
 }
@@ -406,7 +405,8 @@ static iree_status_t get_matrix_shape(iree_hal_buffer_view_t* buffer_view,
   if (shape_rank != 2) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "expected a matrix (2D tensor) shape, got a %zu-dimensional shape",
+        "expected a matrix (2D tensor) shape, got a %" PRIhsz
+        "-dimensional shape",
         shape_rank);
   }
   dims[0] = iree_hal_buffer_view_shape_dim(buffer_view, 0);
@@ -1219,11 +1219,14 @@ static iree_status_t run_trace_files(int file_count, char** file_paths,
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   if (argc <= 1) {
     fprintf(stderr,
             "no trace files provided; pass one or more yaml file paths\n");
-    return 1;
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   iree_vm_instance_t* instance = NULL;
@@ -1233,11 +1236,13 @@ int main(int argc, char** argv) {
     status = run_trace_files(argc - 1, argv + 1, instance);
   }
   iree_vm_instance_release(instance);
+  int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     bool is_unavailable = iree_status_is_unavailable(status);
     iree_status_free(status);
-    return is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
+    exit_code = is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
+  IREE_TRACE_APP_EXIT(exit_code);
+  return exit_code;
 }

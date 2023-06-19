@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - Python
+  - TensorFlow
+---
+
 # TFLite Integration
 
 IREE supports compiling and running TensorFlow Lite programs stored as [TFLite

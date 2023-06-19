@@ -63,7 +63,6 @@
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
@@ -163,7 +162,8 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
                                      iree_vm_function_t function,
                                      iree_vm_list_t* inputs,
                                      benchmark::State& state) {
-  IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
+  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
+                                      benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
 
   vm::ref<iree_vm_list_t> outputs;
@@ -172,14 +172,17 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
 
   // Benchmarking loop.
   while (state.KeepRunningBatch(batch_size)) {
-    IREE_TRACE_SCOPE0("BenchmarkIteration");
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
         inputs, outputs.get(), iree_allocator_system()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
+    IREE_TRACE_ZONE_END(z1);
   }
   state.SetItemsProcessed(state.iterations());
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void RegisterGenericBenchmark(const std::string& function_name,
@@ -222,7 +225,8 @@ static void BenchmarkAsyncFunction(
     int32_t batch_concurrency, iree_hal_device_t* device,
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_vm_list_t* common_inputs, benchmark::State& state) {
-  IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
+  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
+                                      benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
   iree_allocator_t host_allocator = iree_allocator_system();
 
@@ -231,10 +235,9 @@ static void BenchmarkAsyncFunction(
 
   // Benchmarking loop.
   while (state.KeepRunningBatch(batch_size)) {
-    IREE_TRACE_SCOPE0("BenchmarkIteration");
-    IREE_TRACE_FRAME_MARK_NAMED("Iteration");
-
     state.PauseTiming();
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "BenchmarkIteration");
+    IREE_TRACE_FRAME_MARK_NAMED("Iteration");
 
     IREE_TRACE_ZONE_BEGIN_NAMED(z_begin, "PrepareBatch");
 
@@ -324,9 +327,12 @@ static void BenchmarkAsyncFunction(
     timeline_semaphores.clear();
     IREE_TRACE_ZONE_END(z_end);
 
+    IREE_TRACE_ZONE_END(z1);
     state.ResumeTiming();
   }
   state.SetItemsProcessed(state.iterations());
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void RegisterAsyncBenchmark(const std::string& function_name,
@@ -358,7 +364,8 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
                                       iree_vm_context_t* context,
                                       iree_vm_function_t function,
                                       benchmark::State& state) {
-  IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
+  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
+                                      benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
 
   vm::ref<iree_vm_list_t> inputs;
@@ -373,14 +380,17 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
 
   // Benchmarking loop.
   while (state.KeepRunningBatch(FLAG_batch_size)) {
-    IREE_TRACE_SCOPE0("BenchmarkIteration");
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
         inputs.get(), outputs.get(), iree_allocator_system()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
+    IREE_TRACE_ZONE_END(z1);
   }
   state.SetItemsProcessed(state.iterations());
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void RegisterDispatchBenchmark(const std::string& function_name,
@@ -411,7 +421,7 @@ class IREEBenchmark {
   IREEBenchmark() { iree_tooling_module_list_initialize(&module_list_); }
 
   ~IREEBenchmark() {
-    IREE_TRACE_SCOPE0("IREEBenchmark::dtor");
+    IREE_TRACE_SCOPE_NAMED("IREEBenchmark::dtor");
 
     // Order matters. Tear down modules first to release resources.
     inputs_.reset();
@@ -431,7 +441,7 @@ class IREEBenchmark {
   iree_hal_device_t* device() const { return device_.get(); }
 
   iree_status_t Register() {
-    IREE_TRACE_SCOPE0("IREEBenchmark::Register");
+    IREE_TRACE_SCOPE_NAMED("IREEBenchmark::Register");
 
     if (!instance_ || !device_allocator_ || !context_ || !module_list_.count) {
       IREE_RETURN_IF_ERROR(Init());
@@ -448,7 +458,7 @@ class IREEBenchmark {
 
  private:
   iree_status_t Init() {
-    IREE_TRACE_SCOPE0("IREEBenchmark::Init");
+    IREE_TRACE_SCOPE_NAMED("IREEBenchmark::Init");
     IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
 
     iree_allocator_t host_allocator = iree_allocator_system();
@@ -468,14 +478,15 @@ class IREEBenchmark {
   }
 
   iree_status_t RegisterSpecificFunction(const std::string& function_name) {
-    IREE_TRACE_SCOPE0("IREEBenchmark::RegisterSpecificFunction");
+    IREE_TRACE_SCOPE_NAMED("IREEBenchmark::RegisterSpecificFunction");
 
     iree_vm_module_t* main_module =
         iree_tooling_module_list_back(&module_list_);
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
         main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
+        iree_string_view_t{function_name.data(),
+                           (iree_host_size_t)function_name.size()},
         &function));
 
     IREE_CHECK_OK(iree_tooling_parse_to_variant_list(
@@ -498,7 +509,7 @@ class IREEBenchmark {
   }
 
   iree_status_t RegisterAllExportedFunctions() {
-    IREE_TRACE_SCOPE0("IREEBenchmark::RegisterAllExportedFunctions");
+    IREE_TRACE_SCOPE_NAMED("IREEBenchmark::RegisterAllExportedFunctions");
     iree_vm_module_t* main_module =
         iree_tooling_module_list_back(&module_list_);
     iree_vm_module_signature_t signature =
@@ -579,7 +590,8 @@ class IREEBenchmark {
 }  // namespace iree
 
 int main(int argc, char** argv) {
-  IREE_TRACE_SCOPE0("main");
+  IREE_TRACE_APP_ENTER();
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-module");
 
   // Pass through flags to benchmark (allowing --help to fall through).
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
@@ -590,12 +602,17 @@ int main(int argc, char** argv) {
   iree::IREEBenchmark iree_benchmark;
   iree_status_t status = iree_benchmark.Register();
   if (!iree_status_is_ok(status)) {
-    int ret = static_cast<int>(iree_status_code(status));
+    int exit_code = static_cast<int>(iree_status_code(status));
     printf("%s\n", iree::Status(std::move(status)).ToString().c_str());
-    return ret;
+    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_APP_EXIT(exit_code);
+    return exit_code;
   }
   IREE_CHECK_OK(iree_hal_begin_profiling_from_flags(iree_benchmark.device()));
   ::benchmark::RunSpecifiedBenchmarks();
   IREE_CHECK_OK(iree_hal_end_profiling_from_flags(iree_benchmark.device()));
-  return 0;
+
+  IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(EXIT_SUCCESS);
+  return EXIT_SUCCESS;
 }

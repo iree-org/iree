@@ -120,6 +120,13 @@ typedef enum iree_hal_executable_plugin_sanitizer_kind_e {
   IREE_HAL_EXECUTABLE_PLUGIN_SANITIZER_NONE
 #endif  // !IREE_HAL_EXECUTABLE_PLUGIN_SANITIZER_KIND
 
+#if !defined(IREE_HOST_SIZE_T)
+#define IREE_HOST_SIZE_T size_t
+#endif  // !IREE_HOST_SIZE_T
+
+// Size, in bytes, of a buffer on the local host.
+typedef IREE_HOST_SIZE_T iree_host_size_t;
+
 //===----------------------------------------------------------------------===//
 // Versioning and interface querying
 //===----------------------------------------------------------------------===//
@@ -276,7 +283,7 @@ typedef enum iree_hal_executable_plugin_allocator_command_e {
 } iree_hal_executable_plugin_allocator_command_t;
 
 typedef struct iree_hal_executable_plugin_allocator_alloc_params_t {
-  size_t byte_length;
+  iree_host_size_t byte_length;
 } iree_hal_executable_plugin_allocator_alloc_params_t;
 
 typedef iree_hal_executable_plugin_status_t (
@@ -291,8 +298,8 @@ typedef struct iree_hal_executable_plugin_allocator_t {
 
 static inline iree_hal_executable_plugin_status_t
 iree_hal_executable_plugin_allocator_malloc(
-    iree_hal_executable_plugin_allocator_t allocator, size_t byte_length,
-    void** inout_ptr) {
+    iree_hal_executable_plugin_allocator_t allocator,
+    iree_host_size_t byte_length, void** inout_ptr) {
   iree_hal_executable_plugin_allocator_alloc_params_t params = {byte_length};
   return allocator.ctl(allocator.self,
                        IREE_HAL_EXECUTABLE_PLUGIN_ALLOCATOR_COMMAND_MALLOC,
@@ -316,7 +323,7 @@ iree_hal_executable_plugin_allocator_free(
 // characters) must be used.
 typedef struct iree_hal_executable_plugin_string_view_t {
   const char* data;
-  size_t size;
+  iree_host_size_t size;
 } iree_hal_executable_plugin_string_view_t;
 
 // iree_string_pair_t-compatible type.

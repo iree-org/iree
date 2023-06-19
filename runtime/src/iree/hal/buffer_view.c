@@ -7,7 +7,6 @@
 #include "iree/hal/buffer_view.h"
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer_view_util.h"
 #include "iree/hal/resource.h"
@@ -176,7 +175,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_reshape(
     // remembering all the conditions in which they may be.
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer view reshapes must have the same rank; "
-                            "target=%zu, existing=%zu",
+                            "target=%" PRIhsz " , existing=%" PRIhsz,
                             shape_rank, buffer_view->shape_rank);
   }
 

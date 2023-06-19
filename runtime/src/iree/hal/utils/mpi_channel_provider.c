@@ -8,7 +8,6 @@
 
 #include <stdlib.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/libmpi.h"
 
 // Returns true if |var_name| is set to a non-empty value in the environment.

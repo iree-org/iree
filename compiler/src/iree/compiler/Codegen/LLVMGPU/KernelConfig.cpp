@@ -11,7 +11,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -430,7 +430,7 @@ static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps
   std::array<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
   // Set all non-parallel loops to zero tile size.
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
@@ -513,7 +513,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   // To get peak occupancy we need a workgroup size of at least two warps
   std::array<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
   unsigned vectorSize = 4;
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
   // Set all non-parallel loops to zero tile size.
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
@@ -704,7 +704,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   bool foundSingleReductionOutput = false;
   for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
     // Only single combiner operations are supported for now.
-    SmallVector<Operation *, 4> combinerOps;
+    SmallVector<Operation *> combinerOps;
     if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
         combinerOps.size() == 1) {
       if (foundSingleReductionOutput) return failure();
@@ -745,8 +745,8 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
           .getPartitionableLoops(kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> reductionTileSizes(numLoops, 0);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
   reductionTileSizes.push_back(groupSize * vectorSize);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level

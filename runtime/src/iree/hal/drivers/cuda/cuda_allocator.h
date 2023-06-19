@@ -20,7 +20,8 @@ extern "C" {
 // Creates a CUDA memory allocator.
 // |device| and |stream| will be used for management operations.
 // |pools| provides memory pools that may be shared across multiple allocators
-// and the pointer must remain valid for the lifetime of the allocator.
+// and the pointer must remain valid for the lifetime of the allocator. Pools
+// may not be supported on all devices and can be NULL.
 iree_status_t iree_hal_cuda_allocator_create(
     iree_hal_device_t* base_device, iree_hal_cuda_context_wrapper_t* context,
     CUdevice device, CUstream stream, iree_hal_cuda_memory_pools_t* pools,

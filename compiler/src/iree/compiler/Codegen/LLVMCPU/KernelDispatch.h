@@ -13,13 +13,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(hanchung): Create a pass to handle detailed logic about splitting tiling
-// sizes for parallel dims and reduction dims.
-// We have to fuse the fill + named_op + generic ops along parallel dims
-// firstly. At this stage, we do not apply vectorization. The reduction dim
-// won't get tiled if the case is matmul + generic op. In this case, we have to
-// tile along reduction dim again, which needs them to be TilingInterface ops.
-
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp);
 
 }  // namespace iree_compiler

@@ -1,4 +1,3 @@
-// XFAIL: *
 
 !in_tensor_t = tensor<32x256xf32>
 !out_tensor_t = tensor<32xf32>

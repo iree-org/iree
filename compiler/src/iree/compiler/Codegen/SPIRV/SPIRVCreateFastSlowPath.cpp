@@ -54,7 +54,7 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
 
   // Find the anchor tensor.pad op, from which we get the conditions for
   // switching between the fast and slow path.
-  auto padOps = llvm::to_vector<4>(body->getOps<tensor::PadOp>());
+  auto padOps = llvm::to_vector(body->getOps<tensor::PadOp>());
   if (llvm::size(padOps) != 1) return;
   tensor::PadOp padOp = *padOps.begin();
 
@@ -68,7 +68,8 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
   SmallVector<Operation *, 16> allOps;
   for (Operation &op : body->without_terminator()) allOps.push_back(&op);
 
-  auto isDefinedInRegion = [](Operation *op) { return true; };
+  BackwardSliceOptions options;
+  options.filter = [](Operation *op) { return true; };
   SetVector<Operation *> padSizeOps;
 
   // Build the condition for the scf.if op: all pad sizes are zero.
@@ -77,7 +78,7 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
   SmallVector<Value> eqZeroCmpVals;
   for (OpFoldResult pad : llvm::concat<OpFoldResult>(lowPads, highPads)) {
     if (auto padValue = pad.dyn_cast<Value>()) {
-      getBackwardSlice(padValue, &padSizeOps, isDefinedInRegion);
+      getBackwardSlice(padValue, &padSizeOps, options);
       padSizeOps.insert(padValue.getDefiningOp());
     }
     if (!isZero(pad)) {

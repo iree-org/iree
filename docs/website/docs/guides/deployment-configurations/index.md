@@ -14,7 +14,7 @@ runtime entirely or interface with custom accelerators.
 
 These are just the most stable configurations IREE supports. Feel free to reach
 out on any of IREE's
-[communication channels](../index.md#communication-channels) if you have
+[communication channels](../../index.md#communication-channels) if you have
 questions about a specific platform, hardware accelerator, or set of system
 features.
 
@@ -31,19 +31,46 @@ When compiling programs, a list of target backends must be specified via
 
 | Target backend | Description | Compatible HAL devices |
 | -------------- | ----------- | ---------------------- |
-| `llvm-cpu`     | Code generation for CPU-like devices supported by LLVM | `local-sync`, `local-task` |
-| `vmvx`         | Portable interpreter powered by a microkernel library | `local-sync`, `local-task` |
-| `vulkan-spirv` | Portable GPU support via SPIR-V for Vulkan | `vulkan` |
-| `cuda`         | NVIDIA GPU support via PTX for CUDA | `cuda` |
-| `rocm`         | **Experimental** <br> AMD GPU support via HSACO for ROCm | `rocm` |
-| `webgpu-wgsl`  | **Experimental** <br> GPU support on the Web via WGSL for WebGPU | `webgpu` |
-| `metal-spirv`  | **Stale - see [Issue#4370](https://github.com/openxla/iree/issues/4370)** <br> GPU support on Apple platforms via MSL for Metal | `metal` |
+| `llvm-cpu` | Code generation for CPU-like devices supported by LLVM | `local-sync`, `local-task` |
+| `vmvx` | Portable interpreter powered by a microkernel library | `local-sync`, `local-task` |
+| `vulkan` or<br>`vulkan-spirv` | Portable GPU support via SPIR-V for Vulkan | `vulkan` |
+| `cuda` | NVIDIA GPU support via PTX for CUDA | `cuda` |
+| `rocm` | **Experimental** <br> AMD GPU support via HSACO for ROCm | `rocm` |
+| `webgpu-wgsl` | **Experimental** <br> GPU support on the Web via WGSL for WebGPU | `webgpu` |
+| `metal` or<br>`metal-spirv` | **Experimental** <br> GPU support on Apple platforms via MSL for Metal | `metal` |
 
-!!! tip
-    The list of available compiler target backends can be queried with
+!!! tip "Tip - listing available backends"
+    The list of compiler target backends can be queried:
 
-    * `iree-compile --iree-hal-list-target-backends` (command-line)
-    * `iree.compiler.query_available_targets()` (Python)
+    === "Command-line"
+
+        ```console
+        $ iree-compile --iree-hal-list-target-backends
+
+        Registered target backends:
+            llvm-cpu
+            metal
+            metal-spirv
+            vmvx
+            vmvx-inline
+            vulkan
+            vulkan-spirv
+        ```
+
+    === "Python bindings"
+
+        ```python
+        iree.compiler.query_available_targets()
+
+        ['cuda',
+         'llvm-cpu',
+         'metal',
+         'metal-spirv',
+         'vmvx',
+         'vmvx-inline',
+         'vulkan',
+         'vulkan-spirv']
+        ```
 
 ## Runtime HAL drivers/devices
 
@@ -59,13 +86,7 @@ focus and the build configuration.
 | `cuda`       | NVIDIA GPU execution using CUDA |
 | `rocm`       | **Experimental** <br> AMD GPU execution using ROCm |
 | `webgpu`     | **Experimental** <br> GPU execution on the web using WebGPU |
-| `metal`      | **Stale - see [Issue#4370](https://github.com/openxla/iree/issues/4370)** <br> GPU execution on Apple platforms using Metal |
-
-!!! tip
-    The list of available runtime HAL devices can be queried with
-
-    * `iree-run-module --list_devices` (command-line)
-    * `iree.runtime.query_available_drivers()` (Python)
+| `metal`      | **Experimental** <br> GPU execution on Apple platforms using Metal |
 
 Additional HAL drivers can also be defined external to the core project via
 `IREE_EXTERNAL_HAL_DRIVERS`.

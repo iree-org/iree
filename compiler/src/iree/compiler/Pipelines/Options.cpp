@@ -44,19 +44,14 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
           clEnumValN(InputDialectOptions::Type::auto_detect, "auto",
                      "Analyze the input program to choose conversion.")
   // clang-format off
-#ifdef IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_STABLEHLO_INPUT
         , clEnumValN(InputDialectOptions::Type::stablehlo,
             "stablehlo",
             "Legalize from StableHLO ops.")
         , clEnumValN(InputDialectOptions::Type::stablehlo_xla,
             "stablehlo_xla",
             "Legalize from StableHLO ops (with XLA cleanup preprocessing). ")
-        , clEnumValN(InputDialectOptions::Type::mhlo_legacy, "mhlo_legacy",
-                     "Legalize from MHLO ops. (Deprecated.)")
-        , clEnumValN(InputDialectOptions::Type::xla_legacy, "xla_legacy",
-            "Legalize from MHLO ops (with XLA cleanup preprocessing). "
-            "(Deprecated.)")
-#endif  // IREE_HAVE_MHLO_INPUT
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
         , clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",
                      "Legalize from TMTensor ops.")
@@ -69,7 +64,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
       // clang-format on
       llvm::cl::cat(category));
 
-#ifdef IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_STABLEHLO_INPUT
   binder.opt<bool>(
       "iree-input-demote-i64-to-i32", demoteI64ToI32,
       llvm::cl::desc("Converts all i64 ops and values into i32 counterparts."),
@@ -84,7 +79,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
       "iree-input-promote-bf16-to-f32", promoteBF16ToF32,
       llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts."),
       llvm::cl::cat(category));
-#endif
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 }
 
 void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {

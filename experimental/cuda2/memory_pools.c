@@ -9,7 +9,6 @@
 #include "experimental/cuda2/cuda_buffer.h"
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "experimental/cuda2/cuda_status_util.h"
-#include "iree/base/tracing.h"
 
 // NOTE: these are currently global for all devices; we could make
 // device-specific ones by malloc() and leaking (with LSAN note) unique string
@@ -59,9 +58,9 @@ static iree_status_t iree_hal_cuda2_create_memory_pool(
 }
 
 iree_status_t iree_hal_cuda2_memory_pools_initialize(
-    iree_allocator_t host_allocator,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols, CUdevice cu_device,
     const iree_hal_cuda2_memory_pooling_params_t* pooling_params,
+    iree_allocator_t host_allocator,
     iree_hal_cuda2_memory_pools_t* IREE_RESTRICT out_pools) {
   IREE_ASSERT_ARGUMENT(cuda_symbols);
   IREE_ASSERT_ARGUMENT(pooling_params);
@@ -178,6 +177,21 @@ void iree_hal_cuda2_memory_pools_merge_statistics(
   });
 }
 
+iree_status_t iree_hal_cuda2_memory_pools_trim(
+    iree_hal_cuda2_memory_pools_t* pools,
+    const iree_hal_cuda2_memory_pooling_params_t* pooling_params) {
+  IREE_CUDA_RETURN_IF_ERROR(
+      pools->cuda_symbols,
+      cuMemPoolTrimTo(pools->device_local,
+                      pooling_params->device_local.minimum_capacity),
+      "cuMemPoolTrimTo");
+  IREE_CUDA_RETURN_IF_ERROR(
+      pools->cuda_symbols,
+      cuMemPoolTrimTo(pools->other, pooling_params->other.minimum_capacity),
+      "cuMemPoolTrimTo");
+  return iree_ok_status();
+}
+
 // NOTE: this is only issued if the buffer is destroyed without having had been
 // scheduled for deallocation asynchronously. When a buffer is scheduled we drop
 // the release callback so that this isn't called and we don't double-free.
@@ -200,7 +214,7 @@ iree_status_t iree_hal_cuda2_memory_pools_alloca(
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
 
   iree_hal_buffer_params_canonicalize(&params);
 
@@ -258,20 +272,34 @@ iree_status_t iree_hal_cuda2_memory_pools_dealloca(
     iree_hal_cuda2_memory_pools_t* pools, CUstream stream,
     iree_hal_buffer_t* buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(buffer));
 
-  // Try to schedule the buffer for freeing.
-  CUdeviceptr device_ptr = iree_hal_cuda2_buffer_device_pointer(buffer);
-  iree_status_t status = IREE_CURESULT_TO_STATUS(
-      pools->cuda_symbols, cuMemFreeAsync(device_ptr, stream),
-      "cuMemFreeAsync");
+  // Only process the request if the buffer came from an async pool.
+  // We may get requests for deallocations on ones that didn't if one part of
+  // the application allocated the buffer synchronously and another deallocated
+  // it asynchronously.
+  iree_status_t status = iree_ok_status();
+  if (iree_hal_cuda2_buffer_type(buffer) == IREE_HAL_CUDA_BUFFER_TYPE_ASYNC) {
+    // Try to schedule the buffer for freeing.
+    CUdeviceptr device_ptr = iree_hal_cuda2_buffer_device_pointer(buffer);
+    status = IREE_CURESULT_TO_STATUS(pools->cuda_symbols,
+                                     cuMemFreeAsync(device_ptr, stream),
+                                     "cuMemFreeAsync");
+    if (iree_status_is_ok(status)) {
+      // Drop the release callback so that we don't try to double-free the
+      // buffer. Note that we only do this if the CUDA free succeeded as
+      // otherwise we still need to synchronously deallocate the buffer when it
+      // is destroyed.
+      iree_hal_cuda2_buffer_drop_release_callback(buffer);
 
-  // Drop the release callback so that we don't try to double-free the buffer.
-  iree_hal_cuda2_buffer_drop_release_callback(buffer);
-
-  // Update statistics (note that it may not yet be accurate).
-  iree_hal_cuda2_memory_pool_track_free(pools, buffer);
+      // Update statistics (note that it may not yet be accurate).
+      iree_hal_cuda2_memory_pool_track_free(pools, buffer);
+    }
+  } else {
+    // Not allocated via alloca, ignore.
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, "ignored sync allocation");
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;

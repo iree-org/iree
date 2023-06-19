@@ -40,8 +40,11 @@ struct TargetOptions {
   //   3: maximal debug information
   int debugLevel;
 
+  // Default path to write executable files into.
+  std::string executableFilesPath;
+
   // A path to write individual executable source listings into.
-  std::string sourceListingPath;
+  std::string executableSourcesPath;
 
   // A path to write standalone executable benchmarks into.
   std::string executableBenchmarksPath;

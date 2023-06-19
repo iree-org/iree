@@ -41,6 +41,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
@@ -56,7 +57,7 @@ namespace HAL {
 namespace {
 struct CUDAOptions {
   bool dumpPtx = false;
-  std::string clTargetChip = "sm_35";
+  std::string clTargetChip = "sm_60";
   std::string clTargetFeature = "+ptx76";
   bool clUsePtxas = false;
   std::string clUsePtxasFrom;
@@ -361,8 +362,11 @@ class CUDATargetBackend final : public TargetBackend {
   std::string name() const override { return "cuda"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    // TODO: Derive the use of TransformDialect from inner
+    // `LLVMGPULowerExecutableTargetPass`.
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+                    IREE::Codegen::IREECodegenDialect,
+                    transform::TransformDialect>();
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);

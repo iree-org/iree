@@ -102,7 +102,7 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   };
 
   // Capture all required dimensions and add tie_shape ops.
-  for (auto operand : llvm::to_vector<4>(dispatchOp.getArguments())) {
+  for (auto operand : llvm::to_vector(dispatchOp.getArguments())) {
     captureTensorDims(operand, outerToInnerMap[operand]);
   }
   for (auto result : dispatchOp.getResults()) {

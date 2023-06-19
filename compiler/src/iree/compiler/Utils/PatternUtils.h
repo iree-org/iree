@@ -44,7 +44,7 @@ static void insertGreedyPattern(RewritePatternSet &patterns,
       // have a dependency on ArrayRef as it requires doing this copy. In
       // practice for this level of IR, this is sub-optimal but not the end
       // of the world.
-      SmallVector<Value, 4> operands;
+      SmallVector<Value> operands;
       for (unsigned i = 0, e = op.getOperation()->getNumOperands(); i < e;
            ++i) {
         operands.push_back(op.getOperation()->getOperand(i));

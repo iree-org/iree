@@ -71,19 +71,11 @@ void LLVMCPUTilePass::runOnOperation() {
   auto funcOp = getOperation();
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
 
-  // Retrieve tile sizes from lowering config if they where not provided.
-  if (tilingLevel != -1) {
-    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-        getLoweringConfig(computeOps);
-    if (failed(maybeLoweringConfig)) {
-      LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
-      return;
-    }
-    tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
-    if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
-      LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
-      return;
-    }
+  FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
+      getLoweringConfig(computeOps);
+  if (failed(rootLoweringConfig)) {
+    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
+    return;
   }
 
   for (auto computeOp : computeOps) {
@@ -97,6 +89,17 @@ void LLVMCPUTilePass::runOnOperation() {
     if (isa<tensor::PadOp>(computeOp)) continue;
 
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
+    SmallVector<int64_t> tileSizes;
+    if (auto loweringConfig = getLoweringConfig(op)) {
+      tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+    } else {
+      tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
+    }
+
+    if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
+      LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
+      continue;
+    }
 
     IRRewriter rewriter(context);
     auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(

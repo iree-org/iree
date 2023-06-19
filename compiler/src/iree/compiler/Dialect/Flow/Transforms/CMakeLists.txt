@@ -80,6 +80,7 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
+    MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR

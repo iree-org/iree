@@ -157,7 +157,7 @@ class MaterializeResourceCachesPass
 
     // First lookup (or create) all the required descriptor sets. This ensures
     // they end up in the proper initialization order.
-    SmallVector<IREE::Util::GlobalOp, 4> setLayoutGlobalOps;
+    SmallVector<IREE::Util::GlobalOp> setLayoutGlobalOps;
     for (auto setLayoutAttr : layoutAttr.getSetLayouts()) {
       SmallVector<Attribute> bindingAttrs;
       for (auto bindingAttr : setLayoutAttr.getBindings()) {
@@ -180,7 +180,7 @@ class MaterializeResourceCachesPass
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
-    SmallVector<Value, 4> setLayoutValues;
+    SmallVector<Value> setLayoutValues;
     for (auto setLayoutGlobalOp : setLayoutGlobalOps) {
       auto setLayoutValue = blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
           loc, DescriptorSetLayoutType::get(loc.getContext()),

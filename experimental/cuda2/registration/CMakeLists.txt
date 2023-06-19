@@ -13,8 +13,6 @@ iree_cc_library(
     "driver_module.c"
   DEPS
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
     iree::experimental::cuda2
     iree::hal
   DEFINES

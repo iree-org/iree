@@ -8,7 +8,6 @@
 #define IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_UTIL_H_
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_loader.h"
@@ -44,7 +43,9 @@ iree_zone_id_t iree_hal_executable_library_call_zone_begin(
       executable_identifier, library, ordinal)
 #else
 #define IREE_HAL_EXECUTABLE_LIBRARY_CALL_TRACE_ZONE_BEGIN( \
-    zone_id, executable_identifier, library, ordinal)
+    zone_id, executable_identifier, library, ordinal)      \
+  iree_zone_id_t zone_id = 0;                              \
+  (void)zone_id;
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #endif  // IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_UTIL_H_

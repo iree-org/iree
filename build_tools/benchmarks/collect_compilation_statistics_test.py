@@ -12,7 +12,7 @@ import unittest
 import zipfile
 
 from common.benchmark_definition import ModuleComponentSizes
-from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, get_module_path, parse_compilation_time_from_ninja_log
+from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, parse_compilation_time_from_ninja_log
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -28,22 +28,15 @@ class CollectCompilationStatistics(unittest.TestCase):
 
     self.assertEqual(target, "e2e_test_artifacts/iree_abcd/module.vmfb")
 
-  def test_match_module_cmake_target_with_benchmark_suites(self):
-    target = collect_compilation_statistics.match_module_cmake_target(
-        pathlib.PurePath(
-            "iree/iree-build/benchmark_suites/TFLite/vmfb/test.vmfb"))
-
-    self.assertEqual(target, "benchmark_suites/TFLite/vmfb/test.vmfb")
-
   def test_match_module_cmake_target_not_match(self):
     target = collect_compilation_statistics.match_module_cmake_target(
-        pathlib.PurePath("benchmark_suites/TFLite/vmfb/test.mlir"))
+        pathlib.PurePath("other/target.vmfb"))
 
     self.assertIsNone(target)
 
   def test_parse_compilation_time_from_ninja_log(self):
-    target1 = "benchmark_suites/TFLite/vmfb/deeplabv3.vmfb"
-    target2 = "benchmark_suites/TFLite/vmfb/mobilessd.vmfb"
+    target1 = "e2e_test_artifacts/iree_deeplabv3/module.vmfb"
+    target2 = "e2e_test_artifacts/iree_mobilessd/module.vmfb"
     ninja_log = StringIO("# ninja log v5\n"
                          f"0\t100\taaa\tbuild/{target1}\taaa\n"
                          f"130\t200\tbbb\tbuild/{target2}\tbbb\n")
@@ -84,13 +77,6 @@ class CollectCompilationStatistics(unittest.TestCase):
     self.assertRaises(
         RuntimeError, lambda: get_module_component_info(
             BytesIO(module_file_data), len(module_file_data)))
-
-  def test_get_module_path(self):
-    flag_file = StringIO(f"--module=/abcd.vmfb\n--inputs=1x2x3xf32")
-
-    moduel_path = get_module_path(flag_file)
-
-    self.assertEqual(moduel_path, "/abcd-compile-stats.vmfb")
 
   def test_get_module_map_from_compilation_benchmark_config(self):
     model_a = common_definitions.Model(

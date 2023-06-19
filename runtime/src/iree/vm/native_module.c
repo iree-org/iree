@@ -57,12 +57,12 @@ static iree_status_t iree_vm_native_module_verify_descriptor(
     iree_string_view_t export_name = module_descriptor->exports[i].local_name;
     int cmp = iree_string_view_compare(prev_export_name, export_name);
     if (IREE_UNLIKELY(cmp >= 0)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "module export table is not sorted by name "
-                              "(export %zu ('%.*s') >= %zu ('%.*s'))",
-                              i - 1, (int)prev_export_name.size,
-                              prev_export_name.data, i, (int)export_name.size,
-                              export_name.data);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "module export table is not sorted by name "
+          "(export %" PRIhsz " ('%.*s') >= %" PRIhsz " ('%.*s'))",
+          i - 1, (int)prev_export_name.size, prev_export_name.data, i,
+          (int)export_name.size, export_name.data);
     }
   }
   return iree_ok_status();
@@ -140,7 +140,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_import_function(
     iree_vm_function_signature_t* out_signature) {
   if (IREE_UNLIKELY(ordinal >= module->descriptor->import_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "import ordinal out of range (0 < %zu < %zu)",
+                            "import ordinal out of range (0 < %" PRIhsz
+                            " < %" PRIhsz ")",
                             ordinal, module->descriptor->import_count);
   }
   const iree_vm_native_import_descriptor_t* import_descriptor =
@@ -165,7 +166,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_export_function(
     iree_vm_function_signature_t* out_signature) {
   if (IREE_UNLIKELY(ordinal >= module->descriptor->export_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "export ordinal out of range (0 < %zu < %zu)",
+                            "export ordinal out of range (0 < %" PRIhsz
+                            " < %" PRIhsz ")",
                             ordinal, module->descriptor->export_count);
   }
   if (out_function) {
@@ -371,7 +373,7 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
       IREE_UNLIKELY(call.function.ordinal >=
                     module->descriptor->export_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "function ordinal out of bounds: 0 < %u < %zu",
+                            "function ordinal out of bounds: 0 < %u < %" PRIhsz,
                             call.function.ordinal,
                             module->descriptor->export_count);
   }

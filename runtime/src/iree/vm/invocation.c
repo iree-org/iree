@@ -12,7 +12,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/debugging.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 #include "iree/vm/value.h"
@@ -89,10 +88,11 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
     }
     return iree_ok_status();
   } else if (IREE_UNLIKELY(expected_input_count != iree_vm_list_size(inputs))) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "input list and function mismatch; expected %zu "
-                            "arguments but passed %zu",
-                            expected_input_count, iree_vm_list_size(inputs));
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "input list and function mismatch; expected %" PRIhsz
+        " arguments but passed %" PRIhsz,
+        expected_input_count, iree_vm_list_size(inputs));
   }
 
   uint8_t* p = arguments.data;

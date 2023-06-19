@@ -12,7 +12,6 @@
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "experimental/cuda2/cuda_status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 static const char* IREE_HAL_CUDA_ALLOCATOR_ID = "CUDA2 unpooled";
@@ -30,6 +29,7 @@ typedef struct iree_hal_cuda2_allocator_t {
   // The CUDA stream that allocations should be used in.
   CUstream stream;
 
+  // NOTE: optional depending on device support.
   iree_hal_cuda2_memory_pools_t* pools;
 
   const iree_hal_cuda2_dynamic_symbols_t* symbols;
@@ -136,8 +136,10 @@ static void iree_hal_cuda2_allocator_query_statistics(
     iree_hal_cuda2_allocator_t* allocator =
         iree_hal_cuda2_allocator_cast(base_allocator);
     memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
-    iree_hal_cuda2_memory_pools_merge_statistics(allocator->pools,
-                                                 out_statistics);
+    if (allocator->pools) {
+      iree_hal_cuda2_memory_pools_merge_statistics(allocator->pools,
+                                                   out_statistics);
+    }
   });
 }
 
@@ -306,6 +308,10 @@ static void iree_hal_cuda2_buffer_free(
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; async)");
       break;
     }
+    case IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; external)");
+      break;
+    }
   }
   IREE_TRACE_ZONE_END(z0);
 }
@@ -354,7 +360,7 @@ static iree_status_t iree_hal_cuda2_allocator_allocate_buffer(
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda2_buffer_allocate");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     if (iree_all_bits_set(compat_params.type,
@@ -564,6 +570,11 @@ static iree_status_t iree_hal_cuda2_allocator_import_buffer(
             cuMemHostGetDevicePointer(&device_ptr, host_ptr, 0),
             "cuMemHostGetDevicePointer");
       }
+      break;
+    }
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION: {
+      buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL;
+      device_ptr = (CUdeviceptr)external_buffer->handle.device_allocation.ptr;
       break;
     }
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD:

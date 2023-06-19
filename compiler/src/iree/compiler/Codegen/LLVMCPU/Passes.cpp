@@ -185,14 +185,14 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                                 CPUDoubleTilingPadExpert);
   }
 
-  if (tilingConfig.getNumLevels() == 5) {
+  if (tilingConfig.getNumTilingLevels() == 5) {
     // TODO: update verification.
     return success();
   }
 
-  if (tilingConfig.getNumLevels() != 3) {
+  if (tilingConfig.getNumTilingLevels() != 3) {
     return op->emitOpError("expected three tiling levels, got ")
-           << tilingConfig.getNumLevels();
+           << tilingConfig.getNumTilingLevels();
   }
 
   auto interfaceOp = dyn_cast_or_null<TilingInterface>(op);
@@ -206,7 +206,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
 
     SmallVector<int64_t> secondLevelTileSizes =
-        tilingConfig.getParallelVectorSizes();
+        tilingConfig.getVectorParallelSizes();
     for (auto [index, tileSize] : llvm::enumerate(secondLevelTileSizes)) {
       if (tileSize != 0 && !pLoopsSet.contains(index)) {
         return op->emitOpError(
@@ -217,7 +217,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
 
     SmallVector<int64_t> thirdLevelTileSizes =
-        tilingConfig.getReductionVectorSizes();
+        tilingConfig.getVectorReductionSizes();
     for (auto [index, tileSize] : llvm::enumerate(thirdLevelTileSizes)) {
       if (tileSize != 0 && pLoopsSet.contains(index)) {
         return op->emitOpError(
@@ -228,28 +228,26 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
   }
 
-  // TODO: What is this?
-  //// Verify interchange
-  // if (!loweringConfig.getTileInterchange().empty()) {
-  //   for (auto level : llvm::seq<unsigned>(
-  //            0, static_cast<unsigned>(
-  //                   loweringConfig.getTileInterchange().size()))) {
-  //     auto tileSizes = loweringConfig.getTileSizeVals(level);
-  //     auto interchange = loweringConfig.getTileInterchangeVals(level);
-  //     if (!isValidInterchange(interchange, tileSizes.size())) {
-  //       return op->emitOpError("expected [0, ")
-  //              << tileSizes.size()
-  //              << ") to be set exactly once in interchange #" << level;
-  //     }
-  //   }
-  // }
+  // Verify interchange
+  if (!tilingConfig.getTileInterchange().empty()) {
+    for (auto level : llvm::seq<unsigned>(
+             0,
+             static_cast<unsigned>(tilingConfig.getTileInterchange().size()))) {
+      auto tileSizes = tilingConfig.getTileSizes()[level];
+      auto interchange = tilingConfig.getTileInterchangeSizes(level);
+      if (!isValidInterchange(interchange, tileSizes.size())) {
+        return op->emitOpError("expected [0, ")
+               << tileSizes.size()
+               << ") to be set exactly once in interchange #" << level;
+      }
+    }
+  }
 
-  //// Verify that native vector size is empty.
-  // SmallVector<int64_t> nativeVectorSize =
-  //     loweringConfig.getNativeVectorSizeVals();
-  // if (!nativeVectorSize.empty()) {
-  //   return op->emitOpError("native_vector_size must be empty");
-  // }
+  // Verify that native vector size is empty.
+  SmallVector<int64_t> nativeVectorSize = tilingConfig.getNativeVectorSizes();
+  if (!nativeVectorSize.empty()) {
+    return op->emitOpError("native_vector_size must be empty");
+  }
   return success();
 }
 
@@ -257,18 +255,18 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
-  if (tilingConfig.getNumLevels() == 5) {
+  if (tilingConfig.getNumTilingLevels() == 5) {
     // TODO: update verification.
     return success();
   }
-  if (tilingConfig.getNumLevels() != 3) {
+  if (tilingConfig.getNumTilingLevels() != 3) {
     return op->emitOpError("expected three tiling levels, got ")
-           << tilingConfig.getNumLevels();
+           << tilingConfig.getNumTilingLevels();
   }
 
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  for (auto sizes : tilingConfig.getAllTileSizes()) {
+  for (auto sizes : tilingConfig.getTileSizes()) {
     for (auto [i, size] : llvm::enumerate(sizes)) {
       if (size == 1) shape[i] = 1;
       if (shape[i] == -1 || size == 0) continue;
@@ -338,7 +336,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   // only.
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+      createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   {
     LLVMCPUVectorizationPassOptions options;
@@ -374,27 +372,12 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileAndFusePass(tilingConfig.getParallelCacheIdx()));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getReductionCacheIdx()));
-
-  // Fuse next level only if reduction cache level is all zeros (no tiling).
-  // TODO(dcaballe): Teach TileAndFuse to only fuse up to the first reduction
-  // dimension.
-  if (llvm::all_of(tilingConfig.getReductionCacheSizes(),
-                   [](int64_t size) { return size == 0; })) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUTileAndFusePass(tilingConfig.getParallelVectorIdx()));
-  } else {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
-  }
-
+      createLLVMCPUTileAndFusePass(tilingConfig.getVectorParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ParallelDims));
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
+      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
 
@@ -468,26 +451,26 @@ void addMultiTilingExpertPassPipeline(
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRematerializeParallelOpsPass());
 
-  if (tilingConfig.getNumLevels() == 5) {
+  if (tilingConfig.getNumTilingLevels() == 5) {
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUTileAndFusePass(tilingConfig.getParallelCacheIdx()));
+        createLLVMCPUTileAndFusePass(tilingConfig.getCacheParallelLevel()));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUTilePass(tilingConfig.getReductionCacheIdx()));
+        createLLVMCPUTilePass(tilingConfig.getCacheReductionLevel()));
 
     // Fuse next level only if reduction cache level is all zeros (no tiling).
     // TODO(dcaballe): Teach TileAndFuse to only fuse up to the first reduction
     // dimension.
-    if (llvm::all_of(tilingConfig.getReductionCacheSizes(),
+    if (llvm::all_of(tilingConfig.getCacheReductionSizes(),
                      [](int64_t size) { return size == 0; })) {
       nestedModulePM.addNestedPass<func::FuncOp>(
-          createLLVMCPUTileAndFusePass(tilingConfig.getParallelVectorIdx()));
+          createLLVMCPUTileAndFusePass(tilingConfig.getVectorParallelLevel()));
     } else {
       nestedModulePM.addNestedPass<func::FuncOp>(
-          createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+          createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
     }
 
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
+        createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
   } else {  // TODO: Unify.
     SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
     // Apply tile and fuse to all the non-distribution fusable levels. Skip
@@ -511,7 +494,7 @@ void addMultiTilingExpertPassPipeline(
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
+      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFuseTensorPadWithConsumerPass());
@@ -572,14 +555,14 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   // along reduction dim again, which needs them to be Linalg ops form.
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileAndFusePass(tilingConfig.getParallelVectorIdx()));
+      createLLVMCPUTileAndFusePass(tilingConfig.getVectorParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFuseTensorPadWithConsumerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConcretizePadResultShapePass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getReductionVectorIdx()));
+      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposeConvolutionToLowerDimOpsPass());
 
@@ -634,9 +617,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addPass(createLLVMCPULowerToUKernelsPass());
   } else {
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-        static_cast<int64_t>(tilingConfig.getParallelVectorIdx())));
+        static_cast<int64_t>(tilingConfig.getVectorParallelLevel())));
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-        static_cast<int64_t>(tilingConfig.getReductionVectorIdx())));
+        static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass());
   }
@@ -657,7 +640,7 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getParallelVectorIdx()));
+      createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
 

@@ -44,9 +44,9 @@ IREE_API_EXPORT iree_status_t iree_loop_dispatch(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)workgroup_count_xyz[0]);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)workgroup_count_xyz[1]);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)workgroup_count_xyz[2]);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)workgroup_count_xyz[0]);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)workgroup_count_xyz[1]);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)workgroup_count_xyz[2]);
 
   const iree_loop_dispatch_params_t params = {
       .callback =
@@ -159,7 +159,7 @@ IREE_API_EXPORT iree_status_t iree_loop_wait_any(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)count);
   iree_status_t status =
       iree_loop_wait_multi(IREE_LOOP_COMMAND_WAIT_ANY, loop, count,
                            wait_sources, timeout, callback, user_data);
@@ -174,7 +174,7 @@ IREE_API_EXPORT iree_status_t iree_loop_wait_all(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)count);
   iree_status_t status =
       iree_loop_wait_multi(IREE_LOOP_COMMAND_WAIT_ALL, loop, count,
                            wait_sources, timeout, callback, user_data);

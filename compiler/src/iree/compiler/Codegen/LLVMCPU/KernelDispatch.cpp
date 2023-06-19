@@ -13,7 +13,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -187,7 +187,7 @@ static void getBoundsFromRange(ArrayRef<Range> loopRange,
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
-  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
   return llvm::all_of(loopRanges,
                       [](int64_t size) { return ShapedType::isDynamic(size); });
 }
@@ -668,7 +668,7 @@ static void splitParallelAndReductionTiles(
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &parallelSizes,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
-  SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
   for (auto [index, valuePair] : llvm::enumerate(
            llvm::zip_equal(staticLoopRanges, op.getIteratorTypesArray()))) {
     auto [size, iterType] = valuePair;
@@ -840,16 +840,16 @@ static LogicalResult setMatmulPadRootConfig(
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
-  SmallVector<int64_t> parallelCacheTileSizes(cacheTileSizes.begin(),
+  SmallVector<int64_t> cacheParallelTileSizes(cacheTileSizes.begin(),
                                               cacheTileSizes.end());
-  SmallVector<int64_t> reductionCacheTileSizes(numTiledDims, 0);
-  std::swap(parallelCacheTileSizes.back(), reductionCacheTileSizes.back());
+  SmallVector<int64_t> cacheReductionTileSizes(numTiledDims, 0);
+  std::swap(cacheParallelTileSizes.back(), cacheReductionTileSizes.back());
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
-  tileSizes.push_back(parallelCacheTileSizes);
+  tileSizes.push_back(cacheParallelTileSizes);
+  tileSizes.push_back(cacheReductionTileSizes);
   tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(reductionCacheTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -937,24 +937,24 @@ static LogicalResult setMatmulMaskingRootConfig(
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
-  SmallVector<int64_t> parallelCacheTileSizes(cacheTileSizes.begin(),
+  SmallVector<int64_t> cacheParallelTileSizes(cacheTileSizes.begin(),
                                               cacheTileSizes.end());
-  SmallVector<int64_t> reductionCacheTileSizes;
-  SmallVector<int64_t> parallelVectorTileSizes(workgroupTileSizes.begin(),
+  SmallVector<int64_t> cacheReductionTileSizes;
+  SmallVector<int64_t> vectorParallelTileSizes(workgroupTileSizes.begin(),
                                                workgroupTileSizes.end());
-  SmallVector<int64_t> reductionVectorTileSizes;
+  SmallVector<int64_t> vectorReductionTileSizes;
 
-  splitParallelAndReductionTiles(linalgOp, parallelCacheTileSizes,
-                                 reductionCacheTileSizes);
-  splitParallelAndReductionTiles(linalgOp, parallelVectorTileSizes,
-                                 reductionVectorTileSizes);
+  splitParallelAndReductionTiles(linalgOp, cacheParallelTileSizes,
+                                 cacheReductionTileSizes);
+  splitParallelAndReductionTiles(linalgOp, vectorParallelTileSizes,
+                                 vectorReductionTileSizes);
 
   TileSizesListType newTileSizes;
   newTileSizes.emplace_back(std::move(flowTileSizes));
-  newTileSizes.emplace_back(std::move(parallelCacheTileSizes));
-  newTileSizes.emplace_back(std::move(parallelVectorTileSizes));
-  newTileSizes.emplace_back(std::move(reductionCacheTileSizes));
-  newTileSizes.emplace_back(std::move(reductionVectorTileSizes));
+  newTileSizes.emplace_back(std::move(cacheParallelTileSizes));
+  newTileSizes.emplace_back(std::move(cacheReductionTileSizes));
+  newTileSizes.emplace_back(std::move(vectorParallelTileSizes));
+  newTileSizes.emplace_back(std::move(vectorReductionTileSizes));
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for masking contraction: "
                        << newTileSizes << "\n");
@@ -1433,7 +1433,7 @@ static void setX86WorkgroupTileSizes(
     ArrayRef<int64_t> maxTileSizes, VectorPreProcStrategy vecPreProcStrategy,
     SmallVectorImpl<int64_t> &workgroupTileSizes) {
   workgroupTileSizes.append(numLoops, 0);
-  SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
+  SmallVector<int64_t> staticLoopRanges = genericOp.getStaticLoopRanges();
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] = getMaxVectorTileSize(
@@ -1822,7 +1822,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
       vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
-  SmallVector<int64_t, 4> shapes = convOp.getStaticLoopRanges();
+  SmallVector<int64_t> shapes = convOp.getStaticLoopRanges();
   SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
                                          targetTileSizes.end());
   for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {

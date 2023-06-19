@@ -6,7 +6,6 @@
 
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/cuda_event.h"
 #include "iree/hal/drivers/cuda/native_executable.h"

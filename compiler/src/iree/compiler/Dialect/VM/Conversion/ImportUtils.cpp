@@ -118,7 +118,7 @@ size_t getSegmentSpanSize(Type spanType) {
   }
 }
 
-std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
+std::optional<SmallVector<Value>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter) {
   if (auto intAttr = llvm::dyn_cast<IntegerAttr>(attrValue)) {
@@ -133,7 +133,7 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     return {{constValue}};
   }
   if (auto elementsAttr = llvm::dyn_cast<DenseIntElementsAttr>(attrValue)) {
-    SmallVector<Value, 4> elementValues;
+    SmallVector<Value> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
       elementValues.push_back(rewriter.createOrFold<mlir::arith::ConstantOp>(
@@ -143,7 +143,7 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     return elementValues;
   }
   if (auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attrValue)) {
-    SmallVector<Value, 4> allValues;
+    SmallVector<Value> allValues;
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
           rewriteAttrToOperands(loc, elementAttr, inputType, rewriter);
@@ -163,11 +163,11 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
           .getRegisteredInterface<VMConversionDialectInterface>();
   if (conversionInterface) {
     bool anyFailed = false;
-    SmallVector<Value, 4> allValues;
+    SmallVector<Value> allValues;
     if (auto tupleType = llvm::dyn_cast<TupleType>(inputType)) {
       // Custom dialect type maps into a tuple; we expect 1:1 tuple elements to
       // attribute storage elements.
-      auto tupleTypes = llvm::to_vector<4>(tupleType.getTypes());
+      auto tupleTypes = llvm::to_vector(tupleType.getTypes());
       int ordinal = 0;
       LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
           attrValue, [&](Attribute elementAttr) {

@@ -1,10 +1,12 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-verify-input-legality))" --verify-diagnostics %s -split-input-file
 
 // expected-error@below {{illegal operations still remain}}
-func.func @check_no_mhlo(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+func.func @check_no_stablehlo(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error@+1 {{illegal op still exists}}
-  %0 = "mhlo.add"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
+  %0 = stablehlo.add %arg0, %arg1 : tensor<?x?xf32>
+  // expected-error@+1 {{illegal op still exists}}
+  %1 = chlo.broadcast_add %0, %arg1 : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
 }
 
 // -----

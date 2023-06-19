@@ -80,14 +80,14 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
   auto *beforeBlock = funcBuilder.getBlock();
   auto *afterBlock = beforeBlock->splitBlock(switchOp);
   SmallVector<Location> locs(switchOp.getNumResults(), switchOp.getLoc());
-  auto finalValues = llvm::to_vector<4>(
+  auto finalValues = llvm::to_vector(
       afterBlock->addArguments(switchOp.getResultTypes(), locs));
 
   // Create the blocks we'll use for all our conditions so that we can
   // reference them when inserting the branch ops.
-  SmallVector<Block *, 4> conditionMatchBlocks(
+  SmallVector<Block *> conditionMatchBlocks(
       switchOp.getConditionRegions().size());
-  SmallVector<Block *, 4> conditionFallthroughBlocks(
+  SmallVector<Block *> conditionFallthroughBlocks(
       switchOp.getConditionRegions().size());
   for (int i = 0; i < conditionMatchBlocks.size(); ++i) {
     conditionMatchBlocks[i] = funcBuilder.createBlock(afterBlock);
@@ -151,7 +151,7 @@ class InlineDeviceSwitchesPass
 
   void runOnOperation() override {
     auto funcOp = getOperation();
-    SmallVector<IREE::HAL::DeviceSwitchOp, 4> switchOps;
+    SmallVector<IREE::HAL::DeviceSwitchOp> switchOps;
     funcOp->walk([&](IREE::HAL::DeviceSwitchOp switchOp) {
       switchOps.push_back(switchOp);
     });

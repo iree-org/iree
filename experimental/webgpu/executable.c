@@ -10,7 +10,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
-#include "iree/base/tracing.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -39,7 +38,8 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "flatbuffer data is not present or less than 16 bytes (%zu total)",
+        "flatbuffer data is not present or less than 16 bytes (%" PRIhsz
+        " total)",
         flatbuffer_data.data_length);
   }
 
@@ -78,17 +78,17 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
   if (entry_point_count != expected_entry_point_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "executable provides %zu entry points but caller "
-                            "provided %zu; must match",
+                            "provided %" PRIhsz "; must match",
                             entry_point_count, expected_entry_point_count);
   }
 
   for (size_t i = 0; i < entry_point_count; ++i) {
     uint32_t module_ordinal = flatbuffers_uint32_vec_at(entry_points_vec, i);
     if (module_ordinal >= shader_module_count) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "executable entry point %zu references an invalid shader module %d",
-          i, module_ordinal);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable entry point %zu"
+                              " references an invalid shader module %d",
+                              i, module_ordinal);
     }
   }
 

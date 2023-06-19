@@ -29,12 +29,11 @@ iree_cc_library(
     "string_view.c"
     "string_view.h"
     "time.c"
-    "time.h"
     "wait_source.c"
     "wait_source.h"
   DEPS
     ::core_headers
-    ::tracing
+    iree::base::tracing::provider
   PUBLIC
 )
 
@@ -46,6 +45,8 @@ iree_cc_library(
     "attributes.h"
     "config.h"
     "target_platform.h"
+    "time.h"
+    "tracing.h"
   PUBLIC
 )
 
@@ -68,7 +69,6 @@ iree_cc_test(
   DEPS
     ::base
     ::loop_test_hdrs
-    ::tracing
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -80,7 +80,6 @@ iree_cc_library(
     "loop_test.h"
   DEPS
     ::base
-    ::tracing
     iree::base::internal::wait_handle
     iree::testing::gtest
   TESTONLY
@@ -122,14 +121,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    target_platform
-  HDRS
-    "target_platform.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     loop_sync
   HDRS
     "loop_sync.h"
@@ -137,7 +128,6 @@ iree_cc_library(
     "loop_sync.c"
   DEPS
     ::base
-    ::tracing
     iree::base::internal
     iree::base::internal::wait_handle
   PUBLIC
@@ -152,26 +142,8 @@ iree_cc_test(
     ::base
     ::loop_sync
     ::loop_test_hdrs
-    ::tracing
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-# TODO(benvanik): evaluate if we want this as part of the API. Could restrict it
-# to excusively static linkage scenarios and note that it's unstable. It's just
-# really really useful and the only way for applications to interleave with our
-# tracing (today).
-iree_cc_library(
-  NAME
-    tracing
-  HDRS
-    "tracing.h"
-  SRCS
-    "tracing.cc"
-  DEPS
-    ::core_headers
-    tracy_client::runtime_impl
-  PUBLIC
 )
 
 if(EMSCRIPTEN)

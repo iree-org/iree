@@ -1,4 +1,3 @@
-// XFAIL: *
 
 func.func @attention() -> tensor<1x4x4xf32> {
   %init = tensor.empty() : tensor<1x4x4xf32>

@@ -689,6 +689,35 @@ def HAL_DeviceTargetAttr :
     // the `hal.device.targets` attribute is found.
     static SmallVector<DeviceTargetAttr, 4> lookup(Operation *op);
 
+    // Returns true if there is any UnitAttr with |name| in any device
+    // configuration for the given |op|.
+    static bool lookupConfigAttrAny(Operation *op, StringRef name);
+
+    // Returns true if all device configurations found for the given |op| have
+    // a UnitAttr with |name|.
+    static bool lookupConfigAttrAll(Operation *op, StringRef name);
+
+    // Returns the AND of boolean attributes of |name| in all device
+    // configurations found for the given |op|.
+    // Returns nullopt if any config does not have the key defined indicating
+    // that it's not statically known/runtime dynamic.
+    static std::optional<bool>
+    lookupConfigAttrAnd(Operation *op, StringRef name);
+
+    // Returns the OR of boolean attributes of |name| in all device
+    // configurations found for the given |op|.
+    // Returns nullopt if any config does not have the key defined indicating
+    // that it's not statically known/runtime dynamic.
+    static std::optional<bool>
+    lookupConfigAttrOr(Operation *op, StringRef name);
+
+    // Returns the range of integer attributes of |name| in all device
+    // configurations found for the given |op|.
+    // Returns nullopt if any config does not have the key defined indicating
+    // that it's not statically known/runtime dynamic.
+    static std::optional<StaticRange<APInt>>
+    lookupConfigAttrRange(Operation *op, StringRef name);
+
     // Returns a list of all target executable configurations that may be
     // required for the given operation.
     static SmallVector<ExecutableTargetAttr, 4>

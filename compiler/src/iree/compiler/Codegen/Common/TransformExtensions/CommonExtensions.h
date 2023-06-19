@@ -28,43 +28,6 @@ struct TileSizesSpec;
 struct NumThreadsSpec;
 class TransformTypeInterface;
 }  // namespace transform
-
-namespace iree_compiler {
-namespace IREE {
-namespace transform_dialect {
-/// Selected patterns for ApplyPatternOp.
-struct ApplyPatternsOpPatterns {
-  bool additionalIreePatterns = false;
-  bool bubbleCollapse = false;
-  bool bubbleExpand = false;
-  bool bubblePackUnPack = false;
-  bool canonicalization = false;
-  bool cse = false;
-  bool eraseUnnecessaryTensorOperands = false;
-  bool expandMemrefStridedMetadata = false;
-  bool extractAddressComputations = false;
-  bool foldMemrefAliases = false;
-  bool foldReassociativeReshapes = false;
-  bool foldTensorEmptyExtract = false;
-  bool foldTensorSubsets = false;
-  bool foldVectorTransferTensorSlice = false;
-  bool licm = false;
-  bool linalgElementwiseGreedyFusion = false;
-  bool lowerTransferOpPermutations = false;
-  bool lowerVectorMasks = false;
-  bool prepareVectorToMma = false;
-  bool rankReducingLinalg = false;
-  bool rankReducingLinalgViaReshapes = false;
-  bool rankReducingVector = false;
-  bool swapPaddingElideConditional = false;
-  bool swappingPatterns = false;
-  bool tilingCanonicalization = false;
-  bool unrollVectorsGpuMmaSync = false;
-  bool unrollVectorsGpuWmma = false;
-};
-}  // namespace transform_dialect
-}  // namespace IREE
-}  // namespace iree_compiler
 }  // namespace mlir
 
 #define GET_OP_CLASSES

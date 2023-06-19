@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 
@@ -30,7 +29,8 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "unsupported cconv version %c", cconv.data[0]);
   }
-  iree_string_view_t cconv_body = iree_string_view_substr(cconv, 1, INTPTR_MAX);
+  iree_string_view_t cconv_body =
+      iree_string_view_substr(cconv, 1, IREE_HOST_SIZE_MAX);
   if (iree_string_view_split(cconv_body, '_', out_arguments, out_results) ==
       -1) {
     *out_arguments = cconv_body;

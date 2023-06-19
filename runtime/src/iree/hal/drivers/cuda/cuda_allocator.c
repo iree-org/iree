@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/status_util.h"
@@ -119,8 +118,10 @@ static void iree_hal_cuda_allocator_query_statistics(
     iree_hal_cuda_allocator_t* allocator =
         iree_hal_cuda_allocator_cast(base_allocator);
     memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
-    iree_hal_cuda_memory_pools_merge_statistics(allocator->pools,
-                                                out_statistics);
+    if (allocator->pools) {
+      iree_hal_cuda_memory_pools_merge_statistics(allocator->pools,
+                                                  out_statistics);
+    }
   });
 }
 
@@ -284,6 +285,10 @@ static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; async)");
       break;
     }
+    case IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; external)");
+      break;
+    }
   }
   IREE_TRACE_ZONE_END(z0);
 }
@@ -329,7 +334,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda_buffer_allocate");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
@@ -534,6 +539,11 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
             cuMemHostGetDevicePointer(&device_ptr, host_ptr, 0),
             "cuMemHostGetDevicePointer");
       }
+      break;
+    }
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION: {
+      buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL;
+      device_ptr = (CUdeviceptr)external_buffer->handle.device_allocation.ptr;
       break;
     }
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD:

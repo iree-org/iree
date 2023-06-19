@@ -8,7 +8,6 @@
 
 #include "./vm.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
@@ -84,7 +83,7 @@ py::str HalAllocator::FormattedStatistics() {
 py::object HalAllocator::AllocateBufferCopy(
     int memory_type, int allowed_usage, py::object buffer,
     std::optional<iree_hal_element_types_t> element_type) {
-  IREE_TRACE_SCOPE0("HalAllocator::AllocateBufferCopy");
+  IREE_TRACE_SCOPE_NAMED("HalAllocator::AllocateBufferCopy");
   // Request a view of the buffer (use the raw python C API to avoid
   // some allocation and copying at the pybind level).
   Py_buffer py_view;
@@ -269,7 +268,8 @@ std::vector<std::string> HalDriver::Query() {
 py::object HalDriver::Create(const std::string& device_uri,
                              py::dict& driver_cache) {
   iree_string_view_t driver_name, device_path, params_str;
-  iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
+  iree_string_view_t device_uri_sv{
+      device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   iree_uri_split(device_uri_sv, &driver_name, &device_path, &params_str);
 
   // Check cache.
@@ -394,7 +394,8 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
 HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
                                        const py::kwargs& kwargs) {
   iree_hal_device_t* device;
-  iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
+  iree_string_view_t device_uri_sv{
+      device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   CheckApiStatus(
       iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
                                            iree_allocator_system(), &device),

@@ -66,10 +66,18 @@ iree_build_test(
     ],
 )
 
+cpu_data_headers = [
+    "cpu_data.h",
+    "cpu_feature_bits.inl",
+]
+
+# Filegroup used in Bazel only (only Bazel enforces header dependencies).
+filegroup(
+    name = "cpu_data_headers_filegroup",
+    srcs = cpu_data_headers,
+)
+
 iree_runtime_cc_library(
     name = "cpu_data",
-    hdrs = [
-        "cpu_data.h",
-        "cpu_feature_bits.inl",
-    ],
+    hdrs = cpu_data_headers,
 )

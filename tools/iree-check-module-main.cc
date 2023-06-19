@@ -14,8 +14,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/check/module.h"
 #include "iree/testing/gtest.h"
@@ -79,7 +77,6 @@ class CheckModuleTest : public ::testing::Test {
 };
 
 iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
-  IREE_TRACE_SCOPE0("iree-check-module");
   *out_exit_code = 1;
 
   iree_vm_instance_t* instance = nullptr;
@@ -106,7 +103,7 @@ iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_ordinal(
             main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function),
-        "looking up function export %zu", ordinal);
+        "looking up function export %" PRIhsz, ordinal);
     iree_string_view_t function_name = iree_vm_function_name(&function);
 
     if (iree_string_view_starts_with(function_name,
@@ -152,17 +149,24 @@ iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   // Pass through flags to gtest (allowing --help to fall through).
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
 
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-check-module");
   int exit_code = 1;
   iree_status_t status = Run(iree_allocator_system(), &exit_code);
-  int ret = iree_status_is_ok(status) ? exit_code : 1;
+  exit_code = iree_status_is_ok(status) ? exit_code : EXIT_FAILURE;
+  IREE_TRACE_ZONE_END(z0);
+
+  IREE_TRACE_APP_EXIT(exit_code);
+
   if (FLAG_expect_failure) {
-    if (ret == 0) {
+    if (exit_code == 0) {
       printf("Test passed but expected failure\n");
       return 1;
     }
@@ -170,11 +174,11 @@ extern "C" int main(int argc, char** argv) {
     return 0;
   }
 
-  if (ret != 0) {
+  if (exit_code != 0) {
     printf("Test failed\n%s\n", Status(std::move(status)).ToString().c_str());
   }
 
-  return ret;
+  return exit_code;
 }
 
 }  // namespace iree

@@ -37,8 +37,14 @@ hal.executable private @pad_matmul_static_dispatch_0  {
         : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // Late canonicalizations to cleanup and pass the checks.
-    transform.iree.apply_patterns %variant_op
-      { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.iree.fold_fill_into_pad
+    transform.apply_patterns.linalg.tiling_canonicalization
+    transform.apply_patterns.scf.for_loop_canonicalization
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
+  transform.iree.apply_licm %variant_op : !transform.any_op
+  transform.iree.apply_cse %variant_op : !transform.any_op
   }
 }
 

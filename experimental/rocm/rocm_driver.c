@@ -12,7 +12,6 @@
 #include "experimental/rocm/rocm_device.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 
 typedef struct iree_hal_rocm_driver_t {

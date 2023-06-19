@@ -37,7 +37,7 @@ static bool checkIntegerArrayAttr(ArrayAttr arrayAttr) {
 static ArrayAttr getIndexIntegerArrayAttr(MLIRContext *context,
                                           ArrayRef<int64_t> values) {
   auto attrs =
-      llvm::map_to_vector<4>(values, [&context](int64_t value) -> Attribute {
+      llvm::map_to_vector(values, [&context](int64_t value) -> Attribute {
         return IntegerAttr::get(IndexType::get(context), APInt(64, value));
       });
   return ArrayAttr::get(context, attrs);
@@ -48,7 +48,7 @@ static ArrayAttr getIndexIntegerArrayAttr(MLIRContext *context,
 static ArrayAttr getI64IntegerArrayAttr(MLIRContext *context,
                                         ArrayRef<int64_t> values) {
   auto attrs =
-      llvm::map_to_vector<4>(values, [&context](int64_t value) -> Attribute {
+      llvm::map_to_vector(values, [&context](int64_t value) -> Attribute {
         return IntegerAttr::get(IntegerType::get(context, 64),
                                 APInt(64, value));
       });
@@ -111,10 +111,9 @@ LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
                                            TileSizesListTypeRef tileInterchange,
                                            ArrayRef<int64_t> nativeVectorSize) {
   auto attrList = [&](TileSizesListTypeRef lst) {
-    return llvm::map_to_vector<4>(
-        lst, [&](ArrayRef<int64_t> sizes) -> Attribute {
-          return getI64IntegerArrayAttr(context, sizes);
-        });
+    return llvm::map_to_vector(lst, [&](ArrayRef<int64_t> sizes) -> Attribute {
+      return getI64IntegerArrayAttr(context, sizes);
+    });
   };
   ArrayAttr tileSizesAttr = ArrayAttr::get(context, attrList(tileSizes));
   ArrayAttr tileInterchangeAttr =
@@ -327,12 +326,10 @@ SmallVector<int64_t> getTileSizes(Operation *op, unsigned level) {
   if (!configAttr) return {};
   return configAttr.getTileSizeVals(level);
 }
-SmallVector<Value, 4> getTileSizes(OpBuilder &b, Operation *op,
-                                   unsigned level) {
-  return llvm::map_to_vector<4>(
-      getTileSizes(op, level), [&](int64_t t) -> Value {
-        return b.create<arith::ConstantIndexOp>(op->getLoc(), t);
-      });
+SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level) {
+  return llvm::map_to_vector(getTileSizes(op, level), [&](int64_t t) -> Value {
+    return b.create<arith::ConstantIndexOp>(op->getLoc(), t);
+  });
 }
 
 unsigned getNumTileLevels(Operation *op) {

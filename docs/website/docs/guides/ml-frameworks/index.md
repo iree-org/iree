@@ -49,4 +49,4 @@ executed on the specified devices using IREE's runtime.
 The final stage is executing the now compiled module. This involves selecting
 what compute devices should be used, loading the module, and executing the
 module with the intended inputs. IREE provides several
-[language bindings](../../reference/bindings/index.md) for it's runtime API.
+[language bindings](../../reference/bindings/index.md) for its runtime API.

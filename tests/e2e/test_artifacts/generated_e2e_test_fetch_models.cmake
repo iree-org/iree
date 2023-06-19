@@ -265,6 +265,13 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
+  NAME "model-9b81a2f5-bab2-4f6f-b8b5-13cc4b3e9413"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230612_1686563210/matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_9b81a2f5-bab2-4f6f-b8b5-13cc4b3e9413_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-699fd533-02a9-49f0-bf26-1902d8dbb5af"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f16t_f16t_f16t_tile_config_default.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_699fd533-02a9-49f0-bf26-1902d8dbb5af_matmul_128x256x8192_f16t_tile_config_default.mlirbc"

@@ -104,8 +104,8 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
 
     LinalgExt::TopkSplitReductionControlFn splitReductionFn =
         [&](int64_t splitReductionDepth) -> int64_t {
-      SmallVector<int64_t, 4> reductionRatios(topkSplitReductionRatio.begin(),
-                                              topkSplitReductionRatio.end());
+      SmallVector<int64_t> reductionRatios(topkSplitReductionRatio.begin(),
+                                           topkSplitReductionRatio.end());
       if (splitReductionDepth >= reductionRatios.size()) {
         return -1;
       } else {

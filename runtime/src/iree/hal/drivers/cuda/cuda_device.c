@@ -12,7 +12,6 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/context_wrapper.h"
 #include "iree/hal/drivers/cuda/cuda_allocator.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
@@ -56,6 +55,7 @@ typedef struct iree_hal_cuda_device_t {
   iree_hal_cuda_context_wrapper_t context_wrapper;
   iree_hal_cuda_tracing_context_t* tracing_context;
 
+  bool supports_memory_pools;
   iree_hal_cuda_memory_pools_t memory_pools;
   iree_hal_allocator_t* device_allocator;
 
@@ -88,6 +88,7 @@ IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
   out_params->command_buffer_mode = IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH;
   out_params->allow_inline_execution = false;
   out_params->stream_tracing = false;
+  out_params->async_allocations = true;
 }
 
 static iree_status_t iree_hal_cuda_device_check_params(
@@ -137,8 +138,20 @@ static iree_status_t iree_hal_cuda_device_create_internal(
         &device->block_pool, host_allocator, &device->tracing_context);
   }
 
+  // Memory pool support is conditional.
+  if (iree_status_is_ok(status) && params->async_allocations) {
+    int supports_memory_pools = 0;
+    status = CU_RESULT_TO_STATUS(
+        syms,
+        cuDeviceGetAttribute(&supports_memory_pools,
+                             CU_DEVICE_ATTRIBUTE_MEMORY_POOLS_SUPPORTED,
+                             cu_device),
+        "cuDeviceGetAttribute");
+    device->supports_memory_pools = supports_memory_pools != 0;
+  }
+
   // Create memory pools first so that we can share them with the allocator.
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && device->supports_memory_pools) {
     status = iree_hal_cuda_memory_pools_initialize(
         &device->context_wrapper, &params->memory_pools, &device->memory_pools);
   }
@@ -146,7 +159,8 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_allocator_create(
         (iree_hal_device_t*)device, &device->context_wrapper, cu_device, stream,
-        &device->memory_pools, &device->device_allocator);
+        device->supports_memory_pools ? &device->memory_pools : NULL,
+        &device->device_allocator);
   }
 
   if (iree_status_is_ok(status) &&
@@ -287,34 +301,45 @@ static iree_status_t iree_hal_cuda_device_trim(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_arena_block_pool_trim(&device->block_pool);
   IREE_RETURN_IF_ERROR(iree_hal_allocator_trim(device->device_allocator));
-  // TODO: move to memory pool manager.
-  CUDA_RETURN_IF_ERROR(
-      device->context_wrapper.syms,
-      cuMemPoolTrimTo(
-          device->memory_pools.device_local,
-          device->params.memory_pools.device_local.minimum_capacity),
-      "cuMemPoolTrimTo");
-  CUDA_RETURN_IF_ERROR(
-      device->context_wrapper.syms,
-      cuMemPoolTrimTo(device->memory_pools.other,
-                      device->params.memory_pools.other.minimum_capacity),
-      "cuMemPoolTrimTo");
+  if (device->supports_memory_pools) {
+    IREE_RETURN_IF_ERROR(iree_hal_cuda_memory_pools_trim(
+        &device->memory_pools, &device->params.memory_pools));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_device_query_attribute(
+    iree_hal_cuda_device_t* device, CUdevice_attribute attribute,
+    int64_t* out_value) {
+  int value = 0;
+  CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
+                       cuDeviceGetAttribute(&value, attribute,
+                                            device->context_wrapper.cu_device),
+                       "cuDeviceGetAttribute");
+  *out_value = value;
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
-  // iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   *out_value = 0;
 
-  if (iree_string_view_equal(category,
-                             iree_make_cstring_view("hal.executable.format"))) {
-    *out_value =
-        iree_string_view_equal(key, iree_make_cstring_view("cuda-nvptx-fb"))
-            ? 1
-            : 0;
+  if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
+    *out_value = iree_string_view_equal(key, IREE_SV("cuda-nvptx-fb")) ? 1 : 0;
     return iree_ok_status();
+  }
+
+  if (iree_string_view_equal(category, IREE_SV("cuda.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("compute_capability_major"))) {
+      return iree_hal_cuda_device_query_attribute(
+          device, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, out_value);
+    } else if (iree_string_view_equal(key,
+                                      IREE_SV("compute_capability_minor"))) {
+      return iree_hal_cuda_device_query_attribute(
+          device, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, out_value);
+    }
   }
 
   return iree_make_status(
@@ -384,12 +409,10 @@ static iree_status_t iree_hal_cuda_device_create_channel(
                          "exchanging NCCL ID with other participants");
   } else if (params.id.data_length != IREE_ARRAYSIZE(id.data)) {
     // User provided something but it's not what we expect.
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "NCCL ID must be %" PRIhsz
-        " bytes matching the ncclUniqueId struct but caller provided %" PRIhsz
-        " bytes",
-        IREE_ARRAYSIZE(id.data), sizeof(id));
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "NCCL ID must be %zu bytes matching the "
+                            "ncclUniqueId struct but caller provided %zu bytes",
+                            IREE_ARRAYSIZE(id.data), sizeof(id));
   } else {
     // User provided the ID - we treat it as opaque here and let NCCL validate.
     memcpy(id.data, params.id.data, IREE_ARRAYSIZE(id.data));
@@ -516,9 +539,18 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
 
   // Allocate from the pool; likely to fail in cases of virtual memory
   // exhaustion but the error may be deferred until a later synchronization.
-  iree_status_t status = iree_hal_cuda_memory_pools_alloca(
-      &device->memory_pools, device->stream, pool, params, allocation_size,
-      out_buffer);
+  // If pools are not supported we allocate a buffer as normal from whatever
+  // allocator is set on the device.
+  iree_status_t status = iree_ok_status();
+  if (device->supports_memory_pools) {
+    status = iree_hal_cuda_memory_pools_alloca(&device->memory_pools,
+                                               device->stream, pool, params,
+                                               allocation_size, out_buffer);
+  } else {
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(base_device), params, allocation_size,
+        iree_const_byte_span_empty(), out_buffer);
+  }
 
   // Only signal if not returning a synchronous error - synchronous failure
   // indicates that the stream is unchanged (it's not really since we waited
@@ -546,9 +578,13 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
                                                     iree_infinite_timeout()));
 
-  // Schedule the buffer deallocation.
-  iree_status_t status = iree_hal_cuda_memory_pools_dealloca(
-      &device->memory_pools, device->stream, buffer);
+  // Schedule the buffer deallocation if we got it from a pool and otherwise
+  // drop it on the floor and let it be freed when the buffer is released.
+  iree_status_t status = iree_ok_status();
+  if (device->supports_memory_pools) {
+    status = iree_hal_cuda_memory_pools_dealloca(&device->memory_pools,
+                                                 device->stream, buffer);
+  }
 
   // Only signal if not returning a synchronous error - synchronous failure
   // indicates that the stream is unchanged (it's not really since we waited

@@ -1,5 +1,3 @@
-// XFAIL: *
-
 // This example demonstrates calling dynamically imported functions in the
 // runtime through the use of ukernels. This is calling the same function
 // as `standalone_example.mlir`, but using the `iree_codegen.ukernel.generic`.

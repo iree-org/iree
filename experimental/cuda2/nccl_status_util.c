@@ -11,7 +11,7 @@
 #include "experimental/cuda2/nccl_dynamic_symbols.h"
 #include "iree/base/status.h"
 
-iree_status_t iree_hal_nccl2_result_to_status(
+iree_status_t iree_hal_cuda2_nccl_result_to_status(
     const iree_hal_cuda2_nccl_dynamic_symbols_t* syms, ncclResult_t result,
     const char* file, uint32_t line) {
   iree_status_code_t code;

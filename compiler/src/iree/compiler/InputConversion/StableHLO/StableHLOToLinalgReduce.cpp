@@ -10,6 +10,7 @@
 
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/Rewriters.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -17,6 +18,23 @@
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
+/// Returns true when reduction `op` is not supported and should be filtered
+/// out.
+static bool isUnsupported(mlir::stablehlo::ReduceOp op) {
+  // Empty reductions are not supported. We expect canonicalization patterns to
+  // handle them.
+  if (op.getDimensions().empty()) return true;
+
+  // We require all reduce shapes to be the same, up to the element types, so
+  // we can just the first operand and the first result as a representative.
+  if (auto inputTy =
+          dyn_cast<RankedTensorType>(op.getInputs().getType().front())) {
+    return llvm::is_contained(inputTy.getShape(), 0);
+  }
+
+  return false;
+}
+
 /// Returns a permutation AffineMap that puts all reduction dimensions to the
 /// last. The order of parallel loops and reduction loops are all sorted. E.g.,
 /// if `rank` is 4 and `reductionDims` is {1, 3}, then
@@ -26,7 +44,7 @@ AffineMap getTransposeMapForReduction(MLIRContext *context, int rank,
                                       ArrayRef<int64_t> reductionDims) {
   llvm::SmallSetVector<int, 4> s(reductionDims.begin(), reductionDims.end());
 
-  SmallVector<unsigned, 4> permutation;
+  SmallVector<unsigned> permutation;
   for (int i = 0; i < rank; ++i) {
     if (!s.contains(i)) {
       permutation.push_back(i);
@@ -43,7 +61,7 @@ SmallVector<Value, 8> getReduceOpEmptyTensorDynSizes(
     ArrayRef<int64_t> reductionDims) {
   llvm::SmallSetVector<int, 4> s(reductionDims.begin(), reductionDims.end());
 
-  SmallVector<unsigned, 4> parallelDims;
+  SmallVector<unsigned> parallelDims;
   SmallVector<Value, 8> dynShape;
   int rank = cast<RankedTensorType>(arg.getType()).getRank();
   for (int i = 0, j = 0; i < rank; ++i) {
@@ -66,7 +84,7 @@ struct ReduceRegionReturnOpConversion final
       return failure();
     }
 
-    SmallVector<Value, 4> operands(adaptor.getOperands());
+    SmallVector<Value> operands(adaptor.getOperands());
     for (Value &operand : operands) {
       if (isa<ShapedType>(operand.getType())) {
         Location loc = operand.getLoc();
@@ -85,6 +103,11 @@ struct ReduceOpToGenericConverter final
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    if (isUnsupported(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported reduce (noop or empty)");
+    }
+
     Location loc = op.getLoc();
 
     int numOperands = static_cast<int>(adaptor.getInputs().size());
@@ -96,7 +119,7 @@ struct ReduceOpToGenericConverter final
     }
     auto srcRank = cast<ShapedType>(adaptor.getInputs()[0].getType()).getRank();
 
-    SmallVector<int64_t, 4> reductionDims = extract1DVector(op.getDimensions());
+    SmallVector<int64_t> reductionDims = extract1DVector(op.getDimensions());
 
     SmallVector<Type> resultTypes;
     if (failed(typeConverter->convertTypes(op.getResultTypes(), resultTypes)))
@@ -131,7 +154,7 @@ struct ReduceOpToGenericConverter final
     // reduction loops now are all in the innermost, drops
     // `reduction_dims.size()` dimensions. We don't need an inverse
     // permutation here because they are the same.
-    SmallVector<AffineExpr, 4> exprs;
+    SmallVector<AffineExpr> exprs;
     for (int i = 0, e = srcRank - reductionDims.size(); i < e; ++i) {
       exprs.push_back(rewriter.getAffineDimExpr(i));
     }
@@ -154,11 +177,11 @@ struct ReduceOpToGenericConverter final
     rewriter.inlineRegionBefore(op.getBody(), region, region.end());
     TypeConverter::SignatureConversion signatureConverter(numOperands * 2);
 
-    // The mhlo ReduceOp requires that the seed be used as a LHS operand inside
-    // the region, and the seed is encoded in linalg in the intial out value, so
-    // modify the signature of the block and the value mappings, so the output
-    // args will correlate with the original LHS and the inputs correlate with
-    // the original RHS.
+    // The stablehlo ReduceOp requires that the seed be used as a LHS operand
+    // inside the region, and the seed is encoded in linalg in the initial out
+    // value, so modify the signature of the block and the value mappings, so
+    // the output args will correlate with the original LHS and the inputs
+    // correlate with the original RHS.
     for (auto [idx, val] : llvm::enumerate(op.getInputs())) {
       signatureConverter.addInputs(
           /*origInputNo=*/idx + numOperands,
@@ -188,6 +211,11 @@ struct ReduceOpToReduceConverter final
   LogicalResult matchAndRewrite(
       mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    if (isUnsupported(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported reduce (noop or empty)");
+    }
+
     auto reductionDims =
         llvm::to_vector(op.getDimensions().getValues<int64_t>());
     // stablehlo.reduce doesn't specify the order of the reduction dimensions.
@@ -251,10 +279,10 @@ struct ReduceOpToReduceConverter final
     // apply function has a signature with tensor types, this is converted to a
     // function with element types. E.g. the signature "(tensor<f32>,
     // tensor<f32>) -> tensor<f32>" will be converted to "(f32, f32) -> f32".
-    // Also, we need to swap the operands of the function. The mhlo.reduce op
-    // expects the init values to be the first parameters of the apply function,
-    // while the linalg.reduction op expects the init values as the last
-    // parameters of the 'combiner' region apply function.
+    // Also, we need to swap the operands of the function. The stablehlo.reduce
+    // op expects the init values to be the first parameters of the apply
+    // function, while the linalg.reduction op expects the init values as the
+    // last parameters of the 'combiner' region apply function.
     TypeConverter::SignatureConversion signatureConverter(
         linalgOp.getNumDpsInputs() * 2);
     assert(linalgOp.getNumDpsInputs() == linalgOp.getNumDpsInits());
@@ -351,13 +379,13 @@ struct ReduceWindowOpOnTensorsGenericConversion final
       dstExprs.push_back(mlir::getAffineDimExpr(i, ctx));
     }
 
-    SmallVector<AffineMap, 4> inferredMaps(3, AffineMap::get(ctx));
+    SmallVector<AffineMap> inferredMaps(3, AffineMap::get(ctx));
     if (rank > 0) {
       inferredMaps =
           AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs});
     }
 
-    SmallVector<AffineMap, 4> indexingMaps;
+    SmallVector<AffineMap> indexingMaps;
 
     indexingMaps.append(numOperands, inferredMaps[0]);
     indexingMaps.append(1, inferredMaps[1]);

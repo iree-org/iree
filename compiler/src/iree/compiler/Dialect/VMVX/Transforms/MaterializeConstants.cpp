@@ -66,10 +66,10 @@ class MaterializeConstantsPass
     for (auto [keyAttr, loadOps] : allLoadOps) {
       auto globalLoc = FusedLoc::get(
           context,
-          llvm::map_to_vector<4>(
-              loadOps, [&](IREE::HAL::ExecutableConstantLoadOp loadOp) {
-                return loadOp.getLoc();
-              }));
+          llvm::map_to_vector(loadOps,
+                              [&](IREE::HAL::ExecutableConstantLoadOp loadOp) {
+                                return loadOp.getLoc();
+                              }));
       auto globalType = loadOps.front().getType();
       auto globalName = (kConstantBlockGlobalPrefix +
                          llvm::cast<StringAttr>(keyAttr).getValue())

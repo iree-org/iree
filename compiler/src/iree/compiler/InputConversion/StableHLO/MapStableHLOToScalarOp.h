@@ -897,21 +897,6 @@ struct CompareSelectOpToStdScalarOp<SupportedType, StdCompareOp, Predicate,
   }
 };
 
-inline Value mhloAlwaysPropagateNaN(Value v, ValueRange args, Location loc,
-                                    OpBuilder* b) {
-  Type elementType = getElementTypeOrSelf(args.front().getType());
-  if (auto floatType = elementType.dyn_cast<FloatType>()) {
-    Value isnan = b->create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::UNO,
-                                                 args[0], args[1]);
-
-    auto nanApfloat = APFloat::getQNaN(floatType.getFloatSemantics());
-    Value nan = getConstantOrSplat(b, loc, args[0].getType(),
-                                   b->getFloatAttr(floatType, nanApfloat));
-    v = b->create<mlir::arith::SelectOp>(loc, isnan, nan, v);
-  }
-  return v;
-}
-
 template <>
 inline Value mapStableHloOpToStdScalarOp<stablehlo::ClampOp>(
     Location loc, ArrayRef<Type> resultTypes, ArrayRef<Type> argTypes,
@@ -1268,7 +1253,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::ShiftRightArithmeticOp>(
 }  // namespace impl
 
 struct StableHloOpToStdScalarOp {
-  // Converts mhlo 'op' to linalg and arith ops.
+  // Converts stablehlo 'op' to linalg and arith ops.
   template <typename StableHloOpTy>
   static Value mapOp(StableHloOpTy op, ArrayRef<Type> resultTypes,
                      ValueRange args, OpBuilder* b) {
@@ -1276,8 +1261,8 @@ struct StableHloOpToStdScalarOp {
     return mapOpWithArgTypes(op, resultTypes, argTypes, args, b);
   }
 
-  // Converts mhlo 'op' to linalg and arith ops. The types of 'args' may already
-  // be converted, 'argTypes' are their original types.
+  // Converts stablehlo 'op' to linalg and arith ops. The types of 'args' may
+  // already be converted, 'argTypes' are their original types.
   template <typename StableHloOpTy>
   static Value mapOpWithArgTypes(StableHloOpTy op, ArrayRef<Type> resultTypes,
                                  ArrayRef<Type> argTypes, ValueRange args,
@@ -1296,7 +1281,7 @@ struct StableHloOpToStdScalarOp {
                                            resultTypes, argTypes, args, b);
   }
 
-  // Converts mhlo 'op' to linalg and arith ops.
+  // Converts stablehlo 'op' to linalg and arith ops.
   template <typename StableHloOpTy>
   static Value mapOpOfType(Location loc, ArrayRef<Type> resultTypes,
                            ArrayRef<Type> argTypes,

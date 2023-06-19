@@ -69,7 +69,7 @@ struct Artifacts {
   Artifact debugFile;
 
   // Other files associated with linking.
-  SmallVector<Artifact, 4> otherFiles;
+  SmallVector<Artifact> otherFiles;
 
   // Keeps all of the artifacts around after linking completes. Useful for
   // debugging.

@@ -14,7 +14,6 @@
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_pipeline_layout.h"
@@ -377,7 +376,8 @@ static iree_status_t iree_hal_inline_command_buffer_push_constants(
   if (IREE_UNLIKELY(offset + values_length >=
                     sizeof(command_buffer->state.push_constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "push constant range %zu (length=%zu) out of range",
+                            "push constant range %" PRIhsz " (length=%" PRIhsz
+                            ") out of range",
                             offset, values_length);
   }
 

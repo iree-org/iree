@@ -21,7 +21,6 @@ iree_cc_library(
     "module.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
     iree::hal::local::executable_environment
     iree::hal::local::executable_loader

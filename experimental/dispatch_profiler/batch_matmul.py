@@ -225,3 +225,9 @@ class CudaBatchMatmulGenerator(CudaMatmulGenerator):
     data_type = [DataType.f32, DataType.f32, DataType.f32]
     self._append_matmul_dispatch_collection(self.batch_matmul_shapes, data_type,
                                             configuration_list)
+
+  def generate(self):
+    """Generates a list of matmul operations."""
+    self._cuda_matmul_tensor_cores_f16()
+    self._cuda_matmul_tensor_cores_f32()
+    return self.dispatches_collection_list

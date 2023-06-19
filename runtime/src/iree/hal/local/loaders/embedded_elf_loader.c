@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/elf/elf_module.h"
 #include "iree/hal/local/executable_library.h"

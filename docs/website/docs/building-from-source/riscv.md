@@ -1,3 +1,10 @@
+---
+hide:
+  - tags
+tags:
+  - CPU
+---
+
 # RISC-V cross-compilation
 
 Running on a platform like RISC-V involves cross-compiling from a _host_

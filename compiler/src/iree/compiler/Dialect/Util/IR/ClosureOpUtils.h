@@ -28,15 +28,15 @@ namespace Util {
 // Modifies in-place the operand results vectors for a closure operation.
 // |excludedOperandIndices| and |excludedResultIndices| are sets containing the
 // operands and results in the lists to remove.
-void excludeClosureOperandsAndResults(SmallVector<Value, 4> &operandValues,
+void excludeClosureOperandsAndResults(SmallVector<Value> &operandValues,
                                       ArrayRef<unsigned> excludedOperandIndices,
-                                      SmallVector<Type, 4> &resultTypes,
+                                      SmallVector<Type> &resultTypes,
                                       ArrayRef<unsigned> excludedResultIndices);
-void excludeClosureOperandsAndResults(SmallVector<Value, 4> &operandValues,
-                                      SmallVector<Value, 4> &operandDims,
+void excludeClosureOperandsAndResults(SmallVector<Value> &operandValues,
+                                      SmallVector<Value> &operandDims,
                                       ArrayRef<unsigned> excludedOperandIndices,
-                                      SmallVector<Type, 4> &resultTypes,
-                                      SmallVector<Value, 4> &resultDims,
+                                      SmallVector<Type> &resultTypes,
+                                      SmallVector<Value> &resultDims,
                                       ArrayRef<unsigned> excludedResultIndices);
 
 // Erases the given result indices from terminators in the given region.

@@ -8,7 +8,6 @@
 
 #include <stddef.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
 #include "iree/hal/resource.h"
@@ -43,9 +42,9 @@ IREE_API_EXPORT iree_status_t iree_hal_channel_split(
   IREE_ASSERT_ARGUMENT(out_split_channel);
   *out_split_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, color);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, key);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, flags);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, color);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, key);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, flags);
   iree_status_t status = _VTABLE_DISPATCH(base_channel, split)(
       base_channel, color, key, flags, out_split_channel);
   IREE_TRACE_ZONE_END(z0);
