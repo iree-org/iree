@@ -53,7 +53,7 @@ hal.executable private @preset_config_matmul  {
 // CHECK:         scf.for
 // CHECK:           scf.for
 // CHECK:             scf.for
-// CHECK:               vector.outerproduct
+// CHECK:               vector.fma
 // CHECK-NOT: scf.for
 
 // -----
@@ -109,7 +109,7 @@ hal.executable private @preset_config_matmul  {
 // CHECK:         scf.for
 // CHECK:           scf.for
 // CHECK:             scf.for
-// CHECK:               vector.outerproduct
+// CHECK:               vector.fma
 
 // 2nd dim peeling:
 // CHECK:           scf.for
@@ -187,7 +187,7 @@ hal.executable private @preset_config_matmul  {
 // CHECK:             scf.for
 // CHECK:               scf.for
 // CHECK:                 scf.for
-// CHECK:                   vector.outerproduct
+// CHECK:                   vector.fma
 
 // 1nd dim peeling:
 // CHECK:                 scf.for

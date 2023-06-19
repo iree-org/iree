@@ -213,7 +213,7 @@ hal.executable private @pad_consumer_fusion {
 //         CHECK:             scf.for
 // CHECK-COUNT-7:               vector.load %[[INPUT]]
 // CHECK-COUNT-8:               vector.load %[[FILTER_SUBVIEW]]
-// CHECK-COUNT-8:               vector.outerproduct
+// CHECK-COUNT-8:               vector.fma
 //         CHECK:               scf.yield
 //         CHECK:             scf.yield
 //         CHECK:           scf.yield
