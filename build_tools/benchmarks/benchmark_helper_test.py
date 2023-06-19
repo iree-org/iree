@@ -5,44 +5,38 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import io
 import json
 import unittest
 import benchmark_helper
+import tempfile
+import pathlib
 
 
 class BenchmarkHelperTest(unittest.TestCase):
     def test_merge_results_simple(self):
-        first = io.StringIO(
-            json.dumps(
-                {
-                    "commit": "123",
-                    "benchmarks": [
-                        {"benchmark_id": "first1"},
-                        {"benchmark_id": "first2"},
-                    ],
-                }
-            )
+        first = benchmark_helper.JSONBackedBenchmarkData(
+            pathlib.Path("first.json"),
+            {
+                "commit": "123",
+                "benchmarks": [{"benchmark_id": "first1"}, {"benchmark_id": "first2"}],
+            },
         )
-        setattr(first, "name", "first.json")
 
-        second = io.StringIO(
-            json.dumps(
-                {
-                    "commit": "123",
-                    "benchmarks": [
-                        {"benchmark_id": "second1"},
-                        {"benchmark_id": "second2"},
-                    ],
-                }
-            )
+        second = benchmark_helper.JSONBackedBenchmarkData(
+            pathlib.Path("second.json"),
+            {
+                "commit": "123",
+                "benchmarks": [
+                    {"benchmark_id": "second1"},
+                    {"benchmark_id": "second2"},
+                ],
+            },
         )
-        setattr(second, "name", "second.json")
 
         result = benchmark_helper.merge_results([first, second])
 
         self.assertEqual(
-            result,
+            result.data,
             {
                 "commit": "123",
                 "benchmarks": [
@@ -55,34 +49,46 @@ class BenchmarkHelperTest(unittest.TestCase):
         )
 
     def test_merge_results_mismatching_commits(self):
-        first = io.StringIO(json.dumps({"commit": "123", "benchmarks": []}))
-        setattr(first, "name", "first.json")
+        first = benchmark_helper.JSONBackedBenchmarkData(
+            pathlib.Path("first.json"), {"commit": "123", "benchmarks": []}
+        )
+        second = benchmark_helper.JSONBackedBenchmarkData(
+            pathlib.Path("second.json"), {"commit": "456", "benchmarks": []}
+        )
 
-        second = io.StringIO(json.dumps({"commit": "456", "benchmarks": []}))
-        setattr(second, "name", "second.json")
-
-        with self.assertRaisesRegex(RuntimeError, "based on different commits"):
+        with self.assertRaisesRegex(ValueError, "based on different commits"):
             benchmark_helper.merge_results([first, second])
 
-    def test_merge_results_missing_benchmark_list(self):
-        first = io.StringIO(json.dumps({"commit": "123", "benchmarks": []}))
-        setattr(first, "name", "first.json")
+    def test_create_json_backed_benchmark_data_success(self):
+        benchmark_helper.JSONBackedBenchmarkData(
+            pathlib.Path("first.json"), {"commit": "123", "benchmarks": []}
+        )
 
-        second = io.StringIO(json.dumps({"commit": "123"}))
-        setattr(second, "name", "second.json")
+    def test_create_json_backed_benchmark_data_with_missing_benchmark_list(self):
+        with self.assertRaisesRegex(ValueError, '"benchmarks" field not found'):
+            benchmark_helper.JSONBackedBenchmarkData(
+                pathlib.Path("second.json"), {"commit": "123"}
+            )
 
-        with self.assertRaisesRegex(RuntimeError, '"benchmarks" field not found'):
-            benchmark_helper.merge_results([first, second])
+    def test_load_from_file_success(self):
+        with tempfile.TemporaryDirectory() as dir:
+            filepath = pathlib.Path(dir) / "first.json"
+            contents = {"commit": "123", "benchmarks": []}
+            filepath.write_text(json.dumps(contents))
 
-    def test_merge_results_invalid_json(self):
-        first = io.StringIO(json.dumps({"commit": "123", "benchmarks": []}))
-        setattr(first, "name", "first.json")
+            result = benchmark_helper.JSONBackedBenchmarkData.loadFromFile(filepath)
+            self.assertEqual(result.data, contents)
+            self.assertEqual(result.source_filepath, filepath)
 
-        second = io.StringIO("bliblablub")
-        setattr(second, "name", "second.notjson")
+    def test_load_from_file_invalid_json(self):
+        with tempfile.TemporaryDirectory() as dir:
+            filepath = pathlib.Path(dir) / "first.json"
+            filepath.write_text("bliblablub")
 
-        with self.assertRaisesRegex(RuntimeError, "seems not to be a valid JSON file"):
-            benchmark_helper.merge_results([first, second])
+            with self.assertRaisesRegex(
+                ValueError, "seems not to be a valid JSON file"
+            ):
+                benchmark_helper.JSONBackedBenchmarkData.loadFromFile(filepath)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,6 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import argparse
-import io
 import json
 import os
 import shlex
@@ -162,63 +161,80 @@ def _dump_cmds_handler(
     print(*lines, sep="\n")
 
 
-def merge_results(benchmark_results_files: List[io.TextIOWrapper]):
-    # Merges the benchmark results from `right` into `left` and returns the updated `left`
-    def _merge_two_resultsets(left, right):
-        # Parses a JSON benchmark results file and makes some sanity checks
-        def _load(file):
-            try:
-                content = json.load(file)
-            except json.JSONDecodeError as e:
-                raise RuntimeError(
-                    '"{}" seems not to be a valid JSON file: {}'.format(
-                        file.name, e.msg
-                    )
+# Represents a benchmark results file with the data already loaded from a JSON file.
+class JSONBackedBenchmarkData:
+    def __init__(self, source_filepath: pathlib.PurePath, data: Dict):
+        if not isinstance(data, dict):
+            raise ValueError(
+                '"{}" seems not to be a valid benchmark-results-file (No JSON struct as root element).'.format(
+                    source_filepath
                 )
-            if not isinstance(content, dict):
-                raise RuntimeError(
-                    '"{}" seems not to be a valid benchmark-results-file (No JSON struct as root element).'.format(
-                        file.name
-                    )
+            )
+        if "commit" not in data:
+            raise ValueError(
+                '"{}" seems not to be a valid benchmark-results-file ("commit" field not found).'.format(
+                    source_filepath
                 )
-            if "commit" not in content:
-                raise RuntimeError(
-                    '"{}" seems not to be a valid benchmark-results-file ("commit" field not found).'.format(
-                        file.name
-                    )
-                )
-            if "benchmarks" not in content:
-                raise RuntimeError(
-                    '"{}" seems not to be a valid benchmark-results-file ("benchmarks" field not found).'.format(
-                        file.name
-                    )
-                )
-            return content
-
-        left_content = left if isinstance(left, dict) else _load(left)
-        right_content = right if isinstance(right, dict) else _load(right)
-
-        if left_content["commit"] != right_content["commit"]:
-            raise RuntimeError(
-                '"{}" and the previous files are based on different commits ({} != {}). Merging not supported.'.format(
-                    left.name, left_content["commit"], right_content["commit"]
+            )
+        if "benchmarks" not in data:
+            raise ValueError(
+                '"{}" seems not to be a valid benchmark-results-file ("benchmarks" field not found).'.format(
+                    source_filepath
                 )
             )
 
-        left_content["benchmarks"].extend(right_content["benchmarks"])
-        return left_content
+        self.source_filepath: pathlib.PurePath = source_filepath
+        self.data: Dict = data
 
-    return functools.reduce(_merge_two_resultsets, benchmark_results_files)
+    # Parses a JSON benchmark results file and makes some sanity checks
+    @staticmethod
+    def loadFromFile(filepath: pathlib.Path):
+        try:
+            data = json.loads(filepath.read_bytes())
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                '"{}" seems not to be a valid JSON file: {}'.format(filepath, e.msg)
+            )
+        return JSONBackedBenchmarkData(filepath, data)
+
+    # A convenience wrapper around `loadFromFile` that accepts a sequence of paths and returns a sequence of JSONBackedBenchmarkData objects as a generator.
+    @staticmethod
+    def loadManyFromFiles(filepaths: Sequence[pathlib.Path]):
+        return (
+            JSONBackedBenchmarkData.loadFromFile(filepath) for filepath in filepaths
+        )
+
+
+# Merges the benchmark results from `right` into `left` and returns the updated `left`
+def _merge_two_resultsets(
+    left: JSONBackedBenchmarkData, right: JSONBackedBenchmarkData
+) -> JSONBackedBenchmarkData:
+    # left_content = left if isinstance(left, dict) else _load(left)
+    # right_content = right if isinstance(right, dict) else _load(right)
+    if left.data["commit"] != right.data["commit"]:
+        raise ValueError(
+            '"{}" and the previous files are based on different commits ({} != {}). Merging not supported.'.format(
+                right.source_filepath, left.data["commit"], right.data["commit"]
+            )
+        )
+    left.data["benchmarks"].extend(right.data["benchmarks"])
+    return left
+
+
+def merge_results(benchmark_results: Sequence[JSONBackedBenchmarkData]):
+    return functools.reduce(_merge_two_resultsets, benchmark_results)
 
 
 def _merge_results_handler(
-    benchmark_results_files: List[io.TextIOWrapper], **_unused_args
+    benchmark_results_files: Sequence[pathlib.Path], **_unused_args
 ):
-    try:
-        print(json.dumps(merge_results(benchmark_results_files)))
-    except Exception as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
+    print(
+        json.dumps(
+            merge_results(
+                JSONBackedBenchmarkData.loadManyFromFiles(benchmark_results_files)
+            )
+        )
+    )
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -259,7 +275,7 @@ def _parse_arguments() -> argparse.Namespace:
     )
     merge_results_parser.add_argument(
         "benchmark_results_files",
-        type=argparse.FileType(),
+        type=pathlib.Path,
         nargs="+",
         help="One or more benchmark results JSON file paths",
     )
