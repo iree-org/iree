@@ -47,8 +47,17 @@ function(iree_trace_runner_test)
     ${ARGN}
   )
 
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
@@ -160,8 +169,17 @@ function(iree_single_backend_generated_trace_runner_test)
     ${ARGN}
   )
 
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
@@ -312,11 +330,6 @@ function(iree_generated_trace_runner_test)
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
-
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
-    return()
-  endif()
 
   if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
     set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")

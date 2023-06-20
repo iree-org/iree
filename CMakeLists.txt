@@ -534,6 +534,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(iree_macros)
 include(iree_copts)
+include(iree_filter_test)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
