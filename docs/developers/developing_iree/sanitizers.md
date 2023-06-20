@@ -1,79 +1,49 @@
-# Using Address/Memory/Thread Sanitizers
+# Using Sanitizers (ASAN, TSAN, etc)
 
-[AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html),
-[MemorySanitizer](https://clang.llvm.org/docs/MemorySanitizer.html) and
-[ThreadSanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html) are tools
-provided by `clang` to detect certain classes of errors in C/C++ programs. They
-consist of compiler instrumentation (so your program's executable code is
-modified) and runtime libraries (so e.g. the `malloc` function may get
-replaced).
+[AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html) and
+[ThreadSanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html), abbreviated as "ASAN" and "TSAN" respectively, are LLVM instrumentation features helping to detect certain classes of bugs. They are available both via Clang (to build C/C++ code, such as IREE's binaries) and via `iree-compile` (to build IREE bytecode modules). This page discusses both Clang and `iree-compile` usage, and the interactions between the two, since there are consistency requirements between how IREE bytecode modules are instrumented and how the IREE runtime, which loads them, is instrumented.
 
-They are abbreviated as "ASan", "MSan" and "TSan" respectively.
+## Cheat sheet
 
-They all incur large overhead, so only enable them while debugging.
+Sanitizer to use  | ASAN    | TSAN
+----------------- | ------------------ | -----------------
+Compile my own sanitizer-instrumented bytecode module | `iree-compile --iree-llvmcpu-sanitize=address --iree-llvmcpu-link-embedded=false` . No need for ASAN instrumentation in `iree-compile` itself. | `iree-compile --iree-llvmcpu-sanitize=thread --iree-llvmcpu-link-embedded=false` . No need for TSAN instrumentation in `iree-compile` itself.
+Load my own sanitizer-instrumented bytecode module | You can load the module in any IREE runtime, whether or not it's ASAN-instrumented. Enabling ASAN instrumentation in the IREE runtime may yield additional insights but is not necessary. | The IREE runtime must be built with TSAN. Rebuild it with `cmake . -DIREE_ENABLE_TSAN=ON`. Then the resulting IREE runtime tools, e.g. `iree-run-module`, are able to load TSAN-instrumented modules. No need to rebuild the compiler.
+Instrument IREE's own binaries (runtime and compiler) | `cmake . -DIREE_ENABLE_ASAN=ON` enables ASAN in all of IREE's C/C++ code (runtime and compiler). | `cmake . -DIREE_ENABLE_TSAN=ON` enables TSAN in all of IREE's C/C++ code (runtime and compiler).
+Enable instrumentation in IREE's own tests building bytecode modules. | `cmake . -DIREE_ENABLE_ASAN=ON -DIREE_BYTECODE_MODULE_ENABLE_ASAN=ON -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON` | `cmake . -DIREE_ENABLE_TSAN=ON -DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON`
 
-Tool   | Detects | Helps debug what? | Slowdown | Memory overhead | Android support
------- | ------- | ----------------- | -------- | --------------- | ---------------
-ASan   | Out-of-bounds accesses,<br>Use-after-free,<br>Use-after-return,<br>Memory leaks (*), ... | Crashes,<br>non-deterministic results,<br>memory leaks (*) | 2x | 3x | Yes
-MSan   | Uninitialized memory reads | Non-deterministic results | 3x | ? | Yes
-TSan   | Data races | Many bugs in multi-thread code | 5x-15x | 5x-10x | [No](https://github.com/android/ndk/issues/1171)
+## Explanation &mdash; The 3 different things that "enabling sanitizers" can mean in IREE
 
-Notes:
-* (*) See [this
-  documentation](https://clang.llvm.org/docs/AddressSanitizer.html#memory-leak-detection)
-  on leak detection. It is only enabled by default on some platforms.
+### 1. Telling `iree-compile` to generate sanitizer instrumentation in bytecode modules.
 
-## Support status and how to enable each sanitizer
+That is achieved by the `--iree-llvmcpu-sanitize={address,thread}` flag, which works similarly to Clang's `-fsanitize=` flag. For example, `iree-compile --iree-llvmcpu-sanitize=address` will generate a bytecode module with ASAN instrumentation.
 
-### ASan (AddressSanitizer)
+When passing a `--iree-llvmcpu-sanitize=` flag, one must also pass `--iree-llvmcpu-link-embedded=false`. Sanitizers do not work with the default embedded linker. This flag causes the bytecode module to be linked using the system linker instead.
 
-Enabling ASan in the IREE build is a simple matter of setting the
-`IREE_ENABLE_ASAN` CMake option:
+### 2. Building IREE's own C/C++ code with sanitizer instrumentation.
 
-```
-cmake -DIREE_ENABLE_ASAN=ON ...
-```
+That is done by the CMake options `IREE_ENABLE_{ASAN,TSAN}`.
 
-### TSan (ThreadSanitizer)
+This controls all of IREE's C/C++ targets: the runtime, the compiler, the other tools.
 
-To enable TSan, at the moment, the following 3 CMake options must be set:
+TSAN-instrumented bytecode modules can only be loaded by a TSAN-instrumented IREE runtime. By contrast, ASAN-instrumented bytecode modules can be loaded by any IREE runtime.
 
-```
-cmake \
-  -DIREE_ENABLE_TSAN=ON \
-  -DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON \
-  -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON \
-  -DIREE_BUILD_SAMPLES=OFF \
-  ...
-```
+### 3. Building IREE's test bytecode modules with sanitizer instrumentation.
 
-In practice, `IREE_ENABLE_TSAN` alone would be enough for many targets, but not
-all. The problem is that a IREE runtime built with `IREE_ENABLE_TSAN` cannot
-load a IREE compiled LLVM/CPU module unless the following flags were passed to
-the IREE compiler: `--iree-llvmcpu-sanitize=thread` and
-`--iree-llvmcpu-link-embedded=false`.
+Many of IREE's tests involve building a bytecode module with `iree-compile`. These a built by the `iree-test-deps` target. To get instrumentation into that module code, the `iree-compile` command used to build test modules must itself pass `--iree-llvmcpu-sanitize={address,thread}`.
 
-The CMake options `IREE_BYTECODE_MODULE_ENABLE_TSAN` and
-`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` ensure that the above flags are
-passed to the IREE compiler when building modules used in tests, benchmarks,
-etc. (anything that internally uses the CMake `iree_bytecode_module` macro).
+That is enabled by the CMake options `IREE_BYTECODE_MODULE_ENABLE_{ASAN,TSAN}`.
 
-The CMake option `IREE_BUILD_SAMPLES=OFF` is needed because samples [currently
-assume](https://github.com/openxla/iree/pull/8893) that the embedded linker is
-used, so they are incompatible with
-`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON`.
+As noted above, when `--iree-llvmcpu-sanitize=` is passed, `--iree-llvmcpu-link-embedded=false` must also be passed. Just like `IREE_BYTECODE_MODULE_ENABLE_{ASAN,TSAN}` enables `--iree-llvmcpu-sanitize=` in test modules, `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` enables `--iree-llvmcpu-link-embedded=false` in test modules. So, always set `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` when setting `IREE_BYTECODE_MODULE_ENABLE_{ASAN,TSAN}`.
 
-At the moment, CMake logic heavy-handedly enforces that whenever
-`IREE_ENABLE_TSAN` is set, these other two CMake variables are also set.
-That ensures that all tests succeed: no test is expected to fail with TSan.
 
-If you know what you're doing (i.e. if you are not building targets that
-internally involve a LLVM/CPU `iree_bytecode_module`), feel free to locally comment out
-the CMake error and only set `IREE_ENABLE_TSAN`. Also see a
-[past attempt]((https://github.com/openxla/iree/pull/8966) to relax that CMake
-validation.
+## Other sanitizers
 
-### MSan (MemorySanitizer)
+Besides the main sanitizers ASAN and TSAN, there is some stub of support for a few additional sanitizers.
+
+### MSAN (MemorySanitizer)
+
+[MSAN](https://clang.llvm.org/docs/MemorySanitizer.html) helps detect use of uninitialized memory.
 
 In theory that should be a simple matter of
 
@@ -82,11 +52,11 @@ In theory that should be a simple matter of
 ```
 
 However, that requires making and using a custom
-build of libc++ with MSan as explained in
+build of libc++ with MSAN as explained in
 [this documentation](https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo).
 
-As of April 2022, all of IREE's tests succeeded with MSan on Linux/x86-64,
-provided that the `vulkan` driver was disabled (due to lack of MSan
+As of April 2022, all of IREE's tests succeeded with MSAN on Linux/x86-64,
+provided that the `vulkan` driver was disabled (due to lack of MSAN
 instrumentation in the NVIDIA Vulkan driver).
 
 ### UBSan (UndefinedBehaviorSanitizer)
@@ -98,7 +68,7 @@ Enabling UBSan in the IREE build is a simple matter of setting the
 cmake -DIREE_ENABLE_UBSAN=ON ...
 ```
 
-Note that both ASan and UBSan can be enabled in the same build.
+Note that both ASAN and UBSan can be enabled in the same build.
 
 ## Symbolizing the reports
 
@@ -119,13 +89,13 @@ from the sanitizer and feed it into the `stdin` of the
 variable pointing to the NDK root directory, like this:
 
 ```shell
-ANDROID_NDK=~/android-ndk-r21d ./build_tools/scripts/android_symbolize.sh < /tmp/asan.txt
+ANDROID_NDK=~/android-ndk-r21d ./build_tools/scripts/android_symbolize.sh < /tmp/aSAN.txt
 ```
 
-Where `/tmp/asan.txt` is where you've pasted the raw sanitizer report.
+Where `/tmp/aSAN.txt` is where you've pasted the raw sanitizer report.
 
 **Tip:** this script will happily just echo any line that isn't a stack frame.
-That means you can feed it the whole `ASan` report at once, and it will output a
+That means you can feed it the whole `ASAN` report at once, and it will output a
 symbolized version of it. DO NOT run it on a single stack at a time! That is
 unlike the symbolizer tool that's being added in NDK r22, and one of the reasons
 why we prefer to keep our own script. For more details see [this
