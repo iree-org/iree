@@ -14,14 +14,14 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    "EncodingInfo.h"
+    "EncodingUtils.h"
     "GPUUtils.h"
     "LinalgOpInfo.h"
     "LinkingUtils.h"
     "MarkerUtils.h"
     "Utils.h"
   SRCS
-    "EncodingInfo.cpp"
+    "EncodingUtils.cpp"
     "GPUUtils.cpp"
     "LinalgOpInfo.cpp"
     "LinkingUtils.cpp"

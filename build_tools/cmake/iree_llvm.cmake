@@ -68,6 +68,7 @@ macro(iree_llvm_configure_bundled)
   set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
 
   set(IREE_LLVM_LINK_BINARY "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
+  set(IREE_LLD_BINARY "$<TARGET_FILE:${IREE_LLD_TARGET}>")
   set(IREE_CLANG_BINARY "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
   set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${CLANG_EXECUTABLE_VERSION}/include/")
 endmacro()
@@ -96,6 +97,7 @@ macro(iree_llvm_configure_installed)
   endif()
 
   set(IREE_LLVM_LINK_BINARY "${LLVM_INSTALL_DIR}/llvm/bin/llvm-link${CMAKE_EXECUTABLE_SUFFIX}")
+  set(IREE_LLD_BINARY "${LLVM_INSTALL_DIR}/llvm/bin/lld${CMAKE_EXECUTABLE_SUFFIX}")
   set(IREE_CLANG_BINARY "${LLVM_INSTALL_DIR}/llvm/bin/clang${CMAKE_EXECUTABLE_SUFFIX}")
   string(REGEX REPLACE "[^0-9].*" "" _LLVM_VERSION_MAJOR "${LLVM_VERSION}")
   set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_INSTALL_DIR}/llvm/lib/clang/${_LLVM_VERSION_MAJOR}/include/")
@@ -138,6 +140,7 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   # Unconditionally enable some other cheap LLVM tooling.
   set(IREE_LLVM_LINK_TARGET llvm-link)
+  set(IREE_LLD_TARGET lld)
 
   # Unconditionally enable mlir.
   list(APPEND LLVM_ENABLE_PROJECTS mlir)

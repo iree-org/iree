@@ -84,7 +84,12 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions,
         /*benefit=*/1,
-        /*disableOuterProductLowering=*/true);
+        /*disableOuterProductLowering=*/false);
+    // This pattern will transform vector loads whose elements are used in a
+    // scalar fashion into scalar loads. This will let scalar loads to be folded
+    // into broadcast/arithmetic operations and reduce register pressure.
+    vector::populateScalarVectorTransferLoweringPatterns(
+        patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
     vector::populateVectorMultiReductionLoweringPatterns(
         patterns, vectorMultiReductionLowering);

@@ -6,15 +6,21 @@
 
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Utils/EncodingInfo.h"
+#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/TypeRange.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -327,6 +333,60 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       genericMicroKernelOp.getOperation());
 }
 
+static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
+    RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
+  auto tensorType = op.getTensorType().dyn_cast<RankedTensorType>();
+  if (!tensorType) {
+    return rewriter.notifyMatchFailure(op,
+                                       "need a ranked tensor type attribute");
+  }
+  if (tensorType.getRank() != 2) {
+    return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
+  }
+  auto encoding = getEncoding(tensorType);
+  if (!encoding) {
+    return rewriter.notifyMatchFailure(op, "no TensorEncoding attribute");
+  }
+  auto matmulType = getMatmulType(*encoding);
+  auto matmulOperandRole = getMatmulOperandRole(*encoding);
+  if (!matmulType || !matmulOperandRole) {
+    return rewriter.notifyMatchFailure(op, "unhandled TensorEncoding");
+  }
+  uint32_t flags = 0;
+  if (*matmulType == MatmulType::F32F32F32) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
+  } else if (*matmulType == MatmulType::I8I8I32) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
+  } else {
+    return failure();
+  }
+  if (*matmulOperandRole == MatmulOperandRole::LHS) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
+  } else if (*matmulOperandRole == MatmulOperandRole::RHS) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
+  } else if (*matmulOperandRole == MatmulOperandRole::RESULT) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
+  } else {
+    return failure();
+  }
+  SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
+  SmallVector<Value> inputValues;
+  Location loc = op.getLoc();
+  for (int64_t i : tensorType.getShape()) {
+    inputValues.push_back(rewriter.create<arith::ConstantIndexOp>(loc, i));
+  }
+  inputValues.push_back(rewriter.create<arith::ConstantIntOp>(loc, flags, 32));
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  auto fn = getFnNameAndDefAttrs("query_tile_sizes.2d", rewriter, targetAttr);
+  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
+      loc, resultTypes, fn.name, inputValues, /*outs=*/ValueRange{},
+      /*other_operands=*/ValueRange{},
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
+      /*strided_outer_dims=*/IntegerAttr{});
+  return cast<IREE::Codegen::UKernelOpInterface>(
+      genericMicroKernelOp.getOperation());
+}
+
 namespace {
 
 template <typename OpType>
@@ -335,10 +395,6 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
 
   LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.hasTensorSemantics()) {
-      return rewriter.notifyMatchFailure(
-          op, "operation needs to have tensor semantics");
-    }
     FailureOr<IREE::Codegen::UKernelOpInterface> ukernelOp =
         matchDAGForUKernel(rewriter, op);
     if (failed(ukernelOp)) {
@@ -357,7 +413,9 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   RewritePatternSet patterns(context);
   patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
                   LowerToUKernelPattern<tensor::PackOp>,
-                  LowerToUKernelPattern<tensor::UnPackOp>>(context);
+                  LowerToUKernelPattern<tensor::UnPackOp>,
+                  LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
+      context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

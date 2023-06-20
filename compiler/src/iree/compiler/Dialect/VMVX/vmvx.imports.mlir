@@ -482,7 +482,8 @@ vm.import private @unpack(
 //==============================================================================
 
 vm.import private @query_tile_sizes.2d(
-  %sizes : tuple<i64, i64>,
+  %size0 : i64,
+  %size1 : i64,
   %flags : i32
 ) -> (i64, i64)
 
