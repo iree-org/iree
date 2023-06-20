@@ -20,13 +20,13 @@ iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arch(
   // Unpack is currently only used in practice with esize==4 and non-transpose.
   if (esize != 4 || transpose) return 0;
   if (params->in_size2 == 8 && params->in_size3 == 8) {
-#ifdef IREE_UK_BUILD_X86_64_AVX2_FMA
+#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
     if (iree_uk_cpu_supports_avx2_fma(params->cpu_data)) {
       return iree_uk_unpack_tile_8x8_x32_x86_64_avx2_fma_direct;
     }
 #endif
   } else if (params->in_size2 == 16 && params->in_size3 == 16) {
-#ifdef IREE_UK_BUILD_X86_64_AVX512_BASE
+#if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
     if (iree_uk_cpu_supports_avx512_base(params->cpu_data)) {
       return iree_uk_unpack_tile_16x16_x32_x86_64_avx512_base_direct;
     }
