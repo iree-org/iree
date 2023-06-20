@@ -61,6 +61,8 @@ py_binary(
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
+    # "--shapes=large" can cause timeouts on riscv emulator.
+    size = "large",
     compiler_flags = [
         "--iree-flow-enable-data-tiling",
     ],
@@ -69,8 +71,6 @@ py_binary(
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",
     ],
-    # "--shapes=large" can cause timeouts on riscv emulator.
-    size = "large",
     tags = [
         # "--shapes=large" can cause timeouts on TSAN CI.
         # Revisit when the CI build hosts get an upgraded toolchain,
@@ -184,6 +184,8 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
 # Test mmt4d with --iree-llvmcpu-enable-microkernels.
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_%s_ukernel" % (lhs_rhs_type, size),
+    # "--shapes=large" can cause timeouts on riscv emulator.
+    size = "large" if size == "large" else None,
     compiler_flags = [
         "--iree-llvmcpu-enable-microkernels",
         "--iree-flow-enable-data-tiling",
@@ -193,8 +195,6 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=%s" % size,
     ],
-    # "--shapes=large" can cause timeouts on riscv emulator.
-    size = "large" if size == "large" else None,
     tags = [
         # "--shapes=large" can cause timeouts on TSAN CI.
         # Revisit when the CI build hosts get an upgraded toolchain,
@@ -355,6 +355,8 @@ iree_generated_trace_runner_test(
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
+    # "--shapes=large" can cause timeouts on riscv emulator.
+    size = "large",
     compiler_flags = [
         "--iree-flow-split-matmul-reduction=4",
     ],
@@ -363,8 +365,6 @@ iree_generated_trace_runner_test(
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",
     ],
-    # "--shapes=large" can cause timeouts on riscv emulator.
-    size = "large",
     tags = [
         "requires-gpu-nvidia",
     ],

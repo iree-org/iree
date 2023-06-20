@@ -16,6 +16,11 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
+    # Several of these tests are somewhat expensive with sanitizers. Tagging
+    # them large does not currently disable them on sanitizers, as we
+    # currently run sanitizers on all but "enormous" tests, but is done
+    # for consistency with similarly expensive tests (#14152).
+    size = "large",
     srcs = enforce_glob(
         [
             "annotate_winograd_loops.mlir",
@@ -77,11 +82,6 @@ iree_lit_test_suite(
     data = [
         "transform_dialect_dummy_spec.mlir",
     ],
-    # Several of these tests are somewhat expensive with sanitizers. Tagging
-    # them large does not currently disable them on sanitizers, as we
-    # currently run sanitizers on all but "enormous" tests, but is done
-    # for consistency with similarly expensive tests (#14152).
-    size = "large",
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

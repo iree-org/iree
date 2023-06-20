@@ -760,13 +760,7 @@ class BuildFileFunctions(object):
                              f"{size_block}"
                              f")\n\n")
 
-  def native_test(self,
-                  name,
-                  src,
-                  args=None,
-                  data=None,
-                  tags=None,
-                  size=None):
+  def native_test(self, name, src, args=None, data=None, tags=None, size=None):
     if self._should_skip_target(tags=tags):
       return
     if data is not None:

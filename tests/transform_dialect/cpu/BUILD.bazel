@@ -15,6 +15,11 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
+    # Several of these tests are somewhat expensive with sanitizers. Tagging
+    # them large does not currently disable them on sanitizers, as we
+    # currently run sanitizers on all but "enormous" tests, but is done
+    # for consistency with similarly expensive tests (#14152).
+    size = "large",
     srcs = [
         "attention.mlir",
         "contraction-packing.mlir",
@@ -30,11 +35,6 @@ iree_lit_test_suite(
         "matmul_codegen_custom_dispatch_formation_spec.mlir",
         "matmul_codegen_default_spec.mlir",
     ],
-    # Several of these tests are somewhat expensive with sanitizers. Tagging
-    # them large does not currently disable them on sanitizers, as we
-    # currently run sanitizers on all but "enormous" tests, but is done
-    # for consistency with similarly expensive tests (#14152).
-    size = "large",
     tools = [
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",

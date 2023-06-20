@@ -82,11 +82,11 @@ iree_lit_test_suite(
 
 iree_lit_test_suite(
     name = "lit_large",
+    size = "large",
     srcs = [
         "nvvm_pipeline_test.mlir",
     ],
     cfg = "//compiler:lit.cfg.py",
-    size = "large",
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

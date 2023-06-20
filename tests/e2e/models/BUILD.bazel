@@ -22,6 +22,8 @@ CHECK_FRAMEWORK_TESTS = [
 
 iree_lit_test_suite(
     name = "lit_large",
+    # These tests are too large for some slow configurations (emulators...).
+    size = "large",
     srcs = enforce_glob(
         [
             "collatz.mlir",
@@ -39,8 +41,6 @@ iree_lit_test_suite(
         ],
     ),
     cfg = "//tests:lit.cfg.py",
-    # These tests are too large for some slow configurations (emulators...).
-    size = "large",
     tags = [
         # These tests use `iree-run-mlir`, so they require the `hostonly` tag.
         "hostonly",
@@ -57,11 +57,11 @@ iree_lit_test_suite(
 
 iree_lit_test_suite(
     name = "lit_enormous",
-    srcs = ["resnet50_fake_weights.mlir"],
-    cfg = "//tests:lit.cfg.py",
     # These tests are too large for even moderately slow configurations
     # (sanitizers...).
     size = "enormous",
+    srcs = ["resnet50_fake_weights.mlir"],
+    cfg = "//tests:lit.cfg.py",
     tags = [
         # These tests use `iree-run-mlir`, so they require the `hostonly` tag.
         "hostonly",
@@ -78,10 +78,10 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
+    size = "large",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
-    size = "large",
     target_backend = "llvm-cpu",
 )
 
@@ -95,7 +95,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    timeout = "long",
+    size = "large",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "vulkan",
@@ -104,7 +104,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_cuda_cuda",
-    timeout = "long",
+    size = "large",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "cuda",
