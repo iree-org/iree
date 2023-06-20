@@ -153,6 +153,11 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
 
  private:
   // If the module was created from a FlatBuffer blob, we stash it here.
+  // Note that this buffer will typically be captured here at the Python
+  // instance level and within the deallocator of the native vm module.
+  // Since this child field is destroyed first (before the base class wrapped
+  // vm module), we ensure that there are no dangling references when
+  // that deallocator is called.
   py::object stashed_flatbuffer_blob = py::none();
 };
 

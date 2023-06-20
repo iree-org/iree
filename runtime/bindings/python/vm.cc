@@ -337,7 +337,11 @@ VmModule VmModule::WrapBuffer(VmInstance* instance, py::object buffer_obj,
   }
 
   CheckApiStatus(status, "Error creating vm module from aligned memory");
-  return VmModule::StealFromRawPtr(module);
+  auto py_module = VmModule::StealFromRawPtr(module);
+  // Stash a reference to the flatbuffer at the Python instance level. This
+  // is exposed to the tracing API, allowing it to get at the backing contents.
+  py_module.stashed_flatbuffer_blob = buffer_obj;
+  return py_module;
 }
 
 VmModule VmModule::CopyBuffer(VmInstance* instance, py::object buffer_obj) {
