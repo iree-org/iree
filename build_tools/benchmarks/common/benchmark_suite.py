@@ -25,7 +25,7 @@ MODEL_TOOLFILE_NAME = "tool"
 
 @dataclass
 class BenchmarkCase:
-  """Represents a benchmark case.
+    """Represents a benchmark case.
 
     model_name: the source model, e.g., 'MobileSSD'.
     model_tags: the source model tags, e.g., ['f32'].
@@ -35,148 +35,182 @@ class BenchmarkCase:
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
     benchmark_case_dir: the path to benchmark case directory.
     run_config: the run config from e2e test framework.
-  """
+    """
 
-  model_name: str
-  model_tags: Sequence[str]
-  bench_mode: Sequence[str]
-  target_arch: common_definitions.DeviceArchitecture
-  driver_info: DriverInfo
-  benchmark_tool_name: str
-  benchmark_case_dir: pathlib.Path
-  run_config: iree_definitions.E2EModelRunConfig
+    model_name: str
+    model_tags: Sequence[str]
+    bench_mode: Sequence[str]
+    target_arch: common_definitions.DeviceArchitecture
+    driver_info: DriverInfo
+    benchmark_tool_name: str
+    benchmark_case_dir: pathlib.Path
+    run_config: iree_definitions.E2EModelRunConfig
 
 
 # A map from execution config to driver info. This is temporary during migration
 # before we can drop the DriverInfo.
-EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP: Dict[Tuple[
-    iree_definitions.RuntimeDriver, iree_definitions.RuntimeLoader], str] = {
-        (iree_definitions.RuntimeDriver.LOCAL_TASK, iree_definitions.RuntimeLoader.EMBEDDED_ELF):
-            "iree-llvm-cpu",
-        (iree_definitions.RuntimeDriver.LOCAL_SYNC, iree_definitions.RuntimeLoader.EMBEDDED_ELF):
-            "iree-llvm-cpu-sync",
-        (iree_definitions.RuntimeDriver.LOCAL_TASK, iree_definitions.RuntimeLoader.VMVX_MODULE):
-            "iree-vmvx",
-        (iree_definitions.RuntimeDriver.LOCAL_SYNC, iree_definitions.RuntimeLoader.VMVX_MODULE):
-            "iree-vmvx-sync",
-        (iree_definitions.RuntimeDriver.VULKAN, iree_definitions.RuntimeLoader.NONE):
-            "iree-vulkan",
-        (iree_definitions.RuntimeDriver.CUDA, iree_definitions.RuntimeLoader.NONE):
-            "iree-cuda",
-    }
+EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP: Dict[
+    Tuple[iree_definitions.RuntimeDriver, iree_definitions.RuntimeLoader], str
+] = {
+    (
+        iree_definitions.RuntimeDriver.LOCAL_TASK,
+        iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+    ): "iree-llvm-cpu",
+    (
+        iree_definitions.RuntimeDriver.LOCAL_SYNC,
+        iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+    ): "iree-llvm-cpu-sync",
+    (
+        iree_definitions.RuntimeDriver.LOCAL_TASK,
+        iree_definitions.RuntimeLoader.VMVX_MODULE,
+    ): "iree-vmvx",
+    (
+        iree_definitions.RuntimeDriver.LOCAL_SYNC,
+        iree_definitions.RuntimeLoader.VMVX_MODULE,
+    ): "iree-vmvx-sync",
+    (
+        iree_definitions.RuntimeDriver.VULKAN,
+        iree_definitions.RuntimeLoader.NONE,
+    ): "iree-vulkan",
+    (
+        iree_definitions.RuntimeDriver.CUDA,
+        iree_definitions.RuntimeLoader.NONE,
+    ): "iree-cuda",
+}
 
 
 class BenchmarkSuite(object):
-  """Represents the benchmarks in benchmark suite directory."""
+    """Represents the benchmarks in benchmark suite directory."""
 
-  def __init__(self, benchmark_cases: Sequence[BenchmarkCase]):
-    """Construct a benchmark suite.
+    def __init__(self, benchmark_cases: Sequence[BenchmarkCase]):
+        """Construct a benchmark suite.
 
-    Args:
-      benchmark_cases: list of benchmark cases.
-    """
-    self.benchmark_cases = list(benchmark_cases)
+        Args:
+          benchmark_cases: list of benchmark cases.
+        """
+        self.benchmark_cases = list(benchmark_cases)
 
-  def filter_benchmarks(
-      self,
-      available_drivers: Optional[Sequence[str]] = None,
-      available_loaders: Optional[Sequence[str]] = None,
-      target_architectures: Optional[Sequence[
-          common_definitions.DeviceArchitecture]] = None,
-      driver_filter: Optional[str] = None,
-      mode_filter: Optional[str] = None,
-      model_name_filter: Optional[str] = None) -> Sequence[BenchmarkCase]:
-    """Filters benchmarks.
-      Args:
-        available_drivers: list of drivers supported by the tools. None means to
-          match any driver.
-        available_loaders: list of executable loaders supported by the tools.
-          None means to match any loader.
-        target_architectures: list of target architectures to be included. None
-          means no filter.
-        driver_filter: driver filter regex.
-        mode_filter: benchmark mode regex.
-        model_name_filter: model name regex.
-      Returns:
-        A list of matched benchmark cases.
-    """
+    def filter_benchmarks(
+        self,
+        available_drivers: Optional[Sequence[str]] = None,
+        available_loaders: Optional[Sequence[str]] = None,
+        target_architectures: Optional[
+            Sequence[common_definitions.DeviceArchitecture]
+        ] = None,
+        driver_filter: Optional[str] = None,
+        mode_filter: Optional[str] = None,
+        model_name_filter: Optional[str] = None,
+    ) -> Sequence[BenchmarkCase]:
+        """Filters benchmarks.
+        Args:
+          available_drivers: list of drivers supported by the tools. None means to
+            match any driver.
+          available_loaders: list of executable loaders supported by the tools.
+            None means to match any loader.
+          target_architectures: list of target architectures to be included. None
+            means no filter.
+          driver_filter: driver filter regex.
+          mode_filter: benchmark mode regex.
+          model_name_filter: model name regex.
+        Returns:
+          A list of matched benchmark cases.
+        """
 
-    chosen_cases = []
-    for benchmark_case in self.benchmark_cases:
-      driver_info = benchmark_case.driver_info
+        chosen_cases = []
+        for benchmark_case in self.benchmark_cases:
+            driver_info = benchmark_case.driver_info
 
-      driver_name = driver_info.driver_name
-      matched_available_driver = (available_drivers is None or
-                                  driver_name in available_drivers)
-      matched_driver_filter = driver_filter is None or re.match(
-          driver_filter, driver_name) is not None
-      matched_driver = matched_available_driver and matched_driver_filter
+            driver_name = driver_info.driver_name
+            matched_available_driver = (
+                available_drivers is None or driver_name in available_drivers
+            )
+            matched_driver_filter = (
+                driver_filter is None
+                or re.match(driver_filter, driver_name) is not None
+            )
+            matched_driver = matched_available_driver and matched_driver_filter
 
-      matched_loader = not driver_info.loader_name or available_loaders is None or (
-          driver_info.loader_name in available_loaders)
+            matched_loader = (
+                not driver_info.loader_name
+                or available_loaders is None
+                or (driver_info.loader_name in available_loaders)
+            )
 
-      if target_architectures is None:
-        matched_arch = True
-      else:
-        matched_arch = benchmark_case.target_arch in target_architectures
+            if target_architectures is None:
+                matched_arch = True
+            else:
+                matched_arch = benchmark_case.target_arch in target_architectures
 
-      bench_mode = ','.join(benchmark_case.bench_mode)
-      matched_mode = (mode_filter is None or
-                      re.match(mode_filter, bench_mode) is not None)
+            bench_mode = ",".join(benchmark_case.bench_mode)
+            matched_mode = (
+                mode_filter is None or re.match(mode_filter, bench_mode) is not None
+            )
 
-      model_name_with_tags = benchmark_case.model_name
-      if len(benchmark_case.model_tags) > 0:
-        model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
-      matched_model_name = (model_name_filter is None or re.match(
-          model_name_filter, model_name_with_tags) is not None)
+            model_name_with_tags = benchmark_case.model_name
+            if len(benchmark_case.model_tags) > 0:
+                model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
+            matched_model_name = (
+                model_name_filter is None
+                or re.match(model_name_filter, model_name_with_tags) is not None
+            )
 
-      if (matched_driver and matched_loader and matched_arch and
-          matched_model_name and matched_mode):
-        chosen_cases.append(benchmark_case)
+            if (
+                matched_driver
+                and matched_loader
+                and matched_arch
+                and matched_model_name
+                and matched_mode
+            ):
+                chosen_cases.append(benchmark_case)
 
-    return chosen_cases
+        return chosen_cases
 
-  @staticmethod
-  def load_from_run_configs(
-      run_configs: Sequence[iree_definitions.E2EModelRunConfig],
-      root_benchmark_dir: pathlib.Path):
-    """Loads the benchmarks from the run configs.
+    @staticmethod
+    def load_from_run_configs(
+        run_configs: Sequence[iree_definitions.E2EModelRunConfig],
+        root_benchmark_dir: pathlib.Path,
+    ):
+        """Loads the benchmarks from the run configs.
 
-    Args:
-      run_configs: list of benchmark run configs.
-    Returns:
-      A benchmark suite.
-    """
+        Args:
+          run_configs: list of benchmark run configs.
+        Returns:
+          A benchmark suite.
+        """
 
-    benchmark_cases = []
-    for run_config in run_configs:
-      module_gen_config = run_config.module_generation_config
-      module_exec_config = run_config.module_execution_config
-      target_device_spec = run_config.target_device_spec
+        benchmark_cases = []
+        for run_config in run_configs:
+            module_gen_config = run_config.module_generation_config
+            module_exec_config = run_config.module_execution_config
+            target_device_spec = run_config.target_device_spec
 
-      driver_info_key = EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP.get(
-          (module_exec_config.driver, module_exec_config.loader))
-      if driver_info_key is None:
-        raise ValueError(
-            f"Can't map execution config to driver info: {module_exec_config}.")
-      driver_info = IREE_DRIVERS_INFOS[driver_info_key]
+            driver_info_key = EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP.get(
+                (module_exec_config.driver, module_exec_config.loader)
+            )
+            if driver_info_key is None:
+                raise ValueError(
+                    f"Can't map execution config to driver info: {module_exec_config}."
+                )
+            driver_info = IREE_DRIVERS_INFOS[driver_info_key]
 
-      target_arch = target_device_spec.architecture
-      model = module_gen_config.imported_model.model
+            target_arch = target_device_spec.architecture
+            model = module_gen_config.imported_model.model
 
-      module_dir_path = iree_artifacts.get_module_dir_path(
-          module_generation_config=module_gen_config,
-          root_path=root_benchmark_dir)
-      module_dir_path = pathlib.Path(module_dir_path)
+            module_dir_path = iree_artifacts.get_module_dir_path(
+                module_generation_config=module_gen_config, root_path=root_benchmark_dir
+            )
+            module_dir_path = pathlib.Path(module_dir_path)
 
-      benchmark_case = BenchmarkCase(model_name=model.name,
-                                     model_tags=model.tags,
-                                     bench_mode=module_exec_config.tags,
-                                     target_arch=target_arch,
-                                     driver_info=driver_info,
-                                     benchmark_tool_name=run_config.tool.value,
-                                     benchmark_case_dir=module_dir_path,
-                                     run_config=run_config)
-      benchmark_cases.append(benchmark_case)
+            benchmark_case = BenchmarkCase(
+                model_name=model.name,
+                model_tags=model.tags,
+                bench_mode=module_exec_config.tags,
+                target_arch=target_arch,
+                driver_info=driver_info,
+                benchmark_tool_name=run_config.tool.value,
+                benchmark_case_dir=module_dir_path,
+                run_config=run_config,
+            )
+            benchmark_cases.append(benchmark_case)
 
-    return BenchmarkSuite(benchmark_cases=benchmark_cases)
+        return BenchmarkSuite(benchmark_cases=benchmark_cases)

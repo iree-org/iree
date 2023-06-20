@@ -11,11 +11,11 @@ from iree.compiler.tools import binaries
 
 
 def main(args=None):
-  if args is None:
-    args = sys.argv[1:]
-  exe = binaries.find_tool("iree-compile")
-  return subprocess.call(args=[exe] + args)
+    if args is None:
+        args = sys.argv[1:]
+    exe = binaries.find_tool("iree-compile")
+    return subprocess.call(args=[exe] + args)
 
 
 if __name__ == "__main__":
-  sys.exit(main())
+    sys.exit(main())
