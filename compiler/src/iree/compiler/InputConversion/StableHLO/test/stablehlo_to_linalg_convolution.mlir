@@ -133,6 +133,38 @@ func.func @conv_transpose_2d(%arg0: tensor<2x9x10x3xf32>,
 
 // -----
 
+// CHECK-LABEL: func @conv_transpose_complex_2d
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @conv_transpose_complex_2d(%arg0: tensor<2x9x10x3xcomplex<f32>>,
+                             %arg1: tensor<4x4x3x3xcomplex<f32>>)
+  -> tensor<2x15x25x3xcomplex<f32>> {
+  %0 = stablehlo.convolution(%arg0, %arg1)
+    dim_numbers = [b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f],
+    window = {stride = [1, 1], pad = [[6, 6], [6, 6]],
+              lhs_dilate = [1, 2], rhs_dilate = [2, 2]}
+    {
+      batch_group_count = 1 : i64,
+      feature_group_count = 1 : i64,
+      precision_config = [#stablehlo<precision DEFAULT>,
+                          #stablehlo<precision DEFAULT>]
+    } : (tensor<2x9x10x3xcomplex<f32>>, tensor<4x4x3x3xcomplex<f32>>) -> tensor<2x15x25x3xcomplex<f32>>
+  return %0 : tensor<2x15x25x3xcomplex<f32>>
+}
+// CHECK:     %[[ZERO:.+]] = complex.constant [0.000000e+00 : f32, 0.000000e+00 : f32] : complex<f32>
+// CHECK:         %[[INIT:.+]] = tensor.empty()
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[ZERO]]{{.*}}outs(%[[INIT]]
+// CHECK:         %[[LHS_INIT:.+]] = tensor.empty()
+// CHECK:         %[[LHS_FILL:.+]] = linalg.fill ins(%[[ZERO]]{{.*}}outs(%[[LHS_INIT]]
+// CHECK:         %[[LHS_PAD:.+]] = tensor.insert_slice %[[ARG0]] into %[[LHS_FILL]][0, 6, 6, 0] [2, 9, 10, 3] [1, 1, 2, 1] : tensor<2x9x10x3xcomplex<f32>> into tensor<2x21x31x3xcomplex<f32>>
+// CHECK:         linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:      {dilations = dense<2> : tensor<2xi64>
+// CHECK-SAME:       strides = dense<1> : tensor<2xi64>}
+// CHECK-SAME:     ins(%[[LHS_PAD]], %[[ARG1]] : tensor<2x21x31x3xcomplex<f32>>, tensor<4x4x3x3xcomplex<f32>>)
+// CHECK-SAME:     outs(%[[FILL]] : tensor<2x15x25x3xcomplex<f32>>) -> tensor<2x15x25x3xcomplex<f32>>
+
+// -----
+
 // Just check that this lowers successfully.
 // CHECK-LABEL: func @conv_different_batch_dim_in_out
 func.func @conv_different_batch_dim_in_out(%arg0: tensor<1x1x1xf64>,
