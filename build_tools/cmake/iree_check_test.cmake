@@ -56,8 +56,8 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME;SIZE"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -126,8 +126,8 @@ function(iree_check_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
-    TIMEOUT
-      ${_RULE_TIMEOUT}
+    SIZE
+      ${_RULE_SIZE}
   )
 endfunction()
 
@@ -166,8 +166,8 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "NAME;TARGET_BACKEND;DRIVER;SIZE"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -239,8 +239,8 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_LABELS}
       TARGET_CPU_FEATURES
         ${_RULE_TARGET_CPU_FEATURES}
-      TIMEOUT
-        ${_RULE_TIMEOUT}
+      SIZE
+        ${_RULE_SIZE}
     )
   endforeach()
 endfunction()
@@ -336,8 +336,8 @@ function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
-    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS;TIMEOUT"
+    "NAME;SIZE"
+    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
 
@@ -399,8 +399,8 @@ function(iree_check_test_suite)
           ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
-        TIMEOUT
-          ${_RULE_TIMEOUT}
+        SIZE
+          ${_RULE_SIZE}
       )
     endforeach()
   endforeach()

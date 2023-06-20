@@ -49,25 +49,10 @@ class BuildFileFunctions(object):
     else:
       return f"  {name}\n    {value}\n"
 
-  # Match Bazel's timeout values
-  # https://docs.bazel.build/versions/main/test-encyclopedia.html
-  _timeout_map = {
-      "short": 60,
-      "moderate": 300,
-      "long": 900,
-      "eternal": 3600,
-  }
-
   def _should_skip_target(self, tags=None, **kwargs):
     if tags and "skip-bazel_to_cmake" in tags:
       return True
     return False
-
-  def _convert_timeout_arg_block(self, name, value):
-    if value is None:
-      return ""
-    value = self._timeout_map[value]
-    return f"  {name}\n    {value}\n"
 
   def _convert_string_list_block(self, name, values, quote=True, sort=False):
     # Note this deliberately distinguishes between an empty list (argument
@@ -379,7 +364,7 @@ class BuildFileFunctions(object):
               defines=None,
               data=None,
               deps=None,
-              timeout=None,
+              size=None,
               args=None,
               tags=None,
               includes=None,
@@ -395,7 +380,7 @@ class BuildFileFunctions(object):
     deps_block = self._convert_target_list_block("DEPS", deps)
     args_block = self._convert_string_list_block("ARGS", args)
     labels_block = self._convert_string_list_block("LABELS", tags)
-    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+    size_block = self._convert_string_arg_block("SIZE", size)
     includes_block = self._convert_includes_block(includes)
 
     self._converter.body += (f"iree_cc_test(\n"
@@ -408,7 +393,7 @@ class BuildFileFunctions(object):
                              f"{deps_block}"
                              f"{args_block}"
                              f"{labels_block}"
-                             f"{timeout_block}"
+                             f"{size_block}"
                              f"{includes_block}"
                              f")\n\n")
 
@@ -614,7 +599,7 @@ class BuildFileFunctions(object):
                           tools=None,
                           data=None,
                           tags=None,
-                          timeout=None,
+                          size=None,
                           **kwargs):
     if self._should_skip_target(tags=tags, **kwargs):
       return
@@ -623,7 +608,7 @@ class BuildFileFunctions(object):
     tools_block = self._convert_target_list_block("TOOLS", tools)
     data_block = self._convert_target_list_block("DATA", data)
     labels_block = self._convert_string_list_block("LABELS", tags)
-    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+    size_block = self._convert_string_arg_block("SIZE", size)
 
     self._converter.body += (f"iree_lit_test_suite(\n"
                              f"{name_block}"
@@ -631,7 +616,7 @@ class BuildFileFunctions(object):
                              f"{tools_block}"
                              f"{data_block}"
                              f"{labels_block}"
-                             f"{timeout_block}"
+                             f"{size_block}"
                              f")\n\n")
 
   def iree_check_single_backend_test_suite(self,
@@ -644,7 +629,7 @@ class BuildFileFunctions(object):
                                            runner_args=None,
                                            tags=None,
                                            target_cpu_features=None,
-                                           timeout=None,
+                                           size=None,
                                            **kwargs):
     if self._should_skip_target(tags=tags, **kwargs):
       return
@@ -660,7 +645,7 @@ class BuildFileFunctions(object):
     labels_block = self._convert_string_list_block("LABELS", tags)
     target_cpu_features_block = self._convert_string_arg_block(
         "TARGET_CPU_FEATURES", target_cpu_features)
-    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+    size_block = self._convert_string_arg_block("SIZE", size)
 
     self._converter.body += (f"iree_check_single_backend_test_suite(\n"
                              f"{name_block}"
@@ -671,7 +656,7 @@ class BuildFileFunctions(object):
                              f"{runner_args_block}"
                              f"{labels_block}"
                              f"{target_cpu_features_block}"
-                             f"{timeout_block}"
+                             f"{size_block}"
                              f")\n\n")
 
   def iree_check_test_suite(self,
@@ -682,7 +667,7 @@ class BuildFileFunctions(object):
                             runner_args=None,
                             tags=None,
                             target_cpu_features_variants=None,
-                            timeout=None,
+                            size=None,
                             **kwargs):
     if self._should_skip_target(tags=tags, **kwargs):
       return
@@ -704,7 +689,7 @@ class BuildFileFunctions(object):
     labels_block = self._convert_string_list_block("LABELS", tags)
     target_cpu_features_variants_block = self._convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
-    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+    size_block = self._convert_string_arg_block("SIZE", size)
 
     self._converter.body += (f"iree_check_test_suite(\n"
                              f"{name_block}"
@@ -715,7 +700,7 @@ class BuildFileFunctions(object):
                              f"{runner_args_block}"
                              f"{labels_block}"
                              f"{target_cpu_features_variants_block}"
-                             f"{timeout_block}"
+                             f"{size_block}"
                              f")\n\n")
 
   def iree_generated_trace_runner_test(self,
@@ -728,6 +713,7 @@ class BuildFileFunctions(object):
                                        runner_args=None,
                                        tags=None,
                                        target_cpu_features_variants=None,
+                                       size=None,
                                        **kwargs):
     if self._should_skip_target(tags=tags, **kwargs):
       return
@@ -758,6 +744,7 @@ class BuildFileFunctions(object):
     labels_block = self._convert_string_list_block("LABELS", tags)
     target_cpu_features_variants_block = self._convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
+    size_block = self._convert_string_arg_block("SIZE", size)
 
     self._converter.body += (f"iree_generated_trace_runner_test(\n"
                              f"{name_block}"
@@ -770,15 +757,10 @@ class BuildFileFunctions(object):
                              f"{runner_args_block}"
                              f"{labels_block}"
                              f"{target_cpu_features_variants_block}"
+                             f"{size_block}"
                              f")\n\n")
 
-  def native_test(self,
-                  name,
-                  src,
-                  args=None,
-                  data=None,
-                  tags=None,
-                  timeout=None):
+  def native_test(self, name, src, args=None, data=None, tags=None, size=None):
     if self._should_skip_target(tags=tags):
       return
     if data is not None:
@@ -788,13 +770,14 @@ class BuildFileFunctions(object):
     test_binary_block = self._convert_single_target_block("SRC", src)
     args_block = self._convert_string_list_block("ARGS", args)
     labels_block = self._convert_string_list_block("LABELS", tags)
-    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+    size_block = self._convert_string_arg_block("SIZE", size)
 
     self._converter.body += (f"iree_native_test(\n"
                              f"{name_block}"
                              f"{args_block}"
                              f"{test_binary_block}"
                              f"{labels_block}"
+                             f"{size_block}"
                              f")\n\n")
 
   def cc_binary_benchmark(
@@ -809,8 +792,7 @@ class BuildFileFunctions(object):
       tags=None,
       testonly=True,
       # unused
-      size="small",
-      timeout=None):
+      size=None):
     if self._should_skip_target(tags=tags):
       return
     name_block = self._convert_string_arg_block("NAME", name, quote=False)
@@ -822,6 +804,7 @@ class BuildFileFunctions(object):
     defines_block = self._convert_string_list_block("LINKOPTS", linkopts)
     testonly_block = self._convert_option_block("TESTONLY", testonly)
     labels_block = self._convert_string_list_block("LABELS", tags)
+    size_block = self._convert_string_arg_block("SIZE", size)
 
     self._converter.body += (f"iree_cc_binary_benchmark(\n"
                              f"{name_block}"
@@ -833,6 +816,7 @@ class BuildFileFunctions(object):
                              f"{defines_block}"
                              f"{testonly_block}"
                              f"{labels_block}"
+                             f"{size_block}"
                              f")\n\n")
 
   def iree_cmake_extra_content(self, content, inline=False):

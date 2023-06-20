@@ -42,7 +42,7 @@ function(iree_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME"
+    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME;SIZE"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -102,6 +102,8 @@ function(iree_trace_runner_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
+    SIZE
+      ${_RULE_SIZE}
   )
 endfunction()
 
@@ -153,7 +155,7 @@ function(iree_single_backend_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER"
+    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER;SIZE"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -247,6 +249,8 @@ function(iree_single_backend_generated_trace_runner_test)
       ${_RULE_LABELS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
+    SIZE
+      ${_RULE_SIZE}
   )
 
   # Note we are relying on the fact that the target created by
@@ -304,7 +308,7 @@ function(iree_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TRACE_RUNNER"
+    "NAME;GENERATOR;TRACE_RUNNER;SIZE"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
@@ -371,6 +375,8 @@ function(iree_generated_trace_runner_test)
           ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
+        SIZE
+          ${_RULE_SIZE}
       )
     endforeach()
   endforeach()

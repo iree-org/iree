@@ -22,9 +22,9 @@ def iree_check_test(
         driver = None,
         compiler_flags = [],
         runner_args = [],
+        size = None,
         tags = [],
         target_cpu_features = None,
-        timeout = None,
         **kwargs):
     """Creates an iree-check-module test for the specified source file.
 
@@ -39,11 +39,13 @@ def iree_check_test(
           format and backend flags are passed automatically.
       runner_args: additional runner_args to pass to iree-check-module. The
           driver and input file are passed automatically.
+      size: Optional value identifying heavy tests. Allowed values are
+          like in Bazel but the focus is less in controlling test timeouts
+          and more on altogether skipping heavy tests in slow configs.
       tags: additional tags to apply to the generated test. A tag
           "driver=DRIVER" is added automatically.
       target_cpu_features: currently unimplemented (must be empty), will
           eventually allow specifying target CPU features.
-      timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying native_test.
     """
 
@@ -72,7 +74,7 @@ def iree_check_test(
         data = [":%s" % bytecode_module_name],
         src = "//tools:iree-check-module",
         tags = tags + ["driver=%s" % driver],
-        timeout = timeout,
+        size = size,
         **kwargs
     )
 
@@ -83,9 +85,9 @@ def iree_check_single_backend_test_suite(
         driver = None,
         compiler_flags = [],
         runner_args = [],
+        size = None,
         tags = [],
         target_cpu_features = None,
-        timeout = None,
         **kwargs):
     """Creates a test suite of iree-check-module tests for a single backend/driver pair.
 
@@ -106,10 +108,12 @@ def iree_check_single_backend_test_suite(
           separate suite or iree_check_test.
       target_cpu_features: currently unimplemented (must be empty), will
           eventually allow specifying target CPU features.
+      size: Optional value identifying heavy tests. Allowed values are
+          like in Bazel but the focus is less in controlling test timeouts
+          and more on altogether skipping heavy tests in slow configs.
       tags: tags to apply to the generated tests. Note that as in standard test
           suites, manual is treated specially and will also apply to the test
           suite itself.
-      timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying tests and
           test suite.
     """
@@ -132,7 +136,7 @@ def iree_check_single_backend_test_suite(
             compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
-            timeout = timeout,
+            size = size,
             **kwargs
         )
         tests.append(test_name)
@@ -158,6 +162,7 @@ def iree_check_test_suite(
         target_backends_and_drivers = ALL_TARGET_BACKENDS_AND_DRIVERS,
         compiler_flags = [],
         runner_args = [],
+        size = None,
         tags = [],
         target_cpu_features_variants = [],
         **kwargs):
@@ -176,6 +181,9 @@ def iree_check_test_suite(
           iree-check-module tests. The driver and input file are passed
           automatically. To use different runner_args per test, create a
           separate suite or iree_check_test.
+      size: Optional value identifying heavy tests. Allowed values are
+          like in Bazel but the focus is less in controlling test timeouts
+          and more on altogether skipping heavy tests in slow configs.
       tags: tags to apply to the generated tests. Note that as in standard test
           suites, manual is treated specially and will also apply to the test
           suite itself.
@@ -210,6 +218,7 @@ def iree_check_test_suite(
             compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
+            size = size,
             **kwargs
         )
         tests.append(suite_name)

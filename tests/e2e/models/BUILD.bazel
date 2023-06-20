@@ -98,7 +98,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    timeout = "long",
+    size = "large",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "vulkan",
@@ -107,7 +107,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_cuda_cuda",
-    timeout = "long",
+    size = "large",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "cuda",
