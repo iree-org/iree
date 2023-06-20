@@ -125,3 +125,25 @@ func.func @matmul_scalar_loads() {
 
 // CHECK-LABEL:       func.func @matmul_scalar_load
 // CHECK-COUNT-128:     memref.load
+
+// -----
+
+// Make sure we don't transpose a mask but create a transposed mask instead.
+
+func.func @transpose_mask() {
+  %a = arith.constant 4 : index
+  %b = arith.constant 8 : index
+  %c0 = arith.constant 0 : index
+  %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<4x2xi1>
+  %mask = vector.create_mask %a, %b : vector<2x4xi1>
+  %transpose_mask = vector.transpose %mask, [1, 0] : vector<2x4xi1> to vector<4x2xi1>
+  vector.transfer_write %transpose_mask, %3[%c0, %c0] {in_bounds = [true, true]} : vector<4x2xi1>, memref<4x2xi1>
+  return
+}
+
+// CHECK-LABEL: func.func @transpose_mask
+//   CHECK-NOT:   vector.create_mask
+//   CHECK-NOT:   vector.constant_mask [2, 4]
+//   CHECK-NOT:   vector.transpose
+//   CHECK-NOT:   vector.shuffle
+//       CHECK:   vector.constant_mask [4, 2] : vector<4x2xi1>
