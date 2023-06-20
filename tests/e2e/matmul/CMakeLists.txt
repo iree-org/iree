@@ -101,13 +101,13 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-flow-enable-data-tiling"
   LABELS
-    "noriscv"
-    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
+  SIZE
+    "large"
 )
 
 iree_generated_trace_runner_test(
@@ -127,11 +127,11 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-flow-enable-data-tiling"
   LABELS
-    "noriscv"
-    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
+  SIZE
+    "large"
 )
 
 iree_generated_trace_runner_test(
@@ -298,8 +298,6 @@ iree_generated_trace_runner_test(
     "--iree-llvmcpu-enable-microkernels"
     "--iree-flow-enable-data-tiling"
   LABELS
-    "noriscv"
-    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
@@ -308,6 +306,8 @@ iree_generated_trace_runner_test(
     "x86_64:avx512_vnni:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
+  SIZE
+    "large"
 )
 
 iree_generated_trace_runner_test(
@@ -353,13 +353,13 @@ iree_generated_trace_runner_test(
     "--iree-llvmcpu-enable-microkernels"
     "--iree-flow-enable-data-tiling"
   LABELS
-    "noriscv"
-    "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2_fma:+avx,+avx2,+fma"
     "x86_64:avx512_base:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+  SIZE
+    "large"
 )
 
 iree_generated_trace_runner_test(
@@ -505,7 +505,8 @@ iree_generated_trace_runner_test(
     "--iree-flow-split-matmul-reduction=4"
   LABELS
     "requires-gpu-nvidia"
-    "noriscv"
+  SIZE
+    "large"
 )
 
 iree_generated_trace_runner_test(

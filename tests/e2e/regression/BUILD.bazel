@@ -45,8 +45,10 @@ iree_lit_test_suite(
     ],
     cfg = "//tests:lit.cfg.py",
     tags = [
+        # Some of these tests explicitly use these drivers.
         "driver=local-task",
         "driver=vulkan",
+        # Some of these tests run iree-run-mlir, requiring `hostonly`.
         "hostonly",
     ],
     tools = [

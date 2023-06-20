@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_lit_test_suite(
   NAME
-    lit
+    lit_large
   SRCS
     "collatz.mlir"
     "edge_detection.mlir"
@@ -25,15 +25,16 @@ iree_lit_test_suite(
     FileCheck
     iree-run-mlir
   LABELS
+    "hostonly"
     "driver=local-task"
     "driver=vulkan"
-    "hostonly"
-    "optonly"
+  SIZE
+    "large"
 )
 
 iree_lit_test_suite(
   NAME
-    lit_large
+    lit_enormous
   SRCS
     "resnet50_fake_weights.mlir"
   TOOLS
@@ -41,12 +42,11 @@ iree_lit_test_suite(
     FileCheck
     iree-run-mlir
   LABELS
+    "hostonly"
     "driver=local-task"
     "driver=vulkan"
-    "hostonly"
-    "noasan"
-    "notsan"
-    "optonly"
+  SIZE
+    "enormous"
 )
 
 iree_check_single_backend_test_suite(
@@ -61,11 +61,8 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
-  LABELS
-    "hostonly"
-    "noasan"
-    "notsan"
-    "optonly"
+  SIZE
+    "large"
 )
 
 iree_check_single_backend_test_suite(
