@@ -96,7 +96,7 @@ jobs:
           # the workflow has been rerun and picked up the new labels. Skip rerun
           # in this case.
           RUN_STARTED_AT_EPOCH="$(date --date="${RUN_STARTED_AT}" +%s)"
-          if (( "${RUN_STARTED_AT_EPOCH}" < "${TRIGGERED_AT}" )); then
+          if (( RUN_STARTED_AT_EPOCH < TRIGGERED_AT )); then
             SHOULD_RERUN="true"
           else
             SHOULD_RERUN="false"
