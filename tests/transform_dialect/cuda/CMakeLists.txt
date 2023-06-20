@@ -48,8 +48,8 @@ iree_lit_test_suite(
     vecadd2d_codegen_spec.mlir
     vecadd2d_codegen_spec_partial_tile.mlir
   LABELS
-    "requires-gpu-nvidia"
     "driver=cuda"
+    "requires-gpu-nvidia"
 )
 
 iree_lit_test_suite(
@@ -73,8 +73,8 @@ iree_lit_test_suite(
     mma_reduction_layout_analysis_dispatch_spec.mlir
     mma_using_layout_analysis_codegen_spec.mlir
   LABELS
-    "requires-gpu-sm80"
     "driver=cuda"
+    "requires-gpu-sm80"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

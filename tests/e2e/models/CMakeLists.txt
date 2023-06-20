@@ -77,6 +77,8 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
+  SIZE
+    "large"
 )
 
 iree_check_single_backend_test_suite(
@@ -93,6 +95,8 @@ iree_check_single_backend_test_suite(
     "--iree-input-type=stablehlo"
   LABELS
     "requires-gpu-nvidia"
+  SIZE
+    "large"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
