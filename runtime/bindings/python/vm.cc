@@ -8,6 +8,7 @@
 
 #include "./status_utils.h"
 #include "iree/base/api.h"
+
 // TODO: We shouldn't need the HAL API but it is used for direct printing
 // summaries of HAL objects in lists. We should have a better way of doing this
 // dynamically vs hard depending on a type switch here.
@@ -16,10 +17,84 @@
 #include "iree/vm/api.h"
 #include "pybind11/numpy.h"
 
+using namespace pybind11::literals;
+
 namespace iree {
 namespace python {
 
 namespace {
+
+static const char kFromBufferDocstring[] =
+    R"(Creates a Vmmodule from a Python buffer.
+
+This is intended as a quick and dirty way to instantiate a VmModule from
+a binary blob. It will implicitly make a copy if alignment is not sufficient.
+
+It is recommended to use one of the other construction methods for maximum
+determinism and efficiency:
+
+* `mmap` : To memory map from a file.
+* `wrap_buffer` : To directly wrap a Python buffer that is known to be
+  aligned properly.
+* `copy_buffer` : To always make a copy of a Python buffer such that it is
+  aligned properly.
+
+This was historically called `from_flatbuffer`. It is recommended that new
+code use `flat_buffer`.
+
+Args:
+  instance: A VmInstance.
+  buffer: An object implementing the Python buffer protocol. Typically a
+    bytes, bytearray, memoryview, etc.
+  warn_if_copy: Raises a warning if alignment is not sufficient to use the
+    buffer directly, resulting in a copy. Defaults to True.
+)";
+
+static const char kCopyBufferDocstring[] =
+    R"(Creates a VmModule by making a copy of a Python buffer.
+
+Args:
+  instance: A VmInstance.
+  buffer: An object implementing the Python buffer protocol. Typically a
+    bytes, bytearray, memoryview, etc.
+)";
+
+static const char kWrapBufferDocstring[] =
+    R"(Creates a VmModule by directly using the backing memory of a Python buffer.
+
+Args:
+  instance: A VmInstance.
+  buffer: An object implementing the Python buffer protocol. Typically a
+    bytes, bytearray, memoryview, etc.
+  destroy_callback: A no-argument callback that is invoked when the backing
+    buffer is no longer in use.
+  close_buffer: Whether to call the `close` method on the `buffer` (prior to
+    invoking `destroy_callback`). Defaults to False.
+
+Raises:
+  ValueError if alignment is not satisfied.
+)";
+
+static const char kMMapDocstring[] =
+    R"(Create a VmModule by mmap'ing a file.
+
+When backed by a file, this is generally the most effective way to create a
+VmModule. Especially for large modules, this will result in the fewest
+copies and the most effective use of the system cache across invocations.
+
+Note that mmap behavior differs between Posix and Windows. Whereas the former
+will allow the backing file to be open before an mmap call and deleted
+immediately after, Windows generally allows neither. For compatibility,
+make sure that the backing file is not open for writing before calling this
+method and that if it needs to be deleted when done, that is done in a
+`destroy_callback`.
+
+Args:
+  instance: A VmInstance.
+  filepath: Path to the file on the file system.
+  destroy_callback: A no-argument callback that is invoked when the backing
+    buffer is no longer in use.
+)";
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
 // out of scope.
@@ -150,24 +225,107 @@ VmModule VmModule::ResolveModuleDependency(VmInstance* instance,
   return py_module;
 }
 
-VmModule VmModule::FromFlatbufferBlob(VmInstance* instance,
-                                      py::object flatbuffer_blob_object) {
-  IREE_TRACE_SCOPE_NAMED("VmModule::FromFlatbufferBlob");
-  auto flatbuffer_blob = py::cast<py::buffer>(flatbuffer_blob_object);
-  auto buffer_info = flatbuffer_blob.request();
+VmModule VmModule::MMap(VmInstance* instance, std::string filepath,
+                        py::object destroy_callback) {
+  IREE_TRACE_SCOPE_NAMED("VmModule::MMap");
+  auto mmap_module = py::module::import("mmap");
+  auto open_func = py::module::import("io").attr("open");
+  auto file_obj = open_func(filepath, "r+b");
+  // The signature of mmap is different on Windows vs others. On others,
+  // we use explicit flags and protection attributes for better control,
+  // triggering off of the presence of the MAP_SHARED flag constant (which
+  // is not present on Windows).
+  py::object mapped_file;
+  if (py::hasattr(mmap_module, "MAP_SHARED")) {
+    // Posix mmap signature.
+    auto flags = py::cast<int64_t>(mmap_module.attr("MAP_SHARED"));
+    // MAP_POPULATE isn't available on all versions/platforms.
+    if (py::hasattr(mmap_module, "MAP_POPULATE")) {
+      flags |= py::cast<int64_t>(mmap_module.attr("MAP_POPULATE"));
+    }
+    auto prot = py::cast<int64_t>(mmap_module.attr("PROT_READ"));
+    mapped_file = mmap_module.attr("mmap")(file_obj.attr("fileno")(), 0,
+                                           "flags"_a = flags, "prot"_a = prot);
+  } else {
+    // Windows mmap signature.
+    mapped_file =
+        mmap_module.attr("mmap")(file_obj.attr("fileno")(), 0,
+                                 "access"_a = mmap_module.attr("ACCESS_READ"));
+  }
+  // Backing file can be closed after a successful mmap call.
+  file_obj.attr("close")();
+
+  // MADV_RANDOM is not available on Windows (and possibly others?).
+  if (py::hasattr(mmap_module, "MADV_RANDOM")) {
+    mapped_file.attr("madvise")(mmap_module.attr("MADV_RANDOM"));
+  }
+  return WrapBuffer(instance, std::move(mapped_file),
+                    std::move(destroy_callback),
+                    /*close_buffer=*/true);
+}
+
+VmModule VmModule::WrapBuffer(VmInstance* instance, py::object buffer_obj,
+                              py::object destroy_callback, bool close_buffer) {
+  IREE_TRACE_SCOPE_NAMED("VmModule::FromAlignedMemory");
+  auto py_buffer = py::cast<py::buffer>(buffer_obj);
+  auto buffer_info = py_buffer.request();
+  if (!iree_host_size_has_alignment((uintptr_t)buffer_info.ptr,
+                                    IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
+    std::stringstream err;
+    err << "VmModule.from_aligned_memory received an unaligned buffer. ";
+    err << "Got 0x" << (void*)buffer_info.ptr << ", expected alignment ";
+    err << IREE_HAL_HEAP_BUFFER_ALIGNMENT;
+    throw std::invalid_argument(err.str());
+  }
+
   iree_vm_module_t* module = nullptr;
 
   // Bridge to the C-based deallocator API.
-  PyObject* pyobject_ptr = flatbuffer_blob_object.ptr();
+  struct DeallocateState {
+    DeallocateState(py::object buffer_obj, py::object destroy_callback,
+                    bool close_buffer)
+        : buffer_obj(std::move(buffer_obj)),
+          destroy_callback(std::move(destroy_callback)),
+          close_buffer(close_buffer) {}
+    py::object buffer_obj;
+    py::object destroy_callback;
+    bool close_buffer;
+  };
+  DeallocateState* state =
+      new DeallocateState(buffer_obj, destroy_callback, close_buffer);
   auto ctl_fn = +([](void* self, iree_allocator_command_t command,
                      const void* params, void** inout_ptr) {
+    py::gil_scoped_acquire gil;
     assert(command == IREE_ALLOCATOR_COMMAND_FREE);
-    PyObject* pyobject_ptr = static_cast<PyObject*>(self);
-    Py_XDECREF(pyobject_ptr);
+    try {
+      DeallocateState* state = static_cast<DeallocateState*>(self);
+      if (state->close_buffer) {
+        state->buffer_obj.attr("close")();
+      }
+      if (!state->destroy_callback.is_none()) {
+        state->destroy_callback();
+      }
+      delete state;
+    } catch (std::exception& e) {
+      // There are many situations where deallocation exceptions can be
+      // swallowed, so carp loudly. This is almost always a critical issue
+      // that needs to be visible.
+      fprintf(
+          stderr,
+          "error: exception raised while deallocating storage for an "
+          "iree.runtime.VmModule. This is unrecoverable and likely indicates a "
+          "serious problem, minimally resulting in memory leaks: %s",
+          e.what());
+      return iree_make_status(
+          IREE_STATUS_UNKNOWN,
+          "exception raised while deallocating storage for an "
+          "iree.runtime.VmModule. This is unrecoverable and likely indicates a "
+          "serious problem, minimally resulting in memory leaks: %s",
+          e.what());
+    }
     return iree_ok_status();
   });
-  Py_XINCREF(pyobject_ptr);
-  iree_allocator_t deallocator{/*self=*/pyobject_ptr, /*ctl=*/ctl_fn};
+  iree_allocator_t deallocator{/*self=*/state, /*ctl=*/ctl_fn};
 
   auto status = iree_vm_bytecode_module_create(
       instance->raw_ptr(),
@@ -175,13 +333,71 @@ VmModule VmModule::FromFlatbufferBlob(VmInstance* instance,
        static_cast<iree_host_size_t>(buffer_info.size)},
       deallocator, iree_allocator_system(), &module);
   if (!iree_status_is_ok(status)) {
-    Py_XDECREF(pyobject_ptr);
+    delete state;
   }
 
-  CheckApiStatus(status, "Error creating vm module from FlatBuffer");
+  CheckApiStatus(status, "Error creating vm module from aligned memory");
   auto py_module = VmModule::StealFromRawPtr(module);
-  py_module.stashed_flatbuffer_blob = flatbuffer_blob_object;
+  // Stash a reference to the flatbuffer at the Python instance level. This
+  // is exposed to the tracing API, allowing it to get at the backing contents.
+  py_module.stashed_flatbuffer_blob = buffer_obj;
   return py_module;
+}
+
+VmModule VmModule::CopyBuffer(VmInstance* instance, py::object buffer_obj) {
+  IREE_TRACE_SCOPE_NAMED("VmModule::CopyBuffer");
+  auto alignment =
+      py::cast<uintptr_t>(py::module::import("mmap").attr("PAGESIZE"));
+  auto bytearray_ctor = py::module::import("builtins").attr("bytearray");
+  auto src_buffer = py::cast<py::buffer>(buffer_obj);
+  auto src_buffer_info = src_buffer.request();
+  py::ssize_t src_buffer_size = src_buffer_info.itemsize * src_buffer_info.size;
+
+  // Need to allocate an extra page because there is no control at the Python
+  // level for the alignment it may have.
+  auto dst_buffer =
+      py::cast<py::buffer>(bytearray_ctor(src_buffer_size + alignment));
+  auto dst_buffer_info = dst_buffer.request();
+  void* dst_aligned =
+      (void*)iree_host_align((uintptr_t)dst_buffer_info.ptr, alignment);
+  uintptr_t dst_offset =
+      (uintptr_t)dst_aligned - (uintptr_t)dst_buffer_info.ptr;
+
+  // Now create a memoryview over the unaligned bytearray and slice into that
+  // to get the aligned Python buffer.
+  auto dst_slice = py::slice(dst_offset, dst_offset + src_buffer_size, 1);
+  py::object dst_view = py::memoryview(dst_buffer);
+  py::object dst_view_aligned = dst_view[dst_slice];
+
+  // If any of the indexing math was wrong, Python exceptions will be raised
+  // above, so this is implicitly guarding the memcpy if it is done last.
+  std::memcpy(dst_aligned, src_buffer_info.ptr, src_buffer_size);
+  return WrapBuffer(instance, std::move(dst_view_aligned),
+                    /*destroy_callback=*/py::none(),
+                    /*close_buffer=*/false);
+}
+
+VmModule VmModule::FromBuffer(VmInstance* instance, py::object buffer_obj,
+                              bool warn_if_copy) {
+  IREE_TRACE_SCOPE_NAMED("VmModule::FromBuffer");
+  auto py_buffer = py::cast<py::buffer>(buffer_obj);
+  auto buffer_info = py_buffer.request();
+  if (iree_host_size_has_alignment((uintptr_t)buffer_info.ptr,
+                                   IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
+    return WrapBuffer(instance, std::move(buffer_obj),
+                      /*destroy_callback=*/py::none(), /*close_buffer=*/false);
+  } else {
+    if (warn_if_copy) {
+      py::module::import("warnings")
+          .attr("warn")(
+              "Making copy of unaligned VmModule buffer. It is recommended to "
+              "make this deterministic by calling `copy_buffer` to always make "
+              "a copy or `mmap` to efficiently load from a file. This warning "
+              "can be silenced by adding `warn_if_copy=False` to "
+              "`from_buffer`");
+    }
+    return CopyBuffer(instance, std::move(buffer_obj));
+  }
 }
 
 std::optional<iree_vm_function_t> VmModule::LookupFunction(
@@ -661,7 +877,20 @@ void SetupVmBindings(pybind11::module m) {
   py::class_<VmModule>(m, "VmModule")
       .def_static("resolve_module_dependency",
                   &VmModule::ResolveModuleDependency)
-      .def_static("from_flatbuffer", &VmModule::FromFlatbufferBlob)
+      .def_static("from_flatbuffer", &VmModule::FromBuffer, py::arg("instance"),
+                  py::arg("buffer"), py::arg("warn_if_copy") = true,
+                  kFromBufferDocstring)
+      .def_static("from_buffer", &VmModule::FromBuffer, py::arg("instance"),
+                  py::arg("buffer"), py::arg("warn_if_copy") = true,
+                  kFromBufferDocstring)
+      .def_static("copy_buffer", &VmModule::CopyBuffer, py::arg("instance"),
+                  py::arg("buffer"), kCopyBufferDocstring)
+      .def_static("wrap_buffer", &VmModule::WrapBuffer, py::arg("instance"),
+                  py::arg("buffer"), py::arg("destroy_callback") = py::none(),
+                  py::arg("close_buffer") = false, kWrapBufferDocstring)
+      .def_static("mmap", &VmModule::MMap, py::arg("instance"),
+                  py::arg("filepath"), py::arg("destroy_callback") = py::none(),
+                  kMMapDocstring)
       .def_property_readonly("name", &VmModule::name)
       .def_property_readonly("version",
                              [](VmModule& self) {
