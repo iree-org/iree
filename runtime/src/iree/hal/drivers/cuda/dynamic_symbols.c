@@ -27,20 +27,28 @@ static const char* kNCCLLoaderSearchNames[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-#define concat(A, B) A B
+// CUDA API version for cuGetProcAddress.
+// 1000 * major + 10 * minor
+#define IREE_CUDA_DRIVER_API_VERSION 11030
 
-// Load CUDA entry points, prefer _v2 version if it exists.
+// Load CUDA entry points.
 static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     iree_hal_cuda_dynamic_symbols_t* syms) {
-#define CU_PFN_DECL(cudaSymbolName, ...)                                     \
-  {                                                                          \
-    static const char* kName = #cudaSymbolName;                              \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(                 \
-        syms->cuda_library, kName, (void**)&syms->cudaSymbolName));          \
-    static const char* kNameV2 = concat(#cudaSymbolName, "_v2");             \
-    void* funV2;                                                             \
-    iree_dynamic_library_lookup_symbol(syms->cuda_library, kNameV2, &funV2); \
-    if (funV2) syms->cudaSymbolName = funV2;                                 \
+  // Since cuGetProcAddress is in the symbol table, it will be loaded again
+  // through cuGetProcAddress. cuGetProcAddress_v2 is added in CUDA 12.0 and has
+  // a new function signature. If IREE_CUDA_DRIVER_API_VERSION is increased to
+  // >=12.0, then make sure we are using the correct signature.
+  IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(
+      syms->cuda_library, "cuGetProcAddress", (void**)&syms->cuGetProcAddress));
+#define CU_PFN_DECL(cudaSymbolName, ...)                              \
+  {                                                                   \
+    static const char* kName = #cudaSymbolName;                       \
+    CUDA_RETURN_IF_ERROR(                                             \
+        syms,                                                         \
+        cuGetProcAddress(kName, (void**)&syms->cudaSymbolName,        \
+                         IREE_CUDA_DRIVER_API_VERSION,                \
+                         CU_GET_PROC_ADDRESS_DEFAULT),                \
+        "when resolving " #cudaSymbolName " using cuGetProcAddress"); \
   }
 #define NCCL_PFN_DECL(ncclSymbolName, ...)
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
