@@ -39,7 +39,17 @@ function(iree_lit_test)
     ${ARGN}
   )
 
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+  iree_filter_test(
+    RESULT_VAR_ENABLED
+      _ENABLED
+    LABELS
+      ${_RULE_LABELS}
+    TIMEOUT
+      ${_RULE_TIMEOUT}
+    DRIVER
+      ${_RULE_DRIVER}
+  )
+  if(NOT _ENABLED)
     return()
   endif()
 
