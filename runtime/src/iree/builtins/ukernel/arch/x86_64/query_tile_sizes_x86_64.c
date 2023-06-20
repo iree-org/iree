@@ -10,12 +10,12 @@
 static iree_uk_matmul_tile_sizes_t
 iree_uk_query_matmul_tile_sizes_x86_64_f32f32f32(
     const iree_uk_query_tile_sizes_2d_params_t* params) {
-#ifdef IREE_UK_BUILD_X86_64_AVX512_BASE
+#if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
   if (iree_uk_cpu_supports_avx512_base(params->cpu_data)) {
     return (iree_uk_matmul_tile_sizes_t){.M = 16, .K = 1, .N = 16};
   }
 #endif
-#ifdef IREE_UK_BUILD_X86_64_AVX2_FMA
+#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
   if (iree_uk_cpu_supports_avx2_fma(params->cpu_data)) {
     return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 1, .N = 8};
   }
@@ -27,12 +27,12 @@ iree_uk_query_matmul_tile_sizes_x86_64_f32f32f32(
 static iree_uk_matmul_tile_sizes_t
 iree_uk_query_matmul_tile_sizes_x86_64_i8i8i32(
     const iree_uk_query_tile_sizes_2d_params_t* params) {
-#ifdef IREE_UK_BUILD_X86_64_AVX512_VNNI
+#if defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
   if (iree_uk_cpu_supports_avx512_vnni(params->cpu_data)) {
     return (iree_uk_matmul_tile_sizes_t){.M = 16, .K = 2, .N = 16};
   }
 #endif
-#ifdef IREE_UK_BUILD_X86_64_AVX2_FMA
+#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
   if (iree_uk_cpu_supports_avx2_fma(params->cpu_data)) {
     return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 2, .N = 8};
   }
