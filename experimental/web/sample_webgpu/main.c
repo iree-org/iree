@@ -424,6 +424,8 @@ static void iree_webgpu_mapped_buffer_release(void* user_data,
 
 static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
                                       void* userdata_ptr) {
+  iree_status_t status = iree_ok_status();
+
   iree_buffer_map_userdata_t* userdata =
       (iree_buffer_map_userdata_t*)userdata_ptr;
   iree_host_size_t buffer_index = userdata->buffer_index;
@@ -450,20 +452,12 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
   }
 
   if (map_status != WGPUBufferMapAsyncStatus_Success) {
-    // Set the sticky async error if not already set.
-    userdata->call_state->async_status = iree_status_join(
-        userdata->call_state->async_status,
-        iree_make_status(IREE_STATUS_UNKNOWN,
-                         "wgpuBufferMapAsync failed for buffer %" PRIhsz,
-                         buffer_index));
-    iree_event_set(
-        &userdata->call_state->output_states[buffer_index].ready_event);
-    iree_allocator_free(iree_allocator_system(), userdata);
-    return;
+    status = iree_make_status(IREE_STATUS_UNKNOWN,
+                              "wgpuBufferMapAsync failed for buffer %" PRIhsz,
+                              buffer_index);
   }
 
-  iree_device_size_t data_offset = iree_hal_buffer_byte_offset(
-      iree_hal_buffer_view_buffer(output_buffer_view));
+  iree_device_size_t data_offset = 0;
   iree_device_size_t data_length =
       iree_hal_buffer_view_byte_length(output_buffer_view);
   WGPUBuffer buffer_handle =
@@ -476,10 +470,18 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
   // application (or one not requiring pretty logging like this), we could
   // skip a few buffer copies and other data transformations here.
 
-  const void* data_ptr =
-      wgpuBufferGetConstMappedRange(buffer_handle, data_offset, data_length);
+  const void* data_ptr = NULL;
+  if (iree_status_is_ok(status)) {
+    data_ptr =
+        wgpuBufferGetConstMappedRange(buffer_handle, data_offset, data_length);
+    if (data_ptr == NULL) {
+      status = iree_make_status(
+          IREE_STATUS_UNKNOWN,
+          "wgpuBufferGetConstMappedRange failed for buffer %" PRIhsz,
+          buffer_index);
+    }
+  }
 
-  iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     // The buffer we get from WebGPU may not be aligned to 64.
     iree_hal_memory_access_t memory_access =
@@ -496,9 +498,11 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
         mapped_host_buffer_ptr);
   }
 
-  // Set the sticky async error if not already set.
-  userdata->call_state->async_status =
-      iree_status_join(userdata->call_state->async_status, status);
+  if (!iree_status_is_ok(status)) {
+    // Set the sticky async error if not already set.
+    userdata->call_state->async_status =
+        iree_status_join(userdata->call_state->async_status, status);
+  }
 
   iree_event_set(
       &userdata->call_state->output_states[buffer_index].ready_event);
@@ -747,7 +751,10 @@ static iree_status_t process_call_outputs(
     if (!buffer_view) continue;
 
     iree_hal_buffer_t* source_buffer = iree_hal_buffer_view_buffer(buffer_view);
-    iree_device_size_t data_offset = iree_hal_buffer_byte_offset(source_buffer);
+    iree_hal_buffer_t* source_buffer_allocated =
+        iree_hal_buffer_allocated_buffer(source_buffer);
+    iree_device_size_t source_offset =
+        iree_hal_buffer_byte_offset(source_buffer);
     iree_hal_buffer_t* target_buffer =
         call_state->output_states[i].mappable_device_buffer;
     iree_device_size_t target_offset = 0;
@@ -758,8 +765,8 @@ static iree_status_t process_call_outputs(
         .type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY,
         .copy =
             {
-                .source_buffer = source_buffer,
-                .source_offset = data_offset,
+                .source_buffer = source_buffer_allocated,
+                .source_offset = source_offset,
                 .target_buffer = target_buffer,
                 .target_offset = target_offset,
                 .length = data_length,
@@ -832,12 +839,14 @@ static iree_status_t process_call_outputs(
   //
   // Note: call_state (and everything within it) is kept alive until the
   // callback resolves.
-  IREE_RETURN_IF_ERROR(iree_loop_wait_all(
-      iree_loop_emscripten(call_state->loop), outputs_size, wait_sources,
-      iree_make_timeout_ms(5000), map_all_callback,
-      /*user_data=*/call_state));
+  if (iree_status_is_ok(status)) {
+    status = iree_loop_wait_all(iree_loop_emscripten(call_state->loop),
+                                outputs_size, wait_sources,
+                                iree_make_timeout_ms(5000), map_all_callback,
+                                /*user_data=*/call_state);
+  }
 
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
