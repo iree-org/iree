@@ -373,7 +373,7 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
 }
 
 /// Returns the default tile sizes to use for the loops that are distributed.
-static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
+static SmallVector<int64_t> getDefaultDistributionTileSizes(
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
     ArrayRef<int64_t> vectorSizeHints) {
@@ -612,10 +612,9 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     }
   }
 
-  SmallVector<int64_t> distributedTileSizes =
-      getDefaultDistributedLoopTileSizes(lbs, ubs, adjustedMinTileSizes,
-                                         adjustedMaxTileSizes,
-                                         adjustedVectorSizeHints);
+  SmallVector<int64_t> distributedTileSizes = getDefaultDistributionTileSizes(
+      lbs, ubs, adjustedMinTileSizes, adjustedMaxTileSizes,
+      adjustedVectorSizeHints);
   // Final fix up of the tile sizes to make sure that they divide the problem
   // size to make it vectorizable.
   for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
