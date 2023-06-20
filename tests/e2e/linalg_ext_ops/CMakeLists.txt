@@ -25,10 +25,6 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -44,10 +40,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-flow-topk-split-reduction=2"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -63,10 +55,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-flow-topk-split-reduction=3,2"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 

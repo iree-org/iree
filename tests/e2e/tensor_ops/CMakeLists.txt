@@ -84,10 +84,6 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 

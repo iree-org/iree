@@ -227,11 +227,6 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -256,11 +251,6 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -282,11 +272,6 @@ iree_generated_trace_runner_test(
         "--shapes=gpu_large",
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -308,11 +293,6 @@ iree_generated_trace_runner_test(
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -336,11 +316,6 @@ iree_generated_trace_runner_test(
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -364,11 +339,6 @@ iree_generated_trace_runner_test(
         "--compilation_info=%s" % compilation_info,
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
@@ -390,11 +360,6 @@ iree_generated_trace_runner_test(
         "--shapes=large",
     ],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
         # "--shapes=large" can cause timeouts on riscv emulator.
         "noriscv",

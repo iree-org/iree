@@ -154,10 +154,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -174,10 +170,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-flow-fuse-multi-use"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 

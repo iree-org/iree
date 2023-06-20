@@ -378,10 +378,6 @@ iree_generated_trace_runner_test(
   DRIVERS
     "cuda"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -403,10 +399,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -427,10 +419,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -452,10 +440,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -477,10 +461,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -502,10 +482,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
 )
 
@@ -528,10 +504,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-flow-split-matmul-reduction=4"
   LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
     "requires-gpu-nvidia"
     "noriscv"
 )

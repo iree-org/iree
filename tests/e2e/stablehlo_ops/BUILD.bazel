@@ -413,11 +413,6 @@ iree_check_single_backend_test_suite(
     driver = "cuda",
     runner_args = ["--cuda_use_streams=false"],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
@@ -497,11 +492,6 @@ iree_check_single_backend_test_suite(
     driver = "cuda",
     runner_args = ["--cuda_use_streams=true"],
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",

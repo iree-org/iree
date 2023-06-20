@@ -33,11 +33,6 @@ iree_check_single_backend_test_suite(
     ),
     driver = "cuda",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
@@ -51,11 +46,6 @@ iree_check_single_backend_test_suite(
     compiler_flags = ["--iree-flow-topk-split-reduction=2"],
     driver = "cuda",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
@@ -69,11 +59,6 @@ iree_check_single_backend_test_suite(
     compiler_flags = ["--iree-flow-topk-split-reduction=3,2"],
     driver = "cuda",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
