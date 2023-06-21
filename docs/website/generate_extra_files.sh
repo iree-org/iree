@@ -19,20 +19,21 @@ set -xeuo pipefail
 
 THIS_DIR="$(cd $(dirname $0) && pwd)"
 REPO_ROOT="$(cd $THIS_DIR/../../ && pwd)"
-DOCS_BUILD_DIR="${DOCS_BUILD_DIR:-${REPO_ROOT}/build-docs}"
+BUILD_DIR="${BUILD_DIR:-${REPO_ROOT}/build-docs}"
 
-mkdir -p "${DOCS_BUILD_DIR}"
+source ${REPO_ROOT}/build_tools/cmake/setup_build.sh
+source ${REPO_ROOT}/build_tools/cmake/setup_ccache.sh
 
 # Build `iree-doc` CMake target. This requires the LLVM submodule and can take
 # several minutes, as it builds `iree-tblgen`.
 cmake -G Ninja \
-  -B "${DOCS_BUILD_DIR}" "${REPO_ROOT}" \
+  -B "${BUILD_DIR}" "${REPO_ROOT}" \
   -DIREE_BUILD_DOCS=ON
-cmake --build "${DOCS_BUILD_DIR}" --target iree-doc
+cmake --build "${BUILD_DIR}" --target iree-doc
 
 # Copy from build directory -> source directory (files are .gitignore'd).
 cp -r \
-  "${DOCS_BUILD_DIR}/doc/Dialects/." \
+  "${BUILD_DIR}/doc/Dialects/." \
   "${THIS_DIR}/docs/reference/mlir-dialects/"
 
 # Delete sample dialects.
