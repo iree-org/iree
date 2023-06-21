@@ -49,7 +49,6 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -456,7 +455,6 @@ void ConvertToSPIRVPass::runOnOperation() {
       typeConverter, std::numeric_limits<int64_t>::max() / 8, patterns);
 
   // Pull in vector patterns to convert vector ops.
-  mlir::vector::populateVectorShapeCastLoweringPatterns(patterns);
   mlir::populateVectorToSPIRVPatterns(typeConverter, patterns);
 
   // Pull in builtin func to spirv.func conversion.
