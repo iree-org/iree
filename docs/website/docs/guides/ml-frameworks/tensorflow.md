@@ -15,6 +15,14 @@ or stored in the `SavedModel`
 
 ``` mermaid
 graph LR
+  accTitle: TensorFlow to runtime deployment workflow overview
+  accDescr {
+    Programs start as either TensorFlow SavedModel or tf.Module programs.
+    Programs are imported into MLIR as StableHLO.
+    The IREE compiler uses the imported MLIR.
+    Compiled programs are used by the runtime.
+  }
+
   subgraph A[TensorFlow]
     direction TB
     A1[SavedModel]

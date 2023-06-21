@@ -14,6 +14,14 @@ imported into an IREE-compatible format then compiled to a series of backends.
 
 ``` mermaid
 graph LR
+  accTitle: TFLite to runtime deployment workflow overview
+  accDescr {
+    Programs start as TensorFlow Lite FlatBuffers.
+    Programs are imported into MLIR's TOSA dialect using iree-import-tflite.
+    The IREE compiler uses the imported MLIR.
+    Compiled programs are used by the runtime.
+  }
+
   subgraph A[TFLite]
     A1[FlatBuffer]
   end

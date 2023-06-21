@@ -5,6 +5,14 @@ technology.
 
 ``` mermaid
 graph LR
+  accTitle: ML framework to runtime deployment workflow overview
+  accDescr {
+    Programs start in some ML framework.
+    Programs are imported into MLIR.
+    The IREE compiler uses the imported MLIR.
+    Compiled programs are used by the runtime.
+  }
+
   A[ML frameworks]
   B[Imported MLIR]
   C[IREE compiler]

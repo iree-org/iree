@@ -14,6 +14,14 @@ as well as models defined using [`functorch`](https://pytorch.org/functorch/).
 
 ``` mermaid
 graph LR
+  accTitle: PyTorch to runtime deployment workflow overview
+  accDescr {
+    Programs start as either PyTorch nn.Module or functorch programs.
+    Programs are imported into MLIR as either StableHLO, TOSA, or Linalg.
+    The IREE compiler uses the imported MLIR.
+    Compiled programs are used by the runtime.
+  }
+
   subgraph A[PyTorch]
     direction TB
     A1[nn.Module]
