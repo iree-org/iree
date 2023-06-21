@@ -285,23 +285,20 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
   return funcH;
 }
 
-Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
-    ImplicitLocOpBuilder &b, Value containingOpH, bool cleanup) {
+void mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
+    ImplicitLocOpBuilder &b, Value funcH, bool cleanup) {
   // TODO: avoid functional style transform so we can apply to the variant.
-  b.create<transform::ApplyPatternsOp>(
-      containingOpH, [](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(loc);
-      });
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(loc);
+  });
   if (cleanup) {
-    b.create<transform::ApplyPatternsOp>(
-        containingOpH, [](OpBuilder &b, Location loc) {
-          b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
-          b.create<transform::ApplyFoldUnitExtentDimsViaSlicesPatternsOp>(loc);
-          b.create<IREE::transform_dialect::
-                       ApplyFoldReshapeIntoTensorHalInterfacePatternsOp>(loc);
-        });
+    b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+      b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
+      b.create<transform::ApplyFoldUnitExtentDimsViaSlicesPatternsOp>(loc);
+      b.create<IREE::transform_dialect::
+                   ApplyFoldReshapeIntoTensorHalInterfacePatternsOp>(loc);
+    });
   }
-  return containingOpH;
 }
 
 Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(

@@ -192,9 +192,8 @@ Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
 /// operations and subsequent cleanup patterns (fold-memref-aliases).
 /// Takes a handle to a containing op and returns an updated handle to the
 /// containing op.
-Value buildLowerMaskedTransfersAndCleanup(ImplicitLocOpBuilder &b,
-                                          Value containingOpH,
-                                          bool cleanup = true);
+void buildLowerMaskedTransfersAndCleanup(ImplicitLocOpBuilder &b, Value funcH,
+                                         bool cleanup = true);
 
 /// Build transform IR that applies vector mask lowering and subsequent cleanup
 /// patterns (fold-memref-aliases).

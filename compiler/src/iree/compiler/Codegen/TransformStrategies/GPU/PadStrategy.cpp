@@ -121,7 +121,7 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
   // TODO: don't rematch, apply on the variant op directly.
   Value funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH);
+  buildLowerMaskedTransfersAndCleanup(b, funcH);
 
   // Step 5. Vectorize the rest of func normally.
   funcH = buildVectorize(b, funcH, /*applyCleanups=*/true);

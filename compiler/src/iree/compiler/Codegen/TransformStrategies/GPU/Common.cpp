@@ -511,7 +511,7 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // TODO: don't rematch, apply on the variant op directly.
   funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
+  buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 
   // Apply vectorization + cleanups to what remains.
   funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true);
@@ -654,13 +654,14 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
 
 Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
                                                Value variantH) {
-  b.create<transform::ApplyPatternsOp>(
-      variantH, [](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
-      });
-  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(variantH);
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+  });
+  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
   b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
-      variantH);
+      funcH);
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   auto bufferizeOp = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
   bufferizeOp.setTargetGpu(true);
