@@ -10,7 +10,7 @@
 Syntax:
   ./build_tools/docker/get_image_name.py {short_name}
 
-Where {short_name} is the last name component of an image in image_graph.json
+Where {short_name} is the last name component of an image in prod_digests.txt
 (i.e. "base", "nvidia", etc).
 
 This is used both in tree and out of tree to get a image name and current
@@ -20,20 +20,19 @@ version without adding fully referencing sha256 hashes, etc.
 from pathlib import Path
 import sys
 
-import utils
-
 
 def find_image_by_name(img_name):
-    """Find docker image url by name from the `image_graph.json`."""
-
     this_dir = Path(__file__).resolve().parent
 
-    image_graph = utils.load_image_graph(this_dir / "image_graph.json")
-    image_info = image_graph.get(img_name)
-    if image_info is None:
-        raise ValueError(f"ERROR: Image name {img_name} not found in image_graph.json")
-
-    return image_info.url
+    with open(this_dir / "prod_digests.txt", "rt") as f:
+        for line in f.readlines():
+            line = line.strip()
+            if line.startswith(f"gcr.io/iree-oss/{img_name}@"):
+                return line
+        else:
+            raise ValueError(
+                f"ERROR: Image name {img_name} not found in prod_digests.txt"
+            )
 
 
 if __name__ == "__main__":

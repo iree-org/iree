@@ -6,42 +6,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import dataclasses
-import json
-import pathlib
 import subprocess
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
-
-
-@dataclass(frozen=True)
-class ImageInfo:
-    """Information of a docker image."""
-
-    deps: List[str]
-    digest: Optional[str] = None
-    url: Optional[str] = None
-
-
-def load_image_graph(graph_path: pathlib.Path) -> Dict[str, ImageInfo]:
-    """Load image graph from a JSON object."""
-
-    graph_obj = json.loads(graph_path.read_text())
-    image_graph = dict((name, ImageInfo(**info)) for name, info in graph_obj.items())
-    return image_graph
-
-
-def dump_image_graph(image_graph: Dict[str, ImageInfo]) -> Dict[str, Any]:
-    """Dump image graph into a JSON object."""
-
-    graph_obj = dict(
-        (name, dataclasses.asdict(info)) for name, info in image_graph.items()
-    )
-    return graph_obj
+from typing import Any, Sequence
 
 
 def run_command(
-    command: Sequence[str],
+    command: Sequence[Any],
     dry_run: bool = False,
     check: bool = True,
     capture_output: bool = False,
@@ -49,7 +19,7 @@ def run_command(
     **run_kwargs,
 ) -> subprocess.CompletedProcess:
     """Thin wrapper around subprocess.run"""
-    print(f"Running: `{' '.join(command)}`")
+    print(f"Running: `{' '.join(str(arg) for arg in command)}`")
     if dry_run:
         # Dummy CompletedProess with successful returncode.
         return subprocess.CompletedProcess(command, returncode=0)

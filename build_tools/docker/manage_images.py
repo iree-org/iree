@@ -26,12 +26,9 @@ Rebuild and push all images and update references to them in the repository:
 """
 
 import argparse
-import dataclasses
 import fileinput
 import json
-import os
 import pathlib
-import posixpath
 import re
 import subprocess
 from typing import Dict, List, Sequence
@@ -40,18 +37,9 @@ import utils
 
 IREE_GCR_URL = "gcr.io/iree-oss/"
 DIGEST_REGEX = r"sha256:[a-zA-Z0-9]+"
-DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
-
-
-def _get_images_to_dependents(
-    image_info_map: Dict[str, utils.ImageInfo]
-) -> Dict[str, List[str]]:
-    images_to_dependents = {k: [] for k in image_info_map.keys()}
-    for image, info in image_info_map.items():
-        for dependency in info.deps:
-            images_to_dependents[dependency].append(image)
-
-    return images_to_dependents
+IMAGE_DEPS_FILENAME = "image_deps.json"
+PROD_DIGESTS_FILENAME = "prod_digests.txt"
+DOCKERFILES_DIRNAME = "dockerfiles"
 
 
 def parse_arguments():
@@ -65,7 +53,7 @@ def parse_arguments():
         type=str,
         required=True,
         action="append",
-        help=f"Name of the image to build",
+        help="Name of the image to build",
     )
     parser.add_argument(
         "--dry_run",
@@ -78,14 +66,17 @@ def parse_arguments():
         "--only_references",
         "--only-references",
         action="store_true",
-        help="Just update references to images using the digests in --image_graph",
+        help="Just update references to images using the digests in --image_deps",
     )
     parser.add_argument(
-        "--image_graph",
-        "--image-graph",
-        dest="image_graph_path",
+        "--docker_dir",
+        "--docker-dir",
         type=pathlib.Path,
-        default=pathlib.Path("build_tools/docker/image_graph.json"),
+        default=pathlib.Path("build_tools/docker"),
+        help=(
+            "Directory that contains: `dockerfiles/*.Dockerfile`,"
+            " `image_deps.json`, and `prod_digests.txt`"
+        ),
     )
 
     args = parser.parse_args()
@@ -110,6 +101,17 @@ def _dag_dfs(
     return ordered_nodes
 
 
+def _get_images_to_dependents(
+    images_to_dependencies: Dict[str, List[str]]
+) -> Dict[str, List[str]]:
+    images_to_dependents = {k: [] for k in images_to_dependencies.keys()}
+    for image, dependencies in images_to_dependencies.items():
+        for dependency in dependencies:
+            images_to_dependents[dependency].append(image)
+
+    return images_to_dependents
+
+
 def get_dependencies(
     images: Sequence[str], images_to_dependents: Dict[str, List[str]]
 ) -> List[str]:
@@ -125,6 +127,14 @@ def get_ordered_images_to_process(
     )
     dependents.reverse()
     return dependents
+
+
+def parse_prod_digests(prod_digests_path: pathlib.Path) -> Dict[str, str]:
+    image_urls_to_prod_digests = {}
+    for line in prod_digests_path.read_text().splitlines():
+        image_url, digest = line.strip().split("@")
+        image_urls_to_prod_digests[image_url] = digest
+    return image_urls_to_prod_digests
 
 
 def get_repo_digest(tagged_image_url: str, dry_run: bool = False) -> str:
@@ -183,23 +193,25 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
 def main(
     images: Sequence[str],
     only_references: bool,
+    docker_dir: pathlib.Path,
     dry_run: bool,
-    image_graph_path: pathlib.Path,
 ):
-    image_graph = utils.load_image_graph(image_graph_path)
+    image_deps = json.loads((docker_dir / IMAGE_DEPS_FILENAME).read_text())
     if "all" in images:
-        images = list(image_graph.keys())
+        images = list(image_deps.keys())
     for image in images:
-        if image not in image_graph:
+        if image not in image_deps:
             raise ValueError(
                 f'Image "{image}" not found in the image graph.'
-                f' Available images: {",".join(image_graph.keys())}'
+                f' Available options: all,{",".join(image_deps.keys())}'
             )
 
-    images_to_dependents = _get_images_to_dependents(image_graph)
+    images_to_dependents = _get_images_to_dependents(image_deps)
     images_to_process = get_ordered_images_to_process(
         images=images, images_to_dependents=images_to_dependents
     )
+    prod_digests_path = docker_dir / PROD_DIGESTS_FILENAME
+    image_urls_to_prod_digests = parse_prod_digests(prod_digests_path)
     print(f"Also processing dependent images. Will process: {images_to_process}")
 
     if not only_references:
@@ -211,24 +223,23 @@ def main(
         )
         print(f"Pulling image dependencies: {dependencies}")
         for dependency in dependencies:
-            image_digest = image_graph[dependency].digest
+            image_digest = image_urls_to_prod_digests.get(f"{IREE_GCR_URL}{dependency}")
             # If `dependency` is a new image then it may not have a digest yet.
             if image_digest is not None:
-                dependency_url = posixpath.join(IREE_GCR_URL, dependency)
+                dependency_url = f"{IREE_GCR_URL}{dependency}"
                 dependency_with_digest = f"{dependency_url}@{image_digest}"
                 utils.run_command(
                     ["docker", "pull", dependency_with_digest], dry_run=dry_run
                 )
 
     for image in images_to_process:
-        print("\n" * 5 + f"Updating image {image}")
-        image_url = posixpath.join(IREE_GCR_URL, image)
-        tagged_image_url = f"{image_url}"
-        image_path = os.path.join(DOCKER_DIR, "dockerfiles", f"{image}.Dockerfile")
+        print("\n" * 5 + f"Processing image {image}")
+        image_url = f"{IREE_GCR_URL}{image}"
+        image_path = docker_dir / DOCKERFILES_DIRNAME / f"{image}.Dockerfile"
 
         if only_references:
-            digest = image_graph[image].digest
-            if digest is None:
+            image_digest = image_urls_to_prod_digests.get(image_url)
+            if image_digest is None:
                 raise ValueError(
                     f"Can't update the references of {image} because it has no digest."
                 )
@@ -248,27 +259,26 @@ def main(
                     "--file",
                     image_path,
                     "--tag",
-                    tagged_image_url,
+                    image_url,
                     ".",
                 ],
                 dry_run=dry_run,
             )
 
-            utils.run_command(["docker", "push", tagged_image_url], dry_run=dry_run)
+            utils.run_command(["docker", "push", image_url], dry_run=dry_run)
 
-            digest = get_repo_digest(tagged_image_url, dry_run)
-            image_info = image_graph[image]
-            image_graph[image] = dataclasses.replace(
-                image_info, digest=digest, url=f"{image_url}@{digest}"
-            )
-            if not dry_run:
-                # Update the graph file after every image update so it is easier
-                # to restart from the last failure.
-                image_graph_path.write_text(
-                    json.dumps(utils.dump_image_graph(image_graph), indent=2)
-                )
+            image_digest = get_repo_digest(image_url, dry_run)
 
-        update_references(image_url, digest, dry_run=dry_run)
+            # Check that the image is in "prod_digests.txt" and append it to the
+            # list in the file if it isn't.
+            if image_url not in image_urls_to_prod_digests:
+                image_with_digest = f"{image_url}@{image_digest}"
+                print(f"Adding new image {image_with_digest} to {prod_digests_path}")
+                if not dry_run:
+                    with prod_digests_path.open("a") as digests_file:
+                        digests_file.write(f"{image_with_digest}\n")
+
+        update_references(image_url, image_digest, dry_run=dry_run)
 
 
 if __name__ == "__main__":

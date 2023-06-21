@@ -1,0 +1,21 @@
+{
+  "base": [],
+  "manylinux2014_x86_64-release": [],
+  "android": ["base"],
+  "emscripten": ["base"],
+  "nvidia": ["base" ],
+  "riscv": ["base"],
+  "gradle-android": ["base"],
+  "frontends": ["android"],
+  "perf": [],
+  "mmperf": ["perf"],
+  "convperf": ["perf"],
+  "shark": [],
+  "swiftshader": ["base"],
+  "samples": ["swiftshader"],
+  "frontends-swiftshader": ["frontends","swiftshader"],
+  "frontends-nvidia": ["frontends"],
+  "base-bleeding-edge": [],
+  "swiftshader-bleeding-edge": ["base-bleeding-edge"],
+  "nvidia-bleeding-edge": ["base-bleeding-edge"]
+}
