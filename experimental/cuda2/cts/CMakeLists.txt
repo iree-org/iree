@@ -24,4 +24,7 @@ iree_hal_cts_test_suite(
     "descriptor_set_layout"
     "driver"
     "pipeline_layout"
+  LABELS
+    driver=cuda2
+    requires-gpu-nvidia
 )
