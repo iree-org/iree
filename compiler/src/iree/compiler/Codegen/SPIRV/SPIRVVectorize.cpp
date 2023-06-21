@@ -52,7 +52,8 @@ namespace {
 
 int getComputeVectorSize(int64_t size) {
   for (int i : {4, 3, 2}) {
-    if (size % i == 0) return i;
+    if (size % i == 0)
+      return i;
   }
   return 1;
 }
@@ -67,10 +68,13 @@ int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
     // 128-bit chunks. This helps with memory access performance. Such vector
     // sizes are not native in SPIR-V though; this relies on following passes to
     // bitcast them to 32-bit 4-element vectors to be valid.
-    if (bitwidth <= 8 && size % 16 == 0) return 16;
-    if (bitwidth <= 16 && size % 8 == 0) return 8;
+    if (bitwidth <= 8 && size % 16 == 0)
+      return 16;
+    if (bitwidth <= 16 && size % 8 == 0)
+      return 8;
   }
-  if (bitwidth <= 32 && size % 4 == 0) return 4;
+  if (bitwidth <= 32 && size % 4 == 0)
+    return 4;
   return size % 2 == 0 ? 2 : 1;
 }
 
@@ -107,7 +111,8 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
             })
             .Default([](Operation *) { return nullptr; });
 
-    if (!source) break;
+    if (!source)
+      break;
     op = source;
   }
 
@@ -117,7 +122,8 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
 /// Returns true when |op| has the i32 element type that is likely to be result
 /// of a zero/sign extension from i8.
 bool mayExtI8ToI32(Value op) {
-  if (!getElementTypeOrSelf(op.getType()).isInteger(32)) return false;
+  if (!getElementTypeOrSelf(op.getType()).isInteger(32))
+    return false;
 
   // Look through vector operations created by vector unrolling patterns,
   // hoping to find a zero/sign extension op. Note that we do not need to find
@@ -143,13 +149,15 @@ bool mayExtI8ToI32(Value op) {
 /// Succeeds when |contract| is a i32 matmul whose LHS and RHS operands may be
 /// result of zero/sign extension of i8 inputs.
 LogicalResult detectI8ToI32Matmul(vector::ContractionOp contract) {
-  if (contract.getKind() != vector::CombiningKind::ADD) return failure();
+  if (contract.getKind() != vector::CombiningKind::ADD)
+    return failure();
 
   if (!mayExtI8ToI32(contract.getLhs()) || !mayExtI8ToI32(contract.getRhs()))
     return failure();
 
   ArrayRef<Attribute> iteratorTypes = contract.getIteratorTypes().getValue();
-  if (iteratorTypes.size() != 3) return failure();
+  if (iteratorTypes.size() != 3)
+    return failure();
 
   return success(vector::isParallelIterator(iteratorTypes[0]) &&
                  vector::isParallelIterator(iteratorTypes[1]) &&
@@ -205,7 +213,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::MultiDimReductionOp op) {
 
 SmallVector<int64_t> getNativeVectorShapeImpl(vector::ReductionOp op) {
   VectorType srcVectorType = op.getSourceVectorType();
-  assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
+  assert(srcVectorType.getRank() == 1); // Guaranteed by semantics
   int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
   return {vectorSize};
 }
@@ -224,8 +232,8 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::GatherOp op) {
   return nativeSize;
 }
 
-std::optional<SmallVector<int64_t>> getNativeVectorShape(
-    Operation *op, bool targetSupportsDotProd) {
+std::optional<SmallVector<int64_t>>
+getNativeVectorShape(Operation *op, bool targetSupportsDotProd) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
@@ -274,7 +282,8 @@ bool supportsIntegerDotProductOps(func::FuncOp fn) {
     // attribute. This may be preferred in tests.
     targetEnvAttr =
         fn->getAttrOfType<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
-    if (!targetEnvAttr) return false;
+    if (!targetEnvAttr)
+      return false;
   }
 
   spirv::TargetEnv targetEnv(targetEnvAttr);
@@ -283,16 +292,19 @@ bool supportsIntegerDotProductOps(func::FuncOp fn) {
 
   // Query all the dot prod capabilities except for the packed one -- none of
   // the vectorization patterns need it.
-  if (!targetEnv.allows(spirv::Capability::DotProduct)) return false;
-  if (!targetEnv.allows(spirv::Capability::DotProductInput4x8Bit)) return false;
-  if (!targetEnv.allows(spirv::Capability::DotProductInputAll)) return false;
+  if (!targetEnv.allows(spirv::Capability::DotProduct))
+    return false;
+  if (!targetEnv.allows(spirv::Capability::DotProductInput4x8Bit))
+    return false;
+  if (!targetEnv.allows(spirv::Capability::DotProductInputAll))
+    return false;
 
   return true;
 }
 
 /// Vectorizes Linalg ops on buffer semantics.
 class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
- public:
+public:
   SPIRVVectorizePass() = default;
   SPIRVVectorizePass(const SPIRVVectorizePass &pass) = default;
 
@@ -337,7 +349,8 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
         op.emitOpError("should not remain after vectorization");
         return WalkResult::interrupt();
       });
-      if (result.wasInterrupted()) return signalPassFailure();
+      if (result.wasInterrupted())
+        return signalPassFailure();
     }
 
     // Special peephole optimizations to clean up IR before further processing.
@@ -371,7 +384,8 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     // batch dimension. Try to drop that to map to matmul dimensions better.
     SmallVector<vector::ContractionOp> contractOps;
     funcOp.walk([&](vector::ContractionOp op) {
-      if (op.getIteratorTypes().size() > 3) contractOps.push_back(op);
+      if (op.getIteratorTypes().size() > 3)
+        contractOps.push_back(op);
     });
     for (vector::ContractionOp op : contractOps) {
       OpBuilder builder(op);
@@ -641,11 +655,11 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass() {
   return std::make_unique<SPIRVVectorizePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

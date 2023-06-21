@@ -39,14 +39,15 @@ namespace iree_compiler {
 namespace {
 
 class Bf16EmulationConverter : public TypeConverter {
- public:
+public:
   explicit Bf16EmulationConverter() {
     // Allow unknown types.
     addConversion([](Type ty) -> std::optional<Type> { return ty; });
 
     // Scalar case.
     addConversion([](FloatType ty) -> std::optional<Type> {
-      if (ty.isBF16()) return IntegerType::get(ty.getContext(), 16);
+      if (ty.isBF16())
+        return IntegerType::get(ty.getContext(), 16);
       return ty;
     });
 
@@ -63,9 +64,9 @@ struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type newResultTy = getTypeConverter()->convertType(op.getType());
     if (!newResultTy)
       return rewriter.notifyMatchFailure(
@@ -87,9 +88,9 @@ struct ConvertHalInterfaceBindingSubspan final
 struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      memref::AllocOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::AllocOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type newTy = getTypeConverter()->convertType(op.getType());
     if (!newTy)
       return rewriter.notifyMatchFailure(
@@ -109,9 +110,9 @@ struct GenericTypeConversionPattern : public ConversionPattern {
   GenericTypeConversionPattern(TypeConverter &typeConverter,
                                MLIRContext *context)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // Convert attributes only if this is a constant-like op.
     // This is because some ops use typed attributes for structural information
     // - like linalg ops using i64 for dimension indices - and if we converted
@@ -128,9 +129,10 @@ struct GenericTypeConversionPattern : public ConversionPattern {
           APInt apint = floatAttr.getValue().bitcastToAPInt();
           newAttr = rewriter.getI16IntegerAttr(apint.getZExtValue());
         } else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(oldAttr)) {
-          newAttr = denseAttr.mapValues(
-              rewriter.getI16Type(),
-              [&](APFloat src) { return src.bitcastToAPInt(); });
+          newAttr =
+              denseAttr.mapValues(rewriter.getI16Type(), [&](APFloat src) {
+                return src.bitcastToAPInt();
+              });
         }
 
         newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
@@ -168,9 +170,9 @@ struct GenericTypeConversionPattern : public ConversionPattern {
 struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      memref::LoadOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type newResTy = getTypeConverter()->convertType(op.getType());
     if (!newResTy)
       return rewriter.notifyMatchFailure(
@@ -187,9 +189,9 @@ struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
 struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      memref::StoreOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type newTy = getTypeConverter()->convertType(op.getMemRefType());
     if (!newTy)
       return rewriter.notifyMatchFailure(
@@ -267,7 +269,7 @@ struct ConvertBf16ToUInt16BuffersPass final
   }
 };
 
-}  // namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Public interface
@@ -278,5 +280,5 @@ createConvertBf16ToUInt16BuffersPass() {
   return std::make_unique<ConvertBf16ToUInt16BuffersPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

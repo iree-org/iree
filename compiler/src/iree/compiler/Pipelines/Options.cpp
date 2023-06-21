@@ -79,7 +79,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
       "iree-input-promote-bf16-to-f32", promoteBF16ToF32,
       llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts."),
       llvm::cl::cat(category));
-#endif  // IREE_HAVE_STABLEHLO_INPUT
+#endif // IREE_HAVE_STABLEHLO_INPUT
 }
 
 void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
@@ -165,5 +165,5 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

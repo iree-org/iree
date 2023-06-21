@@ -61,7 +61,7 @@ namespace {
 /// Gets the chosen hardware cooperative op size attached to the given `op`
 /// as CodeGen lowering configuration.
 static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
-  return getTileSizes(op, 3);  // For native vector sizes
+  return getTileSizes(op, 3); // For native vector sizes
 }
 
 /// Deduces required subgroup counts along all workgroup tiled dimensions.
@@ -75,8 +75,10 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
 
   SmallVector<int64_t> subgroupCounts;
   for (int i = 0, e = workgroupTileSizes.size(); i < e; ++i) {
-    if (subgroupTileSizes[i] == 0) continue;
-    if (linalg::isReductionIterator(op.getIteratorTypesArray()[i])) continue;
+    if (subgroupTileSizes[i] == 0)
+      continue;
+    if (linalg::isReductionIterator(op.getIteratorTypesArray()[i]))
+      continue;
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
     subgroupCounts.push_back(workgroupTileSizes[i] / subgroupTileSizes[i]);
   }
@@ -94,15 +96,15 @@ static void populateTilingToSubgroupPatterns(
     ArrayRef<int64_t> subgroupTileSizes, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
 
-  auto getSubgroupProcInfoFn = [subgroupCounts, subgroupSize](
-                                   OpBuilder &builder, Location loc,
-                                   ArrayRef<Range> parallelLoopRanges) {
-    auto counts = llvm::to_vector<3>(subgroupCounts);
-    // `getSubgroupIdsAndCounts` assumes we follow GPU (X, Y, Z) order.
-    std::reverse(counts.begin(), counts.end());
-    return getSubgroupIdsAndCounts(builder, loc, subgroupSize,
-                                   parallelLoopRanges.size(), counts);
-  };
+  auto getSubgroupProcInfoFn =
+      [subgroupCounts, subgroupSize](OpBuilder &builder, Location loc,
+                                     ArrayRef<Range> parallelLoopRanges) {
+        auto counts = llvm::to_vector<3>(subgroupCounts);
+        // `getSubgroupIdsAndCounts` assumes we follow GPU (X, Y, Z) order.
+        std::reverse(counts.begin(), counts.end());
+        return getSubgroupIdsAndCounts(builder, loc, subgroupSize,
+                                       parallelLoopRanges.size(), counts);
+      };
 
   linalg::LinalgLoopDistributionOptions distributionOptions;
   distributionOptions.procInfo = getSubgroupProcInfoFn;
@@ -150,16 +152,18 @@ void populateVectorizationPatterns(MLIRContext *context,
 }
 
 template <typename ExtOpTy>
-std::optional<SmallVector<int64_t>> getExtOpVectorShape(
-    ExtOpTy op, ArrayRef<int64_t> nativeShape) {
+std::optional<SmallVector<int64_t>>
+getExtOpVectorShape(ExtOpTy op, ArrayRef<int64_t> nativeShape) {
   auto insert =
       op.getOperand().template getDefiningOp<vector::InsertStridedSliceOp>();
-  if (!insert) return std::nullopt;
+  if (!insert)
+    return std::nullopt;
 
   VectorType sliceType = insert.getSourceVectorType();
   for (Operation *users : op->getUsers()) {
     auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-    if (!extract) return std::nullopt;
+    if (!extract)
+      return std::nullopt;
     auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
     if (!llvm::equal(sliceType.getShape(), vecType.getShape()))
       return std::nullopt;
@@ -170,8 +174,8 @@ std::optional<SmallVector<int64_t>> getExtOpVectorShape(
 
 /// Returns vector shape matching native cooperative op sizes for unrolling
 /// high-D vectors.
-std::optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
-    Operation *op, ArrayRef<int64_t> nativeShape) {
+std::optional<SmallVector<int64_t>>
+getCooperativeOpVectorShape(Operation *op, ArrayRef<int64_t> nativeShape) {
   // Unroll vector.contract ops according to native cooperative matrix size.
   if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
     return llvm::to_vector(nativeShape);
@@ -180,7 +184,7 @@ std::optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
   // Unroll elementwise ops according to native cooperative matrix size.
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0]))
-      return llvm::to_vector(nativeShape.drop_back());  // Drop K dim size
+      return llvm::to_vector(nativeShape.drop_back()); // Drop K dim size
   }
 
   // Unrolling vector.contract generates vector.{insert|extract}_strided_slice
@@ -216,9 +220,11 @@ std::optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
     VectorType sliceType;
     for (Operation *users : sourceOp->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract) return std::nullopt;
+      if (!extract)
+        return std::nullopt;
       auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-      if (sliceType && sliceType != vecType) return std::nullopt;
+      if (sliceType && sliceType != vecType)
+        return std::nullopt;
       sliceType = vecType;
     }
     return llvm::to_vector(sliceType.getShape());
@@ -254,7 +260,7 @@ void populateVectorUnrollPatterns(ArrayRef<int64_t> cooperativeOpSize,
 // or replace unrolling.
 class CombineContractTranspose final
     : public OpRewritePattern<vector::ContractionOp> {
- public:
+public:
   using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
@@ -286,7 +292,8 @@ class CombineContractTranspose final
       newSources.push_back(tranposeOp.getVector());
       foundTranspose = true;
     }
-    if (!foundTranspose) return failure();
+    if (!foundTranspose)
+      return failure();
 
     Value res = rewriter.create<vector::ContractionOp>(
         loc, newSources[0], newSources[1], newSources[2],
@@ -302,7 +309,7 @@ class CombineContractTranspose final
 
 class SPIRVTileToCooperativeOpsPass final
     : public SPIRVTileToCooperativeOpsBase<SPIRVTileToCooperativeOpsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, linalg::LinalgDialect,
                     vector::VectorDialect>();
@@ -371,7 +378,7 @@ class SPIRVTileToCooperativeOpsPass final
 class SPIRVVectorizeToCooperativeOpsPass final
     : public SPIRVVectorizeToCooperativeOpsBase<
           SPIRVVectorizeToCooperativeOpsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, linalg::LinalgDialect,
                     vector::VectorDialect>();
@@ -472,7 +479,7 @@ class SPIRVVectorizeToCooperativeOpsPass final
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileToCooperativeOpsPass() {
@@ -484,5 +491,5 @@ createSPIRVVectorizeToCooperativeOpsPass() {
   return std::make_unique<SPIRVVectorizeToCooperativeOpsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

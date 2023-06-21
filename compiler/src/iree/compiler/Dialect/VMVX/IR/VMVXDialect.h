@@ -16,14 +16,14 @@ namespace IREE {
 namespace VMVX {
 
 class VMVXDialect : public Dialect {
- public:
+public:
   explicit VMVXDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "vmvx"; }
 };
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VMVX_IR_VMVXDIALECT_H_
+#endif // IREE_COMPILER_DIALECT_VMVX_IR_VMVXDIALECT_H_

@@ -35,7 +35,8 @@ struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
     // Only distribute if we see the marker attribute.
     auto numDimAttr =
         forOp->getAttrOfType<IntegerAttr>(getSPIRVDistributeAttrName());
-    if (!numDimAttr) return failure();
+    if (!numDimAttr)
+      return failure();
 
     Location loc = forOp.getLoc();
     auto indexType = rewriter.getIndexType();
@@ -82,11 +83,11 @@ struct SPIRVDistributePass final
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVDistributePass() {
   return std::make_unique<SPIRVDistributePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

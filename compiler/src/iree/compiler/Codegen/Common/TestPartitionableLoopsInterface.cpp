@@ -64,12 +64,12 @@ struct TestPartitionableLoopsInterfacePass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<void>>
 createTestPartitionableLoopsInterfacePass() {
   return std::make_unique<TestPartitionableLoopsInterfacePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

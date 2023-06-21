@@ -84,8 +84,8 @@ std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 
 /// Creates a pass to decompose tensor.pack and tensor.unpack ops. The pass does
 /// tiling and generalization. See implementation for more details.
-std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass(
-    bool tileOuterToOne = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 
 /// A pass to eliminate tensor.empty ops that could turn into allocations
 /// during bufferization.
@@ -152,8 +152,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
-    bool flatten = false, bool dropUnitDims = true);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createOptimizeVectorTransferPass(bool flatten = false,
+                                 bool dropUnitDims = true);
 
 /// Pad dynamic alloc op to convert them into static one.
 std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
@@ -173,8 +174,8 @@ createRemoveSingleIterationLoopPass();
 /// `option` details.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSplitFullPartialTransferPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createSplitFullPartialTransferPass(
-    StringRef option);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSplitFullPartialTransferPass(StringRef option);
 
 /// Tests iree-hal-preprocess-executables-with behavior.
 std::unique_ptr<OperationPass<void>> createTestExecutablePreprocessingPass();
@@ -240,7 +241,7 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_

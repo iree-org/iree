@@ -59,8 +59,9 @@ static constexpr int copyVectorNumBits = 128;
 /// Patterns for copy to shared memory mapping. Copy to shared memory are not
 /// part of the launch config but needs to be distributed on the workgroup
 /// picked by the root op.
-static void populateTilingCopyToWorkgroupMemPatterns(
-    RewritePatternSet &patterns, ArrayRef<int64_t> workgroupSize) {
+static void
+populateTilingCopyToWorkgroupMemPatterns(RewritePatternSet &patterns,
+                                         ArrayRef<int64_t> workgroupSize) {
   // Tile and distribute copy to workgroup memory.
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
       [](OpBuilder &builder, Operation *operation) {
@@ -75,7 +76,8 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 
         unsigned rank = dstMemRefType.getRank();
         // Return empty tile size for zero dim tensor.
-        if (rank == 0) return tileSizesVal;
+        if (rank == 0)
+          return tileSizesVal;
         int copyTileSize =
             copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();
         for (unsigned i = 0; i < rank - 1; i++) {
@@ -87,12 +89,12 @@ static void populateTilingCopyToWorkgroupMemPatterns(
             operation->getLoc(), copyTileSize));
         return tileSizesVal;
       };
-  auto getCopyThreadProcInfoFn = [workgroupSize](
-                                     OpBuilder &builder, Location loc,
-                                     ArrayRef<Range> parallelLoopRanges) {
-    return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
-                                    workgroupSize);
-  };
+  auto getCopyThreadProcInfoFn =
+      [workgroupSize](OpBuilder &builder, Location loc,
+                      ArrayRef<Range> parallelLoopRanges) {
+        return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
+                                        workgroupSize);
+      };
   linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions;
   copyInvocationDistributionOptions.procInfo = getCopyThreadProcInfoFn;
 
@@ -112,8 +114,9 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 
 /// Compute a tile size so that the numer of iteraton is equal to the flat
 /// workgroup size.
-static std::optional<SmallVector<int64_t>> getTileToDistributableSize(
-    linalg::GenericOp copyOp, int64_t flatWorkgroupSize) {
+static std::optional<SmallVector<int64_t>>
+getTileToDistributableSize(linalg::GenericOp copyOp,
+                           int64_t flatWorkgroupSize) {
   SmallVector<int64_t> shape = copyOp.getStaticLoopRanges();
   unsigned bitWidth =
       llvm::cast<MemRefType>(copyOp.getDpsInitOperand(0)->get().getType())
@@ -129,7 +132,8 @@ static std::optional<SmallVector<int64_t>> getTileToDistributableSize(
     unroll.push_back(numThreads * numElementPerThread);
     assert(threadsAvailable % numThreads == 0);
     threadsAvailable = threadsAvailable / numThreads;
-    if (threadsAvailable == 1) break;
+    if (threadsAvailable == 1)
+      break;
   }
   assert(threadsAvailable == 1);
   unroll.resize(shape.size(), 1);
@@ -145,7 +149,8 @@ static void populateTileToUnroll(RewritePatternSet &patterns,
       [flatWorkgroupSize](OpBuilder &builder, Operation *operation) {
         SmallVector<Value> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
-        if (!copyOp) return tileSizesVal;
+        if (!copyOp)
+          return tileSizesVal;
         std::optional<SmallVector<int64_t>> staticSize =
             getTileToDistributableSize(copyOp, flatWorkgroupSize);
         for (int64_t dim : *staticSize) {
@@ -222,7 +227,8 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
       [](OpBuilder &builder, Operation *operation) {
         SmallVector<Value> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
-        if (!copyOp) return tileSizesVal;
+        if (!copyOp)
+          return tileSizesVal;
         SmallVector<int64_t> staticSize = getNativeDstShape(copyOp);
         for (int64_t dim : staticSize) {
           tileSizesVal.push_back(
@@ -230,11 +236,11 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
         }
         return tileSizesVal;
       };
-  auto getCopyThreadProcInfoFn = [flatThreadId](
-                                     OpBuilder &builder, Location loc,
-                                     ArrayRef<Range> parallelLoopRanges) {
-    return getIds(builder, loc, parallelLoopRanges, flatThreadId);
-  };
+  auto getCopyThreadProcInfoFn =
+      [flatThreadId](OpBuilder &builder, Location loc,
+                     ArrayRef<Range> parallelLoopRanges) {
+        return getIds(builder, loc, parallelLoopRanges, flatThreadId);
+      };
   linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions;
   copyInvocationDistributionOptions.procInfo = getCopyThreadProcInfoFn;
 
@@ -286,7 +292,8 @@ static Value createFlatId(func::FuncOp funcOp,
 static void hoistAlloc(func::FuncOp funcOp) {
   SmallVector<memref::AllocOp> allocs;
   funcOp.walk([&](memref::AllocOp alloc) {
-    if (alloc.getOperands().empty()) allocs.push_back(alloc);
+    if (alloc.getOperands().empty())
+      allocs.push_back(alloc);
   });
   for (memref::AllocOp alloc : allocs) {
     alloc->moveBefore(&(*funcOp.getBlocks().begin()),
@@ -309,7 +316,8 @@ static void removeRedundantBarriers(func::FuncOp funcOp) {
         prevOp = prevOp->getPrevNode();
       }
       if (prevOp && hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
-        for (Operation *op : redundantBarriers) op->erase();
+        for (Operation *op : redundantBarriers)
+          op->erase();
       }
     }
   });
@@ -329,11 +337,13 @@ static int64_t numIteration(scf::ForOp forOp) {
 }
 
 /// Fully unroll all the static loops unless they are part of the ignore map.
-static void UnrollSharedMemoryLoops(
-    func::FuncOp funcOp, const llvm::SmallDenseSet<scf::ForOp> &loopsToIgnore) {
+static void
+UnrollSharedMemoryLoops(func::FuncOp funcOp,
+                        const llvm::SmallDenseSet<scf::ForOp> &loopsToIgnore) {
   SmallVector<scf::ForOp> forOpsToUnroll;
   funcOp.walk([&](scf::ForOp forOp) {
-    if (!loopsToIgnore.count(forOp)) forOpsToUnroll.push_back(forOp);
+    if (!loopsToIgnore.count(forOp))
+      forOpsToUnroll.push_back(forOp);
   });
   for (scf::ForOp forOp : llvm::reverse(forOpsToUnroll)) {
     (void)loopUnrollByFactor(forOp, numIteration(forOp));
@@ -351,7 +361,8 @@ class GPUDistributeSharedMemoryCopyPass
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-    if (failed(exportOp)) return;
+    if (failed(exportOp))
+      return;
     auto workgroupSize = getWorkgroupSize(exportOp.value());
     workgroupSize.resize(3, 1);
     MLIRContext *context = &getContext();
@@ -360,7 +371,8 @@ class GPUDistributeSharedMemoryCopyPass
       if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker()))
         copiesToWorkgroupMem.push_back(copyOp);
     });
-    if (copiesToWorkgroupMem.empty()) return;
+    if (copiesToWorkgroupMem.empty())
+      return;
 
     // Step 0. First clean up the IR.
     hoistAlloc(funcOp);
@@ -445,12 +457,12 @@ class GPUDistributeSharedMemoryCopyPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUDistributeSharedMemoryCopy() {
   return std::make_unique<GPUDistributeSharedMemoryCopyPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

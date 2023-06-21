@@ -45,7 +45,7 @@ namespace Vulkan {
 /// We need a field for product to differentiate the cases where the
 /// architecture is unknown or ambiguous.
 class TargetTriple {
- public:
+public:
   static TargetTriple get(const char *triple);
 
   TargetTriple(TargetTripleArch, TargetTripleProduct, TargetTripleOS);
@@ -59,15 +59,15 @@ class TargetTriple {
 
   TargetEnvAttr getTargetEnv(MLIRContext *context) const;
 
- private:
+private:
   TargetTripleArch arch;
   TargetTripleProduct product;
   TargetTripleOS os;
 };
 
-}  // namespace Vulkan
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Vulkan
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VULKAN_UTILS_TARGETTRIPLE_H_
+#endif // IREE_COMPILER_DIALECT_VULKAN_UTILS_TARGETTRIPLE_H_

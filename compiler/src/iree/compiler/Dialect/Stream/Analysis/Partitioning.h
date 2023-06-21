@@ -108,8 +108,9 @@ struct PartitionSet {
 // ops in the block will be covered by a partition.
 PartitionSet partitionStreamableOps(IREE::Stream::PartitioningConfigAttr config,
                                     Block *block);
-PartitionSet partitionRegionConcurrency(
-    IREE::Stream::PartitioningConfigAttr config, Block *block);
+PartitionSet
+partitionRegionConcurrency(IREE::Stream::PartitioningConfigAttr config,
+                           Block *block);
 
 //===----------------------------------------------------------------------===//
 // Reference partitioning
@@ -117,17 +118,19 @@ PartitionSet partitionRegionConcurrency(
 
 // Naive clustering based solely on correctness with no cost model or weighting.
 // Produces the largest possible streams for any given block. Unsatisfactory.
-PartitionSet partitionStreamableOpsReference(
-    IREE::Stream::PartitioningConfigAttr config, Block *block);
+PartitionSet
+partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
+                                Block *block);
 
 // Similarly poor algorithm to partitionStreamableOpsReference but for use
 // within partitioned streams to produce waves of concurrently executable work.
-PartitionSet partitionRegionConcurrencyReference(
-    IREE::Stream::PartitioningConfigAttr config, Block *block);
+PartitionSet
+partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
+                                    Block *block);
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_ANALYSIS_PARTITIONING_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_ANALYSIS_PARTITIONING_H_

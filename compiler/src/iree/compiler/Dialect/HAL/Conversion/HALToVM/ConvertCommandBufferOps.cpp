@@ -21,7 +21,7 @@ namespace {
 // operand set) but we need it for the fixed call signature.
 class CommandBufferCreateOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferCreateOp> {
- public:
+public:
   CommandBufferCreateOpConversion(MLIRContext *context,
                                   SymbolTable &importSymbols,
                                   TypeConverter &typeConverter,
@@ -31,9 +31,9 @@ class CommandBufferCreateOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferCreateOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferCreateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     SmallVector<Value, 8> callOperands = {
@@ -41,12 +41,14 @@ class CommandBufferCreateOpConversion
     };
     auto modesValue = detail::rewriteAttrToOperands(
         op.getLoc(), adaptor.getModesAttr(), rewriter.getI32Type(), rewriter);
-    if (!modesValue.has_value()) return failure();
+    if (!modesValue.has_value())
+      return failure();
     callOperands.append(modesValue.value());
     auto categoriesValue = detail::rewriteAttrToOperands(
         op.getLoc(), adaptor.getCommandCategoriesAttr(), rewriter.getI32Type(),
         rewriter);
-    if (!categoriesValue.has_value()) return failure();
+    if (!categoriesValue.has_value())
+      return failure();
     callOperands.append(categoriesValue.value());
     if (adaptor.getBindingCapacity()) {
       callOperands.push_back(castToImportType(adaptor.getBindingCapacity(),
@@ -64,13 +66,13 @@ class CommandBufferCreateOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
 class CommandBufferFillBufferOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferFillBufferOp> {
- public:
+public:
   CommandBufferFillBufferOpConversion(MLIRContext *context,
                                       SymbolTable &importSymbols,
                                       TypeConverter &typeConverter,
@@ -80,9 +82,9 @@ class CommandBufferFillBufferOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferFillBufferOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferFillBufferOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     SmallVector<Value, 8> callOperands = {
@@ -120,13 +122,13 @@ class CommandBufferFillBufferOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
 class CommandBufferCollectiveOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferCollectiveOp> {
- public:
+public:
   CommandBufferCollectiveOpConversion(MLIRContext *context,
                                       SymbolTable &importSymbols,
                                       TypeConverter &typeConverter,
@@ -136,9 +138,9 @@ class CommandBufferCollectiveOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferCollectiveOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferCollectiveOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     Value nullBuffer;
@@ -212,13 +214,13 @@ class CommandBufferCollectiveOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
 class CommandBufferPushDescriptorSetOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
- public:
+public:
   CommandBufferPushDescriptorSetOpConversion(MLIRContext *context,
                                              SymbolTable &importSymbols,
                                              TypeConverter &typeConverter,
@@ -228,9 +230,10 @@ class CommandBufferPushDescriptorSetOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferPushDescriptorSetOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferPushDescriptorSetOp op,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     // Memoize zeros/nulls ala IndexSet.
@@ -297,11 +300,11 @@ class CommandBufferPushDescriptorSetOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-}  // namespace
+} // namespace
 
 void populateHALCommandBufferToVMPatterns(MLIRContext *context,
                                           SymbolTable &importSymbols,
@@ -344,5 +347,5 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
           "hal.command_buffer.dispatch.indirect");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

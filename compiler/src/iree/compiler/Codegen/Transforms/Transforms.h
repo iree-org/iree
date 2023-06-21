@@ -34,10 +34,12 @@ struct SliceAndDynamicDims {
   SmallVector<OpFoldResult> strides;
   SmallVector<Value> dynamicDims;
 };
-SliceAndDynamicDims cloneOffsetsSizesAndStrides(
-    OpBuilder &builder, IREE::Flow::DispatchTensorStoreOp storeOp);
-SliceAndDynamicDims cloneOffsetsSizesAndStrides(
-    OpBuilder &builder, IREE::Flow::DispatchTensorLoadOp loadOp);
+SliceAndDynamicDims
+cloneOffsetsSizesAndStrides(OpBuilder &builder,
+                            IREE::Flow::DispatchTensorStoreOp storeOp);
+SliceAndDynamicDims
+cloneOffsetsSizesAndStrides(OpBuilder &builder,
+                            IREE::Flow::DispatchTensorLoadOp loadOp);
 
 /// Creates an allocation in the entry block of the function if the size is
 /// statically bounded. For a static allocation, it returns an allocation
@@ -46,10 +48,11 @@ SliceAndDynamicDims cloneOffsetsSizesAndStrides(
 /// dynamic shape of the allocation. Returns std::nullopt if the method
 /// couldnt creat an allocation in the entry block.
 template <typename AllocLikeOpType>
-std::optional<Value> hoistOneStaticallyBoundAllocation(
-    func::FuncOp funcOp, OpBuilder &builder, Location loc,
-    MemRefType allocaType, ValueRange dynamicSizes,
-    std::optional<uint64_t> alignment);
+std::optional<Value>
+hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
+                                  Location loc, MemRefType allocaType,
+                                  ValueRange dynamicSizes,
+                                  std::optional<uint64_t> alignment);
 
 /// Hoists `allocaOp` to the entry block of the function if the size is
 /// statically bounded. For a static allocation, it returns an allocation
@@ -58,8 +61,9 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 /// dynamic shape of the allocation. The method returns a value, but
 /// does not replace the uses of the `allocaOp`.
 template <typename AllocLikeOpType>
-std::optional<Value> hoistOneStaticallyBoundAllocation(
-    func::FuncOp funcOp, OpBuilder &builder, AllocLikeOpType allocaOp);
+std::optional<Value>
+hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
+                                  AllocLikeOpType allocaOp);
 
 /// Traverse funcOp and try to hoist every AllocaOp to the entry block of the
 /// function if the size is statically bounded.
@@ -144,7 +148,7 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_

@@ -24,7 +24,8 @@ namespace {
 // Returns the stream affinity based on the given flow dialect |op|.
 // Returns an empty attribute when no affinity is specified.
 static IREE::Stream::AffinityAttr getAffinityFor(Operation *op) {
-  if (!op) return {};
+  if (!op)
+    return {};
   // TODO(benvanik): support upstream interfaces or something more generic?
   // We may want to allow users to come in with raw string forms or something
   // that we parse and map to an attribute. That would prevent the need for
@@ -51,9 +52,9 @@ static Value buildResultSizeOf(Location loc, Value tensorValue,
 struct ConvertTensorReshapeOp
     : public OpConversionPattern<IREE::Flow::TensorReshapeOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorReshapeOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorReshapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
@@ -70,9 +71,9 @@ struct ConvertTensorReshapeOp
 struct ConvertTensorAllocaOp
     : public OpConversionPattern<IREE::Flow::TensorAllocaOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorAllocaOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorAllocaOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
     auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
                                         op.getResultDims(), rewriter);
@@ -85,9 +86,9 @@ struct ConvertTensorAllocaOp
 struct ConvertTensorEmptyOp
     : public OpConversionPattern<IREE::Flow::TensorEmptyOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorEmptyOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorEmptyOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
     auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
                                         op.getResultDims(), rewriter);
@@ -101,9 +102,9 @@ struct ConvertTensorEmptyOp
 struct ConvertTensorSplatOp
     : public OpConversionPattern<IREE::Flow::TensorSplatOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorSplatOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorSplatOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
                                         op.getResultDims(), rewriter);
@@ -117,9 +118,9 @@ struct ConvertTensorSplatOp
 struct ConvertTensorCloneOp
     : public OpConversionPattern<IREE::Flow::TensorCloneOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorCloneOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorCloneOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto operand =
         consumeTensorOperand(op.getLoc(), adaptor.getOperand(), rewriter);
@@ -134,9 +135,9 @@ struct ConvertTensorCloneOp
 struct ConvertTensorSliceOp
     : public OpConversionPattern<IREE::Flow::TensorSliceOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorSliceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorSliceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
@@ -154,9 +155,9 @@ struct ConvertTensorSliceOp
 struct ConvertTensorUpdateOp
     : public OpConversionPattern<IREE::Flow::TensorUpdateOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorUpdateOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorUpdateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto update =
         consumeTensorOperand(op.getLoc(), adaptor.getUpdate(), rewriter);
     auto target =
@@ -173,9 +174,9 @@ struct ConvertTensorUpdateOp
 struct ConvertTensorLoadOp
     : public OpConversionPattern<IREE::Flow::TensorLoadOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorLoadOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorLoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
@@ -201,9 +202,9 @@ struct ConvertTensorLoadOp
 struct ConvertTensorStoreOp
     : public OpConversionPattern<IREE::Flow::TensorStoreOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorStoreOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorStoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto target =
         consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
 
@@ -240,9 +241,9 @@ struct ConvertTensorStoreOp
 struct ConvertTensorTraceOp
     : public OpConversionPattern<IREE::Flow::TensorTraceOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::TensorTraceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorTraceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> exportedTensors;
     for (auto [tensorOperand, resourceOperand] :
          llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
@@ -274,9 +275,9 @@ struct ConvertTensorTraceOp
 struct ConvertChannelDefaultOp
     : public OpConversionPattern<IREE::Flow::ChannelDefaultOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
     rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCreateOp>(
         op, /*id=*/Value{},
@@ -290,9 +291,9 @@ struct ConvertChannelDefaultOp
 struct ConvertChannelSplitOp
     : public OpConversionPattern<IREE::Flow::ChannelSplitOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::ChannelSplitOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::ChannelSplitOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Stream::ChannelSplitOp>(
         op, adaptor.getChannel(), adaptor.getColor(), adaptor.getKey());
     return success();
@@ -302,9 +303,9 @@ struct ConvertChannelSplitOp
 struct ConvertChannelRankOp
     : public OpConversionPattern<IREE::Flow::ChannelRankOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::ChannelRankOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::ChannelRankOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Stream::ChannelRankOp>(
         op, adaptor.getOperands());
     return success();
@@ -314,9 +315,9 @@ struct ConvertChannelRankOp
 struct ConvertChannelCountOp
     : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
         op, adaptor.getOperands());
     return success();
@@ -326,9 +327,9 @@ struct ConvertChannelCountOp
 struct ConvertAllGatherOp
     : public OpConversionPattern<IREE::Flow::CollectiveAllGatherOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::CollectiveAllGatherOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::CollectiveAllGatherOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto shape = llvm::cast<ShapedType>(op.getSource().getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllGather,
@@ -361,9 +362,9 @@ struct ConvertAllGatherOp
 struct ConvertAllReduceOp
     : public OpConversionPattern<IREE::Flow::CollectiveAllReduceOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::CollectiveAllReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::CollectiveAllReduceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllReduce,
@@ -396,9 +397,9 @@ struct ConvertAllReduceOp
 struct ConvertAllToAllOp
     : public OpConversionPattern<IREE::Flow::CollectiveAllToAllOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::CollectiveAllToAllOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::CollectiveAllToAllOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto shape = llvm::cast<ShapedType>(op.getSource().getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllToAll,
@@ -431,9 +432,9 @@ struct ConvertAllToAllOp
 struct ConvertReduceScatterOp
     : public OpConversionPattern<IREE::Flow::CollectiveReduceScatterOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::CollectiveReduceScatterOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::CollectiveReduceScatterOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::ReduceScatter,
@@ -466,9 +467,9 @@ struct ConvertReduceScatterOp
 struct ConvertCollectiveSendRecvOp
     : public OpConversionPattern<IREE::Flow::CollectiveSendRecvOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::CollectiveSendRecvOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::CollectiveSendRecvOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto shape = llvm::cast<ShapedType>(op.getType());
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::SendRecv,
@@ -514,9 +515,9 @@ struct ConvertCollectiveSendRecvOp
 
 struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::DispatchOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Zero is going to be used for each operand to start.
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
 
@@ -581,9 +582,9 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
 
 struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::FuncOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::FuncOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto convertType = [&](Type type) -> Type {
       if (llvm::isa<TensorType>(type)) {
         // Tensors become resources without sizes. The default type converter
@@ -616,9 +617,9 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
 
 struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::CallOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::CallOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Zero is going to be used for each operand to start.
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
 
@@ -690,7 +691,8 @@ static bool insertBindingOp(BlockArgument arg,
                             IREE::Flow::DispatchTensorType tensorType,
                             Value zero, OpBuilder &builder) {
   // No uses: don't need a binding op.
-  if (arg.use_empty()) return true;
+  if (arg.use_empty())
+    return true;
 
   // Find the dynamic dimension SSA values of the argument within the region.
   // If the flow dialect properly modeled dimension associations we wouldn't
@@ -705,7 +707,8 @@ static bool insertBindingOp(BlockArgument arg,
     IREE::Flow::DispatchTieShapeOp tieShapeOp;
     for (auto user : arg.getUsers()) {
       tieShapeOp = dyn_cast<IREE::Flow::DispatchTieShapeOp>(user);
-      if (tieShapeOp) break;
+      if (tieShapeOp)
+        break;
     }
     if (tieShapeOp) {
       // Found a tie shape op - we'll insert ourselves there.
@@ -757,9 +760,9 @@ static void convertReturnOps(Region &region) {
 struct ConvertExecutableOp
     : public OpConversionPattern<IREE::Flow::ExecutableOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::ExecutableOp flowOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::ExecutableOp flowOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // flow.executable -> stream.executable
     auto streamOp = rewriter.create<IREE::Stream::ExecutableOp>(
         flowOp.getLoc(), flowOp.getSymName());
@@ -790,7 +793,8 @@ struct ConvertExecutableOp
     // Dispatch tensor arguments become bindings and all others are preserved as
     // adaptor. Note that we only touch public (exported) functions.
     for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
-      if (!funcOp.isPublic()) continue;
+      if (!funcOp.isPublic())
+        continue;
 
       SmallVector<Type> newTypes;
       newTypes.reserve(funcOp.getNumArguments());
@@ -831,16 +835,16 @@ struct ConvertExecutableOp
 
 struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Flow::ReturnOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::ReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Stream::ReturnOp>(op,
                                                         adaptor.getOperands());
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateFlowToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
@@ -880,5 +884,5 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
   populateFlowToStreamConversionPatterns(context, typeConverter, patterns);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

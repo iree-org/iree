@@ -60,13 +60,15 @@ struct AbstractGemmLikeStrategy {
   /// Common values based on derived quantities.
   int64_t totalNumThreads() const {
     int64_t res = 1;
-    for (auto v : numThreads) res *= v;
+    for (auto v : numThreads)
+      res *= v;
     return res;
   }
 
   int64_t totalNumWarps() const {
     int64_t res = 1;
-    for (auto v : numWarps) res *= v;
+    for (auto v : numWarps)
+      res *= v;
     return res;
   }
 
@@ -156,8 +158,8 @@ struct AbstractGemmLikeStrategy {
   constexpr static int64_t kMinMmaSyncMinK = 4;
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_ABSTRACT_GEMM_LIKE_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_ABSTRACT_GEMM_LIKE_STRATEGY_H_

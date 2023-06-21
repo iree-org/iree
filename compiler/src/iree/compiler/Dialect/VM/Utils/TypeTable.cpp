@@ -20,7 +20,8 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
     if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
       type = refPtrType.getObjectType();
     }
-    if (typeMap.count(type)) return;
+    if (typeMap.count(type))
+      return;
     std::string str;
     llvm::raw_string_ostream sstream(str);
     type.print(sstream);
@@ -33,8 +34,10 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   };
   for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
     funcOp.walk([&](Operation *op) {
-      for (auto type : op->getOperandTypes()) tryInsertType(type);
-      for (auto type : op->getResultTypes()) tryInsertType(type);
+      for (auto type : op->getOperandTypes())
+        tryInsertType(type);
+      for (auto type : op->getResultTypes())
+        tryInsertType(type);
     });
   }
 
@@ -56,7 +59,7 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   return table;
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

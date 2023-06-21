@@ -19,7 +19,7 @@ void populateUtilToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               RewritePatternSet &patterns);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_UTILTOVM_CONVERTUTILTOVM_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_UTILTOVM_CONVERTUTILTOVM_H_

@@ -15,12 +15,12 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-llvm::Expected<std::unique_ptr<llvm::Module>> loadMuslBitcode(
-    llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
+llvm::Expected<std::unique_ptr<llvm::Module>>
+loadMuslBitcode(llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_MUSL_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_MUSL_H_

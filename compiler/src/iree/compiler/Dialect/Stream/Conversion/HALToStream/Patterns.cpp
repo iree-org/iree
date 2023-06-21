@@ -25,9 +25,9 @@ namespace {
 struct ConvertTensorImportOp
     : public OpConversionPattern<IREE::HAL::TensorImportOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSource().getType();
     auto targetType = op.getTargetEncoding();
     if (!llvm::isa<IREE::HAL::BufferType>(sourceType) &&
@@ -140,9 +140,9 @@ struct ConvertTensorImportOp
 struct ConvertTensorExportOp
     : public OpConversionPattern<IREE::HAL::TensorExportOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSourceEncoding();
     auto targetType = op.getTarget().getType();
     if (!llvm::isa<IREE::HAL::BufferType>(targetType) &&
@@ -219,9 +219,9 @@ struct ConvertTensorExportOp
 struct ConvertTensorBarrierOp
     : public OpConversionPattern<IREE::HAL::TensorBarrierOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::TensorBarrierOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::TensorBarrierOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto timepointType = rewriter.getType<IREE::Stream::TimepointType>();
     SmallVector<Value> signaledResources;
     SmallVector<Value> signaledTimepoints;
@@ -244,7 +244,7 @@ struct ConvertTensorBarrierOp
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateHALToStreamConversionPatterns(MLIRContext *context,
                                            TypeConverter &typeConverter,
@@ -278,5 +278,5 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
   populateHALToStreamConversionPatterns(context, typeConverter, patterns);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

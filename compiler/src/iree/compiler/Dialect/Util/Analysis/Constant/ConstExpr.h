@@ -26,7 +26,7 @@ namespace Util {
 //
 // Modifying any of the analyzed operations invalidates this analysis.
 class ConstExprAnalysis {
- public:
+public:
   struct ConstValueInfo;
   explicit ConstExprAnalysis(Operation *rootOp);
 
@@ -42,7 +42,8 @@ class ConstExprAnalysis {
   // an operation's results will either all be const-expr or not, so we just
   // check the first. 0-result ops cannot be const-expr.
   const ConstValueInfo *lookup(Operation *queryOp) const {
-    if (queryOp->getNumResults() == 0) return nullptr;
+    if (queryOp->getNumResults() == 0)
+      return nullptr;
     return lookup(queryOp->getResult(0));
   }
 
@@ -51,7 +52,8 @@ class ConstExprAnalysis {
   // existing constants returns false.
   bool isConstExprValue(Value queryValue) const {
     ConstValueInfo *found = constInfoMap.lookup(queryValue);
-    if (!found) return false;
+    if (!found)
+      return false;
     return found->state == ConstValueInfo::CONSTANT && !found->isRoot;
   }
 
@@ -59,7 +61,8 @@ class ConstExprAnalysis {
   // an operation's results will either all be const-expr or not, so we just
   // check the first. 0-result ops cannot be const-expr.
   bool isConstExprOperation(Operation *queryOp) const {
-    if (queryOp->getNumResults() == 0) return false;
+    if (queryOp->getNumResults() == 0)
+      return false;
     return isConstExprValue(queryOp->getResult(0));
   }
 
@@ -124,7 +127,7 @@ class ConstExprAnalysis {
     }
   };
 
- private:
+private:
   // Expands the frontier to include all results of a given op in an UNKNOWN
   // state. This also checks that all of its operands are known, adding
   // them recusrively if not.
@@ -159,7 +162,7 @@ class ConstExprAnalysis {
 //
 // The default base class will hoist everything that is eligible.
 class ConstExprHoistingPolicy {
- public:
+public:
   using Worklist = llvm::SmallVector<const ConstExprAnalysis::ConstValueInfo *>;
   enum Outcome {
     UNDECIDED = 0,
@@ -167,7 +170,7 @@ class ConstExprHoistingPolicy {
     DISABLE_HOIST = 2,
   };
   class Decision {
-   public:
+  public:
     void disableHoist() {
       assert(outcome == UNDECIDED &&
              "can only disable hoisting of an undecided decision");
@@ -181,7 +184,7 @@ class ConstExprHoistingPolicy {
 
     Outcome getOutcome() const { return outcome; }
 
-   private:
+  private:
     Outcome outcome = UNDECIDED;
   };
 
@@ -191,7 +194,7 @@ class ConstExprHoistingPolicy {
     return &decisions[info];
   }
 
- private:
+private:
   // At initialization time, makes any fixed decisions. This hook can only
   // make decisions that do not depend on any const-exprs outside of what is
   // passed.
@@ -217,9 +220,9 @@ inline raw_ostream &operator<<(raw_ostream &os,
   return os;
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_CONST_EXPR_H_
+#endif // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_CONST_EXPR_H_

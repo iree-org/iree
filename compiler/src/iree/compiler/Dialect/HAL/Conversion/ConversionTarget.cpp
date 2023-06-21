@@ -76,5 +76,5 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
   return success();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

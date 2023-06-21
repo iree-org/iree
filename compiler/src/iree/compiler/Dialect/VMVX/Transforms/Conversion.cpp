@@ -38,7 +38,7 @@ namespace {
 
 // Runs conversion with registered input dialects.
 class ConversionPass : public ConversionBase<ConversionPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
@@ -101,13 +101,13 @@ class ConversionPass : public ConversionBase<ConversionPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();
 }
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

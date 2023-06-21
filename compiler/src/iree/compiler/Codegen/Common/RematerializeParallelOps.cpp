@@ -23,10 +23,11 @@ struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
     // Find the first operand that is defined by another generic op on tensors.
-    for (OpOperand& opOperand : genericOp->getOpOperands()) {
-      if (!linalg::areElementwiseOpsFusable(&opOperand)) continue;
+    for (OpOperand &opOperand : genericOp->getOpOperands()) {
+      if (!linalg::areElementwiseOpsFusable(&opOperand))
+        continue;
 
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
@@ -59,12 +60,12 @@ struct RematerializeParallelOpsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRematerializeParallelOpsPass() {
   return std::make_unique<RematerializeParallelOpsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

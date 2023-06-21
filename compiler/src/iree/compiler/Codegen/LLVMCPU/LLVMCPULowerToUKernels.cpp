@@ -32,12 +32,13 @@ struct LLVMCPULowerToUKernelsPass
   }
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 /// Returns `true` if an `outsOperand` value is initialized to zero.
 static bool isInitializedToZero(Value outsOperand) {
   auto fillOp = outsOperand.getDefiningOp<linalg::FillOp>();
-  if (!fillOp) return false;
+  if (!fillOp)
+    return false;
   Value fillVal = fillOp.getDpsInputOperand(0)->get();
   return matchPattern(fillVal, m_Zero()) ||
          matchPattern(fillVal, m_AnyZeroFloat());
@@ -51,9 +52,9 @@ struct FnNameAndDefAttrs {
 
 /// Returns the function name and attributes to use for a ukernel with given
 /// `ukernelName` on the target described by `targetAttr`.
-static FnNameAndDefAttrs getFnNameAndDefAttrs(
-    const char *ukernelName, RewriterBase &rewriter,
-    IREE::HAL::ExecutableTargetAttr targetAttr) {
+static FnNameAndDefAttrs
+getFnNameAndDefAttrs(const char *ukernelName, RewriterBase &rewriter,
+                     IREE::HAL::ExecutableTargetAttr targetAttr) {
   FnNameAndDefAttrs result;
   if (isVMVXBackend(targetAttr)) {
     result.name = std::string("vmvx.") + ukernelName;
@@ -83,8 +84,8 @@ static FnNameAndDefAttrs getFnNameAndDefAttrs(
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
-static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
-    RewriterBase &rewriter, linalg::Mmt4DOp op) {
+static FailureOr<IREE::Codegen::UKernelOpInterface>
+matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op) {
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value out = op.getDpsInitOperand(0)->get();
@@ -144,8 +145,8 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       genericMicroKernelOp.getOperation());
 }
 
-static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
-    RewriterBase &rewriter, tensor::PackOp op) {
+static FailureOr<IREE::Codegen::UKernelOpInterface>
+matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op) {
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = llvm::cast<ShapedType>(in.getType());
@@ -256,8 +257,8 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       genericMicroKernelOp.getOperation());
 }
 
-static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
-    RewriterBase &rewriter, tensor::UnPackOp op) {
+static FailureOr<IREE::Codegen::UKernelOpInterface>
+matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op) {
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = llvm::cast<ShapedType>(in.getType());
@@ -333,8 +334,8 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       genericMicroKernelOp.getOperation());
 }
 
-static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
-    RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
+static FailureOr<IREE::Codegen::UKernelOpInterface>
+matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
   auto tensorType = op.getTensorType().dyn_cast<RankedTensorType>();
   if (!tensorType) {
     return rewriter.notifyMatchFailure(op,
@@ -406,7 +407,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void LLVMCPULowerToUKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -426,5 +427,5 @@ std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass() {
   return std::make_unique<LLVMCPULowerToUKernelsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

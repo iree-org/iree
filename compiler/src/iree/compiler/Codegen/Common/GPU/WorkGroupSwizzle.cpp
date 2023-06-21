@@ -27,7 +27,7 @@ namespace iree_compiler {
 // function.
 static void makeSwizzledId(Location loc, OpBuilder b, Value workgroupIdX,
                            Value workgroupIdY, Value gridSizeX, Value gridSizeY,
-                           Value& SwizzledIdX, Value& SwizzledIdY,
+                           Value &SwizzledIdX, Value &SwizzledIdY,
                            unsigned swizzleTile) {
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value tile = b.create<arith::ConstantIndexOp>(loc, swizzleTile);
@@ -60,7 +60,7 @@ struct WorkGroupSwizzlePass
   WorkGroupSwizzlePass(unsigned swizzleLogTile)
       : swizzleLogTile(swizzleLogTile) {}
 
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect>();
   }
   LogicalResult initializeOptions(StringRef options) override {
@@ -71,7 +71,8 @@ struct WorkGroupSwizzlePass
     return success();
   }
   void runOnOperation() override {
-    if (swizzleLogTile == 0) return;
+    if (swizzleLogTile == 0)
+      return;
     unsigned swizzleTile = pow(2, swizzleLogTile);
     func::FuncOp funcOp = getOperation();
     std::array<IREE::HAL::InterfaceWorkgroupIDOp, 2> oldWorkgroupIds;
@@ -86,7 +87,8 @@ struct WorkGroupSwizzlePass
         yFound = true;
       }
     });
-    if (xFound == false || yFound == false) return;
+    if (xFound == false || yFound == false)
+      return;
     OpBuilder builder(funcOp);
     builder.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
     Value workgroupIdX =
@@ -104,15 +106,15 @@ struct WorkGroupSwizzlePass
     oldWorkgroupIds[1].replaceAllUsesWith(SwizzledIdY);
   }
 
- private:
+private:
   unsigned swizzleLogTile;
 };
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
-    unsigned swizzleLogTile) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWorkGroupSwizzle(unsigned swizzleLogTile) {
   return std::make_unique<WorkGroupSwizzlePass>(swizzleLogTile);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -182,13 +182,15 @@ static void inlineClosureOperands(const ClosureOptimizationOptions &options,
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto outerValue = opArg.value();
     auto *sourceOp = outerValue.getDefiningOp();
-    if (!sourceOp) continue;  // can't clone block arguments into closures
+    if (!sourceOp)
+      continue; // can't clone block arguments into closures
 
     // We cannot just simply inline and replace all users if this is an
     // argument that can be written; for example, the region might perform
     // work after loading a initial constant from the argument and then
     // write back.
-    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly()) continue;
+    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly())
+      continue;
 
     if (closureOp.canClosureContainOp(sourceOp) &&
         shouldInlineIntoClosure(options, outerValue)) {
@@ -319,7 +321,7 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
   return success();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

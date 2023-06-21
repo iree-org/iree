@@ -12,14 +12,14 @@ namespace ConstEval {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/ConstEval/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/ConstEval/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerConstEvalPasses() {
   // Generated.
   registerPasses();
 }
 
-}  // namespace ConstEval
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ConstEval
+} // namespace iree_compiler
+} // namespace mlir

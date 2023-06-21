@@ -27,7 +27,8 @@ static constexpr int copyVectorNumBits = 128;
 /// Filter to decide which contract ops need allocations.
 static bool contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) return false;
+  if (!linalgOp)
+    return false;
 
   if (!linalg::isaContractionOpInterface(linalgOp)) {
     return false;
@@ -36,7 +37,8 @@ static bool contractOpFilter(Operation *op) {
   // The workgroup specialization already makes static shapes available for the
   // main tile part and makes the partial tile computation small, so promoting
   // to shared memory for the partial tile actually hurts the performance.
-  if (linalgOp.hasDynamicShape()) return false;
+  if (linalgOp.hasDynamicShape())
+    return false;
 
   // Check if the shape is tile-distributable. The leading dimension must be a
   // multiple of the target vector size, which is 128b / the element bit width.
@@ -72,7 +74,8 @@ static bool contractOpFilter(Operation *op) {
 /// Filter to decide which transpose ops need allocations.
 static bool transposeOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) return false;
+  if (!linalgOp)
+    return false;
   LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
   return opInfo.isTranspose();
 }
@@ -111,15 +114,18 @@ struct SwapAllocTensorPattern final
 
   LogicalResult matchAndRewrite(bufferization::AllocTensorOp allocOp,
                                 PatternRewriter &rewriter) const override {
-    if (!allocOp.getCopy()) return failure();
+    if (!allocOp.getCopy())
+      return failure();
     auto linalgOp = allocOp.getCopy().getDefiningOp<linalg::LinalgOp>();
-    if (!linalgOp) return failure();
+    if (!linalgOp)
+      return failure();
 
     // Make sure we don't use the initial values for the linalg output we are
     // copying during the tensor allocation.
     unsigned resultNumber = cast<OpResult>(allocOp.getCopy()).getResultNumber();
     OpOperand *initOperand = linalgOp.getDpsInitOperand(resultNumber);
-    if (linalgOp.payloadUsesValueFromOperand(initOperand)) return failure();
+    if (linalgOp.payloadUsesValueFromOperand(initOperand))
+      return failure();
 
     rewriter.setInsertionPoint(linalgOp);
     std::optional<Attribute> memorySpace = allocOp.getMemorySpace();
@@ -140,11 +146,11 @@ struct SwapAllocTensorPattern final
 };
 
 struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
- private:
+private:
   GPUPromoteSharedMemPattern promoteSharedMemPattern =
       GPUPromoteSharedMemPattern::ContractionOpPattern;
 
- public:
+public:
   GPUTensorAllocPass(GPUPromoteSharedMemPattern promoteSharedMemPattern)
       : promoteSharedMemPattern(promoteSharedMemPattern) {}
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -168,12 +174,14 @@ struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
     SmallVector<Operation *> opsToPromote;
     funcOp.walk([&](Operation *op) {
       switch (promoteSharedMemPattern) {
-        case GPUPromoteSharedMemPattern::ContractionOpPattern:
-          if (contractOpFilter(op)) opsToPromote.push_back(op);
-          break;
-        case GPUPromoteSharedMemPattern::TransposeOpPattern:
-          if (transposeOpFilter(op)) opsToPromote.push_back(op);
-          break;
+      case GPUPromoteSharedMemPattern::ContractionOpPattern:
+        if (contractOpFilter(op))
+          opsToPromote.push_back(op);
+        break;
+      case GPUPromoteSharedMemPattern::TransposeOpPattern:
+        if (transposeOpFilter(op))
+          opsToPromote.push_back(op);
+        break;
       }
     });
     for (Operation *op : opsToPromote) {
@@ -181,32 +189,32 @@ struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
       auto linalgOp = cast<linalg::LinalgOp>(op);
       bufferization::BufferizationOptions options;
       switch (promoteSharedMemPattern) {
-        case GPUPromoteSharedMemPattern::ContractionOpPattern:
-          // Promote all the input operands
-          for (auto operand : linalgOp.getDpsInputOperands()) {
-            FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-                builder, op->getLoc(), operand->get(), false, options, true);
-            if (failed(ret)) {
-              return signalPassFailure();
-            }
-            Value v = ret.value();
-            operand->set(v);
+      case GPUPromoteSharedMemPattern::ContractionOpPattern:
+        // Promote all the input operands
+        for (auto operand : linalgOp.getDpsInputOperands()) {
+          FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
+              builder, op->getLoc(), operand->get(), false, options, true);
+          if (failed(ret)) {
+            return signalPassFailure();
           }
-          break;
+          Value v = ret.value();
+          operand->set(v);
+        }
+        break;
 
-        case GPUPromoteSharedMemPattern::TransposeOpPattern:
-          LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+      case GPUPromoteSharedMemPattern::TransposeOpPattern:
+        LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
-          for (auto operand : opInfo.getTransposeOperands()) {
-            FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-                builder, op->getLoc(), operand->get(), false, options, true);
-            if (failed(ret)) {
-              return signalPassFailure();
-            }
-            Value v = ret.value();
-            operand->set(v);
+        for (auto operand : opInfo.getTransposeOperands()) {
+          FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
+              builder, op->getLoc(), operand->get(), false, options, true);
+          if (failed(ret)) {
+            return signalPassFailure();
           }
-          break;
+          Value v = ret.value();
+          operand->set(v);
+        }
+        break;
       }
     }
 
@@ -229,12 +237,12 @@ struct GPUTensorAllocPass : public GPUTensorAllocBase<GPUTensorAllocPass> {
     }
   }
 };
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorAlloc(
-    GPUPromoteSharedMemPattern promoteSharedMemPattern) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern) {
   return std::make_unique<GPUTensorAllocPass>(promoteSharedMemPattern);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -31,7 +31,8 @@ namespace IREE {
 namespace HAL {
 
 static std::string getAttrStr(Attribute attr) {
-  if (!attr) return "";
+  if (!attr)
+    return "";
   std::string result;
   llvm::raw_string_ostream os(result);
   attr.print(os, /*elideType=*/true);
@@ -71,7 +72,8 @@ static Value createChunkHeader(Location loc, iree_idbts_chunk_type_t type,
 static Value createPadding(Location loc, uint64_t unalignedLength,
                            OpBuilder &builder) {
   uint64_t padding = llvm::alignTo(unalignedLength, 16) - unalignedLength;
-  if (!padding) return nullptr;
+  if (!padding)
+    return nullptr;
   auto i8Type = builder.getI8Type();
   auto zeroAttr = IntegerAttr::get(i8Type, 0);
   auto dataAttr = DenseElementsAttr::get(
@@ -98,7 +100,7 @@ static void appendListItems(Location loc, Value list, ArrayRef<Value> items,
 class MaterializeDispatchInstrumentationPass
     : public PassWrapper<MaterializeDispatchInstrumentationPass,
                          OperationPass<mlir::ModuleOp>> {
- public:
+public:
   MaterializeDispatchInstrumentationPass() = default;
   MaterializeDispatchInstrumentationPass(
       const MaterializeDispatchInstrumentationPass &pass) {}
@@ -123,7 +125,8 @@ class MaterializeDispatchInstrumentationPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
 
     auto moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
     auto i8Type = moduleBuilder.getI8Type();
@@ -184,7 +187,8 @@ class MaterializeDispatchInstrumentationPass
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         auto funcOp = exportOp.lookupFunctionRef();
-        if (!funcOp) continue;
+        if (!funcOp)
+          continue;
 
         // Capture the source before we mess with it.
         auto originalSource = getOpStr(funcOp);
@@ -272,7 +276,8 @@ class MaterializeDispatchInstrumentationPass
               break;
             }
           }
-          if (!functionId) return;  // not instrumented
+          if (!functionId)
+            return; // not instrumented
 
           // Append dispatch site ID to correlate this op with where it lives in
           // the program and what is being dispatched. Note that multiple
@@ -379,7 +384,7 @@ class MaterializeDispatchInstrumentationPass
     }
   }
 
- private:
+private:
   Option<llvm::cl::PowerOf2ByteSize> bufferSize{
       *this,
       "bufferSize",
@@ -397,7 +402,7 @@ static PassRegistration<MaterializeDispatchInstrumentationPass> pass([] {
   return std::make_unique<MaterializeDispatchInstrumentationPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

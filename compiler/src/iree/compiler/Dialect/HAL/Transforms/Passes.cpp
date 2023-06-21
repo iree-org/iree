@@ -115,7 +115,7 @@ static llvm::cl::list<std::string> clPreprocessExecutablesWith{
         "will fail compilation."),
 };
 
-}  // namespace
+} // namespace
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
@@ -230,7 +230,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
         createPreprocessExecutablesPass(command));
   }
 
-  if (compileTo == PipelinePhase::ExecutableSources) return;
+  if (compileTo == PipelinePhase::ExecutableSources)
+    return;
 
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
@@ -245,7 +246,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       createTranslateExecutablesPass(targetRegistry));
 
-  if (compileTo == PipelinePhase::ExecutableTargets) return;
+  if (compileTo == PipelinePhase::ExecutableTargets)
+    return;
 
   // Substitute hal.executables we've translated with those specified on the
   // command line. This developer feature allows for splicing in hand-authored
@@ -411,7 +413,7 @@ void registerHALTransformPassPipeline() {
       });
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

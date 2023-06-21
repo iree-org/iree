@@ -91,10 +91,11 @@ void AbstractGemmLikeStrategy::initDefaultValues() {
   }
 }
 
-ArrayAttr AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(
-    OpBuilder &b) const {
+ArrayAttr
+AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(OpBuilder &b) const {
   SmallVector<Attribute> paddingValues;
-  for (Type t : paddingValueTypes) paddingValues.push_back(b.getZeroAttr(t));
+  for (Type t : paddingValueTypes)
+    paddingValues.push_back(b.getZeroAttr(t));
   return b.getArrayAttr(paddingValues);
 }
 
@@ -102,8 +103,8 @@ ArrayAttr AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(
 // Validation of support for the configured strategy.
 //===--------------------------------------------------------------------===//
 
-LogicalResult AbstractGemmLikeStrategy::validate(
-    const GPUModel &gpuModel) const {
+LogicalResult
+AbstractGemmLikeStrategy::validate(const GPUModel &gpuModel) const {
   if (totalNumThreads() != totalNumWarps() * kCudaWarpSize) {
     llvm::errs() << "Number of threads specified by warps must match total "
                     "number of threads\n";
@@ -211,7 +212,8 @@ void AbstractGemmLikeStrategy::print(llvm::raw_ostream &os) const {
   os << "- block tile sizes: {";
   bool isFirst = true;
   for (int64_t blockTileSize : blockTileSizes) {
-    if (!isFirst) os << ", ";
+    if (!isFirst)
+      os << ", ";
     os << blockTileSize;
     isFirst = false;
   }
@@ -221,7 +223,8 @@ void AbstractGemmLikeStrategy::print(llvm::raw_ostream &os) const {
   os << "- number of threads: {";
   isFirst = true;
   for (int64_t numThreadsForDim : numThreads) {
-    if (!isFirst) os << ", ";
+    if (!isFirst)
+      os << ", ";
     os << numThreadsForDim;
     isFirst = false;
   }
@@ -230,7 +233,8 @@ void AbstractGemmLikeStrategy::print(llvm::raw_ostream &os) const {
   os << "- number of warps: {";
   isFirst = true;
   for (int64_t numWarpsForDim : numWarps) {
-    if (!isFirst) os << ", ";
+    if (!isFirst)
+      os << ", ";
     os << numWarpsForDim;
     isFirst = false;
   }

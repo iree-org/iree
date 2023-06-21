@@ -56,9 +56,9 @@ static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
 }
 
 // Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
-static LogicalResult verifyDispatchWorkload(
-    Operation *op, IREE::Flow::ExecutableExportOp exportOp,
-    ValueRange workload) {
+static LogicalResult
+verifyDispatchWorkload(Operation *op, IREE::Flow::ExecutableExportOp exportOp,
+                       ValueRange workload) {
   // If the target has a workgroup count computation function we can verify that
   // the workload here matches what is expected.
   if (!exportOp.getWorkgroupCount().empty()) {
@@ -104,8 +104,9 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 }
 
 // Gets the dropped dimensions for `flow.dispatch.tensor.load/store`.
-static llvm::SmallBitVector getDroppedDimsImpl(
-    RankedTensorType slicedObjectType, ArrayRef<OpFoldResult> mixedSizes) {
+static llvm::SmallBitVector
+getDroppedDimsImpl(RankedTensorType slicedObjectType,
+                   ArrayRef<OpFoldResult> mixedSizes) {
   ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
   if (slicedObjectType.getRank() == mixedSizes.size()) {
@@ -224,11 +225,13 @@ static ParseResult parseWorkgroupCountRegionWithoutKeyword(OpAsmParser &parser,
 static void printWorkgroupCountRegionWithoutKeyword(OpAsmPrinter &p,
                                                     Operation *op,
                                                     Region &body) {
-  if (body.empty()) return;
+  if (body.empty())
+    return;
   p << "(";
   auto args = body.getArguments();
   for (unsigned i = 0; i < args.size(); ++i) {
-    if (i > 0) p << ", ";
+    if (i > 0)
+      p << ", ";
     p.printRegionArgument(args[i]);
   }
   p << ")";
@@ -244,14 +247,15 @@ static void printWorkgroupCountRegionWithoutKeyword(OpAsmPrinter &p,
 static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
                                              Region &body) {
   if (failed(parser.parseOptionalKeyword("workgroups"))) {
-    return success();  // Omitted.
+    return success(); // Omitted.
   }
   return parseWorkgroupCountRegionWithoutKeyword(parser, body);
 }
 
 static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
                                       Region &body) {
-  if (body.empty()) return;
+  if (body.empty())
+    return;
   p << "workgroups";
   printWorkgroupCountRegionWithoutKeyword(p, op, body);
 }
@@ -259,14 +263,15 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 static ParseResult parseDispatchWorkgroupsCountRegion(OpAsmParser &parser,
                                                       Region &body) {
   if (failed(parser.parseOptionalKeyword("count"))) {
-    return success();  // Omitted.
+    return success(); // Omitted.
   }
   return parseWorkgroupCountRegionWithoutKeyword(parser, body);
 }
 
 static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
                                                Region &body) {
-  if (body.empty()) return;
+  if (body.empty())
+    return;
   p << " count";
   printWorkgroupCountRegionWithoutKeyword(p, op, body);
 }
@@ -286,7 +291,8 @@ LogicalResult DispatchRegionOp::verify() {
 
   // Verify terminator.
   auto returnOp = dyn_cast<Flow::ReturnOp>(getBody().front().getTerminator());
-  if (!returnOp) return emitOpError() << "expected 'flow.return' terminator";
+  if (!returnOp)
+    return emitOpError() << "expected 'flow.return' terminator";
   for (const auto [resultType, returnType] :
        llvm::zip_equal(getResultTypes(), returnOp->getOperandTypes()))
     if (resultType != returnType)
@@ -307,22 +313,28 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
   SmallVector<OpAsmParser::UnresolvedOperand> allOperands;
   std::unique_ptr<Region> bodyRegion = std::make_unique<Region>();
   std::unique_ptr<Region> workloadCountRegion = std::make_unique<Region>();
-  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
   SmallVector<OpAsmParser::UnresolvedOperand> workloadOperands;
   SMLoc workloadOperandsLoc;
   (void)workloadOperandsLoc;
   if (succeeded(parser.parseOptionalLSquare())) {
     workloadOperandsLoc = parser.getCurrentLocation();
-    if (parser.parseOperandList(workloadOperands)) return failure();
-    if (parser.parseRSquare()) return failure();
+    if (parser.parseOperandList(workloadOperands))
+      return failure();
+    if (parser.parseRSquare())
+      return failure();
   }
   if (succeeded(parser.parseOptionalArrow())) {
     ParseResult typeListResult =
         parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() {
-          if (parser.parseType(resultTypes.emplace_back())) return failure();
+          if (parser.parseType(resultTypes.emplace_back()))
+            return failure();
           auto shapedType = llvm::dyn_cast<ShapedType>(resultTypes.back());
-          if (!shapedType) return success();
-          if (shapedType.hasStaticShape()) return success();
+          if (!shapedType)
+            return success();
+          if (shapedType.hasStaticShape())
+            return success();
           SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
           if (parser.parseOperandList(dynamicDims,
                                       shapedType.getNumDynamicDims(),
@@ -331,9 +343,11 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
           allOperands.append(dynamicDims.begin(), dynamicDims.end());
           return success();
         });
-    if (typeListResult) return failure();
+    if (typeListResult)
+      return failure();
   }
-  if (parser.parseRegion(*bodyRegion)) return failure();
+  if (parser.parseRegion(*bodyRegion))
+    return failure();
   ensureTerminator(*bodyRegion, parser.getBuilder(), result.location);
 
   if (parseDispatchWorkgroupsCountRegion(parser, *workloadCountRegion)) {
@@ -381,7 +395,8 @@ void DispatchRegionOp::print(OpAsmPrinter &p) {
         resultDimCounter += shapedType.getNumDynamicDims();
       }
     }
-    if (it.index() < getNumResults() - 1) p << ", ";
+    if (it.index() < getNumResults() - 1)
+      p << ", ";
   }
   p << ") ";
 
@@ -437,7 +452,8 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
          "expected that all dynamic dims were processed");
 
   // Nothing to do if all results are used.
-  if (unusedResults.empty()) return false;
+  if (unusedResults.empty())
+    return false;
 
   // Create new region and move over the body.
   auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
@@ -565,9 +581,9 @@ static void getDefaultOffsetSizeAndStrides(
   return;
 }
 
-RankedTensorType DispatchTensorLoadOp::inferResultType(
-    IREE::Flow::DispatchTensorType sourceType,
-    ArrayRef<OpFoldResult> mixedSizes) {
+RankedTensorType
+DispatchTensorLoadOp::inferResultType(IREE::Flow::DispatchTensorType sourceType,
+                                      ArrayRef<OpFoldResult> mixedSizes) {
   auto shape =
       llvm::map_to_vector(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
@@ -664,13 +680,13 @@ Value DispatchTensorLoadOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::std::optional<unsigned> DispatchTensorLoadOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+DispatchTensorLoadOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> DispatchTensorLoadOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 bool DispatchTensorLoadOp::isLoadOfWholeSource() {
@@ -904,10 +920,12 @@ LogicalResult DispatchWorkgroupsOp::verify() {
     return success();
   };
   for (auto type : getOperandTypes()) {
-    if (failed(verifyIOType(type))) return failure();
+    if (failed(verifyIOType(type)))
+      return failure();
   }
   for (auto type : getResultTypes()) {
-    if (failed(verifyIOType(type))) return failure();
+    if (failed(verifyIOType(type)))
+      return failure();
   }
 
   // Workgroup count region is optional.
@@ -996,14 +1014,16 @@ static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
             hasWrites = true;
           });
     }
-    if (hasReads && !hasWrites) tensorAccess = TensorAccess::ReadOnly;
-    if (!hasReads && hasWrites) tensorAccess = TensorAccess::WriteOnly;
+    if (hasReads && !hasWrites)
+      tensorAccess = TensorAccess::ReadOnly;
+    if (!hasReads && hasWrites)
+      tensorAccess = TensorAccess::WriteOnly;
   }
   return tensorAccess;
 }
 
-IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
-    unsigned operandIndex) {
+IREE::Util::ValueAccess
+DispatchWorkgroupsOp::getOperandAccess(unsigned operandIndex) {
   BlockArgument arg = getWorkgroupBody().front().getArgument(operandIndex);
   if (auto tensorType = llvm::dyn_cast<DispatchTensorType>(arg.getType())) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
@@ -1020,8 +1040,8 @@ IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
   }
 }
 
-IREE::Util::ValueAccess DispatchWorkgroupsOp::getResultAccess(
-    unsigned resultIndex) {
+IREE::Util::ValueAccess
+DispatchWorkgroupsOp::getResultAccess(unsigned resultIndex) {
   unsigned startIndex = getBody()->getNumArguments() - getNumResults();
   BlockArgument arg =
       getWorkgroupBody().front().getArgument(startIndex + resultIndex);
@@ -1099,18 +1119,20 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   // For dropped results, erase all the store-op uses. It is a pre-requisite
   // that the result can be dropped only if it is written within the dispatch
   // region op.
-  unsigned baseResultIndex = getArguments().size();  // old index
+  unsigned baseResultIndex = getArguments().size(); // old index
   auto erasedArguments = llvm::to_vector(excludedOperandIndices);
   for (unsigned i = baseResultIndex, e = newBody.getNumArguments(); i != e;
        ++i) {
-    if (!is_contained(excludedResultIndices, i - baseResultIndex)) continue;
+    if (!is_contained(excludedResultIndices, i - baseResultIndex))
+      continue;
     auto arg = newBody.front().getArgument(i);
     eraseArgUseTree(arg, rewriter);
     erasedArguments.push_back(i);
   }
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : erasedArguments) eraseIndices.set(i);
+  for (auto i : erasedArguments)
+    eraseIndices.set(i);
   block.eraseArguments(eraseIndices);
 
   return newOp;
@@ -1123,7 +1145,8 @@ DispatchWorkgroupsOp::getTiedOperandsIndexAndLength() {
 
 SmallVector<int64_t> DispatchWorkgroupsOp::getTiedOperandsAsIntegerList() {
   ArrayAttr attr = getTiedOperandsAttr();
-  if (!attr) return {};
+  if (!attr)
+    return {};
   return llvm::map_to_vector(attr, [](Attribute intAttr) {
     return llvm::cast<IntegerAttr>(intAttr).getInt();
   });
@@ -1266,7 +1289,7 @@ FunctionType DispatchOp::getEntryPointType() {
 }
 
 std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
-  return getODSOperandIndexAndLength(1);  // $operands
+  return getODSOperandIndexAndLength(1); // $operands
 }
 
 LogicalResult DispatchOp::verify() {
@@ -1379,7 +1402,7 @@ FunctionType CallOp::getCalleeType() {
 }
 
 std::pair<unsigned, unsigned> CallOp::getTiedOperandsIndexAndLength() {
-  return getODSOperandIndexAndLength(0);  // $arguments
+  return getODSOperandIndexAndLength(0); // $arguments
 }
 
 LogicalResult CallOp::verify() {
@@ -1465,13 +1488,13 @@ Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::std::optional<unsigned> TensorReshapeOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+TensorReshapeOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> TensorReshapeOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 //===----------------------------------------------------------------------===//
@@ -1591,13 +1614,13 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+TensorUpdateOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 //===----------------------------------------------------------------------===//
@@ -1616,7 +1639,8 @@ struct FoldTensorLoadWithExtractSlice
     auto dispatchTensorLoadOp =
         extractSliceOp.getSource()
             .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-    if (!dispatchTensorLoadOp) return failure();
+    if (!dispatchTensorLoadOp)
+      return failure();
 
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
@@ -1644,12 +1668,13 @@ struct FoldInsertSliceWithTensorStoreOp
     : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
   using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchTensorStoreOp dispatchTensorStoreOp,
-      PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::DispatchTensorStoreOp dispatchTensorStoreOp,
+                  PatternRewriter &rewriter) const override {
     auto insertSliceOp =
         dispatchTensorStoreOp.getValue().getDefiningOp<tensor::InsertSliceOp>();
-    if (!insertSliceOp) return failure();
+    if (!insertSliceOp)
+      return failure();
 
     // Check that the `dest` of the `tensor.insert_slice` and target of the
     // `flow.dispatch.tensor.store` are the same interface binding.
@@ -1736,13 +1761,13 @@ Value CollectiveAllGatherOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> CollectiveAllGatherOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+CollectiveAllGatherOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> CollectiveAllGatherOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void CollectiveAllGatherOp::build(OpBuilder &builder, OperationState &state,
@@ -1762,13 +1787,13 @@ Value CollectiveAllReduceOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> CollectiveAllReduceOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+CollectiveAllReduceOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> CollectiveAllReduceOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void CollectiveAllReduceOp::build(OpBuilder &builder, OperationState &state,
@@ -1789,13 +1814,13 @@ Value CollectiveAllToAllOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-std::optional<unsigned> CollectiveAllToAllOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+std::optional<unsigned>
+CollectiveAllToAllOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> CollectiveAllToAllOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void CollectiveAllToAllOp::build(OpBuilder &builder, OperationState &state,
@@ -1816,13 +1841,13 @@ Value CollectiveReduceScatterOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> CollectiveReduceScatterOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+CollectiveReduceScatterOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> CollectiveReduceScatterOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void CollectiveReduceScatterOp::build(OpBuilder &builder, OperationState &state,
@@ -1844,13 +1869,13 @@ Value CollectiveSendRecvOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-std::optional<unsigned> CollectiveSendRecvOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+std::optional<unsigned>
+CollectiveSendRecvOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> CollectiveSendRecvOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void CollectiveSendRecvOp::build(OpBuilder &builder, OperationState &state,
@@ -1864,14 +1889,14 @@ void CollectiveSendRecvOp::build(OpBuilder &builder, OperationState &state,
         recv, builder.getIndexArrayAttr({0}));
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc" // IWYU pragma: keep

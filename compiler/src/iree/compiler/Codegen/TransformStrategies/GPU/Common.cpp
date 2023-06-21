@@ -86,7 +86,8 @@ int64_t mlir::iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle(
   assert((bitWidth & bitWidth - 1) == 0 && "bitWidth must be a power of 2");
   int64_t factor;
   for (factor = scaleUpByBitWidth(1, bitWidth); factor > 1; factor >>= 1)
-    if (numWarpsToUse % factor == 0) break;
+    if (numWarpsToUse % factor == 0)
+      break;
   numWarpsToUse /= factor;
   // Try to scale to using 128b elements in warp shuffles.
   return std::max(numWarpsToUse / 4, int64_t(1));
@@ -186,7 +187,8 @@ void mlir::iree_compiler::gpu::
         Attribute mappingAttr, int64_t maxVectorSize) {
   // Poor man's handling of optionality in C++. Will need to be converted to
   // proper transform dialect filters or handling of emptiness.
-  if (rank == 0) return;
+  if (rank == 0)
+    return;
 
   // Compute split point to guarantee we form a maximal chunk divisible by
   // numThreads * vectorSize.

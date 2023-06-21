@@ -29,22 +29,22 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   //       [vector-parallel], [vector-reduction]]
   int numTileLevels = loweringConfig.getTileSizes().size();
   switch (numTileLevels) {
-    case 3:
-      tilingLevelToActualLevelMap[VectorReductionTiles] = 2;
-      [[fallthrough]];
-    case 2:
-      tilingLevelToActualLevelMap[VectorParallelTiles] = 1;
-      [[fallthrough]];
-    case 1:
-      tilingLevelToActualLevelMap[DistributionTiles] = 0;
-      break;
-    case MaxNumTileLevels:
-      for (int i = 0; i < MaxNumTileLevels; ++i) {
-        tilingLevelToActualLevelMap[i] = i;
-      }
-      break;
-    default:
-      break;
+  case 3:
+    tilingLevelToActualLevelMap[VectorReductionTiles] = 2;
+    [[fallthrough]];
+  case 2:
+    tilingLevelToActualLevelMap[VectorParallelTiles] = 1;
+    [[fallthrough]];
+  case 1:
+    tilingLevelToActualLevelMap[DistributionTiles] = 0;
+    break;
+  case MaxNumTileLevels:
+    for (int i = 0; i < MaxNumTileLevels; ++i) {
+      tilingLevelToActualLevelMap[i] = i;
+    }
+    break;
+  default:
+    break;
   }
 };
 
@@ -67,19 +67,19 @@ SmallVector<int64_t> TilingConfig::getVectorTileSizes() {
 /// configuration.
 SmallVector<int64_t> TilingConfig::getFusableLevels() {
   switch (getNumTilingLevels()) {
-    case 0:
-      return {};
-    case 1:
-      // Only distribution level.
-      return {0};
-    case 3:
-      // Distribution + vector parallel levels.
-      return {0, 1};
-    case 5:
-      // Distribution + cache parallel levels.
-      return {0, 1};
-    default:
-      llvm_unreachable("Unexpected number of tiling levels");
+  case 0:
+    return {};
+  case 1:
+    // Only distribution level.
+    return {0};
+  case 3:
+    // Distribution + vector parallel levels.
+    return {0, 1};
+  case 5:
+    // Distribution + cache parallel levels.
+    return {0, 1};
+  default:
+    llvm_unreachable("Unexpected number of tiling levels");
   }
 }
 
@@ -92,5 +92,5 @@ unsigned TilingConfig::getActualLevel(TilingLevel level) {
   return actualLevel;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

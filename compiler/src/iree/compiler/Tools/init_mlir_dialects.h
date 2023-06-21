@@ -41,7 +41,7 @@
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
 
 namespace mlir {
 
@@ -78,9 +78,9 @@ inline void registerMlirDialects(DialectRegistry &registry) {
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
   registry.insert<emitc::EmitCDialect>();
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
 }
 
-}  // namespace mlir
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_
+#endif // IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_

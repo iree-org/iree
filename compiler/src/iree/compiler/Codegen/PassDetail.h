@@ -20,7 +20,7 @@ namespace iree_compiler {
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Codegen/Passes.h.inc"
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSIONS_PASS_DETAIL_H_
+#endif // IREE_COMPILER_CONVERSIONS_PASS_DETAIL_H_

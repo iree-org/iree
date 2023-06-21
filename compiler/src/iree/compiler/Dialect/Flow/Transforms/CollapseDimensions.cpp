@@ -45,18 +45,19 @@ struct CollapseDimensionsPass
       : CollapseDimensionsPass() {}
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 /// Searches the same sequence in all the affine maps and collapses these
 /// dimensions. It only applies these to "parallel" loops without mixing them
 /// with "reduction" types.
-static SmallVector<ReassociationIndices> getCollapsibleLoops(
-    linalg::GenericOp genericOp) {
+static SmallVector<ReassociationIndices>
+getCollapsibleLoops(linalg::GenericOp genericOp) {
   SmallVector<ReassociationIndices> contiguousLoops;
 
   SmallVector<unsigned> pDims;
   genericOp.getParallelDims(pDims);
-  if (pDims.size() < 2) return contiguousLoops;
+  if (pDims.size() < 2)
+    return contiguousLoops;
 
   llvm::SmallDenseSet<unsigned> pLoops(pDims.begin(), pDims.end());
 
@@ -69,7 +70,8 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(
           break;
         }
       }
-      if (!foundSeq) return false;
+      if (!foundSeq)
+        return false;
     }
     return true;
   };
@@ -86,15 +88,18 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(
       }
     }
     preExpr = nextExpr;
-    if (pLoops.count(pos)) range.push_back(pos);
+    if (pLoops.count(pos))
+      range.push_back(pos);
   }
-  if (range.size() > 1) contiguousLoops.push_back(range);
+  if (range.size() > 1)
+    contiguousLoops.push_back(range);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Collapsing dimensions if possible: ";
     for (auto indices : contiguousLoops) {
       llvm::dbgs() << "[";
-      for (auto idx : indices) llvm::dbgs() << idx << ",";
+      for (auto idx : indices)
+        llvm::dbgs() << idx << ",";
       llvm::dbgs() << "]\t";
     }
     llvm::dbgs() << "\n";
@@ -104,9 +109,9 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(
 }
 
 /// Collapse possible dimension of the given linalg.generic
-static FailureOr<SmallVector<Value>> collapseLinalgGeneric(
-    IRRewriter &rewriter, linalg::GenericOp genericOp,
-    SmallVector<ReassociationIndices> &collapseIndices) {
+static FailureOr<SmallVector<Value>>
+collapseLinalgGeneric(IRRewriter &rewriter, linalg::GenericOp genericOp,
+                      SmallVector<ReassociationIndices> &collapseIndices) {
   rewriter.setInsertionPoint(genericOp->getParentOp());
   FailureOr<SmallVector<Value>> replacements =
       mlir::linalg::collapseGenericOpIterationDims(genericOp, collapseIndices,
@@ -124,7 +129,8 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
   // TODO(guray) There is no mechanism to tell the collapsed indexes to
   // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
   // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape()) return false;
+  if (genericOp.hasDynamicShape())
+    return false;
 
   // TODO(guray) Currently we can only collapse when result of all the
   // AffineMaps are dimensions. Possible to collapse cases like
@@ -139,37 +145,43 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
 
   // TODO(guray) Collapsing caused performance regression in a cpu
   // benchmark, so we disable it.
-  if (genericOp.hasIndexSemantics()) return false;
+  if (genericOp.hasIndexSemantics())
+    return false;
 
   return true;
 }
 
 /// Traverses all the the Ops in DispatchRegionOps and finds linalg.generic Op
 /// without any producers.
-static FailureOr<linalg::GenericOp> findRootGenericOp(
-    DispatchRegionOp regionOp) {
+static FailureOr<linalg::GenericOp>
+findRootGenericOp(DispatchRegionOp regionOp) {
   SmallVector<Operation *> computeOps;
   auto &ops = regionOp.getBody().front().getOperations();
   for (Operation &op : ops) {
-    if (isa<TilingInterface>(op)) computeOps.push_back(&op);
+    if (isa<TilingInterface>(op))
+      computeOps.push_back(&op);
   }
   // Looking for root without producer
-  if (computeOps.size() != 1 || ops.size() != 2) return failure();
+  if (computeOps.size() != 1 || ops.size() != 2)
+    return failure();
   auto genericOp = llvm::dyn_cast<linalg::GenericOp>(computeOps.front());
-  if (!genericOp) return failure();
+  if (!genericOp)
+    return failure();
   return genericOp;
 }
 
 /// Generate a new dispatch.region and workload according with the collapsed
 /// linalg Generic Op
-static LogicalResult generateNewDispatchRegion(
-    IRRewriter &rewriter, DispatchRegionOp regionOp,
-    SmallVector<Value> collapseResults, linalg::GenericOp newGenericOp) {
+static LogicalResult
+generateNewDispatchRegion(IRRewriter &rewriter, DispatchRegionOp regionOp,
+                          SmallVector<Value> collapseResults,
+                          linalg::GenericOp newGenericOp) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(regionOp->getParentOp());
 
   auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, newGenericOp);
-  if (failed(maybeRegionOp)) return failure();
+  if (failed(maybeRegionOp))
+    return failure();
 
   // Replace old regionOp with the result of collapse
   rewriter.replaceOp(regionOp, collapseResults);
@@ -183,24 +195,30 @@ static LogicalResult collapseDimensions(IRRewriter &rewriter,
                                         DispatchRegionOp &regionOp) {
   // Step 1. Find the root linalg.generic Op with no producer
   std::optional<linalg::GenericOp> genericOp = findRootGenericOp(regionOp);
-  if (!genericOp.has_value()) return success();
+  if (!genericOp.has_value())
+    return success();
 
   // Step 2. Check whether it is possible to collapse
-  if (!isEligibleForCollapse(genericOp.value())) return success();
+  if (!isEligibleForCollapse(genericOp.value()))
+    return success();
   SmallVector<ReassociationIndices> collapseIndices;
   collapseIndices = getCollapsibleLoops(genericOp.value());
-  if (collapseIndices.empty()) return success();
+  if (collapseIndices.empty())
+    return success();
 
   // Step 3. Collapse dimensions
   auto maybeReplacements =
       collapseLinalgGeneric(rewriter, genericOp.value(), collapseIndices);
-  if (failed(maybeReplacements)) return failure();
+  if (failed(maybeReplacements))
+    return failure();
   auto expandshapeOp =
       maybeReplacements->front().getDefiningOp<tensor::ExpandShapeOp>();
-  if (!expandshapeOp) return failure();
+  if (!expandshapeOp)
+    return failure();
   auto newGenericOp =
       expandshapeOp.getOperand().getDefiningOp<linalg::GenericOp>();
-  if (!newGenericOp) return failure();
+  if (!newGenericOp)
+    return failure();
 
   // Step 4. Generate new dispatch region and replace old one users
   if (failed(generateNewDispatchRegion(rewriter, regionOp, *maybeReplacements,
@@ -240,7 +258,7 @@ createCollapseDimensionsPass() {
   return std::make_unique<CollapseDimensionsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

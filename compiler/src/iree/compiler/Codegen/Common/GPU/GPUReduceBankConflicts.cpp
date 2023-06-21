@@ -18,7 +18,8 @@ namespace iree_compiler {
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
                      int64_t paddingSizeBits) {
   int64_t innerDim = allocOp.getType().getShape().back();
-  if (ShapedType::isDynamic(innerDim)) return;
+  if (ShapedType::isDynamic(innerDim))
+    return;
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
       mlir::DataLayout::closest(allocOp).getTypeSizeInBits(elType);
@@ -51,10 +52,10 @@ namespace {
 /// be removed once the better solution is implemented.
 struct GPUReduceBankConflictsPass
     : public GPUReduceBankConflictsBase<GPUReduceBankConflictsPass> {
- private:
+private:
   int64_t paddingSizeBits;
 
- public:
+public:
   GPUReduceBankConflictsPass(int64_t paddingSizeBits)
       : paddingSizeBits(paddingSizeBits) {}
 
@@ -73,12 +74,12 @@ struct GPUReduceBankConflictsPass
       padAlloc(context, alloc, paddingSizeBits);
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits) {
   return std::make_unique<GPUReduceBankConflictsPass>(paddingSizeBits);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -19,9 +19,9 @@ namespace VM {
 LogicalResult serializeConstantArray(Location loc, ElementsAttr elementsAttr,
                                      size_t alignment, uint8_t *dst);
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_UTILS_CONSTANTENCODING_H_
+#endif // IREE_COMPILER_DIALECT_VM_UTILS_CONSTANTENCODING_H_

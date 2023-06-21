@@ -38,10 +38,12 @@ namespace HAL {
 static ParseResult parseDescriptorType(OpAsmParser &parser,
                                        DescriptorTypeAttr &dtAttr) {
   StringRef enumKeyword;
-  if (failed(parser.parseKeyword(&enumKeyword))) return failure();
+  if (failed(parser.parseKeyword(&enumKeyword)))
+    return failure();
   std::optional<DescriptorType> maybeEnum =
       symbolizeDescriptorType(enumKeyword);
-  if (!maybeEnum) return failure();
+  if (!maybeEnum)
+    return failure();
   dtAttr = DescriptorTypeAttr::get(parser.getContext(), *maybeEnum);
   return success();
 }
@@ -177,7 +179,8 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
          "information is required");
   SmallVector<Value> dynamicDims;
   for (int64_t i = 0; i < shapedType.getRank(); ++i) {
-    if (!shapedType.isDynamicDim(i)) continue;
+    if (!shapedType.isDynamicDim(i))
+      continue;
     dynamicDims.push_back(builder.createOrFold<IREE::HAL::BufferViewDimOp>(
         result.location, builder.getIndexType(), source,
         builder.getIndexAttr(i)));
@@ -190,22 +193,24 @@ Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::std::optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+TensorImportOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> TensorImportOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 static LogicalResult verifyTypeStorageCompatibility(Operation *op,
                                                     Type encodingType,
                                                     Type storageType) {
-  if (encodingType == storageType) return success();
+  if (encodingType == storageType)
+    return success();
   auto encodingShapedType = llvm::dyn_cast<ShapedType>(encodingType);
   auto storageShapedType = llvm::dyn_cast<ShapedType>(storageType);
-  if (!encodingShapedType || !storageShapedType) return success();
+  if (!encodingShapedType || !storageShapedType)
+    return success();
 
   if (IREE::Util::getRoundedElementByteWidth(
           encodingShapedType.getElementType()) !=
@@ -268,13 +273,13 @@ Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::std::optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+TensorExportOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> TensorExportOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 LogicalResult TensorExportOp::verify() {
@@ -304,9 +309,9 @@ Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
       getSources()[resultIndex]);
 }
 
-::std::optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {resultIndex};  // sources[i]
+::std::optional<unsigned>
+TensorBarrierOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {resultIndex}; // sources[i]
 }
 
 SmallVector<int64_t> TensorBarrierOp::getTiedResultOperandIndices() {
@@ -757,7 +762,8 @@ void ExecutableExportOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
       /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
-  if (getWorkgroupCount().empty()) return;
+  if (getWorkgroupCount().empty())
+    return;
   p << " ";
   p.printRegion(getWorkgroupCount());
 }
@@ -766,7 +772,8 @@ LogicalResult ExecutableExportOp::verify() {
   ExecutableExportOp op = *this;
   Block *body = getWorkgroupCountBody();
   // When there is no body, nothing to verify.
-  if (!body) return success();
+  if (!body)
+    return success();
 
   if (!llvm::hasSingleElement(getWorkgroupCount())) {
     return op.emitOpError() << "expected a single region block";
@@ -806,9 +813,10 @@ LogicalResult ExecutableExportOp::verify() {
 
 // Calculates the workgroup count (x, y, z) given the total N-dimensional
 // |workload| and specific |workgroupSize|.
-static std::array<Value, 3> calculateWorkloadWorkgroupCount(
-    Location loc, ValueRange workload,
-    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+static std::array<Value, 3>
+calculateWorkloadWorkgroupCount(Location loc, ValueRange workload,
+                                const std::array<Value, 3> &workgroupSize,
+                                OpBuilder &builder) {
   std::array<Value, 3> result;
 
   auto constantOne = builder.createOrFold<arith::ConstantIndexOp>(loc, 1);
@@ -853,9 +861,9 @@ static std::array<Value, 3> calculateWorkloadWorkgroupCount(
   return result;
 }
 
-static std::array<Value, 3> calculateWorkgroupCountFromRegion(
-    Location loc, Block *body, Value device, ValueRange workload,
-    OpBuilder &builder) {
+static std::array<Value, 3>
+calculateWorkgroupCountFromRegion(Location loc, Block *body, Value device,
+                                  ValueRange workload, OpBuilder &builder) {
   // TODO(benvanik): replace with region inlining util.
   IRMapping bvm;
   bvm.map(body->getArgument(0), device);
@@ -951,7 +959,8 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
     return failure();
   }
   SmallVector<Type> argTypes;
-  for (auto &arg : entryArgs) argTypes.push_back(arg.type);
+  for (auto &arg : entryArgs)
+    argTypes.push_back(arg.type);
   auto fnType = builder.getFunctionType(argTypes, resultTypes);
   result.addAttribute(getFunctionTypeAttrName(result.name),
                       TypeAttr::get(fnType));
@@ -960,17 +969,20 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
   // There must be one key per result. Note that we support omitted parens when
   // only one result is present.
   SmallVector<Attribute> keyAttrs;
-  if (failed(parser.parseKeyword("as"))) return failure();
+  if (failed(parser.parseKeyword("as")))
+    return failure();
   if (resultTypes.size() == 1) {
     std::string key;
-    if (failed(parser.parseString(&key))) return failure();
+    if (failed(parser.parseString(&key)))
+      return failure();
     keyAttrs.push_back(builder.getStringAttr(key));
   } else {
     if (failed(parser.parseCommaSeparatedList(
             AsmParser::Delimiter::OptionalParen,
             [&]() {
               std::string key;
-              if (failed(parser.parseString(&key))) return failure();
+              if (failed(parser.parseString(&key)))
+                return failure();
               keyAttrs.push_back(builder.getStringAttr(key));
               return success();
             },
@@ -1017,10 +1029,12 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
       p, cast<FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
       resultTypes);
   p << " as ";
-  if (resultTypes.size() != 1) p << '(';
+  if (resultTypes.size() != 1)
+    p << '(';
   llvm::interleaveComma(getKeys().getValue(), p,
                         [&](Attribute attr) { p << attr; });
-  if (resultTypes.size() != 1) p << ')';
+  if (resultTypes.size() != 1)
+    p << ')';
   mlir::function_interface_impl::printFunctionAttributes(
       p, op, {getFunctionTypeAttrName(), getKeysAttrName()});
   p << " ";
@@ -1151,17 +1165,20 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
 
   // If the binding has no assigned alignment we fall back to natural alignment.
   auto baseAlignment = getBaseAlignment();
-  if (!baseAlignment) return naturalAlignment;
+  if (!baseAlignment)
+    return naturalAlignment;
 
   // If there's no offset specified then we can use the binding alignment
   // directly.
-  if (!getByteOffset()) return baseAlignment.value();
+  if (!getByteOffset())
+    return baseAlignment.value();
 
   // Try to get the alignment of the byte offset. If it's a constant then we can
   // find a common alignment between it and the base and otherwise we need to
   // try to infer the alignment from the IR - otherwise we fall back.
   auto offsetOrAlignment = lookupOffsetOrAlignment(getByteOffset());
-  if (!offsetOrAlignment.has_value()) return naturalAlignment;
+  if (!offsetOrAlignment.has_value())
+    return naturalAlignment;
 
   // Compute the common alignment between that of the binding base and that of
   // the byte offset.
@@ -1177,15 +1194,15 @@ static void getAsmResultNamesForInterfaceWorkgroupOp(
     StringRef prefix, const APInt &dimension, Value result,
     function_ref<void(Value, StringRef)> setNameFn) {
   switch (dimension.getZExtValue()) {
-    case 0:
-      setNameFn(result, (prefix + "x").str());
-      return;
-    case 1:
-      setNameFn(result, (prefix + "y").str());
-      return;
-    case 2:
-      setNameFn(result, (prefix + "z").str());
-      return;
+  case 0:
+    setNameFn(result, (prefix + "x").str());
+    return;
+  case 1:
+    setNameFn(result, (prefix + "y").str());
+    return;
+  case 2:
+    setNameFn(result, (prefix + "z").str());
+    return;
   }
 }
 
@@ -1244,10 +1261,10 @@ void FenceAwaitOp::getAsmResultNames(
   setNameFn(getStatus(), "status");
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

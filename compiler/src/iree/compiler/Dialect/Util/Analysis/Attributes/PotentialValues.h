@@ -26,7 +26,7 @@ namespace Util {
 class ConstantAttributePVS
     : public DFX::StateWrapper<DFX::PotentialValuesState<Attribute>,
                                DFX::ValueElement> {
- public:
+public:
   using BaseType = DFX::StateWrapper<DFX::PotentialValuesState<Attribute>,
                                      DFX::ValueElement>;
   using BaseType::BaseType;
@@ -46,14 +46,14 @@ class ConstantAttributePVS
 
   const std::string getAsStr(AsmState &asmState) const override;
 
- private:
+private:
   void initializeValue(Value value, DFX::Solver &solver) override;
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override;
 };
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_ATTRIBUTES_POTENTIAL_VALUES_H_
+#endif // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_ATTRIBUTES_POTENTIAL_VALUES_H_

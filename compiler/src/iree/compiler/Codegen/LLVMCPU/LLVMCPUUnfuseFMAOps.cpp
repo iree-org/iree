@@ -19,7 +19,7 @@ namespace {
 // Rewrites llvm.intr.fma as its un-fuse version.
 // TODO(ataei): Upstream this pattern if needed ?
 class UnfusedFMAOpsPassConversion : public OpRewritePattern<LLVM::FMAOp> {
- public:
+public:
   using OpRewritePattern<LLVM::FMAOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(LLVM::FMAOp op,
@@ -33,7 +33,7 @@ class UnfusedFMAOpsPassConversion : public OpRewritePattern<LLVM::FMAOp> {
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 namespace {
 struct LLVMCPUUnfuseFMAOpsPass
@@ -43,7 +43,7 @@ struct LLVMCPUUnfuseFMAOpsPass
   }
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
                                        RewritePatternSet &patterns) {
@@ -64,5 +64,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass() {
   return std::make_unique<LLVMCPUUnfuseFMAOpsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

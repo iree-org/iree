@@ -26,7 +26,7 @@ namespace iree_compiler {
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Codegen/Passes.h.inc"
-}  // namespace
+} // namespace
 
 void registerCodegenPasses() {
   // Generated.
@@ -85,5 +85,5 @@ void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createRematerializeParallelOpsPass());
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

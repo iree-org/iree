@@ -40,7 +40,7 @@ namespace {
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
 class ConvertToHALPass
     : public PassWrapper<ConvertToHALPass, OperationPass<ModuleOp>> {
- public:
+public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertToHALPass)
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -101,7 +101,7 @@ class ConvertToHALPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
   return std::make_unique<ConvertToHALPass>();
@@ -109,7 +109,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
 
 static PassRegistration<ConvertToHALPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

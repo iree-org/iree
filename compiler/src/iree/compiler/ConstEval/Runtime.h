@@ -24,8 +24,8 @@ namespace ConstEval {
 
 // Abstract base class for a compiled binary.
 class CompiledBinary {
- public:
-  using ResultsCallback = std::function<LogicalResult(iree_vm_list_t* outputs)>;
+public:
+  using ResultsCallback = std::function<LogicalResult(iree_vm_list_t *outputs)>;
   virtual ~CompiledBinary();
 
   // Invokes a nullary function.
@@ -39,14 +39,14 @@ class CompiledBinary {
   // Whether the given type is supported in *AsAttribute methods.
   static bool isSupportedResultType(Type type);
 
- protected:
+protected:
   CompiledBinary();
-  void initialize(void* data, size_t length);
+  void initialize(void *data, size_t length);
   // The base class does not clean up initialized state. This must be done
   // explicitly by subclasses, ensuring that any backing images remain valid
   // through the call to deinitialize().
   void deinitialize();
-  Attribute convertVariantToAttribute(Location loc, iree_vm_variant_t& variant);
+  Attribute convertVariantToAttribute(Location loc, iree_vm_variant_t &variant);
 
   iree::vm::ref<iree_hal_device_t> device;
   iree::vm::ref<iree_vm_module_t> hal_module;
@@ -56,30 +56,30 @@ class CompiledBinary {
 
 // An in-memory compiled binary and accessors for working with it.
 class InMemoryCompiledBinary : public CompiledBinary {
- public:
+public:
   LogicalResult translateFromModule(mlir::ModuleOp moduleOp);
   ~InMemoryCompiledBinary() override;
 
- private:
+private:
   std::string binary;
 };
 
 // Simple wrapper around IREE runtime library sufficient for loading and
 // executing simple programs.
 class Runtime {
- public:
-  static Runtime& getInstance();
+public:
+  static Runtime &getInstance();
 
-  iree_hal_driver_registry_t* registry = nullptr;
+  iree_hal_driver_registry_t *registry = nullptr;
   iree::vm::ref<iree_vm_instance_t> instance;
 
- private:
+private:
   Runtime();
   ~Runtime();
 };
 
-}  // namespace ConstEval
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ConstEval
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CONSTEVAL_RUNTIME_H_
+#endif // IREE_COMPILER_CONSTEVAL_RUNTIME_H_

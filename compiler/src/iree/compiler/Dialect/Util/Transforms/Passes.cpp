@@ -13,15 +13,15 @@ namespace Util {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerTransformPasses() {
   // Generated.
   registerPasses();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

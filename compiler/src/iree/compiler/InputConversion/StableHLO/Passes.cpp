@@ -22,8 +22,8 @@
 namespace mlir::iree_compiler::stablehlo {
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/InputConversion/StableHLO/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/InputConversion/StableHLO/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 namespace {
 
@@ -31,14 +31,14 @@ void registerStableHLOConversionPassPipeline() {
   PassPipelineRegistration<StableHloOptions> stablehlo(
       "iree-stablehlo-input-transformation-pipeline",
       "Runs the StableHLO IREE flow dialect transformation pipeline",
-      [](OpPassManager& passManager, const StableHloOptions& options) {
+      [](OpPassManager &passManager, const StableHloOptions &options) {
         buildStableHLOInputConversionPassPipeline(passManager, options);
       });
 }
 
 // Prepare HLO for use as an input to the Flow dialect.
 void buildStableHLOInputConversionPassPipelineImpl(
-    OpPassManager& passManager, const StableHloOptions& options, bool detuple) {
+    OpPassManager &passManager, const StableHloOptions &options, bool detuple) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
@@ -49,7 +49,8 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
   passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
-  if (detuple) passManager.addPass(createFlattenTuplesInCFG());
+  if (detuple)
+    passManager.addPass(createFlattenTuplesInCFG());
 
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
@@ -104,16 +105,16 @@ void buildStableHLOInputConversionPassPipelineImpl(
 
   passManager.addPass(stablehlo::createVerifyCompilerStableHloInputLegality());
 }
-}  // namespace
+} // namespace
 
 void buildStableHLOInputConversionPassPipeline(
-    OpPassManager& passManager, const StableHloOptions& options) {
+    OpPassManager &passManager, const StableHloOptions &options) {
   buildStableHLOInputConversionPassPipelineImpl(passManager, options,
                                                 /*detuple=*/false);
 }
 
 void buildStableHLOXLAInputConversionPassPipeline(
-    OpPassManager& passManager, const StableHloOptions& options) {
+    OpPassManager &passManager, const StableHloOptions &options) {
   buildStableHLOInputConversionPassPipelineImpl(passManager, options,
                                                 /*detuple=*/true);
 }
@@ -126,4 +127,4 @@ void registerStableHLOConversionPasses() {
   registerStableHLOConversionPassPipeline();
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

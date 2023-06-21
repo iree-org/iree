@@ -58,7 +58,8 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
   Type elementType = originalType.getElementType();
   Type alignedType = legalizeStorageElementType(elementType);
-  if (alignedType == elementType) return originalType;
+  if (alignedType == elementType)
+    return originalType;
   return RankedTensorType::get(originalType.getShape(), alignedType,
                                originalType.getEncoding());
 }
@@ -76,7 +77,8 @@ static Value makeTensorDim(Location loc, RankedTensorType tensorType,
   // Map from absolute dimension index to the compact dynamic index.
   unsigned di = 0;
   for (unsigned j = 0; j < i; ++j) {
-    if (tensorType.isDynamicDim(j)) ++di;
+    if (tensorType.isDynamicDim(j))
+      ++di;
   }
   return dynamicDims[di];
 }
@@ -592,7 +594,7 @@ struct EncodeTensorStoreOp
 
 class EncodeHostTensorsPass
     : public EncodeHostTensorsBase<EncodeHostTensorsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
@@ -622,11 +624,12 @@ class EncodeHostTensorsPass
 
 // Aligns the element type of a !flow.dispatch.tensor<> to a byte-aligned power
 // of 2 bit width.
-static IREE::Flow::DispatchTensorType alignDispatchTensorType(
-    IREE::Flow::DispatchTensorType originalType) {
+static IREE::Flow::DispatchTensorType
+alignDispatchTensorType(IREE::Flow::DispatchTensorType originalType) {
   Type elementType = originalType.getBoundElementType();
   Type alignedType = legalizeStorageElementType(elementType);
-  if (alignedType == elementType) return originalType;
+  if (alignedType == elementType)
+    return originalType;
   return IREE::Flow::DispatchTensorType::get(
       originalType.getAccess(), originalType.getShape(), alignedType);
 }
@@ -652,7 +655,8 @@ struct EncodeBindingSubspanOp
     // Align the element type, if needed.
     IREE::Flow::DispatchTensorType alignedType =
         alignDispatchTensorType(originalType);
-    if (originalType == alignedType) return failure();  // already aligned.
+    if (originalType == alignedType)
+      return failure(); // already aligned.
 
     // Directly swap the type with the one, changing all uses in the IR.
     // This works because
@@ -676,7 +680,8 @@ struct EncodeDispatchTensorLoadOp
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(targetType);
-    if (targetType == alignedType) return failure();  // already aligned.
+    if (targetType == alignedType)
+      return failure(); // already aligned.
 
     // Loads always truncate from an byte aligned type to a sub-byte one.
     assert(targetType.getElementTypeBitWidth() <
@@ -709,7 +714,8 @@ struct EncodeDispatchTensorStoreOp
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(sourceType);
-    if (sourceType == alignedType) return failure();  // already aligned.
+    if (sourceType == alignedType)
+      return failure(); // already aligned.
 
     // Stores always extend from a sub-byte aligned type to a byte aligned one.
     assert(sourceType.getElementTypeBitWidth() <
@@ -731,7 +737,7 @@ struct EncodeDispatchTensorStoreOp
 
 class EncodeDeviceTensorsPass
     : public EncodeDeviceTensorsBase<EncodeDeviceTensorsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
@@ -752,7 +758,7 @@ class EncodeDeviceTensorsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<>> createEncodeHostTensorsPass() {
   return std::make_unique<EncodeHostTensorsPass>();
@@ -762,7 +768,7 @@ std::unique_ptr<OperationPass<>> createEncodeDeviceTensorsPass() {
   return std::make_unique<EncodeDeviceTensorsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

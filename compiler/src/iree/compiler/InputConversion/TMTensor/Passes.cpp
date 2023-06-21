@@ -12,14 +12,14 @@ namespace TMTensor {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/InputConversion/TMTensor/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/InputConversion/TMTensor/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerTMTensorConversionPasses() {
   // Generated.
   registerPasses();
 }
 
-}  // namespace TMTensor
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace TMTensor
+} // namespace iree_compiler
+} // namespace mlir

@@ -19,23 +19,25 @@ class Value;
 namespace tensor {
 class ExtractSliceOp;
 class InsertSliceOp;
-}  // namespace tensor
+} // namespace tensor
 
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
 /// Rewrite the given InsertSliceOp into a Flow::TensorUpdateOp.
-LogicalResult convertInsertSliceOpToFlowUpdateOp(
-    RewriterBase &rewriter, tensor::InsertSliceOp insertOp);
+LogicalResult
+convertInsertSliceOpToFlowUpdateOp(RewriterBase &rewriter,
+                                   tensor::InsertSliceOp insertOp);
 
 /// Rewrite the given ExtractSliceOp into a Flow::TensorSliceOp.
-LogicalResult convertExtractSliceOpToFlowSliceOp(
-    RewriterBase &rewriter, tensor::ExtractSliceOp sliceOp);
+LogicalResult
+convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
+                                   tensor::ExtractSliceOp sliceOp);
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_UTILS_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_UTILS_H_

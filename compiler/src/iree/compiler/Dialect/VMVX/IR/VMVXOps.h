@@ -21,6 +21,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h.inc" // IWYU pragma: keep
 
-#endif  // IREE_COMPILER_DIALECT_VMVX_IR_VMVXOPS_H_
+#endif // IREE_COMPILER_DIALECT_VMVX_IR_VMVXOPS_H_

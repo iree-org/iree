@@ -28,7 +28,7 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
     RewriterBase &rewriter, Operation *op,
     bufferization::OneShotAnalysisState &state);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_INTERFACES_BUFFERIZATIONINTERFACES_H_
+#endif // IREE_COMPILER_CODEGEN_INTERFACES_BUFFERIZATIONINTERFACES_H_

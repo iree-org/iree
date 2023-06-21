@@ -53,12 +53,12 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     populateGpuMemorySpaceAttributeConversions(
         converter, [](gpu::AddressSpace space) {
           switch (space) {
-            case gpu::AddressSpace::Global:
-              return 1;
-            case gpu::AddressSpace::Workgroup:
-              return 3;
-            case gpu::AddressSpace::Private:
-              return 5;
+          case gpu::AddressSpace::Global:
+            return 1;
+          case gpu::AddressSpace::Workgroup:
+            return 3;
+          case gpu::AddressSpace::Private:
+            return 5;
           }
           llvm_unreachable("unknown address space enum value");
           return 0;
@@ -113,7 +113,8 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
       target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-        if (isEntryPoint(funcOp)) return false;
+        if (isEntryPoint(funcOp))
+          return false;
         return true;
       });
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
@@ -122,11 +123,11 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
   }
 };
 
-}  // anonymous namespace
+} // anonymous namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass() {
   return std::make_unique<ConvertToROCDLPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -41,7 +41,8 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
+  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+    return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
@@ -58,7 +59,8 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
                            Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
+  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+    return nullptr;
   bool isUnsigned = eTy.isUnsignedInteger();
 
   int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();
@@ -85,7 +87,8 @@ struct PrimitiveTypeConverter : public TypeConverter {
   explicit PrimitiveTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](SourceType type) -> Type {
-      if (!isSourceType(type)) return type;
+      if (!isSourceType(type))
+        return type;
       return getTargetType(type);
     });
     addConversion([&](ComplexType type) {
@@ -142,9 +145,9 @@ struct GenericTypeConversionPattern : public ConversionPattern {
   GenericTypeConversionPattern(MLIRContext *context,
                                TypeConverter &typeConverter)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // Convert attributes only if this is a constant-like op.
     // This is because some ops use typed attributes for structural information
     // - like linalg ops using i64 for dimension indices - and if we converted
@@ -188,9 +191,9 @@ template <typename OpTy, typename TypeTy,
           typename OperandToResultWidthLegalityRelation>
 struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         this->getTypeConverter()->convertType(op.getResult().getType());
     auto operandType =
@@ -252,20 +255,25 @@ struct ConvertTypesPass : public Base {
         return typeConverter.isLegal(globalOp.getGlobalType());
       } else if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
         for (Type type : funcOp.getFunctionType().getInputs()) {
-          if (!typeConverter.isLegal(type)) return false;
+          if (!typeConverter.isLegal(type))
+            return false;
         }
         for (Type type : funcOp.getFunctionType().getResults()) {
-          if (!typeConverter.isLegal(type)) return false;
+          if (!typeConverter.isLegal(type))
+            return false;
         }
       }
       for (Type type : op->getResultTypes()) {
-        if (!typeConverter.isLegal(type)) return false;
+        if (!typeConverter.isLegal(type))
+          return false;
       }
       for (Type type : op->getOperandTypes()) {
-        if (!typeConverter.isLegal(type)) return false;
+        if (!typeConverter.isLegal(type))
+          return false;
       }
       for (auto &region : op->getRegions()) {
-        if (!typeConverter.isLegal(&region)) return false;
+        if (!typeConverter.isLegal(&region))
+          return false;
       }
       return true;
     });
@@ -279,7 +287,7 @@ struct ConvertTypesPass : public Base {
 
   Converter typeConverter;
 };
-}  // namespace
+} // namespace
 
 namespace {
 struct DemoteI64ToI32Converter
@@ -292,7 +300,7 @@ struct DemoteI64ToI32Converter
 struct DemoteI64ToI32Pass
     : public ConvertTypesPass<DemoteI64ToI32Base<DemoteI64ToI32Pass>,
                               DemoteI64ToI32Converter> {};
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass() {
   return std::make_unique<DemoteI64ToI32Pass>();
@@ -308,7 +316,7 @@ struct DemoteF32ToF16Converter
 struct DemoteF32ToF16Pass
     : public ConvertTypesPass<DemoteF32ToF16Base<DemoteF32ToF16Pass>,
                               DemoteF32ToF16Converter> {};
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass() {
   return std::make_unique<DemoteF32ToF16Pass>();
@@ -324,7 +332,7 @@ struct PromoteF16ToF32Converter
 struct PromoteF16ToF32Pass
     : public ConvertTypesPass<PromoteF16ToF32Base<PromoteF16ToF32Pass>,
                               PromoteF16ToF32Converter> {};
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
   return std::make_unique<PromoteF16ToF32Pass>();
@@ -340,7 +348,7 @@ struct PromoteBF16ToF32Converter
 struct PromoteBF16ToF32Pass
     : public ConvertTypesPass<PromoteBF16ToF32Base<PromoteBF16ToF32Pass>,
                               PromoteBF16ToF32Converter> {};
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
   return std::make_unique<PromoteBF16ToF32Pass>();
@@ -356,13 +364,13 @@ struct DemoteF64ToF32Converter
 struct DemoteF64ToF32Pass
     : public ConvertTypesPass<DemoteF64ToF32Base<DemoteF64ToF32Pass>,
                               DemoteF64ToF32Converter> {};
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass() {
   return std::make_unique<DemoteF64ToF32Pass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

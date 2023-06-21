@@ -59,9 +59,9 @@ static void collectTiledAndFusedOps(Operation *rootOp,
 /// For IREEs use case we dont need this. So this folds away the `if` condition.
 /// Note this is a fairly hacky workaround, but the current pad operation
 /// semantics force us down this path.
-static FailureOr<tensor::PadOp> foldIfGeneratedFromPadding(
-    RewriterBase &rewriter, tensor::PadOp untiledPadOp,
-    tensor::PadOp tiledPadOp) {
+static FailureOr<tensor::PadOp>
+foldIfGeneratedFromPadding(RewriterBase &rewriter, tensor::PadOp untiledPadOp,
+                           tensor::PadOp tiledPadOp) {
   auto ifOp = dyn_cast<scf::IfOp>(tiledPadOp->getParentOp());
   if (!ifOp) {
     return failure();
@@ -150,7 +150,8 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
                                    tilingResult->loops);
-    if (!fusedProducer) continue;
+    if (!fusedProducer)
+      continue;
 
     // Check if the fused producer has other uses that require the value
     // to be yielded from within the tiled loop.
@@ -189,7 +190,8 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   TilingInterface consumerOp;
   funcOp.walk<WalkOrder::PostOrder, ReverseIterator>([&](TilingInterface op) {
     // Find the next consumer op if it does not have loops.
-    if (op.getLoopIteratorTypes().empty()) return WalkResult::advance();
+    if (op.getLoopIteratorTypes().empty())
+      return WalkResult::advance();
     consumerOp = op;
     return WalkResult::interrupt();
   });
@@ -249,12 +251,12 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return signalPassFailure();
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
-    int64_t tilingLevel) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTileAndFusePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTileAndFusePass>(tilingLevel);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

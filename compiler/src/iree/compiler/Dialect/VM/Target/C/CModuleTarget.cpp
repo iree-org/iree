@@ -38,11 +38,12 @@ static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
          << std::string(77, '=') << "\n";
 }
 
-static LogicalResult printFunctionDeclaration(
-    mlir::func::FuncOp funcOp, llvm::raw_ostream &output,
-    mlir::emitc::CppEmitter &emitter) {
+static LogicalResult
+printFunctionDeclaration(mlir::func::FuncOp funcOp, llvm::raw_ostream &output,
+                         mlir::emitc::CppEmitter &emitter) {
   Operation *op = funcOp.getOperation();
-  if (op->hasAttr("emitc.static")) output << "static ";
+  if (op->hasAttr("emitc.static"))
+    output << "static ";
 
   if (failed(emitter.emitTypes(funcOp.getLoc(),
                                funcOp.getFunctionType().getResults())))
@@ -53,9 +54,11 @@ static LogicalResult printFunctionDeclaration(
 
   bool error = false;
   llvm::interleaveComma(funcOp.getArguments(), output, [&](BlockArgument arg) {
-    if (failed(emitter.emitType(funcOp.getLoc(), arg.getType()))) error = true;
+    if (failed(emitter.emitType(funcOp.getLoc(), arg.getType())))
+      error = true;
   });
-  if (error) return failure();
+  if (error)
+    return failure();
   output << ");\n";
 
   return success();
@@ -81,7 +84,8 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
         rodataOp.getAlignment()
             ? static_cast<size_t>(rodataOp.getAlignment().value())
             : 0;
-    if (alignment == 0) alignment = kDefaultRodataAlignment;
+    if (alignment == 0)
+      alignment = kDefaultRodataAlignment;
 
     std::string bufferName =
         moduleOp.getName().str() + "_" + rodataOp.getName().str();
@@ -297,8 +301,9 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 }
 
 /// Adapted from BytecodeModuleTarget and extended by C specific passes
-static LogicalResult canonicalizeModule(
-    IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
+static LogicalResult
+canonicalizeModule(IREE::VM::ModuleOp moduleOp,
+                   IREE::VM::CTargetOptions targetOptions) {
   RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
@@ -416,7 +421,8 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   mlir::emitc::CppEmitter emitter(output, /*declareVariablesAtTop=*/true);
   for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
-    if (!op->hasAttr("vm.module.constructor")) continue;
+    if (!op->hasAttr("vm.module.constructor"))
+      continue;
     if (failed(printFunctionDeclaration(funcOp, output, emitter)))
       return failure();
   }
@@ -457,7 +463,8 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 
   for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
-    if (op->hasAttr("vm.module.constructor")) continue;
+    if (op->hasAttr("vm.module.constructor"))
+      continue;
     if (failed(printFunctionDeclaration(funcOp, output, emitter)))
       return failure();
   }
@@ -469,9 +476,12 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     // TODO(simon-camp): Clean up. We generate calls to a macro that defines a
     // struct. As we declare all variables at the start of the function, the
     // macro call cannot be inlined into the function.
-    if (!isa<mlir::func::FuncOp, emitc::CallOp>(op)) continue;
-    if (op.hasAttr("vm.emit_at_end")) continue;
-    if (op.hasAttr("emitc.static")) output << "static ";
+    if (!isa<mlir::func::FuncOp, emitc::CallOp>(op))
+      continue;
+    if (op.hasAttr("vm.emit_at_end"))
+      continue;
+    if (op.hasAttr("emitc.static"))
+      output << "static ";
     if (failed(emitter.emitOperation(op,
                                      /*trailingSemicolon=*/false)))
       return failure();
@@ -487,8 +497,10 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   // Emit code for functions marked with `vm.emit_at_end`.
   for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
-    if (!op->hasAttr("vm.emit_at_end")) continue;
-    if (op->hasAttr("emitc.static")) output << "static ";
+    if (!op->hasAttr("vm.emit_at_end"))
+      continue;
+    if (op->hasAttr("emitc.static"))
+      output << "static ";
     if (failed(emitter.emitOperation(*funcOp.getOperation(),
                                      /*trailingSemicolon=*/false)))
       return failure();
@@ -509,7 +521,7 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
   return translateModuleToC(*moduleOps.begin(), targetOptions, output);
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

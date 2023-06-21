@@ -22,12 +22,12 @@ namespace scf {
 class ForallOp;
 class IfOp;
 class ForOp;
-}  // namespace scf
+} // namespace scf
 
 namespace vector {
 class VectorDialect;
 class WarpExecuteOnLane0Op;
-}  // namespace vector
+} // namespace vector
 
 namespace iree_compiler {
 
@@ -40,21 +40,22 @@ namespace transform_dialect {
 // Hook to register LLVMGPU transformations to the transform dialect.
 class LLVMGPUExtensions
     : public transform::TransformDialectExtension<LLVMGPUExtensions> {
- public:
+public:
   LLVMGPUExtensions();
 };
-}  // namespace transform_dialect
-}  // namespace IREE
+} // namespace transform_dialect
+} // namespace IREE
 
 /// Transformation to convert scf.forall to gpu distribution.
-FailureOr<SmallVector<OpFoldResult>> rewriteForallToGpu(
-    scf::ForallOp forallOp, const SmallVector<int64_t> &globalWorkgroupSizes,
-    RewriterBase &rewriter, bool syncAfterDistribute = true);
+FailureOr<SmallVector<OpFoldResult>>
+rewriteForallToGpu(scf::ForallOp forallOp,
+                   const SmallVector<int64_t> &globalWorkgroupSizes,
+                   RewriterBase &rewriter, bool syncAfterDistribute = true);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.h.inc"
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_

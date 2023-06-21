@@ -63,7 +63,8 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp) {
   // Gather all of the resource globals in the root.
   for (auto &region : rootOp->getRegions()) {
     for (auto globalOp : region.getOps<IREE::Util::GlobalOp>()) {
-      if (!isResourceType(globalOp.getType())) continue;
+      if (!isResourceType(globalOp.getType()))
+        continue;
       expandedGlobals[globalOp.getName()].resourceOp = globalOp;
     }
   }
@@ -117,16 +118,17 @@ static bool usesResources(Operation *op) {
 // Expands resources in the given |types| list to (resource, size, offset, len).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
-  if (types.empty()) return {};
+  if (types.empty())
+    return {};
   auto indexType = IndexType::get(types.front().getContext());
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
     newTypes.push_back(type);
     if (isResourceType(type)) {
-      newTypes.push_back(indexType);  // resource size
-      newTypes.push_back(indexType);  // subrange offset
-      newTypes.push_back(indexType);  // subrange length
+      newTypes.push_back(indexType); // resource size
+      newTypes.push_back(indexType); // subrange offset
+      newTypes.push_back(indexType); // subrange length
     }
   }
   return newTypes;
@@ -210,19 +212,23 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
 static void expandRegion(Region &region, bool canModifyEntryBlock,
                          ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                          SubrangeMap subrangeMap) {
-  if (region.empty()) return;
+  if (region.empty())
+    return;
 
   // Update all block arguments.
   auto indexType = IndexType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
-    if (!llvm::any_of(block.getArgumentTypes(), isResourceType)) continue;
-    if (block.isEntryBlock() && !canModifyEntryBlock) continue;
+    if (!llvm::any_of(block.getArgumentTypes(), isResourceType))
+      continue;
+    if (block.isEntryBlock() && !canModifyEntryBlock)
+      continue;
 
     // Insert and build a list of expanded (resource, size, offset) tuples.
     SmallVector<Subrange> expansions;
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto arg = block.getArgument(i);
-      if (!isResourceType(arg.getType())) continue;
+      if (!isResourceType(arg.getType()))
+        continue;
       Subrange subrange;
       subrange.resource = arg;
       subrange.resourceSize =
@@ -280,8 +286,10 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
   // Ignore ops that are already in the map (we likely inserted them ourselves
   // earlier).
   auto resultResource = op.getSubrangeResult();
-  if (!resultResource) return;
-  if (subrangeMap.count(resultResource)) return;
+  if (!resultResource)
+    return;
+  if (subrangeMap.count(resultResource))
+    return;
 
   // Get the subrange of the source resource which we should have by way of the
   // other insertions (func/block args, etc).
@@ -289,7 +297,8 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
   builder.setInsertionPointAfter(op);
   auto sourceSubrange = consumeSubrange(op.getLoc(), op.getSubrangeResource(),
                                         subrangeMap, indexSet, builder);
-  if (op.getSubrangeResource() == sourceSubrange.resource) return;
+  if (op.getSubrangeResource() == sourceSubrange.resource)
+    return;
 
   // Update the subrange in the map by adding the source offset and the local
   // offset from the op. Future ops that consume subranges will reference back
@@ -318,7 +327,8 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
 static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
                                ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                                SubrangeMap &subrangeMap) {
-  if (!usesResources(op)) return;
+  if (!usesResources(op))
+    return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto indexType = builder.getIndexType();
@@ -362,7 +372,8 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
 static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet, SubrangeMap &subrangeMap) {
-  if (!usesResources(op)) return;
+  if (!usesResources(op))
+    return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto subrange = consumeSubrange(op.getLoc(), op.getValue(), subrangeMap,
@@ -393,10 +404,12 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 // external and resolved later on. We can't modify their signatures.
 static bool isPublicOrExternal(CallableOpInterface callableOp) {
   if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
-    if (symbolOp.isPublic()) return true;
+    if (symbolOp.isPublic())
+      return true;
   }
   auto *region = callableOp.getCallableRegion();
-  if (!region || region->empty()) return true;
+  if (!region || region->empty())
+    return true;
   return false;
 }
 
@@ -445,12 +458,14 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
 //  %2 = stream.resource.subview %r[%ro] : {%rsz} -> {%rl}
 static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
                          SubrangeMap &subrangeMap) {
-  if (!usesResources(op)) return;
+  if (!usesResources(op))
+    return;
 
   // Ignore calls to public/external functions.
   auto calleeOp = SymbolTable::lookupNearestSymbolFrom<CallableOpInterface>(
       op, op.getCalleeAttr());
-  if (isPublicOrExternal(calleeOp)) return;
+  if (isPublicOrExternal(calleeOp))
+    return;
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
@@ -498,8 +513,10 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
 //  return %0, %sz, %o, %l
 static void expandReturnOp(mlir::func::ReturnOp op, IndexSet &indexSet,
                            SubrangeMap &subrangeMap) {
-  if (!usesResources(op)) return;
-  if (isPublicOrExternal(op->getParentOfType<mlir::func::FuncOp>())) return;
+  if (!usesResources(op))
+    return;
+  if (isPublicOrExternal(op->getParentOfType<mlir::func::FuncOp>()))
+    return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), subrangeMap,
                                  indexSet, builder);
@@ -529,7 +546,8 @@ static void expandBranchOp(mlir::cf::BranchOp op, IndexSet &indexSet,
 
 static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
                                SubrangeMap &subrangeMap) {
-  if (!usesResources(op)) return;
+  if (!usesResources(op))
+    return;
   OpBuilder builder(op);
   builder.create<mlir::cf::CondBranchOp>(
       op.getLoc(), op.getCondition(), op.getTrueDest(),
@@ -599,7 +617,7 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
 // until cleanup.
 class PropagateSubrangesPass
     : public PropagateSubrangesBase<PropagateSubrangesPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::func::FuncDialect>();
@@ -621,7 +639,8 @@ class PropagateSubrangesPass
       // NOTE: the callable may be empty (like when an extern) - we still want
       // to process it but don't need an IndexSet.
       auto *region = callableOp.getCallableRegion();
-      if (!region || region->empty()) continue;
+      if (!region || region->empty())
+        continue;
       IndexSet indexSet(callableOp.getLoc(),
                         OpBuilder::atBlockBegin(&region->front()));
       SubrangeMap subrangeMap;
@@ -630,13 +649,13 @@ class PropagateSubrangesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass() {
   return std::make_unique<PropagateSubrangesPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

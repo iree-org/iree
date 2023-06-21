@@ -17,9 +17,9 @@ namespace HAL {
 // Registers the VMVX backends.
 void registerVMVXTargetBackends();
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_VMVX_VMVXTARGET_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_VMVX_VMVXTARGET_H_

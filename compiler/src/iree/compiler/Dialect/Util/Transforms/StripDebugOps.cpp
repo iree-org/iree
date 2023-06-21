@@ -21,7 +21,7 @@ namespace Util {
 namespace {
 
 class StripDebugOpsPass : public StripDebugOpsBase<StripDebugOpsPass> {
- public:
+public:
   void runOnOperation() override {
     getOperation()->walk([](Operation *op) {
       if (isa<mlir::cf::AssertOp>(op) ||
@@ -32,13 +32,13 @@ class StripDebugOpsPass : public StripDebugOpsBase<StripDebugOpsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass() {
   return std::make_unique<StripDebugOpsPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

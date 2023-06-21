@@ -44,7 +44,8 @@ iree_compiler::gpu::CopyMapping::numThreadsForCopy(int totalNumThreads,
       alignment, sizes.back(), elementalBitWidth);
   LDBG("--maxVectorSize: " << maxVectorSize);
   int64_t numElements = 1;
-  for (auto s : sizes) numElements *= s;
+  for (auto s : sizes)
+    numElements *= s;
   LDBG("--numElements: " << numElements);
 
   int64_t actualVectorSize = maxVectorSize;
@@ -59,7 +60,8 @@ iree_compiler::gpu::CopyMapping::numThreadsForCopy(int totalNumThreads,
     for (; actualVectorSize >= 1; actualVectorSize /= 2) {
       LDBG("--step totalNumThreads * actualVectorSize: "
            << totalNumThreads * actualVectorSize);
-      if (numElements % (totalNumThreads * actualVectorSize) != 0) continue;
+      if (numElements % (totalNumThreads * actualVectorSize) != 0)
+        continue;
       break;
     }
     LDBG("--numElements: " << numElements);
@@ -99,7 +101,7 @@ iree_compiler::gpu::CopyMapping::numThreadsForCopy(int totalNumThreads,
 }
 
 iree_compiler::gpu::MappingInfo iree_compiler::gpu::CopyMapping::getMappingInfo(
-    MLIRContext* ctx, int totalNumThreads, int64_t alignment,
+    MLIRContext *ctx, int totalNumThreads, int64_t alignment,
     ArrayRef<int64_t> copySizes, bool favorPredication,
     int64_t elementalBitWidth) {
   assert(copySizes.size() == 2 && "only 2-D copy supported for now");

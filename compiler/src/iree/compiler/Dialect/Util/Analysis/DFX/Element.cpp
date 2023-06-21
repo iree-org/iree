@@ -17,7 +17,8 @@ namespace DFX {
 
 ChangeStatus AbstractElement::update(Solver &solver) {
   ChangeStatus changeStatus = ChangeStatus::UNCHANGED;
-  if (getState().isAtFixpoint()) return changeStatus;
+  if (getState().isAtFixpoint())
+    return changeStatus;
 
   LLVM_DEBUG({
     llvm::dbgs() << "[Solver] updating: ";
@@ -75,6 +76,6 @@ void AbstractElement::dump(AsmState &asmState) const {
   print(llvm::dbgs(), asmState);
 }
 
-}  // namespace DFX
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace DFX
+} // namespace iree_compiler
+} // namespace mlir

@@ -23,7 +23,7 @@ namespace iree_compiler {
 using TransposeMapFilter = std::function<bool(AffineMap map)>;
 
 class LinalgOpInfo {
- public:
+public:
   LinalgOpInfo(linalg::LinalgOp linalgOp);
   LinalgOpInfo(linalg::LinalgOp linalgOp,
                TransposeMapFilter transposeMapFilter);
@@ -36,7 +36,7 @@ class LinalgOpInfo {
     return transposeOperands;
   }
 
- private:
+private:
   void computeInfo(linalg::LinalgOp);
 
   TransposeMapFilter transposeMapFilter;
@@ -46,7 +46,7 @@ class LinalgOpInfo {
   SmallVector<OpOperand *> transposeOperands;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_

@@ -165,7 +165,8 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
 
   // Walk callee arguments.
   for (auto [i, value] : llvm::enumerate(funcOp.getArguments())) {
-    if (value.use_empty()) analysis.calleeUsedArgs.reset(i);
+    if (value.use_empty())
+      analysis.calleeUsedArgs.reset(i);
   }
 
   // Walk all return sites in the function.
@@ -277,7 +278,8 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
     // Note that we need to track unused results as an AND such that all callers
     // need to not use them. We'll flip the bits below so that `used = true`.
     for (auto [i, value] : llvm::enumerate(callOp.getResults())) {
-      if (!value.use_empty()) callerUnusedResults.reset(i);
+      if (!value.use_empty())
+        callerUnusedResults.reset(i);
     }
   }
   if (!analysis.callOps.empty()) {
@@ -325,7 +327,8 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
   // we know all callers will stop passing them.
   for (unsigned i = 0; i < resultCount; ++i) {
     int argIndex = analysis.passthroughResultArgs[i];
-    if (argIndex == kUnassigned) continue;
+    if (argIndex == kUnassigned)
+      continue;
     auto arg = funcOp.getArgument(argIndex);
     bool onlyReturnUsers = true;
     for (auto user : arg.getUsers()) {
@@ -457,12 +460,14 @@ static bool applyFuncChanges(FuncAnalysis &analysis, func::FuncOp funcOp) {
   }
 
   // Early out if no changes.
-  if (deadArgs.none() && deadResults.none()) return false;
+  if (deadArgs.none() && deadResults.none())
+    return false;
 
   // Erase dead results from all return sites.
   funcOp.walk([&](func::ReturnOp returnOp) {
     for (int i = deadResults.size() - 1; i >= 0; --i) {
-      if (deadResults.test(i)) returnOp.getOperandsMutable().erase(i);
+      if (deadResults.test(i))
+        returnOp.getOperandsMutable().erase(i);
     }
   });
 
@@ -542,7 +547,8 @@ static bool applyCallChanges(FuncAnalysis &analysis, func::CallOp callOp) {
   }
 
   // Early out if no changes.
-  if (deadOperands.none() && deadResults.none()) return false;
+  if (deadOperands.none() && deadResults.none())
+    return false;
 
   // Fully replace call op because we may have changed result count.
   auto newCallOp = OpBuilder(callOp).create<func::CallOp>(
@@ -562,7 +568,7 @@ static bool applyCallChanges(FuncAnalysis &analysis, func::CallOp callOp) {
 }
 
 class IPOPass : public IPOBase<IPOPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
     registry.insert<IREE::Util::UtilDialect>();
@@ -597,7 +603,8 @@ class IPOPass : public IPOBase<IPOPass> {
     // Use analysis results to mutate functions.
     bool anyChanges = false;
     for (auto &analysis : analysisResults) {
-      if (analysis.isIncomplete) continue;
+      if (analysis.isIncomplete)
+        continue;
       anyChanges = applyFuncChanges(analysis, analysis.funcOp) || anyChanges;
       for (auto callOp : analysis.callOps) {
         anyChanges = applyCallChanges(analysis, callOp) || anyChanges;
@@ -612,7 +619,7 @@ class IPOPass : public IPOBase<IPOPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass() {
   return std::make_unique<IPOPass>();
@@ -620,7 +627,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass() {
 
 static PassRegistration<IPOPass> pass;
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

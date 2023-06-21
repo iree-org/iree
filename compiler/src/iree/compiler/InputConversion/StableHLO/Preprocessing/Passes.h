@@ -22,6 +22,6 @@ namespace mlir::iree_compiler::stablehlo {
 
 void registerStableHLOPreprocessingPasses();
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PREPROCESSING_PASSES_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PREPROCESSING_PASSES_H_

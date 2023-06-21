@@ -167,11 +167,11 @@ struct EinsumToDotGeneral final
   }
 };
 
-}  // namespace
+} // namespace
 
 void populatePreprocessingEinsumToDotGeneralPatterns(
     mlir::MLIRContext *context, RewritePatternSet *patterns) {
   patterns->add<EinsumToDotGeneralPattern>(context);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

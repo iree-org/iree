@@ -101,7 +101,7 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
 }
 
 class MetalSPIRVTargetBackend : public TargetBackend {
- public:
+public:
   MetalSPIRVTargetBackend() = default;
 
   // NOTE: we could vary this based on the options such as 'metal-v2'.
@@ -112,8 +112,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
                     IREE::Flow::FlowDialect, spirv::SPIRVDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -130,7 +130,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // For now we disable translation if the variant has external object files.
     // We could instead perform linking with those objects (if they're Metal
     // archives, etc).
-    if (variantOp.isExternal()) return;
+    if (variantOp.isExternal())
+      return;
 
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
@@ -234,9 +235,10 @@ class MetalSPIRVTargetBackend : public TargetBackend {
                                                        threadgroupSizesRef);
 
     if (metalLibs.empty()) {
-      auto shaderSourcesRef = builder.createStringVec(llvm::map_range(
-          mslShaders,
-          [&](const MetalShader &shader) { return shader.source; }));
+      auto shaderSourcesRef = builder.createStringVec(
+          llvm::map_range(mslShaders, [&](const MetalShader &shader) {
+            return shader.source;
+          }));
       iree_hal_metal_ExecutableDef_shader_sources_add(builder,
                                                       shaderSourcesRef);
     } else {
@@ -263,7 +265,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // If we had multiple target environments we would generate one target attr
@@ -273,8 +275,9 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context, spirv::TargetEnvAttr targetEnv) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context,
+                      spirv::TargetEnvAttr targetEnv) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -298,7 +301,7 @@ void registerMetalSPIRVTargetBackends() {
   static TargetBackendRegistration registration1("metal-spirv", backendFactory);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

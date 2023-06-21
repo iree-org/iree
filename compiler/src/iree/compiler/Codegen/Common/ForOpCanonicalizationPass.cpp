@@ -54,8 +54,8 @@ struct CanonicalizeForOpInductionVarShape final
     : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
-  Value FoldCarryDep(scf::ForOp forOp, Operation* ivUser,
-                     Operation* ivDef) const {
+  Value FoldCarryDep(scf::ForOp forOp, Operation *ivUser,
+                     Operation *ivDef) const {
     if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(ivUser)) {
       if (auto souceOp = dyn_cast<vector::ShapeCastOp>(ivDef)) {
         if (shapeCast.getType() == souceOp.getSource().getType()) {
@@ -80,8 +80,8 @@ struct CanonicalizeForOpInductionVarShape final
     return Value();
   }
 
-  void transferBody(Block* source, Block* dest, ArrayRef<Value> results,
-                    PatternRewriter& rewriter) const {
+  void transferBody(Block *source, Block *dest, ArrayRef<Value> results,
+                    PatternRewriter &rewriter) const {
     // Move all operations to the destination block.
     rewriter.mergeBlocks(source, dest, dest->getArguments());
     // Replace the yield op by one that returns only the used values.
@@ -91,22 +91,24 @@ struct CanonicalizeForOpInductionVarShape final
   }
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
     SmallVector<unsigned, 8> iteratorFolded;
-    SmallVector<Operation*, 8> resultOps;
+    SmallVector<Operation *, 8> resultOps;
     auto terminator = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
     auto returnValues = llvm::to_vector<8>(terminator.getOperands());
     auto initArgs = llvm::to_vector<8>(forOp.getIterOperands());
     for (auto [index, iterArg] : llvm::enumerate(forOp.getRegionIterArgs())) {
-      if (!iterArg.hasOneUse()) continue;
-      Operation* op = iterArg.use_begin()->getOwner();
+      if (!iterArg.hasOneUse())
+        continue;
+      Operation *op = iterArg.use_begin()->getOwner();
       if (!isa<vector::ShapeCastOp, vector::ExtractOp,
                UnrealizedConversionCastOp>(op)) {
         continue;
       }
-      Operation* returnValDef = returnValues[index].getDefiningOp();
+      Operation *returnValDef = returnValues[index].getDefiningOp();
       Value newReturn = FoldCarryDep(forOp, op, returnValDef);
-      if (!newReturn) continue;
+      if (!newReturn)
+        continue;
       iteratorFolded.push_back(index);
       resultOps.push_back(returnValDef);
       returnValues[index] = newReturn;
@@ -115,7 +117,8 @@ struct CanonicalizeForOpInductionVarShape final
       mapping.map(iterArg, initArgs[index]);
       initArgs[index] = rewriter.clone(*op, mapping)->getResult(0);
     }
-    if (iteratorFolded.empty()) return failure();
+    if (iteratorFolded.empty())
+      return failure();
     auto newLoop = rewriter.create<scf::ForOp>(
         forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
         forOp.getStep(), initArgs);
@@ -129,7 +132,7 @@ struct CanonicalizeForOpInductionVarShape final
       mapping.map(returnValues[iter], newLoop.getResult(iter));
       repResults[index] =
           rewriter.clone(*resultOps[index], mapping)->getResult(0);
-      Operation* oldOp =
+      Operation *oldOp =
           newLoop.getRegionIterArgs()[index].use_begin()->getOwner();
       assert(oldOp->getNumResults() == 1 && "expected single result");
       rewriter.replaceAllUsesWith(oldOp->getResult(0),
@@ -151,15 +154,17 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
     VectorType v8f16Type = VectorType::get({8}, rewriter.getF16Type());
     VectorType v4f32Type = VectorType::get({4}, rewriter.getF32Type());
 
     SmallVector<unsigned, 8> ivIndices;
     for (auto [index, iterArg] : llvm::enumerate(forOp.getRegionIterArgs())) {
-      if (iterArg.getType() == v8f16Type) ivIndices.push_back(index);
+      if (iterArg.getType() == v8f16Type)
+        ivIndices.push_back(index);
     }
-    if (ivIndices.empty()) return failure();
+    if (ivIndices.empty())
+      return failure();
 
     // Bit cast all init values from v8f16 to v4f32.
     auto ivInitValues = llvm::to_vector<8>(forOp.getIterOperands());
@@ -189,7 +194,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
       // Replace all uses of the new induction variable with a bitcast. We need
       // to exclude the bitcast op itself given it also uses the induction
       // variable.
-      SmallPtrSet<Operation*, 1> exceptions{bitcastOp};
+      SmallPtrSet<Operation *, 1> exceptions{bitcastOp};
       newIv.replaceAllUsesExcept(bitcastOp, exceptions);
     }
 
@@ -206,7 +211,8 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     yieldOp->setOperands(ivRetValues);
 
     SmallVector<Value, 8> forRetValues;
-    for (Value result : newLoop.getResults()) forRetValues.push_back(result);
+    for (Value result : newLoop.getResults())
+      forRetValues.push_back(result);
 
     // Bit cast return values to the old type to fix for op uses.
     rewriter.setInsertionPointAfter(newLoop);
@@ -223,7 +229,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
 
 struct ForOpCanonicalizationPass
     : public ForOpCanonicalizationBase<ForOpCanonicalizationPass> {
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }
 
@@ -238,11 +244,11 @@ struct ForOpCanonicalizationPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass() {
   return std::make_unique<ForOpCanonicalizationPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

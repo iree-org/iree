@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::stablehlo {
 // Type converter to use as part of lowerings from dialects that carry signs
 // in their types to those that are signless.
 class RemoveSignTypeConverter : public TypeConverter {
- public:
+public:
   RemoveSignTypeConverter();
 };
 
@@ -25,10 +25,10 @@ class RemoveSignTypeConverter : public TypeConverter {
 // This is the type converter used by the test pass and is the sanctioned
 // way to use the underlying patterns.
 class LinalgTypeConverter : public RemoveSignTypeConverter {
- public:
+public:
   LinalgTypeConverter();
 };
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_TYPE_CONVERSION_H
+#endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_TYPE_CONVERSION_H

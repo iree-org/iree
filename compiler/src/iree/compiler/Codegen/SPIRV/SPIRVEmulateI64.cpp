@@ -46,9 +46,9 @@ struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type newResultTy = getTypeConverter()->convertType(op.getType());
     if (!newResultTy)
       return rewriter.notifyMatchFailure(
@@ -75,9 +75,11 @@ struct ConvertHalInterfaceBindingSubspan final
 // Tries to flatten `type` to a 1-D vector type. Returns `nullptr` on failure.
 static VectorType flattenVectorType(Type type) {
   auto vecTy = llvm::dyn_cast<VectorType>(type);
-  if (!vecTy) return nullptr;
+  if (!vecTy)
+    return nullptr;
 
-  if (vecTy.isScalable() || vecTy.getRank() <= 1) return nullptr;
+  if (vecTy.isScalable() || vecTy.getRank() <= 1)
+    return nullptr;
 
   int64_t totalElements = vecTy.getNumElements();
   return VectorType::get(llvm::ArrayRef(totalElements), vecTy.getElementType());
@@ -102,7 +104,8 @@ struct FlattenElementwisePattern final : RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!OpTrait::hasElementwiseMappableTraits(op)) return failure();
+    if (!OpTrait::hasElementwiseMappableTraits(op))
+      return failure();
 
     auto newResultTypes = llvm::to_vector_of<Type, 2>(
         llvm::map_range(op->getResultTypes(), flattenVectorType));
@@ -115,7 +118,8 @@ struct FlattenElementwisePattern final : RewritePattern {
     auto operands = llvm::to_vector_of<Value, 2>(op->getOperands());
     for (Value &operand : operands) {
       VectorType newOperandTy = flattenVectorType(operand.getType());
-      if (!newOperandTy) return failure();
+      if (!newOperandTy)
+        return failure();
 
       operand = rewriter.createOrFold<vector::ShapeCastOp>(loc, newOperandTy,
                                                            operand);
@@ -140,8 +144,9 @@ struct FlattenElementwisePattern final : RewritePattern {
 // Helper functions
 //===----------------------------------------------------------------------===//
 
-static void populateIreeI64EmulationPatterns(
-    arith::WideIntEmulationConverter &converter, RewritePatternSet &patterns) {
+static void
+populateIreeI64EmulationPatterns(arith::WideIntEmulationConverter &converter,
+                                 RewritePatternSet &patterns) {
   patterns.add<ConvertHalInterfaceBindingSubspan>(converter,
                                                   patterns.getContext());
 }
@@ -165,7 +170,8 @@ struct SPIRVEmulateI64Pass final
 
   void runOnOperation() override {
     ModuleOp op = getOperation();
-    if (supportsI64(op)) return;
+    if (supportsI64(op))
+      return;
 
     arith::WideIntEmulationConverter typeConverter(32);
     memref::populateMemRefWideIntEmulationConversions(typeConverter);
@@ -216,7 +222,7 @@ struct SPIRVEmulateI64Pass final
   }
 };
 
-}  // namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Public interface
@@ -226,5 +232,5 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass() {
   return std::make_unique<SPIRVEmulateI64Pass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

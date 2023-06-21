@@ -18,13 +18,13 @@ static void setVisibilityFromLinkage(SymbolOpInterface op,
                                      LLVM::Linkage linkage) {
   SymbolTable::Visibility visibility = op.getVisibility();
   switch (linkage) {
-    case LLVM::Linkage::Private:
-    case LLVM::Linkage::Internal:
-      visibility = SymbolTable::Visibility::Private;
-      break;
-    default:
-      visibility = SymbolTable::Visibility::Public;
-      break;
+  case LLVM::Linkage::Private:
+  case LLVM::Linkage::Internal:
+    visibility = SymbolTable::Visibility::Private;
+    break;
+  default:
+    visibility = SymbolTable::Visibility::Public;
+    break;
   }
   op.setVisibility(visibility);
 }
@@ -46,12 +46,12 @@ struct LLVMCPUSynchronizeSymbolVisibilityPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass() {
   return std::make_unique<LLVMCPUSynchronizeSymbolVisibilityPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

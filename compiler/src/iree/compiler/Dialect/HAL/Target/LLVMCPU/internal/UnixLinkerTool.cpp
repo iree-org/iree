@@ -20,13 +20,14 @@ namespace HAL {
 
 // Unix linker (ld-like); for ELF files.
 class UnixLinkerTool : public LinkerTool {
- public:
+public:
   using LinkerTool::LinkerTool;
 
   std::string getSystemToolPath() const override {
     // First check for setting the linker explicitly.
     auto toolPath = LinkerTool::getSystemToolPath();
-    if (!toolPath.empty()) return toolPath;
+    if (!toolPath.empty())
+      return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
     // We want LLD:
@@ -54,14 +55,16 @@ class UnixLinkerTool : public LinkerTool {
       // of these, at least given current behavior.
       toolPath = findToolInEnvironment({"ld.lld", "ld"});
     }
-    if (!toolPath.empty()) return toolPath;
+    if (!toolPath.empty())
+      return toolPath;
 
     llvm::errs() << "No Unix linker tool found in environment.\n";
     return "";
   }
 
-  std::optional<Artifacts> linkDynamicLibrary(
-      StringRef libraryName, ArrayRef<Artifact> objectFiles) override {
+  std::optional<Artifacts>
+  linkDynamicLibrary(StringRef libraryName,
+                     ArrayRef<Artifact> objectFiles) override {
     Artifacts artifacts;
 
     // Create the shared object name; if we only have a single input object we
@@ -93,7 +96,7 @@ class UnixLinkerTool : public LinkerTool {
     } else {
       // Avoids including any libc/startup files that initialize the CRT as
       // we don't use any of that. Our shared libraries must be freestanding.
-      flags.push_back("-nostdlib");  // -nodefaultlibs + -nostartfiles
+      flags.push_back("-nostdlib"); // -nodefaultlibs + -nostartfiles
 
       // Statically link all dependencies so we don't have any runtime deps.
       // We cannot have any imports in the module we produce.
@@ -128,22 +131,24 @@ class UnixLinkerTool : public LinkerTool {
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) return std::nullopt;
+    if (failed(runLinkCommand(commandLine)))
+      return std::nullopt;
     return artifacts;
   }
 
- private:
+private:
   bool targetIsApple() const {
     return targetTriple.isOSDarwin() || targetTriple.isiOS();
   }
 };
 
-std::unique_ptr<LinkerTool> createUnixLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+std::unique_ptr<LinkerTool>
+createUnixLinkerTool(const llvm::Triple &targetTriple,
+                     LLVMTargetOptions &targetOptions) {
   return std::make_unique<UnixLinkerTool>(targetTriple, targetOptions);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -38,7 +38,7 @@ struct FormScalarDispatchesPass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 /// Return true if type represents a value less than `n` elements.
 static bool isScalarOrTensorOfLinearSizeN(int n, Type type) {
@@ -138,8 +138,9 @@ static bool isSliceRoot(int workload, Operation *op) {
 }
 
 // Form dispatch regions from slice of the operation.
-static FailureOr<DispatchRegionOp> formDispatchRegionFromSlice(
-    RewriterBase &rewriter, Operation *rootOp, ArrayRef<Operation *> slice) {
+static FailureOr<DispatchRegionOp>
+formDispatchRegionFromSlice(RewriterBase &rewriter, Operation *rootOp,
+                            ArrayRef<Operation *> slice) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(rootOp);
   FailureOr<DispatchRegionOp> dispatchRegionOp =
@@ -276,7 +277,7 @@ createFormScalarDispatchesPass() {
   return std::make_unique<FormScalarDispatchesPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

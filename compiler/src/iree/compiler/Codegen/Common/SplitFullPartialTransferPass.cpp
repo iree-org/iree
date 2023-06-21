@@ -45,16 +45,16 @@ struct SplitFullPartialTransferPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSplitFullPartialTransferPass() {
   return std::make_unique<SplitFullPartialTransferPass>();
 }
-std::unique_ptr<OperationPass<func::FuncOp>> createSplitFullPartialTransferPass(
-    StringRef option) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSplitFullPartialTransferPass(StringRef option) {
   return std::make_unique<SplitFullPartialTransferPass>(option);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
