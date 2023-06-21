@@ -146,11 +146,10 @@ def get_repo_digest(tagged_image_url: str, dry_run: bool = False) -> str:
     except subprocess.CalledProcessError as error:
         if dry_run:
             return ""
-        else:
-            raise RuntimeError(
-                f"Computing the repository digest for {tagged_image_url} failed. Has "
-                "it been pushed to GCR?"
-            ) from error
+        raise RuntimeError(
+            f"Computing the repository digest for {tagged_image_url} failed."
+            " Has it been pushed to GCR?"
+        ) from error
     _, repo_digest = completed_process.stdout.strip().split("@")
     return repo_digest
 
@@ -189,11 +188,13 @@ def main(
 ):
     image_graph = utils.load_image_graph(image_graph_path)
     if "all" in images:
-      images = list(image_graph.keys())
+        images = list(image_graph.keys())
     for image in images:
-      if image not in image_graph:
-        raise ValueError(f'Image "{image}" not found in the image graph.'
-                         f' Available images: {",".join(image_graph.keys())}')
+        if image not in image_graph:
+            raise ValueError(
+                f'Image "{image}" not found in the image graph.'
+                f' Available images: {",".join(image_graph.keys())}'
+            )
 
     images_to_dependents = _get_images_to_dependents(image_graph)
     images_to_process = get_ordered_images_to_process(
@@ -255,16 +256,17 @@ def main(
 
             utils.run_command(["docker", "push", tagged_image_url], dry_run=dry_run)
 
-          digest = get_repo_digest(tagged_image_url, dry_run)
-          image_info = image_graph[image]
-          image_graph[image] = dataclasses.replace(image_info,
-                                                   digest=digest,
-                                                   url=f"{image_url}@{digest}")
-          if not dry_run:
-            # Update the graph file after every image update so it is easier to
-            # restart from the last failure.
-            image_graph_path.write_text(
-                json.dumps(utils.dump_image_graph(image_graph), indent=2))
+            digest = get_repo_digest(tagged_image_url, dry_run)
+            image_info = image_graph[image]
+            image_graph[image] = dataclasses.replace(
+                image_info, digest=digest, url=f"{image_url}@{digest}"
+            )
+            if not dry_run:
+                # Update the graph file after every image update so it is easier
+                # to restart from the last failure.
+                image_graph_path.write_text(
+                    json.dumps(utils.dump_image_graph(image_graph), indent=2)
+                )
 
         update_references(image_url, digest, dry_run=dry_run)
 

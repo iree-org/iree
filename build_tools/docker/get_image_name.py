@@ -24,6 +24,8 @@ import utils
 
 
 def find_image_by_name(img_name):
+    """Find docker image url by name from the `image_graph.json`."""
+
     this_dir = Path(__file__).resolve().parent
 
     image_graph = utils.load_image_graph(this_dir / "image_graph.json")

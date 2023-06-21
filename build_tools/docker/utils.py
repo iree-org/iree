@@ -16,22 +16,28 @@ from typing import Any, Dict, List, Optional, Sequence
 
 @dataclass(frozen=True)
 class ImageInfo:
-  deps: List[str]
-  digest: Optional[str] = None
-  url: Optional[str] = None
+    """Information of a docker image."""
+
+    deps: List[str]
+    digest: Optional[str] = None
+    url: Optional[str] = None
 
 
 def load_image_graph(graph_path: pathlib.Path) -> Dict[str, ImageInfo]:
-  graph_obj = json.loads(graph_path.read_text())
-  image_graph = dict(
-      (name, ImageInfo(**info)) for name, info in graph_obj.items())
-  return image_graph
+    """Load image graph from a JSON object."""
+
+    graph_obj = json.loads(graph_path.read_text())
+    image_graph = dict((name, ImageInfo(**info)) for name, info in graph_obj.items())
+    return image_graph
 
 
 def dump_image_graph(image_graph: Dict[str, ImageInfo]) -> Dict[str, Any]:
-  graph_obj = dict(
-      (name, dataclasses.asdict(info)) for name, info in image_graph.items())
-  return graph_obj
+    """Dump image graph into a JSON object."""
+
+    graph_obj = dict(
+        (name, dataclasses.asdict(info)) for name, info in image_graph.items()
+    )
+    return graph_obj
 
 
 def run_command(
@@ -49,7 +55,11 @@ def run_command(
         return subprocess.CompletedProcess(command, returncode=0)
 
     completed_process = subprocess.run(
-        command, text=text, check=check, capture_output=capture_output, **run_kwargs
+        command,
+        text=text,
+        check=check,
+        capture_output=capture_output,
+        **run_kwargs,
     )
     return completed_process
 
