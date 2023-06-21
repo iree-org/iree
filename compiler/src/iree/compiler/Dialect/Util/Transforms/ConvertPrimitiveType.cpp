@@ -223,11 +223,6 @@ template <typename Base, typename Converter>
 struct ConvertTypesPass : public Base {
   using Base::Base;
   void runOnOperation() override {
-    llvm::SetVector<mlir::CallOpInterface> calls;
-    this->getOperation().walk([&](mlir::CallOpInterface callOp) {
-      if (callOp->getRegions().empty()) calls.insert(callOp);
-    });
-
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
     patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
@@ -255,6 +250,12 @@ struct ConvertTypesPass : public Base {
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
       if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
         return typeConverter.isLegal(globalOp.getGlobalType());
+      } else if (auto callOp = dyn_cast<mlir::CallOpInterface>(op)) {
+        auto callFuncSymbol = llvm::dyn_cast_if_present<SymbolRefAttr>(
+            callOp.getCallableForCallee());
+        auto funcSymbolOp = dyn_cast_or_null<func::FuncOp>(
+            SymbolTable::lookupNearestSymbolFrom(callOp, callFuncSymbol));
+        if (!funcSymbolOp || funcSymbolOp.isExternal()) return true;
       } else if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
         for (Type type : funcOp.getFunctionType().getInputs()) {
           if (!typeConverter.isLegal(type)) return false;
@@ -262,8 +263,11 @@ struct ConvertTypesPass : public Base {
         for (Type type : funcOp.getFunctionType().getResults()) {
           if (!typeConverter.isLegal(type)) return false;
         }
-      } else if (auto callOp = dyn_cast<mlir::CallOpInterface>(op)) {
-        if (calls.contains(callOp)) return true;
+      } else if (auto retOp = dyn_cast<func::ReturnOp>(op)) {
+        for (auto retOps : retOp.getOperandTypes()) {
+          if (!typeConverter.isLegal(retOps)) return false;
+        }
+        return true;
       }
       for (Type type : op->getResultTypes()) {
         if (!typeConverter.isLegal(type)) return false;
@@ -280,8 +284,6 @@ struct ConvertTypesPass : public Base {
     // Note that this will fail if we can't convert any types.
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
-      llvm::errs() << "Failed Module: ";
-      this->getOperation().dump();
       return this->signalPassFailure();
     }
   }
