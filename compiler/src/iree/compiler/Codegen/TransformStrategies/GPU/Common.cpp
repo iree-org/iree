@@ -179,9 +179,9 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
 //===----------------------------------------------------------------------===//
 void mlir::iree_compiler::gpu::
     build1DSplittingStrategyWithOptionalThreadMapping(
-        ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value opH,
-        int64_t rank, int64_t mostMinorDim, SmallVector<int64_t> opSizes,
-        int64_t numThreads, Attribute mappingAttr, int64_t maxVectorSize) {
+        ImplicitLocOpBuilder &b, Value variantH, Value opH, int64_t rank,
+        int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
+        Attribute mappingAttr, int64_t maxVectorSize) {
   // Poor man's handling of optionality in C++. Will need to be converted to
   // proper transform dialect filters or handling of emptiness.
   if (rank == 0) return;
@@ -214,7 +214,7 @@ void mlir::iree_compiler::gpu::
     if (vectorSize > 1) {
       auto res = iree_compiler::buildTileFuseToScfFor(
           /*b=*/b,
-          /*isolatedParentOpH=*/isolatedParentOpH,
+          /*variantH=*/variantH,
           /*rootH=*/opH,
           /*opsHToFuse=*/{},
           /*tileSizes=*/
@@ -228,7 +228,7 @@ void mlir::iree_compiler::gpu::
       assert(mappingAttr && "must specify a mapping attribute");
       iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*b=*/b,
-          /*isolatedParentOpH=*/isolatedParentOpH,
+          /*variantH=*/variantH,
           /*rootH=*/opH,
           /*opsHToFuse=*/{},
           /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
@@ -241,7 +241,7 @@ void mlir::iree_compiler::gpu::
   if (vectorSize > 1) {
     auto res = iree_compiler::buildTileFuseToScfFor(
         /*b=*/b,
-        /*isolatedParentOpH=*/isolatedParentOpH,
+        /*variantH=*/variantH,
         /*rootH=*/opH,
         /*opsHToFuse=*/{},
         /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
@@ -251,7 +251,7 @@ void mlir::iree_compiler::gpu::
     assert(mappingAttr && "must specify a mapping attribute");
     iree_compiler::buildTileFuseDistToForallWithNumThreads(
         /*b=*/b,
-        /*isolatedParentOpH=*/isolatedParentOpH,
+        /*variantH=*/variantH,
         /*rootH=*/opH,
         /*opsHToFuse=*/{},
         /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
@@ -296,7 +296,7 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   // Step N. Perform a final pass of canonicalization + enabling before
   // returning.
   mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, variantH, [](OpBuilder &b, Location loc) {
+      b, funcH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyFoldTensorEmptyPatternsOp>(loc);
       });
   return std::make_pair(variantH, funcH);
@@ -331,8 +331,10 @@ Value mlir::iree_compiler::gpu::buildHoistOutputPaddingOp(
   // Perform a pass of canonicalization cleanups + folding fill + pad into pad
   // by applying `foldTensorSubsets` and `tilingCanonicalization`.
   {
+    Value funcH = b.create<transform::MatchOp>(
+        variantH, func::FuncOp::getOperationName());
     iree_compiler::buildCanonicalizationAndEnablingTransforms(
-        b, variantH, [](OpBuilder &b, Location loc) {
+        b, funcH, [](OpBuilder &b, Location loc) {
           b.create<transform::ApplyFoldTensorSubsetOpsPatternsOp>(loc);
           b.create<
               transform::ApplyMergeConsecutiveInsertExtractSlicePatternsOp>(
@@ -363,7 +365,7 @@ mlir::iree_compiler::gpu::buildDistributeOnePadOrCopyWithTileSizes(
   TileToForallAndFuseAndDistributeResult res =
       buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/copyOpH,
           /*opsToFuseH=*/{},
           /*tileSizes=*/
@@ -391,7 +393,7 @@ Value mlir::iree_compiler::gpu::buildDistributeOnePadOrCopyWithNumThreads(
   TileToForallAndFuseAndDistributeResult res =
       buildTileFuseDistToForallWithNumThreads(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/copyOpH,
           /*opsToFuseH=*/{},
           /*numThreads=*/
@@ -480,7 +482,9 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // Also, no canonicalization is allowed after vector masking and before we
   // lower the masks: masks are currently quite brittle and do not like
   // canonicalization or anything else that may insert an op in their region.
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, variantH);
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
 
   // Apply vector masking.
   if (!strategy.alignedLhs()) {
@@ -505,7 +509,7 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // Lower all masked vector transfers at this point, as they make
   // canonicalization generate incorrect IR.
   // TODO: don't rematch, apply on the variant op directly.
-  Value funcH =
+  funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 

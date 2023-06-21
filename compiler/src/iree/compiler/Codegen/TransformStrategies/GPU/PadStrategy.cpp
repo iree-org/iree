@@ -34,8 +34,6 @@ using iree_compiler::blockX;
 using iree_compiler::blockY;
 using iree_compiler::blockZ;
 using iree_compiler::buildPad;
-using iree_compiler::buildTileFuseDistToForallWithNumThreads;
-using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::buildBufferize;
 using iree_compiler::gpu::buildConvertToAsyncCopies;
