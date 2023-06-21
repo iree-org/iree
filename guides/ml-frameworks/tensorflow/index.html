@@ -1494,8 +1494,33 @@
 <code>tf.Module</code> <a href="https://www.tensorflow.org/api_docs/python/tf/Module">classes</a>
 or stored in the <code>SavedModel</code>
 <a href="https://www.tensorflow.org/guide/saved_model">format</a>.</p>
-<!-- TODO(??): notes about TensorFlow 2.0, supported features? -->
+<pre class="mermaid"><code>graph LR
+  accTitle: TensorFlow to runtime deployment workflow overview
+  accDescr {
+    Programs start as either TensorFlow SavedModel or tf.Module programs.
+    Programs are imported into MLIR as StableHLO.
+    The IREE compiler uses the imported MLIR.
+    Compiled programs are used by the runtime.
+  }
 
+  subgraph A[TensorFlow]
+    direction TB
+    A1[SavedModel]
+    A2[tf.Module]
+
+    A1 --- A2
+  end
+
+  subgraph B[MLIR]
+    B1[StableHLO]
+  end
+
+  C[IREE compiler]
+  D[Runtime deployment]
+
+  A -- iree-import-tf --&gt; B
+  B --&gt; C
+  C --&gt; D</code></pre>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>Install TensorFlow by following the
 <a href="https://www.tensorflow.org/install">official documentation</a>:</p>
