@@ -65,7 +65,7 @@ jobs:
       - name: Check if modified files are formatted
         run: |
           git diff "${GITHUB_BASE_REF?}" --name-only -- '*.py' ':!third_party' \
-            | xargs black --check --diff --verbose
+            | xargs --no-run-if-empty black --check --diff --verbose
       - name: Instructions for fixing the above linting errors
         if: failure()
         run: |
