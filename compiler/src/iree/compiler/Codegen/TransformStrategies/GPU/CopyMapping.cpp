@@ -45,12 +45,7 @@ iree_compiler::gpu::CopyMapping::numThreadsForCopy(int totalNumThreads,
   for (auto s : sizes) numElements *= s;
   LDBG("--numElements: " << numElements);
 
-  // TODO: this implementation exhibits and issue with mapping to cp.async zfill
-  // in the presence of vectors of size > 1. This could also be related to the
-  // lack of substantial perf gains between masked vector<4> and masked
-  // vector<1>.
-  // int64_t actualVectorSize = maxVectorSize;
-  int64_t actualVectorSize = 1;
+  int64_t actualVectorSize = maxVectorSize;
   if (!favorPredication) {
     // Bias towards reducing the vector size to avoid predication.
     // Predication occurs if we end up using fewer than totalNumThreads for a
