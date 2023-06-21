@@ -53,7 +53,7 @@ def _native_binary_impl(ctx):
 
 def _native_test_impl(ctx):
     if not ctx.attr.timeout:
-      ctx.attr.timeout = "short"
+        ctx.attr.timeout = "short"
     default_info = _shared_impl(ctx)
     return [default_info, testing.TestEnvironment(ctx.attr.env)]
 
