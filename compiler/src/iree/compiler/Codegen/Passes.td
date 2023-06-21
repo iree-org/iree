@@ -636,7 +636,7 @@ def LLVMCPULowerExecutableTarget :
 }
 
 def ExpandArithF16ToF32 :
-    Pass<"iree-llvmcpu-expand-f16-Op-to-f32", ""> {
+    Pass<"iree-llvmcpu-expand-f16-op-to-f32", ""> {
   let summary =
       "Preform f16 opertaions by expanding them to f32.";
   let constructor =
