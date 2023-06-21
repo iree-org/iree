@@ -151,18 +151,17 @@ transform.sequence failures(propagate) {
 // CHECK:          %[[D19:.+]] = vector.broadcast %[[D18]] : vector<128xf32> to vector<128x128xf32>
 // CHECK:          %[[D20:.+]] = vector.transpose %[[D19]], [1, 0] : vector<128x128xf32> to vector<128x128xf32>
 // CHECK:          %[[D21:.+]] = arith.divf %[[D14]], %[[D20]] : vector<128x128xf32>
-// CHECK:          %[[D22:.+]] = vector.broadcast %[[D17]] : vector<128xf32> to vector<64x128xf32>
-// CHECK:          %[[D23:.+]] = vector.broadcast %[[D18]] : vector<128xf32> to vector<64x128xf32>
-// CHECK:          %[[D24:.+]] = arith.divf %[[D22]], %[[D23]] : vector<64x128xf32>
-// CHECK:          %[[D25:.+]] = vector.transpose %[[D24]], [1, 0] : vector<64x128xf32> to vector<128x64xf32>
-// CHECK:          %[[D26:.+]] = arith.mulf %[[D25]], %[[ARG3]] : vector<128x64xf32>
-// CHECK:          %[[D27:.+]] = vector.transfer_read %[[D2]][%[[WORKGROUP_ID_X]], %[[ARG0]], %[[C0]]], %[[CST_2]]
+// CHECK:          %[[D22:.+]] = arith.divf %[[D17]], %[[D18]] : vector<128xf32>
+// CHECK:          %[[D23:.+]] = vector.broadcast %[[D22]] : vector<128xf32> to vector<64x128xf32>
+// CHECK:          %[[D24:.+]] = vector.transpose %[[D23]], [1, 0] : vector<64x128xf32> to vector<128x64xf32>
+// CHECK:          %[[D25:.+]] = arith.mulf %[[D24]], %[[ARG3]] : vector<128x64xf32>
+// CHECK:          %[[D26:.+]] = vector.transfer_read %[[D2]][%[[WORKGROUP_ID_X]], %[[ARG0]], %[[C0]]], %[[CST_2]]
 // CHECK-SAME:       {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
-// CHECK:          %[[D28:.+]] = vector.contract {indexing_maps = [#[[MAP1]], #[[MAP4]], #[[MAP3]]],
+// CHECK:          %[[D27:.+]] = vector.contract {indexing_maps = [#[[MAP1]], #[[MAP4]], #[[MAP3]]],
 // CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>}
-// CHECK-SAME:       %[[D21]], %[[D27]], %[[D26]] : vector<128x128xf32>, vector<128x64xf32> into
+// CHECK-SAME:       %[[D21]], %[[D26]], %[[D25]] : vector<128x128xf32>, vector<128x64xf32> into
 // CHECK-SAME:       vector<128x64xf32>
-// CHECK:          scf.yield %[[D10]], %[[D18]], %[[D28]] : vector<128xf32>, vector<128xf32>, vector<128x64xf32>
+// CHECK:          scf.yield %[[D10]], %[[D18]], %[[D27]] : vector<128xf32>, vector<128xf32>, vector<128x64xf32>
 // CHECK:        }
 // CHECK:        vector.transfer_write %[[D6]]#[[D2:.+]], %[[SUBVIEW]][%[[C0]], %[[C0]], %[[C0]]] {in_bounds =
 // CHECK-SAME:     [true, true]} : vector<128x64xf32>, memref<1x128x64xf32, strided<[65536, 64, 1], offset: ?>>
