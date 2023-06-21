@@ -75,7 +75,8 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
 transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
@@ -97,9 +98,6 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
@@ -110,7 +108,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   rewriter.startRootUpdate(exportOp);
   exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   rewriter.finalizeRootUpdate(exportOp);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::getEffects(
@@ -285,7 +283,8 @@ static HAL::ExecutableExportOp getExecutableExportOpForFunc(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
-    scf::IfOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::IfOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     results.assign(1, nullptr);
@@ -339,10 +338,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
   }
 
   Location loc = target->getLoc();
-  IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   FailureOr<VectorDistributionResult> vectorDistributionResult =
       rewriteScfIfAsWarpExecuteOnLane0(rewriter, loc, target, workgroupSizeX,
                                        warpSize);
@@ -357,7 +353,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
   }
 
   results.push_back(vectorDistributionResult->warpOp);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -588,7 +584,8 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     target->emitOpError(
@@ -658,7 +655,8 @@ void transform_dialect::VectorToMMAConversionOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorToMMAConversionOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     target->emitOpError(
@@ -702,8 +700,6 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
                          << *target << "\n";
   });
 
-  IRRewriter rewriter(target->getContext());
-  rewriter.setListener(&listener);
   auto diag = DiagnosedSilenceableFailure::success();
   if (getUseWmma()) {
     if (failed(convertVectorToMMAOps(rewriter, target)))
@@ -740,10 +736,10 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   Location loc = target->getLoc();
-  IRRewriter rewriter(getContext());
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(target);
   SmallVector<int64_t> indices = llvm::to_vector(getIndices());
@@ -774,9 +770,9 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
 
 DiagnosedSilenceableFailure
 transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
-    scf::ForOp forOp, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::ForOp forOp,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   int64_t depth(getDepth());
   auto schedule = getUseMmaSync()
                       ? PipeliningSchedulingStrategy::nvidiaTensorCore
@@ -799,9 +795,9 @@ void transform_dialect::SynchronizeLoopOp::getEffects(
 }
 
 DiagnosedSilenceableFailure transform_dialect::SynchronizeLoopOp::applyToOne(
-    scf::ForOp forOp, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::ForOp forOp,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   rewriter.setInsertionPointAfter(forOp);
   rewriter.create<gpu::BarrierOp>(forOp.getLoc());
   return DiagnosedSilenceableFailure::success();
@@ -818,14 +814,12 @@ void transform_dialect::CreateAsyncGroupsOp::getEffects(
 }
 
 DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   iree_compiler::createAsyncGroups(rewriter, cast<func::FuncOp>(target),
                                    getUseMmaSync());
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -833,9 +827,9 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
 //===---------------------------------------------------------------------===//
 DiagnosedSilenceableFailure
 transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   iree_compiler::doLayoutAnalysisAndDistribution(rewriter,
                                                  cast<func::FuncOp>(target));
   results.push_back(target);
@@ -846,9 +840,9 @@ transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
 // ReorderTransposeOp
 //===---------------------------------------------------------------------===//
 DiagnosedSilenceableFailure transform_dialect::ReorderTransposeOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   iree_compiler::reorderTranspose(rewriter, cast<func::FuncOp>(target));
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
@@ -1430,7 +1424,8 @@ void transform_dialect::EliminateGpuBarriersOp::build(OpBuilder &builder,
 
 DiagnosedSilenceableFailure
 transform_dialect::EliminateGpuBarriersOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   RewritePatternSet patterns(target.getContext());
   patterns.insert<BarrierElimination>(getContext());

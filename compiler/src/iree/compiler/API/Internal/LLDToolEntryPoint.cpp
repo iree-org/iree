@@ -43,13 +43,10 @@ using namespace lld;
 using namespace llvm;
 using namespace llvm::sys;
 
-enum Flavor {
-  Invalid,
-  Gnu,      // -flavor gnu
-  WinLink,  // -flavor link
-  Darwin,   // -flavor darwin
-  Wasm,     // -flavor wasm
-};
+LLD_HAS_DRIVER(coff)
+LLD_HAS_DRIVER(elf)
+LLD_HAS_DRIVER(macho)
+LLD_HAS_DRIVER(wasm)
 
 [[noreturn]] static void die(const Twine &s) {
   llvm::errs() << s << "\n";

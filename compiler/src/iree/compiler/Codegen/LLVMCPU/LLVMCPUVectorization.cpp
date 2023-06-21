@@ -254,7 +254,9 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
       }
     }
-    (void)linalg::vectorize(rewriter, op, vectorSizes, vectorizeGatherAccesses);
+    (void)linalg::vectorize(rewriter, op, vectorSizes,
+                            /*inputScalableVecDims=*/{},
+                            vectorizeGatherAccesses);
   };
 
   // TODO: Move this down the pipeline once we have the ODM-based masking

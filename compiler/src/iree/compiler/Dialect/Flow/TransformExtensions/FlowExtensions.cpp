@@ -457,11 +457,11 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
 
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
-    scf::ForallOp target, transform::ApplyToEachResultList &results,
-    transform::TransformState &) {
-  SimplePatternRewriter rewriter(target->getContext());
+    transform::TransformRewriter &rewriter, scf::ForallOp target,
+    transform::ApplyToEachResultList &results, transform::TransformState &) {
+  SimplePatternRewriter patternRewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
-      rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
+      rewriteForeachThreadToFlowDispatchWorkgroups(target, patternRewriter);
   if (failed(result)) return emitDefaultDefiniteFailure(target);
   results.push_back(*result);
   return DiagnosedSilenceableFailure::success();
@@ -475,9 +475,8 @@ void transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::getEffects(
 }
 
 DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
-    Flow::DispatchRegionOp target, transform::ApplyToEachResultList &results,
-    transform::TransformState &) {
-  IRRewriter rewriter(target->getContext());
+    transform::TransformRewriter &rewriter, Flow::DispatchRegionOp target,
+    transform::ApplyToEachResultList &results, transform::TransformState &) {
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
   if (failed(result)) return emitDefaultDefiniteFailure(target);
@@ -494,6 +493,7 @@ void transform_dialect::RegionToWorkgroupsOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
+    transform::TransformRewriter &rewriter,
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   auto targetOps = state.getPayloadOps(getTarget());
@@ -522,7 +522,6 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   assert(sortResult && "unable to sort topologically");
   SmallVector<Operation *> orderedTargets =
       llvm::to_vector(llvm::reverse(targetOps));
-  IRRewriter rewriter(regionOp->getContext());
   SmallVector<Operation *> clonedTargets;
   for (Operation *target : orderedTargets) {
     FailureOr<Operation *> clonedTarget =
@@ -545,6 +544,7 @@ void transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
+    transform::TransformRewriter &rewriter,
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   auto targetOps = state.getPayloadOps(getTarget());
@@ -573,7 +573,6 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   assert(sortResult && "unable to sort topologically");
   SmallVector<Operation *> orderedTargets =
       llvm::to_vector(llvm::reverse(targetOps));
-  IRRewriter rewriter(regionOp->getContext());
   for (Operation *target : orderedTargets) {
     auto newRegionOp =
         movePrecedingOpsIntoDispatchRegion(rewriter, target, regionOp);
@@ -744,6 +743,7 @@ static FailureOr<Flow::DispatchRegionOp> moveSucceedingOpIntoDispatchRegion(
 
 DiagnosedSilenceableFailure
 transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
+    transform::TransformRewriter &rewriter,
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   auto targetOps = state.getPayloadOps(getTarget());
@@ -760,7 +760,6 @@ transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
   bool sortResult = computeTopologicalSorting(orderedTargets);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
-  IRRewriter rewriter(regionOp->getContext());
   SmallVector<Operation *> newTargets;
   for (Operation *target : orderedTargets) {
     auto newTarget =
@@ -784,6 +783,7 @@ void transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
+    transform::TransformRewriter &rewriter,
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   auto targetOps = state.getPayloadOps(getTarget());
@@ -802,7 +802,6 @@ transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
   bool sortResult = computeTopologicalSorting(orderedTargets);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
-  IRRewriter rewriter(regionOp->getContext());
   for (Operation *target : orderedTargets) {
     auto newRegionOp =
         moveSucceedingOpIntoDispatchRegion(rewriter, target, regionOp);
@@ -826,9 +825,9 @@ void transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::WrapInDispatchRegionOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
   auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, target);
   if (failed(regionOp)) return emitDefaultDefiniteFailure(target);
 
