@@ -20,6 +20,9 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # Semaphores are not fully implemented in the CUDA backend yet.
     "semaphore"
+  LABELS
+    driver=cuda
+    requires-gpu-nvidia
 )
 
 # Variant test suite using graph command buffers (--cuda_use_streams=0)
@@ -43,4 +46,7 @@ iree_hal_cts_test_suite(
   INCLUDED_TESTS
     "command_buffer"
     "command_buffer_dispatch"
+  LABELS
+    driver=cuda
+    requires-gpu-nvidia
 )
