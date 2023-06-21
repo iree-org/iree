@@ -162,7 +162,7 @@ def main(args):
             (
                 shard
                 for shard in benchmark_group["shards"]
-                if shard["shard_index"] == args.shard_index
+                if shard["index"] == args.shard_index
             ),
             None,
         )
@@ -171,7 +171,7 @@ def main(args):
                 "Given shard (index={}) not found in the benchmark config group. Available indexes: [{}].".format(
                     args.shard_index,
                     ", ".join(
-                        str(shard["shard_index"]) for shard in benchmark_group["shards"]
+                        str(shard["index"]) for shard in benchmark_group["shards"]
                     ),
                 )
             )

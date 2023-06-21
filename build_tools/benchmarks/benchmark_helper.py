@@ -133,7 +133,7 @@ def _dump_cmds_handler(
                     lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
                     lines.append(f"Name: {run_config}")
                     lines.append(f"Target Device: {target_device}")
-                    lines.append(f"Shard: {shard['shard_index']} / {shard_count}")
+                    lines.append(f"Shard: {shard['index']} / {shard_count}")
                     lines.append("")
                     lines += _dump_cmds_from_run_config(
                         run_config=run_config, root_path=e2e_test_artifacts_dir
@@ -166,21 +166,15 @@ class JSONBackedBenchmarkData:
     def __init__(self, source_filepath: pathlib.PurePath, data: Dict):
         if not isinstance(data, dict):
             raise ValueError(
-                '"{}" seems not to be a valid benchmark-results-file (No JSON struct as root element).'.format(
-                    source_filepath
-                )
+                f"'{source_filepath}' seems not to be a valid benchmark-results-file (No JSON struct as root element)."
             )
         if "commit" not in data:
             raise ValueError(
-                '"{}" seems not to be a valid benchmark-results-file ("commit" field not found).'.format(
-                    source_filepath
-                )
+                f"'{source_filepath}' seems not to be a valid benchmark-results-file ('commit' field not found)."
             )
         if "benchmarks" not in data:
             raise ValueError(
-                '"{}" seems not to be a valid benchmark-results-file ("benchmarks" field not found).'.format(
-                    source_filepath
-                )
+                f"'{source_filepath}' seems not to be a valid benchmark-results-file ('benchmarks' field not found)."
             )
 
         self.source_filepath: pathlib.PurePath = source_filepath
@@ -192,9 +186,7 @@ class JSONBackedBenchmarkData:
         try:
             data = json.loads(filepath.read_bytes())
         except json.JSONDecodeError as e:
-            raise ValueError(
-                '"{}" seems not to be a valid JSON file: {}'.format(filepath, e.msg)
-            )
+            raise ValueError(f"'{filepath}' seems not to be a valid JSON file: {e.msg}")
         return JSONBackedBenchmarkData(filepath, data)
 
     # A convenience wrapper around `loadFromFile` that accepts a sequence of paths and returns a sequence of JSONBackedBenchmarkData objects as a generator.
@@ -209,13 +201,9 @@ class JSONBackedBenchmarkData:
 def _merge_two_resultsets(
     left: JSONBackedBenchmarkData, right: JSONBackedBenchmarkData
 ) -> JSONBackedBenchmarkData:
-    # left_content = left if isinstance(left, dict) else _load(left)
-    # right_content = right if isinstance(right, dict) else _load(right)
     if left.data["commit"] != right.data["commit"]:
         raise ValueError(
-            '"{}" and the previous files are based on different commits ({} != {}). Merging not supported.'.format(
-                right.source_filepath, left.data["commit"], right.data["commit"]
-            )
+            f"'{right.source_filepath}' and the previous files are based on different commits ({left.data['commit']} != {right.data['commit']}). Merging not supported."
         )
     left.data["benchmarks"].extend(right.data["benchmarks"])
     return left

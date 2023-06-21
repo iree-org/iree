@@ -122,7 +122,7 @@ def _export_execution_handler(
             for shard_idx in range(current_shard_count)
         ]
 
-        for shard_index, shard in enumerate(sharded_run_configs):
+        for index, shard in enumerate(sharded_run_configs):
             distinct_module_dir_paths = _get_distinct_module_dir_paths(
                 config.module_generation_config for config in shard
             )
@@ -137,7 +137,7 @@ def _export_execution_handler(
             )
             output_map[device_name]["shards"].append(
                 {
-                    "shard_index": shard_index,
+                    "index": index,
                     "module_dir_paths": distinct_module_dir_paths,
                     "run_configs": serialized_run_configs,
                 }
