@@ -10,15 +10,14 @@ import unittest
 
 
 class FlagsTest(unittest.TestCase):
+    def testParse(self):
+        # --help is always available if flags are.
+        rt.flags.parse_flags("--help")
 
-  def testParse(self):
-    # --help is always available if flags are.
-    rt.flags.parse_flags("--help")
-
-  def testParseError(self):
-    with self.assertRaisesRegex(ValueError, "flag 'barbar' not recognized"):
-      rt.flags.parse_flags("--barbar")
+    def testParseError(self):
+        with self.assertRaisesRegex(ValueError, "flag 'barbar' not recognized"):
+            rt.flags.parse_flags("--barbar")
 
 
 if __name__ == "__main__":
-  unittest.main()
+    unittest.main()

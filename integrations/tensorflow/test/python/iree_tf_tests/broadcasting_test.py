@@ -13,55 +13,52 @@ import tensorflow.compat.v2 as tf
 
 
 class BroadcastingModule(tf.Module):
-
-  @tf.function(input_signature=[
-      tf.TensorSpec([None], tf.float32),
-      tf.TensorSpec([None], tf.float32),
-  ])
-  def add(self, lhs, rhs):
-    return lhs + rhs
+    @tf.function(
+        input_signature=[
+            tf.TensorSpec([None], tf.float32),
+            tf.TensorSpec([None], tf.float32),
+        ]
+    )
+    def add(self, lhs, rhs):
+        return lhs + rhs
 
 
 class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._modules = tf_test_utils.compile_tf_module(BroadcastingModule)
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(BroadcastingModule)
+    def test_add_same_shape(self):
+        def add_same_shape(module):
+            lhs = tf_utils.uniform([4])
+            rhs = tf_utils.uniform([4])
+            module.add(lhs, rhs)
 
-  def test_add_same_shape(self):
+        self.compare_backends(add_same_shape, self._modules)
 
-    def add_same_shape(module):
-      lhs = tf_utils.uniform([4])
-      rhs = tf_utils.uniform([4])
-      module.add(lhs, rhs)
+    def test_add_broadcast_lhs(self):
+        def add_broadcast_lhs(module):
+            lhs = tf_utils.uniform([1])
+            rhs = tf_utils.uniform([4])
+            module.add(lhs, rhs)
 
-    self.compare_backends(add_same_shape, self._modules)
+        self.compare_backends(add_broadcast_lhs, self._modules)
 
-  def test_add_broadcast_lhs(self):
+    def test_add_broadcast_rhs(self):
+        def add_broadcast_rhs(module):
+            lhs = tf_utils.uniform([4])
+            rhs = tf_utils.uniform([1])
+            module.add(lhs, rhs)
 
-    def add_broadcast_lhs(module):
-      lhs = tf_utils.uniform([1])
-      rhs = tf_utils.uniform([4])
-      module.add(lhs, rhs)
-
-    self.compare_backends(add_broadcast_lhs, self._modules)
-
-  def test_add_broadcast_rhs(self):
-
-    def add_broadcast_rhs(module):
-      lhs = tf_utils.uniform([4])
-      rhs = tf_utils.uniform([1])
-      module.add(lhs, rhs)
-
-    self.compare_backends(add_broadcast_rhs, self._modules)
+        self.compare_backends(add_broadcast_rhs, self._modules)
 
 
 def main(argv):
-  del argv  # Unused
-  if hasattr(tf, 'enable_v2_behavior'):
-    tf.enable_v2_behavior()
-  tf.test.main()
+    del argv  # Unused
+    if hasattr(tf, "enable_v2_behavior"):
+        tf.enable_v2_behavior()
+    tf.test.main()
 
 
-if __name__ == '__main__':
-  app.run(main)
+if __name__ == "__main__":
+    app.run(main)
