@@ -407,7 +407,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -431,7 +431,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -456,7 +456,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -481,7 +481,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -506,7 +506,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(

@@ -218,13 +218,13 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
     "large",
 ]]
 
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_gpu_large_%s" % compilation_info,
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt",
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
         "--shapes=gpu_large_aligned",
-        "--compilation_info=%s" % compilation_info,
+        "--compilation_info=LLVMGPUMatmulSimt",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -238,14 +238,12 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         ("cuda", "cuda"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for compilation_info in [
-    "LLVMGPUMatmulSimt",
-]]
+)
 
 # Testing Ampere + TensorCore path.
 # WMMA TensorCore(F32): wmma.161616.f32.tf32
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_gpu_large_%s" % compilation_info,
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -253,7 +251,7 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
     generator_args = [
         "--lhs_rhs_type=f32",
         "--shapes=gpu_large_aligned",
-        "--compilation_info=%s" % compilation_info,
+        "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -261,15 +259,13 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
         "nomsan",
         "notsan",
         "noubsan",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm80",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for compilation_info in [
-    "LLVMGPUMatmulTensorCore",
-]]
+)
 
 iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_unaligned",
@@ -287,7 +283,7 @@ iree_generated_trace_runner_test(
         "nomsan",
         "notsan",
         "noubsan",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm80",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
@@ -296,8 +292,8 @@ iree_generated_trace_runner_test(
 )
 
 # MMA.SYNC TensorCore(F32): mma.sync.1688.f32.t32
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_gpu_large_mma_sync_%s" % compilation_info,
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f32_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -305,7 +301,7 @@ iree_generated_trace_runner_test(
     generator_args = [
         "--lhs_rhs_type=f32",
         "--shapes=gpu_large_aligned",
-        "--compilation_info=%s" % compilation_info,
+        "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -313,19 +309,17 @@ iree_generated_trace_runner_test(
         "nomsan",
         "notsan",
         "noubsan",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm80",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for compilation_info in [
-    "LLVMGPUMatmulTensorCoreMmaSync",
-]]
+)
 
 # WMMA TensorCore(F16): wmma.161616.f16.f16
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f16_gpu_large_%s" % compilation_info,
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f16_gpu_large_LLVMGPUMatmulTensorCore",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -333,7 +327,7 @@ iree_generated_trace_runner_test(
     generator_args = [
         "--lhs_rhs_type=f16",
         "--shapes=gpu_large_aligned",
-        "--compilation_info=%s" % compilation_info,
+        "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -341,19 +335,17 @@ iree_generated_trace_runner_test(
         "nomsan",
         "notsan",
         "noubsan",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm80",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for compilation_info in [
-    "LLVMGPUMatmulTensorCore",
-]]
+)
 
 # MMA.SYNC TensorCore(F16): mma.sync.161616.f16.f16
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f16_gpu_large_mma_sync_%s" % compilation_info,
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f16_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -361,7 +353,7 @@ iree_generated_trace_runner_test(
     generator_args = [
         "--lhs_rhs_type=f16",
         "--shapes=gpu_large_aligned",
-        "--compilation_info=%s" % compilation_info,
+        "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -369,15 +361,13 @@ iree_generated_trace_runner_test(
         "nomsan",
         "notsan",
         "noubsan",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm80",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for compilation_info in [
-    "LLVMGPUMatmulTensorCoreMmaSync",
-]]
+)
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
