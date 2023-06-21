@@ -53,10 +53,8 @@ jobs:
           create_credentials_file: false
       - name: Installing dependencies
         run: |
-          pip install \
-            mkdocs-material \
-            mkdocs-redirects \
-            requests
+          pip install -r docs/website/requirements.txt
+          pip install requests
       - name: Generating release index
         run: |
           ./build_tools/scripts/generate_release_index.py \
