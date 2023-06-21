@@ -88,7 +88,15 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
-  - pymdownx.superfences
+  # Diagram support, see
+  #   https://squidfunk.github.io/mkdocs-material/reference/diagrams/
+  #   Docs  : https://mermaid.js.org/
+  #   Editor: https://mermaid.live/edit
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:

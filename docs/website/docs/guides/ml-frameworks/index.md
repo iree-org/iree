@@ -3,6 +3,26 @@
 IREE supports popular machine learning frameworks using the same underlying
 technology.
 
+``` mermaid
+graph LR
+  accTitle: ML framework to runtime deployment workflow overview
+  accDescr {
+    Programs start in some ML framework.
+    Programs are imported into MLIR.
+    The IREE compiler uses the imported MLIR.
+    Compiled programs are used by the runtime.
+  }
+
+  A[ML frameworks]
+  B[Imported MLIR]
+  C[IREE compiler]
+  D[Runtime deployment]
+
+  A --> B
+  B --> C
+  C --> D
+```
+
 ## :octicons-list-unordered-16: Supported frameworks
 
 See end-to-end examples of how to use each framework with IREE:
@@ -25,8 +45,10 @@ as well as the
 Each machine learning framework has some "export" mechanism that snapshots the
 structure and data in your program. These exported programs can then be
 "imported" into IREE's compiler by using either a stable import format or one of
-IREE's importer tools. This export/import process is specific to each frontend
-and typically involves a number of stages:
+IREE's importer tools.
+
+This export/import process is specific to each frontend and typically involves a
+number of stages:
 
 1. Capture/trace/freeze the ML model into a graph
 2. Write that graph to an interchange format (e.g. SavedModel, TorchScript)
@@ -39,14 +61,18 @@ language and framework.
 
 ## :octicons-gear-16: Compilation
 
-During compilation we load an MLIR file and compile for the specified set of
-backends (CPU, GPU, etc).  Each of these backends creates custom native code to
-execute on the target device.  Once compiled, the resulting artifact can be
-executed on the specified devices using IREE's runtime.
+IREE compiles MLIR files for specified sets of backends (CPU, GPU, etc). Each
+backend generates optimized native code custom to the input program and
+intended target platform. Once compiled, modules can be executed using IREE's
+runtime.
+
+See the [deployment configuration guides](../deployment-configurations/index.md)
+for details on selecting a compiler backend and tuning options for your choice
+of target platform(s) or device(s).
 
 ## :octicons-rocket-16: Execution
 
-The final stage is executing the now compiled module. This involves selecting
-what compute devices should be used, loading the module, and executing the
-module with the intended inputs. IREE provides several
-[language bindings](../../reference/bindings/index.md) for its runtime API.
+Compiled modules can be executed by selecting what compute devices to use,
+loading the module, and then executing it with the intended inputs. IREE
+provides several [language bindings](../../reference/bindings/index.md) for its
+runtime API.
