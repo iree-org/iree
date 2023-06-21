@@ -242,7 +242,7 @@ function(iree_check_single_backend_test_suite)
       TARGET_CPU_FEATURES
         ${_RULE_TARGET_CPU_FEATURES}
       DATA
-	${_RULE_DATA}
+        ${_RULE_DATA}
       TIMEOUT
         ${_RULE_TIMEOUT}
     )
