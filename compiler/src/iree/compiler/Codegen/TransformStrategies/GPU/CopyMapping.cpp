@@ -19,15 +19,17 @@ using namespace mlir;
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 int64_t iree_compiler::gpu::CopyMapping::maxContiguousElementsToTransfer(
-    int64_t numContiguousElements, int64_t elementalBitWidth) {
+    int64_t alignment, int64_t numContiguousElements,
+    int64_t elementalBitWidth) {
   assert(kCudaMaxVectorLoadBitWidth % elementalBitWidth == 0 &&
          "elemental bitwidth does not divide kCudaMaxVectorLoadBitWidth");
-  return std::gcd(numContiguousElements,
+  return std::gcd(std::gcd(alignment, numContiguousElements),
                   kCudaMaxVectorLoadBitWidth / elementalBitWidth);
 }
 
 FailureOr<iree_compiler::gpu::CopyMapping>
 iree_compiler::gpu::CopyMapping::numThreadsForCopy(int totalNumThreads,
+                                                   int64_t alignment,
                                                    ArrayRef<int64_t> sizes,
                                                    bool favorPredication,
                                                    int64_t elementalBitWidth) {
@@ -39,7 +41,7 @@ iree_compiler::gpu::CopyMapping::numThreadsForCopy(int totalNumThreads,
   // minor dimension: we are in the business of filling 128B contiguous memory
   // transactions with as few threads as possible.
   int64_t maxVectorSize = CopyMapping::maxContiguousElementsToTransfer(
-      sizes.back(), elementalBitWidth);
+      alignment, sizes.back(), elementalBitWidth);
   LDBG("--maxVectorSize: " << maxVectorSize);
   int64_t numElements = 1;
   for (auto s : sizes) numElements *= s;
@@ -97,28 +99,31 @@ iree_compiler::gpu::CopyMapping::numThreadsForCopy(int totalNumThreads,
 }
 
 iree_compiler::gpu::MappingInfo iree_compiler::gpu::CopyMapping::getMappingInfo(
-    MLIRContext* ctx, int totalNumThreads, ArrayRef<int64_t> sizes,
-    bool favorPredication, int64_t elementalBitWidth) {
-  assert(sizes.size() == 2 && "only 2-D copy supported for now");
-  FailureOr<CopyMapping> maybeCopyMapping = CopyMapping::numThreadsForCopy(
-      totalNumThreads, sizes, favorPredication, elementalBitWidth);
+    MLIRContext* ctx, int totalNumThreads, int64_t alignment,
+    ArrayRef<int64_t> copySizes, bool favorPredication,
+    int64_t elementalBitWidth) {
+  assert(copySizes.size() == 2 && "only 2-D copy supported for now");
+  FailureOr<CopyMapping> maybeCopyMapping =
+      CopyMapping::numThreadsForCopy(totalNumThreads, alignment, copySizes,
+                                     favorPredication, elementalBitWidth);
   // If failed, try again with predication; this must succeed.
   if (failed(maybeCopyMapping)) {
     assert(!favorPredication &&
            "maybe copy mapping may not fail with predication");
     maybeCopyMapping = CopyMapping::numThreadsForCopy(
-        totalNumThreads, sizes, /*favorPredication=*/true, elementalBitWidth);
+        totalNumThreads, alignment, copySizes, /*favorPredication=*/true,
+        elementalBitWidth);
   }
   assert(succeeded(maybeCopyMapping) && "failed to compute copy mapping");
   assert(maybeCopyMapping->numThreads.size() == 2 &&
          "compute copy mapping expected size-2");
   int64_t numThreadsY = maybeCopyMapping->numThreads[0];
   int64_t numThreadsX = maybeCopyMapping->numThreads[1];
-  int64_t sizeY = sizes[0];
-  int64_t sizeX = sizes[1];
+  int64_t sizeY = copySizes[0];
+  int64_t sizeX = copySizes[1];
   MappingInfo res{
       /*numThreads=*/{numThreadsY, numThreadsX},
-      /*tileSizes=*/
+      /*tilecopySizes=*/
       {mlir::ceilDiv(sizeY, numThreadsY), mlir::ceilDiv(sizeX, numThreadsX)},
       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)},
       /*vectorSize=*/maybeCopyMapping->vectorSize};

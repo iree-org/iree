@@ -96,8 +96,10 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // LHS copy is of size mxk.
   MappingInfo lhsCopyMapping() const override {
-    return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
-                                       {blockTileM(), reductionTileSize});
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/k(),
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), reductionTileSize});
   }
   LogicalResult validateLhsCopyMapping() const override {
     MappingInfo mapping = lhsCopyMapping();
@@ -113,8 +115,10 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
-    return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
-                                       {reductionTileSize, blockTileN()});
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/n(),
+        /*copySizes=*/ArrayRef<int64_t>{reductionTileSize, blockTileN()});
   }
   LogicalResult validateRhsCopyMapping() const override {
     MappingInfo mapping = rhsCopyMapping();
@@ -130,8 +134,10 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
-    return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
-                                       {blockTileM(), blockTileN()});
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/n(),
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), blockTileN()});
   }
 
   LogicalResult validateResCopyMapping() const override {
