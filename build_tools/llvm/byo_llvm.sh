@@ -85,13 +85,11 @@ do_build_llvm() {
   main_build_dir="${IREE_BYOLLVM_BUILD_DIR}/llvm"
   main_install_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm"
   targets_to_build="${LLVM_TARGETS_TO_BUILD:-X86}"
-  enable_projects="${LLVM_ENABLE_TARGETS:-clang;lld}"
 
-  cmake_options="-DLLVM_ENABLE_PROJECTS='${enable_projects}' -DLLVM_TARGETS_TO_BUILD='${targets_to_build}'"
-  cmake_options="${cmake_options} -DLLVM_BUILD_EXAMPLES=OFF"
-  cmake_options="${cmake_options} -DLLVM_INSTALL_UTILS=ON"
+  cmake_options="-DLLVM_TARGETS_TO_BUILD='${targets_to_build}'"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
-  cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
+  cmake_options="${cmake_options} -C $TD/llvm_config.cmake"
+  cmake_options="${cmake_options} -DCMAKE_INSTALL_PREFIX=${main_install_dir}"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
     cmake_options="${cmake_options} -DLLVM_ENABLE_LLD=ON"
@@ -102,8 +100,9 @@ do_build_llvm() {
   echo "CMake Options: ${cmake_options}"
   cmake -GNinja -S "${LLVM_SOURCE_DIR}/llvm" -B "${main_build_dir}" \
     $cmake_options
-  cmake --build "${main_build_dir}"
-  cmake -DCMAKE_INSTALL_PREFIX="${main_install_dir}" -P "${main_build_dir}/cmake_install.cmake"
+  cmake --build "${main_build_dir}" \
+    --target install-toolchain-distribution \
+    --target install-development-distribution
 }
 
 do_build_mlir() {
@@ -114,10 +113,9 @@ do_build_mlir() {
 
   cmake_options="-DLLVM_DIR='${main_install_dir}/lib/cmake/llvm'"
   cmake_options="${cmake_options} -DPython3_EXECUTABLE='$(which $python3_command)'"
-  cmake_options="${cmake_options} -DLLVM_INSTALL_TOOLCHAIN_ONLY=OFF"
-  cmake_options="${cmake_options} -DLLVM_BUILD_TOOLS=ON"
-  cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
   cmake_options="${cmake_options} -DMLIR_ENABLE_BINDINGS_PYTHON=ON"
+  cmake_options="${cmake_options} -DCMAKE_INSTALL_PREFIX=${mlir_install_dir}"
+  cmake_options="${cmake_options} -C $TD/mlir_config.cmake"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
     cmake_options="${cmake_options} -DLLVM_ENABLE_LLD=ON"
@@ -128,18 +126,18 @@ do_build_mlir() {
   echo "CMake Options: ${cmake_options}"
   cmake -GNinja -S "${LLVM_SOURCE_DIR}/mlir" -B "${mlir_build_dir}" \
     $cmake_options
-  cmake --build "${mlir_build_dir}"
-  cmake -DCMAKE_INSTALL_PREFIX="${mlir_install_dir}" -P "${mlir_build_dir}/cmake_install.cmake"
+  # TODO: We should be able to just do install-mlirdevelopment-distribution to
+  # tightly control distribution, but this presently leaves out the Python
+  # sources needed to build downstream Python bindings. Once this is fixed,
+  # we should use the more fine grained install target.
+  cmake --build "${mlir_build_dir}" \
+    --target install
 }
 
 print_iree_config() {
   llvm_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/llvm"
   lld_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/lld"
   clang_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/clang"
-  # TODO: There seem to be utility exports missing from installed MLIR,
-  # so using the build tree for now. This isn't great but needs fixing
-  # upstream.
-  #mlir_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/mlir/lib/cmake/mlir"
   mlir_cmake_dir="${IREE_BYOLLVM_BUILD_DIR}/mlir/lib/cmake/mlir"
 
   if ! [ -d "$llvm_cmake_dir" ]; then
@@ -159,7 +157,7 @@ print_iree_config() {
     return 1
   fi
 
-  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF -DLLVM_INSTALL_DIR=${IREE_BYOLLVM_INSTALL_DIR}"
+  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DClang_DIR='$clang_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF"
 }
 
 do_build_iree() {
@@ -181,7 +179,6 @@ do_build_iree() {
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_SYNC=ON"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_TASK=ON"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
-  cmake_options="${cmake_options} -DIREE_ENABLE_ASSERTIONS=ON"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
     cmake_options="${cmake_options} -DIREE_ENABLE_LLD=ON"

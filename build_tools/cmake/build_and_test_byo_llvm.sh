@@ -23,10 +23,10 @@ export IREE_BYOLLVM_INSTALL_DIR="${IREE_BYOLLVM_BUILD_DIR}/install"
 # but that exists for good reasons as some users need control more over the
 # building and packaging than over the source repository, and that's good to
 # have test coverage for, and of course that's more convenient for us to test.
-build_tools/scripts/byo_llvm.sh build_llvm
+build_tools/llvm/byo_llvm.sh build_llvm
 
-build_tools/scripts/byo_llvm.sh build_mlir
-build_tools/scripts/byo_llvm.sh build_iree
+build_tools/llvm/byo_llvm.sh build_mlir
+build_tools/llvm/byo_llvm.sh build_iree
 
 echo "*********************** TESTING IREE **********************************"
 iree_build_dir="${IREE_BYOLLVM_BUILD_DIR}/iree"

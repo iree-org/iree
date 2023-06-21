@@ -30,6 +30,10 @@ macro(iree_llvm_configure_bundled)
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
+  # Setup LLVM lib and bin directories.
+  set(LLVM_LIBRARY_OUTPUT_INTDIR "${CMAKE_CURRENT_BINARY_DIR}/llvm-project/lib")
+  set(LLVM_RUNTIME_OUTPUT_INTDIR "${CMAKE_CURRENT_BINARY_DIR}/llvm-project/bin")
+
   add_subdirectory("third_party/llvm-project/llvm" "llvm-project" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
@@ -87,6 +91,10 @@ macro(iree_llvm_configure_installed)
   list(APPEND CMAKE_MODULE_PATH "${LLD_CMAKE_DIR}")
   include_directories(${LLD_INCLUDE_DIRS})
 
+  find_package(Clang REQUIRED)
+  list(APPEND CMAKE_MODULE_PATH "${CLANG_CMAKE_DIR}")
+  include_directories(${CLANG_INCLUDE_DIRS})
+
   # Lit never gets installed with LLVM. So we have to reach into our copy
   # of the monorepo to get it. I'm sorry. If this doesn't work for you,
   # feel free to -DLLVM_EXTERNAL_LIT to provide your own.
@@ -96,11 +104,13 @@ macro(iree_llvm_configure_installed)
     set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
   endif()
 
-  set(IREE_LLVM_LINK_BINARY "${LLVM_INSTALL_DIR}/llvm/bin/llvm-link${CMAKE_EXECUTABLE_SUFFIX}")
-  set(IREE_LLD_BINARY "${LLVM_INSTALL_DIR}/llvm/bin/lld${CMAKE_EXECUTABLE_SUFFIX}")
-  set(IREE_CLANG_BINARY "${LLVM_INSTALL_DIR}/llvm/bin/clang${CMAKE_EXECUTABLE_SUFFIX}")
-  string(REGEX REPLACE "[^0-9].*" "" _LLVM_VERSION_MAJOR "${LLVM_VERSION}")
-  set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_INSTALL_DIR}/llvm/lib/clang/${_LLVM_VERSION_MAJOR}/include/")
+  set(IREE_LLVM_LINK_BINARY "$<TARGET_FILE:llvm-link>")
+  set(IREE_LLD_BINARY "$<TARGET_FILE:lld>")
+  set(IREE_CLANG_BINARY "$<TARGET_FILE:clang>")
+  set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_LIBRARY_DIR}/clang/${LLVM_VERSION_MAJOR}/include")
+  if(NOT EXISTS "${IREE_CLANG_BUILTIN_HEADERS_PATH}")
+    message(WARNING "Could not find installed clang-resource-headers (tried ${IREE_CLANG_BUILTIN_HEADERS_PATH})")
+  endif()
 endmacro()
 
 # iree_llvm_set_bundled_cmake_options()

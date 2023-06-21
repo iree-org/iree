@@ -219,13 +219,12 @@ iree_runtime_cc_binary(
 iree_compiler_cc_binary(
     name = "iree-tblgen",
     srcs = [
+        "iree-tblgen.cpp",
         "//compiler/src/iree/compiler/Dialect/VM/Tools:GenSrcs",
-        "@llvm-project//mlir:tools/mlir-tblgen/mlir-tblgen.cpp",
     ],
     tags = ["hostonly"],
     deps = [
         "//build_tools:default_linkopts",
-        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",
