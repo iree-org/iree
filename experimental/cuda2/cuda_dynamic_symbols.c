@@ -20,28 +20,33 @@ static const char* iree_hal_cuda_dylib_names[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-#define IREE_CONCAT(A, B) A B
+// CUDA API version for cuGetProcAddress.
+// 1000 * major + 10 * minor
+#define IREE_CUDA_DRIVER_API_VERSION 11030
 
-// Resolves all CUDA dynamic symbols in `dynamic_symbol_tables.h`, prefer _v2
-// version if it exists.
+// Load CUDA entry points.
 static iree_status_t iree_hal_cuda2_dynamic_symbols_resolve_all(
     iree_hal_cuda2_dynamic_symbols_t* syms) {
+  // Since cuGetProcAddress is in the symbol table, it will be loaded again
+  // through cuGetProcAddress. cuGetProcAddress_v2 is added in CUDA 12.0 and has
+  // a new function signature. If IREE_CUDA_DRIVER_API_VERSION is increased to
+  // >=12.0, then make sure we are using the correct signature.
+  IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(
+      syms->dylib, "cuGetProcAddress", (void**)&syms->cuGetProcAddress));
 #define IREE_CU_PFN_DECL(cuda_symbol_name, ...)                         \
   {                                                                     \
     static const char* name = #cuda_symbol_name;                        \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(            \
-        syms->dylib, name, (void**)&syms->cuda_symbol_name));           \
-    static const char* name_v2 = IREE_CONCAT(#cuda_symbol_name, "_v2"); \
-    void* fptr_v2;                                                      \
-    iree_dynamic_library_lookup_symbol(syms->dylib, name_v2, &fptr_v2); \
-    if (fptr_v2) syms->cuda_symbol_name = fptr_v2;                      \
+    IREE_CUDA_RETURN_IF_ERROR(                                          \
+        syms,                                                           \
+        cuGetProcAddress(name, (void**)&syms->cuda_symbol_name,         \
+                         IREE_CUDA_DRIVER_API_VERSION,                  \
+                         CU_GET_PROC_ADDRESS_DEFAULT),                  \
+        "when resolving " #cuda_symbol_name " using cuGetProcAddress"); \
   }
 #include "experimental/cuda2/cuda_dynamic_symbol_table.h"  // IWYU pragma: keep
 #undef IREE_CU_PFN_DECL
   return iree_ok_status();
 }
-
-#undef IREE_CONCAT
 
 iree_status_t iree_hal_cuda2_dynamic_symbols_initialize(
     iree_allocator_t host_allocator,

@@ -217,3 +217,18 @@ func.func @unpack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?x7x8xf32>, 
       : tensor<?x?x7x8xf32> -> tensor<?x?xf32>
   func.return %result : tensor<?x?xf32>
 }
+
+// -----
+
+//     CHECK: func @query_tile_sizes_2d(
+// CHECK-DAG: %[[DYNAMIC:.+]] = arith.constant -9223372036854775808 : index
+// CHECK-DAG: %[[FLAGS:.+]] = arith.constant 259 : i32
+// CHECK:     %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic "vmvx.query_tile_sizes.2d"
+// CHECK-SAME: ins(%[[DYNAMIC]], %[[DYNAMIC]], %[[FLAGS]] : index, index, i32)
+// CHECK:     return %[[RESULT]]#0, %[[RESULT]]#1 : index, index
+func.func @query_tile_sizes_2d() -> (index, index)  attributes {
+  hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+} {
+  %result:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>> -> index, index
+  return %result#0, %result#1 : index, index
+}

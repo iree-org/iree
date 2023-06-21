@@ -7,8 +7,6 @@
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 
-#if defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
-
 void iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
@@ -199,5 +197,3 @@ void iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni(
   iree_uk_avx512_storeu_4x128_to_16x16xi32(out_ptr, 3, 12, 7, 8, 11, 4, 15, 0,
                                            acc_3_CDEF_7_89AB_B_4567_F_0123);
 }
-
-#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)

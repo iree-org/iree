@@ -64,7 +64,7 @@ def IREECodegen_UKernelGenericOp :
     Variadic<AnyType>:$other_operands,
     OptionalAttr<DictionaryAttr>:$fn_def_attrs,
     OptionalAttr<IndexAttr>:$strided_outer_dims);
-  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let results = (outs Variadic<AnyType>:$results);
   let assemblyFormat = [{
     attr-dict $u_kernel_fn_name
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?

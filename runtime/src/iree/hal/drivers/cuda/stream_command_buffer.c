@@ -364,8 +364,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_update_buffer(
                     iree_hal_buffer_byte_offset(target_buffer) + target_offset;
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuMemcpyHtoDAsync_v2(dst, src, length, command_buffer->stream),
-      "cuMemcpyHtoDAsync_v2");
+      cuMemcpyHtoDAsync(dst, src, length, command_buffer->stream),
+      "cuMemcpyHtoDAsync");
 
   return iree_ok_status();
 }
