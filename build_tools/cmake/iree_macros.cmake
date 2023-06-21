@@ -514,6 +514,37 @@ function(iree_symlink_tool)
   )
 endfunction()
 
+#-------------------------------------------------------------------------------
+# Test timeout values
+#-------------------------------------------------------------------------------
+
+# iree_get_timeout_seconds()
+#
+# Evaluates a Bazel-like timeout string to a number of seconds.
+# Allowed timeout values:  "short", "moderate", "long".
+# Default is "short".
+#
+# This is aligned with our `native_test` function in Bazel. This differs from
+# general Bazel rules in two ways: they default to "moderate" and they allow an
+# additional timeout value "eternal".
+#
+# Note: the current numbers of seconds are just the Bazel standard values.
+# They could change in the future. We don't actually want "short" tests that
+# run for 60 seconds, and we might never want any test to run for 900 seconds.
+# The main purpose of these timeout enumeration values is to filter and skip
+# certain tests on slow configurations, not to allow tests to run for a long
+# time.
+function(iree_get_timeout_seconds DST_VAR SRC_TIMEOUT_STRING)
+  if(SRC_TIMEOUT_STRING STREQUAL "short" OR NOT SRC_TIMEOUT_STRING)
+    set(${DST_VAR} 60 PARENT_SCOPE)
+  elseif(SRC_TIMEOUT_STRING STREQUAL "moderate")
+    set(${DST_VAR} 300 PARENT_SCOPE)
+  elseif(SRC_TIMEOUT_STRING STREQUAL "long")
+    set(${DST_VAR} 900 PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "Unhandled timeout value \"${SRC_TIMEOUT_STRING}\"")
+  endif()
+endfunction()
 
 #-------------------------------------------------------------------------------
 # Tests

@@ -40,6 +40,8 @@ endfunction()
 #       to use for the generated IREE module (.vmfb).
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
+#   TIMEOUT: Test target timeout. Allowed values: "short", "moderate", "long".
+#       Default: "short". See iree_get_timeout_seconds().
 function(iree_check_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -56,8 +58,8 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME;TIMEOUT"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -154,6 +156,8 @@ endfunction()
 #       is added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
+#   TIMEOUT: Test target timeout. Allowed values: "short", "moderate", "long".
+#       Default: "short". See iree_get_timeout_seconds().
 function(iree_check_single_backend_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -166,8 +170,8 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "NAME;TARGET_BACKEND;DRIVER;TIMEOUT"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -328,6 +332,8 @@ endfunction()
 #       and cpu_features is a comma-separated list of LLVM target attributes
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
+#   TIMEOUT: Test target timeout. Allowed values: "short", "moderate", "long".
+#       Default: "short". See iree_get_timeout_seconds().
 function(iree_check_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -336,8 +342,8 @@ function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
-    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS;TIMEOUT"
+    "NAME;TIMEOUT"
+    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
 

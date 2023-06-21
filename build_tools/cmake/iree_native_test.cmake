@@ -28,7 +28,11 @@ include(CMakeParseArguments)
 # WILL_FAIL: The target will run, but its pass/fail status will be inverted.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
-# TIMEOUT: Test target timeout in seconds.
+# TIMEOUT: Test target timeout. String, as in Bazel rules. Allowed values:
+#     "short", "moderate", "long". Default is "short". This is aligned with our
+#     `native_test` function in Bazel. This differs from general Bazel rules in
+#     two ways: they default to "moderate" and they allow an additional timeout
+#     value "eternal".
 #
 # Note: the DATA argument is not actually adding dependencies because CMake
 # doesn't have a good way to specify a data dependency for a test.
@@ -148,14 +152,12 @@ function(iree_native_test)
     iree_configure_test(${_TEST_NAME})
   endif()
 
-  if (NOT DEFINED _RULE_TIMEOUT)
-    set(_RULE_TIMEOUT 60)
-  endif()
+  iree_get_timeout_seconds(_TIMEOUT_SECONDS "${_RULE_TIMEOUT}")
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST "${_TEST_NAME}" PROPERTY REQUIRED_FILES "${_RULE_DATA}")
-  set_property(TEST ${_TEST_NAME} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+  set_property(TEST ${_TEST_NAME} PROPERTY TIMEOUT ${_TIMEOUT_SECONDS})
   if(_RULE_WILL_FAIL)
     set_property(TEST ${_TEST_NAME} PROPERTY WILL_FAIL ${_RULE_WILL_FAIL})
   endif()

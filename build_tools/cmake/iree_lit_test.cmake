@@ -34,8 +34,8 @@ function(iree_lit_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_FILE"
-    "DATA;TOOLS;LABELS;TIMEOUT"
+    "NAME;TEST_FILE;TIMEOUT"
+    "DATA;TOOLS;LABELS"
     ${ARGN}
   )
 
@@ -80,7 +80,10 @@ function(iree_lit_test)
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
     "LIT_OPTS=-v"
     "FILECHECK_OPTS=--enable-var-scope")
-  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+
+  iree_get_timeout_seconds(_TIMEOUT_SECONDS "${_RULE_TIMEOUT}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_TIMEOUT_SECONDS})
+
   iree_configure_test(${_NAME_PATH})
 
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
@@ -112,14 +115,10 @@ function(iree_lit_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
-    "SRCS;DATA;TOOLS;LABELS;TIMEOUT"
+    "NAME;TIMEOUT"
+    "SRCS;DATA;TOOLS;LABELS"
     ${ARGN}
   )
-
-  if (NOT DEFINED _RULE_TIMEOUT)
-    set(_RULE_TIMEOUT 60)
-  endif()
 
   foreach(_TEST_FILE ${_RULE_SRCS})
     get_filename_component(_TEST_BASENAME ${_TEST_FILE} NAME)

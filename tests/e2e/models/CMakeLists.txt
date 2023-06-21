@@ -81,7 +81,7 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
   TIMEOUT
-    900
+    "long"
 )
 
 iree_check_single_backend_test_suite(
@@ -103,7 +103,7 @@ iree_check_single_backend_test_suite(
     "noubsan"
     "requires-gpu-nvidia"
   TIMEOUT
-    900
+    "long"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

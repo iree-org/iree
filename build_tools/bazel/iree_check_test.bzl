@@ -160,6 +160,7 @@ def iree_check_test_suite(
         runner_args = [],
         tags = [],
         target_cpu_features_variants = [],
+        timeout = None,
         **kwargs):
     """Creates a test suite of iree-check-module tests.
 
@@ -190,6 +191,7 @@ def iree_check_test_suite(
           and cpu_features is a comma-separated list of LLVM target attributes
           to enable. Example:
             x86_64:avx2_fma:+avx,+avx2,+fma
+      timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying tests and
           test suite.
     """
@@ -210,6 +212,7 @@ def iree_check_test_suite(
             compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
+            timeout = timeout,
             **kwargs
         )
         tests.append(suite_name)

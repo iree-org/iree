@@ -29,6 +29,8 @@ include(CMakeParseArguments)
 #       because trace files (.yaml) reference a specific module file path.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
+#   TIMEOUT: Test target timeout. Allowed values: "short", "moderate", "long".
+#       Default: "short". See iree_get_timeout_seconds().
 function(iree_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -42,7 +44,7 @@ function(iree_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME"
+    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME;TIMEOUT"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -102,6 +104,8 @@ function(iree_trace_runner_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
+    TIMEOUT
+      ${_RULE_TIMEOUT}
   )
 endfunction()
 
@@ -133,6 +137,8 @@ endfunction()
 #   TRACE_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
+#   TIMEOUT: Test target timeout. Allowed values: "short", "moderate", "long".
+#       Default: "short". See iree_get_timeout_seconds().
 function(iree_single_backend_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -153,7 +159,7 @@ function(iree_single_backend_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER"
+    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER;TIMEOUT"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -247,6 +253,8 @@ function(iree_single_backend_generated_trace_runner_test)
       ${_RULE_LABELS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
+    TIMEOUT
+      ${_RULE_TIMEOUT}
   )
 
   # Note we are relying on the fact that the target created by
@@ -296,6 +304,8 @@ endfunction()
 #       and cpu_features is a comma-separated list of LLVM target attributes
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
+#   TIMEOUT: Test target timeout. Allowed values: "short", "moderate", "long".
+#       Default: "short". See iree_get_timeout_seconds().
 function(iree_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -304,7 +314,7 @@ function(iree_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TRACE_RUNNER"
+    "NAME;GENERATOR;TRACE_RUNNER;TIMEOUT"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
@@ -371,6 +381,8 @@ function(iree_generated_trace_runner_test)
           ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
+        TIMEOUT
+          ${_RULE_TIMEOUT}
       )
     endforeach()
   endforeach()

@@ -190,11 +190,8 @@ function(iree_cc_test)
     iree_configure_test(${_NAME_PATH})
   endif(ANDROID)
 
-  if (NOT DEFINED _RULE_TIMEOUT)
-    set(_RULE_TIMEOUT 60)
-  endif()
-
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
-  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+  iree_get_timeout_seconds(_TIMEOUT_SECONDS "${_RULE_TIMEOUT}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_TIMEOUT_SECONDS})
 endfunction()

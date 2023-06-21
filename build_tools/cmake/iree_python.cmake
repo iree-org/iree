@@ -249,9 +249,8 @@ function(iree_local_py_test)
       "PYTHONPATH=${_PYTHONPATH}"
   )
 
-  if (NOT DEFINED _RULE_TIMEOUT)
-    set(_RULE_TIMEOUT 60)
-  endif()
+  iree_get_timeout_seconds(_TIMEOUT_SECONDS "${_RULE_TIMEOUT}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_TIMEOUT_SECONDS})
 
   iree_configure_test(${_NAME_PATH})
 
