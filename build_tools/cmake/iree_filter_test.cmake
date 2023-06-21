@@ -15,31 +15,29 @@ function(iree_filter_test)
     ${ARGN}
   )
 
-  # Default to excluding; then exclusion cases are implemented as early-returns;
-  # then at the end we will override that to TRUE.
-  set("${_FUNC_RESULT_VAR_ENABLED}" FALSE PARENT_SCOPE)
+  set(_ENABLED TRUE)
 
   # Exclude hostonly tests when cross-compiling.
   if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _FUNC_LABELS)
-    return()
+    set(_ENABLED FALSE)
   endif()
 
   # Sanitizer-based exclusions.
   # CUDA is considered incompatible with all sanitizers.
   if(IREE_ENABLE_ASAN)
     if (("noasan" IN_LIST _FUNC_LABELS) OR (_FUNC_DRIVER STREQUAL "cuda"))
-      return()
+      set(_ENABLED FALSE)
     endif()
   endif()
   if(IREE_ENABLE_TSAN)
     if (("notsan" IN_LIST _FUNC_LABELS) OR (_FUNC_DRIVER STREQUAL "cuda"))
-      return()
+      set(_ENABLED FALSE)
     endif()
   endif()
 
   # Architecture-based exclusions.
   if ((IREE_ARCH MATCHES "^riscv_") AND ("noriscv" IN_LIST _FUNC_LABELS))
-    return()
+    set(_ENABLED FALSE)
   endif()
 
   # Timeout-based exclusions.
@@ -63,12 +61,12 @@ function(iree_filter_test)
     set(_EXCLUDE_TIMEOUT_LONG ON)
   endif()
   if(_EXCLUDE_TIMEOUT_MODERATE AND _FUNC_TIMEOUT STREQUAL "moderate")
-    return()
+    set(_ENABLED FALSE)
   endif()
   if(_EXCLUDE_TIMEOUT_LONG AND _FUNC_TIMEOUT STREQUAL "long")
-    return()
+    set(_ENABLED FALSE)
   endif()
 
-  # Test is not excluded, communicate that to the caller.
-  set("${_FUNC_RESULT_VAR_ENABLED}" TRUE PARENT_SCOPE)
+  # Communicate the result to the caller.
+  set("${_FUNC_RESULT_VAR_ENABLED}" "${_ENABLED}" PARENT_SCOPE)
 endfunction()
