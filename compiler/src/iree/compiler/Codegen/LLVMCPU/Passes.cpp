@@ -558,7 +558,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
 
   addBufferizePasses(nestedModulePM);
 
-  // Flatten contiguous transfer_read/write after bufferization.
+  // Perform memref-based transfer_read/write optimizations.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass(/*flatten=*/false));
 
