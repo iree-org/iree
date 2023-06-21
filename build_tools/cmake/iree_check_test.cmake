@@ -57,7 +57,7 @@ function(iree_check_test)
     _RULE
     ""
     "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DATA;TIMEOUT"
     ${ARGN}
   )
 
@@ -95,6 +95,8 @@ function(iree_check_test)
     FLAGS
       "${_BASE_COMPILER_FLAGS}"
       "${_RULE_COMPILER_FLAGS}"
+    DATA
+      "${_RULE_DATA}"
   )
 
   set(_RUNNER_TARGET "iree-check-module")
@@ -167,7 +169,7 @@ function(iree_check_single_backend_test_suite)
     _RULE
     ""
     "NAME;TARGET_BACKEND;DRIVER"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DATA;TIMEOUT"
     ${ARGN}
   )
 
@@ -239,6 +241,8 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_LABELS}
       TARGET_CPU_FEATURES
         ${_RULE_TARGET_CPU_FEATURES}
+      DATA
+	${_RULE_DATA}
       TIMEOUT
         ${_RULE_TIMEOUT}
     )

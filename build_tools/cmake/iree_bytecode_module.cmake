@@ -42,7 +42,7 @@ function(iree_bytecode_module)
     _RULE
     "PUBLIC;TESTONLY"
     "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH"
-    "FLAGS;DEPENDS;DEPS"
+    "FLAGS;DEPENDS;DEPS;DATA"
     ${ARGN}
   )
 
@@ -155,9 +155,11 @@ function(iree_bytecode_module)
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.
   iree_package_name(_PACKAGE_NAME)
-  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
+  set(_TARGET_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  add_custom_target("${_TARGET_NAME}"
     DEPENDS "${_MODULE_FILE_NAME}"
   )
+  iree_add_data_dependencies(NAME ${_TARGET_NAME} DATA ${_RULE_DATA})
 
   if(_RULE_TESTONLY)
     set(_TESTONLY_ARG "TESTONLY")
