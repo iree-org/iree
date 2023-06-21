@@ -104,7 +104,7 @@ transform.sequence failures(propagate) {
 
 
   // Late Canonicalizations.
-  %func_op_3 = transform.structured.match ops{["func.func"]} in %variant_op _3
+  %func_op_3 = transform.structured.match ops{["func.func"]} in %variant_op_3
       : (!transform.any_op) -> !transform.any_op
   transform.apply_patterns to %func_op_3 {
     transform.apply_patterns.iree.fold_fill_into_pad
