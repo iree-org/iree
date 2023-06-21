@@ -330,27 +330,27 @@ TEST(StringViewTest, Substr) {
   };
   EXPECT_EQ(substr("", 0, 0), "");
   EXPECT_EQ(substr("", 0, 1), "");
-  EXPECT_EQ(substr("", 0, INTPTR_MAX), "");
+  EXPECT_EQ(substr("", 0, IREE_STRING_VIEW_NPOS), "");
   EXPECT_EQ(substr("", 1, 0), "");
   EXPECT_EQ(substr("", 1, 1), "");
-  EXPECT_EQ(substr("", 1, INTPTR_MAX), "");
+  EXPECT_EQ(substr("", 1, IREE_STRING_VIEW_NPOS), "");
 
   EXPECT_EQ(substr("a", 0, 0), "");
   EXPECT_EQ(substr("a", 0, 1), "a");
   EXPECT_EQ(substr("a", 0, 2), "a");
-  EXPECT_EQ(substr("a", 0, INTPTR_MAX), "a");
+  EXPECT_EQ(substr("a", 0, IREE_STRING_VIEW_NPOS), "a");
   EXPECT_EQ(substr("a", 1, 0), "");
   EXPECT_EQ(substr("a", 1, 1), "");
-  EXPECT_EQ(substr("a", 1, INTPTR_MAX), "");
+  EXPECT_EQ(substr("a", 1, IREE_STRING_VIEW_NPOS), "");
 
   EXPECT_EQ(substr("abc", 0, 1), "a");
   EXPECT_EQ(substr("abc", 1, 1), "b");
   EXPECT_EQ(substr("abc", 2, 1), "c");
   EXPECT_EQ(substr("abc", 0, 2), "ab");
   EXPECT_EQ(substr("abc", 1, 2), "bc");
-  EXPECT_EQ(substr("abc", 1, INTPTR_MAX), "bc");
+  EXPECT_EQ(substr("abc", 1, IREE_STRING_VIEW_NPOS), "bc");
   EXPECT_EQ(substr("abc", 0, 3), "abc");
-  EXPECT_EQ(substr("abc", 0, INTPTR_MAX), "abc");
+  EXPECT_EQ(substr("abc", 0, IREE_STRING_VIEW_NPOS), "abc");
 }
 
 TEST(StringViewTest, Split) {
@@ -608,7 +608,8 @@ TEST(StringViewTest, InvalidParseHex) {
 iree::StatusOr<iree_device_size_t> ParseDeviceSize(std::string_view value) {
   iree_device_size_t size = 0;
   IREE_RETURN_IF_ERROR(iree::Status(iree_string_view_parse_device_size(
-      iree_string_view_t{value.data(), value.size()}, &size)));
+      iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+      &size)));
   return size;
 }
 

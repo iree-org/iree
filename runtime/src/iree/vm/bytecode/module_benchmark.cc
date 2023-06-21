@@ -90,7 +90,7 @@ static iree_status_t RunFunction(benchmark::State& state,
       instance,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
-          module_file_toc->size},
+          static_cast<iree_host_size_t>(module_file_toc->size)},
       iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
   std::array<iree_vm_module_t*, 2> modules = {import_module, bytecode_module};
@@ -146,7 +146,7 @@ static void BM_ModuleCreate(benchmark::State& state) {
         instance,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
-            module_file_toc->size},
+            static_cast<iree_host_size_t>(module_file_toc->size)},
         iree_allocator_null(), iree_allocator_system(), &module));
 
     // Just testing creation and verification here!
@@ -171,7 +171,7 @@ static void BM_ModuleCreateState(benchmark::State& state) {
       instance,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
-          module_file_toc->size},
+          static_cast<iree_host_size_t>(module_file_toc->size)},
       iree_allocator_null(), iree_allocator_system(), &module));
 
   while (state.KeepRunning()) {
@@ -203,7 +203,7 @@ static void BM_FullModuleInit(benchmark::State& state) {
         instance,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
-            module_file_toc->size},
+            static_cast<iree_host_size_t>(module_file_toc->size)},
         iree_allocator_null(), iree_allocator_system(), &module));
 
     iree_vm_module_state_t* module_state;

@@ -139,10 +139,10 @@ static iree_status_t fatelf_parse_elf_metadata(
   *out_elf_class = 0;
 
   if (elf_data.data_length < sizeof(iree_elf32_ehdr_t)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "ELF data provided (%zu) is smaller than ehdr (%zu)",
-        elf_data.data_length, sizeof(iree_elf32_ehdr_t));
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "ELF data provided (%" PRIhsz
+                            ") is smaller than ehdr (%zu)",
+                            elf_data.data_length, sizeof(iree_elf32_ehdr_t));
   }
 
   // The fields we're checking are the same in both 32 and 64 classes so we just

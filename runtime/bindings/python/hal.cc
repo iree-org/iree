@@ -268,7 +268,8 @@ std::vector<std::string> HalDriver::Query() {
 py::object HalDriver::Create(const std::string& device_uri,
                              py::dict& driver_cache) {
   iree_string_view_t driver_name, device_path, params_str;
-  iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
+  iree_string_view_t device_uri_sv{
+      device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   iree_uri_split(device_uri_sv, &driver_name, &device_path, &params_str);
 
   // Check cache.
@@ -393,7 +394,8 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
 HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
                                        const py::kwargs& kwargs) {
   iree_hal_device_t* device;
-  iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
+  iree_string_view_t device_uri_sv{
+      device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   CheckApiStatus(
       iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
                                            iree_allocator_system(), &device),

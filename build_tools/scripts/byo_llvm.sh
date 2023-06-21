@@ -14,6 +14,9 @@
 #   byo_llvm.sh build_mlir && \
 #   byo_llvm.sh build_iree
 #
+# Additionally, to run tests:
+#   byo_llvm.sh test_iree
+#
 # This script has minimal configurability, which can be extended as needed. The
 # defaults should suffice for testing on CI. Different configurations are
 # possible (i.e. building MLIR bundled with LLVM vs standalone), and this
@@ -27,9 +30,21 @@
 
 TD="$(cd $(dirname $0) && pwd)"
 REPO_ROOT="$(cd $TD/../.. && pwd)"
+
 LLVM_SOURCE_DIR="${LLVM_SOURCE_DIR:-${REPO_ROOT}/third_party/llvm-project}"
-LLVM_BUILD_DIR="${LLVM_BUILD_DIR:-${REPO_ROOT}/../iree-llvm-build}"
-LLVM_INSTALL_DIR="${LLVM_INSTALL_DIR:-${REPO_ROOT}/../iree-llvm-install}"
+IREE_BYOLLVM_BUILD_DIR="${IREE_BYOLLVM_BUILD_DIR:-${REPO_ROOT}/../iree-byollvm-build}"
+IREE_BYOLLVM_INSTALL_DIR="${IREE_BYOLLVM_INSTALL_DIR:-${REPO_ROOT}/../iree-byollvm-install}"
+
+# Canonicalize as absolute paths. These end up in CMake variables such as
+# CMAKE_MODULE_PATH, where relative paths are a footgun as CMake gets invoked
+# from different directories.
+LLVM_SOURCE_DIR="$(realpath -m "${LLVM_SOURCE_DIR}")"
+IREE_BYOLLVM_BUILD_DIR="$(realpath -m "${IREE_BYOLLVM_BUILD_DIR}")"
+IREE_BYOLLVM_INSTALL_DIR="$(realpath -m "${IREE_BYOLLVM_INSTALL_DIR}")"
+echo "Paths canonicalized as:"
+echo "LLVM_SOURCE_DIR=${LLVM_SOURCE_DIR}"
+echo "IREE_BYOLLVM_BUILD_DIR=${IREE_BYOLLVM_BUILD_DIR}"
+echo "IREE_BYOLLVM_INSTALL_DIR=${IREE_BYOLLVM_INSTALL_DIR}"
 
 command="$1"
 shift
@@ -67,8 +82,8 @@ print_toolchain_config() {
 
 do_build_llvm() {
   echo "*********************** BUILDING LLVM *********************************"
-  main_build_dir="${LLVM_BUILD_DIR}/llvm"
-  main_install_dir="${LLVM_INSTALL_DIR}/llvm"
+  main_build_dir="${IREE_BYOLLVM_BUILD_DIR}/llvm"
+  main_install_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm"
   targets_to_build="${LLVM_TARGETS_TO_BUILD:-X86}"
   enable_projects="${LLVM_ENABLE_TARGETS:-clang;lld}"
 
@@ -93,9 +108,9 @@ do_build_llvm() {
 
 do_build_mlir() {
   echo "*********************** BUILDING MLIR *********************************"
-  main_install_dir="${LLVM_INSTALL_DIR}/llvm"
-  mlir_build_dir="${LLVM_BUILD_DIR}/mlir"
-  mlir_install_dir="${LLVM_INSTALL_DIR}/mlir"
+  main_install_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm"
+  mlir_build_dir="${IREE_BYOLLVM_BUILD_DIR}/mlir"
+  mlir_install_dir="${IREE_BYOLLVM_INSTALL_DIR}/mlir"
 
   cmake_options="-DLLVM_DIR='${main_install_dir}/lib/cmake/llvm'"
   cmake_options="${cmake_options} -DPython3_EXECUTABLE='$(which $python3_command)'"
@@ -118,14 +133,14 @@ do_build_mlir() {
 }
 
 print_iree_config() {
-  llvm_cmake_dir="${LLVM_INSTALL_DIR}/llvm/lib/cmake/llvm"
-  lld_cmake_dir="${LLVM_INSTALL_DIR}/llvm/lib/cmake/lld"
-  clang_cmake_dir="${LLVM_INSTALL_DIR}/llvm/lib/cmake/clang"
+  llvm_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/llvm"
+  lld_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/lld"
+  clang_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/clang"
   # TODO: There seem to be utility exports missing from installed MLIR,
   # so using the build tree for now. This isn't great but needs fixing
   # upstream.
-  #mlir_cmake_dir="${LLVM_INSTALL_DIR}/mlir/lib/cmake/mlir"
-  mlir_cmake_dir="${LLVM_BUILD_DIR}/mlir/lib/cmake/mlir"
+  #mlir_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/mlir/lib/cmake/mlir"
+  mlir_cmake_dir="${IREE_BYOLLVM_BUILD_DIR}/mlir/lib/cmake/mlir"
 
   if ! [ -d "$llvm_cmake_dir" ]; then
     echo "WARNING: CMake dir does not exist ($llvm_cmake_dir)" >&2
@@ -144,18 +159,24 @@ print_iree_config() {
     return 1
   fi
 
-  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DCLANG_DIR='$clang_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF -DLLVM_INSTALL_DIR=${LLVM_INSTALL_DIR}"
+  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF -DLLVM_INSTALL_DIR=${IREE_BYOLLVM_INSTALL_DIR}"
 }
 
 do_build_iree() {
   echo "*********************** BUILDING IREE *********************************"
-  iree_build_dir="${LLVM_BUILD_DIR}/iree"
-  iree_install_dir="${LLVM_INSTALL_DIR}/iree"
+  iree_build_dir="${IREE_BYOLLVM_BUILD_DIR}/iree"
+  iree_install_dir="${IREE_BYOLLVM_INSTALL_DIR}/iree"
 
   cmake_options="$(print_iree_config)"
   cmake_options="${cmake_options} -DPython3_EXECUTABLE='$(which $python3_command)'"
   cmake_options="${cmake_options} -DIREE_BUILD_PYTHON_BINDINGS=ON"
+  # Feel free to manually enable or disable any backend, for example
+  #   -DIREE_TARGET_BACKEND_LLVM_CPU=OFF
+  # Be aware though that several tests in IREE's own suite are currently
+  # assuming that certain backends are enabled (#14034), so that may cause test
+  # failures, but that's a test-only issue.
   cmake_options="${cmake_options} -DIREE_TARGET_BACKEND_DEFAULTS=OFF"
+  cmake_options="${cmake_options} -DIREE_TARGET_BACKEND_LLVM_CPU=ON"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_DEFAULTS=OFF"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_SYNC=ON"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_TASK=ON"
@@ -175,6 +196,18 @@ do_build_iree() {
   cmake -DCMAKE_INSTALL_PREFIX="${iree_install_dir}" -P "${iree_build_dir}/cmake_install.cmake"
 }
 
+do_test_iree() {
+  echo "*********************** TESTING IREE **********************************"
+  iree_build_dir="${IREE_BYOLLVM_BUILD_DIR}/iree"
+  iree_install_dir="${IREE_BYOLLVM_INSTALL_DIR}/iree"
+
+  echo "Source Directory: ${REPO_ROOT}"
+  echo "Build Directory: ${iree_build_dir}"
+
+  cmake --build "${iree_build_dir}" --target iree-test-deps
+  "${REPO_ROOT}/build_tools/cmake/ctest_all.sh" "${iree_build_dir}"
+}
+
 case "${command}" in
   build_llvm)
     do_build_llvm
@@ -186,6 +219,10 @@ case "${command}" in
 
   build_iree)
     do_build_iree
+    ;;
+
+  test_iree)
+    do_test_iree
     ;;
 
   *)

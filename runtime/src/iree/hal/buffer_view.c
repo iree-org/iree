@@ -175,7 +175,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_reshape(
     // remembering all the conditions in which they may be.
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer view reshapes must have the same rank; "
-                            "target=%zu, existing=%zu",
+                            "target=%" PRIhsz " , existing=%" PRIhsz,
                             shape_rank, buffer_view->shape_rank);
   }
 

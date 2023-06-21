@@ -239,6 +239,8 @@ static iree_status_t iree_run_trace_files(int file_count, char** file_paths,
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   iree_flags_set_usage(
       "iree-run-trace",
       "Executes a YAML trace file containing a sequence of context operations\n"

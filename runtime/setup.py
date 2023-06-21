@@ -243,6 +243,8 @@ def prepare_installation():
         get_env_cmake_option("IREE_BUILD_TRACY"),
         get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
+    add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER")
+    add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER_H")
 
     # These usually flow through the environment, but we add them explicitly
     # so that they show clearly in logs (getting them wrong can have bad

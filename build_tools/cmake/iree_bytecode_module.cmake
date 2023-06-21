@@ -83,39 +83,46 @@ function(iree_bytecode_module)
   # Users can add their own additional directories as needed.
   list(APPEND _ARGS "--iree-hal-executable-object-search-path=\"${IREE_BINARY_DIR}\"")
 
-  # If an LLVM CPU backend is enabled, supply the linker tool.
-  if(IREE_LLD_TARGET)
-    set(_LINKER_TOOL_EXECUTABLE "$<TARGET_FILE:${IREE_LLD_TARGET}>")
-    list(APPEND _ARGS "--iree-llvmcpu-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
-    list(APPEND _ARGS "--iree-llvmcpu-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
-    # Note: --iree-llvmcpu-system-linker-path is left unspecified.
-  endif()
-
-  if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
-    list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
-  endif()
-
-  if(IREE_BYTECODE_MODULE_ENABLE_ASAN)
-    list(APPEND _ARGS "--iree-llvmcpu-sanitize=address")
-  endif()
-
-  # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an
-  # ABI break: when the host code is built with TSan, the module must be too,
-  # otherwise we get crashes calling module code.
-  if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
-    list(APPEND _ARGS "--iree-llvmcpu-sanitize=thread")
-  endif()
-
   set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
-  # Check LLVM static library setting. If the static libary output path is set,
-  # retrieve the object path and the corresponding header file path.
-  if(_RULE_STATIC_LIB_PATH)
-    list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
-    list(APPEND _ARGS "--iree-llvmcpu-link-static")
-    list(APPEND _ARGS "--iree-llvmcpu-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
 
-    string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
-    list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
+  # If the llvm-cpu backend is used, pass build-system-dependent flags.
+  #
+  # This crude check for target backend llvm-cpu is borrowed from
+  # iree_compile_flags_for_platform(). This should be made more robust and
+  # shared in a common helper.
+  if (_RULE_FLAGS MATCHES "iree-hal-target-backends=llvm-cpu")
+    if (IREE_LLD_BINARY)
+      # Pass build-system-dependent linker paths.
+      list(APPEND _ARGS "--iree-llvmcpu-embedded-linker-path=\"${IREE_LLD_BINARY}\"")
+      list(APPEND _ARGS "--iree-llvmcpu-wasm-linker-path=\"${IREE_LLD_BINARY}\"")
+    endif()
+    # Note: --iree-llvmcpu-system-linker-path is left unspecified.
+
+    if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
+      list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
+    endif()
+
+    if(IREE_BYTECODE_MODULE_ENABLE_ASAN)
+      list(APPEND _ARGS "--iree-llvmcpu-sanitize=address")
+    endif()
+
+    # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an
+    # ABI break: when the host code is built with TSan, the module must be too,
+    # otherwise we get crashes calling module code.
+    if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+      list(APPEND _ARGS "--iree-llvmcpu-sanitize=thread")
+    endif()
+
+    # Check LLVM static library setting. If the static libary output path is set,
+    # retrieve the object path and the corresponding header file path.
+    if(_RULE_STATIC_LIB_PATH)
+      list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
+      list(APPEND _ARGS "--iree-llvmcpu-link-static")
+      list(APPEND _ARGS "--iree-llvmcpu-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
+
+      string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
+      list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
+    endif()
   endif()
 
   iree_compile_flags_for_platform(_PLATFORM_FLAGS "${_RULE_FLAGS}")

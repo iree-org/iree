@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "LLVMCPUVectorization.cpp",
         "Passes.cpp",
         "TargetMLTransformInfo.cpp",
+        "TileSizeSelection.cpp",
         "Utils.cpp",
         "VectorContractCustomKernels.cpp",
         "VerifyLinalgTransformLegality.cpp",
@@ -47,6 +48,7 @@ iree_compiler_cc_library(
         "KernelDispatch.h",
         "LLVMCPUPasses.h",
         "TargetMLTransformInfo.h",
+        "TileSizeSelection.h",
         "Utils.h",
     ],
     deps = [

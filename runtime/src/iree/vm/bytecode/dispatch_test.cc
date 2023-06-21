@@ -49,7 +49,7 @@ std::vector<TestParams> GetModuleTestParams() {
         instance,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file.data),
-            module_file.size},
+            static_cast<iree_host_size_t>(module_file.size)},
         iree_allocator_null(), iree_allocator_system(), &module));
     iree_vm_module_signature_t signature = iree_vm_module_signature(module);
     test_params.reserve(test_params.size() + signature.export_function_count);
@@ -83,7 +83,7 @@ class VMBytecodeDispatchTest
         instance_,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(test_params.module_file.data),
-            test_params.module_file.size},
+            static_cast<iree_host_size_t>(test_params.module_file.size)},
         iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};

@@ -112,9 +112,9 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
                                      iree_wait_set_t** out_set) {
   // Be reasonable; 64K objects is too high.
   if (capacity >= UINT16_MAX) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "wait set capacity of %zu is unreasonably large",
-                            capacity);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "wait set capacity of %" PRIhsz " is unreasonably large", capacity);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

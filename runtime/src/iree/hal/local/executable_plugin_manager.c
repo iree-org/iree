@@ -563,11 +563,11 @@ static iree_status_t iree_hal_executable_plugin_manager_resolve(
           iree_string_builder_append_cstring(&builder, symbol_names[i]));
       ++missing_count;
     }
-    status =
-        iree_make_status(IREE_STATUS_NOT_FOUND,
-                         "missing %zu required executable imports: [%.*s]",
-                         missing_count, (int)iree_string_builder_size(&builder),
-                         iree_string_builder_buffer(&builder));
+    status = iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "missing %" PRIhsz " required executable imports: [%.*s]",
+        missing_count, (int)iree_string_builder_size(&builder),
+        iree_string_builder_buffer(&builder));
     iree_string_builder_deinitialize(&builder);
 #else
     status = iree_status_from_code(IREE_STATUS_NOT_FOUND);

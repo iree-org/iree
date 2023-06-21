@@ -246,7 +246,7 @@ iree_status_t iree_hal_command_buffer_fill_buffer_validation(
   if (pattern_length != 1 && pattern_length != 2 && pattern_length != 4) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "fill value length is not one of the supported "
-                            "values (pattern_length=%zu)",
+                            "values (pattern_length=%" PRIhsz ")",
                             pattern_length);
   }
 
@@ -256,7 +256,7 @@ iree_status_t iree_hal_command_buffer_fill_buffer_validation(
         IREE_STATUS_INVALID_ARGUMENT,
         "fill offset and/or length do not match the natural alignment of the "
         "fill value (target_offset=%" PRIdsz ", length=%" PRIdsz
-        ", pattern_length=%zu)",
+        ", pattern_length=%" PRIhsz ")",
         target_offset, length, pattern_length);
   }
 
@@ -473,9 +473,9 @@ iree_status_t iree_hal_command_buffer_push_constants_validation(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   if (IREE_UNLIKELY((values_length % 4) != 0)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "invalid alignment %zu, must be 4-byte aligned",
-                            values_length);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "invalid alignment %" PRIhsz ", must be 4-byte aligned", values_length);
   }
 
   // TODO(benvanik): validate offset and value count with layout.

@@ -195,7 +195,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
   if (storage.data_length < IREE_VM_STACK_MIN_SIZE) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "stack storage under minimum required amount: %zu < %d",
+        "stack storage under minimum required amount: %" PRIhsz " < %d",
         storage.data_length, IREE_VM_STACK_MIN_SIZE);
   }
 

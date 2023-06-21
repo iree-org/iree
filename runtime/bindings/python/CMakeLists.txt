@@ -153,24 +153,28 @@ iree_py_test(
 
 iree_py_test(
   NAME
-    system_api_test
-  SRCS
-    "tests/system_api_test.py"
-)
-
-iree_py_test(
-  NAME
     system_setup_test
   SRCS
     "tests/system_setup_test.py"
 )
 
-iree_py_test(
-  NAME
-    vm_test
-  SRCS
-    "tests/vm_test.py"
-)
+# These tests perform linking via the Compiler API, which is only supported
+# in bundled-LLVM builds at the moment (#14086).
+if(IREE_BUILD_BUNDLED_LLVM)
+  iree_py_test(
+    NAME
+      system_api_test
+    SRCS
+      "tests/system_api_test.py"
+  )
+
+  iree_py_test(
+    NAME
+      vm_test
+    SRCS
+      "tests/vm_test.py"
+  )
+endif()
 
 iree_py_test(
   NAME
