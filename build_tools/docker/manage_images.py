@@ -26,13 +26,15 @@ Rebuild and push all images and update references to them in the repository:
 """
 
 import argparse
+import dataclasses
 import fileinput
+import json
 import os
+import pathlib
 import posixpath
 import re
 import subprocess
-import sys
-from typing import Dict, List, Sequence, Union
+from typing import Dict, List, Sequence
 
 import utils
 
@@ -40,38 +42,16 @@ IREE_GCR_URL = "gcr.io/iree-oss/"
 DIGEST_REGEX = r"sha256:[a-zA-Z0-9]+"
 DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
 
-# Map from image names to images that they depend on.
-IMAGES_TO_DEPENDENCIES = {
-    "base": [],
-    "manylinux2014_x86_64-release": [],
-    "android": ["base"],
-    "emscripten": ["base"],
-    "nvidia": ["base"],
-    "riscv": ["base"],
-    "gradle-android": ["base"],
-    "frontends": ["android"],
-    "perf": [],
-    "mmperf": ["perf"],
-    "convperf": ["perf"],
-    "shark": [],
-    "swiftshader": ["base"],
-    "samples": ["swiftshader"],
-    "frontends-swiftshader": ["frontends", "swiftshader"],
-    "frontends-nvidia": ["frontends"],
-    # Containers with all the newest versions of dependencies that we support
-    # instead of the oldest.
-    "base-bleeding-edge": [],
-    "swiftshader-bleeding-edge": ["base-bleeding-edge"],
-    "nvidia-bleeding-edge": ["base-bleeding-edge"],
-}
 
-IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}
-for image, dependencies in IMAGES_TO_DEPENDENCIES.items():
-    for dependency in dependencies:
-        IMAGES_TO_DEPENDENT_IMAGES[dependency].append(image)
+def _get_images_to_dependents(
+    image_info_map: Dict[str, utils.ImageInfo]
+) -> Dict[str, List[str]]:
+    images_to_dependents = {k: [] for k in image_info_map.keys()}
+    for image, info in image_info_map.items():
+        for dependency in info.deps:
+            images_to_dependents[dependency].append(image)
 
-IMAGES_HELP = [f"`{name}`" for name in IMAGES_TO_DEPENDENCIES]
-IMAGES_HELP = f"{', '.join(IMAGES_HELP)} or `all`"
+    return images_to_dependents
 
 
 def parse_arguments():
@@ -85,38 +65,35 @@ def parse_arguments():
         type=str,
         required=True,
         action="append",
-        help=f"Name of the image to build: {IMAGES_HELP}.",
+        help=f"Name of the image to build",
     )
     parser.add_argument(
         "--dry_run",
         "--dry-run",
         "-n",
         action="store_true",
-        help="Print output without building or pushing any images.",
+        help="Print output without building or pushing any images",
     )
     parser.add_argument(
         "--only_references",
         "--only-references",
         action="store_true",
-        help="Just update references to images using the digests in prod_digests.txt",
+        help="Just update references to images using the digests in --image_graph",
+    )
+    parser.add_argument(
+        "--image_graph",
+        "--image-graph",
+        dest="image_graph_path",
+        type=pathlib.Path,
+        default=pathlib.Path("build_tools/docker/image_graph.json"),
     )
 
     args = parser.parse_args()
-    for image in args.images:
-        if image == "all":
-            # Sort for a determinstic order
-            args.images = sorted(IMAGES_TO_DEPENDENCIES.keys())
-        elif image not in IMAGES_TO_DEPENDENCIES:
-            raise parser.error(
-                "Expected --image to be one of:\n"
-                f"  {IMAGES_HELP}\n"
-                f"but got `{image}`."
-            )
     return args
 
 
 def _dag_dfs(
-    input_nodes: Sequence[str], node_to_child_nodes: Dict[str, Sequence[str]]
+    input_nodes: Sequence[str], node_to_child_nodes: Dict[str, List[str]]
 ) -> List[str]:
     # Python doesn't have a builtin OrderedSet, but we don't have many images, so
     # we just use a list.
@@ -133,14 +110,21 @@ def _dag_dfs(
     return ordered_nodes
 
 
-def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
-    dependents = _dag_dfs(images, IMAGES_TO_DEPENDENT_IMAGES)
+def get_dependencies(
+    images: Sequence[str], images_to_dependents: Dict[str, List[str]]
+) -> List[str]:
+    return _dag_dfs(input_nodes=images, node_to_child_nodes=images_to_dependents)
+
+
+def get_ordered_images_to_process(
+    images: Sequence[str],
+    images_to_dependents: Dict[str, List[str]],
+) -> List[str]:
+    dependents = get_dependencies(
+        images=images, images_to_dependents=images_to_dependents
+    )
     dependents.reverse()
     return dependents
-
-
-def get_dependencies(images: Sequence[str]) -> List[str]:
-    return _dag_dfs(images, IMAGES_TO_DEPENDENCIES)
 
 
 def get_repo_digest(tagged_image_url: str, dry_run: bool = False) -> str:
@@ -197,45 +181,56 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
             )
 
 
-def parse_prod_digests() -> Dict[str, str]:
-    image_urls_to_prod_digests = {}
-    with open(utils.PROD_DIGESTS_PATH, "r") as f:
-        for line in f:
-            image_url, digest = line.strip().split("@")
-            image_urls_to_prod_digests[image_url] = digest
-    return image_urls_to_prod_digests
+def main(
+    images: Sequence[str],
+    only_references: bool,
+    dry_run: bool,
+    image_graph_path: pathlib.Path,
+):
+    image_graph = utils.load_image_graph(image_graph_path)
+    for image in images:
+        if image not in image_graph:
+            raise ValueError(
+                f'Image "{image}" not found in the image graph.'
+                f' Available images: {",".join(image_graph.keys())}'
+            )
 
-
-if __name__ == "__main__":
-    args = parse_arguments()
-    image_urls_to_prod_digests = parse_prod_digests()
-    images_to_process = get_ordered_images_to_process(args.images)
+    images_to_dependents = _get_images_to_dependents(image_graph)
+    images_to_process = get_ordered_images_to_process(
+        images=images, images_to_dependents=images_to_dependents
+    )
     print(f"Also processing dependent images. Will process: {images_to_process}")
 
-    if not args.only_references:
+    if not only_references:
         # Ensure the user has the correct authorization to push to GCR.
-        utils.check_gcloud_auth(dry_run=args.dry_run)
+        utils.check_gcloud_auth(dry_run=dry_run)
 
-        dependencies = get_dependencies(images_to_process)
+        dependencies = get_dependencies(
+            images=images_to_process, images_to_dependents=images_to_dependents
+        )
         print(f"Pulling image dependencies: {dependencies}")
         for dependency in dependencies:
-            dependency_url = posixpath.join(IREE_GCR_URL, dependency)
-            # If `dependency` is a new image then it may not have a prod digest yet.
-            if dependency_url in image_urls_to_prod_digests:
-                digest = image_urls_to_prod_digests[dependency_url]
-                dependency_with_digest = f"{dependency_url}@{digest}"
+            image_digest = image_graph[dependency].digest
+            # If `dependency` is a new image then it may not have a digest yet.
+            if image_digest is not None:
+                dependency_url = posixpath.join(IREE_GCR_URL, dependency)
+                dependency_with_digest = f"{dependency_url}@{image_digest}"
                 utils.run_command(
-                    ["docker", "pull", dependency_with_digest], dry_run=args.dry_run
+                    ["docker", "pull", dependency_with_digest], dry_run=dry_run
                 )
 
     for image in images_to_process:
-        print("\n" * 5 + f"Processing image {image}")
+        print("\n" * 5 + f"Updating image {image}")
         image_url = posixpath.join(IREE_GCR_URL, image)
         tagged_image_url = f"{image_url}"
         image_path = os.path.join(DOCKER_DIR, "dockerfiles", f"{image}.Dockerfile")
 
-        if args.only_references:
-            digest = image_urls_to_prod_digests[image_url]
+        if only_references:
+            digest = image_graph[image].digest
+            if digest is None:
+                raise ValueError(
+                    f"Can't update the references of {image} because it has no digest."
+                )
         else:
             # We deliberately give the whole repository as context so we can reuse
             # scripts and such. It would be nice if Docker gave us a way to make this
@@ -255,24 +250,25 @@ if __name__ == "__main__":
                     tagged_image_url,
                     ".",
                 ],
-                dry_run=args.dry_run,
+                dry_run=dry_run,
             )
 
-            utils.run_command(
-                ["docker", "push", tagged_image_url], dry_run=args.dry_run
+            utils.run_command(["docker", "push", tagged_image_url], dry_run=dry_run)
+
+            digest = get_repo_digest(tagged_image_url, dry_run)
+            image_info = image_graph[image]
+            image_graph[image] = dataclasses.replace(
+                image_info, digest=digest, url=f"{image_url}@{digest}"
             )
-
-            digest = get_repo_digest(tagged_image_url, args.dry_run)
-
-            # Check that the image is in "prod_digests.txt" and append it to the list
-            # in the file if it isn't.
-            if image_url not in image_urls_to_prod_digests:
-                image_with_digest = f"{image_url}@{digest}"
-                print(
-                    f"Adding new image {image_with_digest} to {utils.PROD_DIGESTS_PATH}"
+            if not dry_run:
+                # Update the graph file on every image update so it is easier to restart
+                # from the last failure.
+                image_graph_path.write_text(
+                    json.dumps(utils.dump_image_graph(image_graph), indent=2)
                 )
-                if not args.dry_run:
-                    with open(utils.PROD_DIGESTS_PATH, "a") as f:
-                        f.write(f"{image_with_digest}\n")
 
-        update_references(image_url, digest, dry_run=args.dry_run)
+        update_references(image_url, digest, dry_run=dry_run)
+
+
+if __name__ == "__main__":
+    main(**vars(parse_arguments()))

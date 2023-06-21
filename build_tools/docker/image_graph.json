@@ -1,0 +1,107 @@
+{
+  "base": {
+    "deps": [],
+    "url": "gcr.io/iree-oss/base@sha256:7dbb7e97e0baa6d4512822b5cd4f601d840a6f950f67c2df497a24cae64a0595"
+  },
+  "manylinux2014_x86_64-release": {
+    "deps": [],
+    "url": "gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:794513562cca263480c0c169c708eec9ff70abfe279d6dc44e115b04488b9ab5"
+  },
+  "android": {
+    "deps": [
+      "base"
+    ],
+    "url": "gcr.io/iree-oss/android@sha256:0acf806428fda9a89c928becf8f3f560131f3906bd9466a633466594d4690430"
+  },
+  "emscripten": {
+    "deps": [
+      "base"
+    ],
+    "url": "gcr.io/iree-oss/emscripten@sha256:28c8878131fa8161cb2d1ae22dd99fe30ec3440ddd8299d006bc52b4c5f2dea3"
+  },
+  "nvidia": {
+    "deps": [
+      "base"
+    ],
+    "url": "gcr.io/iree-oss/nvidia@sha256:1717431fd46b8b1e96d95fa72508e3e3eacb5c95f1245b9b7dbeec23ae823d02"
+  },
+  "riscv": {
+    "deps": [
+      "base"
+    ],
+    "url": "gcr.io/iree-oss/riscv@sha256:396546eaa5f144454c7b83c74ad0d6a96170556a9c164c7c97aa793ff83c446e"
+  },
+  "gradle-android": {
+    "deps": [
+      "base"
+    ],
+    "url": "gcr.io/iree-oss/gradle-android@sha256:b600d09ab54827eca4e268ea8243e5186f51507a5a1308bff82a266bd3b5746a"
+  },
+  "frontends": {
+    "deps": [
+      "android"
+    ],
+    "url": "gcr.io/iree-oss/frontends@sha256:95c23cc732e4f5b0b005816108c65cea7b024f186be9cdd22defdd6e68384298"
+  },
+  "perf": {
+    "deps": [],
+    "url": "gcr.io/iree-oss/perf@sha256:8f4dfc8cf779f6499215a5c4ff2c7608ac3329f23f6ddcf6025e1868e1584222"
+  },
+  "mmperf": {
+    "deps": [
+      "perf"
+    ],
+    "url": "gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75"
+  },
+  "convperf": {
+    "deps": [
+      "perf"
+    ],
+    "url": "gcr.io/iree-oss/convperf@sha256:8a32b97be7c8817aa12bf669fce4dd1f20d0b01b7aa6f4dbb618e27541d1231d"
+  },
+  "shark": {
+    "deps": [],
+    "url": "gcr.io/iree-oss/shark@sha256:ce3bd3abe454d2e481512823e9d2d080322fb2fc1470a12c7306c48140eebdb2"
+  },
+  "swiftshader": {
+    "deps": [
+      "base"
+    ],
+    "url": "gcr.io/iree-oss/swiftshader@sha256:c9be5cbc8467499ae71ec80f3af87b72e746e8903cd52c0be9bb5f7261acc521"
+  },
+  "samples": {
+    "deps": [
+      "swiftshader"
+    ],
+    "url": "gcr.io/iree-oss/samples@sha256:5e64a8f4b3c64e133ceae9028aaa7a843dd58f6b773917d32d25473d4aef3faa"
+  },
+  "frontends-swiftshader": {
+    "deps": [
+      "frontends",
+      "swiftshader"
+    ],
+    "url": "gcr.io/iree-oss/frontends-swiftshader@sha256:e7a5909dd95784ffb69d58ea120f2cd650479e91a83e6f55e1076181c4ca7463"
+  },
+  "frontends-nvidia": {
+    "deps": [
+      "frontends"
+    ],
+    "url": "gcr.io/iree-oss/frontends-nvidia@sha256:bc217d1a226f778e44874b989d6ead3a3085f04643a40aa301f5d30661356d07"
+  },
+  "base-bleeding-edge": {
+    "deps": [],
+    "url": "gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd"
+  },
+  "swiftshader-bleeding-edge": {
+    "deps": [
+      "base-bleeding-edge"
+    ],
+    "url": "gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d"
+  },
+  "nvidia-bleeding-edge": {
+    "deps": [
+      "base-bleeding-edge"
+    ],
+    "url": "gcr.io/iree-oss/nvidia-bleeding-edge@sha256:a14a1c9442a40f02023c8a30a025902f4c8cd06bf37dac605e48521296fb23be"
+  }
+}

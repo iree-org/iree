@@ -6,11 +6,32 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import os
+import dataclasses
+import json
+import pathlib
 import subprocess
-from typing import Sequence
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Sequence
 
-PROD_DIGESTS_PATH = "build_tools/docker/prod_digests.txt".replace("/", os.sep)
+
+@dataclass(frozen=True)
+class ImageInfo:
+  deps: List[str]
+  digest: Optional[str] = None
+  url: Optional[str] = None
+
+
+def load_image_graph(graph_path: pathlib.Path) -> Dict[str, ImageInfo]:
+  graph_obj = json.loads(graph_path.read_text())
+  image_graph = dict(
+      (name, ImageInfo(**info)) for name, info in graph_obj.items())
+  return image_graph
+
+
+def dump_image_graph(image_graph: Dict[str, ImageInfo]) -> Dict[str, Any]:
+  graph_obj = dict(
+      (name, dataclasses.asdict(info)) for name, info in image_graph.items())
+  return graph_obj
 
 
 def run_command(
