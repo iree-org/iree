@@ -119,3 +119,43 @@ builtin.module {
     transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!transform.any_op) -> ()
   }
 }
+
+// -----
+
+// Check that pattern skips unaligned and unsupported sizes.
+builtin.module {
+  // CHECK-LABEL: @copies_to_asyncs_load_store
+  func.func @copies_to_asyncs_load_store(%a: memref<1024x1025xf32>, %b: memref<1024x1024xf32>) {
+    %0 = memref.alloc() : memref<4x32x16xf32, #gpu.address_space<workgroup>>
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %cst_0 = arith.constant 0.000000e+00 : f32
+    // CHECK-NOT: nvgpu.device_async_copy
+    //     CHECK: vector.load
+    //     CHECK: vector.store
+    // 1025 is unaligned for 4xf32.
+    %1 = vector.load %a[%c0, %c0] : memref<1024x1025xf32>, vector<4xf32>
+    vector.store %1, %0[%c0, %c0, %c0] : memref<4x32x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+    // CHECK-NOT: nvgpu.device_async_create_group
+
+    // CHECK: %[[CP:.*]] = nvgpu.device_async_copy {{.*}}, {{.*}}, 4 :
+    // CHECK: %[[G:.*]] = nvgpu.device_async_create_group %[[CP]]
+    // CHECK: nvgpu.device_async_wait %[[G]]
+    %2 = vector.load %b[%c0, %c4] : memref<1024x1024xf32>, vector<4xf32>
+    vector.store %2, %0[%c0, %c4, %c0] : memref<4x32x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+
+    // CHECK-NOT: nvgpu.device_async_copy
+    //     CHECK: vector.load    
+    //     CHECK: vector.store
+    %3 = vector.load %b[%c0, %c4] : memref<1024x1024xf32>, vector<3xf32>
+    vector.store %3, %0[%c0, %c4, %c0] : memref<4x32x16xf32, #gpu.address_space<workgroup>>, vector<3xf32>
+
+    return
+  }
+
+  transform.sequence failures(propagate) {
+  ^bb1(%variant_op: !transform.any_op):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!transform.any_op) -> ()
+  }
+}
