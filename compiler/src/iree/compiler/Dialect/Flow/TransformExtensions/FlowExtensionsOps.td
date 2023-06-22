@@ -16,7 +16,8 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.forall
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Rewrite an scf.forall to Flow::DispatchWorkgroups.
 
@@ -44,6 +45,7 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.forall
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::scf::ForallOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -54,7 +56,8 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
-     TransformEachOpTrait]> {
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Convert a flow.dispatch.region op into a flow.dispatch.workgroups op.
 
@@ -75,6 +78,7 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::iree_compiler::IREE::Flow::DispatchRegionOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -86,7 +90,8 @@ def WrapInDispatchRegionOp : Op<
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
-     TransformEachOpTrait]> {
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Wrap the `target` op in a new `dispatch.region` op. All uses of target op
     are replaces with the results of the newly generated `dispach.region` op.
@@ -108,6 +113,7 @@ def WrapInDispatchRegionOp : Op<
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -117,7 +123,8 @@ def WrapInDispatchRegionOp : Op<
 def ClonePrecedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.clone_preceding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Clone the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -140,17 +147,13 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
     `:` functional-type(operands, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
-  }];
 }
 
 def MovePrecedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.move_preceding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Move the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -176,17 +179,13 @@ def MovePrecedingOpIntoDispatchRegionOp : Op<
     `:` functional-type(operands, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
-  }];
 }
 
 def CloneSucceedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.clone_succeeding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Clone the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -212,17 +211,13 @@ def CloneSucceedingOpIntoDispatchRegionOp : Op<
     `:` functional-type(operands, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
-  }];
 }
 
 def MoveSucceedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.move_succeeding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Move the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -248,11 +243,6 @@ def MoveSucceedingOpIntoDispatchRegionOp : Op<
     `:` functional-type(operands, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
-  }];
 }
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS

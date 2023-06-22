@@ -267,7 +267,7 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
 
 SmallVector<Operation *>
 tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
-                          IRRewriter &rewriter) {
+                          RewriterBase &rewriter) {
   SmallVector<Operation *> ops;
   Location loc = attnOp.getLoc();
   OpBuilder::InsertionGuard guard(rewriter);

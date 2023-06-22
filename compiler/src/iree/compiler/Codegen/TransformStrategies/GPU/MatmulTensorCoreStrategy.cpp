@@ -180,7 +180,7 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
   TileToForallAndFuseAndDistributeResult tileResult =
       buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/matmulH,
           /*opsToFuseH=*/fillH,
           /*tileSizes=*/
@@ -233,7 +233,9 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   // Running canonicalization is required here to enable aligned pads to become
   // linalg.copy ops when rewriting in DPS.
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, variantH);
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
 
   // Step 4. Distribute pad and copies: SIMT programming model.
   auto [lhsCopyOpH, rhsCopyOpH, copyBackOpH] =
@@ -261,7 +263,7 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // Step 8. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, needs hardening.
-  Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
                                     strategy.numWarps);
   funcH = b.create<EliminateGpuBarriersOp>(funcH);

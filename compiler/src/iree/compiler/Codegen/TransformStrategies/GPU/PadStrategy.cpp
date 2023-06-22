@@ -34,8 +34,6 @@ using iree_compiler::blockX;
 using iree_compiler::blockY;
 using iree_compiler::blockZ;
 using iree_compiler::buildPad;
-using iree_compiler::buildTileFuseDistToForallWithNumThreads;
-using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::buildBufferize;
 using iree_compiler::gpu::buildConvertToAsyncCopies;
@@ -123,7 +121,7 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
   // TODO: don't rematch, apply on the variant op directly.
   Value funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH);
+  buildLowerMaskedTransfersAndCleanup(b, funcH);
 
   // Step 5. Vectorize the rest of func normally.
   funcH = buildVectorize(b, funcH, /*applyCleanups=*/true);

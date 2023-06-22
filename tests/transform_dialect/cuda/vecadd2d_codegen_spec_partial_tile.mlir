@@ -11,12 +11,14 @@ transform.sequence failures(propagate) {
 
   // Late canonicalizations to cleanup and pass the checks.
   // Needs to occur on the whole variant to perform cse on the workgroup_count region
-  transform.apply_patterns to %variant_op {
+  %func_op = transform.structured.match ops{["func.func"]} in %variant_op
+      : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func_op {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
     transform.apply_patterns.canonicalization
   } : !transform.any_op
-  transform.iree.apply_licm %variant_op : !transform.any_op
-  transform.iree.apply_cse %variant_op : !transform.any_op
+  transform.iree.apply_licm %func_op : !transform.any_op
+  transform.iree.apply_cse %func_op : !transform.any_op
 }

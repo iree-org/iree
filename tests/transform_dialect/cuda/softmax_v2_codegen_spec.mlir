@@ -35,14 +35,16 @@ transform.sequence failures(propagate) {
     : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
 
   // Canonicalizations.
-  transform.apply_patterns to %variant_op {
+  %func_op = transform.structured.match ops{["func.func"]} in %variant_op
+      : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func_op {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
     transform.apply_patterns.canonicalization
   } : !transform.any_op
-  transform.iree.apply_licm %variant_op : !transform.any_op
-  transform.iree.apply_cse %variant_op : !transform.any_op
+  transform.iree.apply_licm %func_op : !transform.any_op
+  transform.iree.apply_cse %func_op : !transform.any_op
 
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
@@ -76,24 +78,23 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
-  transform.apply_patterns to %variant_op {
+  transform.apply_patterns to %func_op {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
     transform.apply_patterns.canonicalization
   } : !transform.any_op
-  transform.iree.apply_licm %variant_op : !transform.any_op
-  transform.iree.apply_cse %variant_op : !transform.any_op
+  transform.iree.apply_licm %func_op : !transform.any_op
+  transform.iree.apply_cse %func_op : !transform.any_op
 
   // Step 3. Rank-reduce and vectorize.
   // ==================================
-  %funcx_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  transform.apply_patterns to %funcx_2 {
+  transform.apply_patterns to %func_op {
     transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  transform.structured.vectorize %funcx_2 : (!transform.any_op) -> !transform.any_op
+  transform.structured.vectorize %func_op : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
@@ -125,12 +126,14 @@ transform.sequence failures(propagate) {
 
 
   // Late canonicalizations.
-  transform.apply_patterns to %variant_op_3 {
+  %func_op_3 = transform.structured.match ops{["func.func"]} in %variant_op_3
+      : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func_op_3 {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
     transform.apply_patterns.canonicalization
   } : !transform.any_op
-  transform.iree.apply_licm %variant_op_3 : !transform.any_op
-  transform.iree.apply_cse %variant_op_3 : !transform.any_op
+  transform.iree.apply_licm %func_op_3 : !transform.any_op
+  transform.iree.apply_cse %func_op_3 : !transform.any_op
 }

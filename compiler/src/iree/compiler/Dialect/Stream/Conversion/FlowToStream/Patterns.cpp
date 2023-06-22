@@ -824,7 +824,7 @@ struct ConvertExecutableOp
       funcOp.setType(rewriter.getFunctionType(newTypes, {}));
     }
 
-    rewriter.replaceOp(flowOp, {});
+    rewriter.eraseOp(flowOp);
     return success();
   }
 };

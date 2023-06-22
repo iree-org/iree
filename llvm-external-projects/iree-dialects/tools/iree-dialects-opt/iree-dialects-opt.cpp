@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/Func/Extensions/InlinerExtension.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
@@ -92,6 +93,7 @@ int main(int argc, char **argv) {
   mlir::test_ext::registerTestListenerPasses();
 
   // External models.
+  mlir::func::registerInlinerExtension(registry);
   mlir::linalg::registerTilingInterfaceExternalModels(registry);
 
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,

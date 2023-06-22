@@ -267,7 +267,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
   }
 }
 
-void reorderTranspose(IRRewriter& rewriter, func::FuncOp funcOp) {
+void reorderTranspose(RewriterBase& rewriter, func::FuncOp funcOp) {
   SmallVector<vector::TransposeOp> transposeOps;
   funcOp.walk([&](Operation* op) {
     if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
