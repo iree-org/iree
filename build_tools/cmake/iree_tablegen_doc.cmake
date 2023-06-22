@@ -56,8 +56,7 @@ function(iree_tablegen_doc)
   set(LLVM_TARGET_DEFINITIONS ${_INPUTS})
 
   set(_FLAGS
-    # Pass this after https://reviews.llvm.org/D152404
-    # "--strip-prefix=::mlir::iree_compiler::IREE::"
+    "--strip-prefix=::mlir::iree_compiler::IREE::"
   )
 
   set(_OUTPUTS)
