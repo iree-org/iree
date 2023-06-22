@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -147,6 +148,43 @@ static Operation::operand_range getIndices(Operation* op) {
   llvm_unreachable("unsupported op type");
 }
 
+/// Return `true` if the conversion to async copy is legal.
+static bool resultsInSupportedAsyncCopy(MemRefType memrefType,
+                                        Operation::operand_range indices,
+                                        VectorType vecType) {
+  constexpr int64_t kSupportedCpAsyncAlignmentsInBytes[3] = {4, 8, 16};
+  // Condition 1: the vectory rank must be supported.
+  if (vecType.hasRank() != 1) {
+    LDBG("----> cp.async failed, not a 1-D vector: " << vecType);
+    return false;
+  }
+
+  // Condition 2: the copy size must be supported.
+  bool supportedCopySize = false;
+  int64_t numElements = vecType.getNumElements();
+  Type elementType = vecType.getElementType();
+  for (int64_t alignmentInBytes : kSupportedCpAsyncAlignmentsInBytes) {
+    if (alignmentInBytes * 8 ==
+        numElements * elementType.getIntOrFloatBitWidth()) {
+      supportedCopySize = true;
+      break;
+    }
+  }
+  if (!supportedCopySize) {
+    LDBG("----> cp.async alignment failed, "
+         << numElements << " elts * " << elementType.getIntOrFloatBitWidth()
+         << "b/elem = " << numElements * elementType.getIntOrFloatBitWidth()
+         << "b is not supported by cp.async");
+    return false;
+  }
+
+  // TODO: Condition 3: the alignments must be supported. For cp.async the
+  // NVIDIA doc (section 6.4.1) says: "The address must be naturally aligned to
+  // a multiple of the access size. If an address is not properly aligned, the
+  // resulting behavior is undefined.".
+  return true;
+}
+
 void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
                        bool useMMASync) {
   LDBG("Start asyncGroups: useMMASync=" << useMMASync);
@@ -190,13 +228,16 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
       }
     }
 
+    // Check whether both accesses are supported before we emit: this is
+    // necessary to ensure the correctness of DeviceAsyncCopyOp.
     VectorType vecType = llvm::cast<VectorType>(vectorVal.getType());
-    if (!((vecType.getElementType().isF32() && vecType.getNumElements() <= 4) ||
-          (vecType.getElementType().isF16() &&
-           vecType.getNumElements() <= 8))) {
-      LDBG("----readOp is not (<=4)xf32 or (<=8)xf16 -> Skip");
+    Value storeBase = getMemrefOperand(writeOp);
+    Value loadBase = getMemrefOperand(readOp);
+    if (!resultsInSupportedAsyncCopy(cast<MemRefType>(loadBase.getType()),
+                                     getIndices(readOp), vecType) ||
+        !resultsInSupportedAsyncCopy(cast<MemRefType>(storeBase.getType()),
+                                     getIndices(writeOp), vecType))
       return WalkResult::advance();
-    }
 
     LDBG("--writeOp can be made async -> SUCCESS");
     copyToSharedMem.insert(writeOp);
@@ -242,6 +283,8 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
     for (Operation* writeOp : group) {
       rewriter.setInsertionPoint(writeOp);
       Value vectorVal = getValueStored(writeOp);
+      auto vectorType = llvm::cast<VectorType>(vectorVal.getType());
+      int64_t numElements = vectorType.getNumElements();
       Operation* readOp = vectorVal.getDefiningOp();
       Value storeBase = getMemrefOperand(writeOp);
       Value loadBase = getMemrefOperand(readOp);
@@ -250,9 +293,7 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
           writeOp->getLoc(),
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
-          rewriter.getIndexAttr(
-              llvm::cast<VectorType>(vectorVal.getType()).getNumElements()),
-          mask,
+          rewriter.getIndexAttr(numElements), mask,
           /*bypassL1=*/useMMASync ? rewriter.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
