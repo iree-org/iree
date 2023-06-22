@@ -182,7 +182,7 @@ class JSONBackedBenchmarkData:
 
     # Parses a JSON benchmark results file and makes some sanity checks
     @staticmethod
-    def loadFromFile(filepath: pathlib.Path):
+    def load_from_file(filepath: pathlib.Path):
         try:
             data = json.loads(filepath.read_bytes())
         except json.JSONDecodeError as e:
@@ -191,9 +191,9 @@ class JSONBackedBenchmarkData:
 
     # A convenience wrapper around `loadFromFile` that accepts a sequence of paths and returns a sequence of JSONBackedBenchmarkData objects as a generator.
     @staticmethod
-    def loadManyFromFiles(filepaths: Sequence[pathlib.Path]):
+    def load_many_from_files(filepaths: Sequence[pathlib.Path]):
         return (
-            JSONBackedBenchmarkData.loadFromFile(filepath) for filepath in filepaths
+            JSONBackedBenchmarkData.load_from_file(filepath) for filepath in filepaths
         )
 
 
@@ -219,7 +219,7 @@ def _merge_results_handler(
     print(
         json.dumps(
             merge_results(
-                JSONBackedBenchmarkData.loadManyFromFiles(benchmark_results_files)
+                JSONBackedBenchmarkData.load_many_from_files(benchmark_results_files)
             )
         )
     )

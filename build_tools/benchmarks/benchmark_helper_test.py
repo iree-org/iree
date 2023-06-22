@@ -65,7 +65,7 @@ class BenchmarkHelperTest(unittest.TestCase):
         )
 
     def test_create_json_backed_benchmark_data_with_missing_benchmark_list(self):
-        with self.assertRaisesRegex(ValueError, '"benchmarks" field not found'):
+        with self.assertRaisesRegex(ValueError, "'benchmarks' field not found"):
             benchmark_helper.JSONBackedBenchmarkData(
                 pathlib.Path("second.json"), {"commit": "123"}
             )
@@ -76,7 +76,7 @@ class BenchmarkHelperTest(unittest.TestCase):
             contents = {"commit": "123", "benchmarks": []}
             filepath.write_text(json.dumps(contents))
 
-            result = benchmark_helper.JSONBackedBenchmarkData.loadFromFile(filepath)
+            result = benchmark_helper.JSONBackedBenchmarkData.load_from_file(filepath)
             self.assertEqual(result.data, contents)
             self.assertEqual(result.source_filepath, filepath)
 
@@ -88,7 +88,7 @@ class BenchmarkHelperTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 ValueError, "seems not to be a valid JSON file"
             ):
-                benchmark_helper.JSONBackedBenchmarkData.loadFromFile(filepath)
+                benchmark_helper.JSONBackedBenchmarkData.load_from_file(filepath)
 
 
 if __name__ == "__main__":
