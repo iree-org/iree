@@ -127,7 +127,7 @@ static Value createTotalElementCountValue(ShapedType type,
   }
 
   int dynamicDimIndex = 0;
-  SmallVector<Value> dims;
+  SmallVector<OpFoldResult> dims;
   auto shape = type.getShape();
   AffineExpr sizeExpr = getAffineConstantExpr(1, context);
   for (int i = 0; i < shape.size(); ++i) {
@@ -135,7 +135,8 @@ static Value createTotalElementCountValue(ShapedType type,
     if (ShapedType::isDynamic(shape[i])) {
       dims.push_back(dynamicDims[dynamicDimIndex++]);
     } else {
-      dims.push_back(builder.create<arith::ConstantIndexOp>(loc, shape[i]));
+      dims.push_back(
+          builder.create<arith::ConstantIndexOp>(loc, shape[i]).getValue());
     }
   }
   return affine::makeComposedAffineApply(builder, loc, sizeExpr, dims);
@@ -350,9 +351,13 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
         makeStridedLinearLayoutMap(strides, 0, builder.getContext());
     // Dynamic strides/offset will create symbols. There should be none for the
     // static case.
+    SmallVector<OpFoldResult> opFoldIndicies;
+    for (Value value : indices) {
+      opFoldIndicies.push_back(value);
+    }
     if (linearLayoutMap.getNumSymbols() == 0) {
       return affine::makeComposedAffineApply(builder, loc, linearLayoutMap,
-                                             indices);
+                                             opFoldIndicies);
     }
   }
 

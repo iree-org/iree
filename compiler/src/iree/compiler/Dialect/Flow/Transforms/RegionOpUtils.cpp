@@ -62,7 +62,7 @@ static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
 static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
                                                  OpBuilder &builder) {
   SmallVector<OpFoldResult> dimValues =
-      tensor::createDimValues(builder, loc, source);
+      tensor::getMixedSizes(builder, loc, source);
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
   return llvm::map_to_vector(dimValues, [&](OpFoldResult dimValue) {
