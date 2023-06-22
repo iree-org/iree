@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -25,6 +26,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -443,23 +445,20 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
   if (strategy.alignedRhs())
     rhsH = b.create<RewriteInDestinationPassingStyleOp>(rhsH.getType(), rhsH);
 
-  AbstractGemmLikeStrategy::MappingInfo lhsCopyMapping =
-      strategy.lhsCopyMapping();
+  MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
   Value lhsCopyOpH = buildDistributeOnePadOrCopyWithNumThreads(
       b, variantH, lhsH, /*numThreads=*/lhsCopyMapping.numThreads,
       /*threadDimMapping=*/lhsCopyMapping.threadMapping,
       /*foldIfBranch=*/!strategy.alignedLhs());
 
-  AbstractGemmLikeStrategy::MappingInfo rhsCopyMapping =
-      strategy.rhsCopyMapping();
+  MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
   Value rhsCopyOpH = buildDistributeOnePadOrCopyWithNumThreads(
       b, variantH, rhsH, /*numThreads=*/rhsCopyMapping.numThreads,
       /*threadDimMapping=*/rhsCopyMapping.threadMapping,
       /*foldIfBranch=*/!strategy.alignedRhs());
 
   if (!strategy.alignedRes()) {
-    AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
-        strategy.resCopyMapping();
+    MappingInfo resCopyMapping = strategy.resCopyMapping();
     copyBackOpH = buildDistributeOnePadOrCopyWithNumThreads(
         b, variantH, copyBackOpH,
         /*numThreads=*/resCopyMapping.numThreads,
@@ -484,20 +483,17 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
 
   // Apply vector masking.
   if (!strategy.alignedLhs()) {
-    AbstractGemmLikeStrategy::MappingInfo lhsCopyMapping =
-        strategy.lhsCopyMapping();
+    MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
     b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
                                            lhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRhs()) {
-    AbstractGemmLikeStrategy::MappingInfo rhsCopyMapping =
-        strategy.rhsCopyMapping();
+    MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
     b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
                                            rhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRes()) {
-    AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
-        strategy.resCopyMapping();
+    MappingInfo resCopyMapping = strategy.resCopyMapping();
     b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
                                            resCopyMapping.tileSizes);
   }

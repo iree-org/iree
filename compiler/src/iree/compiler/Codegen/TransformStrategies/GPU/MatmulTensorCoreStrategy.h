@@ -11,6 +11,8 @@
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/AbstractGemmLikeStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/CopyMapping.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
@@ -76,35 +78,29 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     return blockTileSizes[1];
   }
 
-  int64_t numWarpsM() const override {
+  int64_t numWarpsX() const override {
     assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
     return numWarps[0];
   }
-  int64_t numWarpsN() const override {
+  int64_t numWarpsY() const override {
     assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
     return numWarps[1];
   }
 
-  using AbstractGemmLikeStrategy::MappingInfo;
-
   MappingInfo getBlockMapping() const override {
     return MappingInfo{/*numThreads=*/{},
                        /*tileSizes=*/{blockTileM(), blockTileN()},
-                       /*threadMapping=*/{blockY(ctx), blockX(ctx)}};
+                       /*threadMapping=*/{blockY(ctx), blockX(ctx)},
+                       /*vectorSize=*/std::nullopt};
   }
 
   // LHS copy is of size mxk.
   MappingInfo lhsCopyMapping() const override {
-    int64_t numThreadsK = mlir::ceilDiv(reductionTileSize, lhsCopyVectorSize());
-    int64_t numThreadsM =
-        std::min(blockTileM(), mlir::ceilDiv(totalNumThreads(), numThreadsK));
-    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsK},
-                       /*tileSizes=*/
-                       {mlir::ceilDiv(blockTileM(), numThreadsM),
-                        mlir::ceilDiv(reductionTileSize, numThreadsK)},
-                       /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/k(),
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), reductionTileSize});
   }
-
   LogicalResult validateLhsCopyMapping() const override {
     MappingInfo mapping = lhsCopyMapping();
     // It is fine to use fewer threads to copy the LHS.
@@ -119,16 +115,11 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
-    int64_t numThreadsN = mlir::ceilDiv(blockTileN(), rhsCopyVectorSize());
-    int64_t numThreadsK = std::min(
-        reductionTileSize, mlir::ceilDiv(totalNumThreads(), numThreadsN));
-    return MappingInfo{/*numThreads=*/{numThreadsK, numThreadsN},
-                       /*tileSizes=*/
-                       {mlir::ceilDiv(reductionTileSize, numThreadsK),
-                        mlir::ceilDiv(blockTileN(), numThreadsN)},
-                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/n(),
+        /*copySizes=*/ArrayRef<int64_t>{reductionTileSize, blockTileN()});
   }
-
   LogicalResult validateRhsCopyMapping() const override {
     MappingInfo mapping = rhsCopyMapping();
     // It is fine to use fewer threads to copy the RHS.
@@ -143,16 +134,10 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
-    int64_t numThreadsN = mlir::ceilDiv(blockTileN(), resCopyVectorSize());
-    int64_t numThreadsM =
-        std::min(blockTileM(), mlir::ceilDiv(totalNumThreads(), numThreadsN));
-    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
-                       /*tileSizes=*/
-                       {std::max(static_cast<int64_t>(1),
-                                 mlir::ceilDiv(blockTileM(), numThreadsM)),
-                        std::max(static_cast<int64_t>(1),
-                                 mlir::ceilDiv(blockTileN(), numThreadsN))},
-                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/n(),
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), blockTileN()});
   }
 
   LogicalResult validateResCopyMapping() const override {
@@ -169,12 +154,10 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {
-    // Warps along M and N need to properly be ordered along the X and Y
-    // dimensions respectively, otherwise we would improperly generate
-    // predicated code.
-    return MappingInfo{/*numThreads=*/{numWarpsM(), numWarpsN()},
+    return MappingInfo{/*numThreads=*/{numWarpsY(), numWarpsX()},
                        /*tileSizes=*/{},
-                       /*threadMapping=*/{warpX(ctx), warpY(ctx)}};
+                       /*threadMapping=*/{warpY(ctx), warpX(ctx)},
+                       /*vectorSize=*/std::nullopt};
   }
 
   LogicalResult validate() const override {
