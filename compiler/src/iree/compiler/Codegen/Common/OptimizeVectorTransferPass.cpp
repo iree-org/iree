@@ -126,8 +126,9 @@ struct OptimizeVectorTransferPass
       }
     }
 
-    // TODO(???): SPIR-V can't handle the vector.shape_cast created here. This
-    // options should go away after all backend issues are resolved.
+    // TODO(#14191): SPIR-V can't handle the vector.shape_cast created for
+    // dropping unit dims so this option is disabled in SPIR-V pipeline.
+    // This option should go away after all backend issues have been resolved.
     if (dropUnitDims) {
       RewritePatternSet patterns(&getContext());
       mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
