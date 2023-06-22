@@ -368,3 +368,16 @@ def : Pat<(CHLO_TanOp NonComplexElementType:$input),
     (StableHLO_SineOp $input),
     (StableHLO_CosineOp $input)
   )>;
+
+
+// Express `tan(a + bi)` as
+//   (tan(a) + i tanh(b)) / (1 - i tan(a) * tanh(b))
+def : Pat<(CHLO_TanOp ComplexElementType:$input),
+  (StableHLO_DivOp
+    (StableHLO_ComplexOp
+      (CHLO_TanOp:$tan (StableHLO_RealOp $input)),
+      (StableHLO_TanhOp:$tanh (StableHLO_ImagOp $input))),
+    (StableHLO_ComplexOp
+      (ConstantLike<"1.0"> $tan),
+      (StableHLO_NegOp (StableHLO_MulOp $tan, $tanh)))
+  )>;
