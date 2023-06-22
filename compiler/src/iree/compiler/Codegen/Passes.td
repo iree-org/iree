@@ -640,6 +640,14 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
+def ExpandArithF16ToF32 :
+    Pass<"iree-llvmcpu-expand-f16-op-to-f32", ""> {
+  let summary =
+      "Preform f16 opertaions by expanding them to f32.";
+  let constructor =
+      "mlir::iree_compiler::createExpandF16OpToF32Pass()";
+}
+
 def LLVMCPULowerToUKernels :
     Pass<"iree-llvmcpu-lower-to-ukernels", ""> {
   let summary =

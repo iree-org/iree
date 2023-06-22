@@ -721,6 +721,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
+  // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added way to
+  // late and should insted be be done during lowering to LLVM.
+  passManager.addPass(createExpandF16OpToF32Pass());
+
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createLLVMCPUMaterializeEncodingPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
