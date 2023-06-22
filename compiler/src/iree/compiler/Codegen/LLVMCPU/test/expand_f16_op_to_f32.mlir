@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-expand-f16-Op-to-f32 %s | FileCheck %s
+// RUN: iree-opt --iree-llvmcpu-expand-f16-op-to-f32 %s | FileCheck %s
 
 func.func @test_expand_f16_maxf(%arg0: tensor<4xf16>, %arg1: tensor<4xf16>) -> tensor<4xf16>{
     %1 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], 
