@@ -17,12 +17,15 @@ BAZEL_VERSION="$(cat .bazelversion)"
 # We could do the whole apt install dance, but this technique works across a
 # range of platforms, allowing us to use a single script. See
 # https://bazel.build/install/ubuntu#binary-installer
+machine=$(uname -m)
+if [ "$machine" == "aarch64" ]; then
+  machine="arm64"
+fi
 
 curl --silent --fail --show-error --location \
-  "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" \
-  --output bazel-installer.sh
-chmod +x bazel-installer.sh
-./bazel-installer.sh
+  "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-linux-${machine}" \
+  --output /usr/bin/bazel
+chmod +x /usr/bin/bazel
 
 if [[ "$(bazel --version)" != "bazel ${BAZEL_VERSION}" ]]; then
   echo "Bazel installation failed" >&2
