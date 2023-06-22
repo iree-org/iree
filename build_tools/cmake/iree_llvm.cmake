@@ -65,8 +65,6 @@ macro(iree_llvm_configure_bundled)
 
   set(LLVM_BINARY_DIR "${IREE_BINARY_DIR}/llvm-project")
   set(LLVM_TOOLS_BINARY_DIR "${LLVM_BINARY_DIR}/bin")
-  set(LLVM_RUNTIME_OUTPUT_INTDIR ${LLVM_BINARY_DIR}/bin)
-  set(LLVM_LIBRARY_OUTPUT_INTDIR ${LLVM_BINARY_DIR}/lib)
   set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
 
   set(IREE_LLVM_LINK_BINARY "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
