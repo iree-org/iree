@@ -11,21 +11,30 @@ on:
     branches:
       - main
     paths:
-      - "docs/website/**"
-      - "build_tools/scripts/generate_release_index.py"
+      # This file itself.
       - ".github/workflows/publish_website.yml"
-  # Regenerate the release pip index when a regular or pre-release is created or
-  # deleted.
+      # Directly authored website source files.
+      - "docs/website/**"
+      # Python/pip release index page.
+      - "build_tools/scripts/generate_release_index.py"
+      # MLIR dialect definitions and .md generation using iree-tblgen.
+      #   Technically this should also include the sources for Tablegen, but
+      #   that rarely changes and we want to run this workflow conservatively.
+      - "**.td"
+      - "build_tools/cmake/iree_tablegen_doc.cmake"
+  # Regenerate the release pip index when a release is created or deleted.
   release:
     types: [published, unpublished]
 
 jobs:
   publish_website:
+    # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
+          submodules: true
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
       - name: Fetching base gh-pages branch
         # We have to explicitly fetch the gh-pages branch as well to preserve history
@@ -35,17 +44,30 @@ jobs:
         with:
           python-version: 3.x
           cache: 'pip'
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       - name: Installing dependencies
         run: |
-          pip install \
-            mkdocs-material \
-            mkdocs-redirects \
-            requests
+          pip install -r docs/website/requirements.txt
+          pip install requests
       - name: Generating release index
         run: |
           ./build_tools/scripts/generate_release_index.py \
             --repo="${GITHUB_REPOSITORY}" \
             --output=docs/website/docs/pip-release-links.html
+      - name: Building documentation files
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=${{ steps.gcp-auth.outputs.access_token }}" \
+            --env "IREE_WRITE_REMOTE_CCACHE=1" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:7dbb7e97e0baa6d4512822b5cd4f601d840a6f950f67c2df497a24cae64a0595" \
+            gcr.io/iree-oss/base@sha256:7dbb7e97e0baa6d4512822b5cd4f601d840a6f950f67c2df497a24cae64a0595 \
+            ./docs/website/generate_extra_files.sh
       - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"

@@ -1,0 +1,4 @@
+# TODO(scotttodd): pin versions to control how often we pull in updates?
+
+mkdocs-material
+mkdocs-redirects
