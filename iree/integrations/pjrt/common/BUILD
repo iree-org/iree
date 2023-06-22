@@ -60,6 +60,7 @@ iree_pjrt_cc_library(
         "@xla//xla/pjrt/c:pjrt_c_api_hdrs",
         # For xla::CompileOptions.
         "@xla//xla/pjrt:pjrt_executable",
+        "@xla//xla/pjrt:transpose",
     ],
 )
 

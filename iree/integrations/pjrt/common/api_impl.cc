@@ -12,6 +12,7 @@
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/iree_helpers.h"
 #include "iree/integrations/pjrt/common/tensor_utils.h"
+#include "xla/pjrt/transpose.h"
 
 using iree::vm::retain_ref;
 
@@ -760,29 +761,31 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   // Handle strided layouts and shape.
   std::vector<int64_t> perms(num_dims);
-  std::array<iree_hal_dim_t, 9> shape;
-  if (num_dims > shape.size()) {
+  std::array<iree_hal_dim_t, 9> input_shape;
+  std::array<iree_hal_dim_t, 9> output_shape;
+  if (num_dims > input_shape.size()) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only supports up to %d dims but got %d",
-                            (int)shape.size(), (int)num_dims);
+                            (int)input_shape.size(), (int)num_dims);
   }
 
   bool has_zero_length = false;
   for (int i = 0, s = num_dims; i < s; ++i) {
     has_zero_length |= dims[i] == 0;
+    output_shape[i] = dims[i];
   }
 
   if (has_zero_length) {
     // This is a degenerate case.
     for (int i = 0; i < num_dims; ++i) {
       perms[i] = i;
-      shape[i] = dims[i];
+      input_shape[i] = dims[i];
     }
   } else {
     // Compute the input shape and permutations for the broadcast.
     iree::pjrt::computeBroadcastArgs(
         num_dims, element_type_byte_size, byte_strides, dims,
-        reinterpret_cast<int64_t*>(shape.data()), perms.data());
+        reinterpret_cast<int64_t*>(input_shape.data()), perms.data());
   }
 
   // Splatting requires length 1, 2, or 4
@@ -790,14 +793,8 @@ iree_status_t DeviceInstance::HostBufferToDevice(
                   element_type_byte_size == 4;
   bool is_dense_row_major = true;
   for (int i = 0, s = num_dims; i < s; ++i) {
-    is_dense_row_major &= (shape[i] == dims[i]) && (perms[i] == i);
+    is_dense_row_major &= (input_shape[i] == dims[i]) && (perms[i] == i);
     is_splat &= (byte_strides[i] == 0) || (dims[i] == 1);
-  }
-
-  if (!is_splat && !is_dense_row_major && !has_zero_length) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "only dense, row-major layouts currently supported");
   }
 
   iree_device_size_t byte_length = element_type_byte_size;
@@ -806,6 +803,31 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   }
 
   byte_length = std::max(element_type_byte_size, byte_length);
+
+  std::vector<int8_t> transposed_data;
+  if (!is_dense_row_major) {
+    client().logger().debug(
+        "Performing transpose on host. This uses 2x memory and is slower than "
+        "doing the transpose on device. See: "
+        "https://github.com/openxla/openxla-pjrt-plugin/issues/201");
+    std::vector<int64_t> input_strides(num_dims);
+    std::vector<int64_t> input_dims(num_dims);
+    for (size_t i = 0; i < num_dims; i++) {
+      input_strides[perms[i]] = byte_strides[i];
+      input_dims[i] = input_shape[i];
+    }
+    transposed_data.resize(byte_length);
+    // TODO: use caching to improve performance of plan creation
+    auto transpose =
+        xla::TransposePlan::Create(element_type_byte_size, input_dims, perms,
+                                   xla::TransposePlan::Striding{input_strides});
+    if (!transpose.ok()) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unable to create transpose plan");
+    }
+    transpose.value()->Execute(data, transposed_data.data());
+    data = transposed_data.data();
+  }
 
   iree::vm::ref<iree_hal_buffer_t> buffer;
   // There are multiple ways to implement zero-copy/staged transfers and each
@@ -902,7 +924,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   // Wrap in a buffer view and return.
   iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      buffer.get(), num_dims, &shape[0], element_type,
+      buffer.get(), num_dims, &output_shape[0], element_type,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, client_.host_allocator(),
       &result_buffer_view));
 
