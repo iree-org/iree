@@ -31,6 +31,10 @@ cmake -G Ninja \
   -DIREE_BUILD_DOCS=ON
 cmake --build "${BUILD_DIR}" --target iree-doc
 
+if (( IREE_USE_CCACHE == 1 )); then
+  ccache --show-stats
+fi
+
 # Copy from build directory -> source directory (files are .gitignore'd).
 cp -r \
   "${BUILD_DIR}/doc/Dialects/." \
