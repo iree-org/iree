@@ -78,3 +78,4 @@ iree/builtins/**/bin/*.ll
 
 # Local cache files
 llvm-external-projects/iree-dialects/.cache
+iree-build*
