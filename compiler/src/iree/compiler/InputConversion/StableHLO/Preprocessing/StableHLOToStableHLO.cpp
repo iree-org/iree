@@ -1287,6 +1287,43 @@ struct DotToMul final : OpRewritePattern<mlir::stablehlo::DotOp> {
   }
 };
 
+// Rewrite RngBitGenerator with f32 return type to instead generate the same
+// number of i32 outputs, then BitcastConvert to return f32.
+struct RngBitcastFloat final
+    : OpRewritePattern<mlir::stablehlo::RngBitGeneratorOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::RngBitGeneratorOp op,
+                                PatternRewriter &rewriter) const override {
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
+    auto resultTy = dyn_cast<RankedTensorType>(op.getType(1));
+    auto stateTy = dyn_cast<RankedTensorType>(op.getType(0));
+
+    if (!isa<FloatType>(resultTy.getElementType())) {
+      return failure();
+    }
+
+    llvm::SmallVector<Type> castedTypes;
+    castedTypes.push_back(stateTy);
+    castedTypes.push_back(resultTy.clone(rewriter.getI32Type()));
+
+    TypeRange castedTypeRange = TypeRange{castedTypes};
+
+    auto resultOp = rewriter.create<mlir::stablehlo::RngBitGeneratorOp>(
+        op.getLoc(), castedTypeRange, op.getRngAlgorithm(), op.getOperand());
+
+    auto casted = rewriter.create<mlir::stablehlo::BitcastConvertOp>(
+        resultOp.getLoc(), resultTy, resultOp.getResult(1));
+
+    llvm::SmallVector<Value> results;
+    results.push_back(resultOp.getResult(0));
+    results.push_back(casted);
+
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+};
+
 // Similar to DotIsMul, this finds the case where a dot general
 // can be represented using a mul operation. This includes possibly making
 // an implicit cast explicit prior the mul.
@@ -1692,6 +1729,9 @@ struct StableHLOToStableHLOPreprocessing final
     populatePreprocessingComplexPatterns(context, &patterns);
     populatePreprocessingGatherToTorchIndexSelectPatterns(context, &patterns);
     patterns.insert<ExpandRngNormal, MulCastOfBool>(context);
+
+    // rng float conversion pattern
+    patterns.insert<RngBitcastFloat>(context);
 
     // scatter canonicalization patterns
     patterns.insert<ScatterInt64Indices, ScatterImplicitIndex,
