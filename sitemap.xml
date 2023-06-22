@@ -150,4 +150,54 @@
          <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/Check/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/Flow/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/HAL/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/HALInline/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/HALLoader/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/Stream/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/Util/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/VM/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/VMVX/</loc>
+         <lastmod>2023-06-22</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
 </urlset>

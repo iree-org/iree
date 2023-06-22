@@ -8,20 +8,20 @@
       
       
       
-        <link rel="canonical" href="https://openxla.github.io/iree/reference/bindings/c-api/">
+        <link rel="canonical" href="https://openxla.github.io/iree/reference/mlir-dialects/HALInline/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../HAL/">
       
       
-        <link rel="next" href="../python/">
+        <link rel="next" href="../HALLoader/">
       
       <link rel="icon" href="../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.16">
     
     
       
-        <title>Runtime C API - IREE</title>
+        <title>HALInline - IREE</title>
       
     
     
@@ -77,7 +77,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#c-api-bindings" class="md-skip">
+        <a href="#hal_inline-dialect" class="md-skip">
           Skip to content
         </a>
       
@@ -157,7 +157,7 @@
         <div data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Runtime C API
+              HALInline
             
           </span>
         </div>
@@ -919,18 +919,16 @@
               
   
   
-    
-  
   
     
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
       
       
         
@@ -949,7 +947,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../">API bindings</a>
+          <a href="../../bindings/">API bindings</a>
           
             <label for="__nav_4_2">
               <span class="md-nav__icon md-icon"></span>
@@ -957,13 +955,167 @@
           
         </div>
       
-      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
         <label class="md-nav__title" for="__nav_4_2">
           <span class="md-nav__icon md-icon"></span>
           API bindings
         </label>
         <ul class="md-nav__list" data-md-scrollfix>
           
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../bindings/c-api/" class="md-nav__link">
+        Runtime C API
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../bindings/python/" class="md-nav__link">
+        Python
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../bindings/tensorflow-lite/" class="md-nav__link">
+        TensorFlow Lite
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+    
+  
+  
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+      
+      
+      
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" checked>
+      
+      
+        
+          
+            
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="../">MLIR dialects</a>
+          
+            <label for="__nav_4_3">
+              <span class="md-nav__icon md-icon"></span>
+            </label>
+          
+        </div>
+      
+      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="true">
+        <label class="md-nav__title" for="__nav_4_3">
+          <span class="md-nav__icon md-icon"></span>
+          MLIR dialects
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Check/" class="md-nav__link">
+        Check
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Flow/" class="md-nav__link">
+        Flow
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../HAL/" class="md-nav__link">
+        HAL
+      </a>
+    </li>
+  
+
             
           
             
@@ -982,12 +1134,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          Runtime C API
+          HALInline
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Runtime C API
+        HALInline
       </a>
       
         
@@ -1006,71 +1158,114 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+  <a href="#operation-definition" class="md-nav__link">
+    Operation definition
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#concepts" class="md-nav__link">
-    Concepts
-  </a>
-  
-    <nav class="md-nav" aria-label="Concepts">
+    <nav class="md-nav" aria-label="Operation definition">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree-vm" class="md-nav__link">
-    IREE VM
+  <a href="#hal_inlinebufferallocate-iree_compilerireehalinlinebufferallocateop" class="md-nav__link">
+    hal_inline.buffer.allocate (iree_compiler::IREE::HAL::Inline::BufferAllocateOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree-hal" class="md-nav__link">
-    IREE HAL
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#using-the-c-api" class="md-nav__link">
-    Using the C API
-  </a>
-  
-    <nav class="md-nav" aria-label="Using the C API">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
-    Setup
+  <a href="#hal_inlinebufferallocateinitialized-iree_compilerireehalinlinebufferallocateinitializedop" class="md-nav__link">
+    hal_inline.buffer.allocate.initialized (iree_compiler::IREE::HAL::Inline::BufferAllocateInitializedOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#configure-stateful-objects" class="md-nav__link">
-    Configure stateful objects
+  <a href="#hal_inlinebufferlength-iree_compilerireehalinlinebufferlengthop" class="md-nav__link">
+    hal_inline.buffer.length (iree_compiler::IREE::HAL::Inline::BufferLengthOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#invoke-functions" class="md-nav__link">
-    Invoke functions
+  <a href="#hal_inlinebufferstorage-iree_compilerireehalinlinebufferstorageop" class="md-nav__link">
+    hal_inline.buffer.storage (iree_compiler::IREE::HAL::Inline::BufferStorageOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#cleanup-resources" class="md-nav__link">
-    Cleanup resources
+  <a href="#hal_inlinebuffersubspan-iree_compilerireehalinlinebuffersubspanop" class="md-nav__link">
+    hal_inline.buffer.subspan (iree_compiler::IREE::HAL::Inline::BufferSubspanOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebufferwrap-iree_compilerireehalinlinebufferwrapop" class="md-nav__link">
+    hal_inline.buffer.wrap (iree_compiler::IREE::HAL::Inline::BufferWrapOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewassert-iree_compilerireehalinlinebufferviewassertop" class="md-nav__link">
+    hal_inline.buffer_view.assert (iree_compiler::IREE::HAL::Inline::BufferViewAssertOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewbuffer-iree_compilerireehalinlinebufferviewbufferop" class="md-nav__link">
+    hal_inline.buffer_view.buffer (iree_compiler::IREE::HAL::Inline::BufferViewBufferOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewcreate-iree_compilerireehalinlinebufferviewcreateop" class="md-nav__link">
+    hal_inline.buffer_view.create (iree_compiler::IREE::HAL::Inline::BufferViewCreateOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewdim-iree_compilerireehalinlinebufferviewdimop" class="md-nav__link">
+    hal_inline.buffer_view.dim (iree_compiler::IREE::HAL::Inline::BufferViewDimOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewelement_type-iree_compilerireehalinlinebufferviewelementtypeop" class="md-nav__link">
+    hal_inline.buffer_view.element_type (iree_compiler::IREE::HAL::Inline::BufferViewElementTypeOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewencoding_type-iree_compilerireehalinlinebufferviewencodingtypeop" class="md-nav__link">
+    hal_inline.buffer_view.encoding_type (iree_compiler::IREE::HAL::Inline::BufferViewEncodingTypeOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewrank-iree_compilerireehalinlinebufferviewrankop" class="md-nav__link">
+    hal_inline.buffer_view.rank (iree_compiler::IREE::HAL::Inline::BufferViewRankOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewtrace-iree_compilerireehalinlinebufferviewtraceop" class="md-nav__link">
+    hal_inline.buffer_view.trace (iree_compiler::IREE::HAL::Inline::BufferViewTraceOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinedevicequery-iree_compilerireehalinlinedevicequeryop" class="md-nav__link">
+    hal_inline.device.query (iree_compiler::IREE::HAL::Inline::DeviceQueryOp)
   </a>
   
 </li>
@@ -1095,159 +1290,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../python/" class="md-nav__link">
-        Python
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tensorflow-lite/" class="md-nav__link">
-        TensorFlow Lite
-      </a>
-    </li>
-  
-
-            
-          
-        </ul>
-      </nav>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    
-      
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-      
-      
-      
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
-      
-      
-        
-          
-            
-          
-        
-          
-        
-          
-        
-          
-        
-          
-        
-          
-        
-          
-        
-          
-        
-          
-        
-          
-        
-      
-      
-        
-        
-        <div class="md-nav__link md-nav__link--index ">
-          <a href="../../mlir-dialects/">MLIR dialects</a>
-          
-            <label for="__nav_4_3">
-              <span class="md-nav__icon md-icon"></span>
-            </label>
-          
-        </div>
-      
-      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
-        <label class="md-nav__title" for="__nav_4_3">
-          <span class="md-nav__icon md-icon"></span>
-          MLIR dialects
-        </label>
-        <ul class="md-nav__list" data-md-scrollfix>
-          
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-dialects/Check/" class="md-nav__link">
-        Check
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-dialects/Flow/" class="md-nav__link">
-        Flow
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-dialects/HAL/" class="md-nav__link">
-        HAL
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-dialects/HALInline/" class="md-nav__link">
-        HALInline
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-dialects/HALLoader/" class="md-nav__link">
+      <a href="../HALLoader/" class="md-nav__link">
         HALLoader
       </a>
     </li>
@@ -1261,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Stream/" class="md-nav__link">
+      <a href="../Stream/" class="md-nav__link">
         Stream
       </a>
     </li>
@@ -1275,7 +1318,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Util/" class="md-nav__link">
+      <a href="../Util/" class="md-nav__link">
         Util
       </a>
     </li>
@@ -1289,7 +1332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/VM/" class="md-nav__link">
+      <a href="../VM/" class="md-nav__link">
         VM
       </a>
     </li>
@@ -1303,7 +1346,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/VMVX/" class="md-nav__link">
+      <a href="../VMVX/" class="md-nav__link">
         VMVX
       </a>
     </li>
@@ -1586,71 +1629,114 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+  <a href="#operation-definition" class="md-nav__link">
+    Operation definition
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#concepts" class="md-nav__link">
-    Concepts
-  </a>
-  
-    <nav class="md-nav" aria-label="Concepts">
+    <nav class="md-nav" aria-label="Operation definition">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree-vm" class="md-nav__link">
-    IREE VM
+  <a href="#hal_inlinebufferallocate-iree_compilerireehalinlinebufferallocateop" class="md-nav__link">
+    hal_inline.buffer.allocate (iree_compiler::IREE::HAL::Inline::BufferAllocateOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree-hal" class="md-nav__link">
-    IREE HAL
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#using-the-c-api" class="md-nav__link">
-    Using the C API
-  </a>
-  
-    <nav class="md-nav" aria-label="Using the C API">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
-    Setup
+  <a href="#hal_inlinebufferallocateinitialized-iree_compilerireehalinlinebufferallocateinitializedop" class="md-nav__link">
+    hal_inline.buffer.allocate.initialized (iree_compiler::IREE::HAL::Inline::BufferAllocateInitializedOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#configure-stateful-objects" class="md-nav__link">
-    Configure stateful objects
+  <a href="#hal_inlinebufferlength-iree_compilerireehalinlinebufferlengthop" class="md-nav__link">
+    hal_inline.buffer.length (iree_compiler::IREE::HAL::Inline::BufferLengthOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#invoke-functions" class="md-nav__link">
-    Invoke functions
+  <a href="#hal_inlinebufferstorage-iree_compilerireehalinlinebufferstorageop" class="md-nav__link">
+    hal_inline.buffer.storage (iree_compiler::IREE::HAL::Inline::BufferStorageOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#cleanup-resources" class="md-nav__link">
-    Cleanup resources
+  <a href="#hal_inlinebuffersubspan-iree_compilerireehalinlinebuffersubspanop" class="md-nav__link">
+    hal_inline.buffer.subspan (iree_compiler::IREE::HAL::Inline::BufferSubspanOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebufferwrap-iree_compilerireehalinlinebufferwrapop" class="md-nav__link">
+    hal_inline.buffer.wrap (iree_compiler::IREE::HAL::Inline::BufferWrapOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewassert-iree_compilerireehalinlinebufferviewassertop" class="md-nav__link">
+    hal_inline.buffer_view.assert (iree_compiler::IREE::HAL::Inline::BufferViewAssertOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewbuffer-iree_compilerireehalinlinebufferviewbufferop" class="md-nav__link">
+    hal_inline.buffer_view.buffer (iree_compiler::IREE::HAL::Inline::BufferViewBufferOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewcreate-iree_compilerireehalinlinebufferviewcreateop" class="md-nav__link">
+    hal_inline.buffer_view.create (iree_compiler::IREE::HAL::Inline::BufferViewCreateOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewdim-iree_compilerireehalinlinebufferviewdimop" class="md-nav__link">
+    hal_inline.buffer_view.dim (iree_compiler::IREE::HAL::Inline::BufferViewDimOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewelement_type-iree_compilerireehalinlinebufferviewelementtypeop" class="md-nav__link">
+    hal_inline.buffer_view.element_type (iree_compiler::IREE::HAL::Inline::BufferViewElementTypeOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewencoding_type-iree_compilerireehalinlinebufferviewencodingtypeop" class="md-nav__link">
+    hal_inline.buffer_view.encoding_type (iree_compiler::IREE::HAL::Inline::BufferViewEncodingTypeOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewrank-iree_compilerireehalinlinebufferviewrankop" class="md-nav__link">
+    hal_inline.buffer_view.rank (iree_compiler::IREE::HAL::Inline::BufferViewRankOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinebuffer_viewtrace-iree_compilerireehalinlinebufferviewtraceop" class="md-nav__link">
+    hal_inline.buffer_view.trace (iree_compiler::IREE::HAL::Inline::BufferViewTraceOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hal_inlinedevicequery-iree_compilerireehalinlinedevicequeryop" class="md-nav__link">
+    hal_inline.device.query (iree_compiler::IREE::HAL::Inline::DeviceQueryOp)
   </a>
   
 </li>
@@ -1681,208 +1767,796 @@
   
 
 
-<h1 id="c-api-bindings">C API bindings<a class="headerlink" href="#c-api-bindings" title="Permanent link">link</a></h1>
-<p>IREE provides a low level C API for its runtime<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>, which can be used directly or
-through higher level APIs and language bindings built on top of it.</p>
-<p>API header files are organized by runtime component:</p>
+<!-- Autogenerated by mlir-tblgen; don't manually edit -->
+<h1 id="hal_inline-dialect">'hal_inline' Dialect<a class="headerlink" href="#hal_inline-dialect" title="Permanent link">link</a></h1>
+<p>IREE inline HAL interop runtime module dialect.</p>
+<p>Low-level dialect for limited in-process ABI interop with the full HAL.
+Only operates synchronously, single-threaded, and on host-local buffers. Use
+the full HAL for all other cases.</p>
+<p>This dialect can be used alongside the full HAL but is intended for use in
+standalone configurations or paired with the <code>hal_loader</code> dialect which also
+carries the same usage restrictions.</p>
+<p>See <code>hal_inline.imports.mlir</code> for the full list of exported functions.</p>
+<div class="toc">
+<ul>
+<li><a href="#hal_inline-dialect">'hal_inline' Dialect</a><ul>
+<li><a href="#operation-definition">Operation definition</a><ul>
+<li><a href="#hal_inlinebufferallocate-iree_compilerireehalinlinebufferallocateop">hal_inline.buffer.allocate (iree_compiler::IREE::HAL::Inline::BufferAllocateOp)</a></li>
+<li><a href="#hal_inlinebufferallocateinitialized-iree_compilerireehalinlinebufferallocateinitializedop">hal_inline.buffer.allocate.initialized (iree_compiler::IREE::HAL::Inline::BufferAllocateInitializedOp)</a></li>
+<li><a href="#hal_inlinebufferlength-iree_compilerireehalinlinebufferlengthop">hal_inline.buffer.length (iree_compiler::IREE::HAL::Inline::BufferLengthOp)</a></li>
+<li><a href="#hal_inlinebufferstorage-iree_compilerireehalinlinebufferstorageop">hal_inline.buffer.storage (iree_compiler::IREE::HAL::Inline::BufferStorageOp)</a></li>
+<li><a href="#hal_inlinebuffersubspan-iree_compilerireehalinlinebuffersubspanop">hal_inline.buffer.subspan (iree_compiler::IREE::HAL::Inline::BufferSubspanOp)</a></li>
+<li><a href="#hal_inlinebufferwrap-iree_compilerireehalinlinebufferwrapop">hal_inline.buffer.wrap (iree_compiler::IREE::HAL::Inline::BufferWrapOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewassert-iree_compilerireehalinlinebufferviewassertop">hal_inline.buffer_view.assert (iree_compiler::IREE::HAL::Inline::BufferViewAssertOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewbuffer-iree_compilerireehalinlinebufferviewbufferop">hal_inline.buffer_view.buffer (iree_compiler::IREE::HAL::Inline::BufferViewBufferOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewcreate-iree_compilerireehalinlinebufferviewcreateop">hal_inline.buffer_view.create (iree_compiler::IREE::HAL::Inline::BufferViewCreateOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewdim-iree_compilerireehalinlinebufferviewdimop">hal_inline.buffer_view.dim (iree_compiler::IREE::HAL::Inline::BufferViewDimOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewelement_type-iree_compilerireehalinlinebufferviewelementtypeop">hal_inline.buffer_view.element_type (iree_compiler::IREE::HAL::Inline::BufferViewElementTypeOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewencoding_type-iree_compilerireehalinlinebufferviewencodingtypeop">hal_inline.buffer_view.encoding_type (iree_compiler::IREE::HAL::Inline::BufferViewEncodingTypeOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewrank-iree_compilerireehalinlinebufferviewrankop">hal_inline.buffer_view.rank (iree_compiler::IREE::HAL::Inline::BufferViewRankOp)</a></li>
+<li><a href="#hal_inlinebuffer_viewtrace-iree_compilerireehalinlinebufferviewtraceop">hal_inline.buffer_view.trace (iree_compiler::IREE::HAL::Inline::BufferViewTraceOp)</a></li>
+<li><a href="#hal_inlinedevicequery-iree_compilerireehalinlinedevicequeryop">hal_inline.device.query (iree_compiler::IREE::HAL::Inline::DeviceQueryOp)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<h2 id="operation-definition">Operation definition<a class="headerlink" href="#operation-definition" title="Permanent link">link</a></h2>
+<h3 id="hal_inlinebufferallocate-iree_compilerireehalinlinebufferallocateop"><code>hal_inline.buffer.allocate</code> (iree_compiler::IREE::HAL::Inline::BufferAllocateOp)<a class="headerlink" href="#hal_inlinebufferallocate-iree_compilerireehalinlinebufferallocateop" title="Permanent link">link</a></h3>
+<p><em>Empty buffer allocation operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.allocate` `alignment` `(` $minimum_alignment `)`
+              `:` custom&lt;SizeAwareType&gt;(type($result), $allocation_size) `in` type($storage)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Allocates a buffer of the given size.
+The size of the buffer returned may be larger than the requested size if the
+allocator has specific alignment requirements or minimum allocation sizes.</p>
+<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<h4 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h4>
 <table>
 <thead>
 <tr>
-<th>Component header file</th>
-<th>Overview</th>
+<th align="center">Operand</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/base/api.h">iree/base/api.h</a></td>
-<td>Core API, type definitions, ownership policies, utilities</td>
+<td align="center"><code>minimum_alignment</code></td>
+<td>index</td>
 </tr>
 <tr>
-<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/api.h">iree/vm/api.h</a></td>
-<td>VM APIs: loading modules, I/O, calling functions</td>
-</tr>
-<tr>
-<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/api.h">iree/hal/api.h</a></td>
-<td>HAL APIs: device management, synchronization, accessing hardware features</td>
+<td align="center"><code>allocation_size</code></td>
+<td>index</td>
 </tr>
 </tbody>
 </table>
-<p>The <a href="https://github.com/openxla/iree/tree/main/samples">samples/</a>
-directory demonstrates several ways to use IREE's C API.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>To use IREE's C API, you will need to build the runtime
-<a href="../../../building-from-source/getting-started/">from source</a>. The
-<a href="https://github.com/iml130/iree-template-cpp">iree-template-cpp</a> community
-project also shows how to integrate IREE into an external project using
-CMake.</p>
-<h2 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">link</a></h2>
-<p>By default, IREE uses its own tiny Virtual Machine (VM) at runtime to interpret
-program instructions on the host system. VM instructions may also be lowered
-further to LLVM IR, C, or other representations for static or resource
-constrained deployment.</p>
-<p>The VM supports generic operations like loads, stores, arithmetic, function
-calls, and control flow. It builds streams of more complex program logic and
-dense math into command buffers that are dispatched to hardware backends
-through the Hardware Abstraction Layer (HAL) interface.</p>
-<p>Most interaction with IREE's C API involves either the VM or the HAL.</p>
-<!-- TODO(scotttodd): diagrams -->
-
-<h3 id="iree-vm">IREE VM<a class="headerlink" href="#iree-vm" title="Permanent link">link</a></h3>
-<ul>
-<li>VM <em>instances</em> can serve multiple isolated execution <em>contexts</em></li>
-<li>VM <em>contexts</em> are effectively sandboxes for loading modules and running
-  programs</li>
-<li>VM <em>modules</em> provide extra functionality to execution <em>contexts</em>, such as
-  access to hardware accelerators through the HAL. Compiled user programs are
-  also modules.</li>
-</ul>
-<h3 id="iree-hal">IREE HAL<a class="headerlink" href="#iree-hal" title="Permanent link">link</a></h3>
-<ul>
-<li>HAL <em>drivers</em> are used to enumerate and create HAL <em>devices</em></li>
-<li>HAL <em>devices</em> interface with hardware, such as by allocating device memory,
-  preparing executables, recording and dispatching command buffers, and
-  synchronizing with the host</li>
-<li>HAL <em>buffers</em> and <em>buffer views</em> represent storage and shaped/typed views
-  into that storage (aka "tensors")</li>
-</ul>
-<h2 id="using-the-c-api">Using the C API<a class="headerlink" href="#using-the-c-api" title="Permanent link">link</a></h2>
-<h3 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">link</a></h3>
-<p>Include headers:</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/base/api.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/api.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/api.h&quot;</span>
-
-<span class="c1">// The VM bytecode and HAL modules will typically be included, along</span>
-<span class="c1">// with those for the specific HAL drivers your application uses.</span>
-<span class="c1">// Functionality extensions can be used via custom modules.</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/modules/hal/module.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/drivers/local_task/registration/driver_module.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/bytecode/module.h&quot;</span>
+<h4 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td align="center"><code>storage</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebufferallocateinitialized-iree_compilerireehalinlinebufferallocateinitializedop"><code>hal_inline.buffer.allocate.initialized</code> (iree_compiler::IREE::HAL::Inline::BufferAllocateInitializedOp)<a class="headerlink" href="#hal_inlinebufferallocateinitialized-iree_compilerireehalinlinebufferallocateinitializedop" title="Permanent link">link</a></h3>
+<p><em>Buffer allocation with cloning</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.allocate.initialized` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+              `alignment` `(` $minimum_alignment `)`
+              `:` custom&lt;SizeAwareType&gt;(type($result), ref($length)) `in` type($storage)
+              attr-dict-with-keyword
 </code></pre></div>
-<p>Check the API version and register components:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// Device drivers are managed through registries.</span>
-<span class="c1">// Applications may use multiple registries to more finely control driver</span>
-<span class="c1">// lifetimes and visibility.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_local_task_driver_module_register</span><span class="p">(</span>
-<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">()));</span>
+<p>Allocates a buffer with a copy of the provided contents.</p>
+<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<h4 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>minimum_alignment</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>source</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td align="center"><code>offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>length</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td align="center"><code>storage</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebufferlength-iree_compilerireehalinlinebufferlengthop"><code>hal_inline.buffer.length</code> (iree_compiler::IREE::HAL::Inline::BufferLengthOp)<a class="headerlink" href="#hal_inlinebufferlength-iree_compilerireehalinlinebufferlengthop" title="Permanent link">link</a></h3>
+<p><em>Buffer byte length accessor</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.length` `&lt;` $buffer `:` type($buffer) `&gt;`
+              `:` type($result)
+              attr-dict-with-keyword
 </code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>The <code>IREE_CHECK_OK()</code> macro calls <code>assert()</code> if an error occurs.
-Applications should propagate errors and handle or report them as desired.</p>
-</div>
-<h3 id="configure-stateful-objects">Configure stateful objects<a class="headerlink" href="#configure-stateful-objects" title="Permanent link">link</a></h3>
-<p>Create a VM instance along with a HAL driver and device:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// Applications should try to reuse instances so resource usage across contexts</span>
-<span class="c1">// is handled and extraneous device interaction is avoided.</span>
-<span class="n">iree_vm_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_instance_create</span><span class="p">(</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">));</span>
-
-<span class="c1">// Modules with custom types must be statically registered before use.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_all_types</span><span class="p">(</span><span class="n">instance</span><span class="p">));</span>
-
-<span class="c1">// We use the CPU &quot;local-task&quot; driver in this example, but could use a different</span>
-<span class="c1">// driver like the GPU &quot;vulkan&quot; driver. The driver(s) used should match with</span>
-<span class="c1">// the target(s) specified during compilation.</span>
-<span class="n">iree_hal_driver_t</span><span class="o">*</span><span class="w"> </span><span class="n">driver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_registry_try_create</span><span class="p">(</span>
-<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">(),</span>
-<span class="w">    </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span>
-<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">driver</span><span class="p">));</span>
-
-<span class="c1">// Drivers may support multiple devices, such as when a machine has multiple</span>
-<span class="c1">// GPUs. You may either enumerate devices and select based on their properties,</span>
-<span class="c1">// or just use the default device.</span>
-<span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_create_default_device</span><span class="p">(</span>
-<span class="w">    </span><span class="n">driver</span><span class="p">,</span><span class="w"> </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
-
-<span class="c1">// Create a HAL module initialized to use the newly created device.</span>
-<span class="c1">// We&#39;ll load this module into a VM context later.</span>
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">hal_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span>
-<span class="w">    </span><span class="n">iree_hal_module_create</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_MODULE_FLAG_NONE</span><span class="p">,</span>
-<span class="w">                           </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">hal_module</span><span class="p">));</span>
-<span class="c1">// The reference to the driver can be released now.</span>
-<span class="n">iree_hal_driver_release</span><span class="p">(</span><span class="n">driver</span><span class="p">);</span>
+<p>Returns the allocated size of a buffer in bytes.
+May be less than the underlying buffer allocation if this is a subspan or
+view into another buffer.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer</code></td>
+<td>buffer</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebufferstorage-iree_compilerireehalinlinebufferstorageop"><code>hal_inline.buffer.storage</code> (iree_compiler::IREE::HAL::Inline::BufferStorageOp)<a class="headerlink" href="#hal_inlinebufferstorage-iree_compilerireehalinlinebufferstorageop" title="Permanent link">link</a></h3>
+<p><em>Buffer backing storage accessor</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.storage` `&lt;` $buffer `:` type($buffer) `&gt;`
+              `:` type($storage)
+              attr-dict-with-keyword
 </code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>The default <code>iree_allocator_system()</code> is backed by <code>malloc</code> and <code>free</code>,
-but custom allocators may also be used.</p>
-</div>
-<p>Load a <abbr title="VM FlatBuffer">vmfb</abbr> bytecode module containing program data:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// (Application-specific loading into memory, such as loading from a file)</span>
-
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">bytecode_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_bytecode_module_create</span><span class="p">(</span>
-<span class="w">    </span><span class="n">instance</span><span class="p">,</span>
-<span class="w">    </span><span class="n">iree_const_byte_span_t</span><span class="p">{</span><span class="n">module_data</span><span class="p">,</span><span class="w"> </span><span class="n">module_size</span><span class="p">},</span>
-<span class="w">    </span><span class="cm">/*flatbuffer_allocator=*/</span><span class="n">iree_allocator_null</span><span class="p">(),</span>
-<span class="w">    </span><span class="cm">/*allocator=*/</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bytecode_module</span><span class="p">));</span>
+<p>Returns the host backing storage of the HAL buffer as a subspan limited to
+to the buffer's logical range (meaning that byte 0 of the returned buffer is
+byte 0 of the HAL buffer).</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer</code></td>
+<td>buffer</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>storage</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffersubspan-iree_compilerireehalinlinebuffersubspanop"><code>hal_inline.buffer.subspan</code> (iree_compiler::IREE::HAL::Inline::BufferSubspanOp)<a class="headerlink" href="#hal_inlinebuffersubspan-iree_compilerireehalinlinebuffersubspanop" title="Permanent link">link</a></h3>
+<p><em>Buffer subspan operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.subspan` `&lt;` $source_buffer `:` type($source_buffer) `&gt;`
+              `` `[` $source_offset `,` $length `]`
+              `:` type($result)
+              attr-dict-with-keyword
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Many IREE samples use
-<a href="https://github.com/openxla/iree/tree/main/build_tools/embed_data"><code>c_embed_data</code></a>
-to embed <abbr title="VM FlatBuffer">vmfb</abbr> files as C code to avoid file I/O and ease portability.
-Applications should use what makes sense for their platforms and deployment
-configurations.</p>
-</div>
-<p>Create a VM context and load modules into it:</p>
-<div class="highlight"><pre><span></span><code><span class="n">iree_vm_context_t</span><span class="o">*</span><span class="w"> </span><span class="n">context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">modules</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">hal_module</span><span class="p">,</span><span class="w"> </span><span class="n">bytecode_module</span><span class="p">};</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_create_with_modules</span><span class="p">(</span>
-<span class="w">    </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_CONTEXT_FLAG_NONE</span><span class="p">,</span>
-<span class="w">    </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">modules</span><span class="p">),</span><span class="w"> </span><span class="n">modules</span><span class="p">,</span>
-<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">context</span><span class="p">));</span>
-<span class="c1">// References to the modules can be released now.</span>
-<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">hal_module</span><span class="p">);</span>
-<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">bytecode_module</span><span class="p">);</span>
+<p>Returns a reference to a subspan of the buffer.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SizeAwareOpInterface</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>source_buffer</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td align="center"><code>source_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>length</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>buffer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebufferwrap-iree_compilerireehalinlinebufferwrapop"><code>hal_inline.buffer.wrap</code> (iree_compiler::IREE::HAL::Inline::BufferWrapOp)<a class="headerlink" href="#hal_inlinebufferwrap-iree_compilerireehalinlinebufferwrapop" title="Permanent link">link</a></h3>
+<p><em>Host buffer wrapping operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.wrap` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+              `:` type($result)
+              attr-dict-with-keyword
 </code></pre></div>
-<p>Look up the function(s) to call:</p>
-<div class="highlight"><pre><span></span><code><span class="n">iree_vm_function_t</span><span class="w"> </span><span class="n">main_function</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_resolve_function</span><span class="p">(</span>
-<span class="w">    </span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;module.main_function&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">main_function</span><span class="p">));</span>
+<p>Tries wrapping a !hal.buffer around host memory backed by the given byte
+buffer.</p>
+<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<h4 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>source</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td align="center"><code>offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>length</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>buffer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewassert-iree_compilerireehalinlinebufferviewassertop"><code>hal_inline.buffer_view.assert</code> (iree_compiler::IREE::HAL::Inline::BufferViewAssertOp)<a class="headerlink" href="#hal_inlinebuffer_viewassert-iree_compilerireehalinlinebufferviewassertop" title="Permanent link">link</a></h3>
+<p><em>Buffer view contents assertion</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.assert` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+              `message` `(` $message `)`
+              `shape` `(` `[` $shape `]` `)`
+              `type` `(` $element_type `)`
+              `encoding` `(` $encoding_type `)`
+              attr-dict-with-keyword
 </code></pre></div>
-<h3 id="invoke-functions">Invoke functions<a class="headerlink" href="#invoke-functions" title="Permanent link">link</a></h3>
-<!-- TODO(scotttodd): I/O buffers (TODO pending new helpers) -->
-
-<div class="highlight"><pre><span></span><code><span class="c1">// (Application-specific I/O buffer setup, making data available to the device)</span>
-
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_invoke</span><span class="p">(</span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">main_function</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_INVOCATION_FLAG_NONE</span><span class="p">,</span>
-<span class="w">                             </span><span class="cm">/*policy=*/</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">,</span><span class="w"> </span><span class="n">outputs</span><span class="p">,</span>
-<span class="w">                             </span><span class="n">iree_allocator_system</span><span class="p">()));</span>
-
-<span class="c1">// (Application-specific output buffer retrieval and reading back from the device)</span>
+<p>Asserts that the buffer view contains a data compatible tensor with the
+given encoding. Program execution will abort as if <code>std.assert</code> had been
+used.</p>
+<h4 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>message</code></td>
+<td align="center">::mlir::StringAttr</td>
+<td>string attribute</td>
+</tr>
+</tbody>
+</table>
+<h4 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer_view</code></td>
+<td>buffer_view</td>
+</tr>
+<tr>
+<td align="center"><code>element_type</code></td>
+<td>32-bit signless integer</td>
+</tr>
+<tr>
+<td align="center"><code>encoding_type</code></td>
+<td>32-bit signless integer</td>
+</tr>
+<tr>
+<td align="center"><code>shape</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewbuffer-iree_compilerireehalinlinebufferviewbufferop"><code>hal_inline.buffer_view.buffer</code> (iree_compiler::IREE::HAL::Inline::BufferViewBufferOp)<a class="headerlink" href="#hal_inlinebuffer_viewbuffer-iree_compilerireehalinlinebufferviewbufferop" title="Permanent link">link</a></h3>
+<p><em>Buffer view buffer accessor</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.buffer` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+              `:` type($result)
+              attr-dict-with-keyword
 </code></pre></div>
-<h3 id="cleanup-resources">Cleanup resources<a class="headerlink" href="#cleanup-resources" title="Permanent link">link</a></h3>
-<div class="highlight"><pre><span></span><code><span class="n">iree_hal_device_release</span><span class="p">(</span><span class="n">device</span><span class="p">);</span>
-<span class="n">iree_vm_context_release</span><span class="p">(</span><span class="n">context</span><span class="p">);</span>
-<span class="n">iree_vm_instance_release</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
+<p>Returns the buffer backing this view's contents.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer_view</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>buffer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewcreate-iree_compilerireehalinlinebufferviewcreateop"><code>hal_inline.buffer_view.create</code> (iree_compiler::IREE::HAL::Inline::BufferViewCreateOp)<a class="headerlink" href="#hal_inlinebuffer_viewcreate-iree_compilerireehalinlinebufferviewcreateop" title="Permanent link">link</a></h3>
+<p><em>Buffer view reference initializer</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.create` `buffer` `(` $source_buffer `:` type($source_buffer) `)`
+              `` `[` $source_offset `,` $source_length `]`
+              `shape` `(` `[` $shape `]` `)`
+              `type` `(` $element_type `)`
+              `encoding` `(` $encoding_type `)`
+              `:` type($result)
+              attr-dict-with-keyword
 </code></pre></div>
-<!-- ## Advanced usage -->
-
-<!-- TODO(scotttodd): async execution and synchronization -->
-<!-- TODO(scotttodd): specialized HAL APIs -->
-<!-- TODO(scotttodd): threadpools -->
-<!-- TODO(scotttodd): heterogenous execution -->
-
-<!-- ## Troubleshooting -->
-
-<!-- TODO(scotttodd): link to GitHub issues -->
-<!-- TODO(scotttodd): compiler/runtime compatibility -->
-<!-- TODO(scotttodd): common problems? object ownership? loaded modules (HAL)? -->
-
-<div class="footnote">
-<hr />
-<ol>
-<li id="fn:1">
-<p>We also have a C API for IREE's compiler, see
-  <a href="https://github.com/openxla/iree/issues/3817">this GitHub issue</a>&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
-</li>
-</ol>
-</div>
+<p>Creates a reference to a buffer with a particular shape and element type.
+The buffer is not copied and both the original and view references must be
+synchronized. This makes it easier to associate commonly-carried metadata
+along with the contents.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>source_buffer</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td align="center"><code>source_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>source_length</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>element_type</code></td>
+<td>32-bit signless integer</td>
+</tr>
+<tr>
+<td align="center"><code>encoding_type</code></td>
+<td>32-bit signless integer</td>
+</tr>
+<tr>
+<td align="center"><code>shape</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewdim-iree_compilerireehalinlinebufferviewdimop"><code>hal_inline.buffer_view.dim</code> (iree_compiler::IREE::HAL::Inline::BufferViewDimOp)<a class="headerlink" href="#hal_inlinebuffer_viewdim-iree_compilerireehalinlinebufferviewdimop" title="Permanent link">link</a></h3>
+<p><em>Buffer view dimension value query</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.dim` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+              `` `[` $index `]`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Returns the value of the given dimension.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>index</code></td>
+<td align="center">::mlir::IntegerAttr</td>
+<td>index attribute</td>
+</tr>
+</tbody>
+</table>
+<h4 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer_view</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewelement_type-iree_compilerireehalinlinebufferviewelementtypeop"><code>hal_inline.buffer_view.element_type</code> (iree_compiler::IREE::HAL::Inline::BufferViewElementTypeOp)<a class="headerlink" href="#hal_inlinebuffer_viewelement_type-iree_compilerireehalinlinebufferviewelementtypeop" title="Permanent link">link</a></h3>
+<p><em>Buffer view element type query</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.element_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Returns the element type of the buffer view.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer_view</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>32-bit signless integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewencoding_type-iree_compilerireehalinlinebufferviewencodingtypeop"><code>hal_inline.buffer_view.encoding_type</code> (iree_compiler::IREE::HAL::Inline::BufferViewEncodingTypeOp)<a class="headerlink" href="#hal_inlinebuffer_viewencoding_type-iree_compilerireehalinlinebufferviewencodingtypeop" title="Permanent link">link</a></h3>
+<p><em>Buffer view encoding type query</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.encoding_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Returns the encoding type of the buffer view.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer_view</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>32-bit signless integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewrank-iree_compilerireehalinlinebufferviewrankop"><code>hal_inline.buffer_view.rank</code> (iree_compiler::IREE::HAL::Inline::BufferViewRankOp)<a class="headerlink" href="#hal_inlinebuffer_viewrank-iree_compilerireehalinlinebufferviewrankop" title="Permanent link">link</a></h3>
+<p><em>Buffer view rank query</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.rank` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Returns the rank of the buffer view.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer_view</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>result</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinebuffer_viewtrace-iree_compilerireehalinlinebufferviewtraceop"><code>hal_inline.buffer_view.trace</code> (iree_compiler::IREE::HAL::Inline::BufferViewTraceOp)<a class="headerlink" href="#hal_inlinebuffer_viewtrace-iree_compilerireehalinlinebufferviewtraceop" title="Permanent link">link</a></h3>
+<p><em>Trace value(s) operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.trace` $operands `:` type($operands)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Traces out to a runtime trace sink (console, log file, etc) the given buffer
+views and titles them with the given key. The key is informational only and
+useful for titling/marking specific sets of buffers for easier searching.</p>
+<h4 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>key</code></td>
+<td align="center">::mlir::StringAttr</td>
+<td>string attribute</td>
+</tr>
+</tbody>
+</table>
+<h4 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>operands</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hal_inlinedevicequery-iree_compilerireehalinlinedevicequeryop"><code>hal_inline.device.query</code> (iree_compiler::IREE::HAL::Inline::DeviceQueryOp)<a class="headerlink" href="#hal_inlinedevicequery-iree_compilerireehalinlinedevicequeryop" title="Permanent link">link</a></h3>
+<p><em>Returns a runtime configuration parameter from the device</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.device.query` `key` `(` $category `:` `` `:` $key `)`
+              `:` type($ok) `,` type($value)
+              (`=` $default_value^)?
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Queries a device configuration parameter with the given key.
+Returns a status indicating whether the pair was recognized/available and if
+it was the value converted to the specified type. Queries must return the
+same value for the lifetime of the module though may vary from run to run.</p>
+<p>This is roughly equivalent to the <code>sysconf</code> linux syscall
+(https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
+set of keys available and their interpretation is target-dependent. If there
+is a HAL match attribute (<code>#hal.device.match.*</code>) or op
+(<code>hal.device.match.*</code>) prefer to use that in order to get compile-time
+propagation when the target is specified and elide the runtime query and
+get compile-time verification when a runtime query is required.</p>
+<p>Users of the op must check the <code>ok</code> result before using the value as what
+set of keys is available may change over time. If in doubt: don't use this.
+Each key used adds additional versioning and testing complexity as runtime
+code path changes will explode combinatorially and should be treated with as
+much care as a binary file format change. Keys should be prefixed with <code>ex.</code>
+when experimental indicating that they are not expected to be present
+forever; all non-experimental keys should be vetted.</p>
+<p>Well-known keys: (none yet)</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h4 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>category</code></td>
+<td align="center">::mlir::StringAttr</td>
+<td>string attribute</td>
+</tr>
+<tr>
+<td align="center"><code>key</code></td>
+<td align="center">::mlir::StringAttr</td>
+<td>string attribute</td>
+</tr>
+<tr>
+<td align="center"><code>default_value</code></td>
+<td align="center">::mlir::Attribute</td>
+<td>any attribute</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>ok</code></td>
+<td>1-bit signless integer</td>
+</tr>
+<tr>
+<td align="center"><code>value</code></td>
+<td>any type</td>
+</tr>
+</tbody>
+</table>
 
 
 

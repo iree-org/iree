@@ -8,27 +8,27 @@
       
       
       
-        <link rel="canonical" href="https://openxla.github.io/iree/building-from-source/riscv/">
+        <link rel="canonical" href="https://openxla.github.io/iree/reference/mlir-dialects/Check/">
       
       
-        <link rel="prev" href="../ios/">
+        <link rel="prev" href="../">
       
       
-        <link rel="next" href="../../guides/">
+        <link rel="next" href="../Flow/">
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.16">
     
     
       
-        <title>RISC-V cross-compilation - IREE</title>
+        <title>Check - IREE</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.26e3688c.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.26e3688c.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ecc896b0.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ecc896b0.min.css">
       
       
 
@@ -44,11 +44,11 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/extra.css">
     
-      <link rel="stylesheet" href="../../assets/stylesheets/openxla.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/openxla.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -77,7 +77,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#risc-v-cross-compilation" class="md-skip">
+        <a href="#check-dialect" class="md-skip">
           Skip to content
         </a>
       
@@ -129,13 +129,13 @@
       data-md-component="logo"
     >
       
-  <img src="../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
+  <img src="../../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
 
     </a>
 
     <!-- Link to site home -->
     <a
-      href="../.."
+      href="../../.."
       title="IREE"
       class="md-header__button md-logo"
       aria-label="IREE"
@@ -157,7 +157,7 @@
         <div data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              RISC-V cross-compilation
+              Check
             
           </span>
         </div>
@@ -298,7 +298,7 @@
 
 
   <li class="md-tabs__item">
-    <a href="../.." class="md-tabs__link">
+    <a href="../../.." class="md-tabs__link">
       Home
     </a>
   </li>
@@ -307,15 +307,13 @@
         
   
   
-    
-  
 
 
   
   
   
     <li class="md-tabs__item">
-      <a href="../" class="md-tabs__link md-tabs__link--active">
+      <a href="../../../building-from-source/" class="md-tabs__link">
         Building from source
       </a>
     </li>
@@ -331,7 +329,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../guides/" class="md-tabs__link">
+      <a href="../../../guides/" class="md-tabs__link">
         Guides
       </a>
     </li>
@@ -341,13 +339,15 @@
         
   
   
+    
+  
 
 
   
   
   
     <li class="md-tabs__item">
-      <a href="../../reference/" class="md-tabs__link">
+      <a href="../../" class="md-tabs__link md-tabs__link--active">
         Reference
       </a>
     </li>
@@ -363,7 +363,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../community/" class="md-tabs__link">
+      <a href="../../../community/" class="md-tabs__link">
         Community
       </a>
     </li>
@@ -380,8 +380,6 @@
         <div class="md-main__inner md-grid">
           
             
-              
-                
               
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
@@ -432,7 +430,7 @@
       data-md-component="logo"
     >
       
-  <img src="../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
+  <img src="../../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
 
     </a>
     <!-- Site title (nav item below links to site home) -->
@@ -465,7 +463,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         Home
       </a>
     </li>
@@ -478,16 +476,14 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
       
       
         
@@ -508,7 +504,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../">Building from source</a>
+          <a href="../../../building-from-source/">Building from source</a>
           
             <label for="__nav_2">
               <span class="md-nav__icon md-icon"></span>
@@ -516,7 +512,7 @@
           
         </div>
       
-      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
         <label class="md-nav__title" for="__nav_2">
           <span class="md-nav__icon md-icon"></span>
           Building from source
@@ -531,7 +527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/" class="md-nav__link">
+      <a href="../../../building-from-source/getting-started/" class="md-nav__link">
         Getting started
       </a>
     </li>
@@ -545,7 +541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../android/" class="md-nav__link">
+      <a href="../../../building-from-source/android/" class="md-nav__link">
         Android cross-compilation
       </a>
     </li>
@@ -559,7 +555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ios/" class="md-nav__link">
+      <a href="../../../building-from-source/ios/" class="md-nav__link">
         iOS cross-compilation
       </a>
     </li>
@@ -571,113 +567,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          RISC-V cross-compilation
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/riscv/" class="md-nav__link">
         RISC-V cross-compilation
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
-  </a>
-  
-    <nav class="md-nav" aria-label="Prerequisites">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#host-environment-setup" class="md-nav__link">
-    Host environment setup
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-risc-v-cross-compile-toolchain-and-emulator" class="md-nav__link">
-    Install RISC-V cross-compile toolchain and emulator
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configure-and-build" class="md-nav__link">
-    Configure and build
-  </a>
-  
-    <nav class="md-nav" aria-label="Configure and build">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#host-configuration" class="md-nav__link">
-    Host configuration
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#target-configuration" class="md-nav__link">
-    Target configuration
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#running-iree-bytecode-modules-on-the-risc-v-system" class="md-nav__link">
-    Running IREE bytecode modules on the RISC-V system
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-configuration" class="md-nav__link">
-    Optional configuration
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -719,7 +613,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../guides/">Guides</a>
+          <a href="../../../guides/">Guides</a>
           
             <label for="__nav_3">
               <span class="md-nav__icon md-icon"></span>
@@ -770,7 +664,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../guides/ml-frameworks/">ML frameworks</a>
+          <a href="../../../guides/ml-frameworks/">ML frameworks</a>
           
             <label for="__nav_3_2">
               <span class="md-nav__icon md-icon"></span>
@@ -793,7 +687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
         TensorFlow
       </a>
     </li>
@@ -807,7 +701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/ml-frameworks/tflite/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tflite/" class="md-nav__link">
         TensorFlow Lite
       </a>
     </li>
@@ -821,7 +715,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/ml-frameworks/jax/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/jax/" class="md-nav__link">
         JAX
       </a>
     </li>
@@ -835,7 +729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/ml-frameworks/pytorch/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/pytorch/" class="md-nav__link">
         PyTorch
       </a>
     </li>
@@ -884,7 +778,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../guides/deployment-configurations/">Deployment configurations</a>
+          <a href="../../../guides/deployment-configurations/">Deployment configurations</a>
           
             <label for="__nav_3_3">
               <span class="md-nav__icon md-icon"></span>
@@ -907,7 +801,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/deployment-configurations/cpu/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/cpu/" class="md-nav__link">
         CPU
       </a>
     </li>
@@ -921,7 +815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
         CPU - Bare-Metal
       </a>
     </li>
@@ -935,7 +829,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
         GPU - Vulkan
       </a>
     </li>
@@ -949,7 +843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/deployment-configurations/gpu-cuda-rocm/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-cuda-rocm/" class="md-nav__link">
         GPU - CUDA/ROCm
       </a>
     </li>
@@ -976,14 +870,16 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
       
       
         
@@ -1002,7 +898,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../reference/">Reference</a>
+          <a href="../../">Reference</a>
           
             <label for="__nav_4">
               <span class="md-nav__icon md-icon"></span>
@@ -1010,7 +906,7 @@
           
         </div>
       
-      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
         <label class="md-nav__title" for="__nav_4">
           <span class="md-nav__icon md-icon"></span>
           Reference
@@ -1051,7 +947,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../reference/bindings/">API bindings</a>
+          <a href="../../bindings/">API bindings</a>
           
             <label for="__nav_4_2">
               <span class="md-nav__icon md-icon"></span>
@@ -1074,7 +970,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/bindings/c-api/" class="md-nav__link">
+      <a href="../../bindings/c-api/" class="md-nav__link">
         Runtime C API
       </a>
     </li>
@@ -1088,7 +984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/bindings/python/" class="md-nav__link">
+      <a href="../../bindings/python/" class="md-nav__link">
         Python
       </a>
     </li>
@@ -1102,7 +998,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/bindings/tensorflow-lite/" class="md-nav__link">
+      <a href="../../bindings/tensorflow-lite/" class="md-nav__link">
         TensorFlow Lite
       </a>
     </li>
@@ -1121,16 +1017,18 @@
               
   
   
+    
+  
   
     
       
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" checked>
       
       
         
@@ -1161,7 +1059,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../reference/mlir-dialects/">MLIR dialects</a>
+          <a href="../">MLIR dialects</a>
           
             <label for="__nav_4_3">
               <span class="md-nav__icon md-icon"></span>
@@ -1169,7 +1067,7 @@
           
         </div>
       
-      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="true">
         <label class="md-nav__title" for="__nav_4_3">
           <span class="md-nav__icon md-icon"></span>
           MLIR dialects
@@ -1182,11 +1080,107 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/Check/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Check
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Check
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#operation-definition" class="md-nav__link">
+    Operation definition
+  </a>
+  
+    <nav class="md-nav" aria-label="Operation definition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_all_true-iree_compilerireecheckexpectalltrueop" class="md-nav__link">
+    check.expect_all_true (iree_compiler::IREE::Check::ExpectAllTrueOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_almost_eq-iree_compilerireecheckexpectalmosteqop" class="md-nav__link">
+    check.expect_almost_eq (iree_compiler::IREE::Check::ExpectAlmostEqOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_almost_eq_const-iree_compilerireecheckexpectalmosteqconstop" class="md-nav__link">
+    check.expect_almost_eq_const (iree_compiler::IREE::Check::ExpectAlmostEqConstOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_eq-iree_compilerireecheckexpecteqop" class="md-nav__link">
+    check.expect_eq (iree_compiler::IREE::Check::ExpectEqOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_eq_const-iree_compilerireecheckexpecteqconstop" class="md-nav__link">
+    check.expect_eq_const (iree_compiler::IREE::Check::ExpectEqConstOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_false-iree_compilerireecheckexpectfalseop" class="md-nav__link">
+    check.expect_false (iree_compiler::IREE::Check::ExpectFalseOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_true-iree_compilerireecheckexpecttrueop" class="md-nav__link">
+    check.expect_true (iree_compiler::IREE::Check::ExpectTrueOp)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1198,7 +1192,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/Flow/" class="md-nav__link">
+      <a href="../Flow/" class="md-nav__link">
         Flow
       </a>
     </li>
@@ -1212,7 +1206,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/HAL/" class="md-nav__link">
+      <a href="../HAL/" class="md-nav__link">
         HAL
       </a>
     </li>
@@ -1226,7 +1220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/HALInline/" class="md-nav__link">
+      <a href="../HALInline/" class="md-nav__link">
         HALInline
       </a>
     </li>
@@ -1240,7 +1234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/HALLoader/" class="md-nav__link">
+      <a href="../HALLoader/" class="md-nav__link">
         HALLoader
       </a>
     </li>
@@ -1254,7 +1248,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/Stream/" class="md-nav__link">
+      <a href="../Stream/" class="md-nav__link">
         Stream
       </a>
     </li>
@@ -1268,7 +1262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/Util/" class="md-nav__link">
+      <a href="../Util/" class="md-nav__link">
         Util
       </a>
     </li>
@@ -1282,7 +1276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/VM/" class="md-nav__link">
+      <a href="../VM/" class="md-nav__link">
         VM
       </a>
     </li>
@@ -1296,7 +1290,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/mlir-dialects/VMVX/" class="md-nav__link">
+      <a href="../VMVX/" class="md-nav__link">
         VMVX
       </a>
     </li>
@@ -1354,7 +1348,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/glossary/" class="md-nav__link">
+      <a href="../../glossary/" class="md-nav__link">
         Glossary
       </a>
     </li>
@@ -1368,7 +1362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/optimization-options/" class="md-nav__link">
+      <a href="../../optimization-options/" class="md-nav__link">
         Optimization options
       </a>
     </li>
@@ -1382,7 +1376,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/extensions/" class="md-nav__link">
+      <a href="../../extensions/" class="md-nav__link">
         Extensions
       </a>
     </li>
@@ -1431,7 +1425,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../community/">Community</a>
+          <a href="../../../community/">Community</a>
           
             <label for="__nav_5">
               <span class="md-nav__icon md-icon"></span>
@@ -1480,7 +1474,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../../community/blog/">Blog</a>
+          <a href="../../../community/blog/">Blog</a>
           
             <label for="__nav_5_2">
               <span class="md-nav__icon md-icon"></span>
@@ -1503,7 +1497,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../community/blog/2021-10-15-cuda-backend/" class="md-nav__link">
+      <a href="../../../community/blog/2021-10-15-cuda-backend/" class="md-nav__link">
         CUDA backend
       </a>
     </li>
@@ -1517,7 +1511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../community/blog/2021-10-13-mmt4d/" class="md-nav__link">
+      <a href="../../../community/blog/2021-10-13-mmt4d/" class="md-nav__link">
         Work in progress on Matrix Multiplication on CPU
       </a>
     </li>
@@ -1531,7 +1525,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../community/blog/2021-07-19-tflite-tosa/" class="md-nav__link">
+      <a href="../../../community/blog/2021-07-19-tflite-tosa/" class="md-nav__link">
         TFLite Support via TOSA
       </a>
     </li>
@@ -1560,8 +1554,6 @@
             
             
               
-                
-              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -1581,70 +1573,64 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+  <a href="#operation-definition" class="md-nav__link">
+    Operation definition
   </a>
   
-    <nav class="md-nav" aria-label="Prerequisites">
+    <nav class="md-nav" aria-label="Operation definition">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#host-environment-setup" class="md-nav__link">
-    Host environment setup
+  <a href="#checkexpect_all_true-iree_compilerireecheckexpectalltrueop" class="md-nav__link">
+    check.expect_all_true (iree_compiler::IREE::Check::ExpectAllTrueOp)
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#install-risc-v-cross-compile-toolchain-and-emulator" class="md-nav__link">
-    Install RISC-V cross-compile toolchain and emulator
+  <a href="#checkexpect_almost_eq-iree_compilerireecheckexpectalmosteqop" class="md-nav__link">
+    check.expect_almost_eq (iree_compiler::IREE::Check::ExpectAlmostEqOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_almost_eq_const-iree_compilerireecheckexpectalmosteqconstop" class="md-nav__link">
+    check.expect_almost_eq_const (iree_compiler::IREE::Check::ExpectAlmostEqConstOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_eq-iree_compilerireecheckexpecteqop" class="md-nav__link">
+    check.expect_eq (iree_compiler::IREE::Check::ExpectEqOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_eq_const-iree_compilerireecheckexpecteqconstop" class="md-nav__link">
+    check.expect_eq_const (iree_compiler::IREE::Check::ExpectEqConstOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_false-iree_compilerireecheckexpectfalseop" class="md-nav__link">
+    check.expect_false (iree_compiler::IREE::Check::ExpectFalseOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkexpect_true-iree_compilerireecheckexpecttrueop" class="md-nav__link">
+    check.expect_true (iree_compiler::IREE::Check::ExpectTrueOp)
   </a>
   
 </li>
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configure-and-build" class="md-nav__link">
-    Configure and build
-  </a>
-  
-    <nav class="md-nav" aria-label="Configure and build">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#host-configuration" class="md-nav__link">
-    Host configuration
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#target-configuration" class="md-nav__link">
-    Target configuration
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#running-iree-bytecode-modules-on-the-risc-v-system" class="md-nav__link">
-    Running IREE bytecode modules on the RISC-V system
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-configuration" class="md-nav__link">
-    Optional configuration
-  </a>
   
 </li>
       
@@ -1662,17 +1648,6 @@
                 
                   
   
-  
-
-
-  <nav class="md-tags" hidden>
-    
-      
-      
-        <span class="md-tag">CPU</span>
-      
-    
-  </nav>
 
 
 
@@ -1680,145 +1655,249 @@
   
 
 
-<h1 id="risc-v-cross-compilation">RISC-V cross-compilation<a class="headerlink" href="#risc-v-cross-compilation" title="Permanent link">link</a></h1>
-<p>Running on a platform like RISC-V involves cross-compiling from a <em>host</em>
-platform (e.g. Linux) to a <em>target</em> platform (a specific RISC-V CPU architecture
-and operating system):</p>
+<!-- Autogenerated by mlir-tblgen; don't manually edit -->
+<h1 id="check-dialect">'check' Dialect<a class="headerlink" href="#check-dialect" title="Permanent link">link</a></h1>
+<p>A dialect implementing test assertions for IREE modules.</p>
+<div class="toc">
 <ul>
-<li>IREE's <em>compiler</em> is built on the host and is used there to generate modules
-  for the target</li>
-<li>IREE's <em>runtime</em> is built on the host for the target. The runtime is then
-  pushed to the target to run natively.</li>
-</ul>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<h3 id="host-environment-setup">Host environment setup<a class="headerlink" href="#host-environment-setup" title="Permanent link">link</a></h3>
-<p>You should already be able to build IREE from source on your host platform.
-Please make sure you have followed the <a href="../getting-started/">getting started</a>
-steps.</p>
-<h3 id="install-risc-v-cross-compile-toolchain-and-emulator">Install RISC-V cross-compile toolchain and emulator<a class="headerlink" href="#install-risc-v-cross-compile-toolchain-and-emulator" title="Permanent link">link</a></h3>
-<p>You'll need a RISC-V LLVM compilation toolchain and a RISC-V enabled QEMU
-emulator.</p>
-<p>See instructions in the following links</p>
-<ul>
-<li><a href="https://clang.llvm.org/get_started.html">Clang getting started</a></li>
-<li><a href="https://github.com/riscv/riscv-gnu-toolchain">RISC-V GNU toolchain</a></li>
-<li><a href="https://github.com/qemu/qemu">QEMU</a></li>
-<li><a href="https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html">RISC-V Linux QEMU</a></li>
-</ul>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code>RISCV_TOOLCHAIN_ROOT</code> environment variable needs
-to be set to the root directory of the installed GNU toolchain when building
-the RISC-V compiler target and the runtime library.</p>
-</div>
-<h4 id="install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain">Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)<a class="headerlink" href="#install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain" title="Permanent link">link</a></h4>
-<p>Execute the following script to download the prebuilt RISC-V toolchain and QEMU
-from the IREE root directory:</p>
-<div class="highlight"><pre><span></span><code>./build_tools/riscv/riscv_bootstrap.sh
-</code></pre></div>
-<h4 id="support-vector-extension">Support vector extension<a class="headerlink" href="#support-vector-extension" title="Permanent link">link</a></h4>
-<p>For RISC-V vector extensions support, see
-<a href="#optional-configuration">additional instructions</a></p>
-<h2 id="configure-and-build">Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">link</a></h2>
-<h3 id="host-configuration">Host configuration<a class="headerlink" href="#host-configuration" title="Permanent link">link</a></h3>
-<p>Build and install on your host machine:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span>../iree-build/install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>.
-cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span class="w"> </span>--target<span class="w"> </span>install
-</code></pre></div>
-<h3 id="target-configuration">Target configuration<a class="headerlink" href="#target-configuration" title="Permanent link">link</a></h3>
-<p>The following instruction shows how to build for a RISC-V 64-bit Linux machine.
-For other RISC-V targets, please refer to
-<a href="https://github.com/openxla/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake">riscv.toolchain.cmake</a>
-as a reference of how to set up the cmake configuration.</p>
-<h4 id="risc-v-64-bit-linux-target">RISC-V 64-bit Linux target<a class="headerlink" href="#risc-v-64-bit-linux-target" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build-riscv/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;./build_tools/cmake/riscv.toolchain.cmake&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build/install/bin<span class="k">)</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DRISCV_CPU<span class="o">=</span>linux-riscv_64<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DRISCV_TOOLCHAIN_ROOT<span class="o">=</span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_ENABLE_CPUINFO<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>.
-cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-riscv/
-</code></pre></div>
-<h2 id="running-iree-bytecode-modules-on-the-risc-v-system">Running IREE bytecode modules on the RISC-V system<a class="headerlink" href="#running-iree-bytecode-modules-on-the-risc-v-system" title="Permanent link">link</a></h2>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The following instructions are meant for the RISC-V 64-bit Linux
-target. For the bare-metal target, please refer to
-<a href="https://github.com/openxla/iree/blob/main/samples/simple_embedding">simple_embedding</a>
-to see how to build a ML workload for a bare-metal machine.</p>
-</div>
-<p>Set the path to qemu-riscv64 Linux emulator binary in the <code>QEMU_BIN</code> environment
-variable. If it is installed with <code>riscv_bootstrap.sh</code>, the path is default at
-${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">QEMU_BIN</span><span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>qemu-riscv64<span class="w"> </span>binary&gt;
-</code></pre></div>
-<p>Invoke the host compiler tools to produce a bytecode module FlatBuffer:</p>
-<div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
-</code></pre></div>
-<p>Run the RISC-V emulation:</p>
-<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-cpu<span class="w"> </span>rv64<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-L<span class="w"> </span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>../iree-build-riscv/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-5
-</code></pre></div>
-<h2 id="optional-configuration">Optional configuration<a class="headerlink" href="#optional-configuration" title="Permanent link">link</a></h2>
-<p><a href="https://github.com/riscv/riscv-v-spec">RISC-V Vector extensions</a> allows SIMD
- code to run more efficiently. To enable the vector extension for the compiler
- toolchain and the emulator, build the tools from the following sources:</p>
-<ul>
-<li>RISC-V toolchain is built from
-<a href="https://github.com/llvm/llvm-project">https://github.com/llvm/llvm-project</a> (main branch).<ul>
-<li>Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
-  GNU linker, and C libraries. You need to build GNU toolchain first.</li>
-<li>Clone GNU toolchain from:
-  <a href="https://github.com/riscv/riscv-gnu-toolchain">https://github.com/riscv/riscv-gnu-toolchain</a>
-  (master branch). Switch the "riscv-binutils" submodule to
-  <code>git://sourceware.org/git/binutils-gdb.git</code> (master branch) manually.</li>
+<li><a href="#check-dialect">'check' Dialect</a><ul>
+<li><a href="#operation-definition">Operation definition</a><ul>
+<li><a href="#checkexpect_all_true-iree_compilerireecheckexpectalltrueop">check.expect_all_true (iree_compiler::IREE::Check::ExpectAllTrueOp)</a></li>
+<li><a href="#checkexpect_almost_eq-iree_compilerireecheckexpectalmosteqop">check.expect_almost_eq (iree_compiler::IREE::Check::ExpectAlmostEqOp)</a></li>
+<li><a href="#checkexpect_almost_eq_const-iree_compilerireecheckexpectalmosteqconstop">check.expect_almost_eq_const (iree_compiler::IREE::Check::ExpectAlmostEqConstOp)</a></li>
+<li><a href="#checkexpect_eq-iree_compilerireecheckexpecteqop">check.expect_eq (iree_compiler::IREE::Check::ExpectEqOp)</a></li>
+<li><a href="#checkexpect_eq_const-iree_compilerireecheckexpecteqconstop">check.expect_eq_const (iree_compiler::IREE::Check::ExpectEqConstOp)</a></li>
+<li><a href="#checkexpect_false-iree_compilerireecheckexpectfalseop">check.expect_false (iree_compiler::IREE::Check::ExpectFalseOp)</a></li>
+<li><a href="#checkexpect_true-iree_compilerireecheckexpecttrueop">check.expect_true (iree_compiler::IREE::Check::ExpectTrueOp)</a></li>
 </ul>
 </li>
-<li>RISC-V QEMU is built from
-<a href="https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh">https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh</a>.</li>
 </ul>
-<p>The SIMD code can be generated following the
-<a href="../../guides/deployment-configurations/cpu/">IREE CPU flow</a>
-with the additional command-line flags</p>
-<div class="highlight"><pre><span></span><code>tools/iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--iree-llvmcpu-target-triple<span class="o">=</span>riscv64<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-cpu<span class="o">=</span>generic-rv64<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-abi<span class="o">=</span>lp64d<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+zvl512b,+v&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
-</span></code></pre></div>
-<p>Then run on the RISC-V QEMU:</p>
-<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>-cpu<span class="w"> </span>rv64,x-v<span class="o">=</span>true,x-k<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">512</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-L<span class="w"> </span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>../iree-build-riscv/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>--module<span class="o">=</span>mobilenet_cpu.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+</li>
+</ul>
+</div>
+<h2 id="operation-definition">Operation definition<a class="headerlink" href="#operation-definition" title="Permanent link">link</a></h2>
+<h3 id="checkexpect_all_true-iree_compilerireecheckexpectalltrueop"><code>check.expect_all_true</code> (iree_compiler::IREE::Check::ExpectAllTrueOp)<a class="headerlink" href="#checkexpect_all_true-iree_compilerireecheckexpectalltrueop" title="Permanent link">link</a></h3>
+<p><em>Checks that the operand contains only values that are true</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_all_true` `(` $operand `)` attr-dict `:` type($operand)
 </code></pre></div>
+<p>Verifies that the operand contains true values, which are represented by any
+non-zero integer.</p>
+<p>Issues a non-fatal failure if the verification fails.</p>
+<div class="highlight"><pre><span></span><code>check.expect_all_true(%arg0) : !hal.buffer_view
+check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
+</code></pre></div>
+<h4 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>operand</code></td>
+<td>buffer_view or tensor of signless integer values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="checkexpect_almost_eq-iree_compilerireecheckexpectalmosteqop"><code>check.expect_almost_eq</code> (iree_compiler::IREE::Check::ExpectAlmostEqOp)<a class="headerlink" href="#checkexpect_almost_eq-iree_compilerireecheckexpectalmosteqop" title="Permanent link">link</a></h3>
+<p><em>Checks that the operands are almost equal</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+</code></pre></div>
+<p>Verifies that the buffer view or tensor operands with float elements are
+almost equal to within an implementation-defined "reasonable" tolerance.</p>
+<p>Issues a non-fatal failure if the verification fails.</p>
+<div class="highlight"><pre><span></span><code>check.expect_almost_eq(%arg0, %arg1) : tensor&lt;5xf32&gt;
+</code></pre></div>
+<p>Traits: SameTypeOperands</p>
+<h4 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>lhs</code></td>
+<td>buffer_view or tensor of floating-point values</td>
+</tr>
+<tr>
+<td align="center"><code>rhs</code></td>
+<td>buffer_view or tensor of floating-point values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="checkexpect_almost_eq_const-iree_compilerireecheckexpectalmosteqconstop"><code>check.expect_almost_eq_const</code> (iree_compiler::IREE::Check::ExpectAlmostEqConstOp)<a class="headerlink" href="#checkexpect_almost_eq_const-iree_compilerireecheckexpectalmosteqconstop" title="Permanent link">link</a></h3>
+<p><em>Checks that the tensor operand is almost equal to some constant</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+</code></pre></div>
+<p>Verifies that the tensor operand with float elements is almost equal to the
+constant attribute within an implementation-defined "reasonable" tolerance.</p>
+<p>Issues a non-fatal failure if the verification fails.</p>
+<p>This op is just a convenience wrapper around the expect_almost_eq op.</p>
+<div class="highlight"><pre><span></span><code>check.expect_almost_eq_const(%const0, dense&lt;[0.999999, 2.0]&gt; : tensor&lt;5xf32&gt;) : tensor&lt;5xf32&gt;
+</code></pre></div>
+<h4 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>value</code></td>
+<td align="center">::mlir::ElementsAttr</td>
+<td>constant vector/tensor attribute</td>
+</tr>
+</tbody>
+</table>
+<h4 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>lhs</code></td>
+<td>tensor of floating-point values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="checkexpect_eq-iree_compilerireecheckexpecteqop"><code>check.expect_eq</code> (iree_compiler::IREE::Check::ExpectEqOp)<a class="headerlink" href="#checkexpect_eq-iree_compilerireecheckexpecteqop" title="Permanent link">link</a></h3>
+<p><em>Checks that the tensor or buffer view operands are equal</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+</code></pre></div>
+<p>Verifies that the operands are exactly equal.</p>
+<p>Issues a non-fatal failure if the verification fails.</p>
+<div class="highlight"><pre><span></span><code>check.expect_eq(%arg0, %arg1) : tensor&lt;5xi32&gt;
+</code></pre></div>
+<p>Traits: SameTypeOperands</p>
+<h4 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>lhs</code></td>
+<td>buffer_view or tensor of any type values</td>
+</tr>
+<tr>
+<td align="center"><code>rhs</code></td>
+<td>buffer_view or tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="checkexpect_eq_const-iree_compilerireecheckexpecteqconstop"><code>check.expect_eq_const</code> (iree_compiler::IREE::Check::ExpectEqConstOp)<a class="headerlink" href="#checkexpect_eq_const-iree_compilerireecheckexpecteqconstop" title="Permanent link">link</a></h3>
+<p><em>Checks that the tensor operand is equal to some constant</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+</code></pre></div>
+<p>Verifies that the tensor operand is exactly equal to a constant attribute.</p>
+<p>Issues a non-fatal failure if the verification fails.</p>
+<p>This op is just a convenience wrapper around the expect_eq op.</p>
+<div class="highlight"><pre><span></span><code>check.expect_eq_const(%arg0, dense&lt;[1, 2]&gt; : tensor&lt;2xi32&gt;) : tensor&lt;2xi32&gt;
+</code></pre></div>
+<h4 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>value</code></td>
+<td align="center">::mlir::ElementsAttr</td>
+<td>constant vector/tensor attribute</td>
+</tr>
+</tbody>
+</table>
+<h4 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>lhs</code></td>
+<td>tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="checkexpect_false-iree_compilerireecheckexpectfalseop"><code>check.expect_false</code> (iree_compiler::IREE::Check::ExpectFalseOp)<a class="headerlink" href="#checkexpect_false-iree_compilerireecheckexpectfalseop" title="Permanent link">link</a></h3>
+<p><em>Checks that the operand is false</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_false` `(` $operand `)` attr-dict `:` type($operand)
+</code></pre></div>
+<p>Verifies that the operand contains a false value, which is represented by
+zero.</p>
+<p>Issues a non-fatal failure if the verification fails.</p>
+<div class="highlight"><pre><span></span><code>check.expect_false(%arg0) : i32
+</code></pre></div>
+<h4 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>operand</code></td>
+<td>signless integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="checkexpect_true-iree_compilerireecheckexpecttrueop"><code>check.expect_true</code> (iree_compiler::IREE::Check::ExpectTrueOp)<a class="headerlink" href="#checkexpect_true-iree_compilerireecheckexpecttrueop" title="Permanent link">link</a></h3>
+<p><em>Checks that the operand is true</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_true` `(` $operand `)` attr-dict `:` type($operand)
+</code></pre></div>
+<p>Verifies that the operand contains a true value, which is represented by
+any non-zero integer.</p>
+<p>Issues a non-fatal failure if the verification fails.</p>
+<div class="highlight"><pre><span></span><code>check.expect_true(%arg0) : i32
+</code></pre></div>
+<h4 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>operand</code></td>
+<td>signless integer</td>
+</tr>
+</tbody>
+</table>
 
 
-
-  
 
 
 
@@ -1893,10 +1972,10 @@ with the additional command-line flags</p>
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.sections", "navigation.tabs", "navigation.top", "navigation.indexes", "toc.follow"], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.sections", "navigation.tabs", "navigation.top", "navigation.indexes", "toc.follow"], "search": "../../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.a51614de.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.a51614de.min.js"></script>
       
     
   </body>
