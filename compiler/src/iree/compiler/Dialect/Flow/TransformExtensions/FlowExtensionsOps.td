@@ -87,14 +87,13 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
 
 def WrapInDispatchRegionOp : Op<
     Transform_Dialect, "iree.wrap_in_dispatch_region",
-    [FunctionalStyleTransformOpTrait,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
      TransformEachOpTrait,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Wrap the `target` op in a new `dispatch.region` op. All uses of target op
-    are replaces with the results of the newly generated `dispach.region` op.
+    are replaces with the results of the newly generated `dispatch.region` op.
 
     The argument `generateWorkload` can be set to generate workload information
     from the given `target` op.

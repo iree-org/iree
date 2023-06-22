@@ -587,7 +587,7 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
 
 void transform_dialect::MovePrecedingOpIntoDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::consumesHandle(getTarget(), effects);
   transform::consumesHandle(getDispatchRegion(), effects);
   transform::producesHandle(getTransformed(), effects);
   transform::modifiesPayload(effects);
@@ -817,7 +817,7 @@ transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
 
 void transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::consumesHandle(getTarget(), effects);
   transform::consumesHandle(getDispatchRegion(), effects);
   transform::producesHandle(getTransformed(), effects);
   transform::modifiesPayload(effects);
