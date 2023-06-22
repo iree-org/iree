@@ -134,10 +134,9 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
-    return CopyMapping::getMappingInfo(
-        ctx, totalNumThreads(),
-        /*alignment=*/n(),
-        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), blockTileN()});
+    return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
+                                       /*alignment=*/n(),
+                                       {blockTileM(), blockTileN()});
   }
 
   LogicalResult validateResCopyMapping() const override {
@@ -154,6 +153,13 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {
+    if (useFma) {
+      // When using FMA we don't need to map to warps, instead just match what
+      // the copy does.
+      return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
+                                         /*alignment=*/n(),
+                                         {blockTileM(), blockTileN()});
+    }
     return MappingInfo{/*numThreads=*/{numWarpsY(), numWarpsX()},
                        /*tileSizes=*/{},
                        /*threadMapping=*/{warpY(ctx), warpX(ctx)},
@@ -200,6 +206,14 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
       llvm::errs() << "pipeline depth too large for reduction tile size";
       return failure();
     }
+
+    bool oneOption =
+        (useMmaSync ^ useWmma ^ useFma) && !(useMmaSync && useWmma && useFma);
+    if (!oneOption) {
+      llvm::errs() << "at most one of useMmaSync, useWmma, useFma can be true";
+      return failure();
+    }
+
     if (useMmaSync) {
       if (blockTileM() < kMinMmaSyncMinM) {
         llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinM
@@ -226,7 +240,7 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
                      << kMinMmaSyncGroups << " k groups";
         return failure();
       }
-    } else {
+    } else if (useWmma) {
       if (blockTileM() < kMinWmmaMinM) {
         llvm::errs() << "wmma requires at least " << kMinWmmaMinM
                      << " block tile size in M";

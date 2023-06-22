@@ -86,6 +86,8 @@ struct AbstractGemmLikeStrategy {
   //===--------------------------------------------------------------------===//
   bool useAsyncCopies;
   bool useMmaSync;
+  bool useWmma;
+  bool useFma;
   int64_t pipelineDepth;
   virtual MappingInfo computeMapping() const = 0;
 
