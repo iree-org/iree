@@ -36,6 +36,7 @@ from typing import Dict, List, Sequence, Union
 
 import utils
 
+# TODO: Remove: localhost:5000/myrepo
 IREE_GCR_URL = "gcr.io/iree-oss/"
 DIGEST_REGEX = r"sha256:[a-zA-Z0-9]+"
 DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
@@ -43,6 +44,7 @@ DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
     "base": [],
+    "base-arm64": [],
     "manylinux2014_x86_64-release": [],
     "android": ["base"],
     "emscripten": ["base"],
@@ -245,18 +247,11 @@ if __name__ == "__main__":
             # access in builds.
             # We're assuming this is being run from the root of the repository.
             # FIXME: make this more robust to where it is run from.
-            utils.run_command(
-                [
-                    "docker",
-                    "build",
-                    "--file",
-                    image_path,
-                    "--tag",
-                    tagged_image_url,
-                    ".",
-                ],
-                dry_run=args.dry_run,
-            )
+            cmd = ["docker", "buildx", "build", "--file", image_path, "--load"]
+            if image == "base-arm64":
+                cmd.extend(["--platform", "linux/arm64"])
+            cmd.extend(["--tag", tagged_image_url, "."])
+            utils.run_command(cmd, dry_run=args.dry_run)
 
             utils.run_command(
                 ["docker", "push", tagged_image_url], dry_run=args.dry_run
