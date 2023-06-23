@@ -1,0 +1,378 @@
+OVERVIEW: IREE compilation driver
+
+USAGE: iree-compile [options] <input file or '-' for stdin>
+
+OPTIONS:
+
+Color Options:
+
+  --color                                                               - Use colors in output (default=autodetect)
+
+General options:
+
+  --aarch64-neon-syntax=<value>                                         - Choose style of NEON code to emit from AArch64 backend:
+    =generic                                                            -   Emit generic NEON assembly
+    =apple                                                              -   Emit Apple-style NEON assembly
+  --aarch64-use-aa                                                      - Enable the use of AA during codegen.
+  --abort-on-max-devirt-iterations-reached                              - Abort when the max iterations for devirtualization CGSCC repeat pass is reached
+  --allow-ginsert-as-artifact                                           - Allow G_INSERT to be considered an artifact. Hack around AMDGPU test infinite loops.
+  --arm-add-build-attributes                                            - 
+  --arm-implicit-it=<value>                                             - Allow conditional instructions outdside of an IT block
+    =always                                                             -   Accept in both ISAs, emit implicit ITs in Thumb
+    =never                                                              -   Warn in ARM, reject in Thumb
+    =arm                                                                -   Accept in ARM, reject in Thumb
+    =thumb                                                              -   Warn in ARM, emit implicit ITs in Thumb
+  --atomic-counter-update-promoted                                      - Do counter update using atomic fetch add  for promoted counters only
+  --atomic-first-counter                                                - Use atomic fetch add for first counter in a function (usually the entry counter)
+  --bounds-checking-single-trap                                         - Use one trap block per function
+  --cfg-hide-cold-paths=<number>                                        - Hide blocks with relative frequency below the given value
+  --cfg-hide-deoptimize-paths                                           - 
+  --cfg-hide-unreachable-paths                                          - 
+  --compile-to=<value>                                                  - Compilation phase to run up until before emitting output.
+    =input                                                              -   Performs input processing and lowering into core IREE input dialects (linalg/etc).
+    =abi                                                                -   Adjusts program ABI for the specified execution environment.
+    =preprocessing                                                      -   Compiles up to the `preprocessing` specified
+    =flow                                                               -   Compiles up to the `flow` dialect.
+    =stream                                                             -   Compiles up to the `stream` dialect.
+    =executable-sources                                                 -   Compiles up to just before `hal.executable`s are translated, excluding codegen.
+    =executable-targets                                                 -   Compiles up to translated `hal.executable`s, including codegen.
+    =hal                                                                -   Compiles up to the `hal` dialect, including codegen.
+    =vm                                                                 -   Compiles up to the `vm` dialect.
+    =end                                                                -   Complete the full compilation pipeline.
+  --cost-kind=<value>                                                   - Target cost kind
+    =throughput                                                         -   Reciprocal throughput
+    =latency                                                            -   Instruction latency
+    =code-size                                                          -   Code size
+    =size-latency                                                       -   Code size and latency
+  --debug-info-correlate                                                - Use debug info to correlate profiles.
+  --debugify-func-limit=<ulong>                                         - Set max number of processed functions per pass.
+  --debugify-level=<value>                                              - Kind of debug info to add
+    =locations                                                          -   Locations only
+    =location+variables                                                 -   Locations and Variables
+  --debugify-quiet                                                      - Suppress verbose debugify output
+  --disable-i2p-p2i-opt                                                 - Disables inttoptr/ptrtoint roundtrip optimization
+  --do-counter-promotion                                                - Do counter register promotion
+  --dot-cfg-mssa=<file name for generated dot file>                     - file name for generated dot file
+  --emscripten-cxx-exceptions-allowed=<string>                          - The list of function names in which Emscripten-style exception handling is enabled (see emscripten EMSCRIPTEN_CATCHING_ALLOWED options)
+  --enable-cse-in-irtranslator                                          - Should enable CSE in irtranslator
+  --enable-cse-in-legalizer                                             - Should enable CSE in Legalizer
+  --enable-emscripten-cxx-exceptions                                    - WebAssembly Emscripten-style exception handling
+  --enable-emscripten-sjlj                                              - WebAssembly Emscripten-style setjmp/longjmp handling
+  --enable-gvn-hoist                                                    - Enable the GVN hoisting pass (default = off)
+  --enable-gvn-memdep                                                   - 
+  --enable-gvn-sink                                                     - Enable the GVN sinking pass (default = off)
+  --enable-load-in-loop-pre                                             - 
+  --enable-load-pre                                                     - 
+  --enable-loop-simplifycfg-term-folding                                - 
+  --enable-name-compression                                             - Enable name/filename string compression
+  --enable-split-backedge-in-load-pre                                   - 
+  --experimental-debug-variable-locations                               - Use experimental new value-tracking variable locations
+  --force-tail-folding-style=<value>                                    - Force the tail folding style
+    =none                                                               -   Disable tail folding
+    =data                                                               -   Create lane mask for data only, using active.lane.mask intrinsic
+    =data-without-lane-mask                                             -   Create lane mask with compare/stepvector
+    =data-and-control                                                   -   Create lane mask using active.lane.mask intrinsic, and use it for both data and control flow
+    =data-and-control-without-rt-check                                  -   Similar to data-and-control, but remove the runtime check
+  --fs-profile-debug-bw-threshold=<uint>                                - Only show debug message if the source branch weight is greater  than this value.
+  --fs-profile-debug-prob-diff-threshold=<uint>                         - Only show debug message if the branch probility is greater than this value (in percentage).
+  --generate-merged-base-profiles                                       - When generating nested context-sensitive profiles, always generate extra base profile for function with all its context profiles merged into it.
+  --hash-based-counter-split                                            - Rename counter variable of a comdat function based on cfg hash
+  --hot-cold-split                                                      - Enable hot-cold splitting pass
+  --import-all-index                                                    - Import all external functions in index.
+  --instcombine-code-sinking                                            - Enable code sinking
+  --instcombine-guard-widening-window=<uint>                            - How wide an instruction window to bypass looking for another guard
+  --instcombine-max-num-phis=<uint>                                     - Maximum number phis to handle in intptr/ptrint folding
+  --instcombine-max-sink-users=<uint>                                   - Maximum number of undroppable users for instruction sinking
+  --instcombine-maxarray-size=<uint>                                    - Maximum array size considered when doing a combine
+  --instcombine-negator-enabled                                         - Should we attempt to sink negations?
+  --instcombine-negator-max-depth=<uint>                                - What is the maximal lookup depth when trying to check for viability of negation sinking.
+  --instrprof-atomic-counter-update-all                                 - Make all profile counter updates atomic (for testing only)
+  --internalize-public-api-file=<filename>                              - A file containing list of symbol names to preserve
+  --internalize-public-api-list=<list>                                  - A list of symbol names to preserve
+  --iree-codegen-check-ir-before-llvm-conversion                        - Runs the pass to check the IR generated from LLVMCPU before conversion to LLVM IR
+  --iree-codegen-enable-vector-padding                                  - Enable padding for vectorization
+  --iree-codegen-enable-vector-peeling                                  - Enable peeling for vectorization
+  --iree-codegen-enable-workgroup-specialization                        - Enable workgroup specialization.
+  --iree-codegen-gpu-native-math-precision                              - Skip polynomial lowering for math op natively available on GPU
+  --iree-codegen-llvm-generic-ops-workgroup-size=<int>                  - linalg.generic and linalg.indexed_generic workgroup tile size
+  --iree-codegen-llvm-generic-ops-workgroup-size-for-unpack-op=<int>    - Like iree-codegen-llvm-generic-ops-workgroup-size but specifically for UnpackOp
+  --iree-codegen-llvm-mmt4d-l1-tile-size=<int>                          - linalg.mmt4d L1 tile size
+  --iree-codegen-llvm-mmt4d-vector-size=<int>                           - linalg.mmt4d vector tile size
+  --iree-codegen-llvm-mmt4d-workgroup-tile-sizes=<int>                  - linalg.mmt4d workgroup tile size
+  --iree-codegen-llvm-number-of-threads=<int>                           - number of threads that are used at runtime
+  --iree-codegen-llvm-vector-size-in-bytes=<int>                        - native vector size to use on the hardware
+  --iree-codegen-llvm-verbose-debug-info                                - Emit verbose debug information in LLVM IR.
+  --iree-codegen-llvmcpu-enable-transform-dialect-jit                   - enable the usage of the transform dialect JIT
+  --iree-codegen-llvmcpu-transform-dialect-debug-payload-tag=<string>   - tag attribute value for the transform dialect interpreter payload root operation
+  --iree-codegen-llvmcpu-transform-dialect-debug-transform-tag=<string> - tag attribute value for the transform dialect transform op container
+  --iree-codegen-llvmcpu-use-transform-dialect=<string>                 - MLIR file containing a transform dialect specification to apply
+  --iree-codegen-llvmgpu-enable-transform-dialect-jit                   - enable the usage of the transform dialect JIT
+  --iree-codegen-llvmgpu-transform-dialect-debug-payload-tag=<string>   - tag attribute value for the transform dialect interpreter payload root operation
+  --iree-codegen-llvmgpu-transform-dialect-debug-transform-tag=<string> - tag attribute value for the transform dialect transform op container
+  --iree-codegen-llvmgpu-use-mma-sync                                   - use mma sync instead of wmma ops
+  --iree-codegen-llvmgpu-use-transform-dialect=<string>                 - MLIR file containing a transform dialect specification to apply
+  --iree-codegen-log-swizzle-tile=<uint>                                - log swizzle tile value
+  --iree-codegen-mmt4d-use-intrinsics                                   - Whether to use instrinsics when lowering vector contracts generated from mmt4d matmuls (as opposed to inline asm). Not for production use.
+  --iree-flow-demote-f32-to-f16                                         - Converts all f32 ops and values into f16 counterparts unconditionally before main flow conversions.
+  --iree-flow-demote-f64-to-f32                                         - Converts all f64 ops and values into f32 counterparts unconditionally before main flow conversions.
+  --iree-flow-demote-i64-to-i32                                         - Converts all i64 ops and values into i32 counterparts unconditionally before main flow conversions.
+  --iree-flow-dispatch-generate-workload-region                         - Generate the workload region
+  --iree-flow-dispatch-use-transform-dialect=<string>                   - mlir file containing a top-level module that specifies the transformations to apply to form dispatch regions.
+  --iree-flow-dump-dispatch-graph                                       - Dump a dot graph for dispatches
+  --iree-flow-dump-dispatch-graph-output-file=<string>                  - Output file name for a dispatch graph dump
+  --iree-flow-enable-aggressive-fusion                                  - Enable the aggressive fusion heuristic to fuse multiuse ops and ops with reduction loops
+  --iree-flow-enable-data-tiling                                        - Enable data tiling path
+  --iree-flow-enable-fuse-padding-into-linalg-consumer-ops              - Enable fusing tensor.pad ops into Linalg consumer ops
+  --iree-flow-export-benchmark-funcs                                    - Exports one function per original module entry point and unique flow.executable that dispatches with dummy arguments.
+  --iree-flow-inline-constants-max-byte-length=<int>                    - Maximum byte-length of tensor constant that can be inlined into a dispatch region or 0 to disable inlining.
+  --iree-flow-normalize-input-indexing-map                              - Enable normalizing input indexing map to identity
+  --iree-flow-promote-bf16-to-f32                                       - Converts all bf16 ops and values into f32 counterparts unconditionally before main flow conversions.
+  --iree-flow-promote-f16-to-f32                                        - Converts all f16 ops and values into f32 counterparts unconditionally before main flow conversions.
+  --iree-flow-split-matmul-reduction=<long>                             - split ratio
+  --iree-flow-topk-split-reduction=<long>                               - comma separated list of split ratios
+  --iree-flow-trace-dispatch-tensors                                    - Trace runtime input/output tensors for each dispatch function.
+  --iree-flow-zero-fill-empty-tensors                                   - Zero fill empty tensors instead of leaving them uninitialized
+  --iree-hal-benchmark-dispatch-repeat-count=<uint>                     - The number of times to repeat each hal.command_buffer.dispatch op. This simply duplicates the dispatch op and inserts barriers. It's meant for command buffers having linear dispatch structures.
+  --iree-hal-cuda-disable-loop-nounroll-wa                              - Disable the workaround for bug in ptxas for CUDA version before 11.4.
+  --iree-hal-cuda-dump-ptx                                              - Dump ptx to the debug stream.
+  --iree-hal-cuda-llvm-target-arch=<string>                             - LLVM target chip.
+  --iree-hal-executable-object-search-path=<string>                     - Additional search paths for resolving #hal.executable.object file references.
+  --iree-hal-instrument-dispatches=<power of two byte size>             - Enables dispatch instrumentation with a power-of-two byte size used for storage (16mib, 64mib, 2gib, etc).
+  --iree-hal-list-target-backends                                       - Lists all registered target backends for executable compilation.
+  --iree-hal-preprocess-executables-with=<string>                       - Passes each hal.executable to the given command. Multiple commands may be specified and they will be executed in order. A command may either be a pass pipeline available within the IREE compiler specified as `builtin.module(...)` or a shell tool that consumes a hal.executable MLIR file on stdin and produces a modified hal.executable on stdout. Non-zero exit codes will fail compilation.
+  --iree-hal-substitute-executable-object=<string>                      - A `executable_name=object_file.xxx` pair specifying a hal.executable symbol name that will be substituted with the object file at the given path. Object paths are relative to those specified on `--iree-hal-executable-object-search-path=`. If a `.mlir` or `.mlirbc` file is specified the entire executable will be replaced with an equivalently named hal.executable in the referenced file and otherwise the executable will be externalized and link the referenced file (`.ptx`/`.spv`/etc).
+  --iree-hal-substitute-executable-objects-from=<string>                - Substitutes any hal.executable with a file in the given path with the same name ala `--iree-hal-substitute-executable-object=`.
+  --iree-hal-substitute-executable-source=<string>                      - A `executable_name=object_file.xxx` pair specifying a hal.executable symbol name that will be substituted with the source object file at the given path. Source object paths are relative to those specified on `--iree-hal-executable-object-search-path=`. If a `.mlir` or `.mlirbc` file is specified the entire executable will be replaced with an equivalently named hal.executable in the referenced file and otherwise the executable will be externalized and link the referenced file (`.ptx`/`.spv`/etc).
+  --iree-hal-substitute-executable-sources-from=<string>                - Substitutes any hal.executable with a file in the given path with the same name ala `--iree-hal-substitute-executable-source=`.
+  --iree-llvmcpu-check-linalg-vectorization                             - Runs the pass to check if all the Linalg ops are vectorized
+  --iree-llvmcpu-debug-symbols                                          - Generate and embed debug information (DWARF, PDB, etc)
+  --iree-llvmcpu-embedded-linker-path=<string>                          - Tool used to link embedded ELFs produced by IREE (for --iree-llvmcpu-link-embedded=true).
+  --iree-llvmcpu-enable-hoist-padding                                   - Flag to enable hoist padding
+  --iree-llvmcpu-enable-pad-consumer-fusion                             - Flag to enable the fusion for pad + consumer
+  --iree-llvmcpu-enable-triple-tiling-pipeline                          - enable triple tiling expert for matmul kernels
+  --iree-llvmcpu-fail-on-out-of-bounds-stack-allocation                 - fail if the upper bound of dynamic stack allocation cannot be solved
+  --iree-llvmcpu-instrument-memory-accesses                             - Instruments memory accesses in dispatches when dispatch instrumentation is enabled.
+  --iree-llvmcpu-keep-linker-artifacts                                  - Keep LLVM linker target artifacts (.so/.dll/etc)
+  --iree-llvmcpu-link-embedded                                          - Links binaries into a platform-agnostic ELF to be loaded by the embedded IREE ELF loader
+  --iree-llvmcpu-link-static                                            - Links system libraries into binaries statically to isolate them from platform dependencies needed at runtime
+  --iree-llvmcpu-list-targets                                           - Lists all registered targets that the LLVM backend can generate code for.
+  --iree-llvmcpu-loop-interleaving                                      - Enable LLVM loop interleaving opt
+  --iree-llvmcpu-loop-unrolling                                         - Enable LLVM loop unrolling opt
+  --iree-llvmcpu-loop-vectorization                                     - Enable LLVM loop vectorization opt
+  --iree-llvmcpu-reassociate-fp-reductions                              - Enables reassociation for FP reductions
+  --iree-llvmcpu-sanitize=<value>                                       - Apply LLVM sanitize feature
+    =address                                                            -   Address sanitizer support
+    =thread                                                             -   Thread sanitizer support
+  --iree-llvmcpu-slp-vectorization                                      - Enable LLVM SLP Vectorization opt
+  --iree-llvmcpu-stack-allocation-limit=<int>                           - maximum allowed stack allocation size in bytes
+  --iree-llvmcpu-static-library-output-path=<string>                    - Path to output static object (EX: '/path/to/static-library.o'). This will produce the static library at the specified path along with a similarly named '.h' file for static linking.
+  --iree-llvmcpu-system-linker-path=<string>                            - Tool used to link system shared libraries produced by IREE (for --iree-llvmcpu-link-embedded=false).
+  --iree-llvmcpu-target-abi=<string>                                    - LLVM target machine ABI; specify for -mabi
+  --iree-llvmcpu-target-cpu=<string>                                    - LLVM target machine CPU; use 'host' for your host native CPU
+  --iree-llvmcpu-target-cpu-features=<string>                           - LLVM target machine CPU features; use 'host' for your host native CPU
+  --iree-llvmcpu-target-float-abi=<value>                               - LLVM target codegen enables soft float abi e.g -mfloat-abi=softfp
+    =default                                                            -   Default (softfp)
+    =soft                                                               -   Software floating-point emulation
+    =hard                                                               -   Hardware floating-point instructions
+  --iree-llvmcpu-target-triple=<string>                                 - LLVM target machine triple
+  --iree-llvmcpu-wasm-linker-path=<string>                              - Tool used to link WebAssembly modules produced by IREE (for --iree-llvmcpu-target-triple=wasm32-*).
+  --iree-mhlo-demote-f64-to-f32                                         - Converts all MHLO f64 ops and values into f32 counterparts.
+  --iree-mhlo-demote-i64-to-i32                                         - Converts all MHLO i64 ops and values into i32 counterparts.
+  --iree-mhlo-promote-bf16-to-f32                                       - Converts all MHLO bf16 ops and values into f32 counterparts.
+  --iree-spirv-index-bits=<int>                                         - Set the bit width of indices in SPIR-V.
+  --iree-stream-partitioning-favor=<value>                              - Default stream partitioning favor configuration.
+    =debug                                                              -   Force debug partitioning (no concurrency or pipelining).
+    =min-peak-memory                                                    -   Favor minimizing memory consumption at the cost of additional concurrency.
+    =max-concurrency                                                    -   Favor maximizing concurrency at the cost of additional memory consumption.
+  --iree-stream-resource-index-bits=<uint>                              - Bit width of indices used to reference resource offsets.
+  --iree-stream-resource-max-allocation-size=<ulong>                    - Maximum size of an individual memory allocation.
+  --iree-stream-resource-max-range=<ulong>                              - Maximum range of a resource binding; may be less than the max allocation size.
+  --iree-stream-resource-min-offset-alignment=<ulong>                   - Minimum required alignment in bytes for resource offsets.
+  --iree-util-zero-fill-elided-attrs                                    - Fills elided attributes with zeros when serializing.
+  --iree-vm-c-module-optimize                                           - Optimizes the VM module with CSE/inlining/etc prior to serialization
+  --iree-vm-c-module-output-format=<value>                              - Output format used to write the C module
+    =code                                                               -   C Code file
+    =mlir-text                                                          -   MLIR module file in the VM and EmitC dialects
+  --iree-vm-c-module-strip-debug-ops                                    - Strips debug-only ops from the module
+  --iree-vmvx-enable-microkernels                                       - Enables microkernel lowering for vmvx (experimental)
+  --iree-vmvx-enable-microkernels-decompose-linalg-generic              - Enables decomposition of linalg.generic ops when microkernels are enabled (experimental)
+  --iree-vulkan-target-env=<string>                                     - Vulkan target environment as #vk.target_env attribute assembly
+  --iree-vulkan-target-triple=<string>                                  - Vulkan target triple
+  --iterative-counter-promotion                                         - Allow counter promotion across the whole loop nest.
+  --load=<pluginfilename>                                               - Load the specified plugin
+  --lto-embed-bitcode=<value>                                           - Embed LLVM bitcode in object files produced by LTO
+    =none                                                               -   Do not embed
+    =optimized                                                          -   Embed after all optimization passes
+    =post-merge-pre-opt                                                 -   Embed post merge, but before optimizations
+  --matrix-default-layout=<value>                                       - Sets the default matrix layout
+    =column-major                                                       -   Use column-major layout
+    =row-major                                                          -   Use row-major layout
+  --matrix-print-after-transpose-opt                                    - 
+  --max-counter-promotions=<int>                                        - Max number of allowed counter promotions
+  --max-counter-promotions-per-loop=<uint>                              - Max number counter promotions per loop to avoid increasing register pressure too much
+  --mir-strip-debugify-only                                             - Should mir-strip-debug only strip debug info from debugified modules by default
+  --misexpect-tolerance=<uint>                                          - Prevents emiting diagnostics when profile counts are within N% of the threshold..
+  --mlir-disable-threading                                              - Disable multi-threading within MLIR, overrides any further call to MLIRContext::enableMultiThreading()
+  --mlir-elide-elementsattrs-if-larger=<uint>                           - Elide ElementsAttrs with "..." that have more elements than the given upper limit
+  --mlir-pass-pipeline-crash-reproducer=<string>                        - Generate a .mlir reproducer file at the given output path if the pass manager crashes or fails
+  --mlir-pass-pipeline-local-reproducer                                 - When generating a crash reproducer, attempt to generated a reproducer with the smallest pipeline.
+  --mlir-pass-statistics                                                - Display the statistics of each pass
+  --mlir-pass-statistics-display=<value>                                - Display method for pass statistics
+    =list                                                               -   display the results in a merged list sorted by pass name
+    =pipeline                                                           -   display the results with a nested pipeline view
+  --mlir-pretty-debuginfo                                               - Print pretty debug info in MLIR output
+  --mlir-print-debuginfo                                                - Print debug info in MLIR output
+  --mlir-print-elementsattrs-with-hex-if-larger=<long>                  - Print DenseElementsAttrs with a hex string that have more elements than the given upper limit (use -1 to disable)
+  --mlir-print-ir-after=<pass-arg>                                      - Print IR after specified passes
+  --mlir-print-ir-after-all                                             - Print IR after each pass
+  --mlir-print-ir-after-change                                          - When printing the IR after a pass, only print if the IR changed
+  --mlir-print-ir-after-failure                                         - When printing the IR after a pass, only print if the pass failed
+  --mlir-print-ir-before=<pass-arg>                                     - Print IR before specified passes
+  --mlir-print-ir-before-all                                            - Print IR before each pass
+  --mlir-print-ir-module-scope                                          - When printing IR for print-ir-[before|after]{-all} always print the top-level operation
+  --mlir-print-local-scope                                              - Print with local scope and inline information (eliding aliases for attributes, types, and locations
+  --mlir-print-op-on-diagnostic                                         - When a diagnostic is emitted on an operation, also print the operation as an attached note
+  --mlir-print-stacktrace-on-diagnostic                                 - When a diagnostic is emitted, also print the stack trace as an attached note
+  --mlir-print-value-users                                              - Print users of operation results and block arguments as a comment
+  --mlir-timing                                                         - Display execution times
+  --mlir-timing-display=<value>                                         - Display method for timing data
+    =list                                                               -   display the results in a list sorted by total time
+    =tree                                                               -   display the results ina with a nested tree view
+  --no-discriminators                                                   - Disable generation of discriminator information.
+  --nvptx-sched4reg                                                     - NVPTX Specific: schedule for register pressue
+  --opaque-pointers                                                     - Use opaque pointers
+  --poison-checking-function-local                                      - Check that returns are non-poison (for testing)
+  --print-pipeline-passes                                               - Print a '-passes' compatible string describing the pipeline (best-effort only).
+  --runtime-counter-relocation                                          - Enable relocating counters at runtime.
+  --safepoint-ir-verifier-print-only                                    - 
+  --sample-profile-check-record-coverage=<N>                            - Emit a warning if less than N% of records in the input profile are matched to the IR.
+  --sample-profile-check-sample-coverage=<N>                            - Emit a warning if less than N% of samples in the input profile are matched to the IR.
+  --sample-profile-max-propagate-iterations=<uint>                      - Maximum number of iterations to go through when propagating sample block/edge weights through the CFG.
+  --skip-ret-exit-block                                                 - Suppress counter promotion if exit blocks contain ret.
+  --speculative-counter-promotion-max-exiting=<uint>                    - The max number of exiting blocks of a loop to allow  speculative counter promotion
+  --speculative-counter-promotion-to-loop                               - When the option is false, if the target block is in a loop, the promotion will be disallowed unless the promoted counter  update can be further/iteratively promoted into an acyclic  region.
+  --split-input-file                                                    - Split the input file into pieces and process each chunk independently.
+  --summary-file=<string>                                               - The summary file to use for function importing.
+  --sve-tail-folding=<string>                                           - Control the use of vectorisation using tail-folding for SVE:
+                                                                          disabled    No loop types will vectorize using tail-folding
+                                                                          default     Uses the default tail-folding settings for the target CPU
+                                                                          all         All legal loop types will vectorize using tail-folding
+                                                                          simple      Use tail-folding for simple loops (not reductions or recurrences)
+                                                                          reductions  Use tail-folding for loops containing reductions
+                                                                          recurrences Use tail-folding for loops containing fixed order recurrences
+  --tail-predication=<value>                                            - MVE tail-predication pass options
+    =disabled                                                           -   Don't tail-predicate loops
+    =enabled-no-reductions                                              -   Enable tail-predication, but not for reduction loops
+    =enabled                                                            -   Enable tail-predication, including reduction loops
+    =force-enabled-no-reductions                                        -   Enable tail-predication, but not for reduction loops, and force this which might be unsafe
+    =force-enabled                                                      -   Enable tail-predication, including reduction loops, and force this which might be unsafe
+  --thinlto-assume-merged                                               - Assume the input has already undergone ThinLTO function importing and the other pre-optimization pipeline changes.
+  --type-based-intrinsic-cost                                           - Calculate intrinsics cost based only on argument types
+  --verify                                                              - Verifies the IR for correctness throughout compilation.
+  --verify-legalizer-debug-locs=<value>                                 - Verify that debug locations are handled
+    =none                                                               -   No verification
+    =legalizations                                                      -   Verify legalizations
+    =legalizations+artifactcombiners                                    -   Verify legalizations and artifact combines
+  --verify-region-info                                                  - Verify region info (time consuming)
+  --vp-counters-per-site=<number>                                       - The average number of profile counters allocated per value profiling site.
+  --vp-static-alloc                                                     - Do static counter allocation for value profiler
+  --wasm-enable-eh                                                      - WebAssembly exception handling
+  --wasm-enable-sjlj                                                    - WebAssembly setjmp/longjmp handling
+  --x86-align-branch=<string>                                           - Specify types of branches to align (plus separated list of types):
+                                                                          jcc      indicates conditional jumps
+                                                                          fused    indicates fused conditional jumps
+                                                                          jmp      indicates direct unconditional jumps
+                                                                          call     indicates direct and indirect calls
+                                                                          ret      indicates rets
+                                                                          indirect indicates indirect unconditional jumps
+  --x86-align-branch-boundary=<uint>                                    - Control how the assembler should align branches with NOP. If the boundary's size is not 0, it should be a power of 2 and no less than 32. Branches will be aligned to prevent from being across or against the boundary of specified size. The default value 0 does not align branches.
+  --x86-branches-within-32B-boundaries                                  - Align selected instructions to mitigate negative performance impact of Intel's micro code update for errata skx102.  May break assumptions about labels corresponding to particular instructions, and should be used with caution.
+  --x86-pad-max-prefix-size=<uint>                                      - Maximum number of prefixes to use for padding
+
+Generic Options:
+
+  --help                                                                - Display available options (--help-hidden for more)
+  --help-list                                                           - Display list of available options (--help-list-hidden for more)
+  --version                                                             - Display the version of this program
+
+IREE HAL executable target options:
+
+  --iree-hal-dump-executable-benchmarks-to=<string>                     - Path to write standalone hal.executable benchmarks into (- for stdout).
+  --iree-hal-dump-executable-binaries-to=<string>                       - Path to write translated and serialized executable binaries into.
+  --iree-hal-dump-executable-intermediates-to=<string>                  - Path to write translated executable intermediates (.bc, .o, etc) into.
+  --iree-hal-dump-executable-sources-to=<string>                        - Path to write individual hal.executable input source listings into (- for stdout).
+  --iree-hal-executable-debug-level=<int>                               - Debug level for executable translation (0-3)
+  --iree-hal-target-backends=<string>                                   - Target backends for executable compilation.
+
+IREE Main Options:
+
+  --compile-mode=<value>                                                - IREE compilation mode
+    =std                                                                -   Standard compilation
+    =vm                                                                 -   Compile from VM IR
+    =hal-executable                                                     -   Compile an MLIR module containing a single hal.executable into a target-specific binary form (such as an ELF file or a flatbuffer containing a SPIR-V blob)
+  -o <filename>                                                         - Output filename
+  --output-format=<value>                                               - Format of compiled output
+    =vm-bytecode                                                        -   IREE VM Bytecode (default)
+    =vm-c                                                               -   C source module
+    =vm-asm                                                             -   IREE VM MLIR Assembly
+
+IREE VM bytecode options:
+
+  --iree-vm-bytecode-module-optimize                                    - Optimizes the VM module with CSE/inlining/etc prior to serialization
+  --iree-vm-bytecode-module-output-format=<value>                       - Output format the bytecode module is written in
+    =flatbuffer-binary                                                  -   Binary FlatBuffer file
+    =flatbuffer-text                                                    -   Text FlatBuffer file, debug-only
+    =mlir-text                                                          -   MLIR module file in the VM dialect
+    =annotated-mlir-text                                                -   MLIR module file in the VM dialect with annotations
+  --iree-vm-bytecode-module-strip-debug-ops                             - Strips debug-only ops from the module
+  --iree-vm-bytecode-module-strip-source-map                            - Strips the source map from the module
+  --iree-vm-bytecode-source-listing=<string>                            - Dump a VM MLIR file and annotate source locations with it
+  --iree-vm-emit-polyglot-zip                                           - Enables output files to be viewed as zip files for debugging (only applies to binary targets)
+
+IREE VM target options:
+
+  --iree-vm-target-extension-f32                                        - Support f32 target opcode extensions.
+  --iree-vm-target-extension-f64                                        - Support f64 target opcode extensions.
+  --iree-vm-target-index-bits=<int>                                     - Bit width of index types.
+  --iree-vm-target-optimize-for-stack-size                              - Prefer optimizations that reduce VM stack usage over performance.
+  --iree-vm-target-truncate-unsupported-floats                          - Truncate f64 to f32 when unsupported.
+
+IREE options for apply custom preprocessing before normal IREE compilation flow:
+
+  --iree-preprocessing-pass-pipeline=<string>                           - Textual description of the pass pipeline to run before running normal IREE compilation pipelines
+
+IREE options for controlling high level optimizations.:
+
+  --iree-opt-const-eval                                                 - Enables eager evaluation of constants using the full compiler and runtime.
+  --iree-opt-const-expr-hoisting                                        - Hoists the results of latent constant expressions into immutable global initializers for evaluation at program load.
+  --iree-opt-numeric-precision-reduction                                - Reduces numeric precision to lower bit depths where possible.
+  --iree-opt-strip-assertions                                           - Strips debug assertions after any useful information has been extracted.
+
+IREE options for controlling host/device scheduling.:
+
+  --iree-execution-model=<value>                                        - Specifies the execution model used for scheduling tensor compute operations.
+    =host-only                                                          -   Host-local code only that does not need execution scheduling.
+    =async-internal                                                     -   Full HAL using asynchronous host/device execution internally but exporting functions as if synchronous.
+    =async-external                                                     -   Full HAL using asynchronous host/device execution both internally and externally.
+    =inline-static                                                      -   Inline host-local in-process execution with executable code statically linked into the host program.
+    =inline-dynamic                                                     -   Inline host-local in-process execution using dynamic executables.
+  --iree-scheduling-dump-statistics-file=<string>                       - File path to write statistics to; or `` for stderr or `-` for stdout.
+  --iree-scheduling-dump-statistics-format=<value>                      - Dumps statistics in the specified output format.
+    =pretty                                                             -   Human-readable pretty printed output.
+    =verbose                                                            -   Pretty printed output with additional IR.
+    =csv                                                                -   Comma separated values.
+    =json                                                               -   JSON output with structures for data exchange
+
+IREE options for controlling the input transformations to apply.:
+
+  --iree-input-type=<value>                                             - Specifies the input program representation.
+    =none                                                               -   No input dialect transformation.
+    =mhlo                                                               -   Legalize from MHLO ops.
+    =xla                                                                -   Legalize from MHLO ops (with XLA cleanup preprocessing).
+    =tm_tensor                                                          -   Legalize from TMTensor ops.
+    =tosa                                                               -   Legalize from TOSA ops.
+
+IREE translation binding support options.:
+
+  --iree-native-bindings-support                                        - Include runtime support for native IREE ABI-compatible bindings.
+  --iree-tflite-bindings-support                                        - Include runtime support for the IREE TFLite compatibility bindings.
