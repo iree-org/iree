@@ -30,10 +30,7 @@ class Android_VMVX_Benchmarks(object):
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
 
         gen_configs = [
@@ -61,4 +58,4 @@ class Android_VMVX_Benchmarks(object):
             device_specs=big_cores_devices,
         )
 
-        return (gen_configs, run_configs)
+        return run_configs

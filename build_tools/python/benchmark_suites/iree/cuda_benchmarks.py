@@ -50,10 +50,7 @@ class Linux_CUDA_Benchmarks(object):
         compile_config: iree_definitions.CompileConfig,
         execution_config: iree_definitions.ModuleExecutionConfig = module_execution_configs.CUDA_CONFIG,
         tags: Sequence[str] = (),
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=compile_config,
@@ -73,45 +70,38 @@ class Linux_CUDA_Benchmarks(object):
             tags=tags,
         )
 
-        return (gen_configs, run_module_configs)
+        return run_module_configs
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
         # The CUDA tag is required to put them into the CUDA benchmark preset.
-        gen_configs, run_configs = self._generate_configs(
+        run_configs = self._generate_configs(
             model_groups.CUDA_MODELS,
             self.SM_80_COMPILE_CONFIG,
             tags=[benchmark_tags.CUDA],
         )
-        ubench_gen_configs, ubench_run_configs = self._generate_configs(
+        ubench_run_configs = self._generate_configs(
             model_groups.MICRO_MATMUL,
             self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,
             execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
             tags=[benchmark_tags.CUDA],
         )
-        ubench_splitk_gen_configs, ubench_splitk_run_configs = self._generate_configs(
+        ubench_splitk_run_configs = self._generate_configs(
             model_groups.MICRO_MATMUL_SPLITK,
             self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
             execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
             tags=[benchmark_tags.CUDA],
         )
-        large_gen_configs, large_module_configs = self._generate_configs(
+        large_module_configs = self._generate_configs(
             model_groups.CUDA_MODELS_LONG,
             self.SM_80_COMPILE_CONFIG,
             tags=[benchmark_tags.CUDA, benchmark_tags.LARGE],
         )
         return (
-            gen_configs
-            + ubench_gen_configs
-            + ubench_splitk_gen_configs
-            + large_gen_configs,
             run_configs
             + ubench_run_configs
             + ubench_splitk_run_configs
-            + large_module_configs,
+            + large_module_configs
         )

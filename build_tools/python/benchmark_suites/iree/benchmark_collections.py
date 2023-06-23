@@ -94,6 +94,8 @@ def generate_benchmarks() -> (
         List[iree_definitions.E2EModelRunConfig],
     ]
 ):
+    """Generate the benchmark suite."""
+
     benchmarks = [
         x86_64_benchmarks.Linux_x86_64_Benchmarks(),
         cuda_benchmarks.Linux_CUDA_Benchmarks(),
@@ -105,12 +107,21 @@ def generate_benchmarks() -> (
         vulkan_nvidia_benchmarks.Linux_Vulkan_NVIDIA_Benchmarks(),
         vmvx_benchmarks.Android_VMVX_Benchmarks(),
     ]
-    all_gen_configs: List[iree_definitions.ModuleGenerationConfig] = []
     all_run_configs: List[iree_definitions.E2EModelRunConfig] = []
     for benchmark in benchmarks:
-        module_generation_configs, run_configs = benchmark.generate()
-        all_gen_configs += module_generation_configs
+        run_configs = benchmark.generate()
         all_run_configs += run_configs
+
+    # Collect all module generation configs in run configs.
+    all_gen_configs: List[iree_definitions.ModuleGenerationConfig] = []
+    added_gen_config_ids = set()
+    for run_config in all_run_configs:
+        print(run_config)
+        gen_config = run_config.module_generation_config
+        if gen_config.composite_id in added_gen_config_ids:
+            continue
+        added_gen_config_ids.add(gen_config.composite_id)
+        all_gen_configs.append(run_config.module_generation_config)
 
     validate_gen_configs(all_gen_configs)
     validate_run_configs(all_run_configs)

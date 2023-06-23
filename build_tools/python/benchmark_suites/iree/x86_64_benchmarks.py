@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE x86_64 benchmarks."""
 
-from typing import List, Sequence, Tuple
+from typing import List, Sequence
 from benchmark_suites.iree import benchmark_tags
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
@@ -45,11 +45,7 @@ class Linux_x86_64_Benchmarks(object):
         compile_config: iree_definitions.CompileConfig,
         device_specs: List[common_definitions.DeviceSpec],
         tags: Sequence[str] = [],
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
-        gen_configs_all = []
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         run_configs_all = []
 
         # We avoid the full combinatorial explosion of testing all models with all
@@ -80,17 +76,13 @@ class Linux_x86_64_Benchmarks(object):
                 tags=tags,
             )
 
-            gen_configs_all.append(gen_config)
             run_configs_all.extend(run_configs)
 
-        return (gen_configs_all, run_configs_all)
+        return run_configs_all
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
 
         cascadelake_devices = (
@@ -101,37 +93,29 @@ class Linux_x86_64_Benchmarks(object):
         )
 
         # The X86_64 tag is required to put them into the X86_64 benchmark preset.
-        default_gen_configs, default_run_configs = self._generate(
+        default_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG,
             self.CASCADELAKE_COMPILE_CONFIG,
             cascadelake_devices,
             tags=[benchmark_tags.X86_64],
         )
-        experimental_gen_configs, experimental_run_configs = self._generate(
+        experimental_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG_EXPERIMENTAL,
             self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
             cascadelake_devices,
             tags=[benchmark_tags.X86_64],
         )
 
-        large_gen_configs, large_run_configs = self._generate(
+        large_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG_LONG,
             self.CASCADELAKE_COMPILE_CONFIG,
             cascadelake_devices,
             tags=[benchmark_tags.X86_64, benchmark_tags.LARGE],
         )
 
-        return (
-            default_gen_configs + experimental_gen_configs + large_gen_configs,
-            default_run_configs + experimental_run_configs + large_run_configs,
-        )
+        return default_run_configs + experimental_run_configs + large_run_configs
 
 
-def generate() -> (
-    Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]
-):
+def generate() -> List[iree_definitions.E2EModelRunConfig]:
     """Generates all compile and run configs for IREE benchmarks."""
     return Linux_x86_64_Benchmarks().generate()

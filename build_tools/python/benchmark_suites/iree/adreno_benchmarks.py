@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE Adreno GPU benchmarks."""
 
-from typing import List, Tuple
+from typing import List
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
@@ -43,10 +43,7 @@ class Android_Adreno_Benchmarks(object):
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         default_models = [
             tflite_models.DEEPLABV3_FP32,
             tflite_models.MOBILESSD_FP32,
@@ -106,9 +103,4 @@ class Android_Adreno_Benchmarks(object):
             device_specs=adreno_devices,
         )
 
-        gen_configs = (
-            default_gen_configs
-            + fuse_padding_gen_configs
-            + fuse_padding_repeated_kernel_gen_configs
-        )
-        return (gen_configs, run_configs)
+        return run_configs

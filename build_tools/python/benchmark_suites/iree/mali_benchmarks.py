@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE Mali GPU benchmarks."""
 
-from typing import List, Sequence, Tuple
+from typing import List, Sequence
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
@@ -75,10 +75,7 @@ class Android_Mali_Benchmarks(object):
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         default_gen_configs = self._get_module_generation_configs(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             fp32_models=self.FP32_MODELS,
@@ -115,12 +112,7 @@ class Android_Mali_Benchmarks(object):
             device_specs=mali_devices,
         )
 
-        gen_configs = (
-            default_gen_configs
-            + experimental_gen_configs
-            + experimental_repeated_kernel_gen_configs
-        )
-        return (gen_configs, run_configs)
+        return run_configs
 
     def _get_module_generation_configs(
         self,

@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE ARMv8-A benchmarks."""
 
-from typing import List, Tuple
+from typing import List
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
@@ -62,10 +62,7 @@ class Android_ARMv8_A_Benchmarks(object):
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
 
         local_sync_execution_configs = [module_execution_configs.ELF_LOCAL_SYNC_CONFIG]
@@ -125,5 +122,4 @@ class Android_ARMv8_A_Benchmarks(object):
             device_specs=big_cores_devices,
         )
 
-        gen_confings = default_gen_confings + experimental_gen_confings
-        return (gen_confings, run_configs)
+        return run_configs
