@@ -42,7 +42,7 @@ function(iree_bytecode_module)
     _RULE
     "PUBLIC;TESTONLY"
     "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH"
-    "FLAGS;DEPENDS;DEPS;DATA"
+    "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
 
@@ -136,6 +136,15 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
+  set(_DEPENDS "")
+  iree_package_name(_PACKAGE_NAME)
+  list(TRANSFORM _RULE_DEPENDS REPLACE "^::" "${_PACKAGE_NAME}::")
+  foreach(_DEPEND ${_RULE_DEPENDS})
+    string(REPLACE "::" "_" _DEPEND "${_DEPEND}")
+    list(APPEND _DEPENDS ${_DEPEND})
+  endforeach()
+  message(STATUS "DEPENDS : " ${_DEPENDS})
+
   add_custom_command(
     OUTPUT
       ${_OUTPUT_FILES}
@@ -146,7 +155,7 @@ function(iree_bytecode_module)
       ${_COMPILE_TOOL}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
-      ${_RULE_DEPENDS}
+      ${_DEPENDS}
     COMMENT
       "Generating ${_MODULE_FILE_NAME} from ${_FRIENDLY_NAME}"
     VERBATIM
@@ -155,11 +164,9 @@ function(iree_bytecode_module)
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.
   iree_package_name(_PACKAGE_NAME)
-  set(_TARGET_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
-  add_custom_target("${_TARGET_NAME}"
+  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
     DEPENDS "${_MODULE_FILE_NAME}"
   )
-  iree_add_data_dependencies(NAME ${_TARGET_NAME} DATA ${_RULE_DATA})
 
   if(_RULE_TESTONLY)
     set(_TESTONLY_ARG "TESTONLY")

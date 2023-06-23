@@ -139,7 +139,8 @@ function(iree_cuda_bitcode_library)
     # Target architecture.
     "--cuda-gpu-arch=${_CUDA_ARCH}"
 
-    # Suppress warnings
+    # Suppress warnings about missing path to cuda lib,
+    # and benign warning about CUDA version.
     "-Wno-unknown-cuda-version"
     "-nocudalib"
     "--cuda-device-only"

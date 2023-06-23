@@ -130,6 +130,7 @@ def iree_bitcode_library(
 
     if not out:
         out = "%s.bc" % (name)
+
     native.genrule(
         name = name,
         srcs = bitcode_files,
@@ -189,9 +190,8 @@ def iree_cuda_bitcode_library(
         "-nocudalib",
         "--cuda-device-only",
 
-        # Optimized and unstamped.
+        # Optimized.
         "-O3",
-        "-DNDEBUG",
 
         # Object file only in bitcode format:
         "-c",
@@ -224,6 +224,7 @@ def iree_cuda_bitcode_library(
 
     if not out:
         out = "%s.bc" % (name)
+
     native.genrule(
         name = name,
         srcs = bitcode_files,

@@ -154,7 +154,6 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
-  DATA
-    iree::samples::custom_dispatch::cuda::kernels::cuda_ukernel
+  DEPENDS
+    ::cuda_ukernel
 )
-#add_dependencies(iree_samples_custom_dispatch_cuda_kernels_check_cuda_ukernel_ukernel_example.mlir_module iree_samples_custom_dispatch_cuda_kernels_cuda_ukernel)
