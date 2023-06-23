@@ -104,10 +104,6 @@ markdown_extensions:
   - tables
   - toc:  # Table of Contents
       permalink: 'link'  # Use Material font's "link" icon; see openxla.css
-
-      # TODO(scotttodd): per-file? Or add groups everywhere?
-      # TODO(scotttodd): remove section headers from Attribute Parameters?
-      #   replace `#### Parameters:` with `##### Parameters:`
       toc_depth: 4
 
 # Navigation with explicit ordering and nesting.
