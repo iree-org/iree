@@ -130,6 +130,7 @@ class ModuleExecutionConfig(object):
         id: str,
         loader: RuntimeLoader,
         driver: RuntimeDriver,
+        tags: Sequence[str] = (),
         extra_flags: Optional[Sequence[str]] = None,
         tags: Sequence[str] = (),
     ):

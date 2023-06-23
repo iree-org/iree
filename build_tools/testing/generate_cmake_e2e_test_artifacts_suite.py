@@ -45,15 +45,13 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-    # Currently benchmark is the only source of module generation configs.
+    # Currently IREE benchmark suite is the only source of configs.
     (
-        iree_module_generation_configs,
-        _,
+        gen_configs,
+        run_configs,
     ) = benchmark_suites.iree.benchmark_collections.generate_benchmarks()
 
-    dependent_model_map = iree_artifacts.get_dependent_model_map(
-        iree_module_generation_configs
-    )
+    dependent_model_map = iree_artifacts.get_dependent_model_map(gen_configs)
 
     root_path = pathlib.PurePath("${%s}" % ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE)
     model_rule_map = model_rule_generator.generate_model_rule_map(
@@ -73,7 +71,8 @@ def main(args: argparse.Namespace):
     iree_cmake_rules = iree_rule_generator.generate_rules(
         package_name=package_name,
         root_path=root_path,
-        module_generation_configs=iree_module_generation_configs,
+        gen_configs=gen_configs,
+        run_configs=run_configs,
         model_rule_map=model_rule_map,
     )
 

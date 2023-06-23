@@ -157,6 +157,7 @@ class DeviceSpec(object):
         device_name: str,
         host_environment: HostEnvironment,
         architecture: DeviceArchitecture,
+        tags: Sequence[str] = (),
         device_parameters: Optional[Sequence[str]] = None,
         tags: Sequence[str] = (),
     ):

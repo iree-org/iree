@@ -16,6 +16,8 @@ ANDROID_GPU = "android-gpu"
 CUDA = "cuda"
 # Large CUDA execution benchmarks.
 CUDA_LARGE = "cuda-large"
+# Default RISC-V execution benchamrks.
+RISCV = "riscv"
 # Default Vulkan NVIDIA execution benchamrks.
 VULKAN_NVIDIA = "vulkan-nvidia"
 # Default x86_64 execution benchmarks.
@@ -33,6 +35,7 @@ DEFAULT_PRESETS = [
     ANDROID_CPU,
     ANDROID_GPU,
     CUDA,
+    RISCV,
     VULKAN_NVIDIA,
     X86_64,
 ]

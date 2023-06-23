@@ -178,14 +178,31 @@ class IreeGeneratorTest(unittest.TestCase):
         gen_config_c = iree_definitions.ModuleGenerationConfig.build(
             imported_model=imported_model_b, compile_config=compile_config_b
         )
+        run_config_a = iree_definitions.E2EModelRunConfig.build(
+            module_generation_config=gen_config_a,
+            module_execution_config=iree_definitions.ModuleExecutionConfig.build(
+                id="exec_a",
+                loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+                driver=iree_definitions.RuntimeDriver.LOCAL_SYNC,
+            ),
+            target_device_spec=common_definitions.DeviceSpec.build(
+                id="dev_a",
+                device_name="dev_a",
+                host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+                architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+            ),
+            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+            presets=["test"],
+        )
         model_rule_map = {
             model_a.id: model_rule_generator.ModelRule(
-                target_name=f"model-x",
+                target_name="model-x",
                 file_path=pathlib.PurePath("x.tflite"),
                 cmake_rules=["abc"],
             ),
             model_b.id: model_rule_generator.ModelRule(
-                target_name=f"model-y",
+                target_name="model-y",
                 file_path=pathlib.PurePath("root/model_5678_stablehlo_m.mlir"),
                 cmake_rules=["efg"],
             ),
@@ -194,7 +211,8 @@ class IreeGeneratorTest(unittest.TestCase):
         cmake_rules = iree_rule_generator.generate_rules(
             package_name="${package}",
             root_path=pathlib.PurePath("root"),
-            module_generation_configs=[gen_config_a, gen_config_b, gen_config_c],
+            gen_configs=[gen_config_a, gen_config_b, gen_config_c],
+            run_configs=[run_config_a],
             model_rule_map=model_rule_map,
         )
 

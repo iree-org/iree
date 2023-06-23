@@ -5,13 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates all benchmarks."""
 
+import collections
 import re
 from typing import List, Tuple, Sequence
 
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 from benchmark_suites.iree import (
-    benchmark_tags,
+    benchmark_presets,
     riscv_benchmarks,
     x86_64_benchmarks,
     adreno_benchmarks,
@@ -114,9 +115,12 @@ def generate_benchmarks() -> (
 
     # Collect all module generation configs in run configs.
     all_gen_configs = {}
+    gen_config_dependents = collections.defaultdict(list)
     for run_config in all_run_configs:
         gen_config = run_config.module_generation_config
         all_gen_configs[gen_config.composite_id] = gen_config
+        gen_config_dependents[gen_config.composite_id].append(run_config)
+
     all_gen_configs = list(all_gen_configs.values())
 
     validate_gen_configs(all_gen_configs)
@@ -130,7 +134,7 @@ def generate_benchmarks() -> (
         scheduling_stats_path = f"{iree_definitions.MODULE_DIR_VARIABLE}/{iree_artifacts.SCHEDULING_STATS_FILENAME}"
         compile_stats_config = iree_definitions.CompileConfig.build(
             id=compile_config.id + COMPILE_STATS_ID_SUFFIX,
-            tags=compile_config.tags + [benchmark_tags.COMPILE_STATS],
+            tags=compile_config.tags + ["compile-stats"],
             compile_targets=compile_config.compile_targets,
             extra_flags=compile_config.extra_flags
             + [
@@ -143,10 +147,26 @@ def generate_benchmarks() -> (
                 f"--iree-scheduling-dump-statistics-file={scheduling_stats_path}",
             ],
         )
+
+        dependents = gen_config_dependents[gen_config.composite_id]
+        compile_stats_presets = set()
+        for dependent in dependents:
+            dep_presets = set(dependent.presets)
+            # Assign compilation benchmark presets based on the size of the
+            # original benchmarks.
+            # A benchmark can be in default and large presets at the same time,
+            # for example, batch-1 benchmark is added to default for sanity
+            # check. So check both cases.
+            if dep_presets.intersection(benchmark_presets.DEFAULT_PRESETS):
+                compile_stats_presets.add(benchmark_presets.COMP_STATS)
+            if dep_presets.intersection(benchmark_presets.LARGE_PRESETS):
+                compile_stats_presets.add(benchmark_presets.COMP_STATS_LARGE)
+
         compile_stats_gen_configs.append(
             iree_definitions.ModuleGenerationConfig.build(
                 imported_model=gen_config.imported_model,
                 compile_config=compile_stats_config,
+                presets=sorted(compile_stats_presets),
                 tags=gen_config.tags,
             )
         )
