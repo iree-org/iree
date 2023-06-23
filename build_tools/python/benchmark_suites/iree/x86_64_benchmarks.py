@@ -6,13 +6,12 @@
 """Defines IREE x86_64 benchmarks."""
 
 from typing import List, Sequence
-from benchmark_suites.iree import benchmark_tags
+
+from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
-from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import unique_ids
-from benchmark_suites.iree import module_execution_configs
-import benchmark_suites.iree.utils
 
 
 class Linux_x86_64_Benchmarks(object):
@@ -44,10 +43,9 @@ class Linux_x86_64_Benchmarks(object):
         benchmark_configs: List[common_definitions.CpuBenchmarkConfig],
         compile_config: iree_definitions.CompileConfig,
         device_specs: List[common_definitions.DeviceSpec],
-        tags: Sequence[str] = [],
+        presets: Sequence[str],
     ) -> List[iree_definitions.E2EModelRunConfig]:
         run_configs_all = []
-
         # We avoid the full combinatorial explosion of testing all models with all
         # thread counts and instead test each model with a number of threads
         # appropriate for its size and configurations we're interested in.
@@ -55,7 +53,6 @@ class Linux_x86_64_Benchmarks(object):
             gen_config = iree_definitions.ModuleGenerationConfig.build(
                 compile_config=compile_config,
                 imported_model=iree_definitions.ImportedModel.from_model(config.model),
-                tags=tags,
             )
 
             execution_configs = []
@@ -69,11 +66,11 @@ class Linux_x86_64_Benchmarks(object):
                         module_execution_configs.get_elf_local_task_config(thread)
                     )
 
-            run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+            run_configs = utils.generate_e2e_model_run_configs(
                 module_generation_configs=[gen_config],
                 module_execution_configs=execution_configs,
                 device_specs=device_specs,
-                tags=tags,
+                presets=presets,
             )
 
             run_configs_all.extend(run_configs)
@@ -97,20 +94,20 @@ class Linux_x86_64_Benchmarks(object):
             model_groups.X86_64_BENCHMARK_CONFIG,
             self.CASCADELAKE_COMPILE_CONFIG,
             cascadelake_devices,
-            tags=[benchmark_tags.X86_64],
+            presets=[benchmark_presets.X86_64],
         )
         experimental_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG_EXPERIMENTAL,
             self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
             cascadelake_devices,
-            tags=[benchmark_tags.X86_64],
+            presets=[benchmark_presets.X86_64],
         )
 
         large_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG_LONG,
             self.CASCADELAKE_COMPILE_CONFIG,
             cascadelake_devices,
-            tags=[benchmark_tags.X86_64, benchmark_tags.LARGE],
+            presets=[benchmark_presets.X86_64_LARGE],
         )
 
         return default_run_configs + experimental_run_configs + large_run_configs

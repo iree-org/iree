@@ -6,12 +6,12 @@
 """Defines IREE Vulkan NVIDIA benchmarks."""
 
 from typing import List, Sequence
-from benchmark_suites.iree import benchmark_tags, module_execution_configs
+
+from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
-import benchmark_suites.iree.utils
 
 
 def _get_compile_flag():
@@ -62,14 +62,13 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
         self,
         models: Sequence[common_definitions.Model],
         compile_config: iree_definitions.CompileConfig,
-        execution_config: iree_definitions.ModuleExecutionConfig = module_execution_configs.VULKAN_CONFIG,
-        tags: Sequence[str] = [],
+        execution_config: iree_definitions.ModuleExecutionConfig,
+        presets: Sequence[str],
     ) -> List[iree_definitions.E2EModelRunConfig]:
         gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=compile_config,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
-                tags=tags,
             )
             for model in models
         ]
@@ -84,11 +83,11 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
                 host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
             )
         )
-        run_module_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_module_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=gen_configs,
             module_execution_configs=[execution_config],
             device_specs=ampere_devices,
-            tags=tags,
+            presets=presets,
         )
 
         return run_module_configs
@@ -102,11 +101,13 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
         tensorcore_run_configs = self._generate_configs(
             model_groups.VULKAN_MODELS,
             self.TENSORCORE_COMPILE_CONFIG,
-            tags=[benchmark_tags.VULKAN_NVIDIA],
+            execution_config=module_execution_configs.VULKAN_CONFIG,
+            presets=[benchmark_presets.VULKAN_NVIDIA],
         )
         simt_run_configs = self._generate_configs(
             model_groups.VULKAN_MODELS,
             self.SIMT_COMPILE_CONFIG,
-            tags=[benchmark_tags.VULKAN_NVIDIA],
+            execution_config=module_execution_configs.VULKAN_CONFIG,
+            presets=[benchmark_presets.VULKAN_NVIDIA],
         )
         return tensorcore_run_configs + simt_run_configs
