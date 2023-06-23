@@ -74,8 +74,8 @@ def parse_arguments():
         type=pathlib.Path,
         default=pathlib.Path("build_tools/docker"),
         help=(
-            "Directory that contains: `dockerfiles/*.Dockerfile`,"
-            " `image_deps.json`, and `prod_digests.txt`"
+            f"Directory that contains: `{DOCKERFILES_DIRNAME}/*.Dockerfile`,"
+            f" `{IMAGE_DEPS_FILENAME}`, and `{PROD_DIGESTS_FILENAME}`"
         ),
     )
 
@@ -269,8 +269,8 @@ def main(
 
             image_digest = get_repo_digest(image_url, dry_run)
 
-            # Check that the image is in "prod_digests.txt" and append it to the
-            # list in the file if it isn't.
+            # Check that the image is in `PROD_DIGESTS_FILENAME` and append it
+            # to the list in the file if it isn't.
             if image_url not in image_urls_to_prod_digests:
                 image_with_digest = f"{image_url}@{image_digest}"
                 print(f"Adding new image {image_with_digest} to {prod_digests_path}")
