@@ -33,6 +33,15 @@ static MatmulTileParams
 chooseMatmulTileParamsAArch64(MatmulType type, ExecutableTargetAttr target) {
   switch (type) {
   case MatmulType::F32F32F32:
+  case MatmulType::F16F16F32:
+  case MatmulType::F16F16F16:
+  case MatmulType::BF16BF16F32:
+  case MatmulType::BF16BF16BF16:
+    // Note: 16-bit floating point types currently use the same tile size as
+    // f32. This makes sense when either (1) the accumulator is f32, or (2)
+    // the arithmetic will have to expand f16 to f32 in registers. We may
+    // reconsider when taking advantage of native f16/bf16 arithmetic when the
+    // accumulator itself is f16/bf16.
     return {8, 1, 8};
   case MatmulType::I8I8I32:
     if (hasFeature(target, "+i8mm")) {
@@ -54,8 +63,18 @@ static MatmulTileParams
 chooseMatmulTileParamsX86_64(MatmulType type, ExecutableTargetAttr target) {
   switch (type) {
   case MatmulType::F32F32F32:
-    if (hasAVX512fFeature(target))
+  case MatmulType::F16F16F32:
+  case MatmulType::F16F16F16:
+  case MatmulType::BF16BF16F32:
+  case MatmulType::BF16BF16BF16:
+    // Note: 16-bit floating point types currently use the same tile size as
+    // f32. This makes sense when either (1) the accumulator is f32, or (2)
+    // the arithmetic will have to expand f16 to f32 in registers. We may
+    // reconsider when taking advantage of native f16/bf16 arithmetic when the
+    // accumulator itself is f16/bf16.
+    if (hasFeature(target, "+avx512f")) {
       return {16, 1, 16};
+    }
     if (hasFeature(target, "+avx")) {
       // Note: for good performance, most +avx users will also want to add
       // +fma, but that's a local instruction selection detail and the tile
