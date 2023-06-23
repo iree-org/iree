@@ -113,14 +113,11 @@ def generate_benchmarks() -> (
         all_run_configs += run_configs
 
     # Collect all module generation configs in run configs.
-    all_gen_configs: List[iree_definitions.ModuleGenerationConfig] = []
-    added_gen_config_ids = set()
+    all_gen_configs = {}
     for run_config in all_run_configs:
         gen_config = run_config.module_generation_config
-        if gen_config.composite_id in added_gen_config_ids:
-            continue
-        added_gen_config_ids.add(gen_config.composite_id)
-        all_gen_configs.append(run_config.module_generation_config)
+        all_gen_configs[gen_config.composite_id] = gen_config
+    all_gen_configs = list(all_gen_configs.values())
 
     validate_gen_configs(all_gen_configs)
     validate_run_configs(all_run_configs)
