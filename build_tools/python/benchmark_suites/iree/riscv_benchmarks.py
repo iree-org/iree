@@ -6,8 +6,11 @@
 """Defines IREE RISC-V benchmarks."""
 
 from typing import List
+
+from benchmark_suites.iree import module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework.device_specs import riscv_specs
 from e2e_test_framework.models import tflite_models
 
 
@@ -45,7 +48,12 @@ class Linux_RV64_Benchmarks(object):
             )
             for model in self.MODELS
         ]
-        return (gen_configs, [])
+        run_configs = utils.generate_e2e_model_run_configs(
+            module_generation_configs=gen_configs,
+            module_execution_configs=[module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
+            device_specs=[riscv_specs.EMULATOR_RISCV_64],
+        )
+        return run_configs
 
 
 class Linux_RV32_Benchmarks(object):
@@ -79,4 +87,9 @@ class Linux_RV32_Benchmarks(object):
             )
             for model in self.MODELS
         ]
-        return (gen_configs, [])
+        run_configs = utils.generate_e2e_model_run_configs(
+            module_generation_configs=gen_configs,
+            module_execution_configs=[module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
+            device_specs=[riscv_specs.EMULATOR_RISCV_32],
+        )
+        return run_configs

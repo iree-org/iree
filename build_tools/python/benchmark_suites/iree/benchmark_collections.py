@@ -116,7 +116,6 @@ def generate_benchmarks() -> (
     all_gen_configs: List[iree_definitions.ModuleGenerationConfig] = []
     added_gen_config_ids = set()
     for run_config in all_run_configs:
-        print(run_config)
         gen_config = run_config.module_generation_config
         if gen_config.composite_id in added_gen_config_ids:
             continue
