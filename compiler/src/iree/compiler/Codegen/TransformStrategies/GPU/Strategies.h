@@ -26,6 +26,7 @@ struct GPUModel {
   StringRef model = kDefaultGPU;
   bool hasWarpShuffle = false;
   bool hasTF32TensorCore = false;
+  bool hasMmaSync = false;
 };
 
 //===--------------------------------------------------------------------===//

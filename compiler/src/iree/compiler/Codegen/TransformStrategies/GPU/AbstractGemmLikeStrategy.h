@@ -27,6 +27,19 @@ struct AbstractGemmLikeStrategy {
   virtual ~AbstractGemmLikeStrategy();
 
   //===--------------------------------------------------------------------===//
+  // Helpers and parameters for configuring the strategy.
+  //===--------------------------------------------------------------------===//
+
+  /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
+  /// default CLI values have been overriden.
+  virtual void initDefaultValues();
+
+  /// Encodes whether the user has specified any CLI options. When true, the
+  /// strategy should just run what was specified and is not allowed to
+  /// override the user's choices.
+  bool cliOptionsSpecified = false;
+
+  //===--------------------------------------------------------------------===//
   // Parameters that control the tiling and mapping.
   //===--------------------------------------------------------------------===//
 
@@ -60,9 +73,15 @@ struct AbstractGemmLikeStrategy {
   //===--------------------------------------------------------------------===//
   // Parameters that control copy/padding transfers from global to shared.
   //===--------------------------------------------------------------------===//
-  SmallVector<float> paddingValues;
+  SmallVector<Type> paddingValueTypes;
   SmallVector<int64_t> paddingDimensions;
   SmallVector<int64_t> packingDimensions;
+
+  ArrayAttr getZeroPadAttrFromElementalTypes(OpBuilder &b) const;
+
+  int64_t lhsElementalBitWidth = 32;
+  int64_t rhsElementalBitWidth = 32;
+  int64_t resElementalBitWidth = 32;
 
   bool alignedLhs() const {
     return m() % blockTileM() == 0 && k() % reductionTileSize == 0;
@@ -91,7 +110,7 @@ struct AbstractGemmLikeStrategy {
   int64_t pipelineDepth;
   virtual MappingInfo computeMapping() const = 0;
 
-  virtual LogicalResult validate() const = 0;
+  virtual LogicalResult validate(const GPUModel &gpuModel) const;
 
   //===--------------------------------------------------------------------===//
   // Problem-related quantities.

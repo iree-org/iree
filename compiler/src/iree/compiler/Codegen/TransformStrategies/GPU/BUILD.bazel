@@ -15,6 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "GPU",
     srcs = [
+        "AbstractGemmLikeStrategy.cpp",
         "Common.cpp",
         "CopyMapping.cpp",
         "MappingInfo.cpp",
