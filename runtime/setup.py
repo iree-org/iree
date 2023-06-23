@@ -433,6 +433,7 @@ setup(
             "iree-run-trace = iree.runtime.scripts.iree_run_trace.__main__:main",
             "iree-benchmark-module = iree.runtime.scripts.iree_benchmark_module.__main__:main",
             "iree-benchmark-trace = iree.runtime.scripts.iree_benchmark_trace.__main__:main",
+            "iree-cpuinfo = iree.runtime.scripts.iree_cpuinfo.__main__:main",
             "iree-tracy-capture = iree.runtime.scripts.iree_tracy_capture.__main__:main",
         ],
     },
