@@ -48,6 +48,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRIR
     MLIRPass
+    MLIRTensorDialect
     MLIRTransforms
     TorchMLIRTMTensorDialect
   DEFINES
