@@ -94,7 +94,7 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   } else {
     // Adjust the vector size to the max power of 2 that divides the reduction,
     // this dimensions the vector properly, whatever the elemental type.
-    assert((maxVectorSize & maxVectorSize - 1) == 0 &&
+    assert((maxVectorSize & (maxVectorSize - 1)) == 0 &&
            "maxVectorSize must be a power of 2");
     // TODO: we could also split out the first multiple of vectorSize instead
     // of reducing the vectorSize. This is better done with future stride /

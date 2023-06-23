@@ -270,17 +270,22 @@ static void failSafeOverrides(MatmulStrategy &strategy,
                               const GPUModel &gpuModel) {
   // Failsafe for blockTileM to avoid tiling by > size (i.e. no tiling).
   int64_t blockTileM = selectLargestFailsafeValueIfNeeded(
-      strategy.blockTileM(), strategy.m(), {2, 4, 8, 16, 32, 64, 128},
-      {1, 2, 4, 8, 16, 32, 64});
+      /*value=*/strategy.blockTileM(),
+      /*limit=*/strategy.m(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
   // Failsafe for blockTileN to avoid tiling by > size (i.e. no tiling).
   int64_t blockTileN = selectLargestFailsafeValueIfNeeded(
-      strategy.blockTileN(), strategy.n(), {2, 4, 8, 16, 32, 64, 128},
-      {1, 2, 4, 8, 16, 32, 64});
+      /*value=*/strategy.blockTileN(),
+      /*limit=*/strategy.n(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
   // Failsafe for reductionSize to avoid tiling by > size (i.e. no tiling).
   int64_t reductionTileSize = selectLargestFailsafeValueIfNeeded(
-      strategy.reductionTileSize, strategy.k(),
-      {2, 4, 8, 16, 24, 32, 40, 48, 56, 64},
-      {1, 2, 4, 8, 16, 24, 32, 40, 48, 56});
+      /*value=*/strategy.reductionTileSize,
+      /*limit=*/strategy.k(),
+      /*thresholds=*/{2, 4, 8, 16, 24, 32, 40, 48, 56, 64},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 24, 32, 40, 48, 56});
 
   // If some dimension is small, use fmas.
   // TODO: more parallelism by locally splitting the K-loop and reducing in the
@@ -330,6 +335,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     LDBG("--Matmul strategy flag turned off\n");
     return failure();
   }
+
   if (!gpuModel.hasTF32TensorCore) {
     LDBG("--Matmul strategy no TF32 tensor core\n");
     return failure();
@@ -402,11 +408,20 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
+  iree_compiler::gpu::MatmulStrategy strategy =
+      getMatmulConfig(op->getContext(), captures, gpuModel);
+
+  // Validate the strategy configuration against the compilation target.
+  if (failed(strategy.validate(gpuModel))) {
+    LDBG("--Matmul strategy failed to validate\n");
+    LLVM_DEBUG(strategy.dump());
+
+    return failure();
+  }
+
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    iree_compiler::gpu::MatmulStrategy strategy =
-        getMatmulConfig(op->getContext(), captures, gpuModel);
     return buildMatmulTensorCoreStrategy(b, variant, strategy);
   };
 

@@ -24,6 +24,7 @@ iree_cc_library(
     "StagedReductionStrategy.h"
     "Strategies.h"
   SRCS
+    "AbstractGemmLikeStrategy.cpp"
     "Common.cpp"
     "CopyMapping.cpp"
     "MappingInfo.cpp"

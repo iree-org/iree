@@ -31,10 +31,7 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
  public:
   MatmulStrategy(MLIRContext *context,
                  const transform_ext::MatchedMatmulCaptures &captures)
-      : AbstractGemmLikeStrategy(),
-        ctx(context),
-        captures(captures),
-        cliOptionsSpecified(false) {
+      : AbstractGemmLikeStrategy(), ctx(context), captures(captures) {
     initDefaultValues();
   }
 
@@ -45,16 +42,11 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   MLIRContext *ctx;
   transform_ext::MatchedMatmulCaptures captures;
 
-  /// Encodes whether the user has specified any CLI options. When true, the
-  /// strategy should just run what was specified and is not allowed to
-  /// override the user's choices.
-  bool cliOptionsSpecified;
-
   /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
   /// default CLI values have been overriden.
-  void initDefaultValues();
+  void initDefaultValues() override;
 
-  LogicalResult verify() const;
+  LogicalResult validate(const GPUModel &gpuModel) const override;
 
   int64_t m() const override {
     assert(captures.matmulOpSizes.size() == 3 && "need 3 sizes");
@@ -99,7 +91,9 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     return CopyMapping::getMappingInfo(
         ctx, totalNumThreads(),
         /*alignment=*/k(),
-        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), reductionTileSize});
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), reductionTileSize},
+        /*favorPredication=*/false,
+        /*elementalBitWidth=*/lhsElementalBitWidth);
   }
   LogicalResult validateLhsCopyMapping() const override {
     MappingInfo mapping = lhsCopyMapping();
@@ -118,7 +112,9 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     return CopyMapping::getMappingInfo(
         ctx, totalNumThreads(),
         /*alignment=*/n(),
-        /*copySizes=*/ArrayRef<int64_t>{reductionTileSize, blockTileN()});
+        /*copySizes=*/ArrayRef<int64_t>{reductionTileSize, blockTileN()},
+        /*favorPredication=*/false,
+        /*elementalBitWidth=*/rhsElementalBitWidth);
   }
   LogicalResult validateRhsCopyMapping() const override {
     MappingInfo mapping = rhsCopyMapping();
@@ -134,9 +130,12 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
-    return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
-                                       /*alignment=*/n(),
-                                       {blockTileM(), blockTileN()});
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/n(),
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), blockTileN()},
+        /*favorPredication=*/false,
+        /*elementalBitWidth=*/resElementalBitWidth);
   }
 
   LogicalResult validateResCopyMapping() const override {
@@ -164,100 +163,6 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
                        /*tileSizes=*/{},
                        /*threadMapping=*/{warpY(ctx), warpX(ctx)},
                        /*vectorSize=*/std::nullopt};
-  }
-
-  LogicalResult validate() const override {
-    if (totalNumThreads() != totalNumWarps() * kCudaWarpSize) {
-      llvm::errs() << "Number of threads specified by warps must match total "
-                      "number of threads\n";
-      return failure();
-    }
-    if (m() < blockTileM()) {
-      llvm::errs() << "m(" << m() << ") < blockTileM(" << blockTileM() << ") ";
-      llvm::errs() << "this is at risk of not vectorizing and is NYI";
-      return failure();
-    }
-    if (n() < blockTileN()) {
-      llvm::errs() << "n(" << n() << ") < blockTileN(" << blockTileN() << ") ";
-      llvm::errs() << "this is at risk of not vectorizing and is NYI";
-      return failure();
-    }
-    if (k() < reductionTileSize) {
-      llvm::errs() << "k(" << k() << ") < reductionTileSize("
-                   << reductionTileSize << ") ";
-      llvm::errs() << "this is at risk of not vectorizing and is NYI";
-      return failure();
-    }
-
-    if (failed(validateLhsCopyMapping())) {
-      llvm::errs() << "invalid lhs copy mapping";
-      return failure();
-    }
-    if (failed(validateRhsCopyMapping())) {
-      llvm::errs() << "invalid rhs copy mapping";
-      return failure();
-    }
-    if (failed(validateResCopyMapping())) {
-      llvm::errs() << "invalid res copy mapping";
-      return failure();
-    }
-
-    if (pipelineDepth > 1 && reductionTileSize * pipelineDepth > k()) {
-      llvm::errs() << "pipeline depth too large for reduction tile size";
-      return failure();
-    }
-
-    bool oneOption =
-        (useMmaSync ^ useWmma ^ useFma) && !(useMmaSync && useWmma && useFma);
-    if (!oneOption) {
-      llvm::errs() << "at most one of useMmaSync, useWmma, useFma can be true";
-      return failure();
-    }
-
-    if (useMmaSync) {
-      if (blockTileM() < kMinMmaSyncMinM) {
-        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinM
-                     << " block tile size in M";
-        return failure();
-      }
-      if (blockTileN() < kMinMmaSyncMinN) {
-        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinN
-                     << " block tile size in N";
-        return failure();
-      }
-      if (reductionTileSize < kMinMmaSyncMinK) {
-        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinK
-                     << " block tile size in K";
-        return failure();
-      }
-      if (pipelineDepth > 1 && pipelineDepth < kMinMmaSyncPipelineDepth) {
-        llvm::errs() << "mma.sync pipelining requires at least "
-                     << kMinMmaSyncPipelineDepth << " stages";
-        return failure();
-      }
-      if (pipelineDepth > 1 && reductionTileSize * kMinMmaSyncGroups > k()) {
-        llvm::errs() << "mma.sync pipelining requires at least "
-                     << kMinMmaSyncGroups << " k groups";
-        return failure();
-      }
-    } else if (useWmma) {
-      if (blockTileM() < kMinWmmaMinM) {
-        llvm::errs() << "wmma requires at least " << kMinWmmaMinM
-                     << " block tile size in M";
-        return failure();
-      }
-      if (blockTileN() < kMinWmmaMinN) {
-        llvm::errs() << "wmma requires at least " << kMinWmmaMinN
-                     << " block tile size in N";
-        return failure();
-      }
-      if (reductionTileSize < kMinWmmaMinK) {
-        llvm::errs() << "wmma requires at least " << kMinWmmaMinK
-                     << " block tile size in K";
-        return failure();
-      }
-    }
-    return success();
   }
 
   void print(llvm::raw_ostream &os) const;
