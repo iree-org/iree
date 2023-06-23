@@ -202,8 +202,8 @@ def main(
     for image in images:
         if image not in image_deps:
             raise ValueError(
-                f'Image "{image}" not found in the image graph.'
-                f' Available options: all,{",".join(image_deps.keys())}'
+                f"Image '{image}' not found in the image graph."
+                f" Available options: all,{','.join(image_deps.keys())}"
             )
 
     images_to_dependents = _get_images_to_dependents(image_deps)
@@ -241,7 +241,7 @@ def main(
             image_digest = image_urls_to_prod_digests.get(image_url)
             if image_digest is None:
                 raise ValueError(
-                    f"Can't update the references of {image} because it has no digest."
+                    f"Can't update the references to '{image}' because it is not listed in '{prod_digests_path}'."
                 )
         else:
             # We deliberately give the whole repository as context so we can reuse
