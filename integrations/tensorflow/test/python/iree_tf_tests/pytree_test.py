@@ -12,36 +12,34 @@ import tensorflow as tf
 # Empty lists and dicts are currently unsupported. IREE also currently cannot
 # represent multiple sequence types, so we turn all sequences into tuples.
 class PyTreeModule(tf_test_utils.TestModule):
+    @tf_test_utils.tf_function_unit_test(input_signature=[])
+    def output_tuple_len_1(self):
+        return (0,)
 
-  @tf_test_utils.tf_function_unit_test(input_signature=[])
-  def output_tuple_len_1(self):
-    return (0,)
+    @tf_test_utils.tf_function_unit_test(input_signature=[])
+    def output_tuple_len_2(self):
+        return 0, 1
 
-  @tf_test_utils.tf_function_unit_test(input_signature=[])
-  def output_tuple_len_2(self):
-    return 0, 1
+    @tf_test_utils.tf_function_unit_test(input_signature=[])
+    def output_tuple_len_3(self):
+        return 0, 1, 2
 
-  @tf_test_utils.tf_function_unit_test(input_signature=[])
-  def output_tuple_len_3(self):
-    return 0, 1, 2
-
-  @tf_test_utils.tf_function_unit_test(input_signature=[])
-  def output_nested_pytree(self):
-    return {"key_a": (0, 1, 2), "key_b": (0, 1, {"key_c": (0, 1)})}
+    @tf_test_utils.tf_function_unit_test(input_signature=[])
+    def output_nested_pytree(self):
+        return {"key_a": (0, 1, 2), "key_b": (0, 1, {"key_c": (0, 1)})}
 
 
 class PyTreeTest(tf_test_utils.TracedModuleTestCase):
-
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(PyTreeModule)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._modules = tf_test_utils.compile_tf_module(PyTreeModule)
 
 
 def main(argv):
-  del argv  # Unused
-  PyTreeTest.generate_unit_tests(PyTreeModule)
-  tf.test.main()
+    del argv  # Unused
+    PyTreeTest.generate_unit_tests(PyTreeModule)
+    tf.test.main()
 
 
-if __name__ == '__main__':
-  app.run(main)
+if __name__ == "__main__":
+    app.run(main)

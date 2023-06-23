@@ -8,9 +8,9 @@ import numpy
 import os
 import sys
 
-with open(os.path.realpath(sys.argv[1]), 'rb') as f:
-  f.seek(0, 2)
-  file_len = f.tell()
-  f.seek(0, 0)
-  while f.tell() < file_len:
-    print(numpy.load(f))
+with open(os.path.realpath(sys.argv[1]), "rb") as f:
+    f.seek(0, 2)
+    file_len = f.tell()
+    f.seek(0, 0)
+    while f.tell() < file_len:
+        print(numpy.load(f))

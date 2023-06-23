@@ -75,25 +75,6 @@ void registerCodegenPasses() {
       });
 }
 
-/// Hook to verify the lowering configuration and translation info for an
-/// operation.
-LogicalResult verifyLoweringConfiguration(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize) {
-  switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
-      return verifyDoubleTilingExpertPassPipelineConfig(op, loweringConfig,
-                                                        translationInfo);
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-      return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo,
-                                     workgroupSize);
-    default:
-      break;
-  }
-  return success();
-}
-
 void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createTypePropagationPass());
   passManager.addPass(createBubbleUpOrdinalOpsPass());

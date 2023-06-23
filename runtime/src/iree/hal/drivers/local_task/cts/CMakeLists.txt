@@ -27,6 +27,8 @@ if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
       "${NATIVE_EXECUTABLE_FORMAT}"
     DEPS
       iree::hal::drivers::local_task::registration
+    LABELS
+      driver=local-task
   )
 endif()
 
@@ -46,5 +48,7 @@ if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
       "\"vmvx-bytecode-fb\""
     DEPS
       iree::hal::drivers::local_task::registration
+    LABELS
+      driver=local-task
   )
 endif()

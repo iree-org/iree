@@ -54,7 +54,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
     for (Block &block : llvm::make_early_inc_range(blockRange)) {
       rewriter.eraseBlock(&block);
     }
-    rewriter.replaceOp(srcOp, {});
+    rewriter.eraseOp(srcOp);
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToEnd(&newModuleOp.getBodyRegion().front());
     rewriter.create<IREE::VM::ModuleTerminatorOp>(srcOp.getLoc());
@@ -153,7 +153,7 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // vm.export ops.
     newFuncOp.setPrivate();
 
-    rewriter.replaceOp(srcOp, std::nullopt);
+    rewriter.eraseOp(srcOp);
     return success();
   }
 };
@@ -228,7 +228,7 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // Retain function attributes in the allowlist.
     copyImportAttrs(srcOp, importOp);
 
-    rewriter.replaceOp(srcOp, std::nullopt);
+    rewriter.eraseOp(srcOp);
     return success();
   }
 };

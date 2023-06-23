@@ -153,6 +153,10 @@ struct FormDispatchRegionsOptions {
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(FormDispatchRegionsOptions options = {});
 
+// Pass to create `flow.dispatch.region`s for scalar computations.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFormScalarDispatchesPass();
+
 // Pass to collapse dimensions of Linalg Ops on tensor ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCollapseDimensionsPass();

@@ -33,17 +33,21 @@ def _validate_repo_root():
     # Look for something we know is there.
     known_dir = os.path.join(_repo_root, "compiler")
     if not os.path.isdir(known_dir):
-        raise SystemExit(f"ERROR: Must run from the iree repository root. "
-                         f"Actually in: {_repo_root}")
+        raise SystemExit(
+            f"ERROR: Must run from the iree repository root. "
+            f"Actually in: {_repo_root}"
+        )
 
 
 def git_setup_remote(remote_alias, url, *, repo_dir=None):
     needs_create = False
     try:
-        existing_url = git_exec(["remote", "get-url", remote_alias],
-                                capture_output=True,
-                                repo_dir=repo_dir,
-                                quiet=True)
+        existing_url = git_exec(
+            ["remote", "get-url", remote_alias],
+            capture_output=True,
+            repo_dir=repo_dir,
+            quiet=True,
+        )
         existing_url = existing_url.strip()
         if existing_url == url:
             return
@@ -52,30 +56,34 @@ def git_setup_remote(remote_alias, url, *, repo_dir=None):
         needs_create = True
 
     if needs_create:
-        git_exec(["remote", "add", "--no-tags", remote_alias, url],
-                 repo_dir=repo_dir)
+        git_exec(["remote", "add", "--no-tags", remote_alias, url], repo_dir=repo_dir)
     else:
         git_exec(["remote", "set-url", remote_alias, url], repo_dir=repo_dir)
 
 
 def git_is_porcelain(*, repo_dir=None):
-    output = git_exec(["status", "--porcelain", "--untracked-files=no"],
-                      capture_output=True,
-                      quiet=True,
-                      repo_dir=repo_dir).strip()
+    output = git_exec(
+        ["status", "--porcelain", "--untracked-files=no"],
+        capture_output=True,
+        quiet=True,
+        repo_dir=repo_dir,
+    ).strip()
     return not bool(output)
 
 
 def git_check_porcelain(*, repo_dir=None):
-    output = git_exec(["status", "--porcelain", "--untracked-files=no"],
-                      capture_output=True,
-                      quiet=True,
-                      repo_dir=repo_dir).strip()
+    output = git_exec(
+        ["status", "--porcelain", "--untracked-files=no"],
+        capture_output=True,
+        quiet=True,
+        repo_dir=repo_dir,
+    ).strip()
     if output:
         actual_repo_dir = get_repo_root() if repo_dir is None else repo_dir
         raise SystemExit(
             f"ERROR: git directory {actual_repo_dir} is not clean. "
-            f"Please stash changes:\n{output}")
+            f"Please stash changes:\n{output}"
+        )
 
 
 def git_fetch(*, repository=None, ref=None, repo_dir=None):
@@ -91,12 +99,9 @@ def git_checkout(ref, *, repo_dir=None):
     git_exec(["checkout", ref], repo_dir=repo_dir)
 
 
-def git_create_branch(branch_name,
-                      *,
-                      checkout=True,
-                      ref=None,
-                      force=False,
-                      repo_dir=None):
+def git_create_branch(
+    branch_name, *, checkout=True, ref=None, force=False, repo_dir=None
+):
     branch_args = ["branch"]
     if force:
         branch_args.append("-f")
@@ -119,10 +124,12 @@ def git_push_branch(repository, branch_name, *, force=False, repo_dir=None):
 
 
 def git_branch_exists(branch_name, *, repo_dir=None):
-    output = git_exec(["branch", "-l", branch_name],
-                      repo_dir=repo_dir,
-                      quiet=True,
-                      capture_output=True).strip()
+    output = git_exec(
+        ["branch", "-l", branch_name],
+        repo_dir=repo_dir,
+        quiet=True,
+        capture_output=True,
+    ).strip()
     return bool(output)
 
 
@@ -133,13 +140,15 @@ def git_submodule_set_origin(path, *, url=None, branch=None, repo_dir=None):
     if branch is not None:
         try:
             if branch == "--default":
-                git_exec(["submodule", "set-branch", "--default", "--", path],
-                         repo_dir=repo_dir)
+                git_exec(
+                    ["submodule", "set-branch", "--default", "--", path],
+                    repo_dir=repo_dir,
+                )
             else:
-                git_exec([
-                    "submodule", "set-branch", "--branch", branch, "--", path
-                ],
-                         repo_dir=repo_dir)
+                git_exec(
+                    ["submodule", "set-branch", "--branch", branch, "--", path],
+                    repo_dir=repo_dir,
+                )
         except subprocess.CalledProcessError:
             # The set-branch command returns 0 on change and !0 on no change.
             # This is a bit unfortunate.
@@ -155,10 +164,12 @@ def git_reset(ref, *, hard=True, repo_dir=None):
 
 
 def git_current_commit(*, repo_dir=None) -> Tuple[str, str]:
-    output = git_exec(["log", "-n", "1", "--pretty=format:%H (%ci): %s"],
-                      capture_output=True,
-                      repo_dir=repo_dir,
-                      quiet=True)
+    output = git_exec(
+        ["log", "-n", "1", "--pretty=format:%H (%ci): %s"],
+        capture_output=True,
+        repo_dir=repo_dir,
+        quiet=True,
+    )
     output = output.strip()
     parts = output.split(" ")
     # Return commit, full_summary
@@ -184,7 +195,7 @@ def git_ls_remote_branches(repository_url, *, filter=None, repo_dir=None):
         ref = parts[1]
         prefix = "refs/heads/"
         if ref.startswith(prefix):
-            ref = ref[len(prefix):]
+            ref = ref[len(prefix) :]
         return ref
 
     return [extract_branch(l) for l in lines]

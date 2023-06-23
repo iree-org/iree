@@ -23,8 +23,6 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
@@ -112,7 +110,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   iree_compiler::TileToForallAndFuseAndDistributeResult tileResult =
       iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/fusionTargetH,
           /*opsToFuseH=*/fusionGroupH,
           /*numThreads=*/
@@ -139,7 +137,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // part.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
-      /*isolatedParentOpH=*/variantH,
+      /*variantH=*/variantH,
       /*opH=*/blockReductionH,
       /*rank=*/strategy.captures.reductionRank,
       // TODO: capture and generalize mostMinorDim.
@@ -152,7 +150,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // mapping part.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
-      /*isolatedParentOpH=*/variantH,
+      /*variantH=*/variantH,
       /*opH=*/maybeBlockTrailingH,
       /*rank=*/strategy.captures.maybeTrailingRank,
       // TODO: capture and generalize mostMinorDim.

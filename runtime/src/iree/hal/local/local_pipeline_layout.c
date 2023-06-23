@@ -34,9 +34,10 @@ iree_status_t iree_hal_local_descriptor_set_layout_create(
   IREE_ASSERT_ARGUMENT(out_descriptor_set_layout);
   *out_descriptor_set_layout = NULL;
   if (binding_count > IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT, "binding count %zu over the limit of %d",
-        binding_count, IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "binding count %" PRIhsz " over the limit of %d",
+                            binding_count,
+                            IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -101,15 +102,15 @@ iree_status_t iree_hal_local_pipeline_layout_create(
   *out_pipeline_layout = NULL;
   if (set_layout_count > IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "set layout count %zu over the limit of %d",
+                            "set layout count %" PRIhsz " over the limit of %d",
                             set_layout_count,
                             IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT);
   }
   if (push_constants > IREE_HAL_LOCAL_MAX_PUSH_CONSTANT_COUNT) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "push constant count %zu over the limit of %d",
-                            push_constants,
-                            IREE_HAL_LOCAL_MAX_PUSH_CONSTANT_COUNT);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "push constant count %" PRIhsz " over the limit of %d", push_constants,
+        IREE_HAL_LOCAL_MAX_PUSH_CONSTANT_COUNT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

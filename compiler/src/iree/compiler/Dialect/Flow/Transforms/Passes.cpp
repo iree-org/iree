@@ -270,6 +270,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                            return createDispatchWithTransformDialect(
                                clDispatchTransformFileName);
                          })
+
+      .addPass(createFormScalarDispatchesPass)
       // Only want use the transform dialect for some dispatch regions and let
       // the FormDispatchRegions handle the rest. This only moves the root
       // compute op into the dispatch region, so that we can run additional

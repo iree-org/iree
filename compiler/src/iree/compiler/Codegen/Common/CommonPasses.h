@@ -153,7 +153,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
-    bool flatten = false);
+    bool flatten = false, bool dropUnitDims = true);
 
 /// Pad dynamic alloc op to convert them into static one.
 std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();

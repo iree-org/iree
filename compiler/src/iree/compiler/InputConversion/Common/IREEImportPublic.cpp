@@ -194,7 +194,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
       return failure();
     }
 
-    rewriter.replaceOp(srcOp, std::nullopt);
+    rewriter.eraseOp(srcOp);
     return success();
   }
 };

@@ -304,7 +304,7 @@ function(iree_select_compiler_opts OPTS)
     _IREE_SELECTS
     ""
     ""
-    "ALL;CLANG;CLANG_GTE_10;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
+    "ALL;CLANG;CLANG_GTE_10;CLANG_GTE_12;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
   )
   # OPTS is a variable containing the *name* of the variable being populated, so
   # we need to dereference it twice.
@@ -321,6 +321,9 @@ function(iree_select_compiler_opts OPTS)
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG})
       if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
         list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_10})
+      endif()
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
+        list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_12})
       endif()
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG_OR_GCC})
     endif()

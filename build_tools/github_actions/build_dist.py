@@ -62,142 +62,157 @@ IREESRC_DIR = os.path.join(WORK_DIR, "main_checkout")
 TF_INTEGRATIONS_DIR = os.path.join(IREESRC_DIR, "integrations/tensorflow")
 BINDIST_DIR = os.environ.get("BINDIST_DIR")
 if BINDIST_DIR is None:
-  BINDIST_DIR = os.path.join(WORK_DIR, "bindist")
+    BINDIST_DIR = os.path.join(WORK_DIR, "bindist")
 THIS_DIR = os.path.realpath(os.path.dirname(__file__))
 CMAKE_CI_SCRIPT = os.path.join(THIS_DIR, "cmake_ci.py")
-BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "runtime", "bindings",
-                                      "python", "iree", "runtime",
-                                      "build_requirements.txt")
+BUILD_REQUIREMENTS_TXT = os.path.join(
+    IREESRC_DIR,
+    "runtime",
+    "bindings",
+    "python",
+    "iree",
+    "runtime",
+    "build_requirements.txt",
+)
 CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
 CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
-INSTALL_TARGET = ("install"
-                  if platform.system() == "Windows" else "install/strip")
+INSTALL_TARGET = "install" if platform.system() == "Windows" else "install/strip"
 
 
 # Load version info.
 def load_version_info():
-  with open(os.path.join(IREESRC_DIR, "version_info.json"), "rt") as f:
-    return json.load(f)
+    with open(os.path.join(IREESRC_DIR, "version_info.json"), "rt") as f:
+        return json.load(f)
 
 
 try:
-  version_info = load_version_info()
+    version_info = load_version_info()
 except FileNotFoundError:
-  print("version_info.json not found. Using defaults")
-  version_info = {
-      "package-version": "0.1dev1",
-      "package-suffix": "-dev",
-  }
+    print("version_info.json not found. Using defaults")
+    version_info = {
+        "package-version": "0.1dev1",
+        "package-suffix": "-dev",
+    }
 
 
 def remove_cmake_cache():
-  cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
-  if os.path.exists(cache_file):
-    print(f"Removing {cache_file}")
-    os.remove(cache_file)
-  else:
-    print(f"Not removing cache file (does not exist): {cache_file}")
+    cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
+    if os.path.exists(cache_file):
+        print(f"Removing {cache_file}")
+        os.remove(cache_file)
+    else:
+        print(f"Not removing cache file (does not exist): {cache_file}")
 
 
 def install_python_requirements():
-  print("Installing python requirements...")
-  subprocess.check_call(
-      [sys.executable, "-m", "pip", "install", "-r", BUILD_REQUIREMENTS_TXT])
-  subprocess.check_call(
-      [sys.executable, "-m", "pip", "install", "-r", CI_REQUIREMENTS_TXT])
+    print("Installing python requirements...")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "-r", BUILD_REQUIREMENTS_TXT]
+    )
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "-r", CI_REQUIREMENTS_TXT]
+    )
 
 
 def configure_bazel():
-  print("Generating configured.bazelrc...")
-  subprocess.check_call([sys.executable, CONFIGURE_BAZEL_PY])
+    print("Generating configured.bazelrc...")
+    subprocess.check_call([sys.executable, CONFIGURE_BAZEL_PY])
 
 
 def build_main_dist():
-  """Builds the main distribution binaries.
+    """Builds the main distribution binaries.
 
-  Additional packages that are installable as part of a full build and do not
-  benefit from a more restricted build can be added here.
-  """
-  install_python_requirements()
+    Additional packages that are installable as part of a full build and do not
+    benefit from a more restricted build can be added here.
+    """
+    install_python_requirements()
 
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
+    # Clean up install and build trees.
+    shutil.rmtree(INSTALL_DIR, ignore_errors=True)
+    remove_cmake_cache()
 
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run(
-      [
-          sys.executable,
-          CMAKE_CI_SCRIPT,
-          f"-B{BUILD_DIR}",
-          "--log-level=VERBOSE",
-          f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-          # On some distributions, this will install to lib64. We would like
-          # consistency in built packages, so hard-code it.
-          "-DCMAKE_INSTALL_LIBDIR=lib",
-          f"-DCMAKE_BUILD_TYPE=Release",
-          f"-DIREE_BUILD_COMPILER=ON",
-          f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
-          f"-DIREE_BUILD_SAMPLES=OFF",
-      ],
-      check=True)
+    # CMake configure.
+    print("*** Configuring ***")
+    subprocess.run(
+        [
+            sys.executable,
+            CMAKE_CI_SCRIPT,
+            f"-B{BUILD_DIR}",
+            "--log-level=VERBOSE",
+            f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
+            # On some distributions, this will install to lib64. We would like
+            # consistency in built packages, so hard-code it.
+            "-DCMAKE_INSTALL_LIBDIR=lib",
+            f"-DCMAKE_BUILD_TYPE=Release",
+            f"-DIREE_BUILD_COMPILER=ON",
+            f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
+            f"-DIREE_BUILD_SAMPLES=OFF",
+        ],
+        check=True,
+    )
 
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      INSTALL_TARGET,
-  ],
-                 check=True)
+    print("*** Building ***")
+    subprocess.run(
+        [
+            sys.executable,
+            CMAKE_CI_SCRIPT,
+            "--build",
+            BUILD_DIR,
+            "--target",
+            INSTALL_TARGET,
+        ],
+        check=True,
+    )
 
-  print("*** Packaging ***")
-  dist_entries = [
-      "bin",
-      "lib",
-  ]
-  dist_archive = os.path.join(
-      BINDIST_DIR, f"iree-dist{version_info['package-suffix']}"
-      f"-{version_info['package-version']}"
-      f"-{sysconfig.get_platform()}.tar.xz")
-  print(f"Creating archive {dist_archive}")
-  os.makedirs(os.path.dirname(dist_archive), exist_ok=True)
-  with tarfile.open(dist_archive, mode="w:xz") as tf:
-    for entry in dist_entries:
-      print(f"Adding entry: {entry}")
-      tf.add(os.path.join(INSTALL_DIR, entry), arcname=entry, recursive=True)
+    print("*** Packaging ***")
+    dist_entries = [
+        "bin",
+        "lib",
+    ]
+    dist_archive = os.path.join(
+        BINDIST_DIR,
+        f"iree-dist{version_info['package-suffix']}"
+        f"-{version_info['package-version']}"
+        f"-{sysconfig.get_platform()}.tar.xz",
+    )
+    print(f"Creating archive {dist_archive}")
+    os.makedirs(os.path.dirname(dist_archive), exist_ok=True)
+    with tarfile.open(dist_archive, mode="w:xz") as tf:
+        for entry in dist_entries:
+            print(f"Adding entry: {entry}")
+            tf.add(os.path.join(INSTALL_DIR, entry), arcname=entry, recursive=True)
 
 
 def build_py_tf_compiler_tools_pkg():
-  """Builds the iree-install/python_packages/iree_tools_tf package."""
-  install_python_requirements()
-  configure_bazel()
+    """Builds the iree-install/python_packages/iree_tools_tf package."""
+    install_python_requirements()
+    configure_bazel()
 
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
+    # Clean up install and build trees.
+    shutil.rmtree(INSTALL_DIR, ignore_errors=True)
+    remove_cmake_cache()
 
-  os.makedirs(BINDIST_DIR, exist_ok=True)
+    os.makedirs(BINDIST_DIR, exist_ok=True)
 
-  for project in ["iree_tflite", "iree_tf"]:
-    print(f"*** Building wheel for {project} ***")
-    subprocess.run(
-        [
-            sys.executable, "-m", "pip", "wheel",
-            os.path.join(TF_INTEGRATIONS_DIR, "python_projects", project)
-        ],
-        cwd=BINDIST_DIR,
-        check=True,
-    )
+    for project in ["iree_tflite", "iree_tf"]:
+        print(f"*** Building wheel for {project} ***")
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "wheel",
+                os.path.join(TF_INTEGRATIONS_DIR, "python_projects", project),
+            ],
+            cwd=BINDIST_DIR,
+            check=True,
+        )
 
 
 command = sys.argv[1]
 if command == "main-dist":
-  build_main_dist()
+    build_main_dist()
 elif command == "py-tf-compiler-tools-pkg":
-  build_py_tf_compiler_tools_pkg()
+    build_py_tf_compiler_tools_pkg()
 else:
-  print(f"Unrecognized command: {command}")
+    print(f"Unrecognized command: {command}")

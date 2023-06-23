@@ -33,7 +33,7 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:a14a1c9442a40f02023c8a30a025902f4c8cd06bf37dac605e48521296fb23be \
+    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:234f6efb1e9fd2eea67d40effd7d9cfe8725c5e5ba7a58c0428200a54493637a \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
@@ -46,7 +46,7 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         --verbose
 elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
   ${DOCKER_WRAPPER} \
-    gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd \
+    gcr.io/iree-oss/base-bleeding-edge@sha256:7d15ecdb60d65b61426b397382096982103dbd5355867832c91c097a97b925c5 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \

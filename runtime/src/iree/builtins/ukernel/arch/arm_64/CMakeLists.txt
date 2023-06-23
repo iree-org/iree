@@ -77,6 +77,10 @@ iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_I8MM
     "-march=armv8.2-a+i8mm"
 )
 
+check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_DOTPROD}" IREE_UK_BUILD_ARM_64_DOTPROD)
+check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_I8MM}" IREE_UK_BUILD_ARM_64_I8MM)
+configure_file("config_arm_64.h.in" "config_arm_64.h")
+
 iree_cc_library(
   NAME
     common_arm_64
@@ -87,6 +91,9 @@ iree_cc_library(
     iree::schemas::cpu_data
 )
 
+set(IREE_UK_ARM_64_DEPS "")
+
+if(IREE_UK_BUILD_ARM_64_DOTPROD)
 iree_cc_library(
   NAME
     arm_64_dotprod
@@ -97,7 +104,10 @@ iree_cc_library(
   DEPS
     iree::builtins::ukernel::internal_headers
 )
+list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_dotprod")
+endif()  # IREE_UK_BUILD_ARM_64_DOTPROD
 
+if(IREE_UK_BUILD_ARM_64_I8MM)
 iree_cc_library(
   NAME
     arm_64_i8mm
@@ -108,6 +118,8 @@ iree_cc_library(
   DEPS
     iree::builtins::ukernel::internal_headers
 )
+list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_i8mm")
+endif()  # IREE_UK_BUILD_ARM_64_I8MM
 
 iree_cc_library(
   NAME
@@ -119,8 +131,6 @@ iree_cc_library(
     "unpack_arm_64.c"
   DEPS
     ::common_arm_64
-    ::arm_64_dotprod
-    ::arm_64_i8mm
     iree::base::core_headers
     iree::schemas::cpu_data
     iree::builtins::ukernel::internal_headers

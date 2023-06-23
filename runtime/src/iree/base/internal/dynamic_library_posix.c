@@ -95,10 +95,10 @@ static iree_status_t iree_dynamic_library_write_temp_file(
   if (iree_status_is_ok(status)) {
     if (fwrite((char*)source_data.data, source_data.data_length, 1,
                file_handle) != 1) {
-      status =
-          iree_make_status(iree_status_code_from_errno(errno),
-                           "unable to write file span of %zu bytes to '%s'",
-                           source_data.data_length, *out_file_path);
+      status = iree_make_status(iree_status_code_from_errno(errno),
+                                "unable to write file span of %" PRIhsz
+                                " bytes to '%s'",
+                                source_data.data_length, *out_file_path);
     }
   }
 

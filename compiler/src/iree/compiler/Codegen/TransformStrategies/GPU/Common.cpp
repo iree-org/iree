@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -25,6 +26,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -34,8 +36,6 @@
 using namespace mlir;
 
 // TODO: significantly better namespacing.
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
-using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::MapNestedForallToGpuThreadsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
@@ -74,7 +74,7 @@ using transform::SequenceOp;
 /// Return max(1, (value * 32) / bitwidth).
 int64_t mlir::iree_compiler::gpu::scaleUpByBitWidth(int64_t value,
                                                     int64_t bitWidth) {
-  assert((bitWidth & bitWidth - 1) == 0 && "bitWidth must be a power of 2");
+  assert((bitWidth & (bitWidth - 1)) == 0 && "bitWidth must be a power of 2");
   return std::max((value * 32) / bitWidth, int64_t(1));
 }
 
@@ -181,9 +181,9 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
 //===----------------------------------------------------------------------===//
 void mlir::iree_compiler::gpu::
     build1DSplittingStrategyWithOptionalThreadMapping(
-        ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value opH,
-        int64_t rank, int64_t mostMinorDim, SmallVector<int64_t> opSizes,
-        int64_t numThreads, Attribute mappingAttr, int64_t maxVectorSize) {
+        ImplicitLocOpBuilder &b, Value variantH, Value opH, int64_t rank,
+        int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
+        Attribute mappingAttr, int64_t maxVectorSize) {
   // Poor man's handling of optionality in C++. Will need to be converted to
   // proper transform dialect filters or handling of emptiness.
   if (rank == 0) return;
@@ -216,7 +216,7 @@ void mlir::iree_compiler::gpu::
     if (vectorSize > 1) {
       auto res = iree_compiler::buildTileFuseToScfFor(
           /*b=*/b,
-          /*isolatedParentOpH=*/isolatedParentOpH,
+          /*variantH=*/variantH,
           /*rootH=*/opH,
           /*opsHToFuse=*/{},
           /*tileSizes=*/
@@ -230,7 +230,7 @@ void mlir::iree_compiler::gpu::
       assert(mappingAttr && "must specify a mapping attribute");
       iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*b=*/b,
-          /*isolatedParentOpH=*/isolatedParentOpH,
+          /*variantH=*/variantH,
           /*rootH=*/opH,
           /*opsHToFuse=*/{},
           /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
@@ -243,7 +243,7 @@ void mlir::iree_compiler::gpu::
   if (vectorSize > 1) {
     auto res = iree_compiler::buildTileFuseToScfFor(
         /*b=*/b,
-        /*isolatedParentOpH=*/isolatedParentOpH,
+        /*variantH=*/variantH,
         /*rootH=*/opH,
         /*opsHToFuse=*/{},
         /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
@@ -253,7 +253,7 @@ void mlir::iree_compiler::gpu::
     assert(mappingAttr && "must specify a mapping attribute");
     iree_compiler::buildTileFuseDistToForallWithNumThreads(
         /*b=*/b,
-        /*isolatedParentOpH=*/isolatedParentOpH,
+        /*variantH=*/variantH,
         /*rootH=*/opH,
         /*opsHToFuse=*/{},
         /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
@@ -298,7 +298,7 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   // Step N. Perform a final pass of canonicalization + enabling before
   // returning.
   mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, variantH, [](OpBuilder &b, Location loc) {
+      b, funcH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyFoldTensorEmptyPatternsOp>(loc);
       });
   return std::make_pair(variantH, funcH);
@@ -307,9 +307,6 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 //===----------------------------------------------------------------------===//
 // Subset of mid-level builders currently used for GEMM-like problems.
 //===----------------------------------------------------------------------===//
-
-/// Key function for vtable.
-AbstractGemmLikeStrategy::~AbstractGemmLikeStrategy() {}
 
 /// Build transform IR to hoist the padded output operand of a padded matmul.
 /// Additionally, this attempts to fold the padding into the producing fill, if
@@ -333,8 +330,10 @@ Value mlir::iree_compiler::gpu::buildHoistOutputPaddingOp(
   // Perform a pass of canonicalization cleanups + folding fill + pad into pad
   // by applying `foldTensorSubsets` and `tilingCanonicalization`.
   {
+    Value funcH = b.create<transform::MatchOp>(
+        variantH, func::FuncOp::getOperationName());
     iree_compiler::buildCanonicalizationAndEnablingTransforms(
-        b, variantH, [](OpBuilder &b, Location loc) {
+        b, funcH, [](OpBuilder &b, Location loc) {
           b.create<transform::ApplyFoldTensorSubsetOpsPatternsOp>(loc);
           b.create<
               transform::ApplyMergeConsecutiveInsertExtractSlicePatternsOp>(
@@ -365,7 +364,7 @@ mlir::iree_compiler::gpu::buildDistributeOnePadOrCopyWithTileSizes(
   TileToForallAndFuseAndDistributeResult res =
       buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/copyOpH,
           /*opsToFuseH=*/{},
           /*tileSizes=*/
@@ -393,7 +392,7 @@ Value mlir::iree_compiler::gpu::buildDistributeOnePadOrCopyWithNumThreads(
   TileToForallAndFuseAndDistributeResult res =
       buildTileFuseDistToForallWithNumThreads(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/copyOpH,
           /*opsToFuseH=*/{},
           /*numThreads=*/
@@ -445,23 +444,20 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
   if (strategy.alignedRhs())
     rhsH = b.create<RewriteInDestinationPassingStyleOp>(rhsH.getType(), rhsH);
 
-  AbstractGemmLikeStrategy::MappingInfo lhsCopyMapping =
-      strategy.lhsCopyMapping();
+  MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
   Value lhsCopyOpH = buildDistributeOnePadOrCopyWithNumThreads(
       b, variantH, lhsH, /*numThreads=*/lhsCopyMapping.numThreads,
       /*threadDimMapping=*/lhsCopyMapping.threadMapping,
       /*foldIfBranch=*/!strategy.alignedLhs());
 
-  AbstractGemmLikeStrategy::MappingInfo rhsCopyMapping =
-      strategy.rhsCopyMapping();
+  MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
   Value rhsCopyOpH = buildDistributeOnePadOrCopyWithNumThreads(
       b, variantH, rhsH, /*numThreads=*/rhsCopyMapping.numThreads,
       /*threadDimMapping=*/rhsCopyMapping.threadMapping,
       /*foldIfBranch=*/!strategy.alignedRhs());
 
   if (!strategy.alignedRes()) {
-    AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
-        strategy.resCopyMapping();
+    MappingInfo resCopyMapping = strategy.resCopyMapping();
     copyBackOpH = buildDistributeOnePadOrCopyWithNumThreads(
         b, variantH, copyBackOpH,
         /*numThreads=*/resCopyMapping.numThreads,
@@ -482,24 +478,23 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // Also, no canonicalization is allowed after vector masking and before we
   // lower the masks: masks are currently quite brittle and do not like
   // canonicalization or anything else that may insert an op in their region.
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, variantH);
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
 
   // Apply vector masking.
   if (!strategy.alignedLhs()) {
-    AbstractGemmLikeStrategy::MappingInfo lhsCopyMapping =
-        strategy.lhsCopyMapping();
+    MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
     b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
                                            lhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRhs()) {
-    AbstractGemmLikeStrategy::MappingInfo rhsCopyMapping =
-        strategy.rhsCopyMapping();
+    MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
     b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
                                            rhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRes()) {
-    AbstractGemmLikeStrategy::MappingInfo resCopyMapping =
-        strategy.resCopyMapping();
+    MappingInfo resCopyMapping = strategy.resCopyMapping();
     b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
                                            resCopyMapping.tileSizes);
   }
@@ -507,9 +502,9 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // Lower all masked vector transfers at this point, as they make
   // canonicalization generate incorrect IR.
   // TODO: don't rematch, apply on the variant op directly.
-  Value funcH =
+  funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
+  buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 
   // Apply vectorization + cleanups to what remains.
   funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true);
@@ -535,20 +530,23 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
     b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
   });
-  {
-    ApplyPatternsOpPatterns config;
-    config.extractAddressComputations = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyExtractAddressComputationsPatternsOp>(loc);
+  });
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
-  {
-    ApplyPatternsOpPatterns config;
-    if (strategy.useMmaSync)
-      config.unrollVectorsGpuMmaSync = true;
-    else
-      config.unrollVectorsGpuWmma = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
+  if (strategy.useWmma) {
+    b.create<transform::ApplyPatternsOp>(
+        funcH, [&](OpBuilder &b, Location loc) {
+          b.create<iree_compiler::IREE::transform_dialect::
+                       ApplyUnrollVectorsGpuWmmaSyncPatternsOp>(loc);
+        });
+  } else if (strategy.useMmaSync) {
+    b.create<transform::ApplyPatternsOp>(
+        funcH, [&](OpBuilder &b, Location loc) {
+          b.create<iree_compiler::IREE::transform_dialect::
+                       ApplyUnrollVectorsGpuMmaSyncPatternsOp>(loc);
+        });
+  } /* else nothing to do for fma here */
 
   Value forH = b.create<transform::MatchOp>(
       transform::OperationType::get(b.getContext(), "scf.for"), funcH,
@@ -568,14 +566,18 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
       transform::AnyOpType::get(b.getContext()), funcH);
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   b.create<ApplyBufferOptimizationsOp>(funcH);
-  auto vectorToMMaConversionOp =
-      b.create<iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(
-          funcH);
-  // TODO: proper builder instead of a setting post-hoc.
-  if (strategy.useMmaSync)
-    vectorToMMaConversionOp.setUseMmaSync(true);
-  else
+
+  if (strategy.useWmma) {
+    auto vectorToMMaConversionOp = b.create<
+        iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(funcH);
+    // TODO: proper builder instead of a setting post-hoc.
     vectorToMMaConversionOp.setUseWmma(true);
+  } else if (strategy.useMmaSync) {
+    auto vectorToMMaConversionOp = b.create<
+        iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(funcH);
+    // TODO: proper builder instead of a setting post-hoc.
+    vectorToMMaConversionOp.setUseMmaSync(true);
+  } /* else nothing to do for fma here */
 
   // Post-hoc elimiation of barriers.
   funcH = b.create<EliminateGpuBarriersOp>(funcH);
@@ -620,8 +622,10 @@ Value mlir::iree_compiler::gpu::buildConvertToAsyncCopies(
   auto createAsyncGroupOp =
       b.create<iree_compiler::IREE::transform_dialect::CreateAsyncGroupsOp>(
           TypeRange{}, funcH);
-  // TODO: proper builder instead of a setting post-hoc.
-  createAsyncGroupOp.setUseMmaSync(strategy.useMmaSync);
+  if (strategy.useMmaSync) {
+    // TODO: proper builder instead of a setting post-hoc.
+    createAsyncGroupOp.setUseMmaSync(strategy.useMmaSync);
+  }
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, funcH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
@@ -633,12 +637,16 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
     ImplicitLocOpBuilder &b, Value funcH,
     const AbstractGemmLikeStrategy &strategy) {
   Value computeOpH;
-  if (strategy.useMmaSync) {
+  if (strategy.useWmma) {
+    computeOpH = b.create<transform::MatchOp>(
+        funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
+  } else if (strategy.useMmaSync) {
     computeOpH = b.create<transform::MatchOp>(
         funcH, mlir::nvgpu::MmaSyncOp::getOperationName());
   } else {
+    assert(strategy.useFma);
     computeOpH = b.create<transform::MatchOp>(
-        funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
+        funcH, mlir::vector::ContractionOp::getOperationName());
   }
   // TODO: Better builder.
   Value forOpH = b.create<transform::GetParentForOp>(
@@ -654,11 +662,14 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
 
 Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
                                                Value variantH) {
-  ApplyPatternsOpPatterns patterns;
-  patterns.canonicalization = true;
-  patterns.cse = true;
-  patterns.licm = true;
-  b.create<ApplyPatternsOp>(variantH, patterns);
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+  });
+  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
+  b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
+      funcH);
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   auto bufferizeOp = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
   bufferizeOp.setTargetGpu(true);

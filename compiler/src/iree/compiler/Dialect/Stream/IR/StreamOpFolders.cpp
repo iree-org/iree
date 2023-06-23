@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -1081,9 +1082,18 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
           "only constant splat attrs can be converted to splat ops");
     }
 
-    auto splatElementAttr = splatAttr.getSplatValue<TypedAttr>();
-    auto splatValue = rewriter.create<arith::ConstantOp>(
-        constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
+    Value splatValue;
+    if (isa<ComplexType>(getElementTypeOrSelf(splatAttr.getType()))) {
+      auto splatElementAttr = splatAttr.getSplatValue<ArrayAttr>();
+      splatValue = rewriter.create<complex::ConstantOp>(
+          constantOp.getLoc(), getElementTypeOrSelf(splatAttr.getType()),
+          cast<ArrayAttr>(splatElementAttr));
+    } else {
+      auto splatElementAttr = splatAttr.getSplatValue<TypedAttr>();
+      splatValue = rewriter.create<arith::ConstantOp>(
+          constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
+    }
+
     auto resultType = IREE::Stream::ResourceType::get(constantOp.getContext());
     auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
         constantOp.getLoc(), rewriter.getIndexType(),

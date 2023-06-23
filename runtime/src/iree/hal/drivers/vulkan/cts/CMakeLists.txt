@@ -17,4 +17,6 @@ iree_hal_cts_test_suite(
     "\"SPVE\""
   DEPS
     iree::hal::drivers::vulkan::registration
+  LABELS
+    driver=vulkan
 )

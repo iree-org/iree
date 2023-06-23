@@ -30,10 +30,6 @@ void IREEDbgHelpUnlock(void) { ReleaseMutex(iree_dbghelp_mutex); }
 
 #if IREE_TRACING_FEATURES != 0
 
-int64_t iree_tracing_time(void) { return tracy::Profiler::GetTime(); }
-
-int64_t iree_tracing_frequency(void) { return tracy::GetFrequencyQpc(); }
-
 iree_zone_id_t iree_tracing_zone_begin_impl(
     const iree_tracing_location_t* src_loc, const char* name,
     size_t name_length) {
@@ -123,6 +119,90 @@ iree_zone_id_t iree_tracing_zone_begin_external_impl(
 void iree_tracing_zone_end(iree_zone_id_t zone_id) {
   ___tracy_emit_zone_end(iree_tracing_make_zone_ctx(zone_id));
 }
+
+void iree_tracing_set_plot_type_impl(const char* name_literal,
+                                     uint8_t plot_type, bool step, bool fill,
+                                     uint32_t color) {
+  tracy::Profiler::ConfigurePlot(name_literal,
+                                 static_cast<tracy::PlotFormatType>(plot_type),
+                                 step, fill, color);
+}
+
+void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value) {
+  tracy::Profiler::PlotData(name_literal, value);
+}
+
+void iree_tracing_plot_value_f32_impl(const char* name_literal, float value) {
+  tracy::Profiler::PlotData(name_literal, value);
+}
+
+void iree_tracing_plot_value_f64_impl(const char* name_literal, double value) {
+  tracy::Profiler::PlotData(name_literal, value);
+}
+
+void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
+                                 uint32_t* out_lock_id) {
+  uint32_t lock_id =
+      tracy::GetLockCounter().fetch_add(1, std::memory_order_relaxed);
+  assert(lock_id != std::numeric_limits<uint32_t>::max());
+  *out_lock_id = lock_id;
+
+  auto item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockAnnounce);
+  tracy::MemWrite(&item->lockAnnounce.id, lock_id);
+  tracy::MemWrite(&item->lockAnnounce.time, tracy::Profiler::GetTime());
+  tracy::MemWrite(&item->lockAnnounce.lckloc,
+                  reinterpret_cast<uint64_t>(src_loc));
+  tracy::MemWrite(&item->lockAnnounce.type, tracy::LockType::Lockable);
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_mutex_terminate(uint32_t lock_id) {
+  auto item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockTerminate);
+  tracy::MemWrite(&item->lockTerminate.id, lock_id);
+  tracy::MemWrite(&item->lockTerminate.time, tracy::Profiler::GetTime());
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_mutex_before_lock(uint32_t lock_id) {
+  auto item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockWait);
+  tracy::MemWrite(&item->lockWait.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->lockWait.id, lock_id);
+  tracy::MemWrite(&item->lockWait.time, tracy::Profiler::GetTime());
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_mutex_after_lock(uint32_t lock_id) {
+  auto item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockObtain);
+  tracy::MemWrite(&item->lockObtain.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->lockObtain.id, lock_id);
+  tracy::MemWrite(&item->lockObtain.time, tracy::Profiler::GetTime());
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired) {
+  if (was_acquired) {
+    iree_tracing_mutex_after_lock(lock_id);
+  }
+}
+
+void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
+  auto item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockRelease);
+  tracy::MemWrite(&item->lockReleaseShared.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->lockRelease.id, lock_id);
+  tracy::MemWrite(&item->lockRelease.time, tracy::Profiler::GetTime());
+  tracy::Profiler::QueueSerialFinish();
+}
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+
+int64_t iree_tracing_time(void) { return tracy::Profiler::GetTime(); }
+
+int64_t iree_tracing_frequency(void) { return tracy::GetFrequencyQpc(); }
 
 uint8_t iree_tracing_gpu_context_allocate(iree_tracing_gpu_context_type_t type,
                                           const char* name, size_t name_length,
@@ -239,83 +319,7 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
   tracy::Profiler::QueueSerialFinish();
 }
 
-void iree_tracing_set_plot_type_impl(const char* name_literal,
-                                     uint8_t plot_type, bool step, bool fill,
-                                     uint32_t color) {
-  tracy::Profiler::ConfigurePlot(name_literal,
-                                 static_cast<tracy::PlotFormatType>(plot_type),
-                                 step, fill, color);
-}
-
-void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value) {
-  tracy::Profiler::PlotData(name_literal, value);
-}
-
-void iree_tracing_plot_value_f32_impl(const char* name_literal, float value) {
-  tracy::Profiler::PlotData(name_literal, value);
-}
-
-void iree_tracing_plot_value_f64_impl(const char* name_literal, double value) {
-  tracy::Profiler::PlotData(name_literal, value);
-}
-
-void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
-                                 uint32_t* out_lock_id) {
-  uint32_t lock_id =
-      tracy::GetLockCounter().fetch_add(1, std::memory_order_relaxed);
-  assert(lock_id != std::numeric_limits<uint32_t>::max());
-  *out_lock_id = lock_id;
-
-  auto item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockAnnounce);
-  tracy::MemWrite(&item->lockAnnounce.id, lock_id);
-  tracy::MemWrite(&item->lockAnnounce.time, tracy::Profiler::GetTime());
-  tracy::MemWrite(&item->lockAnnounce.lckloc,
-                  reinterpret_cast<uint64_t>(src_loc));
-  tracy::MemWrite(&item->lockAnnounce.type, tracy::LockType::Lockable);
-  tracy::Profiler::QueueSerialFinish();
-}
-
-void iree_tracing_mutex_terminate(uint32_t lock_id) {
-  auto item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockTerminate);
-  tracy::MemWrite(&item->lockTerminate.id, lock_id);
-  tracy::MemWrite(&item->lockTerminate.time, tracy::Profiler::GetTime());
-  tracy::Profiler::QueueSerialFinish();
-}
-
-void iree_tracing_mutex_before_lock(uint32_t lock_id) {
-  auto item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockWait);
-  tracy::MemWrite(&item->lockWait.thread, tracy::GetThreadHandle());
-  tracy::MemWrite(&item->lockWait.id, lock_id);
-  tracy::MemWrite(&item->lockWait.time, tracy::Profiler::GetTime());
-  tracy::Profiler::QueueSerialFinish();
-}
-
-void iree_tracing_mutex_after_lock(uint32_t lock_id) {
-  auto item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockObtain);
-  tracy::MemWrite(&item->lockObtain.thread, tracy::GetThreadHandle());
-  tracy::MemWrite(&item->lockObtain.id, lock_id);
-  tracy::MemWrite(&item->lockObtain.time, tracy::Profiler::GetTime());
-  tracy::Profiler::QueueSerialFinish();
-}
-
-void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired) {
-  if (was_acquired) {
-    iree_tracing_mutex_after_lock(lock_id);
-  }
-}
-
-void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
-  auto item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockRelease);
-  tracy::MemWrite(&item->lockReleaseShared.thread, tracy::GetThreadHandle());
-  tracy::MemWrite(&item->lockRelease.id, lock_id);
-  tracy::MemWrite(&item->lockRelease.time, tracy::Profiler::GetTime());
-  tracy::Profiler::QueueSerialFinish();
-}
+#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #endif  // IREE_TRACING_FEATURES
 

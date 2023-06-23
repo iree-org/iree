@@ -129,8 +129,8 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.local_repository,
-        name = "mlir-hlo",
-        path = paths.join(iree_path, "third_party/mlir-hlo"),
+        name = "stablehlo",
+        path = paths.join(iree_path, "third_party/stablehlo"),
     )
 
     maybe(

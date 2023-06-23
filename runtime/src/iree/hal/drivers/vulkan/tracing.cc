@@ -6,7 +6,7 @@
 
 #include "iree/hal/drivers/vulkan/tracing.h"
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #include "iree/base/api.h"
 
@@ -612,4 +612,4 @@ void iree_hal_vulkan_tracing_context_collect(
     iree_hal_vulkan_tracing_context_t* context,
     VkCommandBuffer command_buffer) {}
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE

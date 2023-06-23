@@ -99,7 +99,9 @@ LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
   iree_vm_function_t function;
   if (auto status = iree_vm_module_lookup_function_by_name(
           main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
-          iree_string_view_t{name.data(), name.size()}, &function)) {
+          iree_string_view_t{name.data(),
+                             static_cast<iree_host_size_t>(name.size())},
+          &function)) {
     iree_status_ignore(status);
     return emitError(loc) << "internal error evaling constant: func '" << name
                           << "' not found";

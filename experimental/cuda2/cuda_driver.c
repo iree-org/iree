@@ -448,7 +448,8 @@ static iree_status_t iree_hal_cuda2_driver_select_default_device(
                               "no compatible CUDA devices were found");
   } else if (default_device_index >= device_count) {
     status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "default device %d not found (of %ld enumerated)",
+                              "default device %d not found (of %" PRIhsz
+                              " enumerated)",
                               default_device_index, device_count);
   } else {
     *out_device = IREE_DEVICE_ID_TO_CUDEVICE(
@@ -489,7 +490,7 @@ static iree_status_t iree_hal_cuda2_driver_create_device_by_id(
   // Attempt to create the device now.
   iree_status_t status = iree_hal_cuda2_device_create(
       base_driver, device_name, &driver->device_params, &driver->cuda_symbols,
-      device, host_allocator, out_device);
+      &driver->nccl_symbols, device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

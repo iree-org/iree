@@ -16,6 +16,7 @@ package(
 exports_files([
     "IREECodegenAttributes.td",
     "IREECodegenDialect.td",
+    "IREECodegenOps.td",
     "LoweringConfig.td",
     "UKernelOps.td",
 ])
@@ -26,6 +27,7 @@ iree_td_library(
         [
             "IREECodegenAttributes.td",
             "IREECodegenDialect.td",
+            "IREECodegenOps.td",
             "LoweringConfig.td",
             "UKernelOps.td",
         ],
@@ -35,6 +37,7 @@ iree_td_library(
         "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
         "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
     ],
 )
 
@@ -42,17 +45,21 @@ iree_compiler_cc_library(
     name = "IREECodegenDialect",
     srcs = [
         "IREECodegenDialect.cpp",
+        "IREECodegenOps.cpp",
         "LoweringConfig.cpp",
         "UKernelOps.cpp",
     ],
     hdrs = [
         "IREECodegenDialect.h",
+        "IREECodegenOps.h",
         "LoweringConfig.h",
         "UKernelOps.h",
     ],
     textual_hdrs = [
         "IREECodegenDialect.cpp.inc",
         "IREECodegenDialect.h.inc",
+        "IREECodegenOps.cpp.inc",
+        "IREECodegenOps.h.inc",
         "LoweringConfig.cpp.inc",
         "LoweringConfig.h.inc",
         "LoweringConfigEnums.cpp.inc",
@@ -62,6 +69,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":IREECodegenDialectGen",
+        ":IREECodegenOpsGen",
         ":LoweringConfigGen",
         ":UKernelOpsGen",
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
@@ -96,6 +104,26 @@ iree_gentbl_cc_library(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREECodegenAttributes.td",
     deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREECodegenOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "IREECodegenOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "IREECodegenOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREECodegenOps.td",
+    deps = [
+        ":td_files",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
+    ],
 )
 
 iree_gentbl_cc_library(

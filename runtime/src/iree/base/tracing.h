@@ -47,38 +47,43 @@
 // only be enabled when tracking down missing instrumentation.
 #define IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS (1 << 1)
 
+// Enables instrumentation of external device APIs (GPUs, etc) when supported.
+// This can have significant code size and runtime overhead and should only be
+// used when specifically tracing device-side execution.
+#define IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE (1 << 2)
+
 // Tracks all allocations (we know about) via new/delete/malloc/free.
 // This allows fine-grained allocation and usage tracking down to the code that
 // performed the allocations. Allocations or frees that are performed outside of
 // the IREE API or runtime library will not be tracked and unbalanced usage
 // (allocating with IREE's API then freeing with stdlib free, for example) will
 // cause Tracy to become very unhappy.
-#define IREE_TRACING_FEATURE_ALLOCATION_TRACKING (1 << 2)
+#define IREE_TRACING_FEATURE_ALLOCATION_TRACKING (1 << 3)
 
 // Captures callstacks up to IREE_TRACING_MAX_CALLSTACK_DEPTH at all allocation
 // events when allocation tracking is enabled.
-#define IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS (1 << 3)
+#define IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS (1 << 4)
 
 // Tracks fast locks in all cases (both contended and uncontended).
 // This may introduce contention where there would otherwise be none as what
 // would be a handful of instructions and little memory access may become
 // hundreds. To see only locks under contention use
 // IREE_TRACING_FEATURE_SLOW_LOCKS.
-#define IREE_TRACING_FEATURE_FAST_LOCKS (1 << 4)
+#define IREE_TRACING_FEATURE_FAST_LOCKS (1 << 5)
 
 // Tracks slow locks that end up going to the OS for waits/wakes in futexes.
 // Uncontended locks will not be displayed and only waits will be visible in the
 // Tracy UI.
-#define IREE_TRACING_FEATURE_SLOW_LOCKS (1 << 5)
+#define IREE_TRACING_FEATURE_SLOW_LOCKS (1 << 6)
 
 // Forwards log messages to traces, which will be visible under "Messages" in
 // the Tracy UI.
-#define IREE_TRACING_FEATURE_LOG_MESSAGES (1 << 6)
+#define IREE_TRACING_FEATURE_LOG_MESSAGES (1 << 7)
 
 // Enables fiber support in the Tracy UI.
 // Comes with a per-event overhead (less efficient queue insertion) but is
 // required when running with asynchronous VM invocations.
-#define IREE_TRACING_FEATURE_FIBERS (1 << 7)
+#define IREE_TRACING_FEATURE_FIBERS (1 << 8)
 
 #if !defined(IREE_TRACING_MAX_CALLSTACK_DEPTH)
 // Tracing functions that capture stack traces will only capture up to N frames.
@@ -93,45 +98,67 @@
 //===----------------------------------------------------------------------===//
 // IREE_TRACING_MODE simple setting
 //===----------------------------------------------------------------------===//
+// This defines IREE_TRACING_FEATURES_REQUESTED (which may also be provided in
+// the user config.h) to select which tracing features are requested. Providers
+// may not implement all of the features and are expected to filter out the
+// requested features into ones they do before defining the primary
+// IREE_TRACING_FEATURES value.
 
-// Set IREE_TRACING_FEATURES based on IREE_TRACING_MODE if the user hasn't
-// overridden it with more specific settings.
-//
-// IREE_TRACING_MODE = 0: tracing disabled
-// IREE_TRACING_MODE = 1: instrumentation, log messages, and basic statistics
-// IREE_TRACING_MODE = 2: same as 1 with added allocation tracking
-// IREE_TRACING_MODE = 3: same as 2 with callstacks for allocations
-// IREE_TRACING_MODE = 4: same as 3 with callstacks for all instrumentation
-#if !defined(IREE_TRACING_FEATURES)
+#if !defined(IREE_TRACING_FEATURES_REQUESTED)
 #if defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 1
-#define IREE_TRACING_FEATURES \
+#define IREE_TRACING_FEATURES_REQUESTED \
   (IREE_TRACING_FEATURE_INSTRUMENTATION | IREE_TRACING_FEATURE_LOG_MESSAGES)
 #undef IREE_TRACING_MAX_CALLSTACK_DEPTH
 #define IREE_TRACING_MAX_CALLSTACK_DEPTH 0
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 2
-#define IREE_TRACING_FEATURES                 \
-  (IREE_TRACING_FEATURE_INSTRUMENTATION |     \
-   IREE_TRACING_FEATURE_ALLOCATION_TRACKING | \
+#define IREE_TRACING_FEATURES_REQUESTED          \
+  (IREE_TRACING_FEATURE_INSTRUMENTATION |        \
+   IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE | \
+   IREE_TRACING_FEATURE_ALLOCATION_TRACKING |    \
    IREE_TRACING_FEATURE_LOG_MESSAGES)
 // TODO(#9627): make tracy fibers faster; too slow for on-by-default!
 // | IREE_TRACING_FEATURE_FIBERS)
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 3
-#define IREE_TRACING_FEATURES                   \
-  (IREE_TRACING_FEATURE_INSTRUMENTATION |       \
-   IREE_TRACING_FEATURE_ALLOCATION_TRACKING |   \
-   IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS | \
+#define IREE_TRACING_FEATURES_REQUESTED          \
+  (IREE_TRACING_FEATURE_INSTRUMENTATION |        \
+   IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE | \
+   IREE_TRACING_FEATURE_ALLOCATION_TRACKING |    \
+   IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS |  \
    IREE_TRACING_FEATURE_LOG_MESSAGES | IREE_TRACING_FEATURE_FIBERS)
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE >= 4
-#define IREE_TRACING_FEATURES                        \
+#define IREE_TRACING_FEATURES_REQUESTED              \
   (IREE_TRACING_FEATURE_INSTRUMENTATION |            \
    IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS | \
+   IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE |     \
    IREE_TRACING_FEATURE_ALLOCATION_TRACKING |        \
    IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS |      \
    IREE_TRACING_FEATURE_LOG_MESSAGES | IREE_TRACING_FEATURE_FIBERS)
 #else
-#define IREE_TRACING_FEATURES 0
+#define IREE_TRACING_FEATURES_REQUESTED 0
 #endif  // IREE_TRACING_MODE
 #endif  // !IREE_TRACING_FEATURES
+
+//===----------------------------------------------------------------------===//
+// Tracing implementation
+//===----------------------------------------------------------------------===//
+
+// Include the actual tracing implementation used when a tracing mode is set.
+// This will either come from build options like IREE_TRACING_PROVIDER or can
+// be overridden during compilation with
+// -DIREE_TRACING_PROVIDER_H="my_provider.h".
+#if defined(IREE_TRACING_PROVIDER_H)
+
+#include IREE_TRACING_PROVIDER_H
+
+#if !defined(IREE_TRACING_FEATURES)
+#error \
+    "Tracing provider must define IREE_TRACING_FEATURES based on the requested bits in IREE_TRACING_FEATURES_REQUESTED and what it supports"
+#endif  // !IREE_TRACING_FEATURES
+
+#else
+#define IREE_TRACING_FEATURES 0
+typedef uint32_t iree_zone_id_t;
+#endif  // IREE_TRACING_PROVIDER_H
 
 //===----------------------------------------------------------------------===//
 // Instrumentation macros (C)
@@ -167,6 +194,18 @@ enum {
 //  IREE_TRACE(my_object.trace_only_value = 5);
 #define IREE_TRACE(expr)
 
+// Notifies the tracing implementation the app is about to start.
+// No tracing APIs should be called prior to this point as implementations may
+// use this to perform initialization.
+#define IREE_TRACE_APP_ENTER()
+
+// Notifies the tracing implementation that the app is about to exit.
+// This allows implementations to flush their buffers. |exit_code| may be
+// provided to indicate the application exit code if available.
+// No tracing APIs should be called after this point as implementations may use
+// this to perform deinitialization.
+#define IREE_TRACE_APP_EXIT(exit_code)
+
 // Sets an application-specific payload that will be stored in the trace.
 // This can be used to fingerprint traces to particular versions and denote
 // compilation options or configuration. The given string value will be copied.
@@ -177,11 +216,6 @@ enum {
 // not set the OS thread name as it would appear in a debugger.
 // The C-string |name| will be copied and does not need to be a literal.
 #define IREE_TRACE_SET_THREAD_NAME(name)
-
-// Notifies the tracing implementation that the app is about to exit.
-// This allows implementations to flush their buffers. |exit_code| may be
-// provided to indicate the application exit code if available.
-#define IREE_TRACE_APP_EXIT(exit_code)
 
 // Enters a fiber context.
 // |fiber| must be a unique pointer and remain live for the process lifetime.
@@ -212,7 +246,7 @@ enum {
   IREE_TRACE_ZONE_BEGIN(zone_id)
 
 // Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
-#define IREE_TRACE_ZONE_END(zone_id)
+#define IREE_TRACE_ZONE_END(zone_id) (void)(zone_id)
 
 // Ends the current zone before returning on a failure.
 // Sugar for IREE_TRACE_ZONE_END + IREE_RETURN_IF_ERROR.
@@ -229,8 +263,6 @@ enum {
 // The provided NUL-terminated C string or string view will be copied into the
 // trace buffer.
 #define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)
-#define IREE_TRACE_ZONE_APPEND_TEXT_CSTRING(zone_id, value)
-#define IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(zone_id, value, value_length)
 
 // Configures the named plot with an IREE_TRACING_PLOT_TYPE_* representation.
 #define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type, step, fill, color)
@@ -325,11 +357,5 @@ enum {
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #endif  // __cplusplus
-
-//===----------------------------------------------------------------------===//
-// Tracing implementation
-//===----------------------------------------------------------------------===//
-
-#include "iree/base/tracing/tracy.h"
 
 #endif  // IREE_BASE_TRACING_H_

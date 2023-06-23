@@ -35,10 +35,10 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
                                         iree_task_executor_t** out_executor) {
   iree_host_size_t worker_count = iree_task_topology_group_count(topology);
   if (worker_count > IREE_TASK_EXECUTOR_MAX_WORKER_COUNT) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "requested %zu workers but a maximum of %d is allowed", worker_count,
-        IREE_TASK_EXECUTOR_MAX_WORKER_COUNT);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "requested %" PRIhsz
+                            " workers but a maximum of %d is allowed",
+                            worker_count, IREE_TASK_EXECUTOR_MAX_WORKER_COUNT);
   }
 
   // TODO(benvanik): support a threadless mode where we have one dummy worker

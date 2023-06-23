@@ -8,33 +8,17 @@
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree/compiler/Codegen/Utils/EncodingInfo.h"
+#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
-
-enum class MatmulOperandRole {
-  LHS,
-  RHS,
-  RESULT,
-};
 
 struct MatmulTileParams {
   int64_t M = 1;
   int64_t K = 1;
   int64_t N = 1;
 };
-
-/// Extracts encoding from the `tensorType` if specified.
-std::optional<IREE::LinalgExt::TensorEncoding> getEncoding(
-    RankedTensorType tensorType);
-
-std::optional<MatmulType> getMatmulType(
-    IREE::LinalgExt::TensorEncoding encoding);
-
-std::optional<MatmulOperandRole> getMatmulOperandRole(
-    IREE::LinalgExt::TensorEncoding encoding);
 
 void adjustTileSizesToNarrowStaticShape(
     IREE::LinalgExt::MaterializeEncodingInfo &encodingInfo,

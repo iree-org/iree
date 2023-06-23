@@ -747,7 +747,6 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         // OptimizeVectorTransfer, matrixC reads are moved above the mainloop
         // and writes are moved below the mainloop. Thus, mma.sync read/write
         // accumulator inplace.
-
         SmallVector<int64_t> readShape;
         readShape.append({16, 16});
         LLVM_DEBUG({

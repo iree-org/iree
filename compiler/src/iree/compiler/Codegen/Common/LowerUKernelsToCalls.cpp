@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "llvm/ADT/MapVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -27,7 +28,7 @@ struct LowerUKernelOpsToCallsPass
 void LowerUKernelOpsToCallsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  SmallVector<Operation *> toDelete;
+  llvm::MapVector<IREE::Codegen::UKernelOpInterface, func::CallOp> toReplace;
   Operation *errorOp = nullptr;
   IRRewriter rewriter(context);
   WalkResult result = getOperation().walk(
@@ -40,7 +41,7 @@ void LowerUKernelOpsToCallsPass::runOnOperation() {
           errorOp = microKernelOp;
           return WalkResult::interrupt();
         }
-        toDelete.push_back(microKernelOp);
+        toReplace[microKernelOp] = callOp.value();
         return WalkResult::advance();
       });
   if (result.wasInterrupted()) {
@@ -48,8 +49,8 @@ void LowerUKernelOpsToCallsPass::runOnOperation() {
         "failed to lower micro kernel operation to function call");
     return signalPassFailure();
   }
-  for (auto op : toDelete) {
-    op->erase();
+  for (auto r : toReplace) {
+    rewriter.replaceOp(r.first, r.second->getResults());
   }
 }
 

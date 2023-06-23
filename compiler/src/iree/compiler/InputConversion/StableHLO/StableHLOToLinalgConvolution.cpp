@@ -57,9 +57,20 @@ Value applyConvolutionPadding(Location loc, Value input,
 
   IntegerType indexType = rewriter.getIntegerType(64);
   auto attrType = RankedTensorType::get({rank}, indexType);
-  Value zero = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(
-               RankedTensorType::get({}, inputType.getElementType())));
+
+  Value zero;
+  if (auto complexType = dyn_cast<ComplexType>(inputType.getElementType())) {
+    auto zeroElement = rewriter.getZeroAttr(complexType.getElementType());
+    auto zeroAttr = rewriter.getArrayAttr({zeroElement, zeroElement});
+    zero = rewriter.create<complex::ConstantOp>(loc, complexType, zeroAttr);
+    zero = rewriter.create<tensor::FromElementsOp>(
+        loc, RankedTensorType::get({}, complexType), zero);
+  } else {
+    zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(
+                 RankedTensorType::get({}, inputType.getElementType())));
+  }
+
   return rewriter.create<mlir::stablehlo::PadOp>(
       loc, input, zero, DenseIntElementsAttr::get(attrType, padLow),
       DenseIntElementsAttr::get(attrType, padHigh),

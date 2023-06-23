@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_ABSTRACT_GEMM_LIKE_STRATEGY_H_
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/MappingInfo.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 namespace llvm {
@@ -26,17 +27,21 @@ struct AbstractGemmLikeStrategy {
   virtual ~AbstractGemmLikeStrategy();
 
   //===--------------------------------------------------------------------===//
+  // Helpers and parameters for configuring the strategy.
+  //===--------------------------------------------------------------------===//
+
+  /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
+  /// default CLI values have been overriden.
+  virtual void initDefaultValues();
+
+  /// Encodes whether the user has specified any CLI options. When true, the
+  /// strategy should just run what was specified and is not allowed to
+  /// override the user's choices.
+  bool cliOptionsSpecified = false;
+
+  //===--------------------------------------------------------------------===//
   // Parameters that control the tiling and mapping.
   //===--------------------------------------------------------------------===//
-  struct MappingInfo {
-    SmallVector<int64_t> numThreads;
-    // Explicitly computing the tileSizes is only needed until masked
-    // vectorization properly computes the bounds automatically.
-    SmallVector<int64_t> tileSizes;
-    SmallVector<Attribute> threadMapping;
-    void print(llvm::raw_ostream &os) const;
-    LLVM_DUMP_METHOD void dump() const;
-  };
 
   /// Tile sizes for the workgroup / determines grid size for all known
   /// reduction strategies. The initial values are set by initDefaultValues();
@@ -47,8 +52,8 @@ struct AbstractGemmLikeStrategy {
   virtual int64_t blockTileM() const = 0;
   virtual int64_t blockTileN() const = 0;
 
-  virtual int64_t numWarpsM() const = 0;
-  virtual int64_t numWarpsN() const = 0;
+  virtual int64_t numWarpsX() const = 0;
+  virtual int64_t numWarpsY() const = 0;
 
   virtual MappingInfo getBlockMapping() const = 0;
 
@@ -68,23 +73,15 @@ struct AbstractGemmLikeStrategy {
   //===--------------------------------------------------------------------===//
   // Parameters that control copy/padding transfers from global to shared.
   //===--------------------------------------------------------------------===//
-  SmallVector<float> paddingValues;
+  SmallVector<Type> paddingValueTypes;
   SmallVector<int64_t> paddingDimensions;
   SmallVector<int64_t> packingDimensions;
 
-  // Copy vector sizes based on innermost K/N dims.
-  // TODO: These are now hardcoded for f32 but are element-type dependent.
-  int64_t lhsCopyVectorSize() const {
-    if (k() % 4 == 0) return 4;
-    if (k() % 2 == 0) return 2;
-    return 1;
-  }
-  int64_t rhsCopyVectorSize() const {
-    if (n() % 4 == 0) return 4;
-    if (n() % 2 == 0) return 2;
-    return 1;
-  }
-  int64_t resCopyVectorSize() const { return rhsCopyVectorSize(); }
+  ArrayAttr getZeroPadAttrFromElementalTypes(OpBuilder &b) const;
+
+  int64_t lhsElementalBitWidth = 32;
+  int64_t rhsElementalBitWidth = 32;
+  int64_t resElementalBitWidth = 32;
 
   bool alignedLhs() const {
     return m() % blockTileM() == 0 && k() % reductionTileSize == 0;
@@ -108,10 +105,12 @@ struct AbstractGemmLikeStrategy {
   //===--------------------------------------------------------------------===//
   bool useAsyncCopies;
   bool useMmaSync;
+  bool useWmma;
+  bool useFma;
   int64_t pipelineDepth;
   virtual MappingInfo computeMapping() const = 0;
 
-  virtual LogicalResult validate() const = 0;
+  virtual LogicalResult validate(const GPUModel &gpuModel) const;
 
   //===--------------------------------------------------------------------===//
   // Problem-related quantities.

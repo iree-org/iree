@@ -198,7 +198,8 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "FlatBuffer data is not present or less than 16 bytes (%zu total)",
+        "FlatBuffer data is not present or less than 16 bytes (%" PRIhsz
+        " total)",
         flatbuffer_data.data_length);
   }
 
@@ -222,7 +223,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   if (entry_point_count != expected_entry_point_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "executable provides %zu entry points but caller "
-                            "provided %zu; must match",
+                            "provided %" PRIhsz "; must match",
                             entry_point_count, expected_entry_point_count);
   }
 
@@ -241,7 +242,8 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
     if (subgroup_sizes_count != expected_entry_point_count) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "executable has %zu entry points but %zu subgroup sizes are defined",
+          "executable has %" PRIhsz
+          " entry points but %zu subgroup sizes are defined",
           expected_entry_point_count, subgroup_sizes_count);
     }
   }
@@ -419,7 +421,8 @@ iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
       iree_hal_vulkan_native_executable_cast(base_executable);
   if (entry_ordinal >= executable->entry_point_count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "invalid entry point ordinal %zu", entry_ordinal);
+                            "invalid entry point ordinal %" PRIhsz,
+                            entry_ordinal);
   }
   *out_pipeline_handle = executable->entry_points[entry_ordinal].pipeline;
   return iree_ok_status();

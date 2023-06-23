@@ -33,13 +33,15 @@ transform.sequence failures(propagate) {
   transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Canonicalizations.
-  transform.apply_patterns to %variant_op {
+  %func_op = transform.structured.match ops{["func.func"]} in %variant_op 
+      : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func_op {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
   } : !transform.any_op
-  transform.iree.apply_patterns %variant_op
-    { canonicalization, licm, cse } : (!transform.any_op) -> ()
+  transform.iree.apply_licm %func_op : !transform.any_op
+  transform.iree.apply_cse %func_op : !transform.any_op
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op 
     : (!transform.any_op) -> !transform.any_op
@@ -65,7 +67,9 @@ transform.sequence failures(propagate) {
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
-  transform.iree.apply_patterns %func_3 { fold_reassociative_reshapes } : (!transform.any_op) -> ()
+  transform.apply_patterns to %func_3 {
+    transform.apply_patterns.tensor.reassociative_reshape_folding
+  } : !transform.any_op
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> !transform.any_op
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
@@ -100,11 +104,13 @@ transform.sequence failures(propagate) {
 
 
   // Late Canonicalizations.
-  transform.apply_patterns to %variant_op_3 {
+  %func_op_3 = transform.structured.match ops{["func.func"]} in %variant_op_3
+      : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func_op_3 {
     transform.apply_patterns.iree.fold_fill_into_pad
     transform.apply_patterns.linalg.tiling_canonicalization
     transform.apply_patterns.scf.for_loop_canonicalization
   } : !transform.any_op
-  transform.iree.apply_patterns %variant_op_3
-    { canonicalization, licm, cse } : (!transform.any_op) -> ()
+  transform.iree.apply_licm %func_op_3 : !transform.any_op
+  transform.iree.apply_cse %func_op_3 : !transform.any_op
 }

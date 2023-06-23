@@ -27,6 +27,10 @@ struct SPIRVBreakDownLargeVectorPass final
         patterns, [](vector::ExtractStridedSliceOp op) {
           return op.getSourceVectorType().getNumElements() > 4;
         });
+    vector::populateBreakDownVectorBitCastOpPatterns(
+        patterns, [](vector::BitCastOp op) {
+          return op.getSourceVectorType().getNumElements() > 4;
+        });
     vector::InsertOp::getCanonicalizationPatterns(patterns, context);
     vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),

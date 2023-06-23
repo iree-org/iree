@@ -93,7 +93,7 @@ jobs:
           COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
         run: |
           mkdir -p benchmark-results
-          ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
+          ./build_tools/benchmarks/collect_compilation_statistics.py \
             --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
             --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
             --compilation_benchmark_config="${BENCHMARK_CONFIG}" \

@@ -1287,6 +1287,43 @@ struct DotToMul final : OpRewritePattern<mlir::stablehlo::DotOp> {
   }
 };
 
+// Rewrite RngBitGenerator with f32 return type to instead generate the same
+// number of i32 outputs, then BitcastConvert to return f32.
+struct RngBitcastFloat final
+    : OpRewritePattern<mlir::stablehlo::RngBitGeneratorOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::RngBitGeneratorOp op,
+                                PatternRewriter &rewriter) const override {
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
+    auto resultTy = dyn_cast<RankedTensorType>(op.getType(1));
+    auto stateTy = dyn_cast<RankedTensorType>(op.getType(0));
+
+    if (!isa<FloatType>(resultTy.getElementType())) {
+      return failure();
+    }
+
+    llvm::SmallVector<Type> castedTypes;
+    castedTypes.push_back(stateTy);
+    castedTypes.push_back(resultTy.clone(rewriter.getI32Type()));
+
+    TypeRange castedTypeRange = TypeRange{castedTypes};
+
+    auto resultOp = rewriter.create<mlir::stablehlo::RngBitGeneratorOp>(
+        op.getLoc(), castedTypeRange, op.getRngAlgorithm(), op.getOperand());
+
+    auto casted = rewriter.create<mlir::stablehlo::BitcastConvertOp>(
+        resultOp.getLoc(), resultTy, resultOp.getResult(1));
+
+    llvm::SmallVector<Value> results;
+    results.push_back(resultOp.getResult(0));
+    results.push_back(casted);
+
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+};
+
 // Similar to DotIsMul, this finds the case where a dot general
 // can be represented using a mul operation. This includes possibly making
 // an implicit cast explicit prior the mul.
@@ -1540,6 +1577,38 @@ struct CustomCallIsTopK final
   }
 };
 
+// Recursive helper function that identifies an Iota followed by a set of
+// broadcasts where the last dimension of the iota is preserved throughout.
+bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
+  if (auto iotaOp =
+          dyn_cast_or_null<mlir::stablehlo::IotaOp>(input.getDefiningOp())) {
+    int64_t iotaDim = iotaOp.getIotaDimension();
+    auto iotaLastDim = cast<ShapedType>(iotaOp.getType()).getRank() - 1;
+    if (iotaDim == iotaLastDim) {
+      return true;
+    }
+
+    (void)rewriter.notifyMatchFailure(iotaOp, "Iota must be on last dimension");
+    return false;
+  }
+
+  if (auto broadcastOp = dyn_cast_or_null<mlir::stablehlo::BroadcastInDimOp>(
+          input.getDefiningOp())) {
+    auto broadcastLastDim =
+        cast<ShapedType>(broadcastOp.getType()).getRank() - 1;
+    SmallVector<int64_t> broadcastDimensions = llvm::to_vector(
+        broadcastOp.getBroadcastDimensions().getValues<int64_t>());
+    if (broadcastDimensions.back() != broadcastLastDim) {
+      (void)rewriter.notifyMatchFailure(
+          broadcastOp, "Last dimension must be maintained in broadcast");
+      return false;
+    }
+    return isIotaOrIotaBroadcast(rewriter, broadcastOp.getOperand());
+  }
+
+  return false;
+}
+
 struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1557,10 +1626,8 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     // Check that one of the inputs is iota, assume that the other one is the
     // input.
     for (Value operand : opOperands) {
-      auto iotaOp =
-          dyn_cast_or_null<mlir::stablehlo::IotaOp>(operand.getDefiningOp());
-      if (iotaOp) {
-        inputIota = iotaOp.getResult();
+      if (isIotaOrIotaBroadcast(rewriter, operand)) {
+        inputIota = operand;
       } else {
         topKInput = operand;
       }
@@ -1662,6 +1729,9 @@ struct StableHLOToStableHLOPreprocessing final
     populatePreprocessingComplexPatterns(context, &patterns);
     populatePreprocessingGatherToTorchIndexSelectPatterns(context, &patterns);
     patterns.insert<ExpandRngNormal, MulCastOfBool>(context);
+
+    // rng float conversion pattern
+    patterns.insert<RngBitcastFloat>(context);
 
     // scatter canonicalization patterns
     patterns.insert<ScatterInt64Indices, ScatterImplicitIndex,

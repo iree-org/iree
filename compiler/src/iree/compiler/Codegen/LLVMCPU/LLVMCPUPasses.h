@@ -18,6 +18,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+class TilingConfig;
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);
@@ -34,6 +36,12 @@ createLLVMCPUEmitVectorizationRemarksPass();
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
+
+/// Pass to handel F16 bit operations, but converting f16 operands to F32.
+/// Currently this pass is handeling fmaxf conversion from f16 to f32,
+/// and then returing a f16 output back after preforming the operation.
+/// Can handel more operations if required in future.
+std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 
 /// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
 /// operation.
@@ -116,15 +124,18 @@ void populateVectorContractCustomKernelsPatterns(
 //----------------------------------------------------------------------------//
 // LLVMCPU backend Pass Pipelines.
 //----------------------------------------------------------------------------//
+
 /// Populates the passes to lower linalg ops on buffers. Currenly this
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
+                                             TilingConfig &tilingConfig,
                                              bool enableVectorMasking,
                                              bool enableAArch64SSVE = false);
 
 /// Populates the passes to lower ops through data tiling transformations.
-void addCPUDataTilingPipeline(OpPassManager &passManager);
+void addCPUDataTilingPipeline(OpPassManager &passManager,
+                              TilingConfig &tilingConfig);
 
 /// Populates the passes to lower to scalars operations for linalg based
 /// code-generation. This pipeline does not vectorize, but instead just
@@ -132,22 +143,23 @@ void addCPUDataTilingPipeline(OpPassManager &passManager);
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
+                                               TilingConfig &tilingConfig,
                                                bool enableVectorMasking,
                                                bool enableAArch64SSVE = false);
 
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
+                                          TilingConfig &tilingConfig,
                                           bool enableVectorMasking);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
+                                      TilingConfig &tilingConfig,
                                       bool enableMicrokernels);
 
-void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
-                                      int64_t numLevels, bool enablePeeling,
-                                      bool enableVectorMasking,
-                                      bool lowerToAVX2,
-                                      bool enableAArch64SSVE = false);
+void addMultiTilingExpertPassPipeline(
+    OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
+    bool enableVectorMasking, bool lowerToAVX2, bool enableAArch64SSVE = false);
 
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
@@ -162,13 +174,13 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
 
 /// Populates the passes needed to do two-level tile + vectorize of linalg ops.
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
 
