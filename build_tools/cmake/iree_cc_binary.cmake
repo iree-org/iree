@@ -129,6 +129,7 @@ function(iree_cc_binary)
 
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  iree_filter_cc_deps(_RULE_DEPS)
 
   # Implicit deps.
   if(IREE_IMPLICIT_DEFS_CC_DEPS)
