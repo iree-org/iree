@@ -537,14 +537,19 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
     b.create<transform::ApplyExtractAddressComputationsPatternsOp>(loc);
   });
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
-  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
-    if (strategy.useMmaSync)
-      b.create<iree_compiler::IREE::transform_dialect::
-                   ApplyUnrollVectorsGpuMmaSyncPatternsOp>(loc);
-    else
-      b.create<iree_compiler::IREE::transform_dialect::
-                   ApplyUnrollVectorsGpuWmmaSyncPatternsOp>(loc);
-  });
+  if (strategy.useWmma) {
+    b.create<transform::ApplyPatternsOp>(
+        funcH, [&](OpBuilder &b, Location loc) {
+          b.create<iree_compiler::IREE::transform_dialect::
+                       ApplyUnrollVectorsGpuWmmaSyncPatternsOp>(loc);
+        });
+  } else if (strategy.useMmaSync) {
+    b.create<transform::ApplyPatternsOp>(
+        funcH, [&](OpBuilder &b, Location loc) {
+          b.create<iree_compiler::IREE::transform_dialect::
+                       ApplyUnrollVectorsGpuMmaSyncPatternsOp>(loc);
+        });
+  } /* else nothing to do for fma here */
 
   Value forH = b.create<transform::MatchOp>(
       transform::OperationType::get(b.getContext(), "scf.for"), funcH,
@@ -564,14 +569,18 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
       transform::AnyOpType::get(b.getContext()), funcH);
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   b.create<ApplyBufferOptimizationsOp>(funcH);
-  auto vectorToMMaConversionOp =
-      b.create<iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(
-          funcH);
-  // TODO: proper builder instead of a setting post-hoc.
-  if (strategy.useMmaSync)
-    vectorToMMaConversionOp.setUseMmaSync(true);
-  else
+
+  if (strategy.useWmma) {
+    auto vectorToMMaConversionOp = b.create<
+        iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(funcH);
+    // TODO: proper builder instead of a setting post-hoc.
     vectorToMMaConversionOp.setUseWmma(true);
+  } else if (strategy.useMmaSync) {
+    auto vectorToMMaConversionOp = b.create<
+        iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(funcH);
+    // TODO: proper builder instead of a setting post-hoc.
+    vectorToMMaConversionOp.setUseMmaSync(true);
+  } /* else nothing to do for fma here */
 
   // Post-hoc elimiation of barriers.
   funcH = b.create<EliminateGpuBarriersOp>(funcH);
@@ -616,8 +625,10 @@ Value mlir::iree_compiler::gpu::buildConvertToAsyncCopies(
   auto createAsyncGroupOp =
       b.create<iree_compiler::IREE::transform_dialect::CreateAsyncGroupsOp>(
           TypeRange{}, funcH);
-  // TODO: proper builder instead of a setting post-hoc.
-  createAsyncGroupOp.setUseMmaSync(strategy.useMmaSync);
+  if (strategy.useMmaSync) {
+    // TODO: proper builder instead of a setting post-hoc.
+    createAsyncGroupOp.setUseMmaSync(strategy.useMmaSync);
+  }
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, funcH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
@@ -629,12 +640,16 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
     ImplicitLocOpBuilder &b, Value funcH,
     const AbstractGemmLikeStrategy &strategy) {
   Value computeOpH;
-  if (strategy.useMmaSync) {
+  if (strategy.useWmma) {
+    computeOpH = b.create<transform::MatchOp>(
+        funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
+  } else if (strategy.useMmaSync) {
     computeOpH = b.create<transform::MatchOp>(
         funcH, mlir::nvgpu::MmaSyncOp::getOperationName());
   } else {
+    assert(strategy.useFma);
     computeOpH = b.create<transform::MatchOp>(
-        funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
+        funcH, mlir::vector::ContractionOp::getOperationName());
   }
   // TODO: Better builder.
   Value forOpH = b.create<transform::GetParentForOp>(

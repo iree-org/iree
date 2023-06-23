@@ -54,6 +54,11 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectAlignedMatmul(
     llvm::cl::desc(
         "activate the matmul tensorcore strategy for tile aligned shapes"),
     llvm::cl::init(false));
+llvm::cl::opt<bool> clGPUEnableTransformDialectSmallMatmul(
+    "iree-codegen-llvmgpu-enable-transform-dialect-small-matmul",
+    llvm::cl::desc("activate the matmul tensorcore strategy for small shapes "
+                   "(< 16) in at least a dimension"),
+    llvm::cl::init(false));
 llvm::cl::opt<bool> clGPUEnableTransformDialectPadStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
     llvm::cl::desc("activate the pad strategy"), llvm::cl::init(false));
@@ -265,16 +270,30 @@ static void failSafeOverrides(MatmulStrategy &strategy,
                               const GPUModel &gpuModel) {
   // Failsafe for blockTileM to avoid tiling by > size (i.e. no tiling).
   int64_t blockTileM = selectLargestFailsafeValueIfNeeded(
-      strategy.blockTileM(), strategy.m(), {16, 32, 64, 128}, {1, 16, 32, 64});
+      strategy.blockTileM(), strategy.m(), {2, 4, 8, 16, 32, 64, 128},
+      {1, 2, 4, 8, 16, 32, 64});
   // Failsafe for blockTileN to avoid tiling by > size (i.e. no tiling).
   int64_t blockTileN = selectLargestFailsafeValueIfNeeded(
-      strategy.blockTileN(), strategy.n(), {16, 32, 64, 128}, {1, 16, 32, 64});
+      strategy.blockTileN(), strategy.n(), {2, 4, 8, 16, 32, 64, 128},
+      {1, 2, 4, 8, 16, 32, 64});
   // Failsafe for reductionSize to avoid tiling by > size (i.e. no tiling).
   int64_t reductionTileSize = selectLargestFailsafeValueIfNeeded(
-      strategy.reductionTileSize, strategy.k(), {8, 16, 24, 32, 40, 48, 56, 64},
-      {1, 8, 16, 24, 32, 40, 48, 56});
+      strategy.reductionTileSize, strategy.k(),
+      {2, 4, 8, 16, 24, 32, 40, 48, 56, 64},
+      {1, 2, 4, 8, 16, 24, 32, 40, 48, 56});
+
+  // If some dimension is small, use fmas.
+  // TODO: more parallelism by locally splitting the K-loop and reducing in the
+  // fma case.
+  if (blockTileM < 16 || blockTileN < 16 || reductionTileSize < 16) {
+    strategy.useMmaSync = false;
+    strategy.useWmma = false;
+    strategy.useFma = true;
+  }
+
   strategy.blockTileSizes = {blockTileM, blockTileN};
   strategy.reductionTileSize = reductionTileSize;
+
   // Avoid too deep pipelines. This should also look at shared memory usage in
   // the future.
   if (strategy.pipelineDepth * strategy.reductionTileSize > strategy.k()) {
@@ -354,6 +373,20 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
+  // Currently the unaligned transform strategy does not properly handle
+  // degenerate dimensions that should have been rank-reduced (e.g. `1`).
+  // Also, it is unprofitable to force small matmuls through a high latency
+  // tensorcore path, we are better off with a simple simt strategy.
+  // TODO: profitability details can be ironed out in the future when we have a
+  // heuristic to better select strategy parameters.
+  bool smallCases = (matmulSize[0] > 0 && matmulSize[0] < 16) ||
+                    (matmulSize[1] > 0 && matmulSize[1] < 16) ||
+                    (matmulSize[2] > 0 && matmulSize[2] < 16);
+  if (smallCases && !clGPUEnableTransformDialectSmallMatmul) {
+    LDBG("--Matmul strategy small size check failed\n");
+    return failure();
+  }
+
   // Currently the fully aligned case still lags behind the current default
   // pipeline and thus is guarded by a flag. This is the case when at least one
   // of the following holds
@@ -363,22 +396,9 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   bool guardedAlignedCases = matmulSize[0] % 64 == 0 ||
                              matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
 
-  if (guardedAlignedCases && !clGPUEnableTransformDialectAlignedMatmul) {
+  if (!smallCases && guardedAlignedCases &&
+      !clGPUEnableTransformDialectAlignedMatmul) {
     LDBG("--Matmul strategy alignment check failed\n");
-    return failure();
-  }
-
-  // Currently the unaligned transform strategy does not properly handle
-  // degenerate dimensions that should have been rank-reduced (e.g. `1`).
-  // Also, it is unprofitable to force small matmuls through a high latency
-  // tensorcore path, we are better off with a simple simt strategy.
-  // TODO: profitability details can be ironed out in the future when we have a
-  // heuristic to better select strategy parameters.
-  bool unsupportedSmallCases = (matmulSize[0] > 0 && matmulSize[0] < 16) ||
-                               (matmulSize[1] > 0 && matmulSize[1] < 16) ||
-                               (matmulSize[2] > 0 && matmulSize[2] < 16);
-  if (unsupportedSmallCases) {
-    LDBG("--Matmul strategy small size check failed\n");
     return failure();
   }
 

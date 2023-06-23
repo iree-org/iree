@@ -424,8 +424,8 @@ def PipelineSharedMemoryCopiesOp : Op<
 
     #### Return modes
     This transform consumes the scf.for handle and produces a result handle
-    which points to the new scf.for loop generated. It will fail if the loop
-    cannot be pipelined or if there are no shared memory copies.
+    which points to a) the new scf.for loop generated (success case) or b) the
+    existing scf.for loop (failure case).
   }];
 
   let arguments = (
@@ -497,8 +497,8 @@ def CreateAsyncGroupsOp :
     of consecutive copies and emit wait operation right after.
     The input operation is a `func.func`.
 
-    `use_mma_sync` specifies whether or not `bypassL1` attributes should be
-    added to the async copies.
+    `use_mma_sync` specifies whether `bypassL1` attributes should be added to the
+    async copies.
 
     #### Return modes
     This op returns a handle to the transformed function, even if nothing
@@ -506,7 +506,7 @@ def CreateAsyncGroupsOp :
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-                   BoolAttr:$use_mma_sync);
+                   UnitAttr:$use_mma_sync);
   let results = (outs);
 
   let assemblyFormat = [{ 

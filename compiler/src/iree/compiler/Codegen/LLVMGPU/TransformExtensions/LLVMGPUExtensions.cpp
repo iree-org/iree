@@ -779,7 +779,10 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
       rewriter, forOp, schedule, false, depth);
-  if (failed(pipelinedFor)) return emitDefaultSilenceableFailure(forOp);
+  if (failed(pipelinedFor)) {
+    results.push_back(forOp);
+    return DiagnosedSilenceableFailure::success();
+  }
   results.push_back(pipelinedFor.value());
   return DiagnosedSilenceableFailure::success();
 }

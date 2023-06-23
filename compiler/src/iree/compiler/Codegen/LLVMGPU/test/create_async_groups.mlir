@@ -25,7 +25,7 @@ builtin.module {
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !transform.any_op):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.create_async_groups %top_level_func {use_mma_sync = true} : (!transform.any_op) -> ()
+    transform.iree.create_async_groups %top_level_func {use_mma_sync} : (!transform.any_op) -> ()
   }
 }
 
@@ -57,7 +57,7 @@ builtin.module {
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !transform.any_op):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!transform.any_op) -> ()
+    transform.iree.create_async_groups %top_level_func : (!transform.any_op) -> ()
   }
 }
 
@@ -86,7 +86,7 @@ builtin.module {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %vector_transfer = transform.structured.match ops{["memref.alloc"]} in %top_level_func : (!transform.any_op) -> !transform.any_op
     // expected-error@below {{transform applied to the wrong op kind}}
-    transform.iree.create_async_groups %vector_transfer {use_mma_sync = false} : (!transform.any_op) -> ()
+    transform.iree.create_async_groups %vector_transfer : (!transform.any_op) -> ()
   }
 }
 
@@ -116,7 +116,7 @@ builtin.module {
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !transform.any_op):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!transform.any_op) -> ()
+    transform.iree.create_async_groups %top_level_func : (!transform.any_op) -> ()
   }
 }
 
@@ -152,6 +152,6 @@ builtin.module {
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !transform.any_op):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!transform.any_op) -> ()
+    transform.iree.create_async_groups %top_level_func : (!transform.any_op) -> ()
   }
 }

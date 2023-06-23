@@ -86,6 +86,14 @@ static llvm::cl::opt<bool> clUseMmaSync(
     "td-matmul-strategy-use-mma-sync",
     llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clUseWmma(
+    "td-matmul-strategy-use-wmma",
+    llvm::cl::desc("use wmma for the transform dialect matmul strategy"),
+    llvm::cl::init(false));
+static llvm::cl::opt<bool> clUseFma(
+    "td-matmul-strategy-use-fma",
+    llvm::cl::desc("use fma for the transform dialect matmul strategy"),
+    llvm::cl::init(false));
 static llvm::cl::opt<int64_t> clPipelineDepth(
     "td-matmul-strategy-pipeline-depth",
     llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"),
@@ -99,6 +107,8 @@ void MatmulStrategy::initDefaultValues() {
   reductionTileSize = clReductionTileSize;
   useAsyncCopies = clUseAsyncCopies;
   useMmaSync = clUseMmaSync;
+  useWmma = clUseWmma;
+  useFma = clUseFma;
   pipelineDepth = clPipelineDepth;
 
   // TODO: Capture input/output element types properly for configuring the
@@ -112,6 +122,8 @@ void MatmulStrategy::initDefaultValues() {
       reductionTileSize != clReductionTileSize.getDefault().getValue() ||
       useAsyncCopies != clUseAsyncCopies.getDefault().getValue() ||
       useMmaSync != clUseMmaSync.getDefault().getValue() ||
+      useWmma != clUseWmma.getDefault().getValue() ||
+      useFma != clUseFma.getDefault().getValue() ||
       pipelineDepth != clPipelineDepth.getDefault().getValue()) {
     cliOptionsSpecified = true;
   }
@@ -151,6 +163,8 @@ void MatmulStrategy::print(llvm::raw_ostream &os) const {
   }
   os << "}\n";
   os << "- use async copies: " << useAsyncCopies << '\n';
+  os << "- use fma: " << useFma << '\n';
+  os << "- use wmma: " << useWmma << '\n';
   os << "- use mma sync: " << useMmaSync << '\n';
   os << "- pipeline depth: " << pipelineDepth << '\n';
 

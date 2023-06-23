@@ -1,8 +1,8 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
 // RUN: -td-matmul-strategy-blk-sizes=256,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=8 \
 // RUN: -td-matmul-strategy-num-threads=32,4,1 \
@@ -13,7 +13,7 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=16,16,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -25,7 +25,7 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_2 %s
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=128,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -35,6 +35,9 @@
 // RUN: -td-matmul-strategy-use-mma-sync=true \
 // RUN: -td-matmul-strategy-pipeline-depth=3 \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_3 %s
+
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul \
+// RUN: | FileCheck --check-prefix=SMALL %s
 
 hal.executable @matmul_1 {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
@@ -111,7 +114,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: } : !transform.any_op
 // CHECK: transform.memref.multibuffer %{{.*}} {factor = 3 : i64, skip_analysis}
 // CHECK: transform.apply_patterns.vector.transfer_to_scf max_transfer_rank = 1 full_unroll = true
-// CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync = true}
+// CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync}
 // CHECK: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 3 : i64, use_mma_sync}
 // CHECK: transform.apply_patterns.vector.lower_masks
 // CHECK: transform.apply_patterns.vector.materialize_masks
@@ -182,7 +185,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.memref.multibuffer %{{.*}} {factor = 5 : i64, skip_analysis}
 // WITH_OPTIONS: transform.apply_patterns.vector.transfer_to_scf max_transfer_rank = 1 full_unroll = true
 // The attribute should match td-matmul-use-mma-sync.
-// WITH_OPTIONS: transform.iree.create_async_groups %{{.*}} {use_mma_sync = true}
+// WITH_OPTIONS: transform.iree.create_async_groups %{{.*}} {use_mma_sync}
 // The depth should match td-matmul-strategy-pipeline-depth: 5.
 // WITH_OPTIONS: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 5 : i64, use_mma_sync}
 // WITH_OPTIONS: transform.apply_patterns.vector.lower_masks
@@ -432,15 +435,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // -----
 
-hal.executable @matmul_5_too_small {
+hal.executable @matmul_5_small {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
-  hal.executable.export public @matmul_5_too_small ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  hal.executable.export public @matmul_5_small ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
-    func.func @matmul_5_too_small() {
+    func.func @matmul_5_small() {
       %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x2044xf32>>
@@ -459,15 +462,19 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 // CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
-// CHECK-LABEL: func @matmul_5_too_small
+// CHECK-LABEL: func @matmul_5_small
 
 // This matmul is considered "too small"/"degenerate" for a tensor core strategy,
 // just fallback to the simt strategy.
-// CHECK-NOT: transform.sequence
 
-// WITH_OPTIONS_2-LABEL: func @matmul_5_too_small
+// WITH_OPTIONS_2-LABEL: func @matmul_5_small
 
-// WITH_OPTIONS_3-LABEL: func @matmul_5_too_small
+// WITH_OPTIONS_3-LABEL: func @matmul_5_small
+
+// SMALL-LABEL: func @matmul_5_small
+// SMALL: transform.sequence
+// SMALL-NOT: mma
+// SMALL-NOT: wmma
 
 // -----
 
