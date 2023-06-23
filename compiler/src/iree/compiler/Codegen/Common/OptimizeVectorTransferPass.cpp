@@ -88,7 +88,8 @@ static void loopInvariantCodeMotion(func::FuncOp funcOp) {
 
 struct OptimizeVectorTransferPass
     : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
-  OptimizeVectorTransferPass(bool flatten) : flatten(flatten) {}
+  OptimizeVectorTransferPass(bool flatten, bool dropUnitDims)
+      : flatten(flatten), dropUnitDims(dropUnitDims) {}
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     // Generate vector.shape_cast for dropping leading one dimensions in vector
@@ -125,10 +126,20 @@ struct OptimizeVectorTransferPass
       }
     }
 
+    // TODO(#14191): SPIR-V can't handle the vector.shape_cast created for
+    // dropping unit dims so this option is disabled in SPIR-V pipeline.
+    // This option should go away after all backend issues have been resolved.
+    if (dropUnitDims) {
+      RewritePatternSet patterns(&getContext());
+      mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
     // Second stage of patterns to flatten transfer ops.
     if (flatten) {
       RewritePatternSet patterns(&getContext());
-      mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
       mlir::vector::populateFlattenVectorTransferPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -151,13 +162,14 @@ struct OptimizeVectorTransferPass
 
  private:
   bool flatten;
+  bool dropUnitDims;
 };
 
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
-    bool flatten) {
-  return std::make_unique<OptimizeVectorTransferPass>(flatten);
+    bool flatten, bool dropUnitDims) {
+  return std::make_unique<OptimizeVectorTransferPass>(flatten, dropUnitDims);
 }
 
 }  // namespace iree_compiler
