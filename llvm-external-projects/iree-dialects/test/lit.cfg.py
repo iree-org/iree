@@ -69,8 +69,8 @@ llvm_config.with_environment("PATH", config.llvm_tools_binary_dir, append_path=T
 
 tool_dirs = [config.llvm_tools_binary_dir]
 tools = [
-    ToolSubst('%PYTHON', config.python_executable, unresolved='ignore'),
-    ToolSubst('iree-dialects-opt'),
+    ToolSubst("%PYTHON", config.python_executable, unresolved="ignore"),
+    ToolSubst("iree-dialects-opt"),
 ]
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
