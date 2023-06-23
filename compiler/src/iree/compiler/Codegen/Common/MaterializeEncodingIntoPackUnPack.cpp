@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
+#include "iree/compiler/Utils/DataTilingUniversalPadding.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -278,6 +279,7 @@ void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
     // Dynamic sizes are assumed to be large enough, not to be candidates for
     // narrow kernels.
     if (ShapedType::isDynamic(size)) continue;
+
     int64_t &tileSize = encodingInfo.innerTileSizes[i];
     // Let's not try to handle any dynamic tile sizes here. We could handle the
     // case where size==1 (as whatever is the runtime value of tileSize, it
@@ -285,12 +287,13 @@ void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
     // in general, adjusting dynamic tile sizes has to be done by the
     // materializeEncodingValueFn which we obtain those tileSizes from.
     if (ShapedType::isDynamic(tileSize)) continue;
-    auto generateNarrowTileSize = [&](int64_t n) {
-      if (size <= n && tileSize >= n) tileSize = n;
-    };
-    generateNarrowTileSize(1);
-    generateNarrowTileSize(2);
-    generateNarrowTileSize(4);
+    // Honor the contract in the comment on DataTilingUniversalPadding:
+    // For tile sizes along statically-sized dimensions that are smaller than
+    // DataTilingUniversalPadding, ensure that we never generate a tile size
+    // greater than the next power of two.
+    for (int po2 = 1; po2 < DataTilingUniversalPadding; po2 *= 2) {
+      if (size <= po2 && tileSize >= po2) tileSize = po2;
+    }
   }
 }
 

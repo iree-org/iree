@@ -35,6 +35,18 @@ func.func @simple_pad_and_pack(%input: tensor<5x1xf32>, %output: tensor<1x1x8x2x
 
 // -----
 
+func.func @simple_pack_1x1_to_1x1x1x1(%input: tensor<1x1xf32>, %output: tensor<1x1x1x1xf32>, %pad: f32) -> tensor<1x1x1x1xf32> {
+  %0 = tensor.pack %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %output : tensor<1x1xf32> -> tensor<1x1x1x1xf32>
+  return %0 : tensor<1x1x1x1xf32>
+}
+// CHECK-LABEL: func.func @simple_pack_1x1_to_1x1x1x1
+// CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
+// CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
+// CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[IN]] into %[[OUT]][0, 0, 0, 0] [1, 1, 1, 1] [1, 1, 1, 1]
+// CHECK:         return %[[INSERT]]
+
+// -----
+
 func.func @simple_NC_to_CNnc(%arg0: tensor<32x8xf32>, %arg1: tensor<1x1x32x8xf32>) -> tensor<1x1x32x8xf32>{
   %0 = tensor.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<32x8xf32> -> tensor<1x1x32x8xf32>
   return %0 : tensor<1x1x32x8xf32>

@@ -9,11 +9,14 @@
 // operations in tiled layouts.
 //===---------------------------------------------------------------------===//
 
+#include <iree/compiler/Utils/DataTilingUniversalPadding.h>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -61,14 +64,11 @@ static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-/// Pads `value` to `padding` if needed. If no padding is specified,
-/// return `value` itself.
-static FailureOr<Value> padIfNeeded(
-    OpBuilder &builder, Location loc, Value value,
-    std::optional<int64_t> padding = std::nullopt) {
-  if (!padding) return value;
-
-  OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());
+/// Pads `value` to `padding` if needed. As described in the comment on
+// DataTilingUniversalPadding, statically-sized dimensions smaller that
+// `padding` only get padded to the next power of two.
+static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
+                                    Value value, int64_t universalPadding) {
   FailureOr<SmallVector<OpFoldResult>> shape =
       LinalgExt::getDims(builder, loc, value);
   if (failed(shape)) {
@@ -80,12 +80,21 @@ static FailureOr<Value> padIfNeeded(
   SmallVector<OpFoldResult> highPad(shape->size(), zero);
 
   // The low padding is always zero. The high padding is
-  // shape.ceildDiv(padding) - shape.
+  // shape.ceildDiv(padding) * padding - shape.
   AffineExpr paddingExpr, shapeExpr;
   bindSymbols(builder.getContext(), paddingExpr, shapeExpr);
   AffineExpr highPadExpr =
       shapeExpr.ceilDiv(paddingExpr) * paddingExpr - shapeExpr;
   for (auto shape : llvm::enumerate(shape.value())) {
+    int64_t padding = universalPadding;
+    // Case of small static sizes - round to the next power of two instead of
+    // the universal padding amount.
+    if (auto constant_value = getConstantIntValue(shape.value())) {
+      if (constant_value.value() < padding) {
+        padding = llvm::PowerOf2Ceil(constant_value.value());
+      }
+    }
+    OpFoldResult paddingOfr = builder.getIndexAttr(padding);
     highPad[shape.index()] = affine::makeComposedFoldedAffineApply(
         builder, loc, highPadExpr, {paddingOfr, shape.value()});
   }
@@ -259,11 +268,16 @@ struct FoldFillWithSetEncoding
 };
 
 struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
+  SetEncodingPass(std::optional<int64_t> padding) : padding(padding) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   void runOnOperation() override;
+  LogicalResult initializeOptions(StringRef options) override;
+
+  std::optional<int64_t> padding;
 };
 }  // namespace
 
@@ -271,7 +285,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<SetMatmulEncoding>(context, defaultPadding);
+    patterns.insert<SetMatmulEncoding>(context, padding.value());
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
@@ -282,8 +296,18 @@ void SetEncodingPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<Pass> createSetEncodingPass() {
-  return std::make_unique<SetEncodingPass>();
+LogicalResult SetEncodingPass::initializeOptions(StringRef options) {
+  if (failed(Pass::initializeOptions(options))) {
+    return failure();
+  }
+  if (!padding) {
+    padding = optionDefaultPadding;
+  }
+  return success();
+}
+
+std::unique_ptr<Pass> createSetEncodingPass(std::optional<int64_t> padding) {
+  return std::make_unique<SetEncodingPass>(padding);
 }
 
 }  // namespace Flow

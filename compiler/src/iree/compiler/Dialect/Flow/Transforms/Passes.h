@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
 
 #include <functional>
+#include <optional>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/StringMap.h"
@@ -121,7 +122,8 @@ std::unique_ptr<Pass> createConvertToFlowPass();
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
 // Sets encoding for tensors to allow tiled execution of operations.
-std::unique_ptr<Pass> createSetEncodingPass();
+std::unique_ptr<Pass> createSetEncodingPass(
+    std::optional<int64_t> padding = std::nullopt);
 
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

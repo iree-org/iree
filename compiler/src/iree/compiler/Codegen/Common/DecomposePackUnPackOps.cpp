@@ -83,6 +83,11 @@ struct FoldTrailingUnitTranspose
     }
     if (numDropDims == 0) return failure();
 
+    if (numDropDims == inputTy.getRank()) {
+      rewriter.replaceOp(op, op.getInput());
+      return success();
+    }
+
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> srcMixedSizes =
         tensor::createDimValues(rewriter, loc, op.getInput());

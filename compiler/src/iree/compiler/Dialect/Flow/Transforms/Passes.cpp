@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 
+#include <iree/compiler/Utils/DataTilingUniversalPadding.h>
+
 #include <memory>
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
@@ -262,7 +264,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
       // Enable data tiling after all linalg level transformations.
-      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
+      .addPredicatedPass(
+          clEnableDataTiling,
+          []() { return createSetEncodingPass(DataTilingUniversalPadding); })
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),

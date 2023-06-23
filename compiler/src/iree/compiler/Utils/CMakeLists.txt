@@ -15,6 +15,7 @@ iree_cc_library(
     Utils
   HDRS
     "ConversionUtils.h"
+    "DataTilingUniversalPadding.h"
     "ElementPackingUtils.h"
     "FlatbufferUtils.h"
     "IndexSet.h"

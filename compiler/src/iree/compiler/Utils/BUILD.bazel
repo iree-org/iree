@@ -29,6 +29,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConversionUtils.h",
+        "DataTilingUniversalPadding.h",
         "ElementPackingUtils.h",
         "FlatbufferUtils.h",
         "IndexSet.h",

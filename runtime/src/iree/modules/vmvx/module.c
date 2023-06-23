@@ -590,6 +590,9 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d, mmt4d, v) {
       .K0 = K0,
       .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
+  fprintf(stderr, "M0=%ld N0=%ld K0=%ld\n", M0, N0, K0);
+  fprintf(stderr, "lhs_buffer=%p rhs_buffer=%p out_buffer=%p\n", lhs_buffer,
+          rhs_buffer, out_buffer);
   iree_uk_mmt4d(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

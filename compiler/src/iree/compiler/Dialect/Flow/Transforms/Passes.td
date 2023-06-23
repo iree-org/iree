@@ -251,7 +251,7 @@ def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
   let options = [
-    Option<"defaultPadding", "default-padding", "int64_t",
+    Option<"optionDefaultPadding", "default-padding", "int64_t",
            /*default=*/"16",
            "Default padding to use so packing can be done without padding during the packing">
   ];
