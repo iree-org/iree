@@ -156,7 +156,7 @@ VmInstance VmInstance::Create() {
 //------------------------------------------------------------------------------
 
 VmContext VmContext::Create(VmInstance* instance,
-                            std::optional<std::vector<VmModule*>> modules) {
+                            std::optional<std::vector<VmModule*>>& modules) {
   IREE_TRACE_SCOPE_NAMED("VmContext::Create");
   iree_vm_context_t* context;
   if (!modules) {
@@ -878,7 +878,6 @@ void SetupVmBindings(nanobind::module_ m) {
           [](VmContext* self, VmInstance* instance,
              std::optional<std::vector<VmModule*>> modules) {
             new (self) VmContext();
-            // TODO: Make Create take modules byref.
             *self = VmContext::Create(instance, modules);
           },
           py::arg("instance"),

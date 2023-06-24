@@ -171,7 +171,7 @@ class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {
   // static, disallowing further module registration (and may be more
   // efficient).
   static VmContext Create(VmInstance* instance,
-                          std::optional<std::vector<VmModule*>> modules);
+                          std::optional<std::vector<VmModule*>>& modules);
 
   // Registers additional modules. Only valid for non static contexts (i.e.
   // those created without modules.
