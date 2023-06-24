@@ -97,35 +97,37 @@ enum class MMAMatrixType { AMatrix, BMatrix, CMatrix };
 
 static std::array<Dimension, 3>
 getMMADimensions(MMAType mmaType, MMAMatrixType matrixType, int dim) {
-  switch (mmaType) {
-  case MMAType::M16N8K16:
-    switch (matrixType) {
-    case MMAMatrixType::AMatrix:
-      if (dim == 0)
-        return {{{DimType::LaneIdY, 8},
-                 {DimType::VecIdZ, 2},
-                 {DimType::LaneIdZ, 1}}};
-      return {
-          {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdY, 2}}};
-    case MMAMatrixType::BMatrix:
-      if (dim == 0)
-        return {{{DimType::LaneIdY, 8},
-                 {DimType::LaneIdZ, 1},
-                 {DimType::VecIdZ, 1}}};
-      return {
-          {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdY, 2}}};
-    case MMAMatrixType::CMatrix:
-      if (dim == 0)
-        return {{{DimType::LaneIdY, 8},
-                 {DimType::VecIdY, 2},
-                 {DimType::LaneIdZ, 1}}};
-      return {
-          {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdZ, 1}}};
-    }
-    return {};
-  default:
+  if (mmaType != MMAType::M16N8K16) {
     return {};
   }
+
+  switch (matrixType) {
+  case MMAMatrixType::AMatrix: {
+    if (dim == 0) {
+      return {
+          {{DimType::LaneIdY, 8}, {DimType::VecIdZ, 2}, {DimType::LaneIdZ, 1}}};
+    }
+    return {
+        {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdY, 2}}};
+  }
+  case MMAMatrixType::BMatrix: {
+    if (dim == 0) {
+      return {
+          {{DimType::LaneIdY, 8}, {DimType::LaneIdZ, 1}, {DimType::VecIdZ, 1}}};
+    }
+    return {
+        {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdY, 2}}};
+  }
+  case MMAMatrixType::CMatrix: {
+    if (dim == 0) {
+      return {
+          {{DimType::LaneIdY, 8}, {DimType::VecIdY, 2}, {DimType::LaneIdZ, 1}}};
+    }
+    return {
+        {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdZ, 1}}};
+  }
+  }
+  return {};
 }
 
 static std::array<int, 2> getMMACanonicalShape(MMAType mmaType,
