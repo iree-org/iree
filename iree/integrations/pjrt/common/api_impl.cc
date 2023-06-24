@@ -96,6 +96,9 @@ iree_status_t MapElementTypeToXlaElementType(
     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
       *xla_primitive = xla::PrimitiveType::PRED;
       return iree_ok_status();
+    case IREE_HAL_ELEMENT_TYPE_INT_4:
+      *xla_primitive = xla::PrimitiveType::S4;
+      return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_INT_8:
       *xla_primitive = xla::PrimitiveType::S8;
       return iree_ok_status();
@@ -108,6 +111,9 @@ iree_status_t MapElementTypeToXlaElementType(
     case IREE_HAL_ELEMENT_TYPE_INT_64:
       *xla_primitive = xla::PrimitiveType::S64;
       return iree_ok_status();
+    case IREE_HAL_ELEMENT_TYPE_SINT_4:
+      *xla_primitive = xla::PrimitiveType::S4;
+      return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
       *xla_primitive = xla::PrimitiveType::S8;
       return iree_ok_status();
@@ -119,6 +125,9 @@ iree_status_t MapElementTypeToXlaElementType(
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       *xla_primitive = xla::PrimitiveType::S64;
+      return iree_ok_status();
+    case IREE_HAL_ELEMENT_TYPE_UINT_4:
+      *xla_primitive = xla::PrimitiveType::U4;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
       *xla_primitive = xla::PrimitiveType::U8;
@@ -165,6 +174,9 @@ iree_status_t MapBufferTypeToElementType(
     case PJRT_Buffer_Type_PRED:
       *element_type = IREE_HAL_ELEMENT_TYPE_BOOL_8;
       return iree_ok_status();
+    case PJRT_Buffer_Type_S4:
+      *element_type = IREE_HAL_ELEMENT_TYPE_SINT_4;
+      return iree_ok_status();
     case PJRT_Buffer_Type_S8:
       *element_type = IREE_HAL_ELEMENT_TYPE_SINT_8;
       return iree_ok_status();
@@ -176,6 +188,9 @@ iree_status_t MapBufferTypeToElementType(
       return iree_ok_status();
     case PJRT_Buffer_Type_S64:
       *element_type = IREE_HAL_ELEMENT_TYPE_SINT_64;
+      return iree_ok_status();
+    case PJRT_Buffer_Type_U4:
+      *element_type = IREE_HAL_ELEMENT_TYPE_UINT_4;
       return iree_ok_status();
     case PJRT_Buffer_Type_U8:
       *element_type = IREE_HAL_ELEMENT_TYPE_UINT_8;
