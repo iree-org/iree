@@ -64,7 +64,9 @@ jobs:
           python3 -m pip install black==23.3
       - name: Check if modified files are formatted
         run: |
-          git diff "${GITHUB_BASE_REF?}" --name-only -- '*.py' ':!third_party' \
+          # The filter lowercase `d` means to exclude deleted files.
+          git diff "${GITHUB_BASE_REF?}" --name-only --diff-filter=d \
+            -- '*.py' ':!third_party' \
             | xargs --no-run-if-empty black --check --diff --verbose
       - name: Instructions for fixing the above linting errors
         if: failure()
