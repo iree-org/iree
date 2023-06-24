@@ -459,7 +459,7 @@ class InvokeStatics {
       iree_vm_list_push_ref_move(list, &retained);
     };
     AddPackCallback((py::list{}).type(), sequence_callback);
-    AddPackCallback((py::tuple{}).type(), sequence_callback);
+    AddPackCallback((create_empty_tuple()).type(), sequence_callback);
 
     // Dict.
     auto dict_callback = [this](InvokeContext &c, iree_vm_list_t *list,
@@ -703,7 +703,8 @@ void SetupInvokeBindings(nanobind::module_ &m) {
   py::class_<InvokeStatics>(m, "_InvokeStatics");
   py::class_<InvokeContext>(m, "InvokeContext").def(py::init<HalDevice &>());
   py::class_<ArgumentPacker>(m, "ArgumentPacker")
-      .def(py::init<InvokeStatics &, std::optional<py::list>>())
+      .def(py::init<InvokeStatics &, std::optional<py::list>>(),
+           py::arg("statics"), py::arg("arg_descs") = py::none())
       .def("pack", &ArgumentPacker::Pack);
 
   m.attr("_invoke_statics") = py::cast(InvokeStatics());

@@ -22,6 +22,7 @@ namespace iree {
 namespace python {
 
 namespace py = nanobind;
+using namespace nanobind::literals;
 
 template <typename T>
 struct ApiPtrAdapter {};
@@ -106,6 +107,12 @@ inline bool is_instance_of_type_object(py::handle inst,
     throw py::python_error();
   }
   return static_cast<bool>(rc);
+}
+
+// Nanobind's tuple class has a default constructor that creates a nullptr
+// tuple. Which is not really what one wants.
+inline py::object create_empty_tuple() {
+  return py::steal(py::handle(PyTuple_New(0)));
 }
 
 }  // namespace python

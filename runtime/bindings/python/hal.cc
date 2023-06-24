@@ -310,17 +310,17 @@ py::list HalDriver::QueryAvailableDevices() {
 
 // Configures |device| based on flags before returning it to the user.
 static iree_status_t ConfigureDevice(iree_hal_device_t* device,
-                                     py::list& allocators) {
+                                     std::optional<py::list> allocators) {
   // Optionally wrap the base device allocator with caching/pooling.
   // Doing this here satisfies the requirement that no buffers have been
   // allocated yet - if we returned the device without doing this the caller
   // can more easily break the rules.
-  if (!allocators.is_none()) {
+  if (allocators) {
     // NOTE: we need to pass string views that point to the std::string storage.
     // We do that in two passes because as we grow spec_storage it may
     // reallocate itself and invalidate the pointers - only after we're done
     // can we capture them in views.
-    auto& spec_list = allocators;
+    auto& spec_list = *allocators;
     std::vector<std::string> spec_storage;
     spec_storage.reserve(spec_list.size());
     for (auto item : spec_list) {
@@ -338,7 +338,7 @@ static iree_status_t ConfigureDevice(iree_hal_device_t* device,
   return iree_ok_status();
 }
 
-HalDevice HalDriver::CreateDefaultDevice(py::list& allocators) {
+HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_default_device(
                      raw_ptr(), iree_allocator_system(), &device),
@@ -349,7 +349,7 @@ HalDevice HalDriver::CreateDefaultDevice(py::list& allocators) {
 }
 
 HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
-                                  py::list& allocators) {
+                                  std::optional<py::list> allocators) {
   // Since the device ids are supposed to be opaque, we need to verify
   // them by querying available devices.
   py::list available_devices = QueryAvailableDevices();
@@ -387,7 +387,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
 }
 
 HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
-                                       py::list& allocators) {
+                                       std::optional<py::list> allocators) {
   iree_hal_device_t* device;
   iree_string_view_t device_uri_sv{
       device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
@@ -646,7 +646,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .def(
           "create_device",
           [](HalDriver& self, py::dict device_info,
-             py::list allocators) -> HalDevice {
+             std::optional<py::list> allocators) -> HalDevice {
             // Alias of create_device that takes a dict as returned from
             // query_available_devices for convenience.
             auto device_id =
