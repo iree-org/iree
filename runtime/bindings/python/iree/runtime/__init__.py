@@ -14,21 +14,21 @@ from . import _binding
 
 # Pull some of the native symbols into the public API.
 # Hal imports
-# from ._binding import (
-#     BufferCompatibility,
-#     BufferUsage,
-#     HalAllocator,
-#     HalBuffer,
-#     HalBufferView,
-#     HalDevice,
-#     HalDriver,
-#     HalElementType,
-#     MemoryAccess,
-#     MemoryType,
-#     PyModuleInterface,
-#     Shape,
-#     create_hal_module,
-# )
+from ._binding import (
+    BufferCompatibility,
+    BufferUsage,
+    HalAllocator,
+    HalBuffer,
+    HalBufferView,
+    HalDevice,
+    HalDriver,
+    HalElementType,
+    MemoryAccess,
+    MemoryType,
+    PyModuleInterface,
+    Shape,
+    create_hal_module,
+)
 
 # Vm imports
 from ._binding import (
@@ -41,7 +41,7 @@ from ._binding import (
     VmModule,
 )
 
-# from .array_interop import *
+from .array_interop import *
 from .benchmark import *
 # from .system_api import *
 # from .system_setup import (

@@ -86,7 +86,8 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
     return iree_hal_device_allocator(raw_ptr());
   }
 
-  void BeginProfiling(const py::kwargs& kwargs);
+  void BeginProfiling(std::optional<std::string> mode,
+                      std::optional<std::string> file_path);
   void EndProfiling();
 };
 
@@ -97,11 +98,9 @@ class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
                            py::dict& driver_cache);
 
   py::list QueryAvailableDevices();
-  HalDevice CreateDefaultDevice(const py::kwargs& kwargs);
-  HalDevice CreateDevice(iree_hal_device_id_t device_id,
-                         const py::kwargs& kwargs);
-  HalDevice CreateDeviceByURI(std::string& device_uri,
-                              const py::kwargs& kwargs);
+  HalDevice CreateDefaultDevice(py::list& allocators);
+  HalDevice CreateDevice(iree_hal_device_id_t device_id, py::list& allocators);
+  HalDevice CreateDeviceByURI(std::string& device_uri, py::list& allocators);
 };
 
 class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
@@ -116,10 +115,8 @@ class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
 
 struct HalShape {
  public:
-  static HalShape FromIntVector(std::vector<iree_hal_dim_t> indices) {
-    HalShape s;
-    s.s = {indices.begin(), indices.end()};
-    return s;
+  HalShape(std::vector<iree_hal_dim_t>& indices) {
+    s = {indices.begin(), indices.end()};
   }
 
   std::vector<iree_hal_dim_t> s;
@@ -193,30 +190,30 @@ class HalMappedMemory {
     return HalMappedMemory(mapped_memory, bv.raw_ptr());
   }
 
-  py::buffer_info ToBufferInfo() {
-    std::vector<iree_hal_dim_t> shape(iree_hal_buffer_view_shape_rank(bv_));
-    CheckApiStatus(
-        iree_hal_buffer_view_shape(bv_, shape.size(), shape.data(), nullptr),
-        "Error getting buffer view shape");
-    iree_hal_element_type_t element_type =
-        iree_hal_buffer_view_element_type(bv_);
-    int32_t element_size = iree_hal_element_dense_byte_count(element_type);
-    std::vector<py::ssize_t> dims(shape.size());
-    for (int i = 0; i < shape.size(); ++i) {
-      dims[i] = shape[i];
-    }
-    std::vector<py::ssize_t> strides(shape.size());
-    if (!strides.empty()) {
-      strides[shape.size() - 1] = element_size;
-      for (int i = shape.size() - 2; i >= 0; --i) {
-        strides[i] = strides[i + 1] * shape[i + 1];
-      }
-    }
+  // py::buffer_info ToBufferInfo() {
+  //   std::vector<iree_hal_dim_t> shape(iree_hal_buffer_view_shape_rank(bv_));
+  //   CheckApiStatus(
+  //       iree_hal_buffer_view_shape(bv_, shape.size(), shape.data(), nullptr),
+  //       "Error getting buffer view shape");
+  //   iree_hal_element_type_t element_type =
+  //       iree_hal_buffer_view_element_type(bv_);
+  //   int32_t element_size = iree_hal_element_dense_byte_count(element_type);
+  //   std::vector<py::ssize_t> dims(shape.size());
+  //   for (int i = 0; i < shape.size(); ++i) {
+  //     dims[i] = shape[i];
+  //   }
+  //   std::vector<py::ssize_t> strides(shape.size());
+  //   if (!strides.empty()) {
+  //     strides[shape.size() - 1] = element_size;
+  //     for (int i = shape.size() - 2; i >= 0; --i) {
+  //       strides[i] = strides[i + 1] * shape[i + 1];
+  //     }
+  //   }
 
-    return py::buffer_info(mapped_memory_.contents.data, element_size,
-                           py::format_descriptor<float>::format(), shape.size(),
-                           dims, strides);
-  }
+  //   return py::buffer_info(mapped_memory_.contents.data, element_size,
+  //                          py::format_descriptor<float>::format(),
+  //                          shape.size(), dims, strides);
+  // }
 
   iree_hal_buffer_mapping_t& mapped_memory() { return mapped_memory_; }
 
