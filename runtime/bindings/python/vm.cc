@@ -6,6 +6,10 @@
 
 #include "./vm.h"
 
+#include <ios>
+#include <sstream>
+#include <unordered_set>
+
 #include "./buffer_interop.h"
 #include "./status_utils.h"
 #include "iree/base/api.h"
@@ -13,10 +17,6 @@
 // TODO: We shouldn't need the HAL API but it is used for direct printing
 // summaries of HAL objects in lists. We should have a better way of doing this
 // dynamically vs hard depending on a type switch here.
-#include <ios>
-#include <sstream>
-#include <unordered_set>
-
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/modules/resolver.h"
 #include "iree/vm/api.h"
