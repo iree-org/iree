@@ -1541,6 +1541,11 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Executable_OptimizedProgram"));
   };
+  api->PJRT_Executable_GetCostAnalysis =
+      +[](PJRT_Executable_GetCostAnalysis_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_GetCostAnalysis"));
+  };
 }
 
 void LoadedExecutableInstance::BindApi(PJRT_Api* api) {
@@ -1574,11 +1579,6 @@ void LoadedExecutableInstance::BindApi(PJRT_Api* api) {
     IREE_TRACE_SCOPE_NAMED("PJRT_LoadedExecutable_Execute");
     return MakeError(
         LoadedExecutableInstance::Unwrap(args->executable)->BatchExecute(args));
-  };
-  api->PJRT_LoadedExecutable_GetCostAnalysis =
-      +[](PJRT_LoadedExecutable_GetCostAnalysis_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_LoadedExecutable_GetCostAnalysis"));
   };
   api->PJRT_LoadedExecutable_GetExecutable =
       +[](PJRT_LoadedExecutable_GetExecutable_Args* args) -> PJRT_Error* {
