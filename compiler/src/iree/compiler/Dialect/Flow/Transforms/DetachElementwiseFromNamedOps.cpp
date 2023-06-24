@@ -71,7 +71,7 @@ struct DetachElementwisePattern
     // Create a zero tensor as the new output tensor operand to the Linalg
     // contraction op.
     SmallVector<OpFoldResult> mixedSizes =
-        tensor::createDimValues(rewriter, loc, outputOperand);
+        tensor::getMixedSizes(rewriter, loc, outputOperand);
     auto initOp =
         rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
     Value zero = rewriter.create<arith::ConstantOp>(

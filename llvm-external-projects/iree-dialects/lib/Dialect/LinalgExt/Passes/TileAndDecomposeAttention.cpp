@@ -278,7 +278,7 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   Type elementType = queryType.getElementType();
   ArrayRef<int64_t> queryShape = queryType.getShape();
   SmallVector<OpFoldResult> queryDimValues =
-      tensor::createDimValues(rewriter, loc, query);
+      tensor::getMixedSizes(rewriter, loc, query);
   OpFoldResult headDimension = queryDimValues[2];
   OpFoldResult sequenceTileLength = queryDimValues[1];
   OpFoldResult batchTileLength = queryDimValues[0];
@@ -286,7 +286,7 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value key = attnOp.getKey();
   Value value = attnOp.getValue();
   SmallVector<OpFoldResult> keyDimValues =
-      tensor::createDimValues(rewriter, loc, key);
+      tensor::getMixedSizes(rewriter, loc, key);
   OpFoldResult sequenceLength = keyDimValues[1];
 
   // Construct first loop

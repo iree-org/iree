@@ -87,7 +87,7 @@ struct FoldTrailingUnitTranspose
 
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> srcMixedSizes =
-        tensor::createDimValues(rewriter, loc, op.getInput());
+        tensor::getMixedSizes(rewriter, loc, op.getInput());
     SmallVector<OpFoldResult> mixedStride(inputTy.getRank(),
                                           rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> mixedOffsets(inputTy.getRank(),
@@ -99,7 +99,7 @@ struct FoldTrailingUnitTranspose
         op.getInput(), mixedOffsets, srcMixedSizes, mixedStride);
 
     SmallVector<OpFoldResult> destMixedSizes =
-        tensor::createDimValues(rewriter, loc, op.getInit());
+        tensor::getMixedSizes(rewriter, loc, op.getInit());
     auto initTy = llvm::cast<ShapedType>(op.getInit().getType());
     destMixedSizes.resize(initTy.getRank() - numDropDims);
     auto dest = rewriter.create<tensor::EmptyOp>(loc, destMixedSizes,
