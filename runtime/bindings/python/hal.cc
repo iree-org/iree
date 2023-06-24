@@ -11,7 +11,6 @@
 #include "iree/hal/api.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
-#include "pybind11/numpy.h"
 
 namespace iree {
 namespace python {
@@ -96,7 +95,7 @@ py::object HalAllocator::AllocateBufferCopy(
   // Acquire the backing buffer and setup RAII release.
   if (PyObject_GetBuffer(buffer.ptr(), &py_view, flags) != 0) {
     // The GetBuffer call is required to set an appropriate error.
-    throw py::error_already_set();
+    throw py::python_error();
   }
   PyBufferReleaser py_view_releaser(py_view);
 
@@ -117,7 +116,7 @@ py::object HalAllocator::AllocateBufferCopy(
 
   if (!element_type) {
     return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),
-                    py::return_value_policy::move);
+                    py::rv_policy::move);
   }
 
   // Create the buffer_view. (note that numpy shape is ssize_t, so we need to
@@ -135,7 +134,7 @@ py::object HalAllocator::AllocateBufferCopy(
   iree_hal_buffer_release(hal_buffer);
 
   return py::cast(HalBufferView::StealFromRawPtr(hal_buffer_view),
-                  py::return_value_policy::move);
+                  py::rv_policy::move);
 }
 
 //------------------------------------------------------------------------------
@@ -418,7 +417,7 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
   //
   // Single letter codes can be ambiguous across platforms, so prefer explicit
   // bit depth values, ("Type strings: Any string in numpy.sctypeDict.keys()").
-  // See https://github.com/pybind/pybind11/issues/1908
+  // See https://github.com/pybind/nanobind/issues/1908
   const char* dtype_string;
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
@@ -492,7 +491,7 @@ VmModule CreateHalModule(VmInstance* instance, HalDevice* device) {
 // Bindings
 //------------------------------------------------------------------------------
 
-void SetupHalBindings(pybind11::module m) {
+void SetupHalBindings(nanobind::module_ m) {
   py::dict driver_cache;
 
   // Built-in module creation.
@@ -624,7 +623,7 @@ void SetupHalBindings(pybind11::module m) {
       .def_static("map_to_dtype", &MapElementTypeToDType);
 
   py::class_<HalDevice>(m, "HalDevice")
-      .def_property_readonly(
+      .def_prop_ro(
           "allocator",
           [](HalDevice& self) {
             return HalAllocator::BorrowFromRawPtr(self.allocator());
@@ -667,12 +666,11 @@ void SetupHalBindings(pybind11::module m) {
              CheckApiStatus(iree_hal_allocator_trim(self.raw_ptr()),
                             "Error trim()'ing HAL allocator");
            })
-      .def_property_readonly(
+      .def_prop_ro(
           "has_statistics",
           [](HalAllocator& self) -> bool { return IREE_STATISTICS_ENABLE; })
-      .def_property_readonly("statistics", &HalAllocator::QueryStatistics)
-      .def_property_readonly("formatted_statistics",
-                             &HalAllocator::FormattedStatistics)
+      .def_prop_ro("statistics", &HalAllocator::QueryStatistics)
+      .def_prop_ro("formatted_statistics", &HalAllocator::FormattedStatistics)
       .def(
           "query_buffer_compatibility",
           [](HalAllocator& self, int memory_type, int allowed_usage,
@@ -726,7 +724,7 @@ void SetupHalBindings(pybind11::module m) {
                          iree_hal_buffer_view_retain_ref,
                          iree_hal_buffer_view_deref, iree_hal_buffer_view_isa);
   hal_buffer_view.def("map", HalMappedMemory::Create, py::keep_alive<0, 1>())
-      .def_property_readonly(
+      .def_prop_ro(
           "shape",
           [](HalBufferView& self) {
             iree_host_size_t rank =
@@ -738,11 +736,10 @@ void SetupHalBindings(pybind11::module m) {
             }
             return result;
           })
-      .def_property_readonly(
-          "element_type",
-          [](HalBufferView& self) {
-            return iree_hal_buffer_view_element_type(self.raw_ptr());
-          })
+      .def_prop_ro("element_type",
+                   [](HalBufferView& self) {
+                     return iree_hal_buffer_view_element_type(self.raw_ptr());
+                   })
       .def("__repr__", &HalBufferView::Repr);
 
   py::class_<HalMappedMemory>(m, "MappedMemory", py::buffer_protocol())

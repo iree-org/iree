@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "./binding.h"
-#include "./hal.h"
+//#include "./hal.h"
 #include "./invoke.h"
 #include "./py_module.h"
 #include "./status_utils.h"
@@ -16,20 +16,20 @@
 namespace iree {
 namespace python {
 
-PYBIND11_MODULE(_runtime, m) {
+NB_MODULE(_runtime, m) {
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 
   m.doc() = "IREE Binding Backend Helpers";
-  SetupHalBindings(m);
-  SetupInvokeBindings(m);
-  SetupPyModuleBindings(m);
+  // SetupHalBindings(m);
+  // SetupInvokeBindings(m);
+  // SetupPyModuleBindings(m);
   SetupVmBindings(m);
 
   m.def("parse_flags", [](py::args py_flags) {
     std::vector<std::string> alloced_flags;
     alloced_flags.push_back("python");
-    for (auto &py_flag : py_flags) {
+    for (py::handle py_flag : py_flags) {
       alloced_flags.push_back(py::cast<std::string>(py_flag));
     }
 

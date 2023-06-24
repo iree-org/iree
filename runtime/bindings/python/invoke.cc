@@ -6,6 +6,8 @@
 
 #include "./invoke.h"
 
+#include <functional>
+
 #include "./hal.h"
 #include "./vm.h"
 #include "iree/base/api.h"
@@ -74,18 +76,19 @@ class InvokeStatics {
   py::str kAttrBufferView = py::str("_buffer_view");
 
   // Module 'numpy'.
-  py::module &numpy_module() { return numpy_module_; }
+  py::module_ &numpy_module() { return numpy_module_; }
 
   py::object &runtime_module() {
     if (!runtime_module_) {
-      runtime_module_ = py::module::import("iree.runtime");
+      runtime_module_ = py::module_::import_("iree.runtime");
     }
     return *runtime_module_;
   }
 
-  py::module &array_interop_module() {
+  py::module_ &array_interop_module() {
     if (!array_interop_module_) {
-      array_interop_module_ = py::module::import("iree.runtime.array_interop");
+      array_interop_module_ =
+          py::module_::import_("iree.runtime.array_interop");
     }
     return *array_interop_module_;
   }
@@ -529,9 +532,9 @@ class InvokeStatics {
 
   // Cached modules and types. Those that involve recursive lookup within
   // our top level module, we defer. Those outside, we cache at creation.
-  py::module numpy_module_ = py::module::import("numpy");
+  py::module_ numpy_module_ = py::module_::import_("numpy");
   std::optional<py::object> runtime_module_;
-  std::optional<py::module> array_interop_module_;
+  std::optional<py::module_> array_interop_module_;
   std::optional<py::object> device_array_type_;
   py::type hal_buffer_view_type_ = py::type::of<HalBufferView>();
 
@@ -693,7 +696,7 @@ class ArgumentPacker {
 
 }  // namespace
 
-void SetupInvokeBindings(pybind11::module &m) {
+void SetupInvokeBindings(nanobind::module_ &m) {
   py::class_<InvokeStatics>(m, "_InvokeStatics");
   py::class_<InvokeContext>(m, "InvokeContext").def(py::init<HalDevice &>());
   py::class_<ArgumentPacker>(m, "ArgumentPacker")

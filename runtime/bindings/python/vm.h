@@ -230,14 +230,14 @@ class VmRef {
       return VmRef::Steal(retain_ref(self.raw_ptr()));
     };
     cls.def_static(VmRef::kTypeAttr, [=]() { return type(); });
-    cls.def_property_readonly(VmRef::kRefAttr, ref_lambda);
-    cls.def_property_readonly("ref", ref_lambda);
+    cls.def_prop_ro(VmRef::kRefAttr, ref_lambda);
+    cls.def_prop_ro("ref", ref_lambda);
     cls.def_static(VmRef::kCastAttr, [=](VmRef& ref) -> py::object {
       if (!isa(ref.ref())) {
         return py::none();
       }
       return py::cast(WrapperType::BorrowFromRawPtr(deref(ref.ref())),
-                      py::return_value_policy::move);
+                      py::rv_policy::move);
     });
     cls.def("__eq__", [](WrapperType& self, WrapperType& other) {
       return self.raw_ptr() == other.raw_ptr();
@@ -275,7 +275,7 @@ class VmRef {
   iree_vm_ref_t ref_;
 };
 
-void SetupVmBindings(pybind11::module m);
+void SetupVmBindings(nanobind::module_ m);
 
 }  // namespace python
 }  // namespace iree

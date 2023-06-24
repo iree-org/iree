@@ -225,7 +225,7 @@ class HalMappedMemory {
   iree_hal_buffer_view_t* bv_ = nullptr;
 };
 
-void SetupHalBindings(pybind11::module m);
+void SetupHalBindings(nanobind::module_ m);
 
 }  // namespace python
 }  // namespace iree

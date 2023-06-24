@@ -7,17 +7,18 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_BINDING_H_
 #define IREE_BINDINGS_PYTHON_IREE_BINDING_H_
 
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/optional.h>
+
 #include <optional>
 #include <vector>
 
 #include "iree/base/api.h"
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
 
 namespace iree {
 namespace python {
 
-namespace py = pybind11;
+namespace py = nanobind;
 
 template <typename T>
 struct ApiPtrAdapter {};
