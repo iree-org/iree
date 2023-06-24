@@ -101,10 +101,9 @@ Value recursiveRetuple(Type oldType, Operation::result_range *values,
 }
 
 template <typename T>
-LogicalResult untupleAndLookupValues(T values,
-                                     llvm::SmallVectorImpl<Value> &newValues,
-                                     OpBuilder &builder, Location loc,
-                                     IRMapping &mapping) {
+LogicalResult
+untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> &newValues,
+                       OpBuilder &builder, Location loc, IRMapping &mapping) {
   for (auto operand : values) {
     auto newValue = mapping.lookupOrNull(operand);
     if (!newValue) {
@@ -339,5 +338,5 @@ struct FlattenTuplesInCFG final
   }
 };
 
-}  // namespace
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace
+} // namespace mlir::iree_compiler::stablehlo

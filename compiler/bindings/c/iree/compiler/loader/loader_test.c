@@ -68,9 +68,9 @@ static bool manipulateFlags(iree_compiler_session_t *session) {
   return true;
 }
 
-static bool invokeWithConsoleDiagnostics(
-    iree_compiler_session_t *session,
-    iree_compiler_source_t *sourceWithErrors) {
+static bool
+invokeWithConsoleDiagnostics(iree_compiler_session_t *session,
+                             iree_compiler_source_t *sourceWithErrors) {
   bool rc;
   printf(
       "--- INVOKING WITH CONSOLE DIAGNOSTICS (console error expected) ---\n");
@@ -96,9 +96,9 @@ static void callbackDiag(enum iree_compiler_diagnostic_severity_t severity,
   (*messageAccum)[currentSize + 1 + messageSize] = 0;
 }
 
-static bool invokeWithCallbackDiagnostics(
-    iree_compiler_session_t *session,
-    iree_compiler_source_t *sourceWithErrors) {
+static bool
+invokeWithCallbackDiagnostics(iree_compiler_session_t *session,
+                              iree_compiler_source_t *sourceWithErrors) {
   bool rc;
   printf(
       "--- INVOKING WITH CALLBACK DIAGNOSTICS (console error expected) ---\n");

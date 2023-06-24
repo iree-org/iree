@@ -58,7 +58,7 @@ struct FlowFolderInterface : public DialectFoldInterface {
   }
 };
 
-}  // namespace
+} // namespace
 
 FlowDialect::FlowDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<FlowDialect>()) {
@@ -83,7 +83,7 @@ Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
   return nullptr;
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

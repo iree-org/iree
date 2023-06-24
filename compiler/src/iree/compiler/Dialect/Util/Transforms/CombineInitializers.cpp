@@ -32,7 +32,7 @@ namespace {
 
 class CombineInitializersPass
     : public CombineInitializersBase<CombineInitializersPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
@@ -48,7 +48,8 @@ class CombineInitializersPass
       initializerOps.push_back(initializerOp);
       locs.push_back(initializerOp.getLoc());
     }
-    if (initializerOps.size() <= 1) return;
+    if (initializerOps.size() <= 1)
+      return;
     auto fusedLoc = FusedLoc::get(&getContext(), locs);
 
     // Make the new initializer op in the same location as the last initializer
@@ -76,13 +77,13 @@ class CombineInitializersPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass() {
   return std::make_unique<CombineInitializersPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

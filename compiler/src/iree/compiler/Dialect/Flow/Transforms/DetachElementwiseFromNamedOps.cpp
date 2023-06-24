@@ -42,7 +42,8 @@ struct DetachElementwisePattern
         !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
       return failure();
     }
-    if (!linalgOp.hasTensorSemantics()) return failure();
+    if (!linalgOp.hasTensorSemantics())
+      return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
     OpOperandVector outputOperands;
@@ -51,7 +52,8 @@ struct DetachElementwisePattern
     }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
-    if (outputOperands.size() != 1) return failure();
+    if (outputOperands.size() != 1)
+      return failure();
     Value outputOperand = outputOperands.front()->get();
 
     auto outsDefiningOp = outputOperand.getDefiningOp<linalg::LinalgOp>();
@@ -60,7 +62,8 @@ struct DetachElementwisePattern
       return failure();
     }
     auto outputType = llvm::cast<RankedTensorType>(outputOperand.getType());
-    if (!outputType.getElementType().isIntOrFloat()) return failure();
+    if (!outputType.getElementType().isIntOrFloat())
+      return failure();
     auto elementType = outputType.getElementType();
 
     Location loc = linalgOp.getLoc();
@@ -84,7 +87,8 @@ struct DetachElementwisePattern
         linalgOp.getMatchingIndexingMap(outputOperands.front()));
     // Only support identity map for output access for now; this is the case for
     // all existing contraction/convolution ops.
-    if (!outputMap.isIdentity()) return failure();
+    if (!outputMap.isIdentity())
+      return failure();
     SmallVector<AffineMap> maps(3, outputMap);
 
     SmallVector<utils::IteratorType> iterators;
@@ -92,7 +96,8 @@ struct DetachElementwisePattern
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
       auto attr = linalgOp.getIteratorTypesArray()[pos];
-      if (!linalg::isParallelIterator(attr)) return failure();
+      if (!linalg::isParallelIterator(attr))
+        return failure();
       iterators.push_back(attr);
     }
 
@@ -141,14 +146,17 @@ struct DetachSplatConstantOutsOperands
          llvm::enumerate(dpsInterfaceOp.getDpsInitOperands())) {
       auto constOp =
           outOperand.value()->get().template getDefiningOp<arith::ConstantOp>();
-      if (!constOp) continue;
+      if (!constOp)
+        continue;
 
       auto resultType =
           llvm::dyn_cast<RankedTensorType>(constOp.getResult().getType());
-      if (!resultType || !resultType.getElementType().isIntOrFloat()) continue;
+      if (!resultType || !resultType.getElementType().isIntOrFloat())
+        continue;
 
       auto attr = llvm::dyn_cast<DenseElementsAttr>(constOp.getValue());
-      if (!attr || !attr.isSplat()) continue;
+      if (!attr || !attr.isSplat())
+        continue;
 
       Location loc = constOp.getLoc();
       Type elementType = resultType.getElementType();
@@ -199,13 +207,13 @@ struct DetachElementwiseFromNamedOpsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass() {
   return std::make_unique<DetachElementwiseFromNamedOpsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

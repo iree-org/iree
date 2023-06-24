@@ -31,9 +31,9 @@ namespace {
 class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      ModuleOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(ModuleOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module.
     // This mechanism can only support rewriting non top-level modules.
     if (VMConversionTarget::isTopLevelModule(srcOp)) {
@@ -63,10 +63,10 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
 };
 
 // Converts a function signature with the given |signatureConversion| util.
-static FailureOr<FunctionType> convertFuncSignature(
-    func::FuncOp srcOp, TypeConverter &typeConverter,
-    TypeConverter::SignatureConversion &signatureConversion,
-    ConversionPatternRewriter &rewriter) {
+static FailureOr<FunctionType>
+convertFuncSignature(func::FuncOp srcOp, TypeConverter &typeConverter,
+                     TypeConverter::SignatureConversion &signatureConversion,
+                     ConversionPatternRewriter &rewriter) {
   FunctionType srcFuncType = srcOp.getFunctionType();
   for (unsigned i = 0, e = srcFuncType.getNumInputs(); i < e; ++i) {
     if (failed(typeConverter.convertSignatureArg(i, srcFuncType.getInput(i),
@@ -108,18 +108,20 @@ static void copyFuncAttrs(func::FuncOp srcOp, Operation *dstOp) {
 
 class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      func::FuncOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Handled by import-specific conversion.
-    if (srcOp.isExternal()) return failure();
+    if (srcOp.isExternal())
+      return failure();
 
     // Convert function signature.
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
     auto newFuncType = convertFuncSignature(srcOp, *getTypeConverter(),
                                             signatureConversion, rewriter);
-    if (failed(newFuncType)) return failure();
+    if (failed(newFuncType))
+      return failure();
 
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
@@ -181,11 +183,12 @@ static void copyImportAttrs(func::FuncOp srcOp, IREE::VM::ImportOp dstOp) {
 
 class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      func::FuncOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Handled by internal-specific conversion.
-    if (!srcOp.isExternal()) return failure();
+    if (!srcOp.isExternal())
+      return failure();
 
     // If the user declared an intended signature then we can use that instead
     // of running conversion ourselves. This can be used in cases where the
@@ -205,7 +208,8 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
           srcOp.getNumArguments());
       auto convertedSignature = convertFuncSignature(
           srcOp, *getTypeConverter(), signatureConversion, rewriter);
-      if (failed(convertedSignature)) return failure();
+      if (failed(convertedSignature))
+        return failure();
       newSignature = *convertedSignature;
     }
 
@@ -235,9 +239,9 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
 
 class CallOpConversion : public OpConversionPattern<func::CallOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      func::CallOp callOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Regardless of what the call (or import) does we need to match the
     // result types defined by the type converter. We will insert casts as
     // needed to these types before replacing the op.
@@ -267,10 +271,10 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
 
   // Converts a call to some function which may be internal or an import.
   // Returns the new converted call results.
-  FailureOr<SmallVector<Value>> convertCallOp(
-      Operation *rootOp, Location loc, StringRef calleeName,
-      ValueRange operands, TypeRange resultTypes,
-      ConversionPatternRewriter &rewriter) const {
+  FailureOr<SmallVector<Value>>
+  convertCallOp(Operation *rootOp, Location loc, StringRef calleeName,
+                ValueRange operands, TypeRange resultTypes,
+                ConversionPatternRewriter &rewriter) const {
     // (Slow) lookup of the target function, which may be an import that we need
     // to perform type conversion for.
     auto calleeOp = SymbolTable::lookupSymbolIn(rootOp, calleeName);
@@ -311,10 +315,11 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
 
   // Converts a call to an import that may be optional.
   // Returns the new converted call results.
-  FailureOr<SmallVector<Value>> convertImportCallOp(
-      Operation *rootOp, Location loc, StringRef calleeName,
-      ValueRange operands, TypeRange resultTypes, FunctionType importSignature,
-      Operation *calleeOp, ConversionPatternRewriter &rewriter) const {
+  FailureOr<SmallVector<Value>>
+  convertImportCallOp(Operation *rootOp, Location loc, StringRef calleeName,
+                      ValueRange operands, TypeRange resultTypes,
+                      FunctionType importSignature, Operation *calleeOp,
+                      ConversionPatternRewriter &rewriter) const {
     auto fallbackAttr = calleeOp->getAttrOfType<SymbolRefAttr>("vm.fallback");
     return fallbackAttr
                ? convertOptionalImportCallOp(
@@ -367,7 +372,8 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     rewriter.setInsertionPointToStart(fallbackBlock);
     auto fallbackResults = convertCallOp(rootOp, loc, fallbackName, operands,
                                          resultTypes, rewriter);
-    if (failed(fallbackResults)) return failure();
+    if (failed(fallbackResults))
+      return failure();
     rewriter.create<IREE::VM::BranchOp>(loc, exitBlock, *fallbackResults);
 
     return exitResults;
@@ -405,9 +411,9 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
 
 class ReturnOpConversion : public OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mlir::func::ReturnOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::func::ReturnOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(srcOp,
                                                     adaptor.getOperands());
     return success();
@@ -418,9 +424,9 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
   TypeConverter &typeConverter;
   ConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
-  LogicalResult matchAndRewrite(
-      arith::ConstantOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::ConstantOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto targetType = typeConverter.convertType(srcOp.getType());
     if (!targetType) {
       return srcOp.emitError() << "could not convert type: " << srcOp.getType()
@@ -432,27 +438,27 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
       switch (targetType.getIntOrFloatBitWidth()) {
-        case 1:
-        case 32:
-          if (integerAttr.getInt()) {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
-                srcOp,
-                integerAttr.getType().isInteger(1) ? 1 : integerAttr.getInt());
-          } else {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
-          }
-          break;
-        case 64:
-          if (integerAttr.getInt()) {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstI64Op>(
-                srcOp, integerAttr.getInt());
-          } else {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstI64ZeroOp>(srcOp);
-          }
-          break;
-        default:
-          return srcOp.emitRemark()
-                 << "unsupported const integer bit width for dialect";
+      case 1:
+      case 32:
+        if (integerAttr.getInt()) {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
+              srcOp,
+              integerAttr.getType().isInteger(1) ? 1 : integerAttr.getInt());
+        } else {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
+        }
+        break;
+      case 64:
+        if (integerAttr.getInt()) {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI64Op>(
+              srcOp, integerAttr.getInt());
+        } else {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI64ZeroOp>(srcOp);
+        }
+        break;
+      default:
+        return srcOp.emitRemark()
+               << "unsupported const integer bit width for dialect";
       }
     } else if (llvm::isa<FloatType>(targetType)) {
       auto floatAttr = llvm::dyn_cast<FloatAttr>(srcOp.getValue());
@@ -460,23 +466,23 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
       switch (targetType.getIntOrFloatBitWidth()) {
-        case 32:
-          if (floatAttr.getValue().isZero()) {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstF32ZeroOp>(srcOp);
-          } else {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstF32Op>(srcOp, floatAttr);
-          }
-          break;
-        case 64:
-          if (floatAttr.getValue().isZero()) {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstF64ZeroOp>(srcOp);
-          } else {
-            rewriter.replaceOpWithNewOp<IREE::VM::ConstF64Op>(srcOp, floatAttr);
-          }
-          break;
-        default:
-          return srcOp.emitRemark()
-                 << "unsupported const floating-point bit width for dialect";
+      case 32:
+        if (floatAttr.getValue().isZero()) {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstF32ZeroOp>(srcOp);
+        } else {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstF32Op>(srcOp, floatAttr);
+        }
+        break;
+      case 64:
+        if (floatAttr.getValue().isZero()) {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstF64ZeroOp>(srcOp);
+        } else {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstF64Op>(srcOp, floatAttr);
+        }
+        break;
+      default:
+        return srcOp.emitRemark()
+               << "unsupported const floating-point bit width for dialect";
       }
     } else {
       return rewriter.notifyMatchFailure(srcOp, "unsupported type");
@@ -487,196 +493,199 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
 
 struct CmpI32OpConversion : public OpConversionPattern<arith::CmpIOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::CmpIOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isInteger(32)) return failure();
+  LogicalResult
+  matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!adaptor.getLhs().getType().isInteger(32))
+      return failure();
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
-      case arith::CmpIPredicate::eq:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI32Op>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ne:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI32Op>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::slt:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::sle:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::sgt:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::sge:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ult:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ule:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ugt:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::uge:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      default:
-        return failure();
+    case arith::CmpIPredicate::eq:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI32Op>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ne:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI32Op>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::slt:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::sle:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::sgt:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::sge:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ult:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ule:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ugt:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::uge:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    default:
+      return failure();
     }
   }
 };
 
 struct CmpI64OpConversion : public OpConversionPattern<arith::CmpIOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::CmpIOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isInteger(64)) return failure();
+  LogicalResult
+  matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!adaptor.getLhs().getType().isInteger(64))
+      return failure();
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
-      case arith::CmpIPredicate::eq:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI64Op>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ne:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI64Op>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::slt:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI64SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::sle:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI64SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::sgt:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI64SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::sge:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI64SOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ult:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI64UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ule:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI64UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::ugt:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI64UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      case arith::CmpIPredicate::uge:
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI64UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        return success();
-      default:
-        return failure();
+    case arith::CmpIPredicate::eq:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI64Op>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ne:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI64Op>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::slt:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI64SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::sle:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI64SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::sgt:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI64SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::sge:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI64SOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ult:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI64UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ule:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI64UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::ugt:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI64UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    case arith::CmpIPredicate::uge:
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI64UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    default:
+      return failure();
     }
   }
 };
 
 struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::CmpFOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isF32()) return failure();
+  LogicalResult
+  matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!adaptor.getLhs().getType().isF32())
+      return failure();
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
-      case arith::CmpFPredicate::AlwaysFalse:  // 0
-        rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
-        break;
-      case arith::CmpFPredicate::AlwaysTrue:  // 1
-        rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(srcOp, 1);
-        break;
-      case arith::CmpFPredicate::UNO:  // isnan(lhs) || isnan(rhs)
-        rewriter.replaceOpWithNewOp<IREE::VM::OrI32Op>(
-            srcOp, returnType,
-            rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
-                srcOp.getLoc(), returnType, adaptor.getLhs()),
-            rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
-                srcOp.getLoc(), returnType, adaptor.getRhs()));
-        break;
-      case arith::CmpFPredicate::ORD:  // !(isnan(lhs) || isnan(rhs))
-        rewriter.replaceOpWithNewOp<IREE::VM::XorI32Op>(
-            srcOp, returnType,
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1),
-            rewriter.createOrFold<IREE::VM::AndI32Op>(
-                srcOp.getLoc(), returnType,
-                rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
-                    srcOp.getLoc(), returnType, adaptor.getLhs()),
-                rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
-                    srcOp.getLoc(), returnType, adaptor.getRhs())));
-        break;
-      case arith::CmpFPredicate::OEQ:  // ordered and equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpEQF32OOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::OGT:  // ordered and greater than
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTF32OOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::OGE:  // ordered and greater than or equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEF32OOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::OLT:  // ordered and less than
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTF32OOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::OLE:  // ordered and less than or equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEF32OOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::ONE:  // ordered and not equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpNEF32OOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::UEQ:  // unordered or equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpEQF32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::UGT:  // unordered or greater than
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTF32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::UGE:  // unordered or greater than or equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEF32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::ULT:  // unordered or less than
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTF32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::ULE:  // unordered or less than or equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEF32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      case arith::CmpFPredicate::UNE:  // unordered or not equal
-        rewriter.replaceOpWithNewOp<IREE::VM::CmpNEF32UOp>(
-            srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
-        break;
-      default:
-        return rewriter.notifyMatchFailure(srcOp,
-                                           "unhandled arith::CmpFPredicate");
+    case arith::CmpFPredicate::AlwaysFalse: // 0
+      rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
+      break;
+    case arith::CmpFPredicate::AlwaysTrue: // 1
+      rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(srcOp, 1);
+      break;
+    case arith::CmpFPredicate::UNO: // isnan(lhs) || isnan(rhs)
+      rewriter.replaceOpWithNewOp<IREE::VM::OrI32Op>(
+          srcOp, returnType,
+          rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
+              srcOp.getLoc(), returnType, adaptor.getLhs()),
+          rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
+              srcOp.getLoc(), returnType, adaptor.getRhs()));
+      break;
+    case arith::CmpFPredicate::ORD: // !(isnan(lhs) || isnan(rhs))
+      rewriter.replaceOpWithNewOp<IREE::VM::XorI32Op>(
+          srcOp, returnType,
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1),
+          rewriter.createOrFold<IREE::VM::AndI32Op>(
+              srcOp.getLoc(), returnType,
+              rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
+                  srcOp.getLoc(), returnType, adaptor.getLhs()),
+              rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
+                  srcOp.getLoc(), returnType, adaptor.getRhs())));
+      break;
+    case arith::CmpFPredicate::OEQ: // ordered and equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpEQF32OOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::OGT: // ordered and greater than
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTF32OOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::OGE: // ordered and greater than or equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEF32OOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::OLT: // ordered and less than
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTF32OOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::OLE: // ordered and less than or equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEF32OOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::ONE: // ordered and not equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpNEF32OOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::UEQ: // unordered or equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpEQF32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::UGT: // unordered or greater than
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTF32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::UGE: // unordered or greater than or equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEF32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::ULT: // unordered or less than
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTF32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::ULE: // unordered or less than or equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEF32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    case arith::CmpFPredicate::UNE: // unordered or not equal
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpNEF32UOp>(
+          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      break;
+    default:
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unhandled arith::CmpFPredicate");
     }
     return success();
   }
@@ -685,20 +694,20 @@ struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
 class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
-      case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(
-            srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
-        break;
-      case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(
-            srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
-        break;
-      default:
-        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+    case 32:
+      rewriter.replaceOpWithNewOp<Dst32OpTy>(
+          srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
+      break;
+    case 64:
+      rewriter.replaceOpWithNewOp<Dst64OpTy>(
+          srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
+      break;
+    default:
+      return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
     return success();
   }
@@ -707,22 +716,22 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
 class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
-      case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(
-            srcOp, adaptor.getLhs().getType(), adaptor.getLhs(),
-            adaptor.getRhs());
-        break;
-      case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(
-            srcOp, adaptor.getLhs().getType(), adaptor.getLhs(),
-            adaptor.getRhs());
-        break;
-      default:
-        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+    case 32:
+      rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, adaptor.getLhs().getType(),
+                                             adaptor.getLhs(),
+                                             adaptor.getRhs());
+      break;
+    case 64:
+      rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, adaptor.getLhs().getType(),
+                                             adaptor.getLhs(),
+                                             adaptor.getRhs());
+      break;
+    default:
+      return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
     return success();
   }
@@ -731,9 +740,9 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
 class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Value amount = adaptor.getRhs();
     if (amount.getType().getIntOrFloatBitWidth() > 32) {
       // Shift amounts are always 32-bit in the VM.
@@ -741,16 +750,16 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
           srcOp.getLoc(), rewriter.getI32Type(), amount);
     }
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
-      case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, rewriter.getI32Type(),
-                                               adaptor.getLhs(), amount);
-        break;
-      case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, rewriter.getI64Type(),
-                                               adaptor.getLhs(), amount);
-        break;
-      default:
-        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+    case 32:
+      rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, rewriter.getI32Type(),
+                                             adaptor.getLhs(), amount);
+      break;
+    case 64:
+      rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, rewriter.getI64Type(),
+                                             adaptor.getLhs(), amount);
+      break;
+    default:
+      return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
     return success();
   }
@@ -759,9 +768,9 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 template <typename StdOp>
 class CastingOpConversion : public OpConversionPattern<StdOp> {
   using OpConversionPattern<StdOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      StdOp srcOp, typename StdOp::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(StdOp srcOp, typename StdOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(srcOp, adaptor.getOperands());
     return success();
   }
@@ -770,9 +779,9 @@ class CastingOpConversion : public OpConversionPattern<StdOp> {
 template <typename OpTy, typename ExtOpTy>
 class IndexCastOpConversion : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy srcOp, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy srcOp, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO(jpienaar): Audit and fix if needed.
     auto srcType = adaptor.getIn().getType();
     auto dstType =
@@ -792,9 +801,9 @@ class IndexCastOpConversion : public OpConversionPattern<OpTy> {
 
 class ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::ExtUIOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::ExtUIOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isInteger(1) && dstType.isInteger(32)) {
@@ -826,9 +835,9 @@ class ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
 
 class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::ExtSIOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::ExtSIOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isInteger(8) && dstType.isInteger(32)) {
@@ -852,9 +861,9 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
 
 class TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::TruncIOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::TruncIOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto resultType = srcOp.getResult().getType();
     auto dstType = getTypeConverter()->convertType(resultType);
@@ -895,9 +904,9 @@ class TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
 template <typename OpTy, typename ExtOpTy, typename CastOpTy>
 class IntToFPOpConversion : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy srcOp, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy srcOp, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
     if (!dstType.isF32() ||
@@ -922,9 +931,9 @@ class IntToFPOpConversion : public OpConversionPattern<OpTy> {
 
 class FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::FPToSIOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::FPToSIOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
     auto resultType = getTypeConverter()->convertType(dstType);
@@ -943,9 +952,9 @@ class FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
 
 class FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::FPToUIOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::FPToUIOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
     auto resultType = getTypeConverter()->convertType(dstType);
@@ -962,9 +971,9 @@ class FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
 
 class BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::BitcastOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::BitcastOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
     auto resultType =
@@ -990,9 +999,9 @@ class BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
 
 class SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::SelectOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::SelectOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto valueType = adaptor.getTrueValue().getType();
     if (valueType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
@@ -1028,9 +1037,9 @@ class SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
 
 class AssertOpConversion : public OpConversionPattern<cf::AssertOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      cf::AssertOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(cf::AssertOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto status = rewriter.create<IREE::VM::ConstI32Op>(
         srcOp.getLoc(),
         rewriter.getIntegerAttr(
@@ -1048,9 +1057,9 @@ class AssertOpConversion : public OpConversionPattern<cf::AssertOp> {
 
 class BranchOpConversion : public OpConversionPattern<cf::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      cf::BranchOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(cf::BranchOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(srcOp, srcOp.getDest(),
                                                     adaptor.getOperands());
     return success();
@@ -1059,9 +1068,9 @@ class BranchOpConversion : public OpConversionPattern<cf::BranchOp> {
 
 class CondBranchOpConversion : public OpConversionPattern<cf::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      cf::CondBranchOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(cf::CondBranchOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Block *trueDest = srcOp.getTrueDest();
     rewriter.replaceOpWithNewOp<IREE::VM::CondBranchOp>(
         srcOp, adaptor.getCondition(), trueDest, adaptor.getTrueDestOperands(),
@@ -1070,7 +1079,7 @@ class CondBranchOpConversion : public OpConversionPattern<cf::CondBranchOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateStandardToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
@@ -1170,5 +1179,5 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                                                 context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -33,7 +33,7 @@ void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass();
 std::unique_ptr<OperationPass<ModuleOp>> createAutoInputConversionPipelinePass(
-    const AutoInputConversionPipelineOptions& options);
+    const AutoInputConversionPipelineOptions &options);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -49,7 +49,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTopLevelSCFToCFGPass();
 
 void registerCommonInputConversionPasses();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_

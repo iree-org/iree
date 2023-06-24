@@ -18,4 +18,4 @@
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h.inc" // IWYU pragma: export
 // clang-format on
 
-#endif  // #ifndef IREE_COMPILER_CODEGEN_DIALECT_UKERNELOPS_H_
+#endif // #ifndef IREE_COMPILER_CODEGEN_DIALECT_UKERNELOPS_H_

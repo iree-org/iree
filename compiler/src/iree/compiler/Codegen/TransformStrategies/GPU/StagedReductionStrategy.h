@@ -51,7 +51,7 @@ struct ReductionConfig;
 // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue. This is
 // best done if we can encode the future stride to ensure the 4 is aligned.
 class StagedReductionStrategy : public AbstractReductionStrategy {
- public:
+public:
   StagedReductionStrategy(
       const transform_ext::MatchedReductionCaptures &captures,
       const ReductionConfig &reductionConfig);
@@ -65,7 +65,7 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
 
   int64_t getVectorSize() const { return vectorSize; }
 
- private:
+private:
   /// Compute the staged strategy based on the reductionDimensionSize, the
   /// `maxNumThreadsToUse` and the `vectorSize`.
   /// The latter 2 numbers control the tradeoff between parallelism and shared
@@ -83,8 +83,8 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
   int64_t numThreadsXInBlock;
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_

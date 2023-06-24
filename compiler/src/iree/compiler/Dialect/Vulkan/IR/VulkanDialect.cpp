@@ -18,7 +18,7 @@ VulkanDialect::VulkanDialect(MLIRContext *context)
   registerAttributes();
 }
 
-}  // namespace Vulkan
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Vulkan
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -69,5 +69,5 @@ createVerifyCompilerTOSAInputLegality() {
   return std::make_unique<VerifyCompilerTOSAInputLegalityPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

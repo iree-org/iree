@@ -24,10 +24,10 @@ namespace VM {
 
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createConvertVMToEmitCPass();
 
-}  // namespace VM
-}  // namespace IREE
+} // namespace VM
+} // namespace IREE
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_

@@ -63,7 +63,7 @@ static void insertWaitIfNeeded(Operation *asyncOp,
   // Returns an operation waiting on |fence| that is guaranteed to have
   // executed prior to asyncOp. Returns null if no waits found.
   auto beginIt = std::prev(asyncOp->getBlock()->begin());
-  auto endIt = std::prev(asyncOp->getBlock()->end());  // ignore terminator
+  auto endIt = std::prev(asyncOp->getBlock()->end()); // ignore terminator
   auto findPrecedingAwait = [&](Value fence) -> Operation * {
     auto it = std::prev(Block::iterator(asyncOp));
     for (; it != beginIt; --it) {
@@ -76,7 +76,7 @@ static void insertWaitIfNeeded(Operation *asyncOp,
           continue;
         }
       } else if (!isSafeToReorder(*it)) {
-        break;  // hit a point we can't scan past
+        break; // hit a point we can't scan past
       }
     }
     return nullptr;
@@ -96,7 +96,7 @@ static void insertWaitIfNeeded(Operation *asyncOp,
           continue;
         }
       } else if (!isSafeToReorder(*it)) {
-        break;  // hit a point we can't scan past
+        break; // hit a point we can't scan past
       }
     }
     return nullptr;
@@ -105,7 +105,8 @@ static void insertWaitIfNeeded(Operation *asyncOp,
   OpBuilder builder(asyncOp);
   Value timeoutMillis;
   auto makeInfiniteTimeout = [&]() {
-    if (timeoutMillis) return timeoutMillis;
+    if (timeoutMillis)
+      return timeoutMillis;
     timeoutMillis = builder.create<arith::ConstantIntOp>(loc, -1, 32);
     return timeoutMillis;
   };
@@ -189,7 +190,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFixupLegacySyncPass() {
 
 static PassRegistration<FixupLegacySyncPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

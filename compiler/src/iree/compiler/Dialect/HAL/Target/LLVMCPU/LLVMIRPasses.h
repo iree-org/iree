@@ -20,8 +20,8 @@ namespace IREE {
 namespace HAL {
 
 // Creates target machine form target options.
-std::unique_ptr<llvm::TargetMachine> createTargetMachine(
-    const LLVMTarget &target, const LLVMTargetOptions &options);
+std::unique_ptr<llvm::TargetMachine>
+createTargetMachine(const LLVMTarget &target, const LLVMTargetOptions &options);
 
 // Creates and runs LLVMIR optimization passes defined in LLVMTargetOptions.
 LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
@@ -34,9 +34,9 @@ LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
                                    llvm::CodeGenFileType fileType,
                                    std::string *objData);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMIRPASSES_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMIRPASSES_H_

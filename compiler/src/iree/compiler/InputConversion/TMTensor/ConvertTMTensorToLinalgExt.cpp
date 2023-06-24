@@ -47,7 +47,8 @@ struct ScatterOpConversion
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
     auto indicesTy = op.getIndicesType();
-    if (!indicesTy.hasRank()) return failure();
+    if (!indicesTy.hasRank())
+      return failure();
 
     if (indicesTy.isDynamicDim(indicesTy.getRank() - 1)) {
       return rewriter.notifyMatchFailure(op, "number of indices is unknown");
@@ -55,7 +56,8 @@ struct ScatterOpConversion
 
     auto numIndices = indicesTy.getShape().back();
     llvm::SmallVector<int64_t> dimMap(numIndices);
-    for (int i = 0; i < numIndices; i++) dimMap[i] = i;
+    for (int i = 0; i < numIndices; i++)
+      dimMap[i] = i;
 
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), op.getInputs(), op.getOutputs(),
@@ -67,7 +69,7 @@ struct ScatterOpConversion
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 static Value collapseBatches(PatternRewriter &rewriter, Location loc,
                              Value val) {
@@ -82,7 +84,8 @@ static Value collapseBatches(PatternRewriter &rewriter, Location loc,
 
   auto rank = valSizes.size();
   SmallVector<int64_t> collapsed;
-  for (auto i = 0; i < rank - 2; i++) collapsed.push_back(i);
+  for (auto i = 0; i < rank - 2; i++)
+    collapsed.push_back(i);
 
   SmallVector<ReassociationIndices> reassociation(3);
   reassociation[0].append(collapsed);
@@ -103,7 +106,8 @@ static Value expandBatches(PatternRewriter &rewriter, Location loc,
   Type newType = RankedTensorType::get(newSizes, elementType);
 
   SmallVector<ReassociationIndices> reassociation(3);
-  for (auto i = 0; i < batchSizes.size(); i++) reassociation[0].push_back(i);
+  for (auto i = 0; i < batchSizes.size(); i++)
+    reassociation[0].push_back(i);
   reassociation[1].push_back(rank - 2);
   reassociation[2].push_back(rank - 1);
 
@@ -174,9 +178,9 @@ struct ConvertTMTensorToLinalgExtPass
     RewritePatternSet patterns(context);
     ConversionTarget target(*context);
 
-#define INSERT_TMTENSOR_CONVERSION_PATTERN(Op)                               \
-  patterns.add<                                                              \
-      TMTensorOpConversion<mlir::torch::TMTensor::Op, IREE::LinalgExt::Op>>( \
+#define INSERT_TMTENSOR_CONVERSION_PATTERN(Op)                                 \
+  patterns.add<                                                                \
+      TMTensorOpConversion<mlir::torch::TMTensor::Op, IREE::LinalgExt::Op>>(   \
       context);
 
     INSERT_TMTENSOR_CONVERSION_PATTERN(YieldOp);
@@ -194,13 +198,13 @@ struct ConvertTMTensorToLinalgExtPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertTMTensorToLinalgExtPass() {
   return std::make_unique<ConvertTMTensorToLinalgExtPass>();
 }
 
-}  // namespace TMTensor
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace TMTensor
+} // namespace iree_compiler
+} // namespace mlir

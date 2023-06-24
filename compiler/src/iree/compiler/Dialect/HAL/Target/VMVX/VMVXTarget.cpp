@@ -35,8 +35,9 @@ static llvm::cl::opt<bool> clEnableMicrokernels(
     llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
     llvm::cl::init(false));
 
-static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
-    MLIRContext *context, StringRef backend, StringRef format) {
+static IREE::HAL::ExecutableTargetAttr
+getVMVXExecutableTarget(MLIRContext *context, StringRef backend,
+                        StringRef format) {
   SmallVector<NamedAttribute> config;
   config.emplace_back(StringAttr::get(context, "ukernels"),
                       BoolAttr::get(context, clEnableMicrokernels));
@@ -46,7 +47,7 @@ static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
 }
 
 class VMVXTargetBackend final : public TargetBackend {
- public:
+public:
   VMVXTargetBackend() = default;
 
   std::string name() const override { return "vmvx"; }
@@ -57,8 +58,8 @@ class VMVXTargetBackend final : public TargetBackend {
                     IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -70,8 +71,8 @@ class VMVXTargetBackend final : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  IREE::VM::TargetOptions getTargetOptions(
-      IREE::HAL::ExecutableTargetAttr targetAttr) {
+  IREE::VM::TargetOptions
+  getTargetOptions(IREE::HAL::ExecutableTargetAttr targetAttr) {
     // TODO(benvanik): derive these from a vm target triple.
     auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
     vmOptions.f32Extension = true;
@@ -148,7 +149,7 @@ class VMVXTargetBackend final : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
@@ -159,7 +160,7 @@ class VMVXTargetBackend final : public TargetBackend {
 };
 
 class VMVXInlineTargetBackend final : public TargetBackend {
- public:
+public:
   VMVXInlineTargetBackend() = default;
 
   std::string name() const override { return "vmvx-inline"; }
@@ -169,8 +170,8 @@ class VMVXInlineTargetBackend final : public TargetBackend {
         .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -187,7 +188,7 @@ class VMVXInlineTargetBackend final : public TargetBackend {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
@@ -207,7 +208,7 @@ void registerVMVXTargetBackends() {
   });
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -74,12 +74,14 @@ LogicalResult OptionsBinder::parseArguments(int argc, const char *const *argv,
   return success();
 }
 
-llvm::SmallVector<std::string> OptionsBinder::printArguments(
-    bool nonDefaultOnly) {
+llvm::SmallVector<std::string>
+OptionsBinder::printArguments(bool nonDefaultOnly) {
   llvm::SmallVector<std::string> values;
   for (auto &info : localOptions) {
-    if (!info.print) continue;
-    if (nonDefaultOnly && !info.isChanged()) continue;
+    if (!info.print)
+      continue;
+    if (nonDefaultOnly && !info.isChanged())
+      continue;
 
     std::string s;
     llvm::raw_string_ostream os(s);
@@ -90,8 +92,8 @@ llvm::SmallVector<std::string> OptionsBinder::printArguments(
   return values;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 // Parses a byte size in |value| and returns the value in |out_size|.
 //
@@ -128,8 +130,8 @@ namespace llvm {
 namespace cl {
 template class basic_parser<ByteSize>;
 template class basic_parser<PowerOf2ByteSize>;
-}  // namespace cl
-}  // namespace llvm
+} // namespace cl
+} // namespace llvm
 
 using ByteSize = llvm::cl::ByteSize;
 using PowerOf2ByteSize = llvm::cl::PowerOf2ByteSize;

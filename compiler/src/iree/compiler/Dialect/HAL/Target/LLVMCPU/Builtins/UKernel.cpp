@@ -17,24 +17,26 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static std::unique_ptr<llvm::Module> loadUKernelBitcodeFile(
-    StringRef filename, llvm::LLVMContext& context) {
-  const iree_file_toc_t* file_start = iree_ukernel_bitcode_create();
-  const iree_file_toc_t* file_end = file_start + iree_ukernel_bitcode_size();
-  for (const iree_file_toc_t* file = file_start; file < file_end; ++file) {
+static std::unique_ptr<llvm::Module>
+loadUKernelBitcodeFile(StringRef filename, llvm::LLVMContext &context) {
+  const iree_file_toc_t *file_start = iree_ukernel_bitcode_create();
+  const iree_file_toc_t *file_end = file_start + iree_ukernel_bitcode_size();
+  for (const iree_file_toc_t *file = file_start; file < file_end; ++file) {
     if (filename == file->name) {
       llvm::MemoryBufferRef bitcodeBufferRef(
           llvm::StringRef(file->data, file->size), file->name);
       auto bitcodeFile = llvm::parseBitcodeFile(bitcodeBufferRef, context);
-      if (!bitcodeFile) return nullptr;
+      if (!bitcodeFile)
+        return nullptr;
       return std::move(*bitcodeFile);
     }
   }
   return nullptr;
 }
 
-std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
-    llvm::TargetMachine* targetMachine, llvm::LLVMContext& context) {
+std::unique_ptr<llvm::Module>
+loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
+                       llvm::LLVMContext &context) {
   llvm::Triple triple = targetMachine->getTargetTriple();
   StringRef filename;
   if (triple.isArch64Bit()) {
@@ -51,7 +53,7 @@ std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
   // Copied from Device.cpp - TODO: move this to a shared utility.
   // Clang adds its own per-function attributes that we need to strip so that
   // our current executable variant target is used instead.
-  for (auto& func : baseBitcode->functions()) {
+  for (auto &func : baseBitcode->functions()) {
     func.removeFnAttr("target-cpu");
     func.removeFnAttr("tune-cpu");
     func.removeFnAttr("target-features");
@@ -60,9 +62,10 @@ std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
   return baseBitcode;
 }
 
-std::unique_ptr<llvm::Module> loadUKernelArchBitcode(
-    llvm::TargetMachine* targetMachine, llvm::LLVMContext& context) {
-  const char* archName =
+std::unique_ptr<llvm::Module>
+loadUKernelArchBitcode(llvm::TargetMachine *targetMachine,
+                       llvm::LLVMContext &context) {
+  const char *archName =
       getIreeArchNameForTargetTriple(targetMachine->getTargetTriple());
   char archBitcodeFilename[64];
   snprintf(archBitcodeFilename, sizeof archBitcodeFilename,
@@ -74,7 +77,7 @@ std::unique_ptr<llvm::Module> loadUKernelArchBitcode(
   return archBitcode;
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

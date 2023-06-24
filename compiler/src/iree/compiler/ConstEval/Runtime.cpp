@@ -64,7 +64,7 @@ static Attribute createAttributeFromRawData(Location loc,
   // sizeof(bool) == 1, we just bit-cast. Otherwise, we go through a temporary.
   if (elementType.isInteger(1)) {
     if (sizeof(bool) == 1) {
-      ArrayRef<bool> boolArray(reinterpret_cast<bool*>(rawBuffer.data()),
+      ArrayRef<bool> boolArray(reinterpret_cast<bool *>(rawBuffer.data()),
                                rawBuffer.size());
       return DenseElementsAttr::get(tensorType, boolArray);
     } else {
@@ -81,7 +81,7 @@ static Attribute createAttributeFromRawData(Location loc,
   return {};
 }
 
-}  // namespace
+} // namespace
 
 CompiledBinary::CompiledBinary() = default;
 
@@ -141,7 +141,7 @@ Attribute CompiledBinary::invokeNullaryAsAttribute(Location loc,
                                                    StringRef name) {
   Attribute result;
   if (failed(invokeNullary(
-          loc, name, [&](iree_vm_list_t* outputs) -> LogicalResult {
+          loc, name, [&](iree_vm_list_t *outputs) -> LogicalResult {
             if (iree_vm_list_size(outputs) != 1) {
               return emitError(loc) << "expected 1 result for func " << name
                                     << " got " << iree_vm_list_size(outputs);
@@ -185,35 +185,36 @@ bool CompiledBinary::isSupportedResultType(Type type) {
   return false;
 }
 
-Attribute CompiledBinary::convertVariantToAttribute(
-    Location loc, iree_vm_variant_t& variant) {
+Attribute
+CompiledBinary::convertVariantToAttribute(Location loc,
+                                          iree_vm_variant_t &variant) {
   auto context = loc.getContext();
   Builder builder(context);
   if (iree_vm_variant_is_value(variant)) {
     switch (iree_vm_type_def_as_value(variant.type)) {
-      case IREE_VM_VALUE_TYPE_I8:
-        return builder.getI8IntegerAttr(variant.i8);
-      case IREE_VM_VALUE_TYPE_I16:
-        return builder.getI16IntegerAttr(variant.i16);
-      case IREE_VM_VALUE_TYPE_I32:
-        return builder.getI32IntegerAttr(variant.i32);
-      case IREE_VM_VALUE_TYPE_I64:
-        return builder.getI64IntegerAttr(variant.i64);
-      case IREE_VM_VALUE_TYPE_F32:
-        return builder.getF32FloatAttr(variant.f32);
-      case IREE_VM_VALUE_TYPE_F64:
-        return builder.getF64FloatAttr(variant.f64);
-      default:
-        emitError(loc) << "unrecognized evaluated value type: "
-                       << static_cast<int>(
-                              iree_vm_type_def_as_value(variant.type));
-        return {};
+    case IREE_VM_VALUE_TYPE_I8:
+      return builder.getI8IntegerAttr(variant.i8);
+    case IREE_VM_VALUE_TYPE_I16:
+      return builder.getI16IntegerAttr(variant.i16);
+    case IREE_VM_VALUE_TYPE_I32:
+      return builder.getI32IntegerAttr(variant.i32);
+    case IREE_VM_VALUE_TYPE_I64:
+      return builder.getI64IntegerAttr(variant.i64);
+    case IREE_VM_VALUE_TYPE_F32:
+      return builder.getF32FloatAttr(variant.f32);
+    case IREE_VM_VALUE_TYPE_F64:
+      return builder.getF64FloatAttr(variant.f64);
+    default:
+      emitError(loc) << "unrecognized evaluated value type: "
+                     << static_cast<int>(
+                            iree_vm_type_def_as_value(variant.type));
+      return {};
     }
   }
 
   if (iree_vm_variant_is_ref(variant)) {
     if (iree_hal_buffer_view_isa(variant.ref)) {
-      iree_hal_buffer_view_t* bufferView =
+      iree_hal_buffer_view_t *bufferView =
           iree_hal_buffer_view_deref(variant.ref);
 
       // Get the shape.
@@ -227,12 +228,13 @@ Attribute CompiledBinary::convertVariantToAttribute(
       iree_hal_element_type_t halElementType =
           iree_hal_buffer_view_element_type(bufferView);
       Type elementType = mapElementType(loc, halElementType);
-      if (!elementType) return {};
+      if (!elementType)
+        return {};
 
       auto tensorType = RankedTensorType::get(shape, elementType);
 
       auto length = iree_hal_buffer_view_byte_length(bufferView);
-      iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bufferView);
+      iree_hal_buffer_t *buffer = iree_hal_buffer_view_buffer(bufferView);
 
       // Map the memory and construct.
       // TODO(benvanik): fallback to alloc + iree_hal_device_transfer_range if
@@ -243,7 +245,7 @@ Attribute CompiledBinary::convertVariantToAttribute(
           buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
           /*byte_offset=*/0, length, &mapping));
       MutableArrayRef<char> rawBufferArray(
-          reinterpret_cast<char*>(mapping.contents.data),
+          reinterpret_cast<char *>(mapping.contents.data),
           mapping.contents.data_length);
       auto convertedAttr =
           createAttributeFromRawData(loc, tensorType, rawBufferArray);
@@ -262,11 +264,11 @@ Attribute CompiledBinary::convertVariantToAttribute(
   return {};
 }
 
-void CompiledBinary::initialize(void* data, size_t length) {
-  Runtime& runtime = Runtime::getInstance();
+void CompiledBinary::initialize(void *data, size_t length) {
+  Runtime &runtime = Runtime::getInstance();
 
   // Create driver and device.
-  iree_hal_driver_t* driver = nullptr;
+  iree_hal_driver_t *driver = nullptr;
   IREE_CHECK_OK(iree_hal_driver_registry_try_create(
       runtime.registry, iree_make_cstring_view("local-task"),
       iree_allocator_system(), &driver));
@@ -285,7 +287,7 @@ void CompiledBinary::initialize(void* data, size_t length) {
       iree_allocator_null(), iree_allocator_system(), &main_module));
 
   // Context.
-  std::array<iree_vm_module_t*, 2> modules = {
+  std::array<iree_vm_module_t *, 2> modules = {
       hal_module.get(),
       main_module.get(),
   };
@@ -296,8 +298,8 @@ void CompiledBinary::initialize(void* data, size_t length) {
 
 InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }
 
-LogicalResult InMemoryCompiledBinary::translateFromModule(
-    mlir::ModuleOp moduleOp) {
+LogicalResult
+InMemoryCompiledBinary::translateFromModule(mlir::ModuleOp moduleOp) {
   llvm::raw_string_ostream os(binary);
   iree_compiler::IREE::VM::TargetOptions vmOptions;
   iree_compiler::IREE::VM::BytecodeTargetOptions bytecodeOptions;
@@ -324,11 +326,11 @@ Runtime::~Runtime() {
   iree_hal_driver_registry_free(registry);
 }
 
-Runtime& Runtime::getInstance() {
+Runtime &Runtime::getInstance() {
   static Runtime instance;
   return instance;
 }
 
-}  // namespace ConstEval
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ConstEval
+} // namespace iree_compiler
+} // namespace mlir

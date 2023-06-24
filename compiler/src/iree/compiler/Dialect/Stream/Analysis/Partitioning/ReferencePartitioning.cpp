@@ -42,8 +42,9 @@ static std::unique_ptr<AsmState> getRootAsmState(Block *block) {
 // a real implementation would do. We want cost modeling for tie breakers when
 // an op could be in multiple partitions, cloning for ops that are not worth
 // spanning partitions (like splats), etc.
-PartitionSet partitionStreamableOpsReference(
-    IREE::Stream::PartitioningConfigAttr config, Block *block) {
+PartitionSet
+partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
+                                Block *block) {
   PartitionSet partitionSet;
 
   struct PartitionBuilder {
@@ -126,7 +127,8 @@ PartitionSet partitionStreamableOpsReference(
     llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
       auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end()) continue;
+      if (userInfoIt == opInfos.end())
+        continue;
       auto &userInfo = userInfoIt->second;
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
@@ -292,8 +294,9 @@ PartitionSet partitionStreamableOpsReference(
 
 // This looks to extract a single level of concurrency; we should be recursively
 // dividing the block to identify both serial and concurrent regions.
-PartitionSet partitionRegionConcurrencyReference(
-    IREE::Stream::PartitioningConfigAttr config, Block *block) {
+PartitionSet
+partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
+                                    Block *block) {
   PartitionSet waveSet;
 
   auto favor = config.getFavor().getValue();
@@ -358,7 +361,8 @@ PartitionSet partitionRegionConcurrencyReference(
     // dependency chain down the use-def chain to a wave.
     for (auto user : op.getUsers()) {
       auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end()) continue;
+      if (userInfoIt == opInfos.end())
+        continue;
       auto &userInfo = userInfoIt->second;
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
@@ -456,7 +460,7 @@ PartitionSet partitionRegionConcurrencyReference(
   return waveSet;
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

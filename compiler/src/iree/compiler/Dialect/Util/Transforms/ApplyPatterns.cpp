@@ -22,7 +22,7 @@ namespace IREE {
 namespace Util {
 
 class ApplyPatternsPass : public ApplyPatternsBase<ApplyPatternsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<BuiltinDialect, func::FuncDialect, IREE::Util::UtilDialect>();
@@ -54,7 +54,7 @@ std::unique_ptr<OperationPass<void>> createApplyPatternsPass() {
   return std::make_unique<ApplyPatternsPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

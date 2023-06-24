@@ -15,8 +15,8 @@
 #include "mlir/IR/Location.h"
 
 // Declare entrypoints for each statically registered plugin.
-#define HANDLE_PLUGIN_ID(plugin_id)                          \
-  extern "C" bool iree_register_compiler_plugin_##plugin_id( \
+#define HANDLE_PLUGIN_ID(plugin_id)                                            \
+  extern "C" bool iree_register_compiler_plugin_##plugin_id(                   \
       mlir::iree_compiler::PluginRegistrar *);
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
@@ -41,8 +41,9 @@ PluginManager::PluginManager() {}
 
 bool PluginManager::loadAvailablePlugins() {
 // Initialize static plugins.
-#define HANDLE_PLUGIN_ID(plugin_id) \
-  if (!iree_register_compiler_plugin_##plugin_id(this)) return false;
+#define HANDLE_PLUGIN_ID(plugin_id)                                            \
+  if (!iree_register_compiler_plugin_##plugin_id(this))                        \
+    return false;
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
   return true;
@@ -135,7 +136,8 @@ LogicalResult PluginManagerSession::initializePlugins() {
     }
 
     // Skip if already initialized.
-    if (!initializedIds.insert(it.first()).second) continue;
+    if (!initializedIds.insert(it.first()).second)
+      continue;
 
     if (options.printPluginInfo) {
       llvm::errs() << "[IREE plugins]: Initializing default '" << it.first()
@@ -154,7 +156,8 @@ LogicalResult PluginManagerSession::initializePlugins() {
     }
 
     // Skip if already initialized.
-    if (!initializedIds.insert(pluginId).second) continue;
+    if (!initializedIds.insert(pluginId).second)
+      continue;
 
     if (options.printPluginInfo) {
       llvm::errs() << "[IREE plugins]: Initializing plugin '" << pluginId
@@ -184,7 +187,8 @@ void PluginManagerSession::registerDialects(DialectRegistry &registry) {
 
 LogicalResult PluginManagerSession::activatePlugins(MLIRContext *context) {
   for (auto *s : initializedSessions) {
-    if (failed(s->activate(context))) return failure();
+    if (failed(s->activate(context)))
+      return failure();
   }
   return success();
 }
@@ -196,4 +200,4 @@ void PluginManagerSession::populateHALTargetBackends(
   }
 }
 
-}  // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler

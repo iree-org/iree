@@ -62,7 +62,8 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
 Value castToImportType(Value value, Type targetType,
                        ConversionPatternRewriter &rewriter) {
   auto sourceType = value.getType();
-  if (sourceType == targetType) return value;
+  if (sourceType == targetType)
+    return value;
   bool sourceIsInteger = llvm::isa<IntegerType>(sourceType);
 
   // Allow bitcast between same width float/int types. This is used for
@@ -118,9 +119,9 @@ size_t getSegmentSpanSize(Type spanType) {
   }
 }
 
-std::optional<SmallVector<Value>> rewriteAttrToOperands(
-    Location loc, Attribute attrValue, Type inputType,
-    ConversionPatternRewriter &rewriter) {
+std::optional<SmallVector<Value>>
+rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
+                      ConversionPatternRewriter &rewriter) {
   if (auto intAttr = llvm::dyn_cast<IntegerAttr>(attrValue)) {
     // NOTE: we intentionally go to std.constant ops so that the standard
     // conversions can do their job. If we want to remove the dependency
@@ -147,7 +148,8 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
           rewriteAttrToOperands(loc, elementAttr, inputType, rewriter);
-      if (!flattenedValues) return std::nullopt;
+      if (!flattenedValues)
+        return std::nullopt;
       allValues.append(flattenedValues->begin(), flattenedValues->end());
     }
     return allValues;
@@ -171,7 +173,8 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(
       int ordinal = 0;
       LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
           attrValue, [&](Attribute elementAttr) {
-            if (anyFailed) return;
+            if (anyFailed)
+              return;
             auto elementType = tupleTypes[ordinal++];
             auto flattenedValues =
                 rewriteAttrToOperands(loc, elementAttr, elementType, rewriter);
@@ -181,12 +184,14 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
-      if (failed(walkStatus)) return std::nullopt;
+      if (failed(walkStatus))
+        return std::nullopt;
     } else {
       // Custom dialect type maps into zero or more input types (ala arrays).
       LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
           attrValue, [&](Attribute elementAttr) {
-            if (anyFailed) return;
+            if (anyFailed)
+              return;
             auto flattenedValues =
                 rewriteAttrToOperands(loc, elementAttr, inputType, rewriter);
             if (!flattenedValues) {
@@ -195,9 +200,11 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
-      if (failed(walkStatus)) return std::nullopt;
+      if (failed(walkStatus))
+        return std::nullopt;
     }
-    if (anyFailed) return std::nullopt;
+    if (anyFailed)
+      return std::nullopt;
     return allValues;
   }
 
@@ -205,7 +212,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(
   return std::nullopt;
 }
 
-}  // namespace detail
+} // namespace detail
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -70,9 +70,9 @@ static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
   });
 }
 
-static SmallVector<Range> getLoopRangesImpl(
-    ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
-    OpBuilder &builder) {
+static SmallVector<Range>
+getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
+                  OpBuilder &builder) {
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   ReifiedRankedShapedTypeDims resultDims;
@@ -178,7 +178,8 @@ static void createWorkgroupCountFromDagRootRegion(
     RewriterBase &rewriter, Flow::DispatchRegionOp &regionOp,
     TypeRange workloadTypes, ArrayRef<Location> workloadLocs) {
   Region &countRegion = regionOp.getWorkgroupCount();
-  if (!countRegion.empty()) return;
+  if (!countRegion.empty())
+    return;
   Block *body = rewriter.createBlock(&countRegion, countRegion.begin(),
                                      workloadTypes, workloadLocs);
   auto args = body->getArguments();
@@ -194,7 +195,8 @@ static void createWorkgroupCountFromDagRootRegion(
 /// dynamic dimension.
 static bool hasDynamicShape(Type t) {
   auto shapedType = llvm::dyn_cast<ShapedType>(t);
-  if (!shapedType) return false;
+  if (!shapedType)
+    return false;
   return !shapedType.hasStaticShape();
 }
 
@@ -204,7 +206,8 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   OpBuilder::InsertionGuard guard(b);
 
   // Case 1: No dynamic result dims.
-  if (!hasDynamicShape(value.getType())) return success();
+  if (!hasDynamicShape(value.getType()))
+    return success();
 
   // There is at least one dynamic dimension, continue...
   ShapedType shapedType = llvm::cast<ShapedType>(value.getType());
@@ -252,7 +255,8 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   auto reifyShapeOp = dyn_cast<ReifyRankedShapedTypeOpInterface>(op);
   if (reifyShapeOp) {
     ReifiedRankedShapedTypeDims dims;
-    if (failed(reifyShapeOp.reifyResultShapes(b, dims))) return failure();
+    if (failed(reifyShapeOp.reifyResultShapes(b, dims)))
+      return failure();
     for (int64_t i = 0; i < shapedType.getRank(); ++i)
       if (shapedType.isDynamicDim(i))
         dynamicDims.push_back(dims[opResult.getResultNumber()][i].get<Value>());
@@ -293,7 +297,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResults(
     auto tensorType = result.getType().cast<RankedTensorType>();
     assert(tensorType.getNumDynamicDims() == dynamicDims[index].size() &&
            "incorrect number of dynamicDims provided");
-#endif  // NDEBUG
+#endif // NDEBUG
     resultTypes.push_back(result.getType());
     regionDynamicDims.append(dynamicDims[index]);
     returnedValues.push_back(result);
@@ -337,9 +341,10 @@ Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
 
 // Clone a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-FailureOr<Operation *> Flow::clonePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target,
-    Flow::DispatchRegionOp regionOp) {
+FailureOr<Operation *>
+Flow::clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter,
+                                         Operation *target,
+                                         Flow::DispatchRegionOp regionOp) {
   Block &body = regionOp.getBody().front();
 
   // Gather all uses of `target`.
@@ -367,9 +372,10 @@ FailureOr<Operation *> Flow::clonePrecedingOpIntoDispatchRegion(
 
 // Move a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpsIntoDispatchRegion(
-    RewriterBase &rewriter, ArrayRef<Operation *> targets,
-    Flow::DispatchRegionOp regionOp) {
+FailureOr<Flow::DispatchRegionOp>
+Flow::movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
+                                         ArrayRef<Operation *> targets,
+                                         Flow::DispatchRegionOp regionOp) {
   // Values replaced by moving the `targets` into the dispatch region.
   SmallVector<Value> replacedValues;
 
@@ -436,8 +442,8 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpsIntoDispatchRegion(
   return newRegionOp.value();
 }
 
-FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
-    RewriterBase &rewriter, Operation *op) {
+FailureOr<Flow::DispatchRegionOp>
+Flow::wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   OpBuilder::InsertionGuard g(rewriter);
 
   SmallVector<Value> workload;
@@ -483,7 +489,8 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
-    if (clInlineConstantByteLength == 0) return false;
+    if (clInlineConstantByteLength == 0)
+      return false;
     Attribute constantValueAttr;
     if (!matchPattern(op->getResult(0), m_Constant(&constantValueAttr))) {
       return false;
@@ -528,24 +535,27 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
     Operation *owner = ownerWorkgroupsOp ? ownerWorkgroupsOp : ownerRegionOp;
 
     // Ignore uses outside of dispatch workgroups op.
-    if (owner != dispatchOp) continue;
+    if (owner != dispatchOp)
+      continue;
 
     // Cannot fuse producer of `dest` with `tensor.insert_slice`.
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.getDest() == v) return true;
+      if (insertSliceUser.getDest() == v)
+        return true;
     }
   }
   return false;
 }
 
 /// Collect all ops that should be cloned into the given dispatch region op.
-static SmallVector<Operation *> getCloneableOps(
-    Flow::DispatchRegionOp regionOp) {
+static SmallVector<Operation *>
+getCloneableOps(Flow::DispatchRegionOp regionOp) {
   // Find values that are used inside of the dispatch region but defined outside
   // of the dispatch region.
   llvm::SetVector<Value> valuesDefinedAbove;
   mlir::getUsedValuesDefinedAbove(regionOp.getBody(), valuesDefinedAbove);
-  if (valuesDefinedAbove.empty()) return {};
+  if (valuesDefinedAbove.empty())
+    return {};
 
   // Traverse the defining ops of these values (and the ops on their reverse
   // SSA use-def chain).
@@ -556,7 +566,8 @@ static SmallVector<Operation *> getCloneableOps(
   while (!worklist.empty()) {
     Value outsideValue = worklist.pop_back_val();
     // Skip values that were already visited.
-    if (visited.count(outsideValue)) continue;
+    if (visited.count(outsideValue))
+      continue;
     visited.insert(outsideValue);
 
     Operation *definingOp = outsideValue.getDefiningOp();

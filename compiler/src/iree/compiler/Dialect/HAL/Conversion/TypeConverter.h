@@ -17,7 +17,7 @@ namespace mlir {
 namespace iree_compiler {
 
 class HALTypeConverter : public TypeConverter {
- public:
+public:
   explicit HALTypeConverter(
       ArrayRef<const HALConversionDialectInterface *> conversionInterfaces);
 
@@ -32,12 +32,12 @@ class HALTypeConverter : public TypeConverter {
     return false;
   }
 
- private:
+private:
   // The set of dialect conversion interfaces we should query to convert types.
   std::vector<const HALConversionDialectInterface *> conversionInterfaces;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_TYPECONVERTER_H_
+#endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_TYPECONVERTER_H_

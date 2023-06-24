@@ -78,8 +78,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createVerifyTargetEnvironmentPass(const TargetBackendRegistry &targetRegistry);
 
 // Assigns the HAL devices the module will target to the given list of targets.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createAssignTargetDevicesPass(
-    const TargetBackendRegistry &targetRegistry, ArrayRef<std::string> targets);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createAssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
+                              ArrayRef<std::string> targets);
 
 // Applies fixups to the program for when using legacy HAL devices that only
 // support synchronous execution. Once all devices support async this will be
@@ -103,8 +104,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createMaterializeInterfacesPass();
 
 // Dumps individual hal.executable source listings to |path|.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpExecutableSourcesPass(
-    StringRef path);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createDumpExecutableSourcesPass(StringRef path);
 
 // Dumps standalone hal.executable benchmarks to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -113,12 +114,12 @@ createDumpExecutableBenchmarksPass(StringRef path);
 // Substitutes hal.executable ops by parsing |substitutions| in
 // `executable_name=file.xxx` strings. File paths may be absolute or relative to
 // the paths specified on `--iree-hal-executable-object-search-path=`.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
-    ArrayRef<std::string> substitutions = {});
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSubstituteExecutablesPass(ArrayRef<std::string> substitutions = {});
 // Substitutes hal.executable ops with files in the given |searchPath| matching
 // the symbol name.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
-    std::string searchPath);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSubstituteExecutablesPass(std::string searchPath);
 
 // Preprocess each executable with either a pass pipeline or external tool.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
@@ -143,12 +144,13 @@ createTranslateTargetExecutableVariantsPass(
 // together (if that makes sense). For example, the LLVM AOT backend may combine
 // all executable targets for the same architecture into a single executable and
 // link it as a shared library.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
-    const TargetBackendRegistry &targetRegistry);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createLinkExecutablesPass(const TargetBackendRegistry &targetRegistry);
 
 // Links executables for the specified |target| backend.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkTargetExecutablesPass(
-    const TargetBackendRegistry &targetRegistry, StringRef target);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createLinkTargetExecutablesPass(const TargetBackendRegistry &targetRegistry,
+                                StringRef target);
 
 // Resolves hal.executable.export references to ordinals.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -187,8 +189,8 @@ std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass();
 
 // Repeats dispatches `iree-hal-repeat-dispatch-num` times, which is 1 by
 // default.
-std::unique_ptr<OperationPass<func::FuncOp>> createBenchmarkBatchDispatchesPass(
-    unsigned repeatCount);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createBenchmarkBatchDispatchesPass(unsigned repeatCount);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -222,9 +224,9 @@ inline void registerHALPasses() {
   createVerifyTargetEnvironmentPass(TargetBackendRegistry::getGlobal());
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_

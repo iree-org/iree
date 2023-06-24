@@ -21,7 +21,7 @@ void populateHALLoaderToVMPatterns(MLIRContext *context,
                                    SymbolTable &importSymbols,
                                    RewritePatternSet &patterns);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_HAL_LOADER_CONVERSION_HALLOADERTOVM_PATTERNS_H_
+#endif // IREE_COMPILER_MODULES_HAL_LOADER_CONVERSION_HALLOADERTOVM_PATTERNS_H_

@@ -17,15 +17,15 @@ namespace HAL {
 namespace Loader {
 
 class HALLoaderDialect : public Dialect {
- public:
+public:
   explicit HALLoaderDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "hal_loader"; }
 };
 
-}  // namespace Loader
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Loader
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_HAL_LOADER_IR_HALLOADERDIALECT_H_
+#endif // IREE_COMPILER_MODULES_HAL_LOADER_IR_HALLOADERDIALECT_H_

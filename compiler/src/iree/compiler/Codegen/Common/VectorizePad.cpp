@@ -33,7 +33,8 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
                              Location loc) {
   IntegerAttr attr;
   if (Value val = attrOrValue.dyn_cast<Value>()) {
-    if (val.getType().isIndex()) return val;
+    if (val.getType().isIndex())
+      return val;
     matchPattern(val, m_Constant(&attr));
   } else {
     attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
@@ -82,11 +83,13 @@ struct VectorizePadWithConditions final
                                 PatternRewriter &rewriter) const override {
     // Static result shape is needed to reading padded dimensions in an
     // unrolled manner.
-    if (!padOp.getType().hasStaticShape()) return failure();
+    if (!padOp.getType().hasStaticShape())
+      return failure();
 
     // Only support constant padding value cases.
     Value paddingValue = padOp.getConstantPaddingValue();
-    if (!paddingValue) return failure();
+    if (!paddingValue)
+      return failure();
     Attribute paddingAttr;
     if (!matchPattern(paddingValue, m_Constant(&paddingAttr))) {
       return failure();
@@ -123,7 +126,8 @@ struct VectorizePadWithConditions final
     SmallVector<Value> paddedDimLBs(tensorRank);
     SmallVector<Value> paddedDimUBs(tensorRank);
     for (int i = 0; i < tensorRank; ++i) {
-      if (isConstantZero(lowPads[i]) && isConstantZero(highPads[i])) continue;
+      if (isConstantZero(lowPads[i]) && isConstantZero(highPads[i]))
+        continue;
 
       paddedDimIndices.push_back(i);
       auto srcDimSize =
@@ -142,7 +146,8 @@ struct VectorizePadWithConditions final
         loc, SplatElementsAttr::get(fullVectorType, {paddingAttr}));
 
     auto sliceVectorShape = llvm::to_vector(paddedTensorShape);
-    for (int dim : paddedDimIndices) sliceVectorShape[dim] = 1;
+    for (int dim : paddedDimIndices)
+      sliceVectorShape[dim] = 1;
     auto sliceVectorType =
         VectorType::get(dropLeadingOne(sliceVectorShape), elementType);
     Value cstSliceVector = rewriter.createOrFold<arith::ConstantOp>(
@@ -151,7 +156,8 @@ struct VectorizePadWithConditions final
     // Calculate the total count of all padded dimensions. We need to generate
     // vector read ops with scf.if guards for each of them.
     int totalCount = 1;
-    for (int dim : paddedDimIndices) totalCount *= paddedTensorShape[dim];
+    for (int dim : paddedDimIndices)
+      totalCount *= paddedTensorShape[dim];
 
     auto zeroIndex = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
     auto trueAttr = rewriter.getBoolAttr(true);
@@ -243,7 +249,7 @@ struct TensorToVectorVectorizePadPass
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit) {
@@ -254,5 +260,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass() {
   return std::make_unique<TensorToVectorVectorizePadPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -49,7 +49,7 @@ class DispatchWithTransformDialect
     // clang-format on
   }
 
- public:
+public:
   DispatchWithTransformDialect(StringRef transformFileName,
                                StringRef debugPayloadRootTag = StringRef(),
                                StringRef debugTransformRootTag = StringRef()) {
@@ -64,7 +64,7 @@ class DispatchWithTransformDialect
     this->debugTransformRootTag = pass.debugTransformRootTag;
   }
 
- private:
+private:
   Statistic numDispatches{this, "number of dispatches",
                           "Number of Flow dispatches created"};
 };
@@ -77,7 +77,7 @@ createDispatchWithTransformDialect(StringRef transformFileName,
       transformFileName, debugPayloadRootTag, debugTransformRootTag);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

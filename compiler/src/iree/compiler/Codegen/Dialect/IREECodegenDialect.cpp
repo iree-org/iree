@@ -48,7 +48,7 @@ void IREECodegenDialect::initialize() {
       >();
 }
 
-}  // namespace Codegen
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Codegen
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

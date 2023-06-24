@@ -34,17 +34,18 @@ class CleanupTensorShapesPass
             foundBadOps = true;
           }
         });
-    if (foundBadOps) return signalPassFailure();
+    if (foundBadOps)
+      return signalPassFailure();
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createCleanupTensorShapesPass() {
   return std::make_unique<CleanupTensorShapesPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

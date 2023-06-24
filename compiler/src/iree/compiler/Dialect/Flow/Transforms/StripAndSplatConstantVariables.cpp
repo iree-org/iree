@@ -26,7 +26,7 @@ namespace Flow {
 class StripAndSplatConstantVariablesPass
     : public StripAndSplatConstantVariablesBase<
           StripAndSplatConstantVariablesPass> {
- public:
+public:
   StripAndSplatConstantVariablesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -63,10 +63,12 @@ class StripAndSplatConstantVariablesPass
     moduleOp.walk([&](Operation *op) {
       if (auto globalOp = dyn_cast<Util::GlobalOp>(op)) {
         // Only strip constant variables.
-        if (globalOp.getIsMutable()) return;
+        if (globalOp.getIsMutable())
+          return;
 
         // Only strip tensor type constants (to replace with dense<>).
-        if (!llvm::isa<TensorType>(globalOp.getType())) return;
+        if (!llvm::isa<TensorType>(globalOp.getType()))
+          return;
 
         auto tensorType = llvm::cast<TensorType>(globalOp.getType());
         TypedAttr newValue = getSplatAttr(tensorType);
@@ -79,7 +81,8 @@ class StripAndSplatConstantVariablesPass
         newOp->setAttr("noinline", UnitAttr::get(builder.getContext()));
         globalOp.erase();
       } else if (auto cstOp = dyn_cast<arith::ConstantOp>(op)) {
-        if (!llvm::isa<TensorType>(cstOp.getType())) return;
+        if (!llvm::isa<TensorType>(cstOp.getType()))
+          return;
 
         auto tensorType = llvm::cast<TensorType>(cstOp.getType());
         TypedAttr newValue = getSplatAttr(tensorType);
@@ -98,7 +101,7 @@ createStripAndSplatConstantVariablesPass() {
   return std::make_unique<StripAndSplatConstantVariablesPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -36,7 +36,8 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
     if (addressOfOp.getGlobal(symbolTableCollection).getAddrSpace() == 3)
       addressOfOps.push_back(addressOfOp);
   });
-  if (addressOfOps.size() == 0) return;
+  if (addressOfOps.size() == 0)
+    return;
   OpBuilder builder(moduleOp);
   builder.setInsertionPoint(&moduleOp.front());
   auto type =
@@ -102,7 +103,8 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
   LogicalResult matchAndRewrite(MathOpTy mathOp,
                                 PatternRewriter &rewriter) const override {
     auto vecType = llvm::dyn_cast<VectorType>(mathOp.getType());
-    if (!vecType) return failure();
+    if (!vecType)
+      return failure();
     Location loc = mathOp.getLoc();
     Value newVector = rewriter.create<arith::ConstantOp>(
         loc, vecType, rewriter.getZeroAttr(vecType));
@@ -134,7 +136,8 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
 
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
                                 PatternRewriter &rewriter) const override {
-    if (!hasSharedMemoryAddressSpace(allocOp.getType())) return failure();
+    if (!hasSharedMemoryAddressSpace(allocOp.getType()))
+      return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
     if (llvm::any_of(shape,
                      [](int64_t dim) { return dim == ShapedType::kDynamic; })) {
@@ -207,8 +210,8 @@ using SetBinding = std::pair<APInt, APInt>;
 /// InterfaceBindingOp and kernel argument index.
 /// For instance if the kernel has (set, bindings) A(0, 1), B(1, 5), C(0, 6) it
 /// will return the mapping [A, 0], [C, 1], [B, 2]
-static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
-    Operation *funcOp) {
+static llvm::SmallDenseMap<SetBinding, size_t>
+getKernelArgMapping(Operation *funcOp) {
   llvm::SetVector<SetBinding> usedBindingSet;
   funcOp->walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
     usedBindingSet.insert(
@@ -217,7 +220,8 @@ static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
   auto sparseBindings = usedBindingSet.takeVector();
   std::sort(sparseBindings.begin(), sparseBindings.end(),
             [](SetBinding lhs, SetBinding rhs) {
-              if (lhs.first == rhs.first) return lhs.second.ult(rhs.second);
+              if (lhs.first == rhs.first)
+                return lhs.second.ult(rhs.second);
               return lhs.first.ult(rhs.first);
             });
   llvm::SmallDenseMap<SetBinding, size_t> mapBindingArgIndex;
@@ -228,17 +232,18 @@ static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
 }
 
 class ConvertFunc : public ConvertToLLVMPattern {
- public:
+public:
   explicit ConvertFunc(MLIRContext *context, LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
                              converter, 100) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     auto funcOp = cast<func::FuncOp>(op);
     FunctionType fnType = funcOp.getFunctionType();
     (void)fnType;
-    if (!funcOp.isPublic()) return failure();
+    if (!funcOp.isPublic())
+      return failure();
 
     // illegal FuncOp must have 0 inputs.
     assert(fnType.getNumInputs() == 0 && fnType.getNumResults() == 0);
@@ -262,7 +267,8 @@ class ConvertFunc : public ConvertToLLVMPattern {
     });
     llvmInputTypes.resize(argMapping.size() + numConstants,
                           rewriter.getI32Type());
-    if (!llvmInputTypes.empty()) signatureConverter.addInputs(llvmInputTypes);
+    if (!llvmInputTypes.empty())
+      signatureConverter.addInputs(llvmInputTypes);
 
     // Construct newFunc with all attributes except return type & symbol name.
     SmallVector<NamedAttribute> funcAttrs;
@@ -297,7 +303,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
 };
 
 class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
- public:
+public:
   explicit ConvertIREEBindingSubspanOp(MLIRContext *context,
                                        LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(
@@ -323,12 +329,13 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     return allReadOnly;
   }
 
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // Bail until nested under an LLVMFuncOp.
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
-    if (!llvmFuncOp) return failure();
+    if (!llvmFuncOp)
+      return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
     auto argMapping = getKernelArgMapping(llvmFuncOp);
@@ -441,18 +448,19 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
 };
 
 class ConvertIREEConstantOp : public ConvertToLLVMPattern {
- public:
+public:
   explicit ConvertIREEConstantOp(MLIRContext *context,
                                  LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(
             IREE::HAL::InterfaceConstantLoadOp::getOperationName(), context,
             converter) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // Bail until nested under an LLVMFuncOp.
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
-    if (!llvmFuncOp) return failure();
+    if (!llvmFuncOp)
+      return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
     auto argMapping = getKernelArgMapping(llvmFuncOp);
@@ -473,9 +481,9 @@ struct HALInterfaceWorkgroupOpsConverter final
     : public OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.getDimension().getSExtValue());
     std::array<gpu::Dimension, 3> dimAttr{gpu::Dimension::x, gpu::Dimension::y,
                                           gpu::Dimension::z};
@@ -484,7 +492,7 @@ struct HALInterfaceWorkgroupOpsConverter final
   }
 };
 
-}  // anonymous namespace
+} // anonymous namespace
 
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
@@ -538,5 +546,5 @@ void populateGpuMemorySpaceAttributeConversions(
       });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

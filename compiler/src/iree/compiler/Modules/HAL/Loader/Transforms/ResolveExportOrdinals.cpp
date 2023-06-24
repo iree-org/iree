@@ -20,9 +20,9 @@ namespace Loader {
 struct ResolveExecutableDispatchSymbolOp
     : public OpRewritePattern<IREE::HAL::Loader::ExecutableDispatchSymbolOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::Loader::ExecutableDispatchSymbolOp op,
-      PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::Loader::ExecutableDispatchSymbolOp op,
+                  PatternRewriter &rewriter) const override {
     auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.getEntryPoint());
     assert(symbol && "missing ExecutableEntryPoint symbol");
     auto exportOp = cast<IREE::HAL::ExecutableExportOp>(symbol);
@@ -36,7 +36,7 @@ struct ResolveExecutableDispatchSymbolOp
 
 class ResolveExportOrdinalsPass
     : public ResolveExportOrdinalsBase<ResolveExportOrdinalsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::Loader::HALLoaderDialect>();
   }
@@ -58,8 +58,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createResolveExportOrdinalsPass() {
 
 static PassRegistration<ResolveExportOrdinalsPass> pass;
 
-}  // namespace Loader
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Loader
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

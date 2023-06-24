@@ -83,12 +83,12 @@ struct InstrumentMemoryAccessesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createInstrumentMemoryAccessesPass() {
   return std::make_unique<InstrumentMemoryAccessesPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

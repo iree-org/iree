@@ -19,14 +19,15 @@ namespace iree_compiler {
 namespace {
 
 struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
- public:
+public:
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::ConstantOp constantOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(arith::ConstantOp constantOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle tensor types - other arith.constant types (like i32) are
     // ignored.
-    if (!llvm::isa<TensorType>(constantOp.getType())) return failure();
+    if (!llvm::isa<TensorType>(constantOp.getType()))
+      return failure();
 
     Type constantType = IREE::Stream::ResourceType::get(
         getContext(), IREE::Stream::Lifetime::Constant);
@@ -48,7 +49,7 @@ struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateStandardConstantToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
@@ -61,5 +62,5 @@ void populateStandardConstantToStreamPatterns(
   patterns.insert<ConvertTensorConstantOp>(typeConverter, context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

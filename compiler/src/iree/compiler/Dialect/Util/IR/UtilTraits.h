@@ -37,9 +37,9 @@ struct DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace OpTrait
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace OpTrait
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILTRAITS_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILTRAITS_H_

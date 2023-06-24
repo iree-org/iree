@@ -27,18 +27,20 @@
 #include "mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
-static llvm::cl::opt<std::string> clROCMTargetChip(
-    "iree-rocm-target-chip", llvm::cl::desc("ROCm target Chip"),
-    llvm::cl::init("gfx908"));
+static llvm::cl::opt<std::string>
+    clROCMTargetChip("iree-rocm-target-chip",
+                     llvm::cl::desc("ROCm target Chip"),
+                     llvm::cl::init("gfx908"));
 
-static llvm::cl::opt<bool> clROCMLinkBC(
-    "iree-rocm-link-bc",
-    llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    clROCMLinkBC("iree-rocm-link-bc",
+                 llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
+                 llvm::cl::init(false));
 
-static llvm::cl::opt<std::string> clROCMBitcodeDir(
-    "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
-    llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+static llvm::cl::opt<std::string>
+    clROCMBitcodeDir("iree-rocm-bc-dir",
+                     llvm::cl::desc("Directory of ROCM Bitcode"),
+                     llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
 
 namespace mlir {
 namespace iree_compiler {
@@ -73,7 +75,7 @@ static std::string translateModuleToISA(llvm::Module &module,
   return targetISA;
 }
 class ROCMTargetBackend final : public TargetBackend {
- public:
+public:
   std::string name() const override { return "rocm"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -83,8 +85,8 @@ class ROCMTargetBackend final : public TargetBackend {
     registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -105,7 +107,8 @@ class ROCMTargetBackend final : public TargetBackend {
     // For now we disable translation if the variant has external object files.
     // We could instead perform linking with those objects (if they're bitcode
     // ala libdevice.bc, etc).
-    if (variantOp.isExternal()) return;
+    if (variantOp.isExternal())
+      return;
 
     buildLLVMGPUTransformPassPipeline(passManager, true);
   }
@@ -149,7 +152,8 @@ class ROCMTargetBackend final : public TargetBackend {
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
-      if (llvmFunc->isDeclaration()) continue;
+      if (llvmFunc->isDeclaration())
+        continue;
       std::array<int32_t, 3> workgroupSize;
       auto exportOp = exportOps[func.getName()];
       if (std::optional<ArrayAttr> workgroupSizeAttr =
@@ -248,7 +252,7 @@ class ROCMTargetBackend final : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // If we had multiple target environments we would generate one target attr
@@ -257,8 +261,8 @@ class ROCMTargetBackend final : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     // Add some configurations to the `hal.executable.target` attribute.
@@ -288,7 +292,7 @@ void registerROCMTargetBackends() {
       });
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

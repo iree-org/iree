@@ -58,7 +58,8 @@ static ArrayAttr getI64IntegerArrayAttr(MLIRContext *context,
 /// Assumes that `arrayAttr` is a list of `IntegerAttr`s and returns the values
 /// in these attributes as a vector.
 static SmallVector<int64_t> getIntegerVals(ArrayAttr arrayAttr) {
-  if (!arrayAttr) return {};
+  if (!arrayAttr)
+    return {};
   SmallVector<int64_t> values(arrayAttr.size());
   for (auto [index, attr] : llvm::enumerate(arrayAttr)) {
     values[index] = llvm::cast<IntegerAttr>(attr).getInt();
@@ -125,7 +126,8 @@ LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() {
   auto tileSizesAttr = getTileSizes();
-  if (!tileSizesAttr) return {};
+  if (!tileSizesAttr)
+    return {};
   TileSizesListType tileSizes;
   for (auto attr : tileSizesAttr) {
     auto vals = getIntegerVals(llvm::cast<ArrayAttr>(attr));
@@ -136,26 +138,30 @@ TileSizesListType LoweringConfigAttr::getTileSizeVals() {
 
 SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) {
   ArrayAttr tileSizesAttr = getTileSizes();
-  if (!tileSizesAttr || tileSizesAttr.size() <= level) return {};
+  if (!tileSizesAttr || tileSizesAttr.size() <= level)
+    return {};
   return getIntegerVals(llvm::cast<ArrayAttr>(tileSizesAttr[level]));
 }
 
-SmallVector<int64_t> LoweringConfigAttr::getTileInterchangeVals(
-    unsigned level) {
+SmallVector<int64_t>
+LoweringConfigAttr::getTileInterchangeVals(unsigned level) {
   ArrayAttr tileInterchangeAttr = getTileInterchange();
-  if (!tileInterchangeAttr || tileInterchangeAttr.size() <= level) return {};
+  if (!tileInterchangeAttr || tileInterchangeAttr.size() <= level)
+    return {};
   return getIntegerVals(llvm::cast<ArrayAttr>(tileInterchangeAttr[level]));
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getNativeVectorSizeVals() {
   ArrayAttr nativeVectorSizeAttr = getNativeVectorSize();
-  if (!nativeVectorSizeAttr) return {};
+  if (!nativeVectorSizeAttr)
+    return {};
   return getIntegerVals(nativeVectorSizeAttr);
 }
 
-LogicalResult LoweringConfigAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError, ArrayAttr tileSizes,
-    ArrayAttr tileInterchange, ArrayAttr nativeVectorSize) {
+LogicalResult
+LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                           ArrayAttr tileSizes, ArrayAttr tileInterchange,
+                           ArrayAttr nativeVectorSize) {
   if (!tileSizes) {
     return emitError() << "expected tile_sizes to be specified (even is "
                           "specified as empty)";
@@ -187,10 +193,11 @@ LogicalResult LoweringConfigAttr::verify(
 // iree.compilation_info
 //===----------------------------------------------------------------------===//
 
-CompilationInfoAttr CompilationInfoAttr::get(
-    MLIRContext *context, LoweringConfigAttr configAttr,
-    TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize,
-    std::optional<int64_t> subgroupSize) {
+CompilationInfoAttr
+CompilationInfoAttr::get(MLIRContext *context, LoweringConfigAttr configAttr,
+                         TranslationInfoAttr translationInfo,
+                         ArrayRef<int64_t> workgroupSize,
+                         std::optional<int64_t> subgroupSize) {
   ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
   return get(context, configAttr, translationInfo, workgroupSizeAttr,
              subgroupSize);
@@ -228,7 +235,8 @@ LogicalResult CompilationInfoAttr::verify(
 
 SmallVector<int64_t> CompilationInfoAttr::getWorkgroupSizeVals() {
   ArrayAttr workgroupSizeAttr = getWorkgroupSize();
-  if (!workgroupSizeAttr) return {};
+  if (!workgroupSizeAttr)
+    return {};
   return getIntegerVals(workgroupSizeAttr);
 }
 
@@ -239,20 +247,20 @@ SmallVector<int64_t> CompilationInfoAttr::getWorkgroupSizeVals() {
 void IREECodegenDialect::initializeCodegenAttrs() {
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.cpp.inc"  // IWYU pragma: keeep
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.cpp.inc" // IWYU pragma: keeep
       >();
 }
 
-}  // namespace Codegen
-}  // namespace IREE
+} // namespace Codegen
+} // namespace IREE
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on the
 // `hal.executable.export`
 // ===----------------------------------------------------------------------===//
 
-IREE::Codegen::TranslationInfoAttr getTranslationInfo(
-    IREE::HAL::ExecutableExportOp exportOp) {
+IREE::Codegen::TranslationInfoAttr
+getTranslationInfo(IREE::HAL::ExecutableExportOp exportOp) {
   return exportOp->getAttrOfType<IREE::Codegen::TranslationInfoAttr>(
       kTranslationInfoAttrName);
 }
@@ -276,7 +284,8 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
                                 ArrayRef<int64_t> workgroupSize,
                                 std::optional<int64_t> subgroupSize) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
-  if (failed(exportOp)) return failure();
+  if (failed(exportOp))
+    return failure();
   MLIRContext *context = exportOp->getContext();
   if (!workgroupSize.empty()) {
     auto attr = getIndexIntegerArrayAttr(context, workgroupSize);
@@ -288,11 +297,12 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
   return success();
 }
 
-LogicalResult setTranslationInfo(
-    func::FuncOp entryPoint,
-    IREE::Codegen::TranslationInfoAttr translationInfo) {
+LogicalResult
+setTranslationInfo(func::FuncOp entryPoint,
+                   IREE::Codegen::TranslationInfoAttr translationInfo) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
-  if (failed(exportOp)) return failure();
+  if (failed(exportOp))
+    return failure();
   exportOp.value()->setAttr(kTranslationInfoAttrName, translationInfo);
   return success();
 }
@@ -302,10 +312,11 @@ LogicalResult setTranslationInfo(
 // operations.
 // ===----------------------------------------------------------------------===//
 
-FailureOr<Operation *> getLoweringConfigCarryingOp(
-    ArrayRef<Operation *> computeOps) {
+FailureOr<Operation *>
+getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
   for (Operation *op : computeOps) {
-    if (getLoweringConfig(op)) return op;
+    if (getLoweringConfig(op))
+      return op;
   }
   return failure();
 }
@@ -314,16 +325,18 @@ IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op) {
   return op->getAttrOfType<IREE::Codegen::LoweringConfigAttr>(kConfigAttrName);
 }
 
-FailureOr<IREE::Codegen::LoweringConfigAttr> getLoweringConfig(
-    ArrayRef<Operation *> computeOps) {
+FailureOr<IREE::Codegen::LoweringConfigAttr>
+getLoweringConfig(ArrayRef<Operation *> computeOps) {
   FailureOr<Operation *> op = getLoweringConfigCarryingOp(computeOps);
-  if (failed(op)) return failure();
+  if (failed(op))
+    return failure();
   return getLoweringConfig(*op);
 }
 
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level) {
   IREE::Codegen::LoweringConfigAttr configAttr = getLoweringConfig(op);
-  if (!configAttr) return {};
+  if (!configAttr)
+    return {};
   return configAttr.getTileSizeVals(level);
 }
 SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level) {
@@ -334,7 +347,8 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level) {
 
 unsigned getNumTileLevels(Operation *op) {
   IREE::Codegen::LoweringConfigAttr configAttr = getLoweringConfig(op);
-  if (!configAttr) return 0;
+  if (!configAttr)
+    return 0;
   return configAttr.getTileSizes().size();
 }
 
@@ -362,5 +376,5 @@ void eraseCompilationInfo(Operation *op) {
   op->removeAttr(kCompilationInfoAttrName);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

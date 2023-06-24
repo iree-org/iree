@@ -154,7 +154,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
 /// Pass to splitReduce linalg operations.
 class LLVMCPUSplitReductionPass
     : public LLVMCPUSplitReductionBase<LLVMCPUSplitReductionPass> {
- public:
+public:
   LLVMCPUSplitReductionPass(bool fpReductionReordering) {
     this->enableFpReductionReordering = fpReductionReordering;
   }
@@ -199,12 +199,12 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
     }
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
-    const bool enableFpReductionReordering) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUSplitReductionPass(const bool enableFpReductionReordering) {
   return std::make_unique<LLVMCPUSplitReductionPass>(
       enableFpReductionReordering);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

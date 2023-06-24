@@ -20,7 +20,7 @@ namespace iree_compiler {
 namespace {
 struct SPIRVVectorToGPUSubgroupMMAPass final
     : public SPIRVVectorToGPUSubgroupMMABase<SPIRVVectorToGPUSubgroupMMAPass> {
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect,
                     memref::MemRefDialect>();
   }
@@ -50,7 +50,7 @@ struct SPIRVVectorToGPUSubgroupMMAPass final
     }
 
     // Make sure we actually generate GPU subgroup mma ops.
-    WalkResult result = funcOp.walk([](Operation* op) {
+    WalkResult result = funcOp.walk([](Operation *op) {
       return isa<gpu::SubgroupMmaComputeOp>(op) ? WalkResult::interrupt()
                                                 : WalkResult::advance();
     });
@@ -60,12 +60,12 @@ struct SPIRVVectorToGPUSubgroupMMAPass final
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVVectorToGPUSubgroupMMAOpsPass() {
   return std::make_unique<SPIRVVectorToGPUSubgroupMMAPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

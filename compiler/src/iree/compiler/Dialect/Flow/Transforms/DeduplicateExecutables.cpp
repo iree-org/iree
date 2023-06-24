@@ -27,7 +27,8 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   auto lhsIt = lhs.begin();
   auto rhsIt = rhs.begin();
   while (lhsIt != lhs.end() && rhsIt != rhs.end()) {
-    if (!pred(*lhsIt++, *rhsIt++)) return false;
+    if (!pred(*lhsIt++, *rhsIt++))
+      return false;
   }
   if ((lhsIt == lhs.end()) != (rhsIt == rhs.end())) {
     // Block count mismatch. We do this here so that we avoid the O(n) scan
@@ -79,13 +80,14 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
             }
             for (auto [lhsArg, rhsArg] : llvm::zip_equal(
                      lhsBlock.getArguments(), rhsBlock.getArguments())) {
-              if (lhsArg.getType() != rhsArg.getType()) return false;
+              if (lhsArg.getType() != rhsArg.getType())
+                return false;
               mapping.map(lhsArg, rhsArg);
             }
             mapping.map(&lhsBlock, &rhsBlock);
             return true;
           })) {
-    return false;  // block mismatch
+    return false; // block mismatch
   }
 
   // Walk the blocks again now that we have a populated mapping.
@@ -101,11 +103,13 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
     llvm::ReversePostOrderTraversal<Block *> traversal(&b);
     rhsBlocks.insert(traversal.begin(), traversal.end());
   }
-  if (lhsBlocks.size() != rhsBlocks.size()) return false;
+  if (lhsBlocks.size() != rhsBlocks.size())
+    return false;
   for (auto [lhsBlock, rhsBlock] : llvm::zip_equal(lhsBlocks, rhsBlocks)) {
     auto &lhsOperations = lhsBlock->getOperations();
     auto &rhsOperations = rhsBlock->getOperations();
-    if (lhsOperations.size() != rhsOperations.size()) return false;
+    if (lhsOperations.size() != rhsOperations.size())
+      return false;
     for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsOperations, rhsOperations)) {
       if (!isStructurallyEquivalentTo(lhsOp, rhsOp, mapping)) {
         return false;
@@ -120,11 +124,16 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
 static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
                                        IRMapping &parentMapping) {
   // Check operation metadata for early-exit opportunities.
-  if (lhs.getName() != rhs.getName()) return false;
-  if (lhs.getNumOperands() != rhs.getNumOperands()) return false;
-  if (lhs.getNumResults() != rhs.getNumResults()) return false;
-  if (lhs.getNumRegions() != rhs.getNumRegions()) return false;
-  if (lhs.getNumSuccessors() != rhs.getNumSuccessors()) return false;
+  if (lhs.getName() != rhs.getName())
+    return false;
+  if (lhs.getNumOperands() != rhs.getNumOperands())
+    return false;
+  if (lhs.getNumResults() != rhs.getNumResults())
+    return false;
+  if (lhs.getNumRegions() != rhs.getNumRegions())
+    return false;
+  if (lhs.getNumSuccessors() != rhs.getNumSuccessors())
+    return false;
 
   // TODO(#3996): symbol mapping; for now allow them to differ unconditionally.
   if (!compare_ranges(
@@ -143,7 +152,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // in the mapping already from the parent region to do the lhs->rhs mapping.
   for (auto [lhsSuccessor, rhsSuccessor] :
        llvm::zip_equal(lhs.getSuccessors(), rhs.getSuccessors())) {
-    if (rhsSuccessor != parentMapping.lookup(lhsSuccessor)) return false;
+    if (rhsSuccessor != parentMapping.lookup(lhsSuccessor))
+      return false;
   }
 
   // Ensure result types match first and add to the block and value mapping.
@@ -152,7 +162,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // exit prior to the full traversal.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getResults(), rhs.getResults())) {
-    if (lhsValue.getType() != rhsValue.getType()) return false;
+    if (lhsValue.getType() != rhsValue.getType())
+      return false;
     parentMapping.map(lhsValue, rhsValue);
   }
 
@@ -160,8 +171,10 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // these values they should already be defined in the mapping.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getOperands(), rhs.getOperands())) {
-    if (lhsValue.getType() != rhsValue.getType()) return false;
-    if (rhsValue != parentMapping.lookup(lhsValue)) return false;
+    if (lhsValue.getType() != rhsValue.getType())
+      return false;
+    if (rhsValue != parentMapping.lookup(lhsValue))
+      return false;
   }
 
   // Recurse into regions.
@@ -197,11 +210,11 @@ void replaceEntryPointUses(
   }
 }
 
-}  // namespace
+} // namespace
 
 class DeduplicateExecutablesPass
     : public DeduplicateExecutablesBase<DeduplicateExecutablesPass> {
- public:
+public:
   explicit DeduplicateExecutablesPass() {}
   DeduplicateExecutablesPass(const DeduplicateExecutablesPass &pass) {}
 
@@ -283,7 +296,7 @@ class DeduplicateExecutablesPass
     }
   }
 
- private:
+private:
   Statistic totalExecutables{
       this, "total executable(s)",
       "Number of flow.executable ops before deduplication"};
@@ -300,7 +313,7 @@ createDeduplicateExecutablesPass() {
   return std::make_unique<DeduplicateExecutablesPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

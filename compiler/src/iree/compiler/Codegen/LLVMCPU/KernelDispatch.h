@@ -15,7 +15,7 @@ namespace iree_compiler {
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_KERNELDISPATCH_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_KERNELDISPATCH_H_

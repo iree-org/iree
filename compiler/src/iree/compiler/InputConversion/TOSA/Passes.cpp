@@ -74,8 +74,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/InputConversion/TOSA/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/InputConversion/TOSA/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerTOSAConversionPasses() {
   // Generated.
@@ -85,5 +85,5 @@ void registerTOSAConversionPasses() {
   registerTOSAConversionPassPipeline();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

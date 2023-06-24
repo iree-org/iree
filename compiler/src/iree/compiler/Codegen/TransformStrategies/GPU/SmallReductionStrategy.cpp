@@ -80,7 +80,8 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
   // in a crash in the associated upstream util.
   // TODO: More generally fix PadDynamicAlloc and the associated upstream util.
   bool hasTrailingElementwise = (captures.maybeTrailingRank > 0);
-  if (failed(maybeDivisor) && hasTrailingElementwise) maybeDivisor = 1;
+  if (failed(maybeDivisor) && hasTrailingElementwise)
+    maybeDivisor = 1;
 
   // If the captured dimension has no satisfactory divisor, just tile the last
   // parallel dimension by 2 * kCudaWarpSize.

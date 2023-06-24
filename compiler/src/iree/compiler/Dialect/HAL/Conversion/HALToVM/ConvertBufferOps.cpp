@@ -15,7 +15,7 @@ namespace iree_compiler {
 
 class BufferLoadOpConversion
     : public OpConversionPattern<IREE::HAL::BufferLoadOp> {
- public:
+public:
   BufferLoadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                          TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(typeConverter, context) {
@@ -23,9 +23,9 @@ class BufferLoadOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     auto originalType = op.getResult().getType();
@@ -91,13 +91,13 @@ class BufferLoadOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
 class BufferStoreOpConversion
     : public OpConversionPattern<IREE::HAL::BufferStoreOp> {
- public:
+public:
   BufferStoreOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                           TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(context) {
@@ -105,9 +105,9 @@ class BufferStoreOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     auto elementType = op.getValue().getType();
@@ -171,7 +171,7 @@ class BufferStoreOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
@@ -191,5 +191,5 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                            typeConverter, "hal.buffer.store");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

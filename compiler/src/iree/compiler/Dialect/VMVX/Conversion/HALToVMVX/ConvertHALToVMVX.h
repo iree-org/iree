@@ -26,7 +26,7 @@ void populateHALToVMVXPatterns(MLIRContext *context,
                                RewritePatternSet &patterns,
                                TypeConverter &typeConverter);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VMVX_CONVERSION_HALTOVMVX_CONVERTHALTOVMVX_H_
+#endif // IREE_COMPILER_DIALECT_VMVX_CONVERSION_HALTOVMVX_CONVERTHALTOVMVX_H_

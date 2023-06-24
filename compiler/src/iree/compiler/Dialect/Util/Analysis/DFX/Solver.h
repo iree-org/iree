@@ -44,14 +44,12 @@ namespace DFX {
 // while it is in-use. Modifying the IR invalidates the state and may lead to
 // crashes as pointer references into the IR structure are retained.
 class Solver {
- public:
+public:
   // Creates a solver that uses |explorer| for walking the IR tree and
   // |allocator| for transient allocations of abstract elements.
   explicit Solver(Explorer &explorer, llvm::BumpPtrAllocator &allocator)
-      : explorer(explorer),
-        asmState(explorer.getAsmState()),
-        allocator(allocator),
-        depGraph(explorer.getAsmState()) {}
+      : explorer(explorer), asmState(explorer.getAsmState()),
+        allocator(allocator), depGraph(explorer.getAsmState()) {}
   ~Solver();
 
   // Initialized explorer for walking the IR.
@@ -96,11 +94,10 @@ class Solver {
   //
   // NOTE: |forceUpdate| is ignored in any stage other than the update stage.
   template <typename ElementT>
-  const ElementT &getOrCreateElementFor(Position pos,
-                                        const AbstractElement *queryingElement,
-                                        Resolution resolution,
-                                        bool forceUpdate = false,
-                                        bool updateAfterInit = true) {
+  const ElementT &
+  getOrCreateElementFor(Position pos, const AbstractElement *queryingElement,
+                        Resolution resolution, bool forceUpdate = false,
+                        bool updateAfterInit = true) {
     if (auto *elementPtr =
             lookupElementFor<ElementT>(pos, queryingElement, resolution,
                                        /*allowInvalidState=*/true)) {
@@ -173,7 +170,8 @@ class Solver {
     // Lookup the abstract element of type ElementT and if found return it after
     // registering a dependence of queryingElement on the one returned element.
     auto *elementPtr = elementMap.lookup({&ElementT::ID, pos});
-    if (!elementPtr) return nullptr;
+    if (!elementPtr)
+      return nullptr;
     auto *element = static_cast<ElementT *>(elementPtr);
 
     // Do not register a dependence on an element with an invalid state.
@@ -245,7 +243,7 @@ class Solver {
   // Dumps a .dot of the constraint dependency graph to a file.
   void dumpGraph();
 
- protected:
+protected:
   friend DepGraph;
 
   Explorer &explorer;
@@ -311,8 +309,8 @@ class Solver {
   SmallVector<DependenceVector *, 16> dependenceStack;
 };
 
-}  // namespace DFX
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace DFX
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_SOLVER_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_SOLVER_H_

@@ -44,11 +44,11 @@ class PolynomialApproximationPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass() {
   return std::make_unique<PolynomialApproximationPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

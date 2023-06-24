@@ -34,11 +34,11 @@ class DecomposeLinalgGenericPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass() {
   return std::make_unique<DecomposeLinalgGenericPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

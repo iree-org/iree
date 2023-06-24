@@ -50,9 +50,9 @@ struct ConcatenateOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConcatenateOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ConcatenateOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ConcatenateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         getTypeConverter()->convertType<RankedTensorType>(op.getType());
     if (!resultType || !resultType.hasStaticShape()) {
@@ -87,7 +87,8 @@ struct ConcatenateOpConversion final
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();
-      if (!op) return v;
+      if (!op)
+        return v;
       return op.getValue();
     };
 
@@ -142,21 +143,19 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
       b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
 
   switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
-    case 1:
-      return b
-          .create<linalg::VecmatOp>(loc, TypeRange{resultType},
-                                    ValueRange{lhs, rhs},
-                                    ValueRange{zeroTensor})
-          .getResult(0);
-    case 2:
-      return b
-          .create<linalg::MatmulOp>(loc, TypeRange{resultType},
-                                    ValueRange{lhs, rhs},
-                                    ValueRange{zeroTensor})
-          .getResult(0);
-    default:
-      assert(false && "unhandled matmul type");
-      return Value();
+  case 1:
+    return b
+        .create<linalg::VecmatOp>(loc, TypeRange{resultType},
+                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
+        .getResult(0);
+  case 2:
+    return b
+        .create<linalg::MatmulOp>(loc, TypeRange{resultType},
+                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
+        .getResult(0);
+  default:
+    assert(false && "unhandled matmul type");
+    return Value();
   }
 }
 
@@ -164,9 +163,9 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
 struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::FftOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (op.getFftType() != mlir::stablehlo::FftType::RFFT) {
       return rewriter.notifyMatchFailure(op,
                                          "non RFFT types are supported yet");
@@ -210,9 +209,9 @@ struct OptimizationBarrierOpConversion final
     : OpConversionPattern<mlir::stablehlo::OptimizationBarrierOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::OptimizationBarrierOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::OptimizationBarrierOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> outputs;
     for (Value operand : adaptor.getOperands()) {
       outputs.push_back(
@@ -231,7 +230,8 @@ static bool isValidFuncAttr(DictionaryAttr attrs) {
   // TODO: switch to using a dialect-based exclusion list or some other way that
   // is not a big string table.
   for (auto attr : attrs) {
-    if (attr.getName() == "tf.aliasing_output") return false;
+    if (attr.getName() == "tf.aliasing_output")
+      return false;
   }
   return true;
 }
@@ -290,9 +290,9 @@ static void rewriteFuncAttrs(func::FuncOp funcOp) {
 struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      func::FuncOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
@@ -339,12 +339,13 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
 struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
   using OpConversionPattern<ml_program::GlobalOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      ml_program::GlobalOp globalOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(ml_program::GlobalOp globalOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type oldType = globalOp.getType();
     Type newType = getTypeConverter()->convertType(oldType);
-    if (newType == oldType) return failure();
+    if (newType == oldType)
+      return failure();
     if (!newType) {
       return rewriter.notifyMatchFailure(globalOp,
                                          "result type conversion failed");
@@ -365,9 +366,9 @@ struct GenericTypeConvert final : ConversionPattern {
                      MLIRContext *context, PatternBenefit benefit = 0)
       : ConversionPattern(converter, rootName, benefit, context) {}
 
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     llvm::SmallVector<NamedAttribute> newAttr;
     llvm::append_range(newAttr, op->getAttrs());
 
@@ -422,18 +423,21 @@ static void stripFrontendAttrs(mlir::ModuleOp moduleOp) {
   auto filterOpAttrs = [&](Operation *op) {
     SmallVector<NamedAttribute> newAttrs;
     for (auto attr : op->getDialectAttrs()) {
-      if (!isAttrFiltered(attr)) newAttrs.push_back(attr);
+      if (!isAttrFiltered(attr))
+        newAttrs.push_back(attr);
     }
     op->setDialectAttrs(newAttrs);
   };
   auto filterAttrDicts = [&](ArrayAttr allOldAttrs,
                              SmallVectorImpl<DictionaryAttr> &newAttrs) {
-    if (!allOldAttrs) return false;
+    if (!allOldAttrs)
+      return false;
     for (auto oldAttrs : allOldAttrs.getAsRange<DictionaryAttr>()) {
       SmallVector<NamedAttribute> preservedAttrs;
       preservedAttrs.reserve(oldAttrs.size());
       for (auto attr : oldAttrs) {
-        if (!isAttrFiltered(attr)) preservedAttrs.push_back(attr);
+        if (!isAttrFiltered(attr))
+          preservedAttrs.push_back(attr);
       }
       newAttrs.push_back(
           DictionaryAttr::get(allOldAttrs.getContext(), preservedAttrs));
@@ -508,10 +512,12 @@ struct ConvertStableHloToIreeInputDialects final
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
     auto isLegallyTypedOp = [&](Operation *op) -> bool {
       for (Type type : op->getResultTypes()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalType(type))
+          return false;
       }
       for (Type type : op->getOperandTypes()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalType(type))
+          return false;
       }
       return true;
     };
@@ -534,14 +540,17 @@ struct ConvertStableHloToIreeInputDialects final
         }
       }
       for (Type type : funcOp.getFunctionType().getInputs()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalType(type))
+          return false;
       }
       for (Type type : funcOp.getFunctionType().getResults()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalType(type))
+          return false;
       }
       for (Block &block : funcOp.getFunctionBody()) {
         for (Type type : block.getArgumentTypes()) {
-          if (isIllegalType(type)) return false;
+          if (isIllegalType(type))
+            return false;
         }
       }
       return true;
@@ -578,7 +587,7 @@ struct ConvertStableHloToIreeInputDialects final
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateStableHloToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
@@ -593,4 +602,4 @@ void populateStableHloToLinalgOnTensorsConversionPatterns(
                                               /*enablePrimitiveOps=*/false);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

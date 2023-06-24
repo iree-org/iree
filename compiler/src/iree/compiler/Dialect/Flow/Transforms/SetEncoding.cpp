@@ -56,17 +56,19 @@ static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
             return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
           })
           .Default([](Type type) { return nullptr; });
-  if (!zeroVal) return failure();
+  if (!zeroVal)
+    return failure();
   return builder.create<arith::ConstantOp>(loc, elementType, zeroVal)
       .getResult();
 }
 
 /// Pads `value` to `padding` if needed. If no padding is specified,
 /// return `value` itself.
-static FailureOr<Value> padIfNeeded(
-    OpBuilder &builder, Location loc, Value value,
-    std::optional<int64_t> padding = std::nullopt) {
-  if (!padding) return value;
+static FailureOr<Value>
+padIfNeeded(OpBuilder &builder, Location loc, Value value,
+            std::optional<int64_t> padding = std::nullopt) {
+  if (!padding)
+    return value;
 
   OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());
   FailureOr<SmallVector<OpFoldResult>> shape =
@@ -114,12 +116,13 @@ namespace {
 struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
   SetMatmulEncoding(MLIRContext *context, int64_t padding,
                     PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
-        padding(padding) {}
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit), padding(padding) {
+  }
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics()) return failure();
+    if (!matmulOp.hasTensorSemantics())
+      return failure();
     auto inputs = matmulOp.getDpsInputOperands();
     auto outputs = matmulOp.getDpsInitOperands();
     auto hasEncoding = [](OpOperand *operand) -> bool {
@@ -229,7 +232,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     return success();
   }
 
- private:
+private:
   int64_t padding;
 };
 
@@ -242,7 +245,8 @@ struct FoldFillWithSetEncoding
   LogicalResult matchAndRewrite(IREE::LinalgExt::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto fillOp = encodingOp.getSource().getDefiningOp<linalg::FillOp>();
-    if (!fillOp) return failure();
+    if (!fillOp)
+      return failure();
 
     // Create a new fill op, with outs being defined by a new `tensor.empty` op.
     RankedTensorType encodingType = encodingOp.getResultType();
@@ -265,7 +269,7 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -286,7 +290,7 @@ std::unique_ptr<Pass> createSetEncodingPass() {
   return std::make_unique<SetEncodingPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -57,9 +57,11 @@ static std::optional<OpOperand *> getFusableUse(Operation *op,
       // This can be generalized if needed
       unsigned numUsesOfOp = 0;
       for (OpOperand &operand : sourceOp->getOpOperands()) {
-        if (operand.get().getDefiningOp() == op) numUsesOfOp++;
+        if (operand.get().getDefiningOp() == op)
+          numUsesOfOp++;
       }
-      if (numUsesOfOp != 1) return std::nullopt;
+      if (numUsesOfOp != 1)
+        return std::nullopt;
       return &source;
     }
   }
@@ -70,13 +72,16 @@ static std::optional<OpOperand *> getFusableUse(Operation *op,
 static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
   Operation *producerOp = fusedOperand->get().getDefiningOp();
   Operation *consumerOp = fusedOperand->getOwner();
-  if (!producerOp) return false;
+  if (!producerOp)
+    return false;
 
   // Check for i1 return types, if so aggressively fuse to avoid `i1` buffers.
   if (llvm::all_of(producerOp->getResultTypes(), [](Type t) {
-        if (t.isInteger(1)) return true;
+        if (t.isInteger(1))
+          return true;
         if (auto shapedType = llvm::dyn_cast<ShapedType>(t)) {
-          if (shapedType.getElementType().isInteger(1)) return true;
+          if (shapedType.getElementType().isInteger(1))
+            return true;
         }
         return false;
       })) {
@@ -94,7 +99,8 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
 
   // If the generic op is "just" copy, then fuse always.
   Block &body = producerOp->getRegion(0).front();
-  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>()) return true;
+  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
+    return true;
   if (llvm::all_of(body.getArguments(),
                    [](BlockArgument arg) { return arg.use_empty(); })) {
     // THe operands arent used, its just an `linalg.index` op.
@@ -102,7 +108,8 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
   }
 
   // If producer does not have a single user, dont fuse.
-  if (!producerOp->hasOneUse()) return false;
+  if (!producerOp->hasOneUse())
+    return false;
 
   // If the producer has a single use (this op), only fuse if
   // - 1) The consumer op is all parallel loops. The parallelism of the consumer
@@ -139,15 +146,18 @@ struct FuseElementwiseOpsWithMultipleUses
                                 PatternRewriter &rewriter) const override {
     auto consumerMarker =
         consumerOp->getAttrOfType<IntegerAttr>(getConsumerAttributeName());
-    if (!consumerMarker) return failure();
+    if (!consumerMarker)
+      return failure();
 
     auto fusedOperandIt =
         llvm::find_if(consumerOp->getOpOperands(), [&](OpOperand &operand) {
           Operation *operandProducer = operand.get().getDefiningOp();
-          if (!operandProducer) return false;
+          if (!operandProducer)
+            return false;
           auto producerMarker = operandProducer->getAttrOfType<IntegerAttr>(
               getProducerAttributeName());
-          if (!producerMarker) return false;
+          if (!producerMarker)
+            return false;
           return consumerMarker.getValue() == producerMarker.getValue();
         });
     assert(fusedOperandIt != consumerOp->getOpOperands().end() &&
@@ -198,8 +208,10 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
     std::optional<OpOperand *> fusableUse =
         getFusableUse(genericOp, dominanceInfo);
-    if (!fusableUse) return;
-    if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
+    if (!fusableUse)
+      return;
+    if (!linalg::areElementwiseOpsFusable(fusableUse.value()))
+      return;
 
     auto consumer = dyn_cast<linalg::GenericOp>(fusableUse.value()->getOwner());
     auto isParallelIteratorType = [](Attribute attr) {
@@ -261,7 +273,8 @@ struct FusionOfTensorOpsPass
       linalg::ControlFusionFn fuseElementwiseOpsControlFn =
           [&](OpOperand *fusedOperand) {
             Operation *producer = fusedOperand->get().getDefiningOp();
-            if (!producer) return false;
+            if (!producer)
+              return false;
             Operation *consumer = fusedOperand->getOwner();
 
             // Limit the number of operands. We have hard limit (32) of bindings
@@ -276,7 +289,8 @@ struct FusionOfTensorOpsPass
             operands.insert(std::next(consumer->operand_begin(),
                                       fusedOperand->getOperandNumber() + 1),
                             consumer->operand_end());
-            if (operands.size() >= kIreeMaxOperandCount) return false;
+            if (operands.size() >= kIreeMaxOperandCount)
+              return false;
 
             return areFusableOps(context, fusedOperand);
           };
@@ -354,7 +368,8 @@ struct FusionOfTensorOpsPass
             }
 
             auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
-            if (!reshapeOp) return true;
+            if (!reshapeOp)
+              return true;
 
             return reshapeOp.getSrc().getDefiningOp<linalg::LinalgOp>() !=
                    nullptr;
@@ -407,13 +422,14 @@ struct FusionOfTensorOpsPass
           funcOp->emitError("failed to fuse multi-use producers");
           return signalPassFailure();
         }
-        if (numOfFusableCandidates.value() == 0) break;
+        if (numOfFusableCandidates.value() == 0)
+          break;
       }
     }
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse,
@@ -422,7 +438,7 @@ createFusionOfTensorOpsPass(bool fuseMultiUse,
                                                  multiUseFusionIteration);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

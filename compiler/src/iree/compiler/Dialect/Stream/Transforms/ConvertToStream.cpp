@@ -115,14 +115,16 @@ static Value buildTensorExportOp(Location loc, Value sourceValue,
 // Returns true if |op| has tensor I/O that is not yet imported/exported using
 // the stream ops that capture encodings and shapes.
 static bool doesOperationNeedWrapping(Operation *op) {
-  return llvm::any_of(
-             op->getOperands(),
-             [&](Value operand) {
-               if (!llvm::isa<TensorType>(operand.getType())) return false;
-               return !isa_and_nonnull<TensorExportOp>(operand.getDefiningOp());
-             }) ||
+  return llvm::any_of(op->getOperands(),
+                      [&](Value operand) {
+                        if (!llvm::isa<TensorType>(operand.getType()))
+                          return false;
+                        return !isa_and_nonnull<TensorExportOp>(
+                            operand.getDefiningOp());
+                      }) ||
          llvm::any_of(op->getResults(), [&](Value result) {
-           if (!llvm::isa<TensorType>(result.getType())) return false;
+           if (!llvm::isa<TensorType>(result.getType()))
+             return false;
            return !llvm::all_of(result.getUsers(), [&](Operation *user) {
              return isa<TensorImportOp>(user);
            });
@@ -134,10 +136,11 @@ static bool doesOperationNeedWrapping(Operation *op) {
 struct GenericResourcePattern : public ConversionPattern {
   GenericResourcePattern(MLIRContext *context, TypeConverter &converter)
       : ConversionPattern(converter, MatchAnyOpTypeTag(), 0, context) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!doesOperationNeedWrapping(op)) return failure();
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!doesOperationNeedWrapping(op))
+      return failure();
 
     // Export resources into tensor operands for the op to consume.
     SmallVector<Value> newOperands;
@@ -164,7 +167,8 @@ struct GenericResourcePattern : public ConversionPattern {
     rewriter.setInsertionPointAfter(op);
     for (auto result : op->getResults()) {
       auto tensorType = llvm::dyn_cast<TensorType>(result.getType());
-      if (!tensorType) continue;
+      if (!tensorType)
+        continue;
 
       auto dynamicDims =
           IREE::Util::buildDynamicDimsForValue(op->getLoc(), result, rewriter);
@@ -180,7 +184,7 @@ struct GenericResourcePattern : public ConversionPattern {
 };
 
 class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
@@ -265,13 +269,13 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToStreamPass() {
   return std::make_unique<ConvertToStreamPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

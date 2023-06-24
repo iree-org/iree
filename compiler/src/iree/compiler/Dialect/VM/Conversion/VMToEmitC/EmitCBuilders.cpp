@@ -16,64 +16,64 @@ namespace emitc_builders {
 namespace {
 std::string mapUnaryOperator(UnaryOperator op) {
   switch (op) {
-    case UnaryOperator::PLUS:
-      return "+";
-    case UnaryOperator::MINUS:
-      return "-";
-    case UnaryOperator::BITWISE_NOT:
-      return "~";
-    case UnaryOperator::LOGICAL_NOT:
-      return "!";
-    default:
-      llvm_unreachable("unsupported unary operator");
-      return "XXX";
+  case UnaryOperator::PLUS:
+    return "+";
+  case UnaryOperator::MINUS:
+    return "-";
+  case UnaryOperator::BITWISE_NOT:
+    return "~";
+  case UnaryOperator::LOGICAL_NOT:
+    return "!";
+  default:
+    llvm_unreachable("unsupported unary operator");
+    return "XXX";
   }
 }
 
 std::string mapBinaryOperator(BinaryOperator op) {
   switch (op) {
-    case BinaryOperator::ADDITION:
-      return "+";
-    case BinaryOperator::SUBTRACTION:
-      return "-";
-    case BinaryOperator::PRODUCT:
-      return "*";
-    case BinaryOperator::DIVISION:
-      return "/";
-    case BinaryOperator::REMAINDER:
-      return "%";
-    case BinaryOperator::BITWISE_AND:
-      return "&";
-    case BinaryOperator::BITWISE_OR:
-      return "|";
-    case BinaryOperator::BITWISE_XOR:
-      return "^";
-    case BinaryOperator::BITWISE_LEFT_SHIFT:
-      return "<<";
-    case BinaryOperator::BITWISE_RIGHT_SHIFT:
-      return ">>";
-    case BinaryOperator::LOGICAL_AND:
-      return "&&";
-    case BinaryOperator::LOGICAL_OR:
-      return "||";
-    case BinaryOperator::EQUAL_TO:
-      return "==";
-    case BinaryOperator::NOT_EQUAL_TO:
-      return "!=";
-    case BinaryOperator::LESS_THAN:
-      return "<";
-    case BinaryOperator::GREATER_THAN:
-      return ">";
-    case BinaryOperator::LESS_THAN_OR_EQUAL:
-      return "<=";
-    case BinaryOperator::GREATER_THAN_OR_EQUAL:
-      return ">=";
-    default:
-      llvm_unreachable("unsupported binary operator");
-      return "XXX";
+  case BinaryOperator::ADDITION:
+    return "+";
+  case BinaryOperator::SUBTRACTION:
+    return "-";
+  case BinaryOperator::PRODUCT:
+    return "*";
+  case BinaryOperator::DIVISION:
+    return "/";
+  case BinaryOperator::REMAINDER:
+    return "%";
+  case BinaryOperator::BITWISE_AND:
+    return "&";
+  case BinaryOperator::BITWISE_OR:
+    return "|";
+  case BinaryOperator::BITWISE_XOR:
+    return "^";
+  case BinaryOperator::BITWISE_LEFT_SHIFT:
+    return "<<";
+  case BinaryOperator::BITWISE_RIGHT_SHIFT:
+    return ">>";
+  case BinaryOperator::LOGICAL_AND:
+    return "&&";
+  case BinaryOperator::LOGICAL_OR:
+    return "||";
+  case BinaryOperator::EQUAL_TO:
+    return "==";
+  case BinaryOperator::NOT_EQUAL_TO:
+    return "!=";
+  case BinaryOperator::LESS_THAN:
+    return "<";
+  case BinaryOperator::GREATER_THAN:
+    return ">";
+  case BinaryOperator::LESS_THAN_OR_EQUAL:
+    return "<=";
+  case BinaryOperator::GREATER_THAN_OR_EQUAL:
+    return ">=";
+  default:
+    llvm_unreachable("unsupported binary operator");
+    return "XXX";
   }
 }
-}  // namespace
+} // namespace
 
 Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
                     Value operand, Type resultType) {
@@ -414,6 +414,6 @@ void ireeVmRefRelease(OpBuilder builder, Location location, Value operand) {
       /*operands=*/ArrayRef<Value>{operand});
 }
 
-}  // namespace emitc_builders
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace emitc_builders
+} // namespace iree_compiler
+} // namespace mlir

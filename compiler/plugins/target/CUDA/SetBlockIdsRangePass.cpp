@@ -25,7 +25,8 @@ using namespace llvm;
 // passed-in call instruction.
 static bool addRangeMetadata(uint64_t Low, uint64_t High, CallInst *C) {
   // This call already has range metadata, nothing to do.
-  if (C->getMetadata(LLVMContext::MD_range)) return false;
+  if (C->getMetadata(LLVMContext::MD_range))
+    return false;
 
   LLVMContext &Context = C->getParent()->getContext();
   IntegerType *Int32Ty = Type::getInt32Ty(Context);
@@ -47,53 +48,55 @@ static bool runOnFunction(Function &F,
   unsigned MaxGridSizeZ = 0xffff;
   for (Instruction &I : instructions(F)) {
     CallInst *Call = dyn_cast<CallInst>(&I);
-    if (!Call) continue;
+    if (!Call)
+      continue;
     Function *Callee = Call->getCalledFunction();
-    if (!Callee) continue;
+    if (!Callee)
+      continue;
     switch (Callee->getIntrinsicID()) {
-      // Index within block
-      case Intrinsic::nvvm_read_ptx_sreg_tid_x:
-        Changed |= addRangeMetadata(0, maxWorkgroupSize[0], Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_tid_y:
-        Changed |= addRangeMetadata(0, maxWorkgroupSize[1], Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_tid_z:
-        Changed |= addRangeMetadata(0, maxWorkgroupSize[2], Call);
-        break;
+    // Index within block
+    case Intrinsic::nvvm_read_ptx_sreg_tid_x:
+      Changed |= addRangeMetadata(0, maxWorkgroupSize[0], Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_tid_y:
+      Changed |= addRangeMetadata(0, maxWorkgroupSize[1], Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_tid_z:
+      Changed |= addRangeMetadata(0, maxWorkgroupSize[2], Call);
+      break;
 
-      // Block size
-      case Intrinsic::nvvm_read_ptx_sreg_ntid_x:
-        Changed |= addRangeMetadata(1, maxWorkgroupSize[0] + 1, Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_ntid_y:
-        Changed |= addRangeMetadata(1, maxWorkgroupSize[1] + 1, Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_ntid_z:
-        Changed |= addRangeMetadata(1, maxWorkgroupSize[2] + 1, Call);
-        break;
+    // Block size
+    case Intrinsic::nvvm_read_ptx_sreg_ntid_x:
+      Changed |= addRangeMetadata(1, maxWorkgroupSize[0] + 1, Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_ntid_y:
+      Changed |= addRangeMetadata(1, maxWorkgroupSize[1] + 1, Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_ntid_z:
+      Changed |= addRangeMetadata(1, maxWorkgroupSize[2] + 1, Call);
+      break;
 
-      // Index within grid
-      case Intrinsic::nvvm_read_ptx_sreg_ctaid_x:
-        Changed |= addRangeMetadata(0, MaxGridSizeX, Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_ctaid_y:
-        Changed |= addRangeMetadata(0, MaxGridSizeY, Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_ctaid_z:
-        Changed |= addRangeMetadata(0, MaxGridSizeZ, Call);
-        break;
+    // Index within grid
+    case Intrinsic::nvvm_read_ptx_sreg_ctaid_x:
+      Changed |= addRangeMetadata(0, MaxGridSizeX, Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_ctaid_y:
+      Changed |= addRangeMetadata(0, MaxGridSizeY, Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_ctaid_z:
+      Changed |= addRangeMetadata(0, MaxGridSizeZ, Call);
+      break;
 
-      // Grid size
-      case Intrinsic::nvvm_read_ptx_sreg_nctaid_x:
-        Changed |= addRangeMetadata(1, MaxGridSizeX + 1, Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_nctaid_y:
-        Changed |= addRangeMetadata(1, MaxGridSizeY + 1, Call);
-        break;
-      case Intrinsic::nvvm_read_ptx_sreg_nctaid_z:
-        Changed |= addRangeMetadata(1, MaxGridSizeZ + 1, Call);
-        break;
+    // Grid size
+    case Intrinsic::nvvm_read_ptx_sreg_nctaid_x:
+      Changed |= addRangeMetadata(1, MaxGridSizeX + 1, Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_nctaid_y:
+      Changed |= addRangeMetadata(1, MaxGridSizeY + 1, Call);
+      break;
+    case Intrinsic::nvvm_read_ptx_sreg_nctaid_z:
+      Changed |= addRangeMetadata(1, MaxGridSizeZ + 1, Call);
+      break;
     }
   }
   return Changed;

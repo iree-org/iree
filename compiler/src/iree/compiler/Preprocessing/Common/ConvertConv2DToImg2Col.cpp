@@ -30,13 +30,15 @@ static bool hasAllOneValues(DenseIntElementsAttr attr) {
 
 static Value createAdd(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt) return builder.create<arith::AddIOp>(loc, x, y);
+  if (isInt)
+    return builder.create<arith::AddIOp>(loc, x, y);
   return builder.create<arith::AddFOp>(loc, x, y);
 }
 
 static Value createMul(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt) return builder.create<arith::MulIOp>(loc, x, y);
+  if (isInt)
+    return builder.create<arith::MulIOp>(loc, x, y);
   return builder.create<arith::MulFOp>(loc, x, y);
 }
 
@@ -77,7 +79,7 @@ namespace {
 // multplication.
 class ConvertConv2DNhwcHwcf final
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
@@ -91,7 +93,8 @@ class ConvertConv2DNhwcHwcf final
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -228,7 +231,7 @@ class ConvertConv2DNhwcHwcf final
 // is a batched matrix-vector product.
 class ConvertDepthwiseConv2DNhwcHwc final
     : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
- public:
+public:
   using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
@@ -245,7 +248,8 @@ class ConvertDepthwiseConv2DNhwcHwc final
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     auto loc = convOp.getLoc();
 
@@ -384,7 +388,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
 // (i.e. (D, C x Kh x Kw) * (C x Kh x Kw, Ho x Wo))
 class ConvertConv2DNchwFchw final
     : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
@@ -398,7 +402,8 @@ class ConvertConv2DNchwFchw final
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -545,12 +550,12 @@ struct ConvertConv2DToImg2ColPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass() {
   return std::make_unique<ConvertConv2DToImg2ColPass>();
 }
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

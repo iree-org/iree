@@ -77,7 +77,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 //
 // TODO(#7389): make this an abstract interface and hide the IREE details.
 class Explorer {
- public:
+public:
   Explorer(Operation *rootOp, TraversalAction defaultAction);
   ~Explorer();
 
@@ -214,9 +214,9 @@ class Explorer {
 
   // Walks all of the call ops calling into the given |callableOp|.
   // May be incomplete if there are indirect calls in the program.
-  TraversalResult walkIncomingCalls(
-      CallableOpInterface callableOp,
-      std::function<WalkResult(CallOpInterface)> fn);
+  TraversalResult
+  walkIncomingCalls(CallableOpInterface callableOp,
+                    std::function<WalkResult(CallOpInterface)> fn);
 
   // Walks all return-like (or region terminators to parent) ops in |parentOp|.
   // The operations enumerated will be either ReturnLike or implement
@@ -307,7 +307,7 @@ class Explorer {
   // deduplication on the owner of the use.
   TraversalResult walkTransitiveUsers(Value value, OperationWalkFn fn);
 
- private:
+private:
   // Maps callee callable region -> call sites.
   using InverseCallGraph = DenseMap<Region *, SmallVector<CallOpInterface>>;
 
@@ -337,7 +337,7 @@ class Explorer {
   ModuleAnalysisManager analysisManager;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_EXPLORER_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_EXPLORER_H_

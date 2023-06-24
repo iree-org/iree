@@ -20,7 +20,7 @@ namespace {
 
 class TestFloatRangeAnalysisPass
     : public TestFloatRangeAnalysisBase<TestFloatRangeAnalysisPass> {
- public:
+public:
   void runOnOperation() override {
     Explorer explorer(getOperation(), TraversalAction::SHALLOW);
     llvm::BumpPtrAllocator allocator;
@@ -47,21 +47,20 @@ class TestFloatRangeAnalysisPass
 
     // Update.
     for (auto &it : queryOps) {
-      it.first->setAttr(
-          "analysis",
-          StringAttr::get(&getContext(),
-                          it.second->getAsStr(solver.getAsmState())));
+      it.first->setAttr("analysis", StringAttr::get(&getContext(),
+                                                    it.second->getAsStr(
+                                                        solver.getAsmState())));
     }
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass() {
   return std::make_unique<TestFloatRangeAnalysisPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -19,10 +19,10 @@ struct SetBlockIdsRangePass : PassInfoMixin<SetBlockIdsRangePass> {
       : maxWorkgroupSize(maxWorkgroupSize) {}
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 
- private:
+private:
   std::array<int32_t, 3> maxWorkgroupSize;
 };
 
-}  // namespace llvm
+} // namespace llvm
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_CUDA_PASS_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_CUDA_PASS_H_

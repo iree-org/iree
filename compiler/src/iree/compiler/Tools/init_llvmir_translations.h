@@ -26,7 +26,7 @@ inline void registerLLVMIRTranslations(DialectRegistry &registry) {
   mlir::registerArmNeonDialectTranslation(registry);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_
+#endif // IREE_COMPILER_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_

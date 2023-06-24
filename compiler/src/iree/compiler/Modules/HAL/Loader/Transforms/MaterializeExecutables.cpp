@@ -116,7 +116,7 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
     Value binaryData = loadBuilder.create<IREE::Util::BufferConstantOp>(
         binaryLoc, binaryOp.getNameAttr(), binaryOp.getData(), alignmentAttr,
         binaryOp.getMimeTypeAttr());
-    SmallVector<Value> constants;  // TBD
+    SmallVector<Value> constants; // TBD
     Value executable = loadBuilder.create<IREE::HAL::Loader::ExecutableLoadOp>(
         binaryLoc, executableType, binaryOp.getFormatAttr(), binaryData,
         constants);
@@ -131,7 +131,7 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
 // Runs conversion with registered input dialects.
 class MaterializeExecutablesPass
     : public MaterializeExecutablesBase<MaterializeExecutablesPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::HAL::Loader::HALLoaderDialect, arith::ArithDialect,
@@ -166,8 +166,8 @@ createMaterializeExecutablesPass() {
   return std::make_unique<MaterializeExecutablesPass>();
 }
 
-}  // namespace Loader
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Loader
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

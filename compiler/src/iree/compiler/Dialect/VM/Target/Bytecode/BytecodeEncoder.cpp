@@ -25,7 +25,7 @@ namespace {
 // representation. Always generate this from source in tooling and never check
 // in any emitted files!
 class V0BytecodeEncoder : public BytecodeEncoder {
- public:
+public:
   V0BytecodeEncoder(llvm::DenseMap<Type, int> *typeTable,
                     RegisterAllocation *registerAllocation)
       : typeTable_(typeTable), registerAllocation_(registerAllocation) {}
@@ -107,39 +107,39 @@ class V0BytecodeEncoder : public BytecodeEncoder {
       uint64_t limitedValue =
           integerAttr.getValue().extractBitsAsZExtValue(bitWidth, 0);
       switch (bitWidth) {
-        case 8:
-          return writeUint8(static_cast<uint8_t>(limitedValue));
-        case 16:
-          return writeUint16(static_cast<uint16_t>(limitedValue));
-        case 32:
-          return writeUint32(static_cast<uint32_t>(limitedValue));
-        case 64:
-          return writeUint64(static_cast<uint64_t>(limitedValue));
-        default:
-          return currentOp_->emitOpError()
-                 << "attribute of bitwidth " << bitWidth << " not supported";
+      case 8:
+        return writeUint8(static_cast<uint8_t>(limitedValue));
+      case 16:
+        return writeUint16(static_cast<uint16_t>(limitedValue));
+      case 32:
+        return writeUint32(static_cast<uint32_t>(limitedValue));
+      case 64:
+        return writeUint64(static_cast<uint64_t>(limitedValue));
+      default:
+        return currentOp_->emitOpError()
+               << "attribute of bitwidth " << bitWidth << " not supported";
       }
     } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
       switch (bitWidth) {
-        case 32: {
-          union {
-            float f32;
-            uint32_t u32;
-          } value;
-          value.f32 = floatAttr.getValue().convertToFloat();
-          return writeUint32(value.u32);
-        }
-        case 64: {
-          union {
-            double f64;
-            uint64_t u64;
-          } value;
-          value.f64 = floatAttr.getValue().convertToDouble();
-          return writeUint64(value.u64);
-        }
-        default:
-          return currentOp_->emitOpError()
-                 << "attribute of bitwidth " << bitWidth << " not supported";
+      case 32: {
+        union {
+          float f32;
+          uint32_t u32;
+        } value;
+        value.f32 = floatAttr.getValue().convertToFloat();
+        return writeUint32(value.u32);
+      }
+      case 64: {
+        union {
+          double f64;
+          uint64_t u64;
+        } value;
+        value.f64 = floatAttr.getValue().convertToDouble();
+        return writeUint64(value.u64);
+      }
+      default:
+        return currentOp_->emitOpError()
+               << "attribute of bitwidth " << bitWidth << " not supported";
       }
     } else {
       return currentOp_->emitOpError()
@@ -270,13 +270,15 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   LogicalResult ensureAlignment(size_t alignment) {
     size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
     size_t padding = paddedSize - bytecode_.size();
-    if (padding == 0) return success();
+    if (padding == 0)
+      return success();
     static const uint8_t kZeros[32] = {0};
-    if (padding > sizeof(kZeros)) return failure();
+    if (padding > sizeof(kZeros))
+      return failure();
     return writeBytes(kZeros, padding);
   }
 
- private:
+private:
   // TODO(benvanik): replace this with something not using an ever-expanding
   // vector. I'm sure LLVM has something.
 
@@ -340,7 +342,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   std::vector<std::pair<Block *, size_t>> blockOffsetFixups_;
 };
 
-}  // namespace
+} // namespace
 
 // static
 std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
@@ -425,7 +427,7 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   return result;
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

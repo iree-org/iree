@@ -92,7 +92,7 @@ struct StripResourceConversionCastPattern
   }
 };
 
-}  // namespace
+} // namespace
 
 StreamDialect::StreamDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<StreamDialect>()) {
@@ -128,7 +128,7 @@ Operation *StreamDialect::materializeConstant(OpBuilder &builder,
   return nullptr;
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

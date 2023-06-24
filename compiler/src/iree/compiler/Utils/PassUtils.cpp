@@ -25,5 +25,5 @@ void signalFixedPointModified(Operation *rootOp) {
   rootOp->setAttr("iree.fixedpoint.modified", UnitAttr::get(context));
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

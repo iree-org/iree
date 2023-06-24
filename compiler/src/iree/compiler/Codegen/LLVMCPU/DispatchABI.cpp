@@ -111,27 +111,27 @@ ExecutableLibraryDI::ExecutableLibraryDI(LLVMTypeConverter *typeConverter)
       "int64_t", LLVM::DIBasicTypeAttr::get(
                      context, llvm::dwarf::DW_TAG_base_type, "long long int",
                      /*sizeInBits=*/64, llvm::dwarf::DW_ATE_signed));
-  uint64T = getTypedefOf(
-      "uint64_t",
-      LLVM::DIBasicTypeAttr::get(
-          context, llvm::dwarf::DW_TAG_base_type, "long long unsigned int",
-          /*sizeInBits=*/64, llvm::dwarf::DW_ATE_unsigned));
+  uint64T = getTypedefOf("uint64_t",
+                         LLVM::DIBasicTypeAttr::get(
+                             context, llvm::dwarf::DW_TAG_base_type,
+                             "long long unsigned int",
+                             /*sizeInBits=*/64, llvm::dwarf::DW_ATE_unsigned));
   intptrT =
       getTypedefOf("intptr_t", ptrBitwidth == 32 ? getInt32T() : getInt64T());
   sizeT =
       getTypedefOf("size_t", ptrBitwidth == 32 ? getUint32T() : getUint64T());
 }
 
-LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getConstOf(
-    LLVM::DITypeAttr typeAttr) {
+LLVM::DIDerivedTypeAttr
+ExecutableLibraryDI::getConstOf(LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_const_type,
       /*name=*/nullptr, typeAttr, /*sizeInBits=*/0, /*alignInBits=*/0,
       /*offsetInBits=*/0);
 }
 
-LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getPtrOf(
-    LLVM::DITypeAttr typeAttr) {
+LLVM::DIDerivedTypeAttr
+ExecutableLibraryDI::getPtrOf(LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_pointer_type,
       /*name=*/nullptr, typeAttr, /*sizeInBits=*/ptrBitwidth,
@@ -139,8 +139,8 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getPtrOf(
       /*offsetInBits=*/0);
 }
 
-LLVM::DICompositeTypeAttr ExecutableLibraryDI::getArrayOf(
-    LLVM::DITypeAttr typeAttr, int64_t count) {
+LLVM::DICompositeTypeAttr
+ExecutableLibraryDI::getArrayOf(LLVM::DITypeAttr typeAttr, int64_t count) {
   return LLVM::DICompositeTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_array_type,
       /*name=*/builder.getStringAttr(""), fileAttr,
@@ -156,16 +156,17 @@ LLVM::DICompositeTypeAttr ExecutableLibraryDI::getArrayOf(
       });
 }
 
-LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getTypedefOf(
-    StringRef name, LLVM::DITypeAttr typeAttr) {
+LLVM::DIDerivedTypeAttr
+ExecutableLibraryDI::getTypedefOf(StringRef name, LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_typedef,
       builder.getStringAttr(name), typeAttr, /*sizeInBits=*/0,
       /*alignInBits=*/0, /*offsetInBits=*/0);
 }
 
-LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getMemberOf(
-    StringRef name, LLVM::DITypeAttr typeAttr, unsigned *offsetInBits) {
+LLVM::DIDerivedTypeAttr
+ExecutableLibraryDI::getMemberOf(StringRef name, LLVM::DITypeAttr typeAttr,
+                                 unsigned *offsetInBits) {
   unsigned memberOffsetInBits = *offsetInBits;
   unsigned memberSizeInBits = getDITypeSizeInBits(typeAttr);
   *offsetInBits += memberSizeInBits;
@@ -182,21 +183,21 @@ LLVM::DITypeAttr ExecutableLibraryDI::getBasicType(Type type) {
       .Case([&](IntegerType integerType) -> LLVM::DITypeAttr {
         unsigned bitWidth = integerType.getIntOrFloatBitWidth();
         switch (bitWidth) {
-          case 8:
-            return integerType.isUnsigned() ? getUint8T() : getInt8T();
-          case 16:
-            return integerType.isUnsigned() ? getUint16T() : getInt16T();
-          case 32:
-            return integerType.isUnsigned() ? getUint32T() : getInt32T();
-          case 64:
-            return integerType.isUnsigned() ? getUint64T() : getInt64T();
-          default:
-            return LLVM::DIBasicTypeAttr::get(
-                builder.getContext(), llvm::dwarf::DW_TAG_base_type,
-                StringRef("int") + std::to_string(bitWidth),
-                /*sizeInBits=*/bitWidth,
-                integerType.isUnsigned() ? llvm::dwarf::DW_ATE_unsigned
-                                         : llvm::dwarf::DW_ATE_signed);
+        case 8:
+          return integerType.isUnsigned() ? getUint8T() : getInt8T();
+        case 16:
+          return integerType.isUnsigned() ? getUint16T() : getInt16T();
+        case 32:
+          return integerType.isUnsigned() ? getUint32T() : getInt32T();
+        case 64:
+          return integerType.isUnsigned() ? getUint64T() : getInt64T();
+        default:
+          return LLVM::DIBasicTypeAttr::get(
+              builder.getContext(), llvm::dwarf::DW_TAG_base_type,
+              StringRef("int") + std::to_string(bitWidth),
+              /*sizeInBits=*/bitWidth,
+              integerType.isUnsigned() ? llvm::dwarf::DW_ATE_unsigned
+                                       : llvm::dwarf::DW_ATE_signed);
         }
       })
       .Case([&](FloatType floatType) -> LLVM::DITypeAttr {
@@ -312,12 +313,14 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
 llvm::sys::Mutex HALDispatchABI::sMutex;
 
 // static
-LLVM::LLVMStructType HALDispatchABI::getProcessorType(
-    MLIRContext *context, LLVMTypeConverter *typeConverter) {
+LLVM::LLVMStructType
+HALDispatchABI::getProcessorType(MLIRContext *context,
+                                 LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType =
       LLVM::LLVMStructType::getIdentified(context, "iree_hal_processor_v0_t");
-  if (structType.isInitialized()) return structType;
+  if (structType.isInitialized())
+    return structType;
 
   auto uint64Type = IntegerType::get(context, 64);
   SmallVector<Type> fieldTypes;
@@ -335,13 +338,15 @@ LLVM::LLVMStructType HALDispatchABI::getProcessorType(
 }
 
 // static
-LLVM::LLVMStructType HALDispatchABI::getEnvironmentType(
-    MLIRContext *context, LLVMTypeConverter *typeConverter,
-    LLVM::LLVMStructType processorType) {
+LLVM::LLVMStructType
+HALDispatchABI::getEnvironmentType(MLIRContext *context,
+                                   LLVMTypeConverter *typeConverter,
+                                   LLVM::LLVMStructType processorType) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_environment_v0_t");
-  if (structType.isInitialized()) return structType;
+  if (structType.isInitialized())
+    return structType;
 
   auto uint32Type = IntegerType::get(context, 32);
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
@@ -371,12 +376,14 @@ LLVM::LLVMStructType HALDispatchABI::getEnvironmentType(
 }
 
 // static
-LLVM::LLVMStructType HALDispatchABI::getDispatchStateType(
-    MLIRContext *context, LLVMTypeConverter *typeConverter) {
+LLVM::LLVMStructType
+HALDispatchABI::getDispatchStateType(MLIRContext *context,
+                                     LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_dispatch_state_v0_t");
-  if (structType.isInitialized()) return structType;
+  if (structType.isInitialized())
+    return structType;
 
   auto uint8Type = IntegerType::get(context, 8);
   auto uint16Type = IntegerType::get(context, 16);
@@ -423,12 +430,14 @@ LLVM::LLVMStructType HALDispatchABI::getDispatchStateType(
 }
 
 // static
-LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
-    MLIRContext *context, LLVMTypeConverter *typeConverter) {
+LLVM::LLVMStructType
+HALDispatchABI::getWorkgroupStateType(MLIRContext *context,
+                                      LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_workgroup_state_v0_t");
-  if (structType.isInitialized()) return structType;
+  if (structType.isInitialized())
+    return structType;
 
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
@@ -462,8 +471,9 @@ LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
 }
 
 // static
-SmallVector<Type, 5> HALDispatchABI::getInputTypes(
-    MLIRContext *context, LLVMTypeConverter *typeConverter) {
+SmallVector<Type, 5>
+HALDispatchABI::getInputTypes(MLIRContext *context,
+                              LLVMTypeConverter *typeConverter) {
   return SmallVector<Type, 5>{
       // const iree_hal_executable_environment_v0_t* IREE_RESTRICT
       //   environment
@@ -478,9 +488,9 @@ SmallVector<Type, 5> HALDispatchABI::getInputTypes(
 }
 
 // static
-LLVM::DISubprogramAttr HALDispatchABI::buildScopeAttr(
-    mlir::ModuleOp moduleOp, StringRef funcName,
-    LLVMTypeConverter *typeConverter) {
+LLVM::DISubprogramAttr
+HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
+                               LLVMTypeConverter *typeConverter) {
   auto *context = &typeConverter->getContext();
   Builder builder(context);
 
@@ -550,7 +560,8 @@ static StringRef getDimName(int32_t dim) {
 // the ops if MLIR or LLVM is likely to reject them.
 static bool isLocationValidForDI(Location loc) {
   // Unknown locations are passed as null and DI doesn't like that.
-  if (llvm::isa<UnknownLoc>(loc)) return false;
+  if (llvm::isa<UnknownLoc>(loc))
+    return false;
   // MLIR currently can't handle name-only locations. We do this check to ensure
   // there's at least one real location MLIR can pass along.
   if (auto callLoc = llvm::dyn_cast<CallSiteLoc>(loc)) {
@@ -570,9 +581,11 @@ static bool isLocationValidForDI(Location loc) {
 
 static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
                         LLVM::DITypeAttr type, OpBuilder &builder) {
-  if (!clVerboseDebugInfo) return value;
+  if (!clVerboseDebugInfo)
+    return value;
   auto loc = forOp->getLoc();
-  if (!isLocationValidForDI(loc)) return value;
+  if (!isLocationValidForDI(loc))
+    return value;
   auto scopeAttr = getLocalScopeAttr(forOp);
   builder.create<LLVM::DbgValueOp>(
       loc, value,
@@ -585,9 +598,11 @@ static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
 
 static Value buildValueDI(Operation *forOp, Value value, Twine name,
                           LLVM::DITypeAttr type, OpBuilder &builder) {
-  if (!clVerboseDebugInfo) return value;
+  if (!clVerboseDebugInfo)
+    return value;
   auto loc = forOp->getLoc();
-  if (!isLocationValidForDI(loc)) return value;
+  if (!isLocationValidForDI(loc))
+    return value;
   auto scopeAttr = getLocalScopeAttr(forOp);
   builder.create<LLVM::DbgValueOp>(
       loc, value,
@@ -683,10 +698,10 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
   Value constantValue =
       builder.create<LLVM::LoadOp>(loc, pushConstantType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
-  return buildValueDI(
-      forOp, resultValue,
-      StringRef("push_constant[") + std::to_string(offset) + "]",
-      di.getBasicType(resultType), builder);
+  return buildValueDI(forOp, resultValue,
+                      StringRef("push_constant[") + std::to_string(offset) +
+                          "]",
+                      di.getBasicType(resultType), builder);
 }
 
 Value HALDispatchABI::loadBindingCount(Operation *forOp, OpBuilder &builder) {
@@ -711,10 +726,10 @@ Value HALDispatchABI::loadBindingPtr(Operation *forOp, int64_t ordinal,
   auto elementValue = builder.create<LLVM::LoadOp>(
       loc, mlir::LLVM::LLVMPointerType::get(builder.getContext()),
       elementPtrValue);
-  return buildValueDI(
-      forOp, elementValue,
-      StringRef("binding_ptrs[") + std::to_string(ordinal) + "]",
-      di.getPtrOf(di.getUint8T()), builder);
+  return buildValueDI(forOp, elementValue,
+                      StringRef("binding_ptrs[") + std::to_string(ordinal) +
+                          "]",
+                      di.getPtrOf(di.getUint8T()), builder);
 }
 
 Value HALDispatchABI::loadBindingLength(Operation *forOp, int64_t ordinal,
@@ -728,10 +743,10 @@ Value HALDispatchABI::loadBindingLength(Operation *forOp, int64_t ordinal,
       LLVM::GEPArg(int32_t(ordinal)));
   auto elementValue =
       builder.create<LLVM::LoadOp>(loc, indexType, elementPtrValue);
-  return buildValueDI(
-      forOp, elementValue,
-      StringRef("binding_lengths[") + std::to_string(ordinal) + "]",
-      di.getSizeT(), builder);
+  return buildValueDI(forOp, elementValue,
+                      StringRef("binding_lengths[") + std::to_string(ordinal) +
+                          "]",
+                      di.getSizeT(), builder);
 }
 
 MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
@@ -869,10 +884,10 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
     }
     std::string targetArchUppercase =
         StringRef(getIreeArchNameForTargetTriple(targetTriple.value())).upper();
-#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
-  if (targetArchUppercase == #arch) {                                         \
-    assert(field_index == 0);                                                 \
-    featureToBitPattern[llvm_name] = 1ull << bit_pos;                         \
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name)  \
+  if (targetArchUppercase == #arch) {                                          \
+    assert(field_index == 0);                                                  \
+    featureToBitPattern[llvm_name] = 1ull << bit_pos;                          \
   }
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT
@@ -965,10 +980,10 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, int64_t index,
   SmallVector<int64_t, 1> position = {index};
   Value dataValue = builder.create<LLVM::ExtractValueOp>(
       forOp->getLoc(), dataArrayValue, position);
-  return buildValueDI(
-      forOp, dataValue,
-      StringRef("processor_data[") + std::to_string(index) + "]",
-      di.getBasicType(dataValue.getType()), builder);
+  return buildValueDI(forOp, dataValue,
+                      StringRef("processor_data[") + std::to_string(index) +
+                          "]",
+                      di.getBasicType(dataValue.getType()), builder);
 }
 
 Value HALDispatchABI::loadExecutableConstant(Operation *forOp, StringRef key,
@@ -1098,8 +1113,9 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
 }
 
 // static
-std::optional<Type> HALDispatchABI::getParameterStructType(
-    TypeRange resultTypes, ValueRange args, TypeRange extraFieldsTypes) {
+std::optional<Type>
+HALDispatchABI::getParameterStructType(TypeRange resultTypes, ValueRange args,
+                                       TypeRange extraFieldsTypes) {
   // Struct types are ordered [results..., args...].
   SmallVector<Type> types(resultTypes);
   types.reserve(resultTypes.size() + args.size());
@@ -1115,9 +1131,10 @@ std::optional<Type> HALDispatchABI::getParameterStructType(
 }
 
 // static
-std::tuple<Type, Value> HALDispatchABI::packIntoParameterStruct(
-    Operation *forOp, TypeRange resultTypes, ValueRange args,
-    ValueRange extraFields, OpBuilder &builder) {
+std::tuple<Type, Value>
+HALDispatchABI::packIntoParameterStruct(Operation *forOp, TypeRange resultTypes,
+                                        ValueRange args, ValueRange extraFields,
+                                        OpBuilder &builder) {
   Location loc = forOp->getLoc();
   MLIRContext *context = builder.getContext();
 
@@ -1179,24 +1196,24 @@ FailureOr<LLVM::LLVMFunctionType> HALDispatchABI::getABIFunctionType(
   }
 
   switch (cConv) {
-    case IREE::HAL::CallingConvention::Default: {
-      if (resultTypes.size() > 1) {
-        return forOp->emitOpError(
-            "Cannot have multiple return values for function");
-      }
-      Type resultType = resultTypes.size() == 1
-                            ? resultTypes[0]
-                            : LLVM::LLVMVoidType::get(context);
-      SmallVector<Type> allArgTypes = argTypes;
-      allArgTypes.append(extraFieldsTypes.begin(), extraFieldsTypes.end());
-      return LLVM::LLVMFunctionType::get(resultType, allArgTypes);
+  case IREE::HAL::CallingConvention::Default: {
+    if (resultTypes.size() > 1) {
+      return forOp->emitOpError(
+          "Cannot have multiple return values for function");
     }
-    case IREE::HAL::CallingConvention::ParameterStruct:
-      return LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(context),
-                                         LLVM::LLVMPointerType::get(context));
-    default:
-      llvm_unreachable("unhandled calling convention");
-      return failure();
+    Type resultType = resultTypes.size() == 1
+                          ? resultTypes[0]
+                          : LLVM::LLVMVoidType::get(context);
+    SmallVector<Type> allArgTypes = argTypes;
+    allArgTypes.append(extraFieldsTypes.begin(), extraFieldsTypes.end());
+    return LLVM::LLVMFunctionType::get(resultType, allArgTypes);
+  }
+  case IREE::HAL::CallingConvention::ParameterStruct:
+    return LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(context),
+                                       LLVM::LLVMPointerType::get(context));
+  default:
+    llvm_unreachable("unhandled calling convention");
+    return failure();
   }
 }
 
@@ -1347,7 +1364,8 @@ Value HALDispatchABI::getIndexValue(Location loc, int64_t value,
 Value HALDispatchABI::castValueToType(Location loc, Value value,
                                       Type resultType, OpBuilder &builder) {
   // NOTE: we should handle more cases here (and proper sign extension).
-  if (value.getType() == resultType) return value;
+  if (value.getType() == resultType)
+    return value;
   return builder.createOrFold<LLVM::ZExtOp>(loc, resultType, value);
 }
 
@@ -1424,5 +1442,5 @@ Value HALDispatchABI::getExtraField(Operation *forOp, StringRef extraField,
   }
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

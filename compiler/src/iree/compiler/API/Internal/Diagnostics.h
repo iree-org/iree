@@ -25,7 +25,7 @@ namespace mlir::iree_compiler::embed {
 /// that class relies on various low level properties of the stream to enable
 /// color, extract source lines, etc.
 class FormattingDiagnosticHandler {
- public:
+public:
   using Callback = std::function<void(DiagnosticSeverity severity,
                                       std::string_view message)>;
 
@@ -34,12 +34,12 @@ class FormattingDiagnosticHandler {
 
   LogicalResult emit(Diagnostic &diag);
 
- private:
+private:
   DiagnosticEngine::HandlerID handlerID;
   MLIRContext *ctx;
   Callback callback;
 };
 
-}  // namespace mlir::iree_compiler::embed
+} // namespace mlir::iree_compiler::embed
 
-#endif  // IREE_COMPILER_API_INTERNAL_DIAGNOSTICS_H
+#endif // IREE_COMPILER_API_INTERNAL_DIAGNOSTICS_H

@@ -122,8 +122,8 @@ Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
 
 void ireeVmRefRelease(OpBuilder builder, Location location, Value operand);
 
-}  // namespace emitc_builders
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace emitc_builders
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_

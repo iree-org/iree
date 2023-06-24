@@ -55,9 +55,11 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     Value source = transferReadOp.getSource();
     MemRefType sourceType = llvm::dyn_cast<MemRefType>(source.getType());
     // Contiguity check is valid on tensors only.
-    if (!sourceType) return failure();
+    if (!sourceType)
+      return failure();
     // Already 2D or lower nothing to do.
-    if (vectorType.getRank() < 3) return failure();
+    if (vectorType.getRank() < 3)
+      return failure();
     // The innermost dim is always considered non-unit as it wont be dropped
     // Therefore, we initialize `numberOfNonUnitDims` to 1 and not 0
     int numberOfNonUnitDims = 1;
@@ -85,9 +87,12 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     }
     int rankOfCollapsedVector = 2;
     // TODO: generalize this pattern, relax the requirements here.
-    if (transferReadOp.hasOutOfBoundsDim()) return failure();
-    if (!transferReadOp.getPermutationMap().isMinorIdentity()) return failure();
-    if (transferReadOp.getMask()) return failure();
+    if (transferReadOp.hasOutOfBoundsDim())
+      return failure();
+    if (!transferReadOp.getPermutationMap().isMinorIdentity())
+      return failure();
+    if (transferReadOp.getMask())
+      return failure();
     ArrayAttr newInBoundsAttr = rewriter.getBoolArrayAttr(
         SmallVector<bool>(rankOfCollapsedVector, true));
     auto newidentityMap =
@@ -130,12 +135,13 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
         loc, vectorTypeBroadcast, readCollapse);
     SmallVector<int64_t> tranposePermutation;
     for (int i = 0; i < vectorType.getRank(); i++) {
-      if (i == vectorType.getRank() - 2) continue;
+      if (i == vectorType.getRank() - 2)
+        continue;
       tranposePermutation.push_back(i);
     }
-    tranposePermutation.insert(
-        tranposePermutation.begin() + indexOfOuterNonUnitDim,
-        vectorType.getRank() - 2);
+    tranposePermutation.insert(tranposePermutation.begin() +
+                                   indexOfOuterNonUnitDim,
+                               vectorType.getRank() - 2);
     rewriter.replaceOpWithNewOp<vector::TransposeOp>(
         transferReadOp, readBroadcast, tranposePermutation);
     return success();
@@ -183,7 +189,8 @@ using LinalgPromotionPattern =
 /// Returns true if op is appropriate contract for promotion.
 static LogicalResult contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) return failure();
+  if (!linalgOp)
+    return failure();
   // Limit promotion to matmul and batch matmul, there may be generic
   // ops with more batch dimensions we didn't distribute and therefore
   // cannot find a higher bound.
@@ -193,7 +200,7 @@ static LogicalResult contractOpFilter(Operation *op) {
       linalgOp.getNumParallelLoops() <= 3);
 }
 
-}  // namespace
+} // namespace
 
 void populateVectorTransferToGPUMMAPreparationPatterns(
     RewritePatternSet &patterns) {
@@ -225,5 +232,5 @@ void populateContractPromotionPatterns(RewritePatternSet &patterns,
           .addFilter(contractOpFilter));
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -46,12 +46,13 @@ static bool isWriteOnly(ResourceAccessBitfield access) {
   return access == ResourceAccessBitfield::Write;
 }
 static bool isReadWrite(ResourceAccessBitfield access) {
-  return bitEnumContainsAny(
-      access, ResourceAccessBitfield::Read | ResourceAccessBitfield::Write);
+  return bitEnumContainsAny(access, ResourceAccessBitfield::Read |
+                                        ResourceAccessBitfield::Write);
 }
 
 static bool doesRangeOverlap(AsyncAccessRange &lhs, AsyncAccessRange &rhs) {
-  if (lhs.resource != rhs.resource) return false;
+  if (lhs.resource != rhs.resource)
+    return false;
 
   if (lhs.end == rhs.start || lhs.start == rhs.end) {
     // Adjacent but not overlapping.
@@ -156,7 +157,7 @@ bool ResourceHazardAnalysis::hasHazard(Operation *producerOp,
   return false;
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

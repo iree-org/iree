@@ -35,28 +35,31 @@ namespace iree_compiler {
 
 class TileConsumerAndFuseInputProducer final
     : public OpInterfaceRewritePattern<TilingInterface> {
- public:
+public:
   TileConsumerAndFuseInputProducer(
       MLIRContext *context, IREE::LinalgExt::LinalgTransformationFilter filter,
       bool fuseInputProducer, PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        filter(std::move(filter)),
-        fuseInputProducer(fuseInputProducer) {}
+        filter(std::move(filter)), fuseInputProducer(fuseInputProducer) {}
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, op))) return failure();
+    if (failed(filter.checkAndNotify(rewriter, op)))
+      return failure();
 
     // Make sure we have a PartitionableLoopInterface op here and query the tile
     // sizes from the partitionable loops.
     auto plOp = dyn_cast<PartitionableLoopsInterface>(*op);
-    if (!plOp) return failure();
+    if (!plOp)
+      return failure();
     auto partitionedLoops = plOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<int64_t> tileSizes = getTileSizes(op, 0);
-    if (tileSizes.empty()) return failure();
+    if (tileSizes.empty())
+      return failure();
     // Mask out non reduction dimensions.
     for (unsigned depth : partitionedLoops) {
-      if (depth < tileSizes.size()) tileSizes[depth] = 0;
+      if (depth < tileSizes.size())
+        tileSizes[depth] = 0;
     }
 
     // Make sure we have a tile size for each dimension.
@@ -86,10 +89,11 @@ class TileConsumerAndFuseInputProducer final
     return success();
   }
 
- private:
-  FailureOr<scf::SCFTilingResult> tileConsumerAndFuseInputProducer(
-      RewriterBase &rewriter, TilingInterface consumer,
-      ArrayRef<int64_t> tileSizes) const {
+private:
+  FailureOr<scf::SCFTilingResult>
+  tileConsumerAndFuseInputProducer(RewriterBase &rewriter,
+                                   TilingInterface consumer,
+                                   ArrayRef<int64_t> tileSizes) const {
     // First tile the current op as the consumer op.
     auto tilingOptions = scf::SCFTilingOptions().setTileSizes(tileSizes);
     FailureOr<scf::SCFTilingResult> tilingResult =
@@ -98,9 +102,11 @@ class TileConsumerAndFuseInputProducer final
       return rewriter.notifyMatchFailure(consumer, "failed to tile consumer");
     }
 
-    if (!fuseInputProducer) return tilingResult;
+    if (!fuseInputProducer)
+      return tilingResult;
     // If there are no generated loops generated, fusion is immaterial.
-    if (tilingResult->loops.empty()) return tilingResult;
+    if (tilingResult->loops.empty())
+      return tilingResult;
 
     // Collect immediate input operands that are fusable into the tiled loop.
     // We have tensor extract slice ops taking slices of the untiled op.
@@ -111,12 +117,15 @@ class TileConsumerAndFuseInputProducer final
     assert(tilingResult->tiledOps.size() == 1);
     Operation *tiledOp = tilingResult->tiledOps.front();
     auto dsOp = dyn_cast<DestinationStyleOpInterface>(tiledOp);
-    if (!dsOp) return tilingResult;
+    if (!dsOp)
+      return tilingResult;
     for (OpOperand *operand : dsOp.getDpsInputOperands()) {
       auto sliceOp = operand->get().getDefiningOp<tensor::ExtractSliceOp>();
-      if (!sliceOp) continue;
+      if (!sliceOp)
+        continue;
       auto linalgOp = sliceOp.getSource().getDefiningOp<linalg::LinalgOp>();
-      if (!linalgOp) continue;
+      if (!linalgOp)
+        continue;
       // Restrict to fully parallel linalg ops for now for simplicity.
       auto isParallel = [](utils::IteratorType it) {
         return linalg::isParallelIterator(it);
@@ -200,7 +209,8 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
   for (TilingInterface tilingOp : computeOps) {
     size_t numLoops = 0;
     for (auto type : tilingOp.getLoopIteratorTypes()) {
-      if (type == utils::IteratorType::parallel) numLoops++;
+      if (type == utils::IteratorType::parallel)
+        numLoops++;
     }
     IRRewriter rewriter(tilingOp->getContext());
     rewriter.setInsertionPoint(tilingOp);
@@ -209,7 +219,8 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     // If there are no dimensions to tile skip the transformation.
-    if (partitionedLoops.empty()) continue;
+    if (partitionedLoops.empty())
+      continue;
     SmallVector<OpFoldResult> numThreads(numLoops, rewriter.getIndexAttr(0));
     int64_t id = 0, threadDim = 0;
     SmallVector<Attribute> idDims;
@@ -245,7 +256,8 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
     auto consumerOp = cast<linalg::LinalgOp>(*convOp);
     IRRewriter rewriter(funcOp.getContext());
     SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
-    if (tileSizes.empty()) return success();
+    if (tileSizes.empty())
+      return success();
 
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
         scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
@@ -289,11 +301,11 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
 
 namespace {
 struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
- private:
+private:
   // Distribute the workloads to warp if true otherwise distribute to threads.
   bool distributeToWarp = false;
 
- public:
+public:
   GPUTensorTilePass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -301,7 +313,8 @@ struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
-    if (!isEntryPoint(funcOp)) return;
+    if (!isEntryPoint(funcOp))
+      return;
 
     funcOp->walk([&](linalg::LinalgOp op) {
       op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
@@ -321,7 +334,8 @@ struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
 
     // Tile to serial loops to the wg tile size to handle reductions and other
     // dimension that have not been distributed.
-    if (failed(tileReductionToSerialLoops(funcOp))) return signalPassFailure();
+    if (failed(tileReductionToSerialLoops(funcOp)))
+      return signalPassFailure();
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tile reductions:";
@@ -338,12 +352,12 @@ struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
     });
   }
 };
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTile(
-    bool distributeToWarp) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUTensorTile(bool distributeToWarp) {
   return std::make_unique<GPUTensorTilePass>(distributeToWarp);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

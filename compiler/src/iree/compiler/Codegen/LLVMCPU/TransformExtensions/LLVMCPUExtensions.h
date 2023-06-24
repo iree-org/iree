@@ -26,12 +26,12 @@ namespace transform_dialect {
 // Hook to register LLVMCPU transformations to the transform dialect.
 class LLVMCPUExtensions
     : public transform::TransformDialectExtension<LLVMCPUExtensions> {
- public:
+public:
   LLVMCPUExtensions();
 };
-}  // namespace transform_dialect
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace transform_dialect
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_TRANSFORMEXTENSIONS_LLVMCPUEXTENSIONS_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_TRANSFORMEXTENSIONS_LLVMCPUEXTENSIONS_H_

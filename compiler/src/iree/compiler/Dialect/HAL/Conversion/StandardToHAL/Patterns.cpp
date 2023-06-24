@@ -30,5 +30,5 @@ void populateStandardToHALPatterns(MLIRContext *context,
                                      typeConverter);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

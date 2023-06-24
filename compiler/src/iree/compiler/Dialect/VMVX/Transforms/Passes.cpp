@@ -91,8 +91,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addPass(createCanonicalizerPass());
 }
 
-static void buildLoopOptimizationVMVXTransformPassPipeline(
-    OpPassManager &passManager) {
+static void
+buildLoopOptimizationVMVXTransformPassPipeline(OpPassManager &passManager) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
   nestedModulePM.addNestedPass<func::FuncOp>(createLowerAffinePass());
@@ -132,7 +132,7 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h.inc"
-}  // namespace
+} // namespace
 
 void registerVMVXPasses() {
   // Generated.
@@ -146,7 +146,7 @@ void registerVMVXPasses() {
       });
 }
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

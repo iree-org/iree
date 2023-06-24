@@ -41,10 +41,11 @@ using Slice = IREE::Stream::ResourcePackOp::Slice;
 // Slice packed offset SSA values will be updated and start at the given
 // |baseOffset|. Returns |baseOffset| + the total size of the allocation
 // aligned to the requirements of |resourceConfig|.
-static Value packSlicesWithNoAliasing(
-    IREE::Stream::ResourcePackOp packOp, Value baseOffset,
-    ArrayRef<Slice> slices, IREE::Stream::ResourceConfigAttr resourceConfig,
-    IndexSet &indexSet, OpBuilder &builder) {
+static Value
+packSlicesWithNoAliasing(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
+                         ArrayRef<Slice> slices,
+                         IREE::Stream::ResourceConfigAttr resourceConfig,
+                         IndexSet &indexSet, OpBuilder &builder) {
   auto loc = packOp.getLoc();
   int64_t offsetAlignment = resourceConfig.getMinBufferOffsetAlignment();
   int64_t rangeAlignment = resourceConfig.getMinBufferRangeAlignment();
@@ -81,10 +82,11 @@ static Value packSlicesWithNoAliasing(
 // Slice packed offset SSA values will be updated and start at the given
 // |baseOffset|. Returns |baseOffset| + the total size of the allocation
 // aligned to the requirements of |resourceConfig|.
-static Value packStaticSlicesGreedily(
-    IREE::Stream::ResourcePackOp packOp, Value baseOffset,
-    ArrayRef<Slice> slices, IREE::Stream::ResourceConfigAttr resourceConfig,
-    IndexSet &indexSet, OpBuilder &builder) {
+static Value
+packStaticSlicesGreedily(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
+                         ArrayRef<Slice> slices,
+                         IREE::Stream::ResourceConfigAttr resourceConfig,
+                         IndexSet &indexSet, OpBuilder &builder) {
   int64_t offsetAlignment = resourceConfig.getMinBufferOffsetAlignment();
   int64_t rangeAlignment = resourceConfig.getMinBufferRangeAlignment();
 
@@ -123,8 +125,8 @@ static Value packStaticSlicesGreedily(
         bestOffset = alignedOffset;
         bestOffsetFit = reservation.staticOffset - currentOffset;
       }
-      currentOffset = std::max(
-          currentOffset, reservation.staticOffset + reservation.staticSize);
+      currentOffset = std::max(currentOffset, reservation.staticOffset +
+                                                  reservation.staticSize);
     }
     if (bestOffset == UNASSIGNED) {
       bestOffset = IREE::Util::align(currentOffset, offsetAlignment);
@@ -172,10 +174,11 @@ static Value packStaticSlicesGreedily(
 // Slice packed offset SSA values will be updated and start at the given
 // |baseOffset|. Returns |baseOffset| + the total size of the allocation
 // aligned to the requirements of |resourceConfig|.
-static Value packDynamicSlicesConservatively(
-    IREE::Stream::ResourcePackOp packOp, Value baseOffset,
-    ArrayRef<Slice> slices, IREE::Stream::ResourceConfigAttr resourceConfig,
-    IndexSet &indexSet, OpBuilder &builder) {
+static Value
+packDynamicSlicesConservatively(IREE::Stream::ResourcePackOp packOp,
+                                Value baseOffset, ArrayRef<Slice> slices,
+                                IREE::Stream::ResourceConfigAttr resourceConfig,
+                                IndexSet &indexSet, OpBuilder &builder) {
   auto loc = packOp.getLoc();
   int64_t offsetAlignment = resourceConfig.getMinBufferOffsetAlignment();
   int64_t rangeAlignment = resourceConfig.getMinBufferRangeAlignment();
@@ -208,7 +211,8 @@ static Value packDynamicSlicesConservatively(
       SmallVector<const Slice *> slices;
       bool intersects(const Slice &slice) const {
         for (auto *binSlice : slices) {
-          if (binSlice->intersects(slice)) return true;
+          if (binSlice->intersects(slice))
+            return true;
         }
         return false;
       }
@@ -245,7 +249,7 @@ static Value packDynamicSlicesConservatively(
 //===----------------------------------------------------------------------===//
 
 class LayoutSlicesPass : public LayoutSlicesBase<LayoutSlicesPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
@@ -316,13 +320,13 @@ class LayoutSlicesPass : public LayoutSlicesBase<LayoutSlicesPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass() {
   return std::make_unique<LayoutSlicesPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

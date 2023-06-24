@@ -15,7 +15,7 @@ namespace iree_compiler {
 class ValueLivenessTestPass
     : public PassWrapper<ValueLivenessTestPass,
                          OperationPass<IREE::VM::FuncOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "test-iree-vm-value-liveness";
   }
@@ -36,10 +36,10 @@ namespace VM {
 std::unique_ptr<OperationPass<IREE::VM::FuncOp>> createValueLivenessTestPass() {
   return std::make_unique<ValueLivenessTestPass>();
 }
-}  // namespace VM
-}  // namespace IREE
+} // namespace VM
+} // namespace IREE
 
 static PassRegistration<ValueLivenessTestPass> pass;
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
