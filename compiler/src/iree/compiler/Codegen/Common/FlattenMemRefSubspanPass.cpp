@@ -119,25 +119,27 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
 static Value createTotalElementCountValue(ShapedType type,
                                           ValueRange dynamicDims, Location loc,
                                           OpBuilder &builder) {
-  MLIRContext *context = builder.getContext();
-
   if (type.hasStaticShape()) {
     assert(dynamicDims.empty());
     return builder.create<arith::ConstantIndexOp>(loc, type.getNumElements());
   }
 
-  int dynamicDimIndex = 0;
+  int64_t numSymbols = 0;
+  int64_t constantIntValue = 1;
+
   SmallVector<OpFoldResult> dims;
   auto shape = type.getShape();
-  AffineExpr sizeExpr = getAffineConstantExpr(1, context);
   for (int i = 0; i < shape.size(); ++i) {
-    sizeExpr = sizeExpr * getAffineSymbolExpr(i, context);
     if (ShapedType::isDynamic(shape[i])) {
-      dims.push_back(dynamicDims[dynamicDimIndex++]);
+      dims.push_back(dynamicDims[numSymbols]);
+      numSymbols++;
     } else {
-      dims.push_back(
-          builder.create<arith::ConstantIndexOp>(loc, shape[i]).getValue());
+      constantIntValue *= shape[i];
     }
+  }
+  AffineExpr sizeExpr = builder.getAffineConstantExpr(constantIntValue);
+  for (int i = 0; i < numSymbols; i++) {
+    sizeExpr = sizeExpr * builder.getAffineSymbolExpr(i);
   }
   return affine::makeComposedAffineApply(builder, loc, sizeExpr, dims);
 }
@@ -351,10 +353,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
         makeStridedLinearLayoutMap(strides, 0, builder.getContext());
     // Dynamic strides/offset will create symbols. There should be none for the
     // static case.
-    SmallVector<OpFoldResult> opFoldIndicies;
-    for (Value value : indices) {
-      opFoldIndicies.push_back(value);
-    }
+    SmallVector<OpFoldResult> opFoldIndicies = getAsOpFoldResult(indices);
     if (linearLayoutMap.getNumSymbols() == 0) {
       return affine::makeComposedAffineApply(builder, loc, linearLayoutMap,
                                              opFoldIndicies);
