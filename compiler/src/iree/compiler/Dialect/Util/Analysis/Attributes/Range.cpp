@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Attributes/PotentialValues.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"  // TODO: Remove
+#include "mlir/Dialect/Linalg/IR/Linalg.h" // TODO: Remove
 #include "mlir/Dialect/Math/IR/Math.h"
 
 #define DEBUG_TYPE "iree-util-attributes"
@@ -46,19 +46,20 @@ void FloatRangeStats::addDomainValue(double value) {
 }
 
 std::string FloatRangeStats::getAsStr(AsmState &asmState) const {
-  if (!valid) return std::string("<<INVALID>>");
+  if (!valid)
+    return std::string("<<INVALID>>");
   std::string s("[");
   s += std::to_string(minValue);
   s += ", ";
   s += std::to_string(maxValue);
   s += ", ";
   switch (truncationFlag) {
-    case TRUNC_UNKNOWN:
-      s += "!trunc";
-      break;
-    case TRUNC:
-      s += "TRUNC";
-      break;
+  case TRUNC_UNKNOWN:
+    s += "!trunc";
+    break;
+  case TRUNC:
+    s += "TRUNC";
+    break;
   }
   s += "]";
   return s;
@@ -262,7 +263,7 @@ const std::string FloatRangeValueElement::getAsStr(AsmState &asmState) const {
   return s;
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

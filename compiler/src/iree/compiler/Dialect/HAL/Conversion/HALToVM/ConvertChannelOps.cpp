@@ -23,5 +23,5 @@ void populateHALChannelToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.channel.rank_and_count");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

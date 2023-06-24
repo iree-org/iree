@@ -44,7 +44,8 @@ namespace iree_compiler {
 static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
                                 Value source) {
   Type sourceType = source.getType();
-  if (sourceType == targetType) return source;
+  if (sourceType == targetType)
+    return source;
   if (llvm::isa<IntegerType>(sourceType) &&
       llvm::isa<IntegerType>(targetType)) {
     unsigned sourceBitWidth = sourceType.getIntOrFloatBitWidth();
@@ -65,7 +66,8 @@ static std::optional<Type> getLegalizedType(Type t) {
     Type elementType = shapedType.getElementType();
     std::optional<Type> legalizedElementType =
         legalizeStorageElementType(elementType);
-    if (!legalizedElementType) return std::nullopt;
+    if (!legalizedElementType)
+      return std::nullopt;
     return RankedTensorType::get(shapedType.getShape(),
                                  legalizedElementType.value(),
                                  shapedType.getEncoding());
@@ -80,7 +82,8 @@ struct TypePropagationTypeConverter : public TypeConverter {
   TypePropagationTypeConverter() {
     addConversion([](Type t) {
       auto convertedType = getLegalizedType(t);
-      if (!convertedType) return t;
+      if (!convertedType)
+        return t;
       return convertedType.value();
     });
   }
@@ -99,9 +102,9 @@ struct ConstantOpTypeConversion
     : public TypePropagationPattern<arith::ConstantOp> {
   using TypePropagationPattern<arith::ConstantOp>::TypePropagationPattern;
 
-  LogicalResult matchAndRewrite(
-      arith::ConstantOp constantOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(arith::ConstantOp constantOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
     auto attrType = llvm::dyn_cast<ShapedType>(attr.getType());
     if (!attrType) {
@@ -141,9 +144,9 @@ template <typename OpTy>
 struct NamedOpTypePropagation : public TypePropagationPattern<OpTy> {
   using TypePropagationPattern<OpTy>::TypePropagationPattern;
 
-  LogicalResult matchAndRewrite(
-      OpTy namedOp, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(OpTy namedOp, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     SmallVector<Type> resultTypes;
     resultTypes.reserve(namedOp->getNumResults());
     for (auto resultType : namedOp->getResultTypes()) {
@@ -166,9 +169,9 @@ struct GenericOpTypePropagation
     : public TypePropagationPattern<linalg::GenericOp> {
   using TypePropagationPattern<linalg::GenericOp>::TypePropagationPattern;
 
-  LogicalResult matchAndRewrite(
-      linalg::GenericOp genericOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(linalg::GenericOp genericOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     llvm::SmallSetVector<unsigned, 8> modifiedOperandIndex;
     SmallVector<Type> resultTypes;
 
@@ -287,9 +290,9 @@ struct LinalgFillTypePropagation
     : public TypePropagationPattern<linalg::FillOp> {
   using TypePropagationPattern<linalg::FillOp>::TypePropagationPattern;
 
-  LogicalResult matchAndRewrite(
-      linalg::FillOp fillOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(linalg::FillOp fillOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Value value = adaptor.getInputs().front();
     std::optional<Type> legalizedElementType =
         legalizeStorageElementType(value.getType());
@@ -309,9 +312,9 @@ struct TensorExtractTypePropagation
     : public TypePropagationPattern<tensor::ExtractOp> {
   using TypePropagationPattern<tensor::ExtractOp>::TypePropagationPattern;
 
-  LogicalResult matchAndRewrite(
-      tensor::ExtractOp extractOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(tensor::ExtractOp extractOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = extractOp.getLoc();
     Value newExtract = rewriter.create<tensor::ExtractOp>(
         loc, adaptor.getTensor(), adaptor.getIndices());
@@ -327,9 +330,9 @@ struct IREELinalgExtScatterTypePropagation
     : TypePropagationPattern<IREE::LinalgExt::ScatterOp> {
   using TypePropagationPattern<
       IREE::LinalgExt::ScatterOp>::TypePropagationPattern;
-  LogicalResult matchAndRewrite(
-      IREE::LinalgExt::ScatterOp scatterOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(IREE::LinalgExt::ScatterOp scatterOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto opOperands = scatterOp->getOpOperands();
     Type inputType = opOperands[0].get().getType();
     Type legalizedInputType = this->getTypeConverter()->convertType(inputType);
@@ -412,9 +415,9 @@ template <typename OpTy>
 struct ForwardSourceType : public TypePropagationPattern<OpTy> {
   using TypePropagationPattern<OpTy>::TypePropagationPattern;
 
-  LogicalResult matchAndRewrite(
-      OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op->getNumResults() != 1 || adaptor.getOperands().size() != 1) {
       return rewriter.notifyMatchFailure(
           op, "unhandled op with multiple operands/results");
@@ -433,9 +436,9 @@ struct LegalizeResultElementType : public ConversionPattern {
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), /*benefit=*/1,
                           context) {}
 
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> convertedOperands,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> convertedOperands,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op->getNumSuccessors()) {
       return rewriter.notifyMatchFailure(op, "unhandled ops with successors");
     }
@@ -519,11 +522,11 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass() {
   return std::make_unique<TypePropagationPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -15,15 +15,17 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-std::unique_ptr<llvm::Module> loadUKernelBaseBitcode(
-    llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
+std::unique_ptr<llvm::Module>
+loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
+                       llvm::LLVMContext &context);
 
-std::unique_ptr<llvm::Module> loadUKernelArchBitcode(
-    llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
+std::unique_ptr<llvm::Module>
+loadUKernelArchBitcode(llvm::TargetMachine *targetMachine,
+                       llvm::LLVMContext &context);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_UKERNEL_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_UKERNEL_H_

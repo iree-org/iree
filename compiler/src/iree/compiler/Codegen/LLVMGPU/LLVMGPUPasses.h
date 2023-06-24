@@ -93,8 +93,8 @@ createLLVMGPUTensorCoreVectorizationPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUTileAndDistribute(bool distributeToWarp = false);
 
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
@@ -104,10 +104,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
 /// Lowering calling vectorization patterns.
-LogicalResult verifyGPUMatmulPipeline(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize);
+LogicalResult
+verifyGPUMatmulPipeline(Operation *op,
+                        IREE::Codegen::LoweringConfigAttr loweringConfig,
+                        IREE::Codegen::TranslationInfoAttr translationInfo,
+                        ArrayRef<int64_t> workgroupSize);
 
 //------------------------------------------------------------------------------
 // Test passes
@@ -115,7 +116,7 @@ LogicalResult verifyGPUMatmulPipeline(
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_

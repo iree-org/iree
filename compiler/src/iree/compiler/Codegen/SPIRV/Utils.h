@@ -39,17 +39,16 @@ FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
 
 /// Returns the functor to compute tile sizes at the given `tilingLevel` for
 /// compute ops in `funcOp`.
-FailureOr<linalg::TileSizeComputationFunction> getSPIRVTileSizeComputeFn(
-    func::FuncOp funcOp, int tilingLevel);
+FailureOr<linalg::TileSizeComputationFunction>
+getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
 
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.
 template <typename GPUIdOp, typename GPUCountOp>
-SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
-                                                             Location loc,
-                                                             unsigned numDims);
+SmallVector<linalg::ProcInfo, 2>
+getGPUProcessorIdsAndCounts(OpBuilder &builder, Location loc, unsigned numDims);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  //  IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
+#endif //  IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_

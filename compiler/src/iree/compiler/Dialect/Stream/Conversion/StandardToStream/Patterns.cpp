@@ -43,5 +43,5 @@ void populateStandardToStreamConversionPatterns(
                                              typeConverter, patterns);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -17,7 +17,7 @@ struct LLVMCPUEmitVectorizationRemarksPass
     : LLVMCPUEmitVectorizationRemarksBase<LLVMCPUEmitVectorizationRemarksPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void LLVMCPUEmitVectorizationRemarksPass::runOnOperation() {
   auto funcOp = getOperation();
@@ -36,5 +36,5 @@ createLLVMCPUEmitVectorizationRemarksPass() {
   return std::make_unique<LLVMCPUEmitVectorizationRemarksPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

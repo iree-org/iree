@@ -56,8 +56,9 @@ Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder, Location loc,
 /// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
 ///
 /// Returns the cloned target op.
-FailureOr<Operation *> clonePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp);
+FailureOr<Operation *>
+clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
+                                   Flow::DispatchRegionOp regionOp);
 
 /// Move a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.
@@ -74,9 +75,10 @@ FailureOr<Operation *> clonePrecedingOpIntoDispatchRegion(
 ///   flow.return %1 : tensor<?xf32>
 /// }
 /// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-FailureOr<Flow::DispatchRegionOp> movePrecedingOpsIntoDispatchRegion(
-    RewriterBase &rewriter, ArrayRef<Operation *> targets,
-    Flow::DispatchRegionOp regionOp);
+FailureOr<Flow::DispatchRegionOp>
+movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
+                                   ArrayRef<Operation *> targets,
+                                   Flow::DispatchRegionOp regionOp);
 
 /// Wrap the given op in a new dispatch region op.
 FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
@@ -94,9 +96,9 @@ bool isClonableIntoDispatchOp(Operation *op);
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      Flow::DispatchRegionOp regionOp);
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_

@@ -32,7 +32,7 @@ namespace iree_compiler {
 // LinalgExt version is not batched therefore we materialize the batch index
 // for each update.
 class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
- public:
+public:
   using OpRewritePattern<tosa::ScatterOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tosa::ScatterOp op,
@@ -174,5 +174,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTosaToLinalgExt() {
   return std::make_unique<TosaToLinalgExtPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

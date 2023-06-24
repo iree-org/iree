@@ -25,9 +25,9 @@ namespace {
 
 struct SwitchOpConversion : public OpConversionPattern<IREE::Util::SwitchOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::SwitchOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::SwitchOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto index = rewriter.createOrFold<IREE::VM::TruncI64I32Op>(
         op.getLoc(), rewriter.getI32Type(), adaptor.getIndex());
     auto type = adaptor.getDefaultValue().getType();
@@ -52,7 +52,7 @@ struct SwitchOpConversion : public OpConversionPattern<IREE::Util::SwitchOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateUtilAssignmentToVMPatterns(MLIRContext *context,
                                         ConversionTarget &conversionTarget,
@@ -63,5 +63,5 @@ void populateUtilAssignmentToVMPatterns(MLIRContext *context,
   patterns.insert<SwitchOpConversion>(typeConverter, context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

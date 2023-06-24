@@ -18,12 +18,12 @@ namespace iree_compiler {
 
 static unsigned dimToIndex(gpu::Dimension dim) {
   switch (dim) {
-    case gpu::Dimension::x:
-      return 0;
-    case gpu::Dimension::y:
-      return 1;
-    case gpu::Dimension::z:
-      return 2;
+  case gpu::Dimension::x:
+    return 0;
+  case gpu::Dimension::y:
+    return 1;
+  case gpu::Dimension::z:
+    return 2;
   }
   assert(false && "invalid dimension");
   return 0;
@@ -91,5 +91,5 @@ void registerProcessorOpInterfaceExternalModels(DialectRegistry &registry) {
   });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -44,7 +44,8 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
     // scalar that is not one of the arguments of the linalg operation.
     Region &region = padTensorOp.getRegion();
     Block &block = region.front();
-    if (!llvm::hasSingleElement(block)) return failure();
+    if (!llvm::hasSingleElement(block))
+      return failure();
     auto yieldOp = cast<tensor::YieldOp>(block.getTerminator());
     Value yieldVal = yieldOp.getValue();
     if (llvm::any_of(block.getArguments(),
@@ -114,7 +115,7 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
     return success();
   }
 
- private:
+private:
   // Option to skip the pattern when tensor.pad op has one use and is used by
   // a Linalg op.
   bool skipSingleLinalgOpUses = false;
@@ -152,19 +153,19 @@ struct TensorPadToTensorInsertSlicePass
     }
   }
 
- private:
+private:
   bool skipSingleLinalgOpUses;
 };
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
-    bool skipSingleLinalgOpUses) {
+std::unique_ptr<Pass>
+createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses) {
   return std::make_unique<TensorPadToTensorInsertSlicePass>(
       skipSingleLinalgOpUses);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

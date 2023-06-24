@@ -109,13 +109,13 @@ struct InitializeEmptyTensorsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createInitializeEmptyTensorsPass(bool zeroFill) {
   return std::make_unique<InitializeEmptyTensorsPass>(zeroFill);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

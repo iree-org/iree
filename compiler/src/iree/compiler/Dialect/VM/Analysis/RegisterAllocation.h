@@ -32,7 +32,7 @@ namespace iree_compiler {
 // the receiving op/call. This allows reference count increment elision, though
 // the VM is free to ignore this if it so chooses.
 class Register {
- public:
+public:
   static constexpr int kInt32RegisterCount = 0x7FFF;
   static constexpr int kRefRegisterCount = 0x3FFF;
   static constexpr uint16_t kRefTypeBit = 0x8000;
@@ -68,13 +68,8 @@ class Register {
   }
 
   Register()
-      : null_(1),
-        tombstone_(0),
-        isRef_(0),
-        isMove_(0),
-        byteWidth_(0),
-        reserved_(0),
-        ordinal_(0) {}
+      : null_(1), tombstone_(0), isRef_(0), isMove_(0), byteWidth_(0),
+        reserved_(0), ordinal_(0) {}
 
   // Returns the register without any usage-specific bits set (such as move).
   Register asBaseRegister() const {
@@ -142,19 +137,15 @@ class Register {
   }
   bool operator!=(const Register &other) const { return !(*this == other); }
 
- private:
+private:
   Register(bool isRef, bool isMove, size_t byteWidth, int ordinal)
-      : null_(0),
-        tombstone_(0),
-        isRef_(isRef),
-        isMove_(isMove),
-        byteWidth_(byteWidth),
-        ordinal_(ordinal) {}
+      : null_(0), tombstone_(0), isRef_(isRef), isMove_(isMove),
+        byteWidth_(byteWidth), ordinal_(ordinal) {}
 
   union {
     struct {
-      uint16_t null_ : 1;  // 1 if the register is indicating an empty value
-      uint16_t tombstone_ : 1;  // 1 if a DenseMap tombstone value
+      uint16_t null_ : 1;      // 1 if the register is indicating an empty value
+      uint16_t tombstone_ : 1; // 1 if a DenseMap tombstone value
       uint16_t isRef_ : 1;
       uint16_t isMove_ : 1;
       uint16_t byteWidth_ : 8;
@@ -169,7 +160,7 @@ class Register {
 // its children. Once calculated value usages can be mapped to VM register
 // reference bytes.
 class RegisterAllocation {
- public:
+public:
   // Annotates the IR with the register mappings. This is only required if the
   // register mappings are interesting to persist beyond just encoding, such as
   // in tests where we want to compare values.
@@ -207,10 +198,10 @@ class RegisterAllocation {
   // Remaps branch successor operands to the target block argument registers.
   // Returns a list of source to target register mappings. Source ref registers
   // may have their move bit set.
-  SmallVector<std::pair<Register, Register>, 8> remapSuccessorRegisters(
-      Operation *op, int successorIndex);
+  SmallVector<std::pair<Register, Register>, 8>
+  remapSuccessorRegisters(Operation *op, int successorIndex);
 
- private:
+private:
   int maxI32RegisterOrdinal_ = -1;
   int maxRefRegisterOrdinal_ = -1;
   int scratchI32RegisterCount_ = 0;
@@ -223,8 +214,8 @@ class RegisterAllocation {
   llvm::DenseMap<Value, Register> map_;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 namespace llvm {
 template <>
@@ -245,6 +236,6 @@ struct DenseMapInfo<mlir::iree_compiler::Register> {
     return lhs == rhs;
   }
 };
-}  // namespace llvm
+} // namespace llvm
 
-#endif  // IREE_COMPILER_DIALECT_VM_ANALYSIS_REGISTERALLOCATION_H_
+#endif // IREE_COMPILER_DIALECT_VM_ANALYSIS_REGISTERALLOCATION_H_

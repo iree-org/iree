@@ -43,9 +43,9 @@ namespace {
 //  ->
 //   stream.cmd.dispatch @foo(%0, %1 : index, index)
 // + deduped arguments in the executable
-static void deduplicateOperands(
-    mlir::func::FuncOp funcOp,
-    SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
+static void
+deduplicateOperands(mlir::func::FuncOp funcOp,
+                    SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
   unsigned operandCount = anyDispatchOp.getUniformOperands().size();
@@ -73,15 +73,16 @@ static void deduplicateOperands(
   llvm::BitVector sameValues(operandCount);
   llvm::BitVector deadOperandsMap(operandCount);
   auto uniformDupeIndexMap =
-      llvm::to_vector(llvm::seq(0u, operandCount));  // old -> new
+      llvm::to_vector(llvm::seq(0u, operandCount)); // old -> new
   for (unsigned idx = 0; idx < operandCount; ++idx) {
-    if (deadOperandsMap.test(idx)) continue;
+    if (deadOperandsMap.test(idx))
+      continue;
     // Each bit represents an operand that duplicates the operand at idx.
     // We walk all the sites and AND their masks together to get the safe
     // set of duplicate operands.
     // Example for %0: (%a, %b, %a) -> b001
     // Example for %1: (%a, %b, %a) -> b000
-    sameValues.set();  // note reused
+    sameValues.set(); // note reused
     for (auto &dupeIndexMap : dupeIndexMaps) {
       for (unsigned i = 0; i < operandCount; ++i) {
         if (i == idx || dupeIndexMap[i] != idx) {
@@ -106,7 +107,7 @@ static void deduplicateOperands(
 
   // Build a map of old duplicate arguments to their base arguments.
   auto argReplacementMap =
-      llvm::to_vector(llvm::seq(0u, funcOp.getNumArguments()));  // old -> new
+      llvm::to_vector(llvm::seq(0u, funcOp.getNumArguments())); // old -> new
   auto operandToArgMap =
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
   for (auto dupe : llvm::enumerate(uniformDupeIndexMap)) {
@@ -121,7 +122,8 @@ static void deduplicateOperands(
     llvm::interleaveComma(deadOperandsMap.set_bits(), llvm::dbgs());
     llvm::dbgs() << "\n";
     for (auto replacement : llvm::enumerate(argReplacementMap)) {
-      if (replacement.index() == replacement.value()) continue;
+      if (replacement.index() == replacement.value())
+        continue;
       llvm::dbgs() << "  %arg" << replacement.index() << " -> %arg"
                    << replacement.value() << "\n";
     }
@@ -132,7 +134,8 @@ static void deduplicateOperands(
   for (auto replacement : llvm::enumerate(argReplacementMap)) {
     unsigned deadIdx = replacement.index();
     unsigned liveIdx = replacement.value();
-    if (deadIdx == liveIdx) continue;
+    if (deadIdx == liveIdx)
+      continue;
     deadArgMap.set(deadIdx);
     entryBlock.getArgument(deadIdx).replaceAllUsesWith(
         entryBlock.getArgument(liveIdx));
@@ -140,7 +143,8 @@ static void deduplicateOperands(
 
   // Update each dispatch site to remove duplicates.
   SmallVector<unsigned> deadOperands;
-  for (auto idx : deadOperandsMap.set_bits()) deadOperands.push_back(idx);
+  for (auto idx : deadOperandsMap.set_bits())
+    deadOperands.push_back(idx);
   for (auto dispatchOp : dispatchOps) {
     for (auto idx : llvm::reverse(deadOperands)) {
       dispatchOp.getUniformOperandsMutable().erase(idx);
@@ -165,9 +169,9 @@ static void deduplicateOperands(
 //   stream.cmd.dispatch @foo(%c100 : index)
 //   stream.cmd.dispatch @foo(%c101 : index)
 // + inlined %c1 in the executable
-static void inlineUniformConstants(
-    mlir::func::FuncOp funcOp,
-    SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
+static void
+inlineUniformConstants(mlir::func::FuncOp funcOp,
+                       SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
   unsigned operandCount = anyDispatchOp.getUniformOperands().size();
@@ -178,7 +182,8 @@ static void inlineUniformConstants(
   llvm::BitVector uniformOperandMap(operandCount, /*t=*/true);
   for (auto dispatchOp : dispatchOps) {
     for (unsigned idx = 0; idx < operandCount; ++idx) {
-      if (!uniformOperandMap.test(idx)) continue;
+      if (!uniformOperandMap.test(idx))
+        continue;
       auto value = dispatchOp.getUniformOperands()[idx];
       APInt intValue;
       if (!matchPattern(value, m_ConstantInt(&intValue))) {
@@ -208,7 +213,8 @@ static void inlineUniformConstants(
     llvm::dbgs() << "inlineUniformConstants for " << funcOp.getSymName()
                  << "\n";
     for (unsigned i = 0; i < operandValues.size(); ++i) {
-      if (!operandValues[i].has_value()) continue;
+      if (!operandValues[i].has_value())
+        continue;
       llvm::dbgs() << "  operand " << i << " = " << operandValues[i].value()
                    << "\n";
     }
@@ -233,7 +239,8 @@ static void inlineUniformConstants(
 
   // Update each dispatch site to remove duplicates.
   SmallVector<unsigned> deadOperands;
-  for (auto idx : uniformOperandMap.set_bits()) deadOperands.push_back(idx);
+  for (auto idx : uniformOperandMap.set_bits())
+    deadOperands.push_back(idx);
   for (auto dispatchOp : dispatchOps) {
     for (auto idx : llvm::reverse(deadOperands)) {
       dispatchOp.getUniformOperandsMutable().erase(idx);
@@ -252,7 +259,7 @@ static void inlineUniformConstants(
 
 class FoldUniformOperandsPass
     : public FoldUniformOperandsBase<FoldUniformOperandsPass> {
- public:
+public:
   FoldUniformOperandsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -280,7 +287,8 @@ class FoldUniformOperandsPass
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         auto &dispatchOps = entryDispatchMap[exportOp];
-        if (dispatchOps.empty()) continue;  // no-op if no dispatches
+        if (dispatchOps.empty())
+          continue; // no-op if no dispatches
 
         auto funcOp = exportOp.lookupFunctionRef();
 
@@ -296,13 +304,13 @@ class FoldUniformOperandsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldUniformOperandsPass() {
   return std::make_unique<FoldUniformOperandsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

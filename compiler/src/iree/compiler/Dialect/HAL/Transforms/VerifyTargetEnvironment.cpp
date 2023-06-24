@@ -26,7 +26,7 @@ namespace HAL {
 
 class VerifyTargetEnvironmentPass
     : public PassWrapper<VerifyTargetEnvironmentPass, OperationPass<ModuleOp>> {
- public:
+public:
   VerifyTargetEnvironmentPass(const TargetBackendRegistry &targetRegistry)
       : targetRegistry(targetRegistry) {}
 
@@ -57,7 +57,8 @@ class VerifyTargetEnvironmentPass
         break;
       }
     }
-    if (!anyNonExecutableOps) return;
+    if (!anyNonExecutableOps)
+      return;
 
     // Must have targets specified.
     auto targetsAttr = moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
@@ -104,8 +105,8 @@ class VerifyTargetEnvironmentPass
   const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createVerifyTargetEnvironmentPass(
-    const TargetBackendRegistry &targetRegistry) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createVerifyTargetEnvironmentPass(const TargetBackendRegistry &targetRegistry) {
   return std::make_unique<VerifyTargetEnvironmentPass>(targetRegistry);
 }
 
@@ -114,7 +115,7 @@ static PassRegistration<VerifyTargetEnvironmentPass> pass([] {
       TargetBackendRegistry::getGlobal());
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

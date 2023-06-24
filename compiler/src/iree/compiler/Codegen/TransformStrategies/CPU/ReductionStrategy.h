@@ -28,7 +28,7 @@ struct ReductionConfig {
 
 /// A simple CPU ReductionStrategy.
 class ReductionStrategy : public iree_compiler::AbstractReductionStrategy {
- public:
+public:
   ReductionStrategy(const transform_ext::MatchedReductionCaptures &captures,
                     const ReductionConfig &reductionConfig);
 
@@ -37,7 +37,7 @@ class ReductionStrategy : public iree_compiler::AbstractReductionStrategy {
 
   int64_t getVectorSize() const { return vectorSize; }
 
- private:
+private:
   /// Compute the small strategy based on the problem size.
   void configure(const ReductionConfig &config);
 
@@ -54,8 +54,8 @@ class ReductionStrategy : public iree_compiler::AbstractReductionStrategy {
 void buildReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
                             const ReductionStrategy &strategy);
 
-}  // namespace cpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace cpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_REDUCTION_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_REDUCTION_STRATEGY_H_

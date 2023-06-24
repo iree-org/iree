@@ -20,10 +20,10 @@ namespace Loader {
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h.inc"
 
-}  // namespace Loader
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Loader
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_HAL_LOADER_TRANSFORMS_PASS_DETAIL_H_
+#endif // IREE_COMPILER_MODULES_HAL_LOADER_TRANSFORMS_PASS_DETAIL_H_

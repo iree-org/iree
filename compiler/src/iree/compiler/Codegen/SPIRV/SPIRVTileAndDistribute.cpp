@@ -115,7 +115,7 @@ namespace {
 /// buffer semantics.
 class SPIRVTileAndDistributePass
     : public SPIRVTileAndDistributeBase<SPIRVTileAndDistributePass> {
- public:
+public:
   SPIRVTileAndDistributePass() = default;
   SPIRVTileAndDistributePass(const SPIRVTileAndDistributePass &pass) = default;
 
@@ -127,7 +127,7 @@ class SPIRVTileAndDistributePass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 //====---------------------------------------------------------------------===//
 // Main pass implementation
@@ -136,14 +136,17 @@ class SPIRVTileAndDistributePass
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
-  if (!isEntryPoint(funcOp)) return;
+  if (!isEntryPoint(funcOp))
+    return;
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
-  if (failed(threadTileComputeFn)) return signalPassFailure();
+  if (failed(threadTileComputeFn))
+    return signalPassFailure();
   auto reductionTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 2);
-  if (failed(reductionTileComputeFn)) return signalPassFailure();
+  if (failed(reductionTileComputeFn))
+    return signalPassFailure();
 
-  {  // Tile and distribute to invocations.
+  { // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(context);
     populateTilingToInvocationPatterns(invocationTilingPatterns,
                                        *threadTileComputeFn);
@@ -184,7 +187,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     });
   }
 
-  {  // Tile reduction dimensions.
+  { // Tile reduction dimensions.
     RewritePatternSet reductionTilingPatterns(context);
     populateTilingReductionPatterns(reductionTilingPatterns,
                                     *reductionTileComputeFn);
@@ -220,5 +223,5 @@ createSPIRVTileAndDistributePass() {
   return std::make_unique<SPIRVTileAndDistributePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -77,7 +77,7 @@
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
 
 #ifdef _WIN32
 #include "llvm/Support/Windows/WindowsSupport.h"
@@ -256,8 +256,7 @@ struct Session {
 };
 
 Session::Session(GlobalInit &globalInit)
-    : globalInit(globalInit),
-      binder(OptionsBinder::local()),
+    : globalInit(globalInit), binder(OptionsBinder::local()),
       pluginSession(globalInit.pluginManager, binder, pluginManagerOptions) {
   context.allowUnregisteredDialects();
   context.appendDialectRegistry(globalInit.registry);
@@ -359,7 +358,8 @@ Error *Source::split(void (*callback)(iree_compiler_source_t *source,
   SmallVector<StringRef, 8> rawSubBuffers;
   // Split dropping the last checkLen chars to enable flagging near misses.
   origMemBuffer->getBuffer().split(rawSubBuffers, splitMarker);
-  if (rawSubBuffers.empty()) return nullptr;
+  if (rawSubBuffers.empty())
+    return nullptr;
 
   for (StringRef subBuffer : rawSubBuffers) {
     auto splitLoc = SMLoc::getFromPointer(subBuffer.data());
@@ -454,7 +454,7 @@ struct Output {
   void *mapped_data = nullptr;
   uint64_t mapped_size = 0;
 
- private:
+private:
   // Fields for Type::File.
   // If the output was configured to a file, this is it.
   std::unique_ptr<llvm::ToolOutputFile> outputFile;
@@ -516,7 +516,8 @@ Error *Output::openMembuffer() {
 }
 
 void Output::keep() {
-  if (outputFile) outputFile->keep();
+  if (outputFile)
+    outputFile->keep();
 }
 
 // Invocation corresponds to iree_compiler_invocation_t
@@ -586,21 +587,21 @@ bool Invocation::initializeInvocation() {
         [this](DiagnosticSeverity severity, std::string_view message) {
           iree_compiler_diagnostic_severity_t cSeverity;
           switch (severity) {
-            case DiagnosticSeverity::Note:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
-              break;
-            case DiagnosticSeverity::Warning:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_WARNING;
-              break;
-            case DiagnosticSeverity::Error:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR;
-              break;
-            case DiagnosticSeverity::Remark:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_REMARK;
-              break;
-            default:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR;
-              break;
+          case DiagnosticSeverity::Note:
+            cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+            break;
+          case DiagnosticSeverity::Warning:
+            cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_WARNING;
+            break;
+          case DiagnosticSeverity::Error:
+            cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR;
+            break;
+          case DiagnosticSeverity::Remark:
+            cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_REMARK;
+            break;
+          default:
+            cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR;
+            break;
           }
           diagnosticCallback(cSeverity, message.data(), message.size(),
                              diagnosticCallbackUserData);
@@ -650,50 +651,50 @@ bool Invocation::importModule(OwningOpRef<Operation *> inputModule) {
 
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   switch (pipeline) {
-    case IREE_COMPILER_PIPELINE_STD: {
-      // Parse the compile to phase name.
-      std::optional<IREEVMPipelinePhase> compileToPhase;
-      enumerateIREEVMPipelinePhases(
-          [&](IREEVMPipelinePhase phase, StringRef mnemonic, StringRef desc) {
-            if (mnemonic == compileToPhaseName) {
-              compileToPhase = phase;
-            }
-          });
-      if (!compileToPhase) {
-        (*parsedModule)->emitError()
-            << "unrecognized compile-to phase name: " << compileToPhaseName;
-        return false;
-      }
-
-      buildIREEVMTransformPassPipeline(
-          session.targetRegistry, session.bindingOptions, session.inputOptions,
-          session.preprocessingOptions, session.highLevelOptimizationOptions,
-          session.schedulingOptions, session.halTargetOptions,
-          session.vmTargetOptions, pipelineHooks, passManager, *compileToPhase);
-      break;
-    }
-    case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
-      auto &bodyBlock = (*parsedModule)->getRegion(0).front();
-      auto executableOps =
-          llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableOp>());
-      auto sourceOps =
-          llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableSourceOp>());
-      size_t usableOpCount = executableOps.size() + sourceOps.size();
-      if (usableOpCount != 1) {
-        (*parsedModule)->emitError()
-            << "HAL executable translation requires "
-               "exactly 1 top level hal.executable/hal.executable.source "
-               "op";
-        return false;
-      }
-      IREE::HAL::buildHALTransformPassPipeline(
-          passManager, session.targetRegistry, session.halTargetOptions);
-      break;
-    }
-    default:
+  case IREE_COMPILER_PIPELINE_STD: {
+    // Parse the compile to phase name.
+    std::optional<IREEVMPipelinePhase> compileToPhase;
+    enumerateIREEVMPipelinePhases(
+        [&](IREEVMPipelinePhase phase, StringRef mnemonic, StringRef desc) {
+          if (mnemonic == compileToPhaseName) {
+            compileToPhase = phase;
+          }
+        });
+    if (!compileToPhase) {
       (*parsedModule)->emitError()
-          << "unsupported pipeline type " << (int)pipeline;
+          << "unrecognized compile-to phase name: " << compileToPhaseName;
       return false;
+    }
+
+    buildIREEVMTransformPassPipeline(
+        session.targetRegistry, session.bindingOptions, session.inputOptions,
+        session.preprocessingOptions, session.highLevelOptimizationOptions,
+        session.schedulingOptions, session.halTargetOptions,
+        session.vmTargetOptions, pipelineHooks, passManager, *compileToPhase);
+    break;
+  }
+  case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
+    auto &bodyBlock = (*parsedModule)->getRegion(0).front();
+    auto executableOps =
+        llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableOp>());
+    auto sourceOps =
+        llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableSourceOp>());
+    size_t usableOpCount = executableOps.size() + sourceOps.size();
+    if (usableOpCount != 1) {
+      (*parsedModule)->emitError()
+          << "HAL executable translation requires "
+             "exactly 1 top level hal.executable/hal.executable.source "
+             "op";
+      return false;
+    }
+    IREE::HAL::buildHALTransformPassPipeline(
+        passManager, session.targetRegistry, session.halTargetOptions);
+    break;
+  }
+  default:
+    (*parsedModule)->emitError()
+        << "unsupported pipeline type " << (int)pipeline;
+    return false;
   }
 
   passManager.enableVerifier(enableVerifier);
@@ -774,8 +775,8 @@ Error *Invocation::outputHALExecutable(Output &output) {
   return output.getWriteError();
 }
 
-}  // namespace
-}  // namespace mlir::iree_compiler::embed
+} // namespace
+} // namespace mlir::iree_compiler::embed
 
 using namespace mlir::iree_compiler::embed;
 
@@ -801,7 +802,8 @@ void llvmVersionPrinter(llvm::raw_ostream &os) {
 #endif
 #if LLVM_VERSION_PRINTER_SHOW_HOST_TARGET_INFO
   std::string CPU = std::string(sys::getHostCPUName());
-  if (CPU == "generic") CPU = "(unknown)";
+  if (CPU == "generic")
+    CPU = "(unknown)";
   os << ".\n"
      << "  Default target: " << sys::getDefaultTargetTriple() << '\n'
      << "  Host CPU: " << CPU;
@@ -845,7 +847,7 @@ iree_compiler_output_t *wrap(Output *output) {
   return (iree_compiler_output_t *)output;
 }
 
-}  // namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // C API implementation
@@ -962,9 +964,8 @@ const char *ireeCompilerGetRevision() {
 
 void ireeCompilerGlobalShutdown() {
   if (!globalInit || isShutdown) {
-    fprintf(stderr,
-            "FATAL ERROR: ireeCompilerGlobalShutdown called when not "
-            "initialized\n");
+    fprintf(stderr, "FATAL ERROR: ireeCompilerGlobalShutdown called when not "
+                    "initialized\n");
     abort();
   }
   if (globalInit) {
@@ -989,8 +990,9 @@ void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   delete unwrap(session);
 }
 
-iree_compiler_error_t *ireeCompilerSessionSetFlags(
-    iree_compiler_session_t *session, int argc, const char *const *argv) {
+iree_compiler_error_t *
+ireeCompilerSessionSetFlags(iree_compiler_session_t *session, int argc,
+                            const char *const *argv) {
   return wrap(unwrap(session)->setFlags(argc, argv));
 }
 
@@ -1000,8 +1002,8 @@ void ireeCompilerSessionGetFlags(
   unwrap(session)->getFlags(nonDefaultOnly, onFlag, userData);
 }
 
-iree_compiler_invocation_t *ireeCompilerInvocationCreate(
-    iree_compiler_session_t *session) {
+iree_compiler_invocation_t *
+ireeCompilerInvocationCreate(iree_compiler_session_t *session) {
   return wrap(new Invocation(*unwrap(session)));
 }
 
@@ -1088,18 +1090,20 @@ void ireeCompilerSourceDestroy(iree_compiler_source_t *source) {
   delete unwrap(source);
 }
 
-iree_compiler_error_t *ireeCompilerSourceOpenFile(
-    iree_compiler_session_t *session, const char *filePath,
-    iree_compiler_source_t **out_source) {
+iree_compiler_error_t *
+ireeCompilerSourceOpenFile(iree_compiler_session_t *session,
+                           const char *filePath,
+                           iree_compiler_source_t **out_source) {
   auto source = new Source(*unwrap(session));
   *out_source = wrap(source);
   return wrap(source->openFile(filePath));
 }
 
-iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
-    iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, bool isNullTerminated,
-    iree_compiler_source_t **out_source) {
+iree_compiler_error_t *
+ireeCompilerSourceWrapBuffer(iree_compiler_session_t *session,
+                             const char *bufferName, const char *buffer,
+                             size_t length, bool isNullTerminated,
+                             iree_compiler_source_t **out_source) {
   auto source = new Source(*unwrap(session));
   *out_source = wrap(source);
   return wrap(source->wrapBuffer(bufferName, buffer, length, isNullTerminated));
@@ -1116,29 +1120,31 @@ void ireeCompilerOutputDestroy(iree_compiler_output_t *output) {
   delete unwrap(output);
 }
 
-iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    const char *filePath, iree_compiler_output_t **out_output) {
+iree_compiler_error_t *
+ireeCompilerOutputOpenFile(const char *filePath,
+                           iree_compiler_output_t **out_output) {
   auto output = new Output();
   *out_output = wrap(output);
   return wrap(output->openFile(filePath));
 }
 
-iree_compiler_error_t *ireeCompilerOutputOpenFD(
-    int fd, iree_compiler_output_t **out_output) {
+iree_compiler_error_t *
+ireeCompilerOutputOpenFD(int fd, iree_compiler_output_t **out_output) {
   auto output = new Output();
   *out_output = wrap(output);
   return wrap(output->openFD(fd));
 }
 
-iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
-    iree_compiler_output_t **out_output) {
+iree_compiler_error_t *
+ireeCompilerOutputOpenMembuffer(iree_compiler_output_t **out_output) {
   auto output = new Output();
   *out_output = wrap(output);
   return wrap(output->openMembuffer());
 }
 
-iree_compiler_error_t *ireeCompilerOutputMapMemory(
-    iree_compiler_output_t *output, void **contents, uint64_t *size) {
+iree_compiler_error_t *
+ireeCompilerOutputMapMemory(iree_compiler_output_t *output, void **contents,
+                            uint64_t *size) {
   return wrap(unwrap(output)->mapMemory(contents, size));
 }
 
@@ -1157,23 +1163,27 @@ iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,
   return wrap(unwrap(output)->getWriteError());
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputIR(
-    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputIR(iree_compiler_invocation_t *inv,
+                               iree_compiler_output_t *output) {
   return wrap(unwrap(inv)->outputIR(*unwrap(output)));
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputVMBytecode(
-    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputVMBytecode(iree_compiler_invocation_t *inv,
+                                       iree_compiler_output_t *output) {
   return wrap(unwrap(inv)->outputVMBytecode(*unwrap(output)));
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputVMCSource(
-    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputVMCSource(iree_compiler_invocation_t *inv,
+                                      iree_compiler_output_t *output) {
   return wrap(unwrap(inv)->outputVMCSource(*unwrap(output)));
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputHALExecutable(
-    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputHALExecutable(iree_compiler_invocation_t *inv,
+                                          iree_compiler_output_t *output) {
   return wrap(unwrap(inv)->outputHALExecutable(*unwrap(output)));
 }
 

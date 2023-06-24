@@ -47,7 +47,7 @@ std::string sanitizeSymbolName(StringRef name);
 //  `a$-æb` -> `a_-_b`
 std::string sanitizeFileName(StringRef name);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_STRINGUTILS_H_
+#endif // IREE_COMPILER_UTILS_STRINGUTILS_H_

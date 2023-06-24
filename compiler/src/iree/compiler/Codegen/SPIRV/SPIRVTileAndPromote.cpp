@@ -118,7 +118,7 @@ namespace {
 
 class SPIRVTileAndPromotePass final
     : public SPIRVTileAndPromoteBase<SPIRVTileAndPromotePass> {
- public:
+public:
   SPIRVTileAndPromotePass(bool promoteCMatrix, bool skipThreadLevel)
       : promoteCMatrix(promoteCMatrix), skipThreadLevel(skipThreadLevel) {}
 
@@ -127,7 +127,8 @@ class SPIRVTileAndPromotePass final
   }
 
   LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) return failure();
+    if (failed(Pass::initializeOptions(options)))
+      return failure();
     // Consider pass option too
     promoteCMatrix |= this->promoteC;
     skipThreadLevel |= this->skipThread;
@@ -136,7 +137,7 @@ class SPIRVTileAndPromotePass final
 
   void runOnOperation() override;
 
- private:
+private:
   /// Promotes C matrix to shared memory when necessary and returns success if
   /// no error happens.
   LogicalResult doPromoteCMatrix(func::FuncOp funcOp) const;
@@ -147,29 +148,33 @@ class SPIRVTileAndPromotePass final
   bool skipThreadLevel = false;
 };
 
-}  // namespace
+} // namespace
 
 void SPIRVTileAndPromotePass::runOnOperation() {
   MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp)) return;
+  if (failed(exportOp))
+    return;
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
-  if (failed(threadTileComputeFn)) return signalPassFailure();
+  if (failed(threadTileComputeFn))
+    return signalPassFailure();
   auto reductionTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 2);
-  if (failed(reductionTileComputeFn)) return signalPassFailure();
+  if (failed(reductionTileComputeFn))
+    return signalPassFailure();
 
   // Promote C matrix and propagate the potential fill producer into the
   // allocation. This needs to be done before reduction tiling.
-  if (failed(doPromoteCMatrix(funcOp))) return signalPassFailure();
+  if (failed(doPromoteCMatrix(funcOp)))
+    return signalPassFailure();
 
   StringLiteral markerAttrName =
       IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker;
   auto workgroupMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
   auto kTiledMarker = StringAttr::get(context, getWorkgroupKTiledMarker());
 
-  {  // Tile reduction dimensions.
+  { // Tile reduction dimensions.
     RewritePatternSet patterns(context);
     IREE::LinalgExt::LinalgTransformationFilter filter(
         // Going through C matrix promotion we will have the marker..
@@ -237,7 +242,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     // that there are no subview ops), clear markers to enable following steps.
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       auto marker = linalgOp->getAttrOfType<StringAttr>(markerAttrName);
-      if (!marker) return WalkResult::advance();
+      if (!marker)
+        return WalkResult::advance();
       if (marker.getValue() == promoteBothMarker)
         linalgOp->removeAttr(markerAttrName);
       return WalkResult::advance();
@@ -258,7 +264,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     }
   });
 
-  if (!skipThreadLevel) {  // Tile and distribute to invocations.
+  if (!skipThreadLevel) { // Tile and distribute to invocations.
     RewritePatternSet tilingPatterns(context);
     IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker},
                                                        std::nullopt);
@@ -290,15 +296,17 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   }
 }
 
-LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
-    func::FuncOp funcOp) const {
+LogicalResult
+SPIRVTileAndPromotePass::doPromoteCMatrix(func::FuncOp funcOp) const {
   MLIRContext *context = funcOp.getContext();
-  if (!promoteCMatrix) return success();
+  if (!promoteCMatrix)
+    return success();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   SmallVector<Operation *> linalgOps;
   for (Operation *op : computeOps) {
-    if (isa<linalg::FillOp>(op)) continue;  // Don't care
+    if (isa<linalg::FillOp>(op))
+      continue; // Don't care
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       linalgOps.push_back(linalgOp);
     } else {
@@ -311,7 +319,8 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   }
 
   // If there are no fused elementwise ops, we can avoid promoting C matrix.
-  if (linalgOps.size() <= 1) return success();
+  if (linalgOps.size() <= 1)
+    return success();
 
   auto matmulOp = cast<linalg::LinalgOp>(linalgOps.front());
   auto genericOp = cast<linalg::GenericOp>(*linalgOps.back());
@@ -330,7 +339,8 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
 
   // If the fused elementwise ops are allowed to use cooperative types, we can
   // also avoid promoting C matrix.
-  if (isCooperativeMatrixFusable(genericOp)) return success();
+  if (isCooperativeMatrixFusable(genericOp))
+    return success();
 
   // Finally do promote C matrix.
   RewritePatternSet patterns(context);
@@ -353,11 +363,11 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   return success();
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
-    bool promoteCMatrix, bool skipThreadLevel) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVTileAndPromotePass(bool promoteCMatrix, bool skipThreadLevel) {
   return std::make_unique<SPIRVTileAndPromotePass>(promoteCMatrix,
                                                    skipThreadLevel);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

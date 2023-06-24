@@ -56,8 +56,8 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 /// This pass converts remaining interface ops into SPIR-V global variables,
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath = false, unsigned indexWidth = 32);
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertToSPIRVPass(bool enableFastMath = false, unsigned indexWidth = 32);
 
 /// Annotates the innermost Winograd loops with the spirv distribute attribute.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -107,8 +107,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
 
 /// Pass to promote Linalg ops with buffer semantics to use workgroup memory
 /// and then tile to invocations.
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
-    bool promoteCMatrix = false, bool skipThreadLevel = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVTileAndPromotePass(bool promoteCMatrix = false,
+                              bool skipThreadLevel = false);
 
 /// Pass to tile Linalg ops with tensor semantics to invocations.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass();
@@ -159,7 +160,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
+#endif // IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_

@@ -33,7 +33,8 @@ namespace {
 
 bool isIota(ArrayRef<int64_t> array) {
   for (auto [idx, value] : llvm::enumerate(array)) {
-    if (static_cast<int64_t>(idx) != value) return false;
+    if (static_cast<int64_t>(idx) != value)
+      return false;
   }
   return true;
 }
@@ -129,7 +130,8 @@ struct ReorderConvOpKernelDimensions final
                                 PatternRewriter &rewriter) const override {
     auto kernel = op.getRhs();
     auto kernelType = cast<ShapedType>(kernel.getType());
-    if (!kernelType.hasRank()) return failure();
+    if (!kernelType.hasRank())
+      return failure();
     auto kernelShape = kernelType.getShape();
 
     auto dimensionNumbers = op.getDimensionNumbers();
@@ -148,7 +150,8 @@ struct ReorderConvOpKernelDimensions final
     permutation.push_back(outputFeatureDimension);
 
     // If the permutation is iota, then no transpose is required.
-    if (isIota(permutation)) return failure();
+    if (isIota(permutation))
+      return failure();
 
     llvm::SmallVector<int64_t> transposeShape;
     for (int64_t perm : permutation) {
@@ -258,7 +261,8 @@ struct ReorderConvOpOutputDimensions final
 
 bool isConsecutive(ArrayRef<int64_t> array) {
   for (size_t i = 1, e = array.size(); i < e; ++i) {
-    if (array[i] - array[i - 1] != 1) return false;
+    if (array[i] - array[i - 1] != 1)
+      return false;
   }
   return true;
 }
@@ -278,7 +282,8 @@ struct TransposeReshapeGenericDotGeneral final
 
   Value TransposeIfNonConsecutive(OpBuilder &b, Location loc, Value src,
                                   ArrayRef<int64_t> targetOrder) const {
-    if (isConsecutive(targetOrder)) return src;
+    if (isConsecutive(targetOrder))
+      return src;
 
     auto type = cast<RankedTensorType>(src.getType());
     SmallVector<int64_t> transposeShape;
@@ -315,7 +320,8 @@ struct TransposeReshapeGenericDotGeneral final
     auto lhsShapeType = dyn_cast<RankedTensorType>(op.getLhs().getType());
     auto rhsShapeType = dyn_cast<RankedTensorType>(op.getRhs().getType());
     auto resultType = dyn_cast<RankedTensorType>(op.getResult().getType());
-    if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
+    if (!lhsShapeType || !rhsShapeType || !resultType)
+      return failure();
 
     // TODO(jpienaar): This pattern is not safe for dynamic shapes and seems to
     // be (now) redundant with later pass that does handle them. To decouple
@@ -418,7 +424,8 @@ struct TransposeReshapeGenericDotGeneral final
     // batching、lhs parallel、rhs parallel this order is a conversion
     SmallVector<int64_t> newShape = {lhsNewType.getShape()[0],
                                      lhsNewType.getShape()[1]};
-    if (rhsNewType.getRank() > 2) newShape.push_back(rhsNewType.getDimSize(2));
+    if (rhsNewType.getRank() > 2)
+      newShape.push_back(rhsNewType.getDimSize(2));
 
     TensorType newResultType =
         needReshapeResult
@@ -543,7 +550,8 @@ struct ScatterImplicitBatch final
   static Value addUnitBatchDim(Location loc, Value value,
                                PatternRewriter &rewriter) {
     auto valueTy = cast<ShapedType>(value.getType());
-    if (!valueTy.hasRank()) return nullptr;
+    if (!valueTy.hasRank())
+      return nullptr;
 
     // Materialize the implicit indices dim.
     SmallVector<ReassociationExprs> reassociationMap(valueTy.getRank());
@@ -570,7 +578,8 @@ struct ScatterImplicitBatch final
     auto indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
 
     // Check whether indices has no batch dimension.
-    if (!indicesTy) return failure();
+    if (!indicesTy)
+      return failure();
     if (indicesTy.getRank() != 1 || indexVectorDim != 0) {
       return rewriter.notifyMatchFailure(op,
                                          "no implicit batch dimension to add.");
@@ -622,7 +631,8 @@ struct ScatterCollapseBatch final
   static Value collapseBatchDims(Location loc, Value value, int64_t batchCount,
                                  PatternRewriter &rewriter) {
     auto valueTy = dyn_cast<ShapedType>(value.getType());
-    if (!valueTy) return nullptr;
+    if (!valueTy)
+      return nullptr;
 
     SmallVector<ReassociationExprs> reassociationMap(1);
     reassociationMap.reserve(valueTy.getRank() - batchCount + 1);
@@ -732,10 +742,12 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
       llvm::SmallVector<int64_t> perm;
       perm.reserve(indicesTy.getRank());
       for (int i = 0, s = indicesTy.getRank(); i < s; ++i) {
-        if (i != indexVectorDim) perm.push_back(i);
+        if (i != indexVectorDim)
+          perm.push_back(i);
       }
 
-      if (perm.size() < indicesTy.getRank()) perm.push_back(indexVectorDim);
+      if (perm.size() < indicesTy.getRank())
+        perm.push_back(indexVectorDim);
 
       llvm::SmallVector<int64_t> newShape;
       for (int i = 0, s = perm.size(); i < s; ++i) {
@@ -764,7 +776,8 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
     llvm::SmallVector<int64_t> updatePerm;
     updatePerm.reserve(updates0Ty.getRank());
     for (int i = 0, s = isBatch.size(); i < s; ++i)
-      if (isBatch[i]) updatePerm.push_back(i);
+      if (isBatch[i])
+        updatePerm.push_back(i);
     updatePerm.append(updatedWindowDims.begin(), updatedWindowDims.end());
 
     llvm::SmallVector<int64_t> newUpdatedWindowDims;
@@ -875,7 +888,8 @@ struct ScatterMaterializeInsertedDim final
     int64_t firstNonIndex = 0;
     for (int64_t s = scatterDimsToOperandDims.size(); firstNonIndex < s;
          ++firstNonIndex) {
-      if (!isIndexDim[firstNonIndex]) break;
+      if (!isIndexDim[firstNonIndex])
+        break;
     }
 
     llvm::SmallVector<bool> isInsertDims(operandTy.getRank(), false);
@@ -901,7 +915,8 @@ struct ScatterMaterializeInsertedDim final
     reassociationMap.push_back({rewriter.getAffineDimExpr(0)});
 
     for (auto it : llvm::enumerate(llvm::ArrayRef<bool>(toInsertDims))) {
-      if (!it.value()) reassociationMap.push_back({});
+      if (!it.value())
+        reassociationMap.push_back({});
       reassociationMap.back().push_back(
           rewriter.getAffineDimExpr(it.index() + 1));
     }
@@ -951,7 +966,8 @@ struct ScatterMaterializeInsertedDim final
 bool isFromBool(Value val) {
   while (true) {
     Operation *op = val.getDefiningOp();
-    if (!op) return false;
+    if (!op)
+      return false;
 
     if (auto convertOp = dyn_cast<mlir::stablehlo::ConvertOp>(op)) {
       auto inTy = llvm::cast<ShapedType>(convertOp.getOperand().getType());
@@ -981,14 +997,17 @@ struct MulCastOfBool final : OpRewritePattern<mlir::stablehlo::MulOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::MulOp op,
                                 PatternRewriter &rewriter) const override {
     auto resultTy = cast<ShapedType>(op.getType());
-    if (!isa<FloatType>(resultTy.getElementType())) return failure();
+    if (!isa<FloatType>(resultTy.getElementType()))
+      return failure();
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
     bool lhsIsBool = isFromBool(lhs);
     bool rhsIsBool = isFromBool(rhs);
 
-    if (lhsIsBool == rhsIsBool) return failure();
-    if (rhsIsBool) std::swap(lhs, rhs);
+    if (lhsIsBool == rhsIsBool)
+      return failure();
+    if (rhsIsBool)
+      std::swap(lhs, rhs);
 
     Type eType = resultTy.getElementType();
     auto lhsTy = cast<ShapedType>(lhs.getType());
@@ -1007,7 +1026,8 @@ struct MulCastOfBool final : OpRewritePattern<mlir::stablehlo::MulOp> {
       auto valueTy = cast<ShapedType>(value.getType());
       auto newTy =
           RankedTensorType::get(resultTy.getShape(), valueTy.getElementType());
-      if (valueTy == newTy) return value;
+      if (valueTy == newTy)
+        return value;
       auto dimensions = llvm::to_vector(
           llvm::seq<int64_t>(resultRank - valueTy.getRank(), resultRank));
       return rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -1036,11 +1056,13 @@ struct ExpandRngNormal final : OpRewritePattern<mlir::stablehlo::RngOp> {
     auto resTy = dyn_cast<RankedTensorType>(op.getType());
     // We can support static shapes, but it's easier to implement Box-Muller
     // transform if we know the number of elements.
-    if (!resTy || !resTy.hasStaticShape()) return failure();
+    if (!resTy || !resTy.hasStaticShape())
+      return failure();
 
     // The algorithm requires even numbers and will generate pairs.
     auto numElems = resTy.getNumElements();
-    if (numElems & 1) numElems++;
+    if (numElems & 1)
+      numElems++;
     auto halfNumElems = numElems / 2;
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
@@ -1237,7 +1259,8 @@ struct DotToMul final : OpRewritePattern<mlir::stablehlo::DotOp> {
       return rewriter.notifyMatchFailure(op, "lhs and rhs must be rank-2");
     }
 
-    if (lhsTy.getDimSize(1) != 1) return failure();
+    if (lhsTy.getDimSize(1) != 1)
+      return failure();
 
     // Dynamically compute the shape of the result of the DotOp by querying
     // the 0-th dimensions, of the left, and the 1st dimension of the right.
@@ -1339,7 +1362,8 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
     auto resultTy = dyn_cast<RankedTensorType>(op.getType());
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
 
-    if (!lhsTy || !rhsTy || !resultTy) return failure();
+    if (!lhsTy || !rhsTy || !resultTy)
+      return failure();
 
     auto dNums = op.getDotDimensionNumbers();
     auto batchDimsL = dNums.getLhsBatchingDimensions();
@@ -1350,10 +1374,14 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
     llvm::SmallVector<bool> isLhsParallelDim(lhsTy.getRank(), true);
     llvm::SmallVector<bool> isRhsParallelDim(rhsTy.getRank(), true);
 
-    for (auto dim : batchDimsL) isLhsParallelDim[dim] = false;
-    for (auto dim : batchDimsR) isRhsParallelDim[dim] = false;
-    for (auto dim : contractDimsL) isLhsParallelDim[dim] = false;
-    for (auto dim : contractDimsR) isRhsParallelDim[dim] = false;
+    for (auto dim : batchDimsL)
+      isLhsParallelDim[dim] = false;
+    for (auto dim : batchDimsR)
+      isRhsParallelDim[dim] = false;
+    for (auto dim : contractDimsL)
+      isLhsParallelDim[dim] = false;
+    for (auto dim : contractDimsR)
+      isRhsParallelDim[dim] = false;
 
     for (auto dim : contractDimsL) {
       if (lhsTy.getDimSize(dim) != 1) {
@@ -1369,11 +1397,13 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
     permRhs.append(batchDimsR.begin(), batchDimsR.end());
 
     for (auto [idx, value] : llvm::enumerate(isLhsParallelDim)) {
-      if (value) permLhs.push_back(idx);
+      if (value)
+        permLhs.push_back(idx);
     }
 
     for (auto [idx, value] : llvm::enumerate(isRhsParallelDim)) {
-      if (value) permRhs.push_back(idx);
+      if (value)
+        permRhs.push_back(idx);
     }
 
     llvm::append_range(permLhs, contractDimsL);
@@ -1382,8 +1412,10 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
     // Determine the transpose shape based on the generate permutations.
     llvm::SmallVector<int64_t> lhsTransposeShape;
     llvm::SmallVector<int64_t> rhsTransposeShape;
-    for (auto dim : permLhs) lhsTransposeShape.push_back(lhsTy.getDimSize(dim));
-    for (auto dim : permRhs) rhsTransposeShape.push_back(rhsTy.getDimSize(dim));
+    for (auto dim : permLhs)
+      lhsTransposeShape.push_back(lhsTy.getDimSize(dim));
+    for (auto dim : permRhs)
+      rhsTransposeShape.push_back(rhsTy.getDimSize(dim));
 
     // Transpose the left hand side and the right hand side.
     lhs = builder.create<mlir::stablehlo::TransposeOp>(
@@ -1825,5 +1857,5 @@ struct StableHLOToStableHLOPreprocessing final
   }
 };
 
-}  // namespace
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace
+} // namespace mlir::iree_compiler::stablehlo

@@ -54,9 +54,10 @@ struct PointwiseConversionInfo {
 
 /// Checks the preconditions for conversion of pointwise HLO ops to linalg.
 /// Returns the max operand rank and the result type on success.
-FailureOr<PointwiseConversionInfo> checkOperandsAndResults(
-    Operation* op, ValueRange operands, TypeConverter& typeConverter,
-    ConversionPatternRewriter& rewriter) {
+FailureOr<PointwiseConversionInfo>
+checkOperandsAndResults(Operation *op, ValueRange operands,
+                        TypeConverter &typeConverter,
+                        ConversionPatternRewriter &rewriter) {
   int64_t maxRank = getMaxRank(operands);
 
   // Apply only if all operands are scalar or have the same rank. Some ops,
@@ -83,7 +84,8 @@ FailureOr<PointwiseConversionInfo> checkOperandsAndResults(
 
   // All-scalar pointwise ops inside of linalg ops are processes by
   // ScalarHloToArithmeticPattern.
-  if (maxRank == 0 && isInBodyOfLinalgOps(op)) return failure();
+  if (maxRank == 0 && isInBodyOfLinalgOps(op))
+    return failure();
 
   return PointwiseConversionInfo{maxRank, resultTy};
 }
@@ -95,9 +97,9 @@ struct PointwiseToLinalgMapConverter final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   using OpAdaptor = typename OpTy::Adaptor;
 
-  LogicalResult matchAndRewrite(
-      OpTy op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto conversionInfo = checkOperandsAndResults(
         op, adaptor.getOperands(), *this->typeConverter, rewriter);
     if (failed(conversionInfo)) {
@@ -129,7 +131,7 @@ struct PointwiseToLinalgMapConverter final : OpConversionPattern<OpTy> {
 
     auto mapOp = rewriter.create<linalg::MapOp>(
         loc, mappedInputs, emptyTensor,
-        [&](OpBuilder& b, Location loc, ValueRange args) {
+        [&](OpBuilder &b, Location loc, ValueRange args) {
           Value innerResult = mlir::stablehlo::StableHloOpToStdScalarOp::mapOp(
               op, getElementTypeOrSelf(emptyTensor),
               interleaveScalarAndBlockArgs(scalarInputs, args), &b);
@@ -150,9 +152,9 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   using OpAdaptor = typename OpTy::Adaptor;
 
-  LogicalResult matchAndRewrite(
-      OpTy op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto conversionInfo = checkOperandsAndResults(
         op, adaptor.getOperands(), *this->typeConverter, rewriter);
     if (failed(conversionInfo)) {
@@ -172,7 +174,8 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
     AffineMap scalarMap = AffineMap::get(maxRank, 0, rewriter.getContext());
     AffineMap idMap = rewriter.getMultiDimIdentityMap(maxRank);
     SmallVector<AffineMap> maps;
-    for (Value v : inputs) maps.push_back(isScalar(v) ? scalarMap : idMap);
+    for (Value v : inputs)
+      maps.push_back(isScalar(v) ? scalarMap : idMap);
     maps.push_back(idMap);
 
     // Build `linalg.generic` op.
@@ -180,7 +183,7 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
     auto linalgOp = rewriter.create<linalg::GenericOp>(
         loc, resultTy ? resultTy : TypeRange{}, inputs, output, maps,
         getNParallelLoopsAttrs(maxRank),
-        [&](OpBuilder& nestedBuilder, Location /*nested_loc*/,
+        [&](OpBuilder &nestedBuilder, Location /*nested_loc*/,
             ValueRange args) {
           Type innerResultTy = getElementTypeOrSelf(output);
           auto argvec = llvm::to_vector<2>(args.take_front(inputs.size()));
@@ -195,18 +198,19 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
           }
         },
         linalg::getPrunedAttributeList(op));
-    if (failed) return failure();
+    if (failed)
+      return failure();
 
     rewriter.replaceOp(op, linalgOp->getResults());
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 namespace detail {
 void populatePointwiseStableHloToLinalgConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns, bool enablePrimitiveOps) {
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns, bool enablePrimitiveOps) {
   if (enablePrimitiveOps) {
     patterns->add<
         PointwiseToLinalgMapConverter<mlir::stablehlo::AbsOp>,
@@ -308,5 +312,5 @@ void populatePointwiseStableHloToLinalgConversionPatterns(
             PointwiseToLinalgConverter<mlir::stablehlo::XorOp>>(typeConverter,
                                                                 context);
 }
-}  // namespace detail
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace detail
+} // namespace mlir::iree_compiler::stablehlo

@@ -41,7 +41,8 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
 
     for (auto operand : genericOp.getDpsInputOperands()) {
       auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
-      if (!producer) continue;
+      if (!producer)
+        continue;
 
       // check if the generic op has a non-identity map for the operand.
       auto indexingMap = genericOp.getMatchingIndexingMap(operand);
@@ -50,18 +51,21 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
         return rewriter.notifyMatchFailure(genericOp, "already normalized");
       }
       // The map must be a permutation. If not, then look for other operand.
-      if (!indexingMap.isPermutation()) continue;
+      if (!indexingMap.isPermutation())
+        continue;
 
-      if (!mapForInterchange) mapForInterchange = indexingMap;
+      if (!mapForInterchange)
+        mapForInterchange = indexingMap;
     }
 
     if (!mapForInterchange) {
       return rewriter.notifyMatchFailure(genericOp, "no eligible operands");
     }
     // Make the input indexing maps identity by interchanging.
-    auto interchange = llvm::map_to_vector(
-        mapForInterchange->getResults(),
-        [](AffineExpr e) { return e.cast<AffineDimExpr>().getPosition(); });
+    auto interchange =
+        llvm::map_to_vector(mapForInterchange->getResults(), [](AffineExpr e) {
+          return e.cast<AffineDimExpr>().getPosition();
+        });
 
     return interchangeGenericOp(rewriter, genericOp, interchange);
   }
@@ -84,13 +88,13 @@ struct InterchangeTransposeGenericOpsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createInterchangeTransposeGenericOpsPass() {
   return std::make_unique<InterchangeTransposeGenericOpsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

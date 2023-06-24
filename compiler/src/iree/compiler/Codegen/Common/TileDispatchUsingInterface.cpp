@@ -39,10 +39,12 @@ static bool isZero(Value val) {
 
 /// Helper method to adjust the interchange vector to match the iteration
 /// domain.
-static SmallVector<int64_t> fillInterchangeVector(
-    ArrayRef<unsigned> interchangeVector, size_t iterationDomainSize) {
+static SmallVector<int64_t>
+fillInterchangeVector(ArrayRef<unsigned> interchangeVector,
+                      size_t iterationDomainSize) {
   SmallVector<int64_t> filledVector;
-  for (auto v : interchangeVector) filledVector.push_back(v);
+  for (auto v : interchangeVector)
+    filledVector.push_back(v);
   if (filledVector.size() < iterationDomainSize) {
     auto range = llvm::seq<unsigned>(filledVector.size(), iterationDomainSize);
     filledVector.append(range.begin(), range.end());
@@ -90,7 +92,7 @@ struct RangeVal {
   Value size;
   Value stride;
 };
-}  // namespace
+} // namespace
 
 /// Generate an empty loop nest that represents the tiled loop nest shell.
 /// - `loopRanges` specifies the lb, ub and step of the untiled iteration space.
@@ -202,7 +204,8 @@ static LogicalResult replaceStoresWithTiledVersion(
       storeOps.push_back(storeOp);
     }
   }
-  if (storeOps.empty()) return success();
+  if (storeOps.empty())
+    return success();
   if (storeOps.size() != 1) {
     return rewriter.notifyMatchFailure(untiledValue.getOwner(),
                                        "expected a single store for the op");
@@ -270,11 +273,11 @@ struct IREETilingResult {
   SmallVector<OpFoldResult> tileOffsets;
   SmallVector<OpFoldResult> tileSizes;
 };
-}  // namespace
+} // namespace
 
-static FailureOr<IREETilingResult> tileDispatchUsingSCFFopOp(
-    RewriterBase &rewriter, TilingInterface op,
-    linalg::LinalgTilingOptions options) {
+static FailureOr<IREETilingResult>
+tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
+                          linalg::LinalgTilingOptions options) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(op);
 
@@ -333,9 +336,8 @@ static FailureOr<IREETilingResult> tileDispatchUsingSCFFopOp(
     if (!interchangeVector.empty()) {
       if (!isPermutationVector(interchangeVector)) {
         return rewriter.notifyMatchFailure(
-            op,
-            "invalid intechange vector, not a permutation of the entire "
-            "iteration space");
+            op, "invalid intechange vector, not a permutation of the entire "
+                "iteration space");
       }
 
       applyPermutationToVector(iterationDomain, interchangeVector);
@@ -466,8 +468,9 @@ static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
 
 /// Return all slices that are used to access a tile of the producer. Assume
 /// that `tiledOps` are in "reverse" order of their appearance in the IR.
-static SmallVector<tensor::ExtractSliceOp> getAllFusableProducerUses(
-    Operation *untiledOp, ArrayRef<Operation *> tiledOps) {
+static SmallVector<tensor::ExtractSliceOp>
+getAllFusableProducerUses(Operation *untiledOp,
+                          ArrayRef<Operation *> tiledOps) {
   SmallVector<tensor::ExtractSliceOp> sliceOps;
   for (auto tiledOp : llvm::reverse(tiledOps)) {
     for (OpOperand &operand : llvm::reverse(tiledOp->getOpOperands())) {
@@ -480,9 +483,9 @@ static SmallVector<tensor::ExtractSliceOp> getAllFusableProducerUses(
   return sliceOps;
 }
 
-FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
-    RewriterBase &rewriter, TilingInterface op,
-    linalg::LinalgTilingOptions tilingOptions) {
+FailureOr<IREETileAndFuseResult>
+tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
+                                 linalg::LinalgTilingOptions tilingOptions) {
   IREETileAndFuseResult tileAndFuseResult;
   auto fusableProducers = getAllFusableProducers(op);
   // Apply the tiling pattern.
@@ -562,7 +565,8 @@ struct SwapExtractSliceWithDispatchTensorLoad
                                 PatternRewriter &rewriter) const override {
     auto loadOp =
         sliceOp.getSource().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-    if (!loadOp) return failure();
+    if (!loadOp)
+      return failure();
 
     SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
     if (failed(affine::mergeOffsetsSizesAndStrides(
@@ -591,7 +595,8 @@ struct SwapExtractSliceWithTensorEmpty
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     auto emptyTensorOp = sliceOp.getSource().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyTensorOp) return failure();
+    if (!emptyTensorOp)
+      return failure();
 
     SmallVector<OpFoldResult> mixedSizes = sliceOp.getMixedSizes();
     if (mixedSizes.size() != sliceOp.getType().getRank()) {
@@ -599,7 +604,8 @@ struct SwapExtractSliceWithTensorEmpty
       rankReducedMixedSizes.reserve(sliceOp.getType().getRank());
       auto droppedDims = sliceOp.getDroppedDims();
       for (auto [index, size] : llvm::enumerate(mixedSizes)) {
-        if (droppedDims.test(index)) continue;
+        if (droppedDims.test(index))
+          continue;
         rankReducedMixedSizes.push_back(size);
       }
       std::swap(mixedSizes, rankReducedMixedSizes);
@@ -610,7 +616,7 @@ struct SwapExtractSliceWithTensorEmpty
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options) {
@@ -619,5 +625,5 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
                   SwapExtractSliceWithTensorEmpty>(context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

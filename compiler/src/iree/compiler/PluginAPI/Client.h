@@ -18,7 +18,7 @@ namespace mlir {
 class DialectRegistry;
 class MLIRContext;
 class OpPassManager;
-}  // namespace mlir
+} // namespace mlir
 
 namespace mlir::iree_compiler {
 
@@ -26,7 +26,7 @@ namespace IREE::HAL {
 // Forward declared only from Dialect/HAL/Target/TargetRegistry.h so as to avoid
 // bringing full dependencies into the plugin API.
 class TargetBackendList;
-}  // namespace IREE::HAL
+} // namespace IREE::HAL
 
 class AbstractPluginSession;
 class PluginRegistrar;
@@ -43,7 +43,7 @@ struct EmptyPluginOptions {
 // Entrypoints for extending IREE's pass pipelines at various stages.
 // Override what is needed.
 class PipelineExtensions {
- public:
+public:
   virtual ~PipelineExtensions();
 
   // Add passes to the input preprocessing pipeline, which allows to process the
@@ -76,7 +76,7 @@ enum class PluginActivationPolicy {
 // This is typically not instantiated directly but via the PluginSession
 // CRTP helper which manages most details.
 class AbstractPluginRegistration {
- public:
+public:
   AbstractPluginRegistration(std::string pluginId)
       : pluginId(std::move(pluginId)) {}
   virtual ~AbstractPluginRegistration();
@@ -121,10 +121,10 @@ class AbstractPluginRegistration {
   // the session instance. This will be called globally for all available
   // plugins so that option registration can happen first. It must have
   // no overhead beyond allocating some memory and setting up options.
-  virtual std::unique_ptr<AbstractPluginSession> createUninitializedSession(
-      OptionsBinder &localOptionsBinder) = 0;
+  virtual std::unique_ptr<AbstractPluginSession>
+  createUninitializedSession(OptionsBinder &localOptionsBinder) = 0;
 
- private:
+private:
   std::string pluginId;
 };
 
@@ -139,7 +139,7 @@ class AbstractPluginRegistration {
 // which adds some niceties and support for global command line option
 // registration.
 class AbstractPluginSession : public PipelineExtensions {
- public:
+public:
   virtual ~AbstractPluginSession();
 
   // Called prior to context initialization in order to register dialects.
@@ -153,10 +153,10 @@ class AbstractPluginSession : public PipelineExtensions {
 
   // If the plugin contributes HAL target backends, then it must return a
   // pointer to the plugin session-owned registry here. Otherwise, nullptr.
-  virtual void populateHALTargetBackends(
-      IREE::HAL::TargetBackendList &targets) {}
+  virtual void
+  populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
 
- protected:
+protected:
   // Called from registerDialects() prior to initializing the context and
   // prior to onActivate().
   virtual void onRegisterDialects(DialectRegistry &registry) {}
@@ -172,7 +172,7 @@ template <typename DerivedTy, typename OptionsTy = EmptyPluginOptions,
           PluginActivationPolicy activationPolicy =
               PluginActivationPolicy::Explicit>
 class PluginSession : public AbstractPluginSession {
- public:
+public:
   using Options = OptionsTy;
   const Options &getOptions() { return options; }
 
@@ -200,8 +200,8 @@ class PluginSession : public AbstractPluginSession {
       // Forward to the CRTP derived type.
       DerivedTy::registerGlobalDialects(registry);
     }
-    std::unique_ptr<AbstractPluginSession> createUninitializedSession(
-        OptionsBinder &localOptionsBinder) override {
+    std::unique_ptr<AbstractPluginSession>
+    createUninitializedSession(OptionsBinder &localOptionsBinder) override {
       auto instance = std::make_unique<DerivedTy>();
       if (globalCLIOptions) {
         // Bootstrap the local options with global CLI options.
@@ -214,7 +214,7 @@ class PluginSession : public AbstractPluginSession {
     std::optional<OptionsTy *> globalCLIOptions;
   };
 
- protected:
+protected:
   OptionsTy options;
   friend struct Registration;
 };
@@ -222,7 +222,7 @@ class PluginSession : public AbstractPluginSession {
 // Interface to the registration system.
 // Implemented by PluginManager.
 class PluginRegistrar {
- public:
+public:
   // Register a plugin based on a registration class.
   void registerPlugin(std::unique_ptr<AbstractPluginRegistration> registration);
 
@@ -237,10 +237,10 @@ class PluginRegistrar {
     registerPlugin(std::move(registration));
   }
 
- protected:
+protected:
   llvm::StringMap<std::unique_ptr<AbstractPluginRegistration>> registrations;
 };
 
-}  // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler
 
-#endif  // IREE_COMPILER_PLUGINAPI_CLIENT_H_
+#endif // IREE_COMPILER_PLUGINAPI_CLIENT_H_

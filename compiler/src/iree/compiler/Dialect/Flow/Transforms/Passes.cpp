@@ -96,26 +96,29 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableFuseMultiUse(
-    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops."),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    clEnableFuseMultiUse("iree-flow-fuse-multi-use",
+                         llvm::cl::desc("Fuse multi-use ops."),
+                         llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clEnableDataTiling(
-    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path."),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    clEnableDataTiling("iree-flow-enable-data-tiling",
+                       llvm::cl::desc("Enable data tiling path."),
+                       llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
     llvm::cl::desc("Enable normalizing input indexing map to identity."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clDumpDispatchGraph(
-    "iree-flow-dump-dispatch-graph",
-    llvm::cl::desc("Dump a dot graph for dispatches."), llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    clDumpDispatchGraph("iree-flow-dump-dispatch-graph",
+                        llvm::cl::desc("Dump a dot graph for dispatches."),
+                        llvm::cl::init(false));
 
 static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
     "iree-flow-dump-dispatch-graph-output-file",
@@ -184,7 +187,7 @@ void buildGlobalOptimizationPassPipeline(
       IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
 }
 
-}  // namespace
+} // namespace
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
@@ -407,8 +410,8 @@ void registerFlowTransformPassPipeline() {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerFlowPasses() {
   // Generated.
@@ -418,7 +421,7 @@ void registerFlowPasses() {
   registerFlowTransformPassPipeline();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

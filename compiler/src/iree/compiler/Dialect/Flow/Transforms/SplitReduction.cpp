@@ -25,9 +25,9 @@ namespace IREE {
 namespace Flow {
 
 // TODO(thomasraoux): Move to attributes.
-static llvm::cl::opt<int64_t> splitReductionRatio(
-    "iree-flow-split-matmul-reduction", llvm::cl::desc("split ratio"),
-    llvm::cl::init(1));
+static llvm::cl::opt<int64_t>
+    splitReductionRatio("iree-flow-split-matmul-reduction",
+                        llvm::cl::desc("split ratio"), llvm::cl::init(1));
 
 static llvm::cl::list<int64_t> topkSplitReductionRatio(
     "iree-flow-topk-split-reduction",
@@ -44,8 +44,8 @@ struct LinalgSplitReduction
                        LinalgExt::LinalgTransformationFilter f,
                        PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-        controlSplitReductionFn(controlSplitReductionFn),
-        filter(std::move(f)) {}
+        controlSplitReductionFn(controlSplitReductionFn), filter(std::move(f)) {
+  }
 
   LogicalResult matchAndRewrite(linalg::LinalgOp op,
                                 PatternRewriter &rewriter) const override {
@@ -63,7 +63,8 @@ struct LinalgSplitReduction
 
     FailureOr<linalg::LinalgOp> result = LinalgExt::splitReduction(
         rewriter, op, controlSplitReductionFn, filter);
-    if (failed(result)) return failure();
+    if (failed(result))
+      return failure();
     // If any attributes needs to be propagated set it.
     for (std::pair<StringAttr, Attribute> &attrib : attributes) {
       result.value()->setAttr(attrib.first, attrib.second);
@@ -71,7 +72,7 @@ struct LinalgSplitReduction
     return result;
   }
 
- private:
+private:
   linalg::ControlSplitReductionFn controlSplitReductionFn;
   LinalgExt::LinalgTransformationFilter filter;
 };
@@ -136,13 +137,13 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createSplitReductionPass() {
   return std::make_unique<SplitReductionPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

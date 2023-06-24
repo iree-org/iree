@@ -65,9 +65,9 @@ static void insertConversionPattern(RewritePatternSet &patterns,
     Pattern(MLIRContext *context, GenericOpRewritePattern<OpTy> f,
             PatternBenefit benefit)
         : OpConversionPattern<OpTy>(context, benefit), f(f) {}
-    LogicalResult matchAndRewrite(
-        OpTy op, typename OpTy::Adaptor adaptor,
-        ConversionPatternRewriter &rewriter) const override {
+    LogicalResult
+    matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                    ConversionPatternRewriter &rewriter) const override {
       return f(op, adaptor, rewriter);
     }
     GenericOpRewritePattern<OpTy> f;
@@ -75,7 +75,7 @@ static void insertConversionPattern(RewritePatternSet &patterns,
   patterns.insert<Pattern>(context, f, benefit);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_PATTERNUTILS_H_
+#endif // IREE_COMPILER_UTILS_PATTERNUTILS_H_

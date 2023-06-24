@@ -46,7 +46,8 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type))) return nullptr;
+  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+    return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
@@ -65,7 +66,8 @@ struct PrimitiveTypeConverter : public TypeConverter {
   explicit PrimitiveTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](SourceType type) -> Type {
-      if (!isSourceType(type)) return type;
+      if (!isSourceType(type))
+        return type;
       return getTargetType(type);
     });
     addConversion([&](ComplexType type) {
@@ -112,9 +114,9 @@ struct GenericTypeConversionPattern : public ConversionPattern {
   GenericTypeConversionPattern(MLIRContext *context,
                                TypeConverter &typeConverter)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // Convert attributes only if this is a constant-like op.
     // This is because some ops use typed attributes for structural information
     // - like linalg ops using i64 for dimension indices - and if we converted
@@ -161,9 +163,9 @@ template <typename OpTy, typename TypeTy,
           typename OperandToResultWidthLegalityRelation>
 struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         this->getTypeConverter()->convertType(op.getResult().getType());
     auto operandType = adaptor.getIn().getType();
@@ -200,7 +202,7 @@ template <typename SrcOp>
 class PropagateCastF : public OpRewritePattern<SrcOp> {
   using OpRewritePattern<SrcOp>::OpRewritePattern;
 
- public:
+public:
   LogicalResult matchAndRewrite(SrcOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op.getOperand();
@@ -260,13 +262,16 @@ struct ConvertBf16ArithToF32Pass
 
     auto checkOp = [&](Operation *op) {
       for (Type type : op->getResultTypes()) {
-        if (!typeConverter.isLegal(type)) return false;
+        if (!typeConverter.isLegal(type))
+          return false;
       }
       for (Type type : op->getOperandTypes()) {
-        if (!typeConverter.isLegal(type)) return false;
+        if (!typeConverter.isLegal(type))
+          return false;
       }
       for (auto &region : op->getRegions()) {
-        if (!typeConverter.isLegal(&region)) return false;
+        if (!typeConverter.isLegal(&region))
+          return false;
       }
       return true;
     };
@@ -305,12 +310,12 @@ struct ConvertBf16ArithToF32Pass
   PromoteBF16ToF32Converter typeConverter;
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createConvertBf16ArithToF32Pass() {
   return std::make_unique<ConvertBf16ArithToF32Pass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -148,15 +148,16 @@ static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
   int64_t reductionSize = captures.reductionOpSizes.back();
   if (cpuModel.model == CPUModel::kDefaultCPU) {
     if (captures.reductionOutputElementalTypeBitWidth == 32) {
-      if (reductionSize == 32) return ReductionConfig{/*vectorSize=*/32};
+      if (reductionSize == 32)
+        return ReductionConfig{/*vectorSize=*/32};
     }
   }
   return failure();
 }
 
-static ReductionConfig getReductionConfig(
-    const transform_ext::MatchedReductionCaptures &captures,
-    const CPUModel &cpuModel) {
+static ReductionConfig
+getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
+                   const CPUModel &cpuModel) {
   return ReductionConfig{16};
 }
 
@@ -168,7 +169,8 @@ LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
   transform_ext::MatcherContext matcherContext;
   makeReductionMatcher(matcherContext, reduction, captures,
                        /*mustMatchEntireFunc=*/true);
-  if (!matchPattern(op, *reduction)) return failure();
+  if (!matchPattern(op, *reduction))
+    return failure();
 
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.

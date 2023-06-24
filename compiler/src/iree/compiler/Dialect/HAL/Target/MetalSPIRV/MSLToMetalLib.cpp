@@ -28,15 +28,15 @@ static std::string getMetalCompileCommand(MetalTargetPlatform platform,
                                           StringRef libFile) {
   const char *sdk = "";
   switch (platform) {
-    case MetalTargetPlatform::macOS:
-      sdk = "macosx";
-      break;
-    case MetalTargetPlatform::iOS:
-      sdk = "iphoneos";
-      break;
-    case MetalTargetPlatform::iOSSimulator:
-      sdk = "iphonesimulator";
-      break;
+  case MetalTargetPlatform::macOS:
+    sdk = "macosx";
+    break;
+  case MetalTargetPlatform::iOS:
+    sdk = "iphoneos";
+    break;
+  case MetalTargetPlatform::iOSSimulator:
+    sdk = "iphonesimulator";
+    break;
   }
 
   // Metal shader offline compilation involves two steps:
@@ -57,15 +57,16 @@ static std::string getMetalCompileCommand(MetalTargetPlatform platform,
 static LogicalResult runSystemCommand(StringRef command) {
   LLVM_DEBUG(llvm::dbgs() << "Running system command: '" << command << "'\n");
   int exitCode = system(command.data());
-  if (exitCode == 0) return success();
+  if (exitCode == 0)
+    return success();
   llvm::errs() << "Failed to run system command '" << command
                << "' with error code: " << exitCode << "\n";
   return failure();
 }
 
-std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(
-    MetalTargetPlatform targetPlatform, StringRef mslCode,
-    StringRef entryPoint) {
+std::unique_ptr<llvm::MemoryBuffer>
+compileMSLToMetalLib(MetalTargetPlatform targetPlatform, StringRef mslCode,
+                     StringRef entryPoint) {
   SmallString<32> mslFile, airFile, libFile;
   int mslFd = 0;
   llvm::sys::fs::createTemporaryFile(entryPoint, "metal", mslFd, mslFile);
@@ -73,14 +74,15 @@ std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(
   llvm::FileRemover mslRemover(mslFile.c_str());
   llvm::FileRemover libRemover(libFile.c_str());
 
-  {  // Write input MSL code to the temporary file.
+  { // Write input MSL code to the temporary file.
     llvm::raw_fd_ostream inputStream(mslFd, /*shouldClose=*/true);
     inputStream << mslCode << "\n";
   }
 
   std::string command =
       getMetalCompileCommand(targetPlatform, mslFile, libFile);
-  if (failed(runSystemCommand(command))) return nullptr;
+  if (failed(runSystemCommand(command)))
+    return nullptr;
 
   auto fileOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(libFile, /*isText=*/false);
@@ -93,7 +95,7 @@ std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(
   return std::move(*fileOrErr);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

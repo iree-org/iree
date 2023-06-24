@@ -23,8 +23,8 @@ extern "C" {
 #endif
 
 // Registers all dialects and extensions known to the IREE compiler.
-MLIR_CAPI_EXPORTED void ireeCompilerRegisterDialects(
-    MlirDialectRegistry registry);
+MLIR_CAPI_EXPORTED void
+ireeCompilerRegisterDialects(MlirDialectRegistry registry);
 
 // Gets the MlirContext that the session manages. The context is owned by the
 // session and valid until it is destroyed.
@@ -36,11 +36,12 @@ ireeCompilerSessionGetContext(iree_compiler_session_t *session);
 // Ownership of the moduleOp is transferred to the invocation, regardless of
 // whether the call succeeds or fails.
 // On failure, returns false and issues diagnostics.
-MLIR_CAPI_EXPORTED bool ireeCompilerInvocationImportModule(
-    iree_compiler_invocation_t *inv, MlirOperation moduleOp);
+MLIR_CAPI_EXPORTED bool
+ireeCompilerInvocationImportModule(iree_compiler_invocation_t *inv,
+                                   MlirOperation moduleOp);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // IREE_COMPILER_API_MLIR_INTEROP_H
+#endif // IREE_COMPILER_API_MLIR_INTEROP_H

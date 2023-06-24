@@ -43,6 +43,6 @@ void populatePreprocessingGatherToTorchIndexSelectPatterns(
 void populatePreprocessingUnfuseBatchNormPatterns(MLIRContext *context,
                                                   RewritePatternSet *patterns);
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PREPROCESSING_REWRITERS_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PREPROCESSING_REWRITERS_H_

@@ -34,11 +34,11 @@ class DecomposeConvolutionToLowerDimOpsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass() {
   return std::make_unique<DecomposeConvolutionToLowerDimOpsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

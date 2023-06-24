@@ -38,4 +38,4 @@ IREE_EMBED_EXPORTED int ireeCompilerRunLldMain(int argc, char **argv);
 }
 #endif
 
-#endif  // IREE_COMPILER_TOOL_ENTRY_POINTS_API_H
+#endif // IREE_COMPILER_TOOL_ENTRY_POINTS_API_H

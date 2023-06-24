@@ -43,12 +43,12 @@ struct CleanupBufferAllocViewPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createCleanupBufferAllocViewPass() {
   return std::make_unique<CleanupBufferAllocViewPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

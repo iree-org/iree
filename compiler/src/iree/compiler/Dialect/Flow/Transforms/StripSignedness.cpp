@@ -20,13 +20,13 @@ namespace Flow {
 namespace {
 
 class StripSignednessPass : public StripSignednessBase<StripSignednessPass> {
- public:
+public:
   explicit StripSignednessPass() {}
   void runOnOperation() override;
 };
 
 class IntegerTypeConverter : public TypeConverter {
- public:
+public:
   static Type convertType(Type type) {
     if (auto iType = llvm::dyn_cast<IntegerType>(type)) {
       if (!iType.isSignless()) {
@@ -51,12 +51,12 @@ class IntegerTypeConverter : public TypeConverter {
 // conversion patterns that used the original Quant types to be updated to
 // the non-quant variants.
 class GenericTypeConvert : public ConversionPattern {
- public:
-  GenericTypeConvert(MLIRContext* context, TypeConverter& converter)
+public:
+  GenericTypeConvert(MLIRContext *context, TypeConverter &converter)
       : ConversionPattern(converter, MatchAnyOpTypeTag(), 0, context) {}
-  LogicalResult matchAndRewrite(
-      Operation* op, ArrayRef<Value> operands,
-      ConversionPatternRewriter& rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     llvm::SmallVector<Type> newResults;
     if (isa<FunctionOpInterface>(op)) {
       return failure();
@@ -65,15 +65,15 @@ class GenericTypeConvert : public ConversionPattern {
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
     OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
                          newResults, op->getAttrs(), op->getSuccessors());
-    for (Region& r : op->getRegions()) {
-      Region* newRegion = state.addRegion();
+    for (Region &r : op->getRegions()) {
+      Region *newRegion = state.addRegion();
       rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
       TypeConverter::SignatureConversion result(newRegion->getNumArguments());
       (void)getTypeConverter()->convertSignatureArgs(
           newRegion->getArgumentTypes(), result);
       rewriter.applySignatureConversion(newRegion, result);
     }
-    Operation* newOp = rewriter.create(state);
+    Operation *newOp = rewriter.create(state);
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
@@ -93,25 +93,29 @@ void StripSignednessPass::runOnOperation() {
   ConversionTarget target(getContext());
 
   // Operations are legal if they don't contain any illegal type.
-  target.markUnknownOpDynamicallyLegal([](Operation* op) {
+  target.markUnknownOpDynamicallyLegal([](Operation *op) {
     if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
       for (Type type : funcOp.getArgumentTypes()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalType(type))
+          return false;
       }
       for (Type type : funcOp.getResultTypes()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalType(type))
+          return false;
       }
     }
     for (Type type : op->getResultTypes()) {
-      if (type && isIllegalType(type)) return false;
+      if (type && isIllegalType(type))
+        return false;
     }
     for (Type type : op->getOperandTypes()) {
-      if (type && isIllegalType(type)) return false;
+      if (type && isIllegalType(type))
+        return false;
     }
     return true;
   });
 
-  auto* ctx = &getContext();
+  auto *ctx = &getContext();
 
   RewritePatternSet patterns(&getContext());
   patterns.insert<GenericTypeConvert>(ctx, converter);
@@ -124,14 +128,14 @@ void StripSignednessPass::runOnOperation() {
   }
 }
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createStripSignednessPass() {
   return std::make_unique<StripSignednessPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

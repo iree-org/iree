@@ -95,28 +95,28 @@ struct GlobalTable {
       auto globalName = globalOrder[i];
       auto action = fn(globalMap[globalName]);
       switch (action) {
-        case GlobalAction::PRESERVE: {
-          ++i;
-          break;
+      case GlobalAction::PRESERVE: {
+        ++i;
+        break;
+      }
+      case GlobalAction::UPDATE: {
+        didChange |= true;
+        ++i;
+        break;
+      }
+      case GlobalAction::DELETE: {
+        didChange |= true;
+        auto &global = globalMap[globalName];
+        assert(global.op.isGlobalPrivate() && "can't delete public globals");
+        assert(global.loadOps.empty() && "must not be used");
+        for (auto storeOp : global.storeOps) {
+          storeOp.erase();
         }
-        case GlobalAction::UPDATE: {
-          didChange |= true;
-          ++i;
-          break;
-        }
-        case GlobalAction::DELETE: {
-          didChange |= true;
-          auto &global = globalMap[globalName];
-          assert(global.op.isGlobalPrivate() && "can't delete public globals");
-          assert(global.loadOps.empty() && "must not be used");
-          for (auto storeOp : global.storeOps) {
-            storeOp.erase();
-          }
-          global.op.erase();
-          globalMap.erase(globalName);
-          globalOrder.erase(globalOrder.begin() + i);
-          break;
-        }
+        global.op.erase();
+        globalMap.erase(globalName);
+        globalOrder.erase(globalOrder.begin() + i);
+        break;
+      }
       }
     }
     return didChange;
@@ -140,7 +140,8 @@ struct GlobalTable {
 //  util.global @a = 5 : i32
 static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (global.isIndirect) return GlobalAction::PRESERVE;
+    if (global.isIndirect)
+      return GlobalAction::PRESERVE;
 
     // Find the constant value used in all stores.
     // All stores must match the initial value of the global _or_ the global
@@ -164,7 +165,8 @@ static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
         break;
       }
     }
-    if (!constantValue) return GlobalAction::PRESERVE;
+    if (!constantValue)
+      return GlobalAction::PRESERVE;
 
     // Propagate constant into the initial value. Note that there may have been
     // a previous initial value that is being replaced.
@@ -192,7 +194,8 @@ static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
 //  util.global.mutable @chained0 : i32
 static bool renameChainedGlobals(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (!global.isCandidate()) return GlobalAction::PRESERVE;
+    if (!global.isCandidate())
+      return GlobalAction::PRESERVE;
 
     // Find the other symbol this global is chained with by looking for uniform
     // stores. Note that we don't care about initializers.
@@ -213,7 +216,8 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
         break;
       }
     }
-    if (!aliasName) return GlobalAction::PRESERVE;
+    if (!aliasName)
+      return GlobalAction::PRESERVE;
 
     // Replace all loads from the global with the aliased global.
     auto &aliasGlobal = globalTable.globalMap[aliasName.getValue()];
@@ -245,9 +249,12 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
 //  util.global @a = 5 : i32
 static bool updateGlobalImmutability(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (!global.isCandidate()) return GlobalAction::PRESERVE;
-    if (!global.storeOps.empty()) return GlobalAction::PRESERVE;
-    if (!global.op.isGlobalMutable()) return GlobalAction::PRESERVE;
+    if (!global.isCandidate())
+      return GlobalAction::PRESERVE;
+    if (!global.storeOps.empty())
+      return GlobalAction::PRESERVE;
+    if (!global.op.isGlobalMutable())
+      return GlobalAction::PRESERVE;
     global.op.setGlobalMutable(false);
     return GlobalAction::UPDATE;
   });
@@ -266,18 +273,24 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
   }
   // Fallback that asks a dialect to materialize things. This may fail!
   auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
-  if (!op) return nullptr;
+  if (!op)
+    return nullptr;
   return op->getResult(0);
 }
 
 // Inlines constant global values that are known to not change.
 static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (global.isIndirect) return GlobalAction::PRESERVE;
-    if (!global.storeOps.empty()) return GlobalAction::PRESERVE;
-    if (global.op.isGlobalMutable()) return GlobalAction::PRESERVE;
-    if (global.op->hasAttr("noinline")) return GlobalAction::PRESERVE;
-    if (!global.op.getGlobalInitialValue()) return GlobalAction::PRESERVE;
+    if (global.isIndirect)
+      return GlobalAction::PRESERVE;
+    if (!global.storeOps.empty())
+      return GlobalAction::PRESERVE;
+    if (global.op.isGlobalMutable())
+      return GlobalAction::PRESERVE;
+    if (global.op->hasAttr("noinline"))
+      return GlobalAction::PRESERVE;
+    if (!global.op.getGlobalInitialValue())
+      return GlobalAction::PRESERVE;
 
     if (llvm::isa<IREE::Util::ReferenceTypeInterface>(
             global.op.getGlobalType())) {
@@ -315,7 +328,8 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
 // are discarded.
 static bool eraseUnusedGlobals(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (!global.isCandidate()) return GlobalAction::PRESERVE;
+    if (!global.isCandidate())
+      return GlobalAction::PRESERVE;
     if (global.loadOps.empty()) {
       // No loads; remove entirely.
       return GlobalAction::DELETE;
@@ -332,7 +346,8 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
   DenseMap<Attribute, StringRef> leaderMap;
   for (auto globalIt : globalTable.globalMap) {
     auto &global = globalIt.getSecond();
-    if (!global.isCandidate()) continue;
+    if (!global.isCandidate())
+      continue;
     if (!global.storeOps.empty()) {
       // Stores - not eligible for deduplication.
       continue;
@@ -350,8 +365,10 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
 
   bool didChange = false;
   for (auto it = ec.begin(), end = ec.end(); it != end; ++it) {
-    if (!it->isLeader()) continue;  // Ignore non-leader sets.
-    if (++ec.member_begin(it) == ec.member_end()) continue;
+    if (!it->isLeader())
+      continue; // Ignore non-leader sets.
+    if (++ec.member_begin(it) == ec.member_end())
+      continue;
     IREE::Util::GlobalOpInterface baseGlobalOp =
         globalTable.globalMap[it->getData()].op;
 
@@ -374,7 +391,8 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
         baseGlobalOp.getContext(), baseGlobalOp.getGlobalName());
     for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
       Global &global = globalTable.globalMap[*mi];
-      if (global.op == baseGlobalOp) continue;
+      if (global.op == baseGlobalOp)
+        continue;
       for (auto loadOp : global.loadOps) {
         loadOp.setGlobalAttr(baseGlobalNameAttr);
       }
@@ -393,7 +411,7 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
 }
 
 class FoldGlobalsPass : public FoldGlobalsBase<FoldGlobalsPass> {
- public:
+public:
   explicit FoldGlobalsPass() = default;
   FoldGlobalsPass(const FoldGlobalsPass &pass) {}
 
@@ -464,27 +482,28 @@ class FoldGlobalsPass : public FoldGlobalsBase<FoldGlobalsPass> {
         didChange = true;
       }
 
-      if (!didChange) break;
+      if (!didChange)
+        break;
     }
 
     afterFoldingGlobals =
         count(moduleOp.getOps<IREE::Util::GlobalOpInterface>());
   }
 
- private:
+private:
   Statistic beforeFoldingGlobals{this, "global ops before folding",
                                  "Number of util.global ops before folding"};
   Statistic afterFoldingGlobals{this, "global ops after folding",
                                 "Number of util.global ops after folding"};
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass() {
   return std::make_unique<FoldGlobalsPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

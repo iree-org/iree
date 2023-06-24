@@ -21,8 +21,8 @@ namespace iree_compiler {
 class TilingConfig;
 
 /// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
-    bool reassociateFpReordering = false);
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertToLLVMPass(bool reassociateFpReordering = false);
 
 /// Checks CPU backend specific IR constraints (like no stack allocations)
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -59,8 +59,8 @@ createLLVMCPUMmt4dVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
 
 /// Pass to perform SplitReduction transformations of `LinalgOp`s.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
-    bool enableReassociateFpReductions = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
 
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -72,12 +72,12 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
     LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims);
 
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
-    int64_t tilingLevel = -1);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
 
 /// Pass to tile TilingInterface ops with given tilingLevel.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
-    int64_t tilingLevel = -1);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTilePass(int64_t tilingLevel = -1);
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
@@ -97,8 +97,8 @@ struct LLVMCPUVectorizationPassOptions {
   bool vectorizeGatherAccesses = false;
 };
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
-    const LLVMCPUVectorizationPassOptions &options);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options);
 
 /// A pass that converts certain vector.contract ops to custom kernels.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -219,7 +219,7 @@ createLLVMCPULinkExecutablesPass();
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_

@@ -45,8 +45,8 @@ static MatmulTileParams chooseMatmulTileParams(MatmulType type,
   return chooseMatmulTileParamsGeneric();
 }
 
-static MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr) {
+static MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (hasMicrokernels(targetAttr)) {
     return chooseDynamicEncodingInfoVMVXMicrokernels;
   }
@@ -64,7 +64,7 @@ struct VMVXMaterializeEncodingPass
   void runOnOperation() override;
 };
 
-}  // namespace
+} // namespace
 
 void VMVXMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -75,7 +75,8 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
       [targetAttr](
           RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
         std::optional<TensorEncoding> encoding = getEncoding(tensorType);
-        if (!encoding) return failure();
+        if (!encoding)
+          return failure();
 
         auto matmulType = getMatmulType(*encoding);
         auto matmulOperandRole = getMatmulOperandRole(*encoding);
@@ -119,5 +120,5 @@ createVMVXMaterializeEncodingPass() {
   return std::make_unique<VMVXMaterializeEncodingPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

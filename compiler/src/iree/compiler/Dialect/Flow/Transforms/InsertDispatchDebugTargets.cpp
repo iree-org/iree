@@ -28,24 +28,28 @@ namespace Flow {
 static SmallVector<Value> filterNonTensorValues(ValueRange &&range) {
   SmallVector<Value> result;
   for (auto value : range) {
-    if (llvm::isa<TensorType>(value.getType())) result.push_back(value);
+    if (llvm::isa<TensorType>(value.getType()))
+      result.push_back(value);
   }
   return result;
 }
 
 // Attempts to interpret a pass arg as @<function_name>:<ordinal>, else returns
 // a negative ordinal indicating no match.
-static std::tuple<std::string, int> getOrdinalFromDebugTarget(
-    std::string marker) {
-  if (marker.empty() || marker[0] != '@') return std::make_tuple("", -1);
+static std::tuple<std::string, int>
+getOrdinalFromDebugTarget(std::string marker) {
+  if (marker.empty() || marker[0] != '@')
+    return std::make_tuple("", -1);
 
   SmallVector<StringRef, 2> parts;
   auto cropped = marker.substr(1);
   llvm::SplitString(llvm::StringRef(cropped), parts, ":");
-  if (parts.size() != 2) return std::make_tuple("", -1);
+  if (parts.size() != 2)
+    return std::make_tuple("", -1);
 
   int ordinal;
-  if (parts[1].getAsInteger(10, ordinal)) return std::make_tuple("", -1);
+  if (parts[1].getAsInteger(10, ordinal))
+    return std::make_tuple("", -1);
 
   return std::make_tuple(parts[0].str(), ordinal);
 }
@@ -72,10 +76,12 @@ static void traceOpWithName(DispatchOp dispatchOp, std::string name) {
 static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
                                                 mlir::func::FuncOp funcOp,
                                                 Operation *op) {
-  if (!funcOp->isProperAncestor(op)) return failure();
+  if (!funcOp->isProperAncestor(op))
+    return failure();
 
   // TODO: Handle nested function calls.
-  if (!SymbolTable::symbolKnownUseEmpty(funcOp, moduleOp)) return failure();
+  if (!SymbolTable::symbolKnownUseEmpty(funcOp, moduleOp))
+    return failure();
 
   // TODO: Handle (nested) control flow.
   auto funcBlock = op->getBlock();
@@ -144,13 +150,16 @@ struct InsertDebugTargetAtOrdinalPass
 
       // Only look for dispatches in upstream func ops.
       auto funcOp = llvm::dyn_cast<mlir::func::FuncOp>(operation);
-      if (!funcOp) continue;
+      if (!funcOp)
+        continue;
 
       std::string fName = funcOp.getName().str();
       int localBreakOrdinal = -1;
-      if (fName == breakFname) localBreakOrdinal = breakOrdinal;
+      if (fName == breakFname)
+        localBreakOrdinal = breakOrdinal;
       int localTraceOrdinal = -1;
-      if (fName == traceFname) localTraceOrdinal = traceOrdinal;
+      if (fName == traceFname)
+        localTraceOrdinal = traceOrdinal;
 
       auto &bodyRegion = op.getFunctionBody();
       auto dispatchOps = llvm::to_vector<8>(bodyRegion.getOps<DispatchOp>());
@@ -200,10 +209,12 @@ struct InsertDebugTargetAtSymbolPass
   void runOnOperation() override {
     // Setup regex for matching symbol names.
     llvm::Regex traceMatcher;
-    if (!traceDebugTarget.empty()) traceMatcher = llvm::Regex(traceDebugTarget);
+    if (!traceDebugTarget.empty())
+      traceMatcher = llvm::Regex(traceDebugTarget);
 
     llvm::Regex breakMatcher;
-    if (!breakDebugTarget.empty()) breakMatcher = llvm::Regex(breakDebugTarget);
+    if (!breakDebugTarget.empty())
+      breakMatcher = llvm::Regex(breakDebugTarget);
 
     for (auto it :
          llvm::enumerate(getOperation().getOps<FunctionOpInterface>())) {
@@ -255,7 +266,7 @@ createInsertDebugTargetAtSymbolPass(std::string breakDebugTarget,
                                                          traceDebugTarget);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

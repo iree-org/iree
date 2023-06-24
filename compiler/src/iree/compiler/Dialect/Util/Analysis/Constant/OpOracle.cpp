@@ -48,7 +48,7 @@ ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
   return info;
 }
 
-}  // namespace
+} // namespace
 
 void registerConstExprDependentDialects(DialectRegistry &registry) {
   registry.insert<IREE::Util::UtilDialect>();
@@ -158,7 +158,7 @@ bool isHoistableConstExprConsumingOperand(OpOperand *operand) {
   return true;
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

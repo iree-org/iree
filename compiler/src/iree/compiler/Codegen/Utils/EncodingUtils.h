@@ -29,26 +29,25 @@ enum class MatmulOperandRole {
 
 // Constructs a MatmulType from separate operands element types, or returns
 // std::nullopt if no MatmulType enumeration value would match.
-std::optional<MatmulType> getMatmulType(Type lhsElementType,
-                                        Type rhsElementType,
-                                        Type resultElementType);
+std::optional<MatmulType>
+getMatmulType(Type lhsElementType, Type rhsElementType, Type resultElementType);
 
 // Helper to read the TensorEncoding from a TensorEncodingAttr on a TensorType.
 // Return std::nullopt if the TensorType does not have a TensorEncodingAttr.
-std::optional<IREE::LinalgExt::TensorEncoding> getEncoding(
-    RankedTensorType tensorType);
+std::optional<IREE::LinalgExt::TensorEncoding>
+getEncoding(RankedTensorType tensorType);
 
 // Reads a MatmulType from a TensorEncoding, or returns std::nullopt if no
 // MatmulType enumeration value would match.
-std::optional<MatmulType> getMatmulType(
-    IREE::LinalgExt::TensorEncoding encoding);
+std::optional<MatmulType>
+getMatmulType(IREE::LinalgExt::TensorEncoding encoding);
 
 // Reads a MatmulOperandRole from a TensorEncoding, or returns std::nullopt if
 // no MatmulOperandRole enumeration value would match.
-std::optional<MatmulOperandRole> getMatmulOperandRole(
-    IREE::LinalgExt::TensorEncoding encoding);
+std::optional<MatmulOperandRole>
+getMatmulOperandRole(IREE::LinalgExt::TensorEncoding encoding);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_UTILS_ENCODINGUTILS_H_
+#endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_UTILS_ENCODINGUTILS_H_

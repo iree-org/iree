@@ -27,7 +27,7 @@ namespace HAL {
 class SerializeTargetExecutablesPass
     : public PassWrapper<SerializeTargetExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
- public:
+public:
   SerializeTargetExecutablesPass()
       : targetRegistry(TargetBackendRegistry::getGlobal()) {}
   SerializeTargetExecutablesPass(const SerializeTargetExecutablesPass &pass)
@@ -90,7 +90,8 @@ class SerializeTargetExecutablesPass
     auto variantOps = llvm::to_vector(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
-      if (variantOp.getTarget().getBackend().getValue() != target) continue;
+      if (variantOp.getTarget().getBackend().getValue() != target)
+        continue;
       OpBuilder executableBuilder(variantOp);
       // Ask the target backend to serialize the executable. Note that it
       // may create one or more hal.executable.binary ops in the case of
@@ -105,7 +106,7 @@ class SerializeTargetExecutablesPass
     }
   }
 
- private:
+private:
   Option<std::string> target{
       *this, "target",
       llvm::cl::desc(
@@ -144,14 +145,13 @@ static PassRegistration<SerializeTargetExecutablesPass> linkTargetPass([] {
 class SerializeExecutablesPass
     : public PassWrapper<SerializeExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
- public:
+public:
   SerializeExecutablesPass()
       : targetRegistry(TargetBackendRegistry::getGlobal()) {}
   SerializeExecutablesPass(const TargetBackendRegistry &targetRegistry,
                            int debugLevel, std::string dumpIntermediatesPath,
                            std::string dumpBinariesPath)
-      : targetRegistry(targetRegistry),
-        debugLevel(debugLevel),
+      : targetRegistry(targetRegistry), debugLevel(debugLevel),
         dumpIntermediatesPath(dumpIntermediatesPath),
         dumpBinariesPath(dumpBinariesPath) {}
 
@@ -177,7 +177,7 @@ class SerializeExecutablesPass
     }
   }
 
- private:
+private:
   const TargetBackendRegistry &targetRegistry;
   int debugLevel;
   std::string dumpIntermediatesPath;
@@ -197,7 +197,7 @@ static PassRegistration<SerializeExecutablesPass> linkPass([] {
   return std::make_unique<SerializeExecutablesPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

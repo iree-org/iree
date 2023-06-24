@@ -45,7 +45,7 @@ void registerTransformPassPipeline() {
       });
 }
 
-}  // namespace ABI
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ABI
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

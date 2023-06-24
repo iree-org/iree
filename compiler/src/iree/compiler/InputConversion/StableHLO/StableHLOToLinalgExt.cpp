@@ -47,7 +47,8 @@ Type convertIntegerToSignless(IntegerType intType) {
 }
 
 std::optional<Type> convertRank0TensorToScalar(RankedTensorType tensorType) {
-  if (tensorType.getRank() != 0) return std::nullopt;
+  if (tensorType.getRank() != 0)
+    return std::nullopt;
   Type elementType = tensorType.getElementType();
   if (auto intType = dyn_cast<IntegerType>(elementType)) {
     elementType = convertIntegerToSignless(intType);
@@ -67,7 +68,8 @@ std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
   auto fromType = dyn_cast<RankedTensorType>(fromValue.getType());
-  if (!fromType) return std::nullopt;
+  if (!fromType)
+    return std::nullopt;
 
   if (auto intFromType = dyn_cast<IntegerType>(fromType.getElementType())) {
     Type castType = getElementTypeOrSelf(toType);
@@ -82,7 +84,8 @@ std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
     }
   }
 
-  if (fromType.getRank() != 0) return fromValue;
+  if (fromType.getRank() != 0)
+    return fromValue;
 
   Type extractType = getElementTypeOrSelf(toType);
   return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
@@ -122,12 +125,14 @@ bool isInBodyOfLinalgExtOps(Operation *op) {
 template <typename OpTy>
 struct LinalgExtRegionHLOOpConversion final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!isInBodyOfLinalgExtOps(op)) return failure();
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!isInBodyOfLinalgExtOps(op))
+      return failure();
     TensorType origRetType = dyn_cast<TensorType>(op.getType());
-    if (!origRetType) return failure();
+    if (!origRetType)
+      return failure();
     SmallVector<Value> scalarArgs;
     Type newRetType = getElementTypeOrSelf(
         this->typeConverter->convertType(origRetType.getElementType()));
@@ -141,10 +146,11 @@ struct LinalgExtRegionHLOOpConversion final : OpConversionPattern<OpTy> {
 struct LinalgExtRegionReturnOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReturnOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!isInBodyOfLinalgExtOps(op)) return failure();
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!isInBodyOfLinalgExtOps(op))
+      return failure();
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::YieldOp>(
         op, adaptor.getOperands());
     return success();
@@ -158,9 +164,9 @@ struct LinalgExtRegionReturnOpConversion final
 struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::SortOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::SortOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
 
     llvm::SmallVector<Type> resultTypes;
@@ -213,27 +219,33 @@ struct ScatterOpConversion final
     auto indexDepth = indicesType.getShape().back();
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
 
-    if (indicesRank != 2) return false;
-    if (indexVectorDim != indicesRank - 1) return false;
-    if (scatterDimsToOperandDims.size() != indexDepth) return false;
+    if (indicesRank != 2)
+      return false;
+    if (indexVectorDim != indicesRank - 1)
+      return false;
+    if (scatterDimsToOperandDims.size() != indexDepth)
+      return false;
 
     auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
     for (auto [idx, dim] : llvm::enumerate(insertedWindowDims)) {
-      if (idx != dim) return false;
+      if (idx != dim)
+        return false;
     }
 
     // Check that there is only one batch dimension in the updates.
     for (auto [idx, dim] : llvm::enumerate(dimNumbers.getUpdateWindowDims())) {
-      if (idx + 1 != dim) return false;
+      if (idx + 1 != dim)
+        return false;
     }
 
     return true;
   }
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!hasCanonicalDimensionNumbers(op)) return failure();
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!hasCanonicalDimensionNumbers(op))
+      return failure();
     if (llvm::size(op.getInputs()) != 1)
       return op.emitError("NYI variadic operands scatter");
     if (llvm::size(op.getUpdates()) != 1)
@@ -350,9 +362,9 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
                                     DenseFPElementsAttr::get(type, imag))};
   }
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::FftOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle 2^n fft length.
     auto operandType =
         llvm::dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
@@ -406,11 +418,12 @@ struct ReverseOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReverseOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReverseOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReverseOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto ty = dyn_cast<RankedTensorType>(adaptor.getOperands()[0].getType());
-    if (!ty) return failure();
+    if (!ty)
+      return failure();
 
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> mixedSizes =
@@ -430,9 +443,9 @@ struct ReverseOpConversion final
 
 struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      chlo::TopKOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(chlo::TopKOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value operand = adaptor.getOperand();
 
@@ -568,7 +581,7 @@ struct ConvertStableHloToLinalgExt final
     }
   }
 };
-}  // namespace
+} // namespace
 
 void populateStableHloToLinalgExtConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
@@ -625,4 +638,4 @@ void populateStableHloToLinalgExtConversionPatterns(
       LinalgExtRegionReturnOpConversion>(typeConverter, context);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

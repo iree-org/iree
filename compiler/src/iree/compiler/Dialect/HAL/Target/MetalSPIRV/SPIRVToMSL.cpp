@@ -25,16 +25,17 @@ namespace iree_compiler {
 
 namespace {
 class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
- public:
+public:
   using CompilerMSL::CompilerMSL;
 
-  MetalShader::ThreadGroupSize getWorkgroupSizeForEntryPoint(
-      StringRef entryName) {
-    const auto& entryPoint = get_entry_point(
+  MetalShader::ThreadGroupSize
+  getWorkgroupSizeForEntryPoint(StringRef entryName) {
+    const auto &entryPoint = get_entry_point(
         entryName.str(), spv::ExecutionModel::ExecutionModelGLCompute);
-    const auto& workgroupSize = entryPoint.workgroup_size;
+    const auto &workgroupSize = entryPoint.workgroup_size;
     // TODO(antiagainst): support specialization constant.
-    if (workgroupSize.constant != 0) return {0, 0, 0};
+    if (workgroupSize.constant != 0)
+      return {0, 0, 0};
     return {workgroupSize.x, workgroupSize.y, workgroupSize.z};
   }
 
@@ -45,7 +46,7 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
 
     Descriptor(uint32_t s, uint32_t b) : set(s), binding(b) {}
 
-    friend bool operator<(const Descriptor& l, const Descriptor& r) {
+    friend bool operator<(const Descriptor &l, const Descriptor &r) {
       return std::tie(l.set, l.binding) < std::tie(r.set, r.binding);
     }
   };
@@ -53,36 +54,36 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
   // Updates `descriptors` with resource set and binding number pairs in
   // increasing order, and `hasPushConstant` if with push constants.
   // Returns true if no unsupported cases are encountered.
-  bool getResources(SmallVectorImpl<Descriptor>* descriptors,
-                    bool* hasPushConstant) {
+  bool getResources(SmallVectorImpl<Descriptor> *descriptors,
+                    bool *hasPushConstant) {
     descriptors->clear();
     *hasPushConstant = false;
 
     // Iterate over all variables in the SPIR-V blob.
     bool hasUnknownCase = false;
     ir.for_each_typed_id<SPIRV_CROSS_NAMESPACE::SPIRVariable>(
-        [&](uint32_t id, SPIRV_CROSS_NAMESPACE::SPIRVariable& var) {
+        [&](uint32_t id, SPIRV_CROSS_NAMESPACE::SPIRVariable &var) {
           auto storage = var.storage;
           switch (storage) {
-              // Non-interface variables. We don't care.
-            case spv::StorageClassFunction:
-            case spv::StorageClassPrivate:
-            case spv::StorageClassWorkgroup:
-              // Builtin variables. We don't care either.
-            case spv::StorageClassInput:
-              return;
-            case spv::StorageClassPushConstant:
-              *hasPushConstant = true;
-              return;
-            case spv::StorageClassUniform:
-            case spv::StorageClassStorageBuffer: {
-              uint32_t setNo = get_decoration(id, spv::DecorationDescriptorSet);
-              uint32_t bindingNo = get_decoration(id, spv::DecorationBinding);
-              descriptors->emplace_back(setNo, bindingNo);
-              return;
-            }
-            default:
-              break;
+            // Non-interface variables. We don't care.
+          case spv::StorageClassFunction:
+          case spv::StorageClassPrivate:
+          case spv::StorageClassWorkgroup:
+            // Builtin variables. We don't care either.
+          case spv::StorageClassInput:
+            return;
+          case spv::StorageClassPushConstant:
+            *hasPushConstant = true;
+            return;
+          case spv::StorageClassUniform:
+          case spv::StorageClassStorageBuffer: {
+            uint32_t setNo = get_decoration(id, spv::DecorationDescriptorSet);
+            uint32_t bindingNo = get_decoration(id, spv::DecorationBinding);
+            descriptors->emplace_back(setNo, bindingNo);
+            return;
+          }
+          default:
+            break;
           }
           hasUnknownCase = true;
         });
@@ -96,13 +97,13 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
     // family.
     SPIRVToMSLCompiler::Options spvCrossOptions;
     switch (platform) {
-      case IREE::HAL::MetalTargetPlatform::macOS:
-        spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::macOS;
-        break;
-      case IREE::HAL::MetalTargetPlatform::iOS:
-      case IREE::HAL::MetalTargetPlatform::iOSSimulator:
-        spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::iOS;
-        break;
+    case IREE::HAL::MetalTargetPlatform::macOS:
+      spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::macOS;
+      break;
+    case IREE::HAL::MetalTargetPlatform::iOS:
+    case IREE::HAL::MetalTargetPlatform::iOSSimulator:
+      spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::iOS;
+      break;
     }
     spvCrossOptions.msl_version =
         SPIRVToMSLCompiler::Options::make_msl_version(3, 0);
@@ -112,11 +113,12 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
     return spvCrossOptions;
   }
 };
-}  // namespace
+} // namespace
 
-std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
-    IREE::HAL::MetalTargetPlatform targetPlatform,
-    llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint) {
+std::optional<std::pair<MetalShader, std::string>>
+crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
+                       llvm::ArrayRef<uint32_t> spvBinary,
+                       StringRef entryPoint) {
   SPIRVToMSLCompiler spvCrossCompiler(spvBinary.data(), spvBinary.size());
 
   // All spirv-cross operations work on the current entry point. It should be
@@ -131,7 +133,7 @@ std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
 
   // Explicitly set the argument buffer [[id(N)]] location for each SPIR-V
   // resource variable.
-  for (const auto& descriptor : descriptors) {
+  for (const auto &descriptor : descriptors) {
     SPIRV_CROSS_NAMESPACE::MSLResourceBinding binding = {};
     binding.stage = spv::ExecutionModelGLCompute;
     binding.desc_set = descriptor.set;
@@ -161,7 +163,7 @@ std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
   // code, where we may run into the case that we are using reserved keyword for
   // the entry point name, e.g., `abs`. Under such circumstances, it will be
   // revised to avoid collision.
-  const auto& spirvEntryPoint = spvCrossCompiler.get_entry_point(
+  const auto &spirvEntryPoint = spvCrossCompiler.get_entry_point(
       entryPoint.str(), spv::ExecutionModel::ExecutionModelGLCompute);
   LLVM_DEBUG({
     llvm::dbgs() << "Original entry point name: '" << spirvEntryPoint.orig_name
@@ -180,5 +182,5 @@ std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
                         spirvEntryPoint.name);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

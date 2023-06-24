@@ -26,7 +26,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Codegen {}  // namespace Codegen
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+namespace Codegen {} // namespace Codegen
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

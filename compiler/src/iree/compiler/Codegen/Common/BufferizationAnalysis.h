@@ -27,7 +27,7 @@ namespace iree_compiler {
 /// light-weight wrapper around `llvm::EquivalenceClasses` to account for
 /// `Value` not directly supported as a value type by this class.
 class BufferizationPlan {
- public:
+public:
   llvm::EquivalenceClasses<void *>::iterator findValue(Value v) const {
     return mappedTensors.findValue(getPointer(v));
   }
@@ -67,13 +67,14 @@ class BufferizationPlan {
   /// the dispatch region.
   bool isInStoreSet(Value v) {
     Value leader = getLeaderValue(v);
-    if (!leader) return false;
+    if (!leader)
+      return false;
     return storeLeaders.count(leader);
   }
 
   void dump();
 
- private:
+private:
   Value getLeaderValue(Value v1) const {
     void *ptr = getPointer(v1);
     auto it = mappedTensors.findLeader(ptr);
@@ -101,6 +102,6 @@ class BufferizationPlan {
 LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
                                              BufferizationPlan &plan);
 
-}  // namespace iree_compiler
-}  // namespace mlir
-#endif  // IREE_COMPILER_CODEGEN_COMMON_BUFFERIZATIONANALYSIS_H
+} // namespace iree_compiler
+} // namespace mlir
+#endif // IREE_COMPILER_CODEGEN_COMMON_BUFFERIZATIONANALYSIS_H

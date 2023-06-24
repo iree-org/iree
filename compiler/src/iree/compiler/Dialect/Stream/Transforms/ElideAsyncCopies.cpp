@@ -45,7 +45,7 @@ namespace {
 class LastUsers
     : public DFX::StateWrapper<DFX::PotentialValuesState<Operation *>,
                                DFX::ValueElement> {
- public:
+public:
   using BaseType = DFX::StateWrapper<DFX::PotentialValuesState<Operation *>,
                                      DFX::ValueElement>;
 
@@ -71,7 +71,7 @@ class LastUsers
     return std::string("last users: ") + std::to_string(getAssumedSet().size());
   }
 
- private:
+private:
   explicit LastUsers(const Position &pos) : BaseType(pos) {}
 
   void initializeValue(Value value, DFX::Solver &solver) override {
@@ -119,7 +119,7 @@ const char LastUsers::ID = 0;
 class ArgumentSemantics
     : public DFX::StateWrapper<DFX::BitIntegerState<uint8_t, 3, 0>,
                                DFX::ValueElement> {
- public:
+public:
   using BaseType =
       DFX::StateWrapper<DFX::BitIntegerState<uint8_t, 3, 0>, DFX::ValueElement>;
 
@@ -165,7 +165,8 @@ class ArgumentSemantics
   const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
     auto append = [&](const char *part) {
-      if (!str.empty()) str += '|';
+      if (!str.empty())
+        str += '|';
       str += part;
     };
     append(this->isAssumed(NOT_MUTATED) ? "immutable" : "mutable");
@@ -173,7 +174,7 @@ class ArgumentSemantics
     return str.empty() ? "*" : str;
   }
 
- private:
+private:
   explicit ArgumentSemantics(const Position &pos) : BaseType(pos) {}
 
   // Returns true if |operand| is tied to a result on its owner indicating an
@@ -181,7 +182,8 @@ class ArgumentSemantics
   static bool isTiedUse(OpOperand &operand) {
     if (auto tiedOp =
             dyn_cast<IREE::Util::TiedOpInterface>(operand.getOwner())) {
-      if (tiedOp.isOperandTied(operand.getOperandNumber())) return true;
+      if (tiedOp.isOperandTied(operand.getOperandNumber()))
+        return true;
     }
     return false;
   }
@@ -286,7 +288,7 @@ const char ArgumentSemantics::ID = 0;
 // that to insert stream-ordered deallocs and know when timepoints have been
 // discard as they go out of scope. For now this strictly checks last use.
 class LastUseAnalysis {
- public:
+public:
   explicit LastUseAnalysis(Operation *rootOp)
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
@@ -309,7 +311,8 @@ class LastUseAnalysis {
     // Seed all block arguments throughout the program.
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region) continue;
+      if (!region)
+        continue;
       for (auto &block : *region) {
         for (auto arg : block.getArguments()) {
           if (llvm::isa<IREE::Stream::ResourceType>(arg.getType())) {
@@ -335,7 +338,8 @@ class LastUseAnalysis {
   bool isArgMoved(BlockArgument arg) {
     auto argumentSemantics =
         solver.lookupElementFor<ArgumentSemantics>(Position::forValue(arg));
-    if (!argumentSemantics) return false;
+    if (!argumentSemantics)
+      return false;
     return argumentSemantics->getAssumedByValue();
   }
 
@@ -346,7 +350,7 @@ class LastUseAnalysis {
     return lastUsers.isAssumedLastUser(userOp);
   }
 
- private:
+private:
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;
@@ -431,7 +435,8 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
 // Returns true if the op was elided.
 static bool tryElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
                             LastUseAnalysis &analysis) {
-  if (!isSafeToElideCloneOp(cloneOp, analysis)) return false;
+  if (!isSafeToElideCloneOp(cloneOp, analysis))
+    return false;
   cloneOp.replaceAllUsesWith(cloneOp.getSource());
   cloneOp.erase();
   return true;
@@ -445,7 +450,8 @@ static bool tryElideAsyncCopiesInRegion(Region &region,
   for (auto &block : region) {
     for (auto cloneOp : llvm::make_early_inc_range(
              block.getOps<IREE::Stream::AsyncCloneOp>())) {
-      if (!isSafeToElideCloneOp(cloneOp, analysis)) continue;
+      if (!isSafeToElideCloneOp(cloneOp, analysis))
+        continue;
       cloneOp.replaceAllUsesWith(cloneOp.getSource());
       cloneOp.erase();
       didChange = true;
@@ -474,7 +480,7 @@ static bool tryElideAsyncCopiesInRegion(Region &region,
 // copies are elided: we are guaranteed to reach a fixed point as we are only
 // removing copies in this pass and not introducing any new ops.
 class ElideAsyncCopiesPass : public ElideAsyncCopiesBase<ElideAsyncCopiesPass> {
- public:
+public:
   ElideAsyncCopiesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -484,7 +490,8 @@ class ElideAsyncCopiesPass : public ElideAsyncCopiesBase<ElideAsyncCopiesPass> {
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
 
     // Try analyzing the program and eliding the unneeded copies until we reach
     // a fixed point (no more copies can be elided).
@@ -504,10 +511,12 @@ class ElideAsyncCopiesPass : public ElideAsyncCopiesBase<ElideAsyncCopiesPass> {
       bool didChange = false;
       for (auto callableOp : analysis.getTopLevelOps()) {
         auto *region = callableOp.getCallableRegion();
-        if (!region) continue;
+        if (!region)
+          continue;
         didChange = tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
       }
-      if (!didChange) break;
+      if (!didChange)
+        break;
     }
     if (iterationCount == maxIterationCount) {
       // If you find yourself hitting this we can evaluate increasing the
@@ -523,13 +532,13 @@ class ElideAsyncCopiesPass : public ElideAsyncCopiesBase<ElideAsyncCopiesPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideAsyncCopiesPass() {
   return std::make_unique<ElideAsyncCopiesPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

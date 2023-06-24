@@ -29,61 +29,62 @@ namespace {
 
 static MatmulTileParams chooseMatmulTileParamsGeneric() { return {8, 4, 8}; }
 
-static MatmulTileParams chooseMatmulTileParamsAArch64(
-    MatmulType type, ExecutableTargetAttr target) {
+static MatmulTileParams
+chooseMatmulTileParamsAArch64(MatmulType type, ExecutableTargetAttr target) {
   switch (type) {
-    case MatmulType::F32F32F32:
-      return {8, 1, 8};
-    case MatmulType::I8I8I32:
-      if (hasFeature(target, "+i8mm")) {
-        // Aim to use SMMLA.
-        return {8, 8, 8};
-      }
-      if (hasFeature(target, "+dotprod")) {
-        // Aim to use SDOT.
-        return {8, 4, 8};
-      }
-      return {8, 1, 8};
-    default:
-      assert(false);
-      return {};
+  case MatmulType::F32F32F32:
+    return {8, 1, 8};
+  case MatmulType::I8I8I32:
+    if (hasFeature(target, "+i8mm")) {
+      // Aim to use SMMLA.
+      return {8, 8, 8};
+    }
+    if (hasFeature(target, "+dotprod")) {
+      // Aim to use SDOT.
+      return {8, 4, 8};
+    }
+    return {8, 1, 8};
+  default:
+    assert(false);
+    return {};
   }
 }
 
-static MatmulTileParams chooseMatmulTileParamsX86_64(
-    MatmulType type, ExecutableTargetAttr target) {
+static MatmulTileParams
+chooseMatmulTileParamsX86_64(MatmulType type, ExecutableTargetAttr target) {
   switch (type) {
-    case MatmulType::F32F32F32:
-      if (hasAVX512fFeature(target)) return {16, 1, 16};
-      if (hasFeature(target, "+avx")) {
-        // Note: for good performance, most +avx users will also want to add
-        // +fma, but that's a local instruction selection detail and the tile
-        // layout is unaffected, as there are enough registers even with the
-        // need for intermediate product registers when +fma is not used.
-        return {8, 1, 8};
-      }
-      // SSE fallback.
-      return {8, 1, 4};
-    case MatmulType::I8I8I32:
-      if (hasFeature(target, "+avx512vnni")) {
-        // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
-        // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
-        // call for {16, 4, 16} but we can't use it because of its unsigned LHS.
-        return {16, 2, 16};
-      }
-      if (hasFeature(target, "+avx512bw")) {
-        // Aim to use VPMADDWD (zmm).
-        return {16, 2, 16};
-      }
-      if (hasFeature(target, "+avx2")) {
-        // Aim to use VPMADDWD (ymm).
-        return {8, 2, 8};
-      }
-      // SSE fallback. Aim to use PMADDWD (xmm).
-      return {8, 2, 4};
-    default:
-      assert(false);
-      return {};
+  case MatmulType::F32F32F32:
+    if (hasAVX512fFeature(target))
+      return {16, 1, 16};
+    if (hasFeature(target, "+avx")) {
+      // Note: for good performance, most +avx users will also want to add
+      // +fma, but that's a local instruction selection detail and the tile
+      // layout is unaffected, as there are enough registers even with the
+      // need for intermediate product registers when +fma is not used.
+      return {8, 1, 8};
+    }
+    // SSE fallback.
+    return {8, 1, 4};
+  case MatmulType::I8I8I32:
+    if (hasFeature(target, "+avx512vnni")) {
+      // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
+      // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
+      // call for {16, 4, 16} but we can't use it because of its unsigned LHS.
+      return {16, 2, 16};
+    }
+    if (hasFeature(target, "+avx512bw")) {
+      // Aim to use VPMADDWD (zmm).
+      return {16, 2, 16};
+    }
+    if (hasFeature(target, "+avx2")) {
+      // Aim to use VPMADDWD (ymm).
+      return {8, 2, 8};
+    }
+    // SSE fallback. Aim to use PMADDWD (xmm).
+    return {8, 2, 4};
+  default:
+    assert(false);
+    return {};
   }
 }
 
@@ -109,7 +110,7 @@ struct LLVMCPUMaterializeEncodingPass
   void runOnOperation() override;
 };
 
-}  // namespace
+} // namespace
 
 void LLVMCPUMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -120,7 +121,8 @@ void LLVMCPUMaterializeEncodingPass::runOnOperation() {
       [targetAttr](
           RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
         std::optional<TensorEncoding> encoding = getEncoding(tensorType);
-        if (!encoding) return failure();
+        if (!encoding)
+          return failure();
 
         auto matmulType = getMatmulType(*encoding);
         auto matmulOperandRole = getMatmulOperandRole(*encoding);
@@ -164,5 +166,5 @@ createLLVMCPUMaterializeEncodingPass() {
   return std::make_unique<LLVMCPUMaterializeEncodingPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

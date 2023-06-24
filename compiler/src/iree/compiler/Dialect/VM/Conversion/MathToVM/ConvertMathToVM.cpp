@@ -28,23 +28,24 @@ template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
 class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
-    if (llvm::isa<VectorType>(srcOp.getResult().getType())) return failure();
+    if (llvm::isa<VectorType>(srcOp.getResult().getType()))
+      return failure();
 
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
-      case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(
-            srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
-        break;
-      case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(
-            srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
-        break;
-      default:
-        assert(false && "invalid target type");
+    case 32:
+      rewriter.replaceOpWithNewOp<Dst32OpTy>(
+          srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
+      break;
+    case 64:
+      rewriter.replaceOpWithNewOp<Dst64OpTy>(
+          srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
+      break;
+    default:
+      assert(false && "invalid target type");
     }
     return success();
   }
@@ -54,31 +55,32 @@ template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
 class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
-    if (llvm::isa<VectorType>(srcOp.getResult().getType())) return failure();
+    if (llvm::isa<VectorType>(srcOp.getResult().getType()))
+      return failure();
 
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
-      case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(
-            srcOp, adaptor.getLhs().getType(), adaptor.getLhs(),
-            adaptor.getRhs());
-        break;
-      case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(
-            srcOp, adaptor.getLhs().getType(), adaptor.getLhs(),
-            adaptor.getRhs());
-        break;
-      default:
-        assert(false && "invalid target type");
+    case 32:
+      rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, adaptor.getLhs().getType(),
+                                             adaptor.getLhs(),
+                                             adaptor.getRhs());
+      break;
+    case 64:
+      rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, adaptor.getLhs().getType(),
+                                             adaptor.getLhs(),
+                                             adaptor.getRhs());
+      break;
+    default:
+      assert(false && "invalid target type");
     }
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateMathToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
@@ -131,5 +133,5 @@ void populateMathToVMPatterns(MLIRContext *context,
       typeConverter, context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

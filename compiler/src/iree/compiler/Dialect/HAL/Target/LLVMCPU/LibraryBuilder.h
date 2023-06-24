@@ -33,7 +33,7 @@ namespace HAL {
 //  auto *queryFunc = builder.build("_query_library_foo");
 //  // call queryFunc, export it, etc
 class LibraryBuilder {
- public:
+public:
   // Builder mode setting.
   enum class Mode : uint32_t {
     NONE = 0u,
@@ -48,7 +48,7 @@ class LibraryBuilder {
     // NOTE: until we hit v1 the versioning scheme here is not set in stone.
     // We may want to make this major release number, date codes (0x20220307),
     // or some semantic versioning we track in whatever spec we end up having.
-    V_0_3 = 0x0000'0003u,  // v0.3 - ~2022-08-08
+    V_0_3 = 0x0000'0003u, // v0.3 - ~2022-08-08
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
@@ -130,7 +130,7 @@ class LibraryBuilder {
   // unit, etc).
   llvm::Function *build(StringRef queryFuncName);
 
- private:
+private:
   // Builds and returns an iree_hal_executable_library_v0_t global constant.
   llvm::Constant *buildLibraryV0(std::string libraryName);
   llvm::Constant *buildLibraryV0ImportTable(std::string libraryName);
@@ -162,9 +162,9 @@ class LibraryBuilder {
   size_t constantCount = 0;
 };
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LIBRARYBUILDER_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LIBRARYBUILDER_H_

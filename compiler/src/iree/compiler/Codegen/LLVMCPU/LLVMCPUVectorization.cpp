@@ -74,8 +74,8 @@ static FailureOr<Operation *> getRootOp(Operation *op) {
 
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis.
 /// Returns failure if vector sizes can't be inferred.
-static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
-    linalg::LinalgOp linalgOp) {
+static FailureOr<SmallVector<int64_t>>
+inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
   LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
 
   SmallVector<int64_t> vectorSizes;
@@ -162,7 +162,7 @@ static SmallVector<int64_t> getVectorSizes(linalg::LinalgOp linalgOp) {
 
 class LLVMCPUVectorizationPass
     : public LLVMCPUVectorizationBase<LLVMCPUVectorizationPass> {
- public:
+public:
   using LLVMCPUVectorizationBase::LLVMCPUVectorizationBase;
   LLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options) {
     this->enableVectorMasking.setValue(options.enableVectorMasking);
@@ -183,7 +183,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op)) candidates.push_back(op);
+    if (isa<linalg::LinalgOp>(op))
+      candidates.push_back(op);
     if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
       candidates.push_back(op);
   });
@@ -196,7 +197,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         auto ty = padOp.getResultType();
         // TODO(hanchung): Infer the vector sizes for pad op after
         // maskedVectorize method allows dynamic result shapes.
-        if (!ty.hasStaticShape()) continue;
+        if (!ty.hasStaticShape())
+          continue;
         vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
       }
     }
@@ -253,14 +255,14 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   linalg::hoistRedundantVectorTransfers(funcOp);
   linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
 }
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass() {
   return std::make_unique<LLVMCPUVectorizationPass>();
 }
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
-    const LLVMCPUVectorizationPassOptions &options) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options) {
   return std::make_unique<LLVMCPUVectorizationPass>(options);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

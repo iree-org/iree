@@ -26,13 +26,13 @@ struct StableHloOptions : public PassPipelineOptions<StableHloOptions> {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-void buildStableHLOInputConversionPassPipeline(OpPassManager& passManager,
-                                               const StableHloOptions& options);
+void buildStableHLOInputConversionPassPipeline(OpPassManager &passManager,
+                                               const StableHloOptions &options);
 
 // Performs input legalization on programs that may have originated from an XLA
 // import (or made to interop with it).
 void buildStableHLOXLAInputConversionPassPipeline(
-    OpPassManager& passManager, const StableHloOptions& options);
+    OpPassManager &passManager, const StableHloOptions &options);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -40,6 +40,6 @@ void buildStableHLOXLAInputConversionPassPipeline(
 
 void registerStableHLOConversionPasses();
 
-}  // namespace iree_compiler::stablehlo
-}  // namespace mlir
-#endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES_H_
+} // namespace iree_compiler::stablehlo
+} // namespace mlir
+#endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES_H_

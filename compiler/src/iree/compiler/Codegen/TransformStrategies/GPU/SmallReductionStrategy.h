@@ -42,7 +42,7 @@ struct ReductionConfig;
 // TODO: Add another strategy based on segmented scans, which can allow us
 // to force sizes that don't divide properly into warp shuffles.
 class SmallReductionStrategy : public AbstractReductionStrategy {
- public:
+public:
   SmallReductionStrategy(
       const transform_ext::MatchedReductionCaptures &captures,
       const ReductionConfig &reductionConfig);
@@ -57,14 +57,14 @@ class SmallReductionStrategy : public AbstractReductionStrategy {
     return res;
   }
 
- private:
+private:
   /// Compute the small strategy based on the problem size and the
   /// `maxNumThreadsToUse`.
   void configure(const ReductionConfig &reductionConfig);
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_SMALL_REDUCTION_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_SMALL_REDUCTION_STRATEGY_H_

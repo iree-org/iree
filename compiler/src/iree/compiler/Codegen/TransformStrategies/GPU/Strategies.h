@@ -82,8 +82,8 @@ void buildSmallReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
 void buildStagedReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
                                   const StagedReductionStrategy &strategy);
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_

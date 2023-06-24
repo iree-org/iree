@@ -43,10 +43,10 @@ enum class CompileMode {
   hal_executable,
 };
 
-}  // namespace
+} // namespace
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");
@@ -69,7 +69,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
                      "IREE VM Bytecode (default)"),
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_c, "vm-c", "C source module"),
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
       llvm::cl::init(OutputFormat::vm_bytecode), llvm::cl::cat(mainOptions));
 
@@ -185,25 +185,26 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     ireeCompilerInvocationSetCompileToPhase(
         r.inv, compileToPhases[static_cast<int>(compileTo.getValue())].c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
-    if (!ireeCompilerInvocationParseSource(r.inv, source)) return false;
+    if (!ireeCompilerInvocationParseSource(r.inv, source))
+      return false;
 
     // Switch on compileMode to choose a pipeline to run.
     switch (compileMode) {
-      case CompileMode::std:
-        if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
-          return false;
-        break;
-      case CompileMode::vm:
-        break;
-      case CompileMode::hal_executable: {
-        if (!ireeCompilerInvocationPipeline(
-                r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
-          return false;
-        break;
-      }
-      default:
-        llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
+    case CompileMode::std:
+      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
         return false;
+      break;
+    case CompileMode::vm:
+      break;
+    case CompileMode::hal_executable: {
+      if (!ireeCompilerInvocationPipeline(
+              r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
+        return false;
+      break;
+    }
+    default:
+      llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
+      return false;
     }
 
     // Ending early and just emitting IR.
@@ -218,25 +219,24 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     // Switch based on output format.
     iree_compiler_error_t *outputError = nullptr;
     switch (outputFormat) {
-      case OutputFormat::vm_asm:
-        outputError = ireeCompilerInvocationOutputIR(r.inv, s.output);
-        break;
-      case OutputFormat::vm_bytecode:
-        outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
-        break;
+    case OutputFormat::vm_asm:
+      outputError = ireeCompilerInvocationOutputIR(r.inv, s.output);
+      break;
+    case OutputFormat::vm_bytecode:
+      outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
+      break;
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
-      case OutputFormat::vm_c:
-        outputError = ireeCompilerInvocationOutputVMCSource(r.inv, s.output);
-        break;
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
-      case OutputFormat::hal_executable: {
-        outputError =
-            ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
-        break;
-      }
-      default:
-        llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
-        return false;
+    case OutputFormat::vm_c:
+      outputError = ireeCompilerInvocationOutputVMCSource(r.inv, s.output);
+      break;
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
+    case OutputFormat::hal_executable: {
+      outputError = ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
+      break;
+    }
+    default:
+      llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
+      return false;
     }
 
     if (outputError) {
@@ -269,7 +269,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       return 1;
     }
   } else {
-    if (!processBuffer(s.source)) return 1;
+    if (!processBuffer(s.source))
+      return 1;
   }
 
   ireeCompilerOutputKeep(s.output);

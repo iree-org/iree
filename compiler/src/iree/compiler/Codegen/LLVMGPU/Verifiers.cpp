@@ -35,47 +35,48 @@ static LogicalResult getInstructionShape(
     Operation *op, IREE::Codegen::DispatchLoweringPassPipelineAttr pipeline,
     Type inputElementType, SmallVector<int64_t> &instructionShape) {
   switch (pipeline.getValue()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-      // SIMT Pipeline / CUDA Cores
-      instructionShape = {1, 1, 1};
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-      // Tensor Core Pipeline / WMMA API
-      if (inputElementType.isF16() || inputElementType.isBF16()) {
-        instructionShape = {16, 16, 16};
-      } else if (inputElementType.isF32()) {
-        instructionShape = {16, 16, 8};
-      } else {
-        return op->emitError(
-            "Expected f16, bf16 or f32 for Tensor Core (WMMA) pipeline");
-      }
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        LLVMGPUMatmulTensorCoreMmaSync:
-      // Tensor Core Pipeline / MMA.SYNC
-      if (inputElementType.isF16() || inputElementType.isBF16()) {
-        instructionShape = {16, 8, 16};
-      } else if (inputElementType.isF32()) {
-        instructionShape = {16, 8, 8};
-      } else {
-        return op->emitError(
-            "Expected f16, bf16 or f32 for Tensor Core (MMA.SYNC) pipeline");
-      }
-      break;
-    default:
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
+    // SIMT Pipeline / CUDA Cores
+    instructionShape = {1, 1, 1};
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+    // Tensor Core Pipeline / WMMA API
+    if (inputElementType.isF16() || inputElementType.isBF16()) {
+      instructionShape = {16, 16, 16};
+    } else if (inputElementType.isF32()) {
+      instructionShape = {16, 16, 8};
+    } else {
       return op->emitError(
-          "Expected matmul SIMT, TensorCore(WMMA), or TensorCore(MMA.SYNC), "
-          "compilation pipeline");
+          "Expected f16, bf16 or f32 for Tensor Core (WMMA) pipeline");
+    }
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::
+      LLVMGPUMatmulTensorCoreMmaSync:
+    // Tensor Core Pipeline / MMA.SYNC
+    if (inputElementType.isF16() || inputElementType.isBF16()) {
+      instructionShape = {16, 8, 16};
+    } else if (inputElementType.isF32()) {
+      instructionShape = {16, 8, 8};
+    } else {
+      return op->emitError(
+          "Expected f16, bf16 or f32 for Tensor Core (MMA.SYNC) pipeline");
+    }
+    break;
+  default:
+    return op->emitError(
+        "Expected matmul SIMT, TensorCore(WMMA), or TensorCore(MMA.SYNC), "
+        "compilation pipeline");
   }
   return success();
 }
 
 /// Verifies launch configuration for matmul and batchmatmul on a GPU for CUDA
 /// and Tensor Core pipelines.
-LogicalResult verifyGPUMatmulPipeline(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize) {
+LogicalResult
+verifyGPUMatmulPipeline(Operation *op,
+                        IREE::Codegen::LoweringConfigAttr loweringConfig,
+                        IREE::Codegen::TranslationInfoAttr translationInfo,
+                        ArrayRef<int64_t> workgroupSize) {
   // Only verify batched and unbatched matmul.
   if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
     return success();
@@ -228,5 +229,5 @@ LogicalResult verifyGPUMatmulPipeline(
   return success();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

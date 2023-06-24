@@ -40,7 +40,8 @@ namespace iree_compiler {
 /// attributes.
 static Value getAsValue(OpFoldResult attrOrValue, OpBuilder &builder,
                         Location loc) {
-  if (Value val = attrOrValue.dyn_cast<Value>()) return val;
+  if (Value val = attrOrValue.dyn_cast<Value>())
+    return val;
   auto attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
   return builder.create<arith::ConstantIndexOp>(loc, attr.getInt());
 }
@@ -58,14 +59,15 @@ inline raw_ostream &operator<<(raw_ostream &os,
 }
 #endif
 
-static FailureOr<affine::AffineApplyOp> canonicalizeMinMaxOp(
-    RewriterBase &rewriter, Operation *op,
-    affine::FlatAffineValueConstraints constraints) {
+static FailureOr<affine::AffineApplyOp>
+canonicalizeMinMaxOp(RewriterBase &rewriter, Operation *op,
+                     affine::FlatAffineValueConstraints constraints) {
   RewriterBase::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(op);
   FailureOr<affine::AffineValueMap> simplified =
       mlir::affine::simplifyConstrainedMinMaxOp(op, std::move(constraints));
-  if (failed(simplified)) return failure();
+  if (failed(simplified))
+    return failure();
   return rewriter.replaceOpWithNewOp<affine::AffineApplyOp>(
       op, simplified->getAffineMap(), simplified->getOperands());
 }
@@ -96,18 +98,22 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
     auto loopMatcher = [&](Value iv, OpFoldResult &lb, OpFoldResult &ub,
                            OpFoldResult &step) {
       scf::ForOp forOp = scf::getForInductionVarOwner(iv);
-      if (!forOp) return failure();
+      if (!forOp)
+        return failure();
 
       auto loopInfo = isTiledAndDistributedLoop(forOp);
-      if (!loopInfo) return failure();
+      if (!loopInfo)
+        return failure();
       LLVM_DEBUG(llvm::dbgs() << *loopInfo);
 
       std::optional<int64_t> untiledStep =
           getConstantIntValue(loopInfo->untiledStep);
       // For IREE right now the original untiled loop should have step 1..
-      if (!untiledStep || *untiledStep != 1) return failure();
+      if (!untiledStep || *untiledStep != 1)
+        return failure();
       // ..and we tile according to some static tile sizes for processors.
-      if (!loopInfo->tileSize) return failure();
+      if (!loopInfo->tileSize)
+        return failure();
 
       lb = loopInfo->untiledLowerBound;
       ub = loopInfo->untiledUpperBound;
@@ -135,12 +141,15 @@ struct FoldAffineMinOverWorkgroupIDs final
     // Find all iteration variables among `minOp`'s operands add constrain them.
     for (Value operand : minOp->getOperands()) {
       // Skip duplicate ids.
-      if (!allIds.insert(operand).second) continue;
+      if (!allIds.insert(operand).second)
+        continue;
       auto idOp = operand.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
-      if (!idOp) continue;
+      if (!idOp)
+        continue;
       // Can't infer the range when workroupCount is unknown.
       unsigned index = idOp.getDimension().getZExtValue();
-      if (index >= numWorkgroup.size()) return failure();
+      if (index >= numWorkgroup.size())
+        return failure();
       constraints.appendDimVar({idOp});
       constraints.addBound(presburger::BoundType::LB, idOp, 0);
       constraints.addBound(presburger::BoundType::UB, idOp,
@@ -149,7 +158,7 @@ struct FoldAffineMinOverWorkgroupIDs final
     return canonicalizeMinMaxOp(rewriter, minOp, constraints);
   }
 
- private:
+private:
   ArrayRef<int64_t> numWorkgroup;
 };
 
@@ -170,7 +179,7 @@ struct FoldAffineMinInDistributedLoopsPass final
     }
   }
 };
-}  // namespace
+} // namespace
 
 void populateFoldAffineMinInDistributedLoopsPatterns(
     RewritePatternSet &patterns, ArrayRef<int64_t> numWorkgroups) {
@@ -187,5 +196,5 @@ createFoldAffineMinInDistributedLoopsPass() {
   return std::make_unique<FoldAffineMinInDistributedLoopsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

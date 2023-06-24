@@ -65,7 +65,7 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
 // T must implement the IREE::Util::ClosureOpInterface.
 template <typename T>
 class ClosureOptimizationPattern : public OpRewritePattern<T> {
- public:
+public:
   ClosureOptimizationPattern(MLIRContext *context,
                              ClosureOptimizationOptions options = {},
                              PatternBenefit benefit = 1)
@@ -77,13 +77,13 @@ class ClosureOptimizationPattern : public OpRewritePattern<T> {
     return optimizeClosureLikeOp(options, closureOp, rewriter);
   }
 
- private:
+private:
   const ClosureOptimizationOptions options;
 };
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_

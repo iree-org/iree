@@ -41,9 +41,10 @@ enum class GPUPromoteSharedMemPattern {
   TransposeOpPattern = 1,
 };
 
-FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
-    RewriterBase &rewriter, scf::ForOp forOp,
-    PipeliningSchedulingStrategy startegy, bool peelEpilogue, int64_t depth);
+FailureOr<scf::ForOp>
+pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
+                         PipeliningSchedulingStrategy startegy,
+                         bool peelEpilogue, int64_t depth);
 
 /// Tiles Linalg ops in the given `funcOp` along reduction dimensions to serial
 /// loops without distribution. If `fuseInputProducer` is true, input producers
@@ -76,14 +77,14 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUDistributeSharedMemoryCopy();
 
 /// Apply multi-buffering transformation.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUMultiBuffering(
-    unsigned numBuffers = 5);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUMultiBuffering(unsigned numBuffers = 5);
 
 /// Apply software pipelining.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    bool epiloguePeeling = true, unsigned depth = 1,
-    PipeliningSchedulingStrategy schedule =
-        PipeliningSchedulingStrategy::loadGlobalStage0);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUPipeliningPass(bool epiloguePeeling = true, unsigned depth = 1,
+                        PipeliningSchedulingStrategy schedule =
+                            PipeliningSchedulingStrategy::loadGlobalStage0);
 
 /// Apply transformation to reduce the number of bank conflicts when accessing
 /// shared memory by padding fastest moving dimension with the specified size.
@@ -92,20 +93,21 @@ createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 // Creates a pass to tile reduction dimensions and create allocations for some
 // tensor values to use GPU shared memory.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorAlloc(
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
+                         GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 // Creates a pass to tile tensor (linalg) ops within a GPU workgroup.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTile(
-    bool distributeToWarp = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUTensorTile(bool distributeToWarp = false);
 
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 
 /// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
-    bool generateContract = true, int64_t maxVectorSize = 4096);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUVectorizationPass(bool generateContract = true,
+                           int64_t maxVectorSize = 4096);
 
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the
@@ -116,10 +118,10 @@ createConvertVectorReductionToGPUPass(
     std::function<int(func::FuncOp)> getWarpSize = nullptr);
 
 /// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
-    unsigned swizzleLogTile = 0);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_

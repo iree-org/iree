@@ -17,9 +17,9 @@ namespace HAL {
 // Registers the Metal/SPIR-V backends.
 void registerMetalSPIRVTargetBackends();
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_METALSPIRVTARGET_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_METALSPIRVTARGET_H_

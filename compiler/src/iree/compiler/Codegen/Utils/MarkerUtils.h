@@ -59,7 +59,7 @@ bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_CODEGENUTILS_MARKERUTILS_H_
+#endif // IREE_COMPILER_CODEGEN_CODEGENUTILS_MARKERUTILS_H_

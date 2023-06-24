@@ -21,7 +21,7 @@ std::string escapeCommandLineComponent(const std::string &component) {
   return "\"" + component + "\"";
 #else
   return component;
-#endif  // _WIN32
+#endif // _WIN32
 }
 
 StringRef unescapeCommandLineComponent(StringRef component) {
@@ -29,7 +29,7 @@ StringRef unescapeCommandLineComponent(StringRef component) {
   if (component.starts_with("\"") && component.ends_with("\"")) {
     return component.drop_front(1).drop_back(1);
   }
-#endif  // _WIN32
+#endif // _WIN32
   return component;
 }
 
@@ -38,7 +38,7 @@ static std::string normalizeToolNameForPlatform(const std::string &toolName) {
   return toolName + ".exe";
 #else
   return toolName;
-#endif  // _WIN32
+#endif // _WIN32
 }
 
 static std::string findToolAtPath(SmallVector<std::string> normalizedToolNames,
@@ -56,8 +56,8 @@ static std::string findToolAtPath(SmallVector<std::string> normalizedToolNames,
   return "";
 }
 
-static SmallVector<std::string> normalizeToolNames(
-    SmallVector<std::string> toolNames) {
+static SmallVector<std::string>
+normalizeToolNames(SmallVector<std::string> toolNames) {
   SmallVector<std::string> normalizedToolNames;
   normalizedToolNames.reserve(toolNames.size());
   for (auto toolName : toolNames) {
@@ -126,11 +126,13 @@ std::string findTool(SmallVector<std::string> toolNames) {
 
   // Search the install or build dir.
   std::string executableDirPath = findToolFromExecutableDir(toolNames);
-  if (!executableDirPath.empty()) return executableDirPath;
+  if (!executableDirPath.empty())
+    return executableDirPath;
 
   // Currently fall back on searching the environment.
   std::string environmentPath = findToolInEnvironment(toolNames);
-  if (!environmentPath.empty()) return environmentPath;
+  if (!environmentPath.empty())
+    return environmentPath;
 
   return "";
 }
@@ -140,5 +142,5 @@ std::string findTool(std::string toolName) {
   return findTool(toolNames);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

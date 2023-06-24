@@ -26,7 +26,7 @@ struct DescriptorInfo {
   SmallVector<OpFoldResult> sizes;
   SmallVector<OpFoldResult> strides;
 };
-}  // namespace
+} // namespace
 
 /// Returns an AffineMap for an add or a mul.
 static AffineMap getAddMap(MLIRContext *context) {
@@ -42,8 +42,9 @@ static AffineMap getMulMap(MLIRContext *context) {
 
 /// Returns the strides based on the sizes assuming that the `memref`
 /// has default layout, i.e. it is not a result of a subview.
-static SmallVector<OpFoldResult> getStridesFromSizes(
-    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> sizes) {
+static SmallVector<OpFoldResult>
+getStridesFromSizes(RewriterBase &rewriter, Location loc,
+                    ArrayRef<OpFoldResult> sizes) {
   if (sizes.size() == 0) {
     return {};
   }
@@ -91,8 +92,9 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
 /// Replaces the offsets, sizes and strides based on values provided
 /// by `DescriptorInfo` object.
 template <typename OpTy>
-static void replaceOffsetSizesAndStridesWith(
-    RewriterBase &rewriter, OpTy op, const DescriptorInfo &resultDescriptor) {
+static void
+replaceOffsetSizesAndStridesWith(RewriterBase &rewriter, OpTy op,
+                                 const DescriptorInfo &resultDescriptor) {
   int rank = resultDescriptor.sizes.size();
   assert(rank == resultDescriptor.strides.size() &&
          "expected number of sizes and strides to match");
@@ -129,9 +131,11 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     auto binding =
         op.getSource()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!binding) return failure();
+    if (!binding)
+      return failure();
     auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
-    if (memRefType.getRank() < 1) return failure();
+    if (memRefType.getRank() < 1)
+      return failure();
 
     auto loc = op.getLoc();
     OpBuilder::InsertionGuard g(rewriter);
@@ -225,7 +229,7 @@ struct IREEExpandStridedMetadataPass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void IREEExpandStridedMetadataPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -261,5 +265,5 @@ std::unique_ptr<Pass> createIREEExpandStridedMetadataPass() {
   return std::make_unique<IREEExpandStridedMetadataPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -73,8 +73,8 @@ LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp,
 // TODO(dcaballe):
 //   * Consider transpose + reductions.
 //   * Consider input and output transposes.
-static SmallVector<OpOperand *> computeTransposeInfo(
-    LinalgOp linalgOp, TransposeMapFilter transposeMapFilter) {
+static SmallVector<OpOperand *>
+computeTransposeInfo(LinalgOp linalgOp, TransposeMapFilter transposeMapFilter) {
   SmallVector<OpOperand *> transposeOperands;
 
   // Reductions are not supported.
@@ -125,5 +125,5 @@ void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
   dynamicTrait = computeDynamicInfo(linalgOp);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

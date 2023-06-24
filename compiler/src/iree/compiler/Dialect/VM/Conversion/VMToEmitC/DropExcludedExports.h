@@ -19,9 +19,9 @@ namespace VM {
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createDropExcludedExportsPass();
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_DROPEXCLUDEDEXPORTS_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_DROPEXCLUDEDEXPORTS_H_

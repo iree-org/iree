@@ -114,10 +114,11 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
   if (!typedAttr || typedAttr.getType() != type.getValue()) {
     p << ": ";
     p.printAttribute(type);
-    needsSpace = true;  // subsequent attr value needs a space separator
+    needsSpace = true; // subsequent attr value needs a space separator
   }
   if (attr) {
-    if (needsSpace) p << ' ';
+    if (needsSpace)
+      p << ' ';
     p << "= ";
     p.printAttribute(attr);
   }
@@ -163,10 +164,12 @@ void printSymbolAlias(OpAsmPrinter &p, Operation *op, StringAttr sym_name,
 ParseResult parseTypeAlias(OpAsmParser &parser, TypeAttr &encodingTypeAttr,
                            Type &storageType) {
   Type encodingType;
-  if (failed(parser.parseType(encodingType))) return failure();
+  if (failed(parser.parseType(encodingType)))
+    return failure();
   storageType = encodingType;
   if (succeeded(parser.parseOptionalKeyword("as"))) {
-    if (failed(parser.parseType(storageType))) return failure();
+    if (failed(parser.parseType(storageType)))
+      return failure();
   }
   encodingTypeAttr = TypeAttr::get(encodingType);
   return success();
@@ -185,10 +188,10 @@ void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
 // custom<TypedValueList>(ref($type_value), $values)
 //===----------------------------------------------------------------------===//
 
-ParseResult parseTypedValueList(
-    OpAsmParser &parser, Type type,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
-    SmallVectorImpl<Type> &valueTypes) {
+ParseResult
+parseTypedValueList(OpAsmParser &parser, Type type,
+                    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+                    SmallVectorImpl<Type> &valueTypes) {
   if (failed(parser.parseOperandList(values, AsmParser::Delimiter::Square))) {
     return failure();
   }
@@ -208,10 +211,10 @@ void printTypedValueList(OpAsmPrinter &p, Operation *op, Type type,
 //===----------------------------------------------------------------------===//
 // [%offset for %length], [%offset for %length], ...
 
-ParseResult parseRangeList(
-    OpAsmParser &parser,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &lengths) {
+ParseResult
+parseRangeList(OpAsmParser &parser,
+               SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
+               SmallVectorImpl<OpAsmParser::UnresolvedOperand> &lengths) {
   do {
     OpAsmParser::UnresolvedOperand offset;
     OpAsmParser::UnresolvedOperand length;
@@ -265,12 +268,13 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 //===----------------------------------------------------------------------===//
 // type{%size0}, type, type{%size1}
 
-ParseResult parseSizeAwareTypeList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
+ParseResult
+parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
+                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
   do {
     Type type;
-    if (failed(parser.parseType(type))) return failure();
+    if (failed(parser.parseType(type)))
+      return failure();
     if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
@@ -297,11 +301,12 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
   });
 }
 
-ParseResult parseSizeAwareTypeList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types0,
-    SmallVectorImpl<Type> &types1,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
-  if (failed(parseSizeAwareTypeList(parser, types0, sizes))) return failure();
+ParseResult
+parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+                       SmallVectorImpl<Type> &types1,
+                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
+  if (failed(parseSizeAwareTypeList(parser, types0, sizes)))
+    return failure();
   types1 = types0;
   return success();
 }
@@ -333,9 +338,11 @@ ParseResult parseShapedTiedResult(
   int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   if (res.has_value() && succeeded(res.value())) {
     tiedOperandIndex = 0;
-    if (failed(parser.parseKeyword("as"))) return failure();
+    if (failed(parser.parseKeyword("as")))
+      return failure();
   }
-  if (failed(parser.parseType(resultType))) return failure();
+  if (failed(parser.parseType(resultType)))
+    return failure();
   if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
     if (!shapedType.hasStaticShape()) {
       SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
@@ -405,12 +412,13 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
 //===----------------------------------------------------------------------===//
 // (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
 
-static ParseResult parseShapedOperandList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
+static ParseResult
+parseShapedOperandList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
+                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
   do {
     Type type;
-    if (failed(parser.parseType(type))) return failure();
+    if (failed(parser.parseType(type)))
+      return failure();
     if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       if (!shapedType.hasStaticShape()) {
         SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
@@ -439,9 +447,9 @@ static ParseResult parseShapedOperandList(
 
 // Finds the operand index in |operands| that |tiedResult| references.
 // Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t findTiedOperand(
-    OpAsmParser::UnresolvedOperand tiedResult,
-    ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
+static int64_t
+findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
+                ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name &&
@@ -475,7 +483,8 @@ ParseResult parseShapedResultList(
       }
       if (succeeded(parser.parseOptionalKeyword("as"))) {
         // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type))) return failure();
+        if (failed(parser.parseType(type)))
+          return failure();
       } else {
         // Use the operands type.
         type = operandTypes[tiedOperandIndex];
@@ -557,7 +566,8 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
       p << "}";
       resultDims = resultDims.drop_front(1);
     }
-    if (i < resultTypes.size() - 1) p << ", ";
+    if (i < resultTypes.size() - 1)
+      p << ", ";
   }
 }
 
@@ -568,14 +578,16 @@ ParseResult parseShapedFunctionType(
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
-  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseLParen()))
+    return failure();
   if (failed(parser.parseOptionalRParen())) {
     if (failed(parseShapedOperandList(parser, operandTypes, operandDims)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
   }
-  if (failed(parser.parseArrow())) return failure();
+  if (failed(parser.parseArrow()))
+    return failure();
   if (succeeded(parser.parseOptionalLParen())) {
     if (succeeded(parser.parseOptionalRParen())) {
       // Empty list/no results `()`.
@@ -628,10 +640,12 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
     }
   });
   p << ") -> ";
-  if (resultTypes.size() != 1) p << "(";
+  if (resultTypes.size() != 1)
+    p << "(";
   printShapedResultList(p, op, operands, operandTypes, operandDims, resultTypes,
                         resultDims, tiedOperands);
-  if (resultTypes.size() != 1) p << ")";
+  if (resultTypes.size() != 1)
+    p << ")";
 }
 
 //===----------------------------------------------------------------------===//
@@ -682,7 +696,8 @@ static ParseResult parseShapedFunctionResultList(
       }
       if (succeeded(parser.parseOptionalKeyword("as"))) {
         // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type))) return failure();
+        if (failed(parser.parseType(type)))
+          return failure();
       } else {
         // Use the operands type.
         type = argTypes[tiedOperandIndex];
@@ -736,7 +751,8 @@ static void printShapedFunctionResultList(OpAsmPrinter &p, Operation *op,
         p.printOptionalAttrDict(attrs.getValue());
       }
     }
-    if (i < resultTypes.size() - 1) p << ", ";
+    if (i < resultTypes.size() - 1)
+      p << ", ";
   }
 }
 
@@ -748,7 +764,8 @@ ParseResult parseShapedFunctionSignature(OpAsmParser &parser,
   SmallVector<OpAsmParser::UnresolvedOperand> args;
   SmallVector<Type> argTypes;
   SmallVector<Type> resultTypes;
-  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseLParen()))
+    return failure();
   if (failed(parser.parseOptionalRParen())) {
     if (failed(parseShapedFunctionArgumentList(parser, args, argTypes,
                                                argAttrs)) ||
@@ -802,10 +819,12 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto resultTypes = functionType.getResults();
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1) p << "(";
+    if (resultTypes.size() != 1)
+      p << "(";
     printShapedFunctionResultList(p, op, functionType.getInputs(), resultTypes,
                                   resultAttrs, tiedOperands);
-    if (resultTypes.size() != 1) p << ")";
+    if (resultTypes.size() != 1)
+      p << ")";
   }
 }
 
@@ -873,11 +892,13 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
   p << " ";
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 
-  if (op->getAttrs().size() > 1) p << ' ';
+  if (op->getAttrs().size() > 1)
+    p << ' ';
   p << getValue();
 
   // If the value is a symbol reference, print a trailing type.
-  if (llvm::isa<SymbolRefAttr>(getValue())) p << " : " << getType();
+  if (llvm::isa<SymbolRefAttr>(getValue()))
+    p << " : " << getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -885,7 +906,8 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 
 bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
-  if (inputs.size() != 1 || outputs.size() != 1) return false;
+  if (inputs.size() != 1 || outputs.size() != 1)
+    return false;
   Type a = inputs.front(), b = outputs.front();
   if (a == b) {
     // Both types are the same.
@@ -921,13 +943,13 @@ Value CastOp::getTiedResult(unsigned resultIndex) {
 
 Value CastOp::getTiedResultOperand(Value result) { return getOperand(); }
 
-::std::optional<unsigned> CastOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // operand
+::std::optional<unsigned>
+CastOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // operand
 }
 
 SmallVector<int64_t> CastOp::getTiedResultOperandIndices() {
-  return {0};  // operand
+  return {0}; // operand
 }
 
 //===----------------------------------------------------------------------===//
@@ -936,7 +958,8 @@ SmallVector<int64_t> CastOp::getTiedResultOperandIndices() {
 
 std::optional<std::pair<int64_t, int64_t>>
 NumericOptionalNarrowOp::getIntegerRange() {
-  if (!getMinValue() || !getMaxValue()) return {};
+  if (!getMinValue() || !getMaxValue())
+    return {};
   bool signExtend = isSigned();
   // Note: Cannot sign extend 0 bit values.
   int64_t minValue = signExtend && getMinValue()->getBitWidth() > 0
@@ -1291,13 +1314,13 @@ void BufferSubspanOp::setSubrangeOperand(unsigned operandIndex,
   getResultSizeMutable().assign(operand.length);
 }
 
-::std::optional<unsigned> BufferSubspanOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+BufferSubspanOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> BufferSubspanOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 // static
@@ -1448,10 +1471,10 @@ void BufferStoreOp::setSubrangeOperand(unsigned operandIndex,
   getLengthMutable().assign(operand.length);
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"

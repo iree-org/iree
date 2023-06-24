@@ -28,59 +28,59 @@ namespace {
 /// Returns the GPU vendor for the given target `triple`.
 spirv::Vendor getVendor(const TargetTriple &triple) {
   switch (triple.getArch()) {
-    case TargetTripleArch::Unknown:
-      return spirv::Vendor::Unknown;
-    case TargetTripleArch::AMD_RDNAv1:
-    case TargetTripleArch::AMD_RDNAv2:
-    case TargetTripleArch::AMD_RDNAv3:
-      return spirv::Vendor::AMD;
-    case TargetTripleArch::ARM_Valhall:
-      return spirv::Vendor::ARM;
-    case TargetTripleArch::Apple_M1:
-      return spirv::Vendor::Apple;
-    case TargetTripleArch::Intel_Arc:
-      return spirv::Vendor::Intel;
-    case TargetTripleArch::NV_Turing:
-    case TargetTripleArch::NV_Ampere:
-    case TargetTripleArch::NV_Pascal:
-      return spirv::Vendor::NVIDIA;
-    case TargetTripleArch::QC_Adreno:
-      return spirv::Vendor::Qualcomm;
-    case TargetTripleArch::CPU:
-      switch (triple.getProduct()) {
-        case TargetTripleProduct::SwiftShader:
-          return spirv::Vendor::SwiftShader;
-        default:
-          return spirv::Vendor::Unknown;
-      }
+  case TargetTripleArch::Unknown:
+    return spirv::Vendor::Unknown;
+  case TargetTripleArch::AMD_RDNAv1:
+  case TargetTripleArch::AMD_RDNAv2:
+  case TargetTripleArch::AMD_RDNAv3:
+    return spirv::Vendor::AMD;
+  case TargetTripleArch::ARM_Valhall:
+    return spirv::Vendor::ARM;
+  case TargetTripleArch::Apple_M1:
+    return spirv::Vendor::Apple;
+  case TargetTripleArch::Intel_Arc:
+    return spirv::Vendor::Intel;
+  case TargetTripleArch::NV_Turing:
+  case TargetTripleArch::NV_Ampere:
+  case TargetTripleArch::NV_Pascal:
+    return spirv::Vendor::NVIDIA;
+  case TargetTripleArch::QC_Adreno:
+    return spirv::Vendor::Qualcomm;
+  case TargetTripleArch::CPU:
+    switch (triple.getProduct()) {
+    case TargetTripleProduct::SwiftShader:
+      return spirv::Vendor::SwiftShader;
     default:
-      assert(false && "unhandled vendor");
       return spirv::Vendor::Unknown;
+    }
+  default:
+    assert(false && "unhandled vendor");
+    return spirv::Vendor::Unknown;
   }
 }
 
 /// Returns the GPU device type for the given target `triple`.
 spirv::DeviceType getDeviceType(const TargetTriple &triple) {
   switch (triple.getArch()) {
-    case TargetTripleArch::Unknown:
-      return spirv::DeviceType::Unknown;
-    case TargetTripleArch::CPU:
-      return spirv::DeviceType::CPU;
-    case TargetTripleArch::AMD_RDNAv1:
-    case TargetTripleArch::AMD_RDNAv2:
-    case TargetTripleArch::AMD_RDNAv3:
-    case TargetTripleArch::NV_Turing:
-    case TargetTripleArch::NV_Ampere:
-    case TargetTripleArch::NV_Pascal:
-    case TargetTripleArch::Intel_Arc:
-      return spirv::DeviceType::DiscreteGPU;
-    case TargetTripleArch::Apple_M1:
-    case TargetTripleArch::ARM_Valhall:
-    case TargetTripleArch::QC_Adreno:
-      return spirv::DeviceType::IntegratedGPU;
-    default:
-      assert(false && "unhandled device type");
-      return spirv::DeviceType::Unknown;
+  case TargetTripleArch::Unknown:
+    return spirv::DeviceType::Unknown;
+  case TargetTripleArch::CPU:
+    return spirv::DeviceType::CPU;
+  case TargetTripleArch::AMD_RDNAv1:
+  case TargetTripleArch::AMD_RDNAv2:
+  case TargetTripleArch::AMD_RDNAv3:
+  case TargetTripleArch::NV_Turing:
+  case TargetTripleArch::NV_Ampere:
+  case TargetTripleArch::NV_Pascal:
+  case TargetTripleArch::Intel_Arc:
+    return spirv::DeviceType::DiscreteGPU;
+  case TargetTripleArch::Apple_M1:
+  case TargetTripleArch::ARM_Valhall:
+  case TargetTripleArch::QC_Adreno:
+    return spirv::DeviceType::IntegratedGPU;
+  default:
+    assert(false && "unhandled device type");
+    return spirv::DeviceType::Unknown;
   }
 }
 
@@ -119,48 +119,48 @@ void getExtensions(const TargetTriple &triple,
                    llvm::SmallVectorImpl<Extension> &extensions) {
   // Mobile GPUs need to take Android version into consideration.
   switch (triple.getArch()) {
-    case TargetTripleArch::Apple_M1: {
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
-      const Extension list[] = {
-          Extension::VK_KHR_16bit_storage,
-          Extension::VK_KHR_8bit_storage,
-          Extension::VK_KHR_shader_float16_int8,
-          Extension::VK_KHR_storage_buffer_storage_class,
-          Extension::VK_KHR_variable_pointers,
-      };
-      return append_range(extensions, list);
+  case TargetTripleArch::Apple_M1: {
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
+    const Extension list[] = {
+        Extension::VK_KHR_16bit_storage,
+        Extension::VK_KHR_8bit_storage,
+        Extension::VK_KHR_shader_float16_int8,
+        Extension::VK_KHR_storage_buffer_storage_class,
+        Extension::VK_KHR_variable_pointers,
+    };
+    return append_range(extensions, list);
+  }
+  case TargetTripleArch::ARM_Valhall: {
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312
+    const Extension list[] = {
+        Extension::VK_KHR_16bit_storage,
+        Extension::VK_KHR_8bit_storage,
+        Extension::VK_KHR_shader_float16_int8,
+        Extension::VK_KHR_shader_integer_dot_product,
+        Extension::VK_KHR_spirv_1_4,
+        Extension::VK_KHR_storage_buffer_storage_class,
+        Extension::VK_KHR_variable_pointers,
+    };
+    return append_range(extensions, list);
+  }
+  case TargetTripleArch::QC_Adreno: {
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
+    const Extension list[] = {
+        Extension::VK_KHR_16bit_storage,
+        Extension::VK_KHR_shader_float16_int8,
+        Extension::VK_KHR_spirv_1_4,
+        Extension::VK_KHR_storage_buffer_storage_class,
+        Extension::VK_KHR_variable_pointers,
+    };
+    append_range(extensions, list);
+    if (triple.getOS() == TargetTripleOS::Android31) {
+      extensions.push_back(Extension::VK_KHR_8bit_storage);
     }
-    case TargetTripleArch::ARM_Valhall: {
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312
-      const Extension list[] = {
-          Extension::VK_KHR_16bit_storage,
-          Extension::VK_KHR_8bit_storage,
-          Extension::VK_KHR_shader_float16_int8,
-          Extension::VK_KHR_shader_integer_dot_product,
-          Extension::VK_KHR_spirv_1_4,
-          Extension::VK_KHR_storage_buffer_storage_class,
-          Extension::VK_KHR_variable_pointers,
-      };
-      return append_range(extensions, list);
-    }
-    case TargetTripleArch::QC_Adreno: {
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
-      const Extension list[] = {
-          Extension::VK_KHR_16bit_storage,
-          Extension::VK_KHR_shader_float16_int8,
-          Extension::VK_KHR_spirv_1_4,
-          Extension::VK_KHR_storage_buffer_storage_class,
-          Extension::VK_KHR_variable_pointers,
-      };
-      append_range(extensions, list);
-      if (triple.getOS() == TargetTripleOS::Android31) {
-        extensions.push_back(Extension::VK_KHR_8bit_storage);
-      }
-      return;
-    }
-    default:
-      break;
+    return;
+  }
+  default:
+    break;
   }
 
   // SwiftShader is very limited regarding functionalities.
@@ -234,245 +234,243 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
   Builder builder(context);
 
   switch (triple.getArch()) {
-    case TargetTripleArch::AMD_RDNAv3: {
-      auto i8t = builder.getIntegerType(8);
-      auto i32t = builder.getIntegerType(32);
-      auto f16t = builder.getF16Type();
-      auto f32t = builder.getF32Type();
-      auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
+  case TargetTripleArch::AMD_RDNAv3: {
+    auto i8t = builder.getIntegerType(8);
+    auto i32t = builder.getIntegerType(32);
+    auto f16t = builder.getF16Type();
+    auto f32t = builder.getF32Type();
+    auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
 
-      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          context,
-          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/i8t,
-          /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
-      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          context,
-          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
-      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          context,
-          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-          /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        context,
+        /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/i8t,
+        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        context,
+        /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        context,
+        /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
+  }
+    LLVM_FALLTHROUGH;
+  case TargetTripleArch::AMD_RDNAv1:
+  case TargetTripleArch::AMD_RDNAv2:
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10906
+    maxComputeSharedMemorySize = 65536;
+    maxComputeWorkGroupInvocations = 1024;
+    maxComputeWorkGroupSize = {1024, 1024, 1024};
+
+    subgroupSize = 64, minSubgroupSize = 32, maxSubgroupSize = 64;
+    subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                       SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                       SubgroupFeature::Shuffle |
+                       SubgroupFeature::ShuffleRelative |
+                       SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+    shaderFloat16 = shaderFloat64 = true;
+    shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+    shaderIntegerDotProduct = true;
+
+    storageBuffer16BitAccess = storagePushConstant16 = true;
+    uniformAndStorageBuffer16BitAccess = true;
+    storageBuffer8BitAccess = true, storagePushConstant8 = true;
+    uniformAndStorageBuffer8BitAccess = true;
+
+    variablePointers = variablePointersStorageBuffer = true;
+    break;
+  case TargetTripleArch::Apple_M1:
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
+    maxComputeSharedMemorySize = 32768;
+    maxComputeWorkGroupInvocations = 1024;
+    maxComputeWorkGroupSize = {1024, 1024, 1024};
+
+    subgroupSize = 32;
+    subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                       SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                       SubgroupFeature::Shuffle |
+                       SubgroupFeature::ShuffleRelative | SubgroupFeature::Quad;
+
+    shaderFloat16 = true;
+    shaderFloat64 = false;
+    shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+    storageBuffer16BitAccess = storagePushConstant16 = true;
+    uniformAndStorageBuffer16BitAccess = true;
+    storageBuffer8BitAccess = true, storagePushConstant8 = true;
+    uniformAndStorageBuffer8BitAccess = true;
+
+    variablePointers = variablePointersStorageBuffer = true;
+    break;
+  case TargetTripleArch::ARM_Valhall:
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312 (11)
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=15142 (12)
+    maxComputeSharedMemorySize = 32768;
+    maxComputeWorkGroupInvocations = 512;
+    maxComputeWorkGroupSize = {512, 512, 512};
+
+    subgroupSize = 16;
+    subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                       SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                       SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+    if (triple.getOS() == TargetTripleOS::Android31) {
+      subgroupFeatures = subgroupFeatures | SubgroupFeature::Shuffle |
+                         SubgroupFeature::ShuffleRelative;
     }
-      LLVM_FALLTHROUGH;
-    case TargetTripleArch::AMD_RDNAv1:
-    case TargetTripleArch::AMD_RDNAv2:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10906
-      maxComputeSharedMemorySize = 65536;
-      maxComputeWorkGroupInvocations = 1024;
-      maxComputeWorkGroupSize = {1024, 1024, 1024};
 
-      subgroupSize = 64, minSubgroupSize = 32, maxSubgroupSize = 64;
+    shaderFloat16 = shaderInt8 = shaderInt16 = true;
+
+    shaderIntegerDotProduct = true;
+
+    storageBuffer16BitAccess = storagePushConstant16 = true;
+    uniformAndStorageBuffer16BitAccess = true;
+    storageBuffer8BitAccess = true, storagePushConstant8 = true;
+    uniformAndStorageBuffer8BitAccess = true;
+
+    variablePointers = variablePointersStorageBuffer = true;
+    break;
+  case TargetTripleArch::CPU:
+    if (triple.getProduct() == TargetTripleProduct::SwiftShader) {
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=11023
+      maxComputeSharedMemorySize = 16384;
+
+      subgroupSize = 4;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
                          SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Shuffle |
-                         SubgroupFeature::ShuffleRelative |
-                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+                         SubgroupFeature::ShuffleRelative;
+    }
+    break;
+  case TargetTripleArch::NV_Turing:
+  case TargetTripleArch::NV_Ampere: {
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=11252
+    maxComputeSharedMemorySize = 49152;
+    maxComputeWorkGroupInvocations = 1024;
+    maxComputeWorkGroupSize = {1024, 1024, 64};
 
-      shaderFloat16 = shaderFloat64 = true;
-      shaderInt8 = shaderInt16 = shaderInt64 = true;
+    subgroupSize = 32, minSubgroupSize = 32, maxSubgroupSize = 32;
+    subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                       SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                       SubgroupFeature::Shuffle |
+                       SubgroupFeature::ShuffleRelative |
+                       SubgroupFeature::Clustered | SubgroupFeature::Quad;
 
-      shaderIntegerDotProduct = true;
+    shaderFloat16 = shaderFloat64 = true;
+    shaderInt8 = shaderInt16 = shaderInt64 = true;
 
-      storageBuffer16BitAccess = storagePushConstant16 = true;
-      uniformAndStorageBuffer16BitAccess = true;
-      storageBuffer8BitAccess = true, storagePushConstant8 = true;
-      uniformAndStorageBuffer8BitAccess = true;
+    shaderIntegerDotProduct = true;
 
-      variablePointers = variablePointersStorageBuffer = true;
-      break;
-    case TargetTripleArch::Apple_M1:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
-      maxComputeSharedMemorySize = 32768;
-      maxComputeWorkGroupInvocations = 1024;
-      maxComputeWorkGroupSize = {1024, 1024, 1024};
+    storageBuffer16BitAccess = storagePushConstant16 = true;
+    uniformAndStorageBuffer16BitAccess = true;
+    storageBuffer8BitAccess = true, storagePushConstant8 = true;
+    uniformAndStorageBuffer8BitAccess = true;
 
-      subgroupSize = 32;
-      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
-                         SubgroupFeature::Shuffle |
-                         SubgroupFeature::ShuffleRelative |
-                         SubgroupFeature::Quad;
+    variablePointers = variablePointersStorageBuffer = true;
 
-      shaderFloat16 = true;
-      shaderFloat64 = false;
-      shaderInt8 = shaderInt16 = shaderInt64 = true;
+    auto i8t = builder.getIntegerType(8);
+    auto i32t = builder.getIntegerType(32);
+    auto f16t = builder.getF16Type();
+    auto f32t = builder.getF32Type();
+    auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
 
-      storageBuffer16BitAccess = storagePushConstant16 = true;
-      uniformAndStorageBuffer16BitAccess = true;
-      storageBuffer8BitAccess = true, storagePushConstant8 = true;
-      uniformAndStorageBuffer8BitAccess = true;
+    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        context,
+        /*mSize=*/8, /*nSize=*/8, /*kSize=*/32, /*aType=*/i8t,
+        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        context,
+        /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        context,
+        /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
+  } break;
+  case TargetTripleArch::NV_Pascal:
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=17937
+    maxComputeSharedMemorySize = 49152;
+    maxComputeWorkGroupInvocations = 1536;
+    maxComputeWorkGroupSize = {1536, 1024, 64};
 
-      variablePointers = variablePointersStorageBuffer = true;
-      break;
-    case TargetTripleArch::ARM_Valhall:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312 (11)
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=15142 (12)
-      maxComputeSharedMemorySize = 32768;
-      maxComputeWorkGroupInvocations = 512;
-      maxComputeWorkGroupSize = {512, 512, 512};
+    subgroupSize = 32, minSubgroupSize = 32, maxSubgroupSize = 32;
+    subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                       SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                       SubgroupFeature::Shuffle |
+                       SubgroupFeature::ShuffleRelative |
+                       SubgroupFeature::Clustered | SubgroupFeature::Quad;
 
-      subgroupSize = 16;
-      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
-                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+    shaderFloat16 = shaderFloat64 = true;
+    shaderInt8 = shaderInt16 = shaderInt64 = true;
 
-      if (triple.getOS() == TargetTripleOS::Android31) {
-        subgroupFeatures = subgroupFeatures | SubgroupFeature::Shuffle |
-                           SubgroupFeature::ShuffleRelative;
-      }
+    shaderIntegerDotProduct = true;
 
-      shaderFloat16 = shaderInt8 = shaderInt16 = true;
+    storageBuffer16BitAccess = storagePushConstant16 = true;
+    uniformAndStorageBuffer16BitAccess = true;
+    storageBuffer8BitAccess = true, storagePushConstant8 = true;
+    uniformAndStorageBuffer8BitAccess = true;
 
-      shaderIntegerDotProduct = true;
+    variablePointers = variablePointersStorageBuffer = true;
+    break;
+  case TargetTripleArch::QC_Adreno:
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
+    maxComputeSharedMemorySize = 32768;
+    maxComputeWorkGroupInvocations = 1024;
+    maxComputeWorkGroupSize = {1024, 1024, 64};
 
-      storageBuffer16BitAccess = storagePushConstant16 = true;
-      uniformAndStorageBuffer16BitAccess = true;
-      storageBuffer8BitAccess = true, storagePushConstant8 = true;
-      uniformAndStorageBuffer8BitAccess = true;
+    subgroupSize = 64;
+    subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                       SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                       SubgroupFeature::Shuffle |
+                       SubgroupFeature::ShuffleRelative | SubgroupFeature::Quad;
 
-      variablePointers = variablePointersStorageBuffer = true;
-      break;
-    case TargetTripleArch::CPU:
-      if (triple.getProduct() == TargetTripleProduct::SwiftShader) {
-        // Example: https://vulkan.gpuinfo.org/displayreport.php?id=11023
-        maxComputeSharedMemorySize = 16384;
+    shaderFloat16 = shaderInt8 = shaderInt16 = true;
 
-        subgroupSize = 4;
-        subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                           SubgroupFeature::Arithmetic |
-                           SubgroupFeature::Ballot | SubgroupFeature::Shuffle |
-                           SubgroupFeature::ShuffleRelative;
-      }
-      break;
-    case TargetTripleArch::NV_Turing:
-    case TargetTripleArch::NV_Ampere: {
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=11252
-      maxComputeSharedMemorySize = 49152;
-      maxComputeWorkGroupInvocations = 1024;
-      maxComputeWorkGroupSize = {1024, 1024, 64};
+    storageBuffer16BitAccess = true;
+    if (triple.getOS() == TargetTripleOS::Android31) {
+      storageBuffer8BitAccess = true;
+    }
 
-      subgroupSize = 32, minSubgroupSize = 32, maxSubgroupSize = 32;
-      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
-                         SubgroupFeature::Shuffle |
-                         SubgroupFeature::ShuffleRelative |
-                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+    variablePointers = variablePointersStorageBuffer = true;
+    break;
+  case TargetTripleArch::Intel_Arc:
+    // Example: https://vulkan.gpuinfo.org/displayreport.php?id=19818
+    maxComputeSharedMemorySize = 32768;
+    maxComputeWorkGroupInvocations = 1024;
+    maxComputeWorkGroupSize = {1024, 1024, 64};
 
-      shaderFloat16 = shaderFloat64 = true;
-      shaderInt8 = shaderInt16 = shaderInt64 = true;
+    subgroupSize = 32, minSubgroupSize = 8, maxSubgroupSize = 32;
+    subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                       SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                       SubgroupFeature::Shuffle |
+                       SubgroupFeature::ShuffleRelative |
+                       SubgroupFeature::Clustered | SubgroupFeature::Quad;
 
-      shaderIntegerDotProduct = true;
+    shaderFloat16 = true;
+    shaderFloat64 = false;
+    shaderInt8 = shaderInt16 = true;
+    shaderInt64 = false;
 
-      storageBuffer16BitAccess = storagePushConstant16 = true;
-      uniformAndStorageBuffer16BitAccess = true;
-      storageBuffer8BitAccess = true, storagePushConstant8 = true;
-      uniformAndStorageBuffer8BitAccess = true;
+    shaderIntegerDotProduct = true;
 
-      variablePointers = variablePointersStorageBuffer = true;
+    storageBuffer16BitAccess = storagePushConstant16 = true;
+    uniformAndStorageBuffer16BitAccess = true;
+    storageBuffer8BitAccess = true, storagePushConstant8 = true;
+    uniformAndStorageBuffer8BitAccess = true;
 
-      auto i8t = builder.getIntegerType(8);
-      auto i32t = builder.getIntegerType(32);
-      auto f16t = builder.getF16Type();
-      auto f32t = builder.getF32Type();
-      auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
-
-      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          context,
-          /*mSize=*/8, /*nSize=*/8, /*kSize=*/32, /*aType=*/i8t,
-          /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
-      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          context,
-          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
-      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          context,
-          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-          /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
-    } break;
-    case TargetTripleArch::NV_Pascal:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=17937
-      maxComputeSharedMemorySize = 49152;
-      maxComputeWorkGroupInvocations = 1536;
-      maxComputeWorkGroupSize = {1536, 1024, 64};
-
-      subgroupSize = 32, minSubgroupSize = 32, maxSubgroupSize = 32;
-      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
-                         SubgroupFeature::Shuffle |
-                         SubgroupFeature::ShuffleRelative |
-                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
-
-      shaderFloat16 = shaderFloat64 = true;
-      shaderInt8 = shaderInt16 = shaderInt64 = true;
-
-      shaderIntegerDotProduct = true;
-
-      storageBuffer16BitAccess = storagePushConstant16 = true;
-      uniformAndStorageBuffer16BitAccess = true;
-      storageBuffer8BitAccess = true, storagePushConstant8 = true;
-      uniformAndStorageBuffer8BitAccess = true;
-
-      variablePointers = variablePointersStorageBuffer = true;
-      break;
-    case TargetTripleArch::QC_Adreno:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
-      maxComputeSharedMemorySize = 32768;
-      maxComputeWorkGroupInvocations = 1024;
-      maxComputeWorkGroupSize = {1024, 1024, 64};
-
-      subgroupSize = 64;
-      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
-                         SubgroupFeature::Shuffle |
-                         SubgroupFeature::ShuffleRelative |
-                         SubgroupFeature::Quad;
-
-      shaderFloat16 = shaderInt8 = shaderInt16 = true;
-
-      storageBuffer16BitAccess = true;
-      if (triple.getOS() == TargetTripleOS::Android31) {
-        storageBuffer8BitAccess = true;
-      }
-
-      variablePointers = variablePointersStorageBuffer = true;
-      break;
-    case TargetTripleArch::Intel_Arc:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=19818
-      maxComputeSharedMemorySize = 32768;
-      maxComputeWorkGroupInvocations = 1024;
-      maxComputeWorkGroupSize = {1024, 1024, 64};
-
-      subgroupSize = 32, minSubgroupSize = 8, maxSubgroupSize = 32;
-      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
-                         SubgroupFeature::Shuffle |
-                         SubgroupFeature::ShuffleRelative |
-                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
-
-      shaderFloat16 = true;
-      shaderFloat64 = false;
-      shaderInt8 = shaderInt16 = true;
-      shaderInt64 = false;
-
-      shaderIntegerDotProduct = true;
-
-      storageBuffer16BitAccess = storagePushConstant16 = true;
-      uniformAndStorageBuffer16BitAccess = true;
-      storageBuffer8BitAccess = true, storagePushConstant8 = true;
-      uniformAndStorageBuffer8BitAccess = true;
-
-      variablePointers = variablePointersStorageBuffer = true;
-      break;
-    case TargetTripleArch::Unknown:
-      // Use the largest subgroup size we can find across various vendors.
-      subgroupSize = 64;
-      // The following capabilities have 90%+ device coverage (Vulkan 1.1+)
-      // from https://vulkan.gpuinfo.org/listfeaturesextensions.php.
-      variablePointers = variablePointersStorageBuffer = false;
-      // Use Vulkan default for others.
-      break;
+    variablePointers = variablePointersStorageBuffer = true;
+    break;
+  case TargetTripleArch::Unknown:
+    // Use the largest subgroup size we can find across various vendors.
+    subgroupSize = 64;
+    // The following capabilities have 90%+ device coverage (Vulkan 1.1+)
+    // from https://vulkan.gpuinfo.org/listfeaturesextensions.php.
+    variablePointers = variablePointersStorageBuffer = false;
+    // Use Vulkan default for others.
+    break;
   }
 
   auto getBoolAttr = [context](bool value) -> UnitAttr {
@@ -495,7 +493,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       getBoolAttr(variablePointersStorageBuffer), getBoolAttr(variablePointers),
       builder.getArrayAttr(coopmatCases));
 }
-}  // namespace
+} // namespace
 
 TargetTriple TargetTriple::get(const char *triple) {
   llvm::SmallVector<llvm::StringRef, 3> fragments;
@@ -535,7 +533,7 @@ TargetEnvAttr TargetTriple::getTargetEnv(MLIRContext *context) const {
                             getCapabilities(*this, context));
 }
 
-}  // namespace Vulkan
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Vulkan
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

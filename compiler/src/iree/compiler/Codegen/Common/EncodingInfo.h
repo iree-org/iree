@@ -24,12 +24,12 @@ void adjustTileSizesToNarrowStaticShape(
     IREE::LinalgExt::MaterializeEncodingInfo &encodingInfo,
     ArrayRef<int64_t> shape);
 
-IREE::LinalgExt::MaterializeEncodingInfo chooseEncodingInfoForMatmul(
-    MatmulType type, MatmulOperandRole operandRole,
-    MatmulTileParams tileParams);
+IREE::LinalgExt::MaterializeEncodingInfo
+chooseEncodingInfoForMatmul(MatmulType type, MatmulOperandRole operandRole,
+                            MatmulTileParams tileParams);
 
-IREE::LinalgExt::MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr);
+IREE::LinalgExt::MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 void populateMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns,
@@ -45,6 +45,6 @@ FailureOr<IREE::LinalgExt::MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc);
 
-}  // namespace iree_compiler
-}  // namespace mlir
-#endif  // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_
+} // namespace iree_compiler
+} // namespace mlir
+#endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_

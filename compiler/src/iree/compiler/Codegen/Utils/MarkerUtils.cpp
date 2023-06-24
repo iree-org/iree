@@ -49,7 +49,8 @@ StringRef getDeleteMarker() { return "delete"; }
 StringRef getMarkerOrNull(Operation *op) {
   StringAttr attr = op->getAttrOfType<StringAttr>(
       IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-  if (!attr) return "";
+  if (!attr)
+    return "";
   return attr.getValue();
 }
 
@@ -67,5 +68,5 @@ void setMarker(Operation *op, StringRef marker) {
               StringAttr::get(op->getContext(), marker));
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

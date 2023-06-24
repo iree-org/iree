@@ -69,7 +69,8 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
 
   void handleTerminator(Operation *op, Block *newDest) const final {
     auto returnOp = dyn_cast<IREE::Util::InitializerReturnOp>(op);
-    if (!returnOp) return;
+    if (!returnOp)
+      return;
     // util.initialize.return takes no args - just branch to the new block.
     OpBuilder builder(op);
     builder.create<mlir::cf::BranchOp>(op->getLoc(), newDest, ValueRange{});
@@ -108,7 +109,8 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
                                 PatternRewriter &rewriter) const override {
     auto shapeAwareOp =
         dyn_cast_or_null<ShapeAwareOpInterface>(op.getSource().getDefiningOp());
-    if (!shapeAwareOp) return failure();
+    if (!shapeAwareOp)
+      return failure();
 
     // We only support static dimension indices today (as in general we only
     // support ranked shapes). If we find dynamic indices sneaking in we will
@@ -145,7 +147,7 @@ void UtilDialect::getCanonicalizationPatterns(
   results.insert<FoldDimOp<tensor::DimOp>>(getContext());
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

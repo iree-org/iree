@@ -29,7 +29,7 @@ inline void registerAllPasses() {
   registerHALConversionPasses();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_PASSES_H_
+#endif // IREE_COMPILER_TOOLS_INIT_PASSES_H_

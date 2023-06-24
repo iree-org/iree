@@ -45,5 +45,5 @@ VMConversionTarget::VMConversionTarget(MLIRContext *context)
       +[](mlir::ModuleOp op) { return isTopLevelModule(op); });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

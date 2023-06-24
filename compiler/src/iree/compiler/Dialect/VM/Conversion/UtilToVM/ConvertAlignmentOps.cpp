@@ -50,9 +50,9 @@ void insertAlignOps(IREE::Util::AlignOp srcOp,
 
 struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::AlignOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::AlignOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type valueType = adaptor.getValue().getType();
     if (valueType.isInteger(32)) {
       insertAlignOps<IREE::VM::ConstI32Op, IREE::VM::SubI32Op,
@@ -83,9 +83,9 @@ struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
 struct FixateIndexSizeofConversion
     : public OpConversionPattern<IREE::Util::SizeOfOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::SizeOfOp sizeofOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::SizeOfOp sizeofOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type sizedType = sizeofOp.getSizedType();
     if (llvm::isa<IndexType>(sizedType)) {
       Type converted = getTypeConverter()->convertType(sizedType);
@@ -100,7 +100,7 @@ struct FixateIndexSizeofConversion
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
@@ -113,5 +113,5 @@ void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                                                   context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

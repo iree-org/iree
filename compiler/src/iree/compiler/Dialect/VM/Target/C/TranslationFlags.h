@@ -18,9 +18,9 @@ namespace VM {
 // --iree-vm-c-* flags.
 CTargetOptions getCTargetOptionsFromFlags();
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_C_TRANSLATIONFLAGS_H_
+#endif // IREE_COMPILER_DIALECT_VM_TARGET_C_TRANSLATIONFLAGS_H_

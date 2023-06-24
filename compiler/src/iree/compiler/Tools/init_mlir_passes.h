@@ -80,6 +80,6 @@ inline void registerMlirPasses() {
   registerConvertFuncToSPIRVPass();
 }
 
-}  // namespace mlir
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_MLIR_PASSES_H_
+#endif // IREE_COMPILER_TOOLS_INIT_MLIR_PASSES_H_

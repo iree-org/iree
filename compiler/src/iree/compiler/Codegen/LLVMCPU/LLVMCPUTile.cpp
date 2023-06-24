@@ -80,13 +80,15 @@ void LLVMCPUTilePass::runOnOperation() {
 
   for (auto computeOp : computeOps) {
     auto op = cast<TilingInterface>(computeOp);
-    if (op.getLoopIteratorTypes().empty()) continue;
+    if (op.getLoopIteratorTypes().empty())
+      continue;
 
     // For now do not tile `tensor.pad` operations. The `tensor.pad`
     // operations might be those introduced by the padding-based
     // codegeneration strategy. Those are not meant to be tiled again.
     // Need a better way for handling this, but this works for now.
-    if (isa<tensor::PadOp>(computeOp)) continue;
+    if (isa<tensor::PadOp>(computeOp))
+      continue;
 
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     SmallVector<int64_t> tileSizes;
@@ -108,7 +110,8 @@ void LLVMCPUTilePass::runOnOperation() {
         });
     FailureOr<scf::SCFTilingResult> tiledResults =
         scf::tileUsingSCFForOp(rewriter, op, options);
-    if (failed(tiledResults)) continue;
+    if (failed(tiledResults))
+      continue;
     rewriter.replaceOp(op, tiledResults->replacements);
   }
 
@@ -124,17 +127,17 @@ void LLVMCPUTilePass::runOnOperation() {
     return signalPassFailure();
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
-    int64_t tilingLevel) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTilePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTilePass>(tilingLevel);
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
-    ArrayRef<int64_t> tileSizes) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTilePass(ArrayRef<int64_t> tileSizes) {
   return std::make_unique<LLVMCPUTilePass>(tileSizes);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

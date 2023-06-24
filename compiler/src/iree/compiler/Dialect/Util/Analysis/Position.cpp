@@ -14,8 +14,9 @@ const Position Position::EmptyKey(ENC_BLOCK,
                                   llvm::DenseMapInfo<void *>::getEmptyKey(), 0);
 
 // static
-const Position Position::TombstoneKey(
-    ENC_BLOCK, llvm::DenseMapInfo<void *>::getTombstoneKey(), 0);
+const Position
+    Position::TombstoneKey(ENC_BLOCK,
+                           llvm::DenseMapInfo<void *>::getTombstoneKey(), 0);
 
 void Position::print(llvm::raw_ostream &os) const {
   if (*this == Position::EmptyKey) {
@@ -26,22 +27,22 @@ void Position::print(llvm::raw_ostream &os) const {
     // Suboptimal printing, but it's not worth instantiating an AsmState.
     // Use the print(os, asmState) version instead of <<.
     switch (enc.getInt()) {
-      case Position::ENC_VALUE:
-        os << "value";
-        break;
-      case Position::ENC_RETURNED_VALUE:
-        os << "returned value";
-        break;
-      case Position::ENC_OPERATION: {
-        auto symbol = dyn_cast<mlir::SymbolOpInterface>(getOperation());
-        os << "op "
-           << (symbol ? symbol.getName()
-                      : getOperation().getName().getStringRef());
-        break;
-      }
-      case Position::ENC_BLOCK:
-        os << "block";
-        break;
+    case Position::ENC_VALUE:
+      os << "value";
+      break;
+    case Position::ENC_RETURNED_VALUE:
+      os << "returned value";
+      break;
+    case Position::ENC_OPERATION: {
+      auto symbol = dyn_cast<mlir::SymbolOpInterface>(getOperation());
+      os << "op "
+         << (symbol ? symbol.getName()
+                    : getOperation().getName().getStringRef());
+      break;
+    }
+    case Position::ENC_BLOCK:
+      os << "block";
+      break;
     }
   }
 }
@@ -53,32 +54,32 @@ void Position::print(llvm::raw_ostream &os, AsmState &asmState) const {
     os << "(tombstone)";
   } else {
     switch (enc.getInt()) {
-      case Position::ENC_VALUE: {
-        getValue().printAsOperand(os, asmState);
-        break;
+    case Position::ENC_VALUE: {
+      getValue().printAsOperand(os, asmState);
+      break;
+    }
+    case Position::ENC_RETURNED_VALUE: {
+      auto returnedValue = getReturnedValue();
+      os << returnedValue.first->getName().getStringRef();
+      auto symbol = dyn_cast<mlir::SymbolOpInterface>(returnedValue.first);
+      if (symbol) {
+        os << " @" << symbol.getName();
       }
-      case Position::ENC_RETURNED_VALUE: {
-        auto returnedValue = getReturnedValue();
-        os << returnedValue.first->getName().getStringRef();
-        auto symbol = dyn_cast<mlir::SymbolOpInterface>(returnedValue.first);
-        if (symbol) {
-          os << " @" << symbol.getName();
-        }
-        os << " result " << returnedValue.second;
-        break;
+      os << " result " << returnedValue.second;
+      break;
+    }
+    case Position::ENC_OPERATION: {
+      os << getOperation().getName().getStringRef();
+      auto symbol = dyn_cast<mlir::SymbolOpInterface>(getOperation());
+      if (symbol) {
+        os << " @" << symbol.getName();
       }
-      case Position::ENC_OPERATION: {
-        os << getOperation().getName().getStringRef();
-        auto symbol = dyn_cast<mlir::SymbolOpInterface>(getOperation());
-        if (symbol) {
-          os << " @" << symbol.getName();
-        }
-        break;
-      }
-      case Position::ENC_BLOCK: {
-        getBlock().printAsOperand(os, asmState);
-        break;
-      }
+      break;
+    }
+    case Position::ENC_BLOCK: {
+      getBlock().printAsOperand(os, asmState);
+      break;
+    }
     }
   }
 }
@@ -117,5 +118,5 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
   return {};
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

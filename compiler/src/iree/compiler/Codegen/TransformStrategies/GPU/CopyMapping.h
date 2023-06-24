@@ -36,9 +36,10 @@ struct CopyMapping {
   /// the required aligned for a cp.async, thae conversion to cp.async will be
   /// skipped.
   /// Asserts that `elementalBitWidth` divides `numContiguousElements`.
-  static int64_t maxContiguousElementsToTransfer(
-      int64_t alignment, int64_t numContiguousElements,
-      int64_t elementalBitWidth = 32);
+  static int64_t
+  maxContiguousElementsToTransfer(int64_t alignment,
+                                  int64_t numContiguousElements,
+                                  int64_t elementalBitWidth = 32);
 
   /// Compute the number of threads to use to perform a copy of `sizes`
   /// elements of `elementalBitWidth`.
@@ -53,9 +54,10 @@ struct CopyMapping {
   /// the copy, even if it means reducing the granularity of the transfer.
   /// Otherwise, the implementation will come up with a best-effort predicated
   /// mapping that respects the maximal vector transfer size.
-  static FailureOr<CopyMapping> numThreadsForCopy(
-      int totalNumThreads, int64_t alignment, ArrayRef<int64_t> sizes,
-      bool favorPredication, int64_t elementalBitWidth = 32);
+  static FailureOr<CopyMapping>
+  numThreadsForCopy(int totalNumThreads, int64_t alignment,
+                    ArrayRef<int64_t> sizes, bool favorPredication,
+                    int64_t elementalBitWidth = 32);
 
   /// Greedily compute the MappingInfo to use to perform a copy of `sizes`
   /// elements of bitwidth `elementalBitWidth`.
@@ -76,8 +78,8 @@ struct CopyMapping {
                                     int64_t elementalBitWidth = 32);
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COPY_MAPPING_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COPY_MAPPING_H_
