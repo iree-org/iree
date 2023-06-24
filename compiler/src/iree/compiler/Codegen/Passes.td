@@ -236,7 +236,9 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
   let options = [
     Option<"optionFlatten", "flatten", "bool", "false",
-           "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
+           "Flatten the vector type of vector transfers where possible (contiguous row-major data).">,
+    Option<"optionDropUnitDims", "drop-unit-dims", "bool", /*default=*/"true",
+           "Drop unit dims in vector transfers where possible (might generate vector.shape_cast).">,
   ];
   let dependentDialects = [
       "memref::MemRefDialect"
@@ -645,6 +647,14 @@ def LLVMCPULowerExecutableTarget :
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
+}
+
+def ExpandArithF16ToF32 :
+    Pass<"iree-llvmcpu-expand-f16-op-to-f32", ""> {
+  let summary =
+      "Preform f16 opertaions by expanding them to f32.";
+  let constructor =
+      "mlir::iree_compiler::createExpandF16OpToF32Pass()";
 }
 
 def LLVMCPULowerToUKernels :

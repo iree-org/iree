@@ -199,7 +199,10 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wunused-comparison"
     "-Wvla"
 
+  CLANG_GTE_12
     # Clang is lax by default on SIMD vector typing. GCC is strict by default.
+    # Some Clang's circa version 10 had incorrect return types for some
+    # intrinsics (#14168).
     "-fno-lax-vector-conversions"
 
   # TODO(#6959): Enable -Werror once we have a presubmit CI.

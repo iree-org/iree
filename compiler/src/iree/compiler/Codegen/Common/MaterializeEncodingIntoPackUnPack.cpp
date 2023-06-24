@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -270,44 +271,6 @@ IREE::LinalgExt::MaterializeEncodingInfo chooseEncodingInfoForMatmul(
   return encodingInfo;
 }
 
-std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
-  auto encodingAttr =
-      llvm::dyn_cast_if_present<EncodingAttr>(tensorType.getEncoding());
-  if (!encodingAttr) return std::nullopt;
-  return encodingAttr.getEncoding().getValue();
-}
-
-std::optional<MatmulType> getMatmulType(TensorEncoding encoding) {
-  switch (encoding) {
-    case TensorEncoding::MATMUL_F32F32F32_LHS:
-    case TensorEncoding::MATMUL_F32F32F32_RHS:
-    case TensorEncoding::MATMUL_F32F32F32_RESULT:
-      return MatmulType::F32F32F32;
-    case TensorEncoding::MATMUL_I8I8I32_LHS:
-    case TensorEncoding::MATMUL_I8I8I32_RHS:
-    case TensorEncoding::MATMUL_I8I8I32_RESULT:
-      return MatmulType::I8I8I32;
-    default:
-      return std::nullopt;
-  }
-}
-
-std::optional<MatmulOperandRole> getMatmulOperandRole(TensorEncoding encoding) {
-  switch (encoding) {
-    case TensorEncoding::MATMUL_F32F32F32_LHS:
-    case TensorEncoding::MATMUL_I8I8I32_LHS:
-      return MatmulOperandRole::LHS;
-    case TensorEncoding::MATMUL_F32F32F32_RHS:
-    case TensorEncoding::MATMUL_I8I8I32_RHS:
-      return MatmulOperandRole::RHS;
-    case TensorEncoding::MATMUL_F32F32F32_RESULT:
-    case TensorEncoding::MATMUL_I8I8I32_RESULT:
-      return MatmulOperandRole::RESULT;
-    default:
-      return std::nullopt;
-  }
-}
-
 void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
                                         ArrayRef<int64_t> shape) {
   for (size_t i = 0; i < shape.size(); i++) {
@@ -334,38 +297,11 @@ void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
 FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
-  std::optional<TensorEncoding> encoding = getEncoding(tensorType);
-  if (!encoding) return failure();
-  auto matmulType = getMatmulType(*encoding);
-  auto matmulOperandRole = getMatmulOperandRole(*encoding);
-  if (!matmulType || !matmulOperandRole) return failure();
-  uint32_t flags = 0;
-  if (*matmulType == MatmulType::F32F32F32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
-  } else if (*matmulType == MatmulType::I8I8I32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
-  } else {
-    return failure();
-  }
-  if (*matmulOperandRole == MatmulOperandRole::LHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RESULT) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
-  } else {
-    return failure();
-  }
-  SmallVector<Type> tileSizesTypes(tensorType.getRank(),
-                                   builder.getIndexType());
-  SmallVector<Value> shapeValues;
-  for (int64_t i : tensorType.getShape()) {
-    shapeValues.push_back(builder.create<arith::ConstantIndexOp>(loc, i));
-  }
-  auto op = builder.create<IREE::VMVX::QueryTileSizesOp>(
-      loc, tileSizesTypes, shapeValues, builder.getI32IntegerAttr(flags));
+  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
+  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
+      loc, resultTypes, TypeAttr::get(tensorType));
   MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getTileSizes();
+  result.innerTileSizes = op.getResults();
   return result;
 }
 

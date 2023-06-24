@@ -11,40 +11,36 @@ import tensorflow.compat.v2 as tf
 
 
 class FillModule(tf.Module):
+    def __init__(self):
+        pass
 
-  def __init__(self):
-    pass
-
-  @tf.function(input_signature=[
-      tf.TensorSpec([2], tf.int32),
-      tf.TensorSpec([], tf.float32)
-  ])
-  def fill(self, dims, value):
-    return tf.fill(dims, value)
+    @tf.function(
+        input_signature=[tf.TensorSpec([2], tf.int32), tf.TensorSpec([], tf.float32)]
+    )
+    def fill(self, dims, value):
+        return tf.fill(dims, value)
 
 
 class FillTest(tf_test_utils.TracedModuleTestCase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._modules = tf_test_utils.compile_tf_module(FillModule)
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(FillModule)
+    def test_fill(self):
+        def fill(module):
+            dims = np.array([2, 3], dtype=np.int32)
+            value = np.array(9.0, dtype=np.float32)
+            module.fill(dims, value)
 
-  def test_fill(self):
-
-    def fill(module):
-      dims = np.array([2, 3], dtype=np.int32)
-      value = np.array(9., dtype=np.float32)
-      module.fill(dims, value)
-
-    self.compare_backends(fill, self._modules)
+        self.compare_backends(fill, self._modules)
 
 
 def main(argv):
-  del argv  # Unused
-  if hasattr(tf, 'enable_v2_behavior'):
-    tf.enable_v2_behavior()
-  tf.test.main()
+    del argv  # Unused
+    if hasattr(tf, "enable_v2_behavior"):
+        tf.enable_v2_behavior()
+    tf.test.main()
 
 
-if __name__ == '__main__':
-  app.run(main)
+if __name__ == "__main__":
+    app.run(main)

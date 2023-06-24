@@ -18,7 +18,8 @@ include "mlir/IR/OpBase.td"
 def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Indicates that the entire targeted module should be converted
     to the LLVM dialect. This is expected to be the last transformation in
@@ -47,7 +48,8 @@ def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
 def RegisterMatchCallbacksOp :
     Op<Transform_Dialect, "iree.register_match_callbacks",
       [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       DeclareOpInterfaceMethods<TransformOpInterface>]> {
+       DeclareOpInterfaceMethods<TransformOpInterface>,
+       ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Registers named structured op matcher callbacks specific for IREE to use
     with `transform.iree.match_callback`. This should be called before first
@@ -80,7 +82,8 @@ def RegisterMatchCallbacksOp :
 def MatchCallbackOp :
     Op<Transform_Dialect, "iree.match_callback",
        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-        DeclareOpInterfaceMethods<TransformOpInterface>]> {
+        DeclareOpInterfaceMethods<TransformOpInterface>,
+        ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Performs payload IR matching using a C++ callback registered beforehand.
     The callback is identified by name and is passed the current transform
@@ -107,7 +110,8 @@ def MatchCallbackOp :
 def TakeFirstOp :
     Op<Transform_Dialect, "iree.take_first",
        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-        DeclareOpInterfaceMethods<TransformOpInterface>]> {
+        DeclareOpInterfaceMethods<TransformOpInterface>,
+        ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Given an arbitrary list of handles associated with potentially empty lists
     of payload operations, produces two new handles:
@@ -134,7 +138,8 @@ def TakeFirstOp :
 def EmitRemarkOp :
     Op<Transform_Dialect, "iree.emit_remark",
        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-        TransformOpInterface, TransformEachOpTrait]> {
+        TransformOpInterface, TransformEachOpTrait,
+        ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Emits a diagnostic remark with the given message located at payload ops
     associated with the given handle. This can be used, e.g., for debugging.
@@ -147,6 +152,7 @@ def EmitRemarkOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::transform::TransformRewriter &rewriter,
       ::mlir::Operation *target,
       ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);

@@ -24,40 +24,38 @@ TRANSPARENT_ID = "00000000-0000-0000-0000-000000000000"
 
 
 def hash_composite_id(keys: Sequence[str]) -> str:
-  """Computes the composite hash id from string keys.
+    """Computes the composite hash id from string keys.
 
-  String keys are the component ids that compose this composite object. We hash
-  the composite id since the id isn't designed to be inspected and insufficient
-  to reconstruct the original composite object.
+    String keys are the component ids that compose this composite object. We hash
+    the composite id since the id isn't designed to be inspected and insufficient
+    to reconstruct the original composite object.
 
-  Note that the output is sensitive to the order of the keys, and any key ==
-  TRANSPARENT_ID will be skipped. When adding a new key to the keys, the new key
-  should be always appended to the end. In this way, the composite id can be
-  unchanged for the existing composite object if they use TRANSPARENT_ID on the
-  new keyed field.
+    Note that the output is sensitive to the order of the keys, and any key ==
+    TRANSPARENT_ID will be skipped. When adding a new key to the keys, the new key
+    should be always appended to the end. In this way, the composite id can be
+    unchanged for the existing composite object if they use TRANSPARENT_ID on the
+    new keyed field.
 
-  The composite id is computed in the following steps:
-  1. Index each key with its position in the list from 0.
-  2. Remove any key == TRANSPARENT_ID
-  3. Get the SHA256 hex digest of "0-key_0:1-key_1:..."
+    The composite id is computed in the following steps:
+    1. Index each key with its position in the list from 0.
+    2. Remove any key == TRANSPARENT_ID
+    3. Get the SHA256 hex digest of "0-key_0:1-key_1:..."
 
-  Step 1 is needed to avoid the ambiguity between:
-  ["key_abc", TRANSPARENT_ID] and [TRANSPARENT_ID, "key_abc"]
-  since after removing TRANSPARENT_ID, they both become ["key_abc"] without the
-  position index.
+    Step 1 is needed to avoid the ambiguity between:
+    ["key_abc", TRANSPARENT_ID] and [TRANSPARENT_ID, "key_abc"]
+    since after removing TRANSPARENT_ID, they both become ["key_abc"] without the
+    position index.
 
-  Args:
-    keys: list of string keys.
+    Args:
+      keys: list of string keys.
 
-  Returns:
-    Unique composite id.
-  """
-  trimmed_indexed_key = [
-      f"{index}-{key}" for index, key in enumerate(keys)
-      if key != TRANSPARENT_ID
-  ]
-  return hashlib.sha256(
-      ":".join(trimmed_indexed_key).encode("utf-8")).hexdigest()
+    Returns:
+      Unique composite id.
+    """
+    trimmed_indexed_key = [
+        f"{index}-{key}" for index, key in enumerate(keys) if key != TRANSPARENT_ID
+    ]
+    return hashlib.sha256(":".join(trimmed_indexed_key).encode("utf-8")).hexdigest()
 
 
 # To generate an id, run `uuid.uuid4()`.
@@ -141,33 +139,69 @@ DEVICE_SPEC_MOBILE_SM_G980F = "0247f709-a300-4d12-b986-bdb0c15c2653"
 # IREE benchmarks
 IREE_COMPILE_CONFIG_VMVX_GENERIC_EXPERIMENTAL = "75336abd-8108-462c-9ce3-15443e3f32f4"
 IREE_COMPILE_CONFIG_LINUX_CASCADELAKE = "e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING = "6d0d5716-5525-44ad-b71d-8075ee1583a6"
+IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING = (
+    "6d0d5716-5525-44ad-b71d-8075ee1583a6"
+)
 IREE_COMPILE_CONFIG_LINUX_RV64_GENERIC_DEFAULTS = "cdf579a9-5446-403b-a991-802a6c702e65"
 IREE_COMPILE_CONFIG_LINUX_RV32_GENERIC_DEFAULTS = "6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4"
 IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_DEFAULTS = "09cb5300-7f73-45cf-9f68-e114c77ca030"
-IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_MATMUL_UBENCH = "3f66ba98-5716-4d30-9a87-50bc78e5f714"
-IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_MATMUL_SPLITK_UBENCH = "54cf2ec3-d073-4281-9561-b6c1280bd0eb"
+IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_MATMUL_UBENCH = (
+    "3f66ba98-5716-4d30-9a87-50bc78e5f714"
+)
+IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_MATMUL_SPLITK_UBENCH = (
+    "54cf2ec3-d073-4281-9561-b6c1280bd0eb"
+)
 IREE_COMPILE_CONFIG_LINUX_VULKAN_SD_SIMT = "da0ea6e6-719b-43ee-bfec-72eb3b1173bf"
 IREE_COMPILE_CONFIG_LINUX_VULKAN_SD_TENSORCORE = "97790694-4f0f-4d83-bc52-d74e019c1df9"
-IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_DEFAULTS = "8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
-IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_EXPERIMENTAL = "32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
-IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_EXPERIMENTAL_REPEATED_KERNEL = "6b601a8d-4824-42e0-bcc6-500c0c3fa346"
-IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DEFAULTS = "1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
-IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D = "d463322c-24e6-4685-85ca-d541b41a405f"
-IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D_DOTPROD = "f672a6b9-99fc-47ce-8b1b-8e5f44a541a1"
-IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_DEFAULTS = "c7eea358-d8d2-4199-9d75-bb741c399b1b"
-IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_FUSE_PADDING = "d3038b95-c889-456a-bff6-5cbabd10f1ad"
-IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_FUSE_PADDING_REPEATED_KERNEL = "70b823ca-2807-4531-8c00-e02af7d70466"
+IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_DEFAULTS = (
+    "8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
+)
+IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_EXPERIMENTAL = (
+    "32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
+)
+IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_EXPERIMENTAL_REPEATED_KERNEL = (
+    "6b601a8d-4824-42e0-bcc6-500c0c3fa346"
+)
+IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DEFAULTS = (
+    "1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
+)
+IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D = (
+    "d463322c-24e6-4685-85ca-d541b41a405f"
+)
+IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D_DOTPROD = (
+    "f672a6b9-99fc-47ce-8b1b-8e5f44a541a1"
+)
+IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_DEFAULTS = (
+    "c7eea358-d8d2-4199-9d75-bb741c399b1b"
+)
+IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_FUSE_PADDING = (
+    "d3038b95-c889-456a-bff6-5cbabd10f1ad"
+)
+IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_FUSE_PADDING_REPEATED_KERNEL = (
+    "70b823ca-2807-4531-8c00-e02af7d70466"
+)
 IREE_MODULE_EXECUTION_CONFIG_LOCAL_SYNC = "13fc65a9-e5dc-4cbb-9c09-25b0b08f4c03"
 IREE_MODULE_EXECUTION_CONFIG_LOCAL_TASK_BASE = "c7c4a15e-b20c-4898-bb4a-864f34ff34b2"
-IREE_MODULE_EXECUTION_CONFIG_SYS_SCHED_LOCAL_TASK_BASE = "0dfb6b03-bd15-45a9-b82a-345c03f1fea6"
+IREE_MODULE_EXECUTION_CONFIG_SYS_SCHED_LOCAL_TASK_BASE = (
+    "0dfb6b03-bd15-45a9-b82a-345c03f1fea6"
+)
 IREE_MODULE_EXECUTION_CONFIG_CUDA = "f7c0ec98-f028-436a-b05a-7d35cf18ce2d"
-IREE_MODULE_EXECUTION_CONFIG_CUDA_BATCH_SIZE_100 = "ce15c338-b1d1-4ee3-b876-22d3cc5a831d"
+IREE_MODULE_EXECUTION_CONFIG_CUDA_BATCH_SIZE_100 = (
+    "ce15c338-b1d1-4ee3-b876-22d3cc5a831d"
+)
 IREE_MODULE_EXECUTION_CONFIG_VULKAN = "34ae13f0-d6d9-43f7-befb-15d024e88e89"
-IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_16 = "b10737a8-5da4-4052-9b7a-5b07f21e02d0"
-IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_32 = "c59f6ed8-ef78-4ddd-93ea-f173c5e4d6b8"
-IREE_MODULE_EXECUTION_CONFIG_VMVX_LOCAL_TASK_BASE = "953183e2-1e84-4a51-a43c-9b869bdc2218"
-IREE_MODULE_EXECUTION_CONFIG_VMVX_SYS_SCHED_LOCAL_TASK_BASE = "a1a9795e-2fc5-4d95-abc0-b0fb41b07557"
+IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_16 = (
+    "b10737a8-5da4-4052-9b7a-5b07f21e02d0"
+)
+IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_32 = (
+    "c59f6ed8-ef78-4ddd-93ea-f173c5e4d6b8"
+)
+IREE_MODULE_EXECUTION_CONFIG_VMVX_LOCAL_TASK_BASE = (
+    "953183e2-1e84-4a51-a43c-9b869bdc2218"
+)
+IREE_MODULE_EXECUTION_CONFIG_VMVX_SYS_SCHED_LOCAL_TASK_BASE = (
+    "a1a9795e-2fc5-4d95-abc0-b0fb41b07557"
+)
 IREE_MODEL_IMPORT_STABLEHLO_MLIR_DEFAULT = "8b2df698-f3ba-4207-8696-6c909776eac4"
 IREE_MODEL_IMPORT_TFLITE_DEFAULT = "16280d67-7ce0-4807-ab4b-0cb3c771d206"
 IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT = "8afc4561-e84d-4a91-af55-2b1917465fcc"

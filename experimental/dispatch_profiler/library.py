@@ -27,8 +27,8 @@ from collections import namedtuple
 # Architecure types
 ###################################################################################################
 class ArchType(enum.Enum):
-  Cpu = auto()
-  Gpu = auto()
+    Cpu = auto()
+    Gpu = auto()
 
 
 ArchTypeNames = {
@@ -38,9 +38,9 @@ ArchTypeNames = {
 
 
 class GpuArchType(enum.Enum):
-  nvptx = auto()
-  rocm = auto()
-  spirv = auto()
+    nvptx = auto()
+    rocm = auto()
+    spirv = auto()
 
 
 GpuArchTypeNames = {
@@ -53,79 +53,79 @@ GpuArchTypeNames = {
 # Operation kinds
 ###################################################################################################
 class OperationKind(enum.Enum):
-  Matmul = auto()
-  BatchMatmul = auto()
-  SplitkMatmul = auto()
-  Conv2d = auto()
+    Matmul = auto()
+    BatchMatmul = auto()
+    SplitkMatmul = auto()
+    Conv2d = auto()
 
 
 OperationKindNames = {
-    OperationKind.Matmul: 'matmul',
-    OperationKind.SplitkMatmul: 'matmul_splitk',
-    OperationKind.BatchMatmul: 'batch_matmul',
-    OperationKind.Conv2d: 'conv2d'
+    OperationKind.Matmul: "matmul",
+    OperationKind.SplitkMatmul: "matmul_splitk",
+    OperationKind.BatchMatmul: "batch_matmul",
+    OperationKind.Conv2d: "conv2d",
 }
 
 
 # MLIR dialects
 ###################################################################################################
 class MlirDialect(enum.Enum):
-  Linalg = auto()
-  Mhlo = auto()
+    Linalg = auto()
+    Mhlo = auto()
 
 
 MlirDialectNames = {
-    MlirDialect.Linalg: 'linalg',
-    MlirDialect.Mhlo: 'mhlo',
+    MlirDialect.Linalg: "linalg",
+    MlirDialect.Mhlo: "mhlo",
 }
 
 
 # Compilation modes (verification or benchmarking/profiling)
 ###################################################################################################
 class CompilationMode(enum.Enum):
-  Verify = auto()
-  Profile = auto()
+    Verify = auto()
+    Profile = auto()
 
 
 CompilationModeNames = {
-    CompilationMode.Verify: 'verify',
-    CompilationMode.Profile: 'profile',
+    CompilationMode.Verify: "verify",
+    CompilationMode.Profile: "profile",
 }
 
 
 class CompilationConfigType(enum.Enum):
-  Default = auto()
-  Custom = auto()
+    Default = auto()
+    Custom = auto()
 
 
 CompilationConfigTypeName = {
-    CompilationConfigType.Default: 'default',
-    CompilationConfigType.Custom: 'custom',
+    CompilationConfigType.Default: "default",
+    CompilationConfigType.Custom: "custom",
 }
 
 
 # Enumerations for data types and layouts
 ###################################################################################################
 class DataType(enum.Enum):
-  b1 = auto()
-  u4 = auto()
-  u8 = auto()
-  u16 = auto()
-  u32 = auto()
-  u64 = auto()
-  s4 = auto()
-  s8 = auto()
-  s16 = auto()
-  s32 = auto()
-  s64 = auto()
-  e4m3 = auto()
-  e5m2 = auto()
-  f16 = auto()
-  bf16 = auto()
-  f32 = auto()
-  tf32 = auto()
-  f64 = auto()
-  invalid = auto()
+    b1 = auto()
+    u4 = auto()
+    u8 = auto()
+    u16 = auto()
+    u32 = auto()
+    u64 = auto()
+    s4 = auto()
+    s8 = auto()
+    s16 = auto()
+    s32 = auto()
+    s64 = auto()
+    e4m3 = auto()
+    e5m2 = auto()
+    f16 = auto()
+    bf16 = auto()
+    f32 = auto()
+    tf32 = auto()
+    f64 = auto()
+    invalid = auto()
 
 
 DataTypeName = {
@@ -140,8 +140,8 @@ DataTypeName = {
     DataType.s16: "s16",
     DataType.s32: "s32",
     DataType.s64: "s64",
-    DataType.e4m3: 'e4m3',
-    DataType.e5m2: 'e5m2',
+    DataType.e4m3: "e4m3",
+    DataType.e5m2: "e5m2",
     DataType.f16: "f16",
     DataType.bf16: "bf16",
     DataType.f32: "f32",
@@ -177,37 +177,34 @@ DataTypeSizeInBits = {
 
 
 class LayoutType(enum.Enum):
-  ColumnMajor = auto()
-  RowMajor = auto()
-  NHWC = auto()
-  NCWH = auto()
+    ColumnMajor = auto()
+    RowMajor = auto()
+    NHWC = auto()
+    NCWH = auto()
 
 
 # cuBLAS/cuDNN layout type names convention is followed for the layout names.
 # https://docs.nvidia.com/cuda/cublas/index.html#cublasoperation-t
 ShortLayoutTypeName = {
-    LayoutType.ColumnMajor: 'n',
-    LayoutType.RowMajor: 't',
-    LayoutType.NHWC: 'nhwc',
-    LayoutType.NCWH: 'ncwh',
+    LayoutType.ColumnMajor: "n",
+    LayoutType.RowMajor: "t",
+    LayoutType.NHWC: "nhwc",
+    LayoutType.NCWH: "ncwh",
 }
 
 
 # Compilation pipelines/translation info.
 ###################################################################################################
 class TranslationInfo(enum.Enum):
-  LLVMGPUMatmulSIMT = auto()
-  LLVMGPUMatmulTensorCore = auto()
-  LLVMGPUMatmulTensorCoreMmaSync = auto()
+    LLVMGPUMatmulSIMT = auto()
+    LLVMGPUMatmulTensorCore = auto()
+    LLVMGPUMatmulTensorCoreMmaSync = auto()
 
 
 TranslationInfoTag = {
-    TranslationInfo.LLVMGPUMatmulSIMT:
-        "LLVMGPUMatmulSIMT",
-    TranslationInfo.LLVMGPUMatmulTensorCore:
-        "LLVMGPUMatmulTensorCore",
-    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync:
-        "LLVMGPUMatmulTensorCoreMmaSync",
+    TranslationInfo.LLVMGPUMatmulSIMT: "LLVMGPUMatmulSIMT",
+    TranslationInfo.LLVMGPUMatmulTensorCore: "LLVMGPUMatmulTensorCore",
+    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "LLVMGPUMatmulTensorCoreMmaSync",
 }
 
 TranslationInfoName = {
@@ -220,12 +217,12 @@ TranslationInfoName = {
 # Distribution of values in a tensor.
 ###################################################################################################
 class Distribution(enum.Enum):
-  Empty = auto()
-  Zeros = auto()
-  Ones = auto()
-  Sequential = auto()
-  Identity = auto()
-  Random = auto()
+    Empty = auto()
+    Zeros = auto()
+    Ones = auto()
+    Sequential = auto()
+    Identity = auto()
+    Random = auto()
 
 
 DistributionName = {
@@ -246,29 +243,31 @@ DistributionName = {
 
 
 class TensorDescription:
-  """A class for tensor description."""
+    """A class for tensor description."""
 
-  def __init__(self, datatype, layout):
-    self.datatype = datatype
-    self.layout = layout
+    def __init__(self, datatype, layout):
+        self.datatype = datatype
+        self.layout = layout
 
-  def name(self):
-    return "%s%s" % (DataTypeName[self.datatype],
-                     ShortLayoutTypeName[self.layout])
+    def name(self):
+        return "%s%s" % (DataTypeName[self.datatype], ShortLayoutTypeName[self.layout])
 
 
 class TileDescription:
-  """A class for tile description."""
+    """A class for tile description."""
 
-  def __init__(self, threadblock_shape, stages, block_dim):
-    self.threadblock_shape = threadblock_shape  # in number of elements in M, N, K
-    self.stages = stages  # number of shared memory stages in tile K
-    self.block_dim = block_dim  # block dimension in number of threads in x, y, z
+    def __init__(self, threadblock_shape, stages, block_dim):
+        self.threadblock_shape = threadblock_shape  # in number of elements in M, N, K
+        self.stages = stages  # number of shared memory stages in tile K
+        self.block_dim = block_dim  # block dimension in number of threads in x, y, z
 
-  def name(self):
-    return "%dx%d_%dx%d" % (self.threadblock_shape[0],
-                            self.threadblock_shape[1],
-                            self.threadblock_shape[2], self.stages)
+    def name(self):
+        return "%dx%d_%dx%d" % (
+            self.threadblock_shape[0],
+            self.threadblock_shape[1],
+            self.threadblock_shape[2],
+            self.stages,
+        )
 
 
 ###################################################################################################
@@ -277,77 +276,79 @@ class TileDescription:
 # functionality they provide becomes apparent and necessary as we move forward.
 ###################################################################################################
 def get_np_array(tensor_description, shape, dist):
-  """Returns a numpy array based on the distribution and shape."""
-  # Fix the seed for reproducibility.
-  np.random.seed(42)
+    """Returns a numpy array based on the distribution and shape."""
+    # Fix the seed for reproducibility.
+    np.random.seed(42)
 
-  # Generate the numpy array based on the distribution.
-  if dist == Distribution.Empty:
-    return np.empty(shape)
-  elif dist == Distribution.Zeros:
-    return np.zeros(shape)
-  elif dist == Distribution.Ones:
-    return np.ones(shape)
-  elif dist == Distribution.Sequential:
-    return np.arange(np.prod(shape)).reshape(shape)
-  elif dist == Distribution.Identity:
-    return np.eye(shape[0], shape[1])
-  elif dist == Distribution.Random:
-    if tensor_description.datatype == DataType.s8:
-      return np.random.randint(-2, 3, shape)
-    elif tensor_description.datatype == DataType.u8:
-      return np.random.randint(0, 4, shape)
-    elif tensor_description.datatype == DataType.f16 or \
-         tensor_description.datatype == DataType.bf16:
-      return np.random.randint(-3, 4, shape)
-    elif tensor_description.datatype == DataType.f32:
-      return np.random.randint(-7, 8, shape)
+    # Generate the numpy array based on the distribution.
+    if dist == Distribution.Empty:
+        return np.empty(shape)
+    elif dist == Distribution.Zeros:
+        return np.zeros(shape)
+    elif dist == Distribution.Ones:
+        return np.ones(shape)
+    elif dist == Distribution.Sequential:
+        return np.arange(np.prod(shape)).reshape(shape)
+    elif dist == Distribution.Identity:
+        return np.eye(shape[0], shape[1])
+    elif dist == Distribution.Random:
+        if tensor_description.datatype == DataType.s8:
+            return np.random.randint(-2, 3, shape)
+        elif tensor_description.datatype == DataType.u8:
+            return np.random.randint(0, 4, shape)
+        elif (
+            tensor_description.datatype == DataType.f16
+            or tensor_description.datatype == DataType.bf16
+        ):
+            return np.random.randint(-3, 4, shape)
+        elif tensor_description.datatype == DataType.f32:
+            return np.random.randint(-7, 8, shape)
 
 
 ###################################################################################################
 def SubstituteTemplate(template, values):
-  """Substitutes values into a template string."""
-  text = template
-  for key, value in values.items():
-    regex = "\\$\\{%s\\}" % key
-    newtext = re.sub(regex, value, text)
-    text = newtext
-  return text
+    """Substitutes values into a template string."""
+    text = template
+    for key, value in values.items():
+        regex = "\\$\\{%s\\}" % key
+        newtext = re.sub(regex, value, text)
+        text = newtext
+    return text
 
 
 ###################################################################################################
 class ReferenceOpInterface(ABC):
-  """Interface for reference implementations."""
+    """Interface for reference implementations."""
 
-  @abstractmethod
-  def get_input_filepaths(self):
-    """Returns the list of inputs."""
-    pass
+    @abstractmethod
+    def get_input_filepaths(self):
+        """Returns the list of inputs."""
+        pass
 
-  @abstractmethod
-  def get_output_filepaths(self):
-    """Returns the list of outputs/."""
-    pass
+    @abstractmethod
+    def get_output_filepaths(self):
+        """Returns the list of outputs/."""
+        pass
 
-  @abstractmethod
-  def __call__(self):
-    """Runs the reference implementation."""
-    pass
+    @abstractmethod
+    def __call__(self):
+        """Runs the reference implementation."""
+        pass
 
-  def is_cached(self):
-    """Returns whether the reference run is cached."""
+    def is_cached(self):
+        """Returns whether the reference run is cached."""
 
-    # Returns False if any of the reference input are missing.
-    for input_filepath in self.get_input_filepaths():
-      if not input_filepath.exists():
-        return False
+        # Returns False if any of the reference input are missing.
+        for input_filepath in self.get_input_filepaths():
+            if not input_filepath.exists():
+                return False
 
-    # Returns False if any of the reference output are missing.
-    for output_filepath in self.get_output_filepaths():
-      if not output_filepath.exists():
-        return False
+        # Returns False if any of the reference output are missing.
+        for output_filepath in self.get_output_filepaths():
+            if not output_filepath.exists():
+                return False
 
-    # Returns True if all the reference inputs and outputs are cached.
-    return True
+        # Returns True if all the reference inputs and outputs are cached.
+        return True
 
-  ###################################################################################################
+    ###################################################################################################

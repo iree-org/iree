@@ -12,13 +12,12 @@ model_path = "https://tfhub.dev/tensorflow/lite-model/mnasnet_1.0_224/1/metadata
 
 
 class MnasnetTest(test_util.TFLiteModelTest):
+    def __init__(self, *args, **kwargs):
+        super(MnasnetTest, self).__init__(model_path, *args, **kwargs)
 
-  def __init__(self, *args, **kwargs):
-    super(MnasnetTest, self).__init__(model_path, *args, **kwargs)
-
-  def test_compile_tflite(self):
-    self.compile_and_execute()
+    def test_compile_tflite(self):
+        self.compile_and_execute()
 
 
-if __name__ == '__main__':
-  absl.testing.absltest.main()
+if __name__ == "__main__":
+    absl.testing.absltest.main()

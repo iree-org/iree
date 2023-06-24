@@ -34,71 +34,74 @@ MLIR_END_SEQUENCE = "//----- //"
 
 
 def parse_arguments():
-  """Parses command line arguments."""
+    """Parses command line arguments."""
 
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      'input_file_path',
-      type=str,
-      nargs='?',
-      metavar="<input_file_path>",
-      help='Input IR dump (.mlir from -mlir-print-ir-after-all)')
-  parser.add_argument('-o,',
-                      '--output',
-                      type=str,
-                      required=True,
-                      metavar="<output>",
-                      help='Output file path (e.g. translation_ir.md)')
-  # TODO(scotttodd): flags for original IR path and compilation command line
-  #                  .md could then show original IR + flags -> output
-  # TODO(scotttodd): flag for markdown flavor (mkdocs, github, etc.)
-  # TODO(scotttodd): flag for diff view (correlate IR before and IR after)?
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "input_file_path",
+        type=str,
+        nargs="?",
+        metavar="<input_file_path>",
+        help="Input IR dump (.mlir from -mlir-print-ir-after-all)",
+    )
+    parser.add_argument(
+        "-o,",
+        "--output",
+        type=str,
+        required=True,
+        metavar="<output>",
+        help="Output file path (e.g. translation_ir.md)",
+    )
+    # TODO(scotttodd): flags for original IR path and compilation command line
+    #                  .md could then show original IR + flags -> output
+    # TODO(scotttodd): flag for markdown flavor (mkdocs, github, etc.)
+    # TODO(scotttodd): flag for diff view (correlate IR before and IR after)?
 
-  return parser.parse_args()
+    return parser.parse_args()
 
 
 def main(args):
-  input_file_path = args.input_file_path
-  output_file_path = args.output
-  print("Converting input file '%s'" % (input_file_path))
-  print("     into output file '%s'" % (output_file_path))
+    input_file_path = args.input_file_path
+    output_file_path = args.output
+    print("Converting input file '%s'" % (input_file_path))
+    print("     into output file '%s'" % (output_file_path))
 
-  with open(input_file_path, "r") as input_file:
-    with open(output_file_path, "w") as output_file:
+    with open(input_file_path, "r") as input_file:
+        with open(output_file_path, "w") as output_file:
+            # Iterate line by line through the input file, collecting text into
+            # blocks and writing them into the output file with markdown formatting
+            # as we go.
+            #
+            # Note: we could parse through and find/replace within the file using
+            # regex (or sed), but iterating this way is easier to understand and
+            # uses a predictable amount of memory.
 
-      # Iterate line by line through the input file, collecting text into
-      # blocks and writing them into the output file with markdown formatting
-      # as we go.
-      #
-      # Note: we could parse through and find/replace within the file using
-      # regex (or sed), but iterating this way is easier to understand and
-      # uses a predictable amount of memory.
+            current_block_lines = []
+            dump_after_regex = re.compile(
+                MLIR_START_SEQUENCE + "\s(.*)\s" + MLIR_END_SEQUENCE
+            )
 
-      current_block_lines = []
-      dump_after_regex = re.compile(MLIR_START_SEQUENCE + "\s(.*)\s" +
-                                    MLIR_END_SEQUENCE)
+            def finish_block():
+                nonlocal current_block_lines
+                if len(current_block_lines) != 0:
+                    current_block_lines.append("```\n\n")
+                    output_file.writelines(current_block_lines)
+                    current_block_lines = []
 
-      def finish_block():
-        nonlocal current_block_lines
-        if len(current_block_lines) != 0:
-          current_block_lines.append("```\n\n")
-          output_file.writelines(current_block_lines)
-          current_block_lines = []
+            for input_line in input_file:
+                if input_line == "\n":
+                    continue
 
-      for input_line in input_file:
-        if input_line == "\n":
-          continue
+                if input_line.startswith(MLIR_START_SEQUENCE):
+                    finish_block()
+                    header_text = dump_after_regex.match(input_line).group(1)
+                    current_block_lines.append("### " + header_text + "\n\n")
+                    current_block_lines.append("```mlir\n")
+                else:
+                    current_block_lines.append(input_line)
 
-        if input_line.startswith(MLIR_START_SEQUENCE):
-          finish_block()
-          header_text = dump_after_regex.match(input_line).group(1)
-          current_block_lines.append("### " + header_text + "\n\n")
-          current_block_lines.append("```mlir\n")
-        else:
-          current_block_lines.append(input_line)
-
-      finish_block()
+            finish_block()
 
 
-if __name__ == '__main__':
-  main(parse_arguments())
+if __name__ == "__main__":
+    main(parse_arguments())

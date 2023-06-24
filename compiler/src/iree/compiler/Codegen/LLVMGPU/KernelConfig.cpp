@@ -76,6 +76,7 @@ struct TargetInfo {
   // TODO: add finer grain control for other tensorcore types.
   bool hasTF32TensorCore = false;
   bool hasWarpShuffle = false;
+  bool hasMmaSync = false;
 };
 
 struct TileWorkgroupSizePair {
@@ -179,7 +180,10 @@ static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
     return info;
   }
   int64_t smVersion = version.getZExtValue();
-  if (smVersion >= 80) info.hasTF32TensorCore = true;
+  if (smVersion >= 80) {
+    info.hasTF32TensorCore = true;
+    info.hasMmaSync = true;
+  }
   return info;
 }
 
@@ -670,6 +674,8 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
   iree_compiler::gpu::GPUModel gpuModel;
   gpuModel.hasWarpShuffle = targetInfo.hasWarpShuffle;
   gpuModel.hasTF32TensorCore = targetInfo.hasTF32TensorCore;
+  gpuModel.hasMmaSync = targetInfo.hasMmaSync;
+
   if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
                                                               gpuModel)))
     return failure();

@@ -27,7 +27,7 @@ IREE_UK_MMT4D_TILE_FUNC_DECL(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32_8x8x1(
     const iree_uk_mmt4d_params_t* params) {
-#ifdef IREE_UK_BUILD_X86_64_AVX2_FMA
+#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
   if (iree_uk_cpu_supports_avx2_fma(params->cpu_data)) {
     return iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma;
   }
@@ -38,7 +38,7 @@ iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32_8x8x1(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32_16x16x1(
     const iree_uk_mmt4d_params_t* params) {
-#ifdef IREE_UK_BUILD_X86_64_AVX512_BASE
+#if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
   if (iree_uk_cpu_supports_avx512_base(params->cpu_data)) {
     return iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base;
   }
@@ -49,12 +49,12 @@ iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32_16x16x1(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_x86_64_i8i8i32_16x16x2(
     const iree_uk_mmt4d_params_t* params) {
-#ifdef IREE_UK_BUILD_X86_64_AVX512_VNNI
+#if defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
   if (params->cpu_data[0] & (IREE_CPU_DATA0_X86_64_AVX512VNNI)) {
     return iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni;
   }
 #endif
-#ifdef IREE_UK_BUILD_X86_64_AVX512_BASE
+#if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
   if (params->cpu_data[0] & (IREE_CPU_DATA0_X86_64_AVX512BW)) {
     return iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_base;
   }
@@ -65,7 +65,7 @@ iree_uk_mmt4d_select_tile_func_x86_64_i8i8i32_16x16x2(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_x86_64_i8i8i32_8x8x2(
     const iree_uk_mmt4d_params_t* params) {
-#ifdef IREE_UK_BUILD_X86_64_AVX2_FMA
+#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
   if (iree_uk_cpu_supports_avx2_fma(params->cpu_data)) {
     return iree_uk_mmt4d_tile_i8i8i32_8x8x2_x86_64_avx2_fma;
   }

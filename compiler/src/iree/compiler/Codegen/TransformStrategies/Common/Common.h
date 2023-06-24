@@ -79,7 +79,7 @@ using ApplyPatternsOpBodyBuilderFn = std::function<void(OpBuilder &, Location)>;
 /// In addition to the specified transform, perform the following ones:
 ///   canonicalization, tiling_canonicalization, licm and cse (in this order).
 void buildCanonicalizationAndEnablingTransforms(
-    ImplicitLocOpBuilder &b, Value variantH,
+    ImplicitLocOpBuilder &b, Value funcH,
     ApplyPatternsOpBodyBuilderFn populatePatternsFn = nullptr);
 
 /// Build transform IR to dynamically selects the first non-empty handle; i.e.
@@ -112,9 +112,8 @@ struct TileToScfForAndFuseResult {
 /// Build transform IR to perform multi-level tile and fuse into an scf.for op.
 /// Note: fusion is currently unsupported.
 TileToScfForAndFuseResult buildTileFuseToScfFor(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
-    bool canonicalize = true);
+    ImplicitLocOpBuilder &b, Value variantH, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<OpFoldResult> tileSizes, bool canonicalize = true);
 
 /// Result of the combined transform performing tiling, fusion and
 /// distribution to parallel constructs.
@@ -154,16 +153,14 @@ struct TileToForallAndFuseAndDistributeResult {
 ///
 // TODO: if someone knows how to properly export templates go for it .. sigh.
 TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithTileSizes(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
-    ArrayAttr threadDimMapping);
+    ImplicitLocOpBuilder &b, Value variantH, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
 
 /// Similar to `buildTileFuseDistWithTileSizes` but using `numThreads` instead
 /// of `tileSizes`.
 TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithNumThreads(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
-    ArrayAttr threadDimMapping);
+    ImplicitLocOpBuilder &b, Value variantH, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
 
 /// Build transform IR to split the reduction into a parallel and combiner part.
 /// Then tile the parallel part and map it to `tileSize` threads, each reducing
@@ -195,16 +192,15 @@ Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
 /// operations and subsequent cleanup patterns (fold-memref-aliases).
 /// Takes a handle to a containing op and returns an updated handle to the
 /// containing op.
-Value buildLowerMaskedTransfersAndCleanup(ImplicitLocOpBuilder &b,
-                                          Value containingOpH,
-                                          bool cleanup = true);
+void buildLowerMaskedTransfersAndCleanup(ImplicitLocOpBuilder &b, Value funcH,
+                                         bool cleanup = true);
 
 /// Build transform IR that applies vector mask lowering and subsequent cleanup
 /// patterns (fold-memref-aliases).
 /// Takes a handle to a containing op and returns an updated handle to the
 /// containing op.
-Value buildLowerVectorMasksAndCleanup(ImplicitLocOpBuilder &b,
-                                      Value containingOpH, bool cleanup = true);
+Value buildLowerVectorMasksAndCleanup(ImplicitLocOpBuilder &b, Value funcH,
+                                      bool cleanup = true);
 
 /// Build transform IR to hoist redundant subset operations.
 void buildHoisting(ImplicitLocOpBuilder &b, Value funcH);

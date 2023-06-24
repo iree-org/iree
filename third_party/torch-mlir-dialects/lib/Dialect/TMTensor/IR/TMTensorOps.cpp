@@ -9,28 +9,11 @@
 
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorOps.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/TypeUtilities.h"
-#include "mlir/IR/Value.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/SMLoc.h"
 
 using namespace mlir;
 using namespace mlir::torch;
@@ -79,6 +62,26 @@ OpFoldResult TMTensor::getDim(OpBuilder &builder, Location loc, Value v,
     return getDimValue(builder, loc, v, dim);
   }
   return builder.getI64IntegerAttr(t.getDimSize(dim));
+}
+
+
+//===----------------------------------------------------------------------===//
+// AttentionOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult AttentionOp::verify() {
+  Operation *op = getOperation();
+  ShapedType queryType = getQueryType();
+  ShapedType keyType = getKeyType();
+  ArrayRef<int64_t> queryShape = queryType.getShape();
+  ArrayRef<int64_t> keyShape = keyType.getShape();
+  auto queryRank = queryShape.size();
+  auto keyRank = queryShape.size();
+  if (keyShape[0] != queryShape[0])
+    return op->emitOpError("query and key batch mismatch");
+  if (keyShape[keyRank-1] != queryShape[queryRank-1])
+    return op->emitOpError("query and key head dimension mismatch");
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -605,6 +608,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
                    outputBuffers);                                             \
   }
 
+DEFINE_OP_GET_EFFECTS(AttentionOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)

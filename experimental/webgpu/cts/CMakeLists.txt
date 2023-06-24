@@ -17,4 +17,6 @@ iree_hal_cts_test_suite(
     "\"webgpu-wgsl-fb\""
   DEPS
     iree::experimental::webgpu::registration
+  LABELS
+    driver=webgpu
 )

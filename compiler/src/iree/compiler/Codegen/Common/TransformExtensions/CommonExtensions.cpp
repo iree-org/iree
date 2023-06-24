@@ -107,15 +107,13 @@ static void eraseDeadAllocAndStores(RewriterBase &rewriter,
 
 DiagnosedSilenceableFailure
 transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   vector::transferOpflowOpt(rewriter, target);
   eraseDeadAllocAndStores(rewriter, target);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
@@ -301,7 +299,8 @@ void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
 
 DiagnosedSilenceableFailure
 transform_dialect::ApplyCommonSubexpressionEliminationOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   ErrorCheckingTrackingListener listener(state, *this);
   Operation *lastOpVisited = nullptr;
@@ -337,7 +336,8 @@ void transform_dialect::ApplyCommonSubexpressionEliminationOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::ApplyLoopIndependentCodeMotionOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   ErrorCheckingTrackingListener listener(state, *this);
   target->walk([&](func::FuncOp funcOp) {
@@ -373,14 +373,12 @@ void transform_dialect::ApplyLoopIndependentCodeMotionOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
       rewriter, target);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::HoistStaticAllocOp::getEffects(
@@ -395,9 +393,9 @@ void transform_dialect::HoistStaticAllocOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::ShareForallOperandsOp::applyToOne(
-    scf::ForallOp forallOp, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::ForallOp forallOp,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   SmallVector<int64_t> shareOperands(getShareOperands());
   // Empty case: consider all operands need to be shared.
   if (shareOperands.empty()) {
@@ -563,7 +561,8 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     return mlir::emitDefiniteFailure(
@@ -596,14 +595,11 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
         target, "could not find a unique topLevel scf.forall");
   }
 
-  IRRewriter rewriter(topLevelForallOp->getContext());
   rewriter.setInsertionPoint(topLevelForallOp);
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp, exportOp)))
     return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
 
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::ForallToWorkgroupOp::getEffects(
@@ -624,7 +620,8 @@ void transform_dialect::IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
 
 DiagnosedSilenceableFailure transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::applyToOne(
-        Operation *target, transform::ApplyToEachResultList &results,
+        transform::TransformRewriter &rewriter, Operation *target,
+        transform::ApplyToEachResultList &results,
         transform::TransformState &state) {
   auto forAllOp = dyn_cast<scf::ForallOp>(target);
   if (!forAllOp) {
@@ -635,7 +632,6 @@ DiagnosedSilenceableFailure transform_dialect::
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "Expect the for op to be normalized");
   }
-  IRRewriter rewriter(target->getContext());
   auto workgroupCount =
       getMixedValues(forAllOp.getStaticUpperBound(),
                      forAllOp.getDynamicUpperBound(), rewriter);
@@ -837,6 +833,7 @@ struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
 }  // namespace
 
 DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
+    transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
   auto payload = state.getPayloadOps(getTarget());
   if (!llvm::hasSingleElement(payload) ||
@@ -933,17 +930,14 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
 DiagnosedSilenceableFailure
 transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
-    ::mlir::Operation *target,
+    transform::TransformRewriter &rewriter, ::mlir::Operation *target,
     ::mlir::transform::ApplyToEachResultList &results,
     ::mlir::transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   if (failed(
           eliminateEmptyTensors(rewriter, target, getBufferizationOptions())))
     return emitDefaultDefiniteFailure(target)
            << "failed to eliminate tensor.empty ops";
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
@@ -958,7 +952,7 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
-    ::mlir::Operation *target,
+    transform::TransformRewriter &rewriter, ::mlir::Operation *target,
     ::mlir::transform::ApplyToEachResultList &results,
     ::mlir::transform::TransformState &state) {
   if (!isa<func::FuncOp>(target)) {

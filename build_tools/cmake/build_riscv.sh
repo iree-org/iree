@@ -54,12 +54,14 @@ args=(
 if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
+    -DRISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
   )
 elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT}"
+    -DRISCV_TOOLCHAIN_PREFIX="riscv32-unknown-elf-"
   )
 else
   echo "riscv config for ${RISCV_PLATFORM_ARCH} not supported yet"

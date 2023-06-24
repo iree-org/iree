@@ -583,11 +583,15 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  // Eliminate redundant transfer_read/write to avoid stack allocations.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass(/*flatten=*/true));
+
   addBufferizePasses(nestedModulePM);
+
+  // Perform memref-based transfer_read/write optimizations.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass(/*flatten=*/false));
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -752,6 +756,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
+  // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added way to
+  // late and should insted be be done during lowering to LLVM.
+  passManager.addPass(createExpandF16OpToF32Pass());
+
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createLLVMCPUMaterializeEncodingPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type

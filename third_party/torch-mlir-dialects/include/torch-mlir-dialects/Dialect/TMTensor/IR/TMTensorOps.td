@@ -45,6 +45,88 @@ class TMTensor_Op<string mnemonic, list<Trait> traits = []> :
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 
+def TMTensor_AttentionOp : TMTensor_Op<"attention"> {
+  let summary = "Attention operator";
+  let description = [{
+    This operator takes in 3 tensors: query(Q), key(K) and value(V) and computes
+    the attention. Each of the inputs has shape BxNxd where B is the
+    of the batch dimension, N is the sequence length and d is head dimension.
+    Typically N >>> d. Mathematically, the attention is defined as
+    matmul(softmax(matmul(Q, transpose(K))), V) and has shape BxNxd. Usually,
+    this operator also performs scaling, masking and dropout, but we leave
+    that out of the current implementation. Note that we only support a single
+    batch dimension, so inputs containing multiple must be collapsed prior
+    to using this op.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($result)^)?
+  }];
+
+  let extraClassDeclaration = extraTMTensorOpClassDeclaration # [{
+    Value getQuery() {
+      return getInputOperand(0)->get();
+    }
+    Value getKey() {
+      return getInputOperand(1)->get();
+    }
+    Value getValue() {
+      return getInputOperand(2)->get();
+    }
+    Value getOutput() {
+      return getOutputOperand(0)->get();
+    }
+    ShapedType getQueryType() {
+      return getQuery().getType().cast<ShapedType>();
+    }
+    ShapedType getKeyType() {
+      return getKey().getType().cast<ShapedType>();
+    }
+    ShapedType getValueType() {
+      return getValue().getType().cast<ShapedType>();
+    }
+    ShapedType getOutputType() {
+      return getOutput().getType().cast<ShapedType>();
+    }
+    int64_t getQueryRank() {
+      return getQueryType().getRank();
+    }
+    int64_t getKeyRank() {
+      return getKeyType().getRank();
+    }
+    int64_t getValueRank() {
+      return getValueType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    int64_t getIterationDomainRank() {
+      return 2;
+    };
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
+      std::pair<unsigned, unsigned> outputsIndexAndLength =
+        getODSOperandIndexAndLength(1);
+      return std::make_pair<int64_t, int64_t>(
+          outputsIndexAndLength.first,
+          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    }
+  }];
+}
+
 def TMTensor_ScanOp : TMTensor_Op<"scan",
     [DeclareOpInterfaceMethods<ScalarLoopOpInterface,
         ["generateScalarImplementation"]>]> {

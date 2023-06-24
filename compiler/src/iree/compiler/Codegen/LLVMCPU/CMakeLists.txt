@@ -23,6 +23,7 @@ iree_cc_library(
   SRCS
     "ConvertToLLVM.cpp"
     "DispatchABI.cpp"
+    "ExpandF16OpToF32Pass.cpp"
     "KernelDispatch.cpp"
     "LLVMCPUAssignConstantOrdinals.cpp"
     "LLVMCPUAssignImportOrdinals.cpp"

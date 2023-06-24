@@ -240,7 +240,7 @@ static MMAType getMMAType(ArrayRef<int64_t> aShape, ArrayRef<int64_t> bShape,
 // before the op.
 static void createLayoutConflictOp(Value value, Layout targetLayout,
                                    DenseMap<Value, Layout> &layoutMap,
-                                   Operation *op, IRRewriter &rewriter) {
+                                   Operation *op, RewriterBase &rewriter) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
   vector::ShapeCastOp conflictOp = rewriter.create<vector::ShapeCastOp>(
@@ -253,7 +253,7 @@ static void createLayoutConflictOp(Value value, Layout targetLayout,
 
 static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
                          Value dMatrix, DenseMap<Value, Layout> &layoutMap,
-                         Operation *op, IRRewriter &rewriter) {
+                         Operation *op, RewriterBase &rewriter) {
   // First determine which variant of MMA this op is most suitable for
   auto aType = llvm::cast<ShapedType>(aMatrix.getType());
   auto bType = llvm::cast<ShapedType>(aMatrix.getType());
@@ -977,7 +977,7 @@ static void replaceForOpWithNewSignature(RewriterBase &rewriter,
 
 static void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
                           DenseMap<Value, Value> &simdToSimtMap,
-                          IRRewriter &rewriter,
+                          RewriterBase &rewriter,
                           llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(forOp);
@@ -996,7 +996,7 @@ static void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
 static void distributeYield(scf::YieldOp yieldOp,
                             DenseMap<Value, Layout> &layoutMap,
                             DenseMap<Value, Value> &simdToSimtMap,
-                            IRRewriter &rewriter,
+                            RewriterBase &rewriter,
                             llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(yieldOp);
@@ -1018,7 +1018,7 @@ static void distributeYield(scf::YieldOp yieldOp,
 static void distributeConstants(arith::ConstantOp constantOp,
                                 DenseMap<Value, Layout> &layoutMap,
                                 DenseMap<Value, Value> &simdToSimtMap,
-                                IRRewriter &rewriter,
+                                RewriterBase &rewriter,
                                 llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(constantOp);
@@ -1044,7 +1044,7 @@ static void distributeConstants(arith::ConstantOp constantOp,
 static void distributeElementwise(Operation *op,
                                   DenseMap<Value, Layout> &layoutMap,
                                   DenseMap<Value, Value> &simdToSimtMap,
-                                  IRRewriter &rewriter,
+                                  RewriterBase &rewriter,
                                   llvm::SetVector<Operation *> &ops) {
   if (!OpTrait::hasElementwiseMappableTraits(op)) return;
   if (op->getNumResults() != 1) return;
@@ -1066,7 +1066,7 @@ static void distributeElementwise(Operation *op,
 static Value resolveBatchConflict(SmallVectorImpl<int> &mismatchedDims,
                                   Value vector, const Layout &targetLayout,
                                   const Layout &currentLayout,
-                                  IRRewriter &rewriter, Location loc) {
+                                  RewriterBase &rewriter, Location loc) {
   assert(mismatchedDims.size() == 1);
   int batchDim = mismatchedDims[0];
   VectorType vectorType = llvm::cast<VectorType>(vector.getType());
@@ -1106,7 +1106,7 @@ static Value resolveBatchVectorConflict(SmallVectorImpl<int> &mismatchedDims,
                                         Value vector,
                                         const Layout &targetLayout,
                                         const Layout &currentLayout,
-                                        IRRewriter &rewriter, Location loc) {
+                                        RewriterBase &rewriter, Location loc) {
   int numMismatchedVecDims{0};
   int vecDim, batchDim;
   for (auto dimType : mismatchedDims) {
@@ -1155,7 +1155,7 @@ static Value resolveBatchVectorConflict(SmallVectorImpl<int> &mismatchedDims,
 static void distributeLayoutConflicts(vector::ShapeCastOp op,
                                       DenseMap<Value, Layout> &layoutMap,
                                       DenseMap<Value, Value> &simdToSimtMap,
-                                      IRRewriter &rewriter,
+                                      RewriterBase &rewriter,
                                       llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(op);
@@ -1204,7 +1204,7 @@ static void distributeLayoutConflicts(vector::ShapeCastOp op,
 }
 
 static void eraseOps(llvm::SetVector<Operation *> &opsToErase,
-                     IRRewriter &rewriter) {
+                     RewriterBase &rewriter) {
   for (int i = opsToErase.size() - 1; i >= 0; i--) {
     assert(opsToErase[i]->getUses().empty());
     rewriter.eraseOp(opsToErase[i]);
@@ -1240,7 +1240,7 @@ static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
   return maps == infer({{m, k}, {n, k}, {m, n}});
 }
 
-void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
+void doLayoutAnalysisAndDistribution(RewriterBase &rewriter,
                                      func::FuncOp funcOp) {
   // First walk through all the MMA ops and set their layouts
   DenseMap<Value, Layout> layoutMap;

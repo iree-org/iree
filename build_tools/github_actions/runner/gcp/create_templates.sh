@@ -18,9 +18,8 @@ DRY_RUN="${DRY_RUN:-0}"
 TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
 GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-06-02-1685724247}"
-GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-1000}"
 CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-06-02-1685725199}"
-CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-1000}"
+DISK_SIZE_GB="${DISK_SIZE_GB:-1000}"
 
 PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-openxla/iree}"
 GITHUB_RUNNER_SCOPE="${GITHUB_RUNNER_SCOPE:-openxla}"
@@ -128,22 +127,29 @@ function create_template() {
 
   if [[ "${type}" == gpu ]]; then
     cmd+=(
+      --machine-type=n1-standard-16
+      --maintenance-policy=TERMINATE
+      --accelerator=count=1,type=nvidia-tesla-t4
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+    )
+  elif [[ "${type}" == a100 ]]; then
+    cmd+=(
       --machine-type=a2-highgpu-1g
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-ssd"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
     )
   elif [[ "${type}" == cpu ]]; then
     cmd+=(
       --machine-type=n1-standard-96
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-ssd"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
     )
   elif [[ "${type}" == c2s16 ]]; then
     cmd+=(
       --machine-type=c2-standard-16
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-ssd"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
     )
   else
     echo "Got unrecognized type '${type}'" >2
@@ -159,7 +165,7 @@ function create_template() {
 }
 
 for group in presubmit postsubmit; do
-  for type in gpu cpu c2s16; do
+  for type in gpu a100 cpu c2s16; do
     create_template "${group}" "${type}"
   done
 done

@@ -6,6 +6,35 @@
 
 include(CMakeParseArguments)
 
+# iree_filter_cc_deps(DEPS_VAR)
+#
+# Filters a list of CC dependencies, making alterations as needed.
+# At present, this is used to redirect LLVM libraries to the libLLVM.so
+# dynamic library, when LLVM has been configured to link against it.
+# This is necessary to preserve the one-definition rule in the build graph
+# in a consistent way as to how AddLLVM.cmake does it.
+# Note that this only really works if libLLVM.so was configured to contain
+# "all" components. If this ever becomes unworkable, we may need to port the
+# component naming logic and selectively choose when to divert.
+function(iree_filter_cc_deps DEPS_VAR)
+  set(_deps ${${DEPS_VAR}})
+  set(_new_deps)
+  set(_modified FALSE)
+  foreach(_dep ${_deps})
+    # If linking against the LLVM dylib, then divert any LLVM prefixed
+    # targets there.
+    if(LLVM_LINK_LLVM_DYLIB AND _dep MATCHES "^LLVM")
+      list(APPEND _new_deps "LLVM")
+      set(_modified TRUE)
+    else()
+      list(APPEND _new_deps "${_dep}")
+    endif()
+  endforeach()
+  if(_modified)
+    set(${DEPS_VAR} "${_new_deps}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # iree_cc_library()
 #
 # CMake function to imitate Bazel's cc_library rule.
@@ -88,6 +117,7 @@ function(iree_cc_library)
 
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  iree_filter_cc_deps(_RULE_DEPS)
 
   # Check if this is a header-only library.
   # Note that as of February 2019, many popular OS's (for example, Ubuntu

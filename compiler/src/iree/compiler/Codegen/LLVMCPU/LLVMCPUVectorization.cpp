@@ -200,7 +200,9 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
       }
     }
-    (void)linalg::vectorize(rewriter, op, vectorSizes, vectorizeGatherAccesses);
+    SmallVector<bool> scalableVecDims(vectorSizes.size(), false);
+    (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                            vectorizeGatherAccesses);
   };
 
   // Canonicalize mask-related ops before we lower them.
