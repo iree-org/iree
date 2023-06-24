@@ -61,8 +61,8 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
   NB_STATIC LTO
   "binding.h"
   "initialize_module.cc"
-  # "invoke.h"
-  # "invoke.cc"
+  "invoke.h"
+  "invoke.cc"
   "hal.h"
   "hal.cc"
   "py_module.h"

@@ -22,7 +22,7 @@ NB_MODULE(_runtime, m) {
 
   m.doc() = "IREE Binding Backend Helpers";
   SetupHalBindings(m);
-  // SetupInvokeBindings(m);
+  SetupInvokeBindings(m);
   SetupPyModuleBindings(m);
   SetupVmBindings(m);
 

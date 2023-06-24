@@ -43,14 +43,14 @@ from ._binding import (
 
 from .array_interop import *
 from .benchmark import *
-# from .system_api import *
-# from .system_setup import (
-#     get_device,
-#     get_first_device,
-#     get_driver,
-#     query_available_drivers,
-# )
-# from .function import *
+from .system_api import *
+from .system_setup import (
+    get_device,
+    get_first_device,
+    get_driver,
+    query_available_drivers,
+)
+from .function import *
 from .tracing import *
 
 from . import flags

@@ -98,6 +98,16 @@ class ApiRefCounted {
   T* instance_;
 };
 
+// Pybind11 had an isintance for Python objects helper. Nanobind doesn't.
+inline bool is_instance_of_type_object(py::handle inst,
+                                       py::handle type_object) {
+  int rc = PyObject_IsInstance(inst.ptr(), type_object.ptr());
+  if (rc == -1) {
+    throw py::python_error();
+  }
+  return static_cast<bool>(rc);
+}
+
 }  // namespace python
 }  // namespace iree
 
