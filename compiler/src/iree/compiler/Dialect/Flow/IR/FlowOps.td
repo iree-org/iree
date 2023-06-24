@@ -28,7 +28,7 @@ class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
 
 def OpGroupPartitionedRegionOps : OpDocGroup {
   let summary = "Partitioned region ops";
-  let description = ".";
+  let description = "";
 }
 
 let opDocGroup = OpGroupPartitionedRegionOps in {
