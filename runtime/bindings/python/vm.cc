@@ -428,7 +428,7 @@ const char* const VmRef::kCastAttr = "__iree_vm_cast__";
 const char* const VmRef::kTypeAttr = "__iree_vm_type__";
 
 py::object VmRef::Deref(py::object ref_object_class, bool optional) {
-  py::object casted = ref_object_class.attr(kCastAttr)(*this);
+  py::object casted = ref_object_class.attr(kCastAttr)(this);
   if (!optional && casted.is_none()) {
     throw py::type_error("Cannot dereference to specific type");
   }
@@ -778,10 +778,9 @@ void SetupVmBindings(nanobind::module_ m) {
 
   auto vm_buffer =
       py::class_<VmBuffer>(m, "VmBuffer" /*, py::buffer_protocol()*/);
-  // TODO: Port ref protocol to nanobind.
-  // VmRef::BindRefProtocol(vm_buffer, iree_vm_buffer_type,
-  //                        iree_vm_buffer_retain_ref, iree_vm_buffer_deref,
-  //                        iree_vm_buffer_isa);
+  VmRef::BindRefProtocol(vm_buffer, iree_vm_buffer_type,
+                         iree_vm_buffer_retain_ref, iree_vm_buffer_deref,
+                         iree_vm_buffer_isa);
   vm_buffer
       .def(
           "__init__",
@@ -812,9 +811,8 @@ void SetupVmBindings(nanobind::module_ m) {
 
   // Mutation and inspection of the variant list is mostly opaque to python.
   auto vm_list = py::class_<VmVariantList>(m, "VmVariantList");
-  // TODO: Port ref protocol to nanobind.
-  // VmRef::BindRefProtocol(vm_list, iree_vm_list_type, iree_vm_list_retain_ref,
-  //                        iree_vm_list_deref, iree_vm_list_isa);
+  VmRef::BindRefProtocol(vm_list, iree_vm_list_type, iree_vm_list_retain_ref,
+                         iree_vm_list_deref, iree_vm_list_isa);
   vm_list
       // User Methods.
       .def(

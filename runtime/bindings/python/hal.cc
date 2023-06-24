@@ -725,11 +725,9 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__repr__", &HalBuffer::Repr);
 
   auto hal_buffer_view = py::class_<HalBufferView>(m, "HalBufferView");
-  // TODO: Fix me. DO NOT SUBMIT.
-  // VmRef::BindRefProtocol(hal_buffer_view, iree_hal_buffer_view_type,
-  //                        iree_hal_buffer_view_retain_ref,
-  //                        iree_hal_buffer_view_deref,
-  //                        iree_hal_buffer_view_isa);
+  VmRef::BindRefProtocol(hal_buffer_view, iree_hal_buffer_view_type,
+                         iree_hal_buffer_view_retain_ref,
+                         iree_hal_buffer_view_deref, iree_hal_buffer_view_isa);
   hal_buffer_view.def("map", HalMappedMemory::Create, py::keep_alive<0, 1>())
       .def_prop_ro("shape",
                    [](HalBufferView& self) {

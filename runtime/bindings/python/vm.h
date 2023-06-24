@@ -224,7 +224,7 @@ class VmRef {
   static void BindRefProtocol(PyClass& cls, TypeFunctor type,
                               RetainRefFunctor retain_ref, DerefFunctor deref,
                               IsaFunctor isa) {
-    using WrapperType = typename PyClass::type;
+    using WrapperType = typename PyClass::Type;
     using RawPtrType = typename WrapperType::RawPtrType;
     auto ref_lambda = [=](WrapperType& self) {
       return VmRef::Steal(retain_ref(self.raw_ptr()));
