@@ -406,68 +406,55 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 
 namespace {
 
-py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
-  // See:
-  //   * https://numpy.org/doc/stable/reference/arrays.dtypes.html
-  //   * https://docs.python.org/3/c-api/arg.html#numbers
-  //
-  // Single letter codes can be ambiguous across platforms, so prefer explicit
-  // bit depth values, ("Type strings: Any string in numpy.sctypeDict.keys()").
-  // See https://github.com/pybind/nanobind/issues/1908
-  const char* dtype_string;
+nanobind::dlpack::dtype MapElementTypeToDType(
+    iree_hal_element_type_t element_type) {
+  using nanobind::dlpack::dtype;
+  using nanobind::dlpack::dtype_code;
+
+  auto make_dtype = [](dtype_code code, uint8_t bits, uint16_t lanes = 1) {
+    dtype dt;
+    dt.code = static_cast<uint8_t>(code);
+    dt.bits = bits;
+    dt.lanes = lanes;
+    return dt;
+  };
+
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-      dtype_string = "?";
-      break;
+      return make_dtype(dtype_code::Bool, 8);
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      dtype_string = "int8";
-      break;
+      return make_dtype(dtype_code::Int, 8);
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      dtype_string = "uint8";
-      break;
+      return make_dtype(dtype_code::UInt, 8);
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      dtype_string = "int16";
-      break;
+      return make_dtype(dtype_code::Int, 16);
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      dtype_string = "uint16";
-      break;
+      return make_dtype(dtype_code::UInt, 16);
     case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      dtype_string = "int32";
-      break;
+      return make_dtype(dtype_code::Int, 32);
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      dtype_string = "uint32";
-      break;
+      return make_dtype(dtype_code::UInt, 32);
     case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      dtype_string = "int64";
-      break;
+      return make_dtype(dtype_code::Int, 64);
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      dtype_string = "uint64";
-      break;
+      return make_dtype(dtype_code::UInt, 64);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      dtype_string = "float16";
-      break;
+      return make_dtype(dtype_code::Float, 16);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      dtype_string = "float32";
-      break;
+      return make_dtype(dtype_code::Float, 32);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      dtype_string = "float64";
-      break;
+      return make_dtype(dtype_code::Float, 64);
     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
-      dtype_string = "complex64";
-      break;
+      return make_dtype(dtype_code::Complex, 64);
     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
-      dtype_string = "complex128";
-      break;
+      return make_dtype(dtype_code::Complex, 128);
     default:
       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
   }
-  // TODO: DO NOT SUBMIT. Port to nanobind.
-  throw RaiseValueError("Unimplemented: nanobind arrays");
-  // return py::dtype(dtype_string);
 }
 
 }  // namespace
@@ -618,7 +605,12 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
       .export_values()
-      .def_static("map_to_dtype", &MapElementTypeToDType);
+      .def_static("map_to_dtype", [](iree_hal_element_type_t element_type) {
+        // TODO: We used to have dedicated dtypes. Now they are just
+        // the element type.
+        return element_type;
+      });
+  //.def_static("map_to_dtype", &MapElementTypeToDType);
 
   py::class_<HalDevice>(m, "HalDevice")
       .def_prop_ro(
@@ -748,16 +740,24 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__repr__", &HalBufferView::Repr);
 
   py::class_<HalMappedMemory>(m, "MappedMemory" /*, py::buffer_protocol() */)
+      // TODO: Implement buffer protocol.
       //.def_buffer(&HalMappedMemory::ToBufferInfo)
-      .def("asarray",
-           [](HalMappedMemory& self, std::vector<iree_host_size_t> shape,
-              py::object dtype) {
-             py::object py_mapped_memory = py::cast(self);
-             throw RaisePyError(PyExc_NotImplementedError, "nanobind::ndarray");
-             //  return py::array(std::move(dtype), shape,
-             //                   self.mapped_memory().contents.data,
-             //                   std::move(py_mapped_memory) /* base */);
-           });
+      .def(
+          "asarray",
+          [](HalMappedMemory* self, std::vector<iree_host_size_t> shape,
+             iree_hal_element_type_t element_type) {
+            py::object py_mapped_memory = py::cast(self);
+            //  throw RaisePyError(PyExc_NotImplementedError, "nanobind::ndarray
+            //  1");
+            return py::ndarray<py::numpy>(
+                /*value=*/self->mapped_memory().contents.data,
+                /*ndim=*/shape.size(),
+                /*shape=*/shape.data(),
+                /*owner=*/std::move(py_mapped_memory),
+                /*strides=*/nullptr,
+                /*dtype=*/MapElementTypeToDType(element_type));
+          },
+          py::arg("shape"), py::arg("element_type"));
 
   py::class_<HalShape>(m, "Shape")
       .def("__init__", [](HalShape* self, std::vector<iree_hal_dim_t> indices) {
