@@ -7,6 +7,7 @@
 import pathlib
 import unittest
 
+from e2e_test_artifacts import utils
 from e2e_test_artifacts.cmake_generator import model_rule_generator, iree_rule_generator
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
@@ -43,7 +44,7 @@ class IreeRuleBuilderTest(unittest.TestCase):
 
         self.assertEqual(
             rule.target_name,
-            f"iree-imported-model-{tflite_imported_model.composite_id}",
+            utils.get_safe_name(f"iree-imported-model-{tflite_imported_model.name}"),
         )
         self.assertEqual(rule.output_file_path, output_file_path)
 
@@ -114,7 +115,9 @@ class IreeRuleBuilderTest(unittest.TestCase):
             output_file_path=output_file_path,
         )
 
-        self.assertEqual(rule.target_name, f"iree-module-{gen_config.composite_id}")
+        self.assertEqual(
+            rule.target_name, utils.get_safe_name(f"iree-module-{gen_config.name}")
+        )
         self.assertEqual(rule.output_module_path, output_file_path)
 
     def test_build_target_path(self):
@@ -202,8 +205,8 @@ class IreeGeneratorTest(unittest.TestCase):
                 cmake_rules=["abc"],
             ),
             model_b.id: model_rule_generator.ModelRule(
-                target_name="model-y",
-                file_path=pathlib.PurePath("root/model_5678_stablehlo_m.mlir"),
+                target_name=f"model-y",
+                file_path=pathlib.PurePath("root/model_stablehlo_m.mlir"),
                 cmake_rules=["efg"],
             ),
         }
@@ -218,16 +221,20 @@ class IreeGeneratorTest(unittest.TestCase):
 
         concated_cmake_rules = "\n".join(cmake_rules)
         self.assertRegex(
-            concated_cmake_rules, f"iree-imported-model-{imported_model_a.composite_id}"
+            concated_cmake_rules,
+            utils.get_safe_name(f"iree-imported-model-{imported_model_a.name}"),
         )
         self.assertRegex(
-            concated_cmake_rules, f"iree-module-{gen_config_a.composite_id}"
+            concated_cmake_rules,
+            utils.get_safe_name(f"iree-module-{gen_config_a.name}"),
         )
         self.assertRegex(
-            concated_cmake_rules, f"iree-module-{gen_config_b.composite_id}"
+            concated_cmake_rules,
+            utils.get_safe_name(f"iree-module-{gen_config_b.name}"),
         )
         self.assertRegex(
-            concated_cmake_rules, f"iree-module-{gen_config_c.composite_id}"
+            concated_cmake_rules,
+            utils.get_safe_name(f"iree-module-{gen_config_c.name}"),
         )
 
 
