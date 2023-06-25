@@ -62,7 +62,7 @@ jobs:
           mkdir "${RESULTS_DIR}"
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
-            gcr.io/iree-oss/nvidia-bleeding-edge@sha256:234f6efb1e9fd2eea67d40effd7d9cfe8725c5e5ba7a58c0428200a54493637a \
+            gcr.io/iree-oss/nvidia-bleeding-edge@sha256:522491c028ec3b4070f23910c70c8162fd9612e11d9cf062a13444df7e88ab70 \
             ./experimental/dispatch_profiler/profile_all.sh "${BUILD_DIR}/install/bin" \
             "${RESULTS_DIR}"
       - name: "Uploading results"

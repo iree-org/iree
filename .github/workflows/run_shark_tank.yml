@@ -80,7 +80,7 @@ jobs:
       - name: "Benchmarking SHARK tank on CPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:ce3bd3abe454d2e481512823e9d2d080322fb2fc1470a12c7306c48140eebdb2 \
+            gcr.io/iree-oss/shark@sha256:2b2e41dbf909194b598e226144a2fb1e74d31851d41fe519d0fcb6d071b77461 \
           ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cpu" --driver "cpu" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "true" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -109,7 +109,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
-            gcr.io/iree-oss/shark@sha256:ce3bd3abe454d2e481512823e9d2d080322fb2fc1470a12c7306c48140eebdb2 \
+            gcr.io/iree-oss/shark@sha256:2b2e41dbf909194b598e226144a2fb1e74d31851d41fe519d0fcb6d071b77461 \
           ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cuda" --driver "cuda" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "false" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -144,7 +144,7 @@ jobs:
       - name: "Generating report"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:ce3bd3abe454d2e481512823e9d2d080322fb2fc1470a12c7306c48140eebdb2 \
+            gcr.io/iree-oss/shark@sha256:2b2e41dbf909194b598e226144a2fb1e74d31851d41fe519d0fcb6d071b77461 \
           ./build_tools/benchmarks/shark/run_report.sh "${BENCHMARK_RESULTS_DIR}" \
             "${BENCHMARK_RESULTS_DIR}/cpu_baseline.csv" \
             "${BENCHMARK_RESULTS_DIR}/cuda_baseline.csv" \
