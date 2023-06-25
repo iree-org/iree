@@ -402,65 +402,6 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 }
 
 //------------------------------------------------------------------------------
-// Enum helpers
-//------------------------------------------------------------------------------
-
-namespace {
-
-// nanobind::dlpack::dtype MapElementTypeToDType(
-//     iree_hal_element_type_t element_type) {
-//   using nanobind::dlpack::dtype;
-//   using nanobind::dlpack::dtype_code;
-
-//   auto make_dtype = [](dtype_code code, uint8_t bits, uint16_t lanes = 1) {
-//     dtype dt;
-//     dt.code = static_cast<uint8_t>(code);
-//     dt.bits = bits;
-//     dt.lanes = lanes;
-//     return dt;
-//   };
-
-//   switch (element_type) {
-//     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-//       return make_dtype(dtype_code::Bool, 8);
-//     case IREE_HAL_ELEMENT_TYPE_INT_8:
-//     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-//       return make_dtype(dtype_code::Int, 8);
-//     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-//       return make_dtype(dtype_code::UInt, 8);
-//     case IREE_HAL_ELEMENT_TYPE_INT_16:
-//     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-//       return make_dtype(dtype_code::Int, 16);
-//     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-//       return make_dtype(dtype_code::UInt, 16);
-//     case IREE_HAL_ELEMENT_TYPE_INT_32:
-//     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-//       return make_dtype(dtype_code::Int, 32);
-//     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-//       return make_dtype(dtype_code::UInt, 32);
-//     case IREE_HAL_ELEMENT_TYPE_INT_64:
-//     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-//       return make_dtype(dtype_code::Int, 64);
-//     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-//       return make_dtype(dtype_code::UInt, 64);
-//     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-//       return make_dtype(dtype_code::Float, 16);
-//     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-//       return make_dtype(dtype_code::Float, 32);
-//     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-//       return make_dtype(dtype_code::Float, 64);
-//     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
-//       return make_dtype(dtype_code::Complex, 64);
-//     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
-//       return make_dtype(dtype_code::Complex, 128);
-//     default:
-//       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
-//   }
-// }
-
-}  // namespace
-
-//------------------------------------------------------------------------------
 // HAL module
 //------------------------------------------------------------------------------
 
@@ -754,13 +695,6 @@ void SetupHalBindings(nanobind::module_ m) {
             return SimpleNewFromData(
                 shape.size(), reinterpret_cast<intptr_t const*>(shape.data()),
                 typenum, self->mapped_memory().contents.data, py_mapped_memory);
-            // return py::ndarray<py::numpy>(
-            //     /*value=*/self->mapped_memory().contents.data,
-            //     /*ndim=*/shape.size(),
-            //     /*shape=*/shape.data(),
-            //     /*owner=*/std::move(py_mapped_memory),
-            //     /*strides=*/nullptr,
-            //     /*dtype=*/MapElementTypeToDType(element_type));
           },
           py::arg("shape"), py::arg("element_type"));
 
