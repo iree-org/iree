@@ -252,7 +252,7 @@ struct FoldFillWithSetEncoding
     RankedTensorType encodingType = encodingOp.getResultType();
     Location loc = fillOp.getLoc();
     SmallVector<OpFoldResult> dimValues =
-        tensor::createDimValues(rewriter, loc, fillOp.getOutputs()[0]);
+        tensor::getMixedSizes(rewriter, loc, fillOp.getOutputs()[0]);
     auto newEmptyOp = rewriter.create<tensor::EmptyOp>(
         loc, dimValues, encodingType.getElementType(),
         encodingType.getEncoding());

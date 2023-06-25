@@ -67,9 +67,9 @@ static std::tuple<Value, Value> getDistributeLBAndStep(OpBuilder &b,
   auto offsetMap = AffineMap::get(0, 3, {s0 + s1 * s2});
   auto stepMap = AffineMap::get(0, 2, {s0 * s1});
   Value distributeLB = affine::makeComposedAffineApply(
-      b, loc, offsetMap, ValueRange{lb, procId, step});
+      b, loc, offsetMap, ArrayRef<OpFoldResult>{lb, procId, step});
   Value distributeStep = affine::makeComposedAffineApply(
-      b, loc, stepMap, ValueRange{step, nprocs});
+      b, loc, stepMap, ArrayRef<OpFoldResult>{step, nprocs});
   return {distributeLB, distributeStep};
 }
 

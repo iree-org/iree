@@ -23,7 +23,7 @@ using namespace IREE::LinalgExt;
 static Operation *sliceTensor(Location loc, Value expanded, Value original,
                               OpBuilder &builder) {
   SmallVector<OpFoldResult> sizes =
-      tensor::createDimValues(builder, loc, original);
+      tensor::getMixedSizes(builder, loc, original);
   SmallVector<OpFoldResult> offsets(sizes.size(), builder.getI64IntegerAttr(0));
   SmallVector<OpFoldResult> strides(sizes.size(), builder.getI64IntegerAttr(1));
   return builder.create<tensor::ExtractSliceOp>(loc, expanded, offsets, sizes,

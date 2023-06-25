@@ -313,7 +313,7 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     auto rank = realType.getRank();
 
     SmallVector<OpFoldResult> mixedSizes =
-        tensor::createDimValues(b, b.getLoc(), real);
+        tensor::getMixedSizes(b, b.getLoc(), real);
     Value emptyTensor =
         b.create<tensor::EmptyOp>(mixedSizes, realType.getElementType());
 
@@ -398,7 +398,7 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     SmallVector<OpFoldResult> offsets(ty.getRank(), b.getIndexAttr(0));
     SmallVector<OpFoldResult> strides(ty.getRank(), b.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes =
-        tensor::createDimValues(b, b.getLoc(), adaptor.getOperand());
+        tensor::getMixedSizes(b, b.getLoc(), adaptor.getOperand());
     sizes.back() = b.getIndexAttr(shape.back());
     auto real = b.create<tensor::ExtractSliceOp>(ty, results[0], offsets, sizes,
                                                  strides);
@@ -427,7 +427,7 @@ struct ReverseOpConversion final
 
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> mixedSizes =
-        tensor::createDimValues(rewriter, loc, adaptor.getOperands()[0]);
+        tensor::getMixedSizes(rewriter, loc, adaptor.getOperands()[0]);
     Value emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, mixedSizes, ty.getElementType());
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
@@ -470,7 +470,7 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
     // Create and initialize output tensors for LinalgExt TopK results
     // Define the output types based on the results of CHLO TopK
     SmallVector<OpFoldResult> mixedSizes =
-        tensor::createDimValues(rewriter, loc, adaptor.getOperand());
+        tensor::getMixedSizes(rewriter, loc, adaptor.getOperand());
     mixedSizes.back() = rewriter.getIndexAttr(adaptor.getK());
     Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
         loc, mixedSizes, valueElementType);
