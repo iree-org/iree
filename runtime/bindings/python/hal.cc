@@ -6,6 +6,7 @@
 
 #include "./hal.h"
 
+#include "./numpy_interop.h"
 #include "./vm.h"
 #include "iree/base/internal/path.h"
 #include "iree/hal/api.h"
@@ -406,56 +407,56 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 
 namespace {
 
-nanobind::dlpack::dtype MapElementTypeToDType(
-    iree_hal_element_type_t element_type) {
-  using nanobind::dlpack::dtype;
-  using nanobind::dlpack::dtype_code;
+// nanobind::dlpack::dtype MapElementTypeToDType(
+//     iree_hal_element_type_t element_type) {
+//   using nanobind::dlpack::dtype;
+//   using nanobind::dlpack::dtype_code;
 
-  auto make_dtype = [](dtype_code code, uint8_t bits, uint16_t lanes = 1) {
-    dtype dt;
-    dt.code = static_cast<uint8_t>(code);
-    dt.bits = bits;
-    dt.lanes = lanes;
-    return dt;
-  };
+//   auto make_dtype = [](dtype_code code, uint8_t bits, uint16_t lanes = 1) {
+//     dtype dt;
+//     dt.code = static_cast<uint8_t>(code);
+//     dt.bits = bits;
+//     dt.lanes = lanes;
+//     return dt;
+//   };
 
-  switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-      return make_dtype(dtype_code::Bool, 8);
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
-    case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      return make_dtype(dtype_code::Int, 8);
-    case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      return make_dtype(dtype_code::UInt, 8);
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
-    case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      return make_dtype(dtype_code::Int, 16);
-    case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      return make_dtype(dtype_code::UInt, 16);
-    case IREE_HAL_ELEMENT_TYPE_INT_32:
-    case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      return make_dtype(dtype_code::Int, 32);
-    case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      return make_dtype(dtype_code::UInt, 32);
-    case IREE_HAL_ELEMENT_TYPE_INT_64:
-    case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      return make_dtype(dtype_code::Int, 64);
-    case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      return make_dtype(dtype_code::UInt, 64);
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return make_dtype(dtype_code::Float, 16);
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      return make_dtype(dtype_code::Float, 32);
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      return make_dtype(dtype_code::Float, 64);
-    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
-      return make_dtype(dtype_code::Complex, 64);
-    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
-      return make_dtype(dtype_code::Complex, 128);
-    default:
-      throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
-  }
-}
+//   switch (element_type) {
+//     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
+//       return make_dtype(dtype_code::Bool, 8);
+//     case IREE_HAL_ELEMENT_TYPE_INT_8:
+//     case IREE_HAL_ELEMENT_TYPE_SINT_8:
+//       return make_dtype(dtype_code::Int, 8);
+//     case IREE_HAL_ELEMENT_TYPE_UINT_8:
+//       return make_dtype(dtype_code::UInt, 8);
+//     case IREE_HAL_ELEMENT_TYPE_INT_16:
+//     case IREE_HAL_ELEMENT_TYPE_SINT_16:
+//       return make_dtype(dtype_code::Int, 16);
+//     case IREE_HAL_ELEMENT_TYPE_UINT_16:
+//       return make_dtype(dtype_code::UInt, 16);
+//     case IREE_HAL_ELEMENT_TYPE_INT_32:
+//     case IREE_HAL_ELEMENT_TYPE_SINT_32:
+//       return make_dtype(dtype_code::Int, 32);
+//     case IREE_HAL_ELEMENT_TYPE_UINT_32:
+//       return make_dtype(dtype_code::UInt, 32);
+//     case IREE_HAL_ELEMENT_TYPE_INT_64:
+//     case IREE_HAL_ELEMENT_TYPE_SINT_64:
+//       return make_dtype(dtype_code::Int, 64);
+//     case IREE_HAL_ELEMENT_TYPE_UINT_64:
+//       return make_dtype(dtype_code::UInt, 64);
+//     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+//       return make_dtype(dtype_code::Float, 16);
+//     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+//       return make_dtype(dtype_code::Float, 32);
+//     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+//       return make_dtype(dtype_code::Float, 64);
+//     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
+//       return make_dtype(dtype_code::Complex, 64);
+//     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
+//       return make_dtype(dtype_code::Complex, 128);
+//     default:
+//       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
+//   }
+// }
 
 }  // namespace
 
@@ -747,15 +748,19 @@ void SetupHalBindings(nanobind::module_ m) {
           [](HalMappedMemory* self, std::vector<iree_host_size_t> shape,
              iree_hal_element_type_t element_type) {
             py::object py_mapped_memory = py::cast(self);
-            //  throw RaisePyError(PyExc_NotImplementedError, "nanobind::ndarray
-            //  1");
-            return py::ndarray<py::numpy>(
-                /*value=*/self->mapped_memory().contents.data,
-                /*ndim=*/shape.size(),
-                /*shape=*/shape.data(),
-                /*owner=*/std::move(py_mapped_memory),
-                /*strides=*/nullptr,
-                /*dtype=*/MapElementTypeToDType(element_type));
+            int typenum = ConvertHalElementTypeToNumPyTypeNum(element_type);
+            static_assert(sizeof(shape[0]) == sizeof(intptr_t),
+                          "size_t not of same size as intptr_t");
+            return SimpleNewFromData(
+                shape.size(), reinterpret_cast<intptr_t const*>(shape.data()),
+                typenum, self->mapped_memory().contents.data, py_mapped_memory);
+            // return py::ndarray<py::numpy>(
+            //     /*value=*/self->mapped_memory().contents.data,
+            //     /*ndim=*/shape.size(),
+            //     /*shape=*/shape.data(),
+            //     /*owner=*/std::move(py_mapped_memory),
+            //     /*strides=*/nullptr,
+            //     /*dtype=*/MapElementTypeToDType(element_type));
           },
           py::arg("shape"), py::arg("element_type"));
 

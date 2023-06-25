@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 if(NOT nanobind_FOUND)
-  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  find_package(Python COMPONENTS Interpreter Development.Module NumPy REQUIRED)
   execute_process(
     COMMAND "${Python3_EXECUTABLE}" -m nanobind --cmake_dir
     OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
@@ -65,6 +65,8 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
   "invoke.cc"
   "hal.h"
   "hal.cc"
+  "numpy_interop.h"
+  "numpy_interop.cc"
   "py_module.h"
   "py_module.cc"
   "status_utils.cc"
@@ -84,6 +86,8 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::tooling::modules
   iree::vm
   iree::vm::bytecode::module
+
+  Python::NumPy
 )
 
 target_compile_definitions(iree_runtime_bindings_python_PyExtRt
