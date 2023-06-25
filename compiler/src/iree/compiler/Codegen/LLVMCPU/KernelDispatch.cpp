@@ -1024,12 +1024,12 @@ static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
     if (isQuantized) {
-      sizes.append({8, 16, 1});
+      sizes.append({8, 32, 16});
       return;
     }
 
     // 4-byte case: 16 accumulators, 32 broadcasts, 8 vector loads.
-    sizes.append({8, 32, 1});
+    sizes.append({8, 16, 1});
     return;
   }
 
