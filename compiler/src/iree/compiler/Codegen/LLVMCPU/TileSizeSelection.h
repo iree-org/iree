@@ -42,6 +42,12 @@ public:
                           [](int64_t tileSize) { return tileSize != 0; });
   }
 
+  /// Returns the number of reduction dimensions to tile at vector level.
+  unsigned getNumVectorReductionTiles() {
+    return llvm::count_if(getVectorReductionSizes(),
+                          [](int64_t tileSize) { return tileSize != 0; });
+  }
+
   /// Returns the tiling level for cache parallel dimensions.
   unsigned getCacheParallelLevel() {
     return getActualLevel(CacheParallelTiles);

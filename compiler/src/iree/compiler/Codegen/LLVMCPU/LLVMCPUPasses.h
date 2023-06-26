@@ -79,6 +79,10 @@ createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUTilePass(int64_t tilingLevel = -1);
 
+/// Pass to tile TilingInterface ops with given tile sizes.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTilePass(ArrayRef<int64_t> tileSizes);
+
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 
