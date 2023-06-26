@@ -18,6 +18,8 @@ using iree::vm::retain_ref;
 
 namespace iree::pjrt {
 
+const absl::string_view kMlirFormat = "mlir";
+
 // Some general conversion functions for managing around some API layering
 // that is in flight. It is expected that most of this goes away over time.
 namespace PJRTApiConverter {
@@ -1319,7 +1321,10 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     }
 
     auto executable = std::make_unique<LoadedExecutableInstance>(
-        *this, new ExecutableImage(std::move(output)), addressable_devices_);
+        *this,
+        new ExecutableImage(std::move(output),
+                            std::string(program->code, program->code_size)),
+        addressable_devices_);
     status = executable->LoadAll();
     if (!iree_status_is_ok(status)) {
       return MakeError(status);
@@ -1553,8 +1558,24 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Executable_OptimizedProgram =
       +[](PJRT_Executable_OptimizedProgram_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Executable_OptimizedProgram"));
+    ExecutableImage* executable = ExecutableImage::Unwrap(args->executable);
+    PJRT_Program* program = args->program;
+    program->format = kMlirFormat.data();
+    program->format_size = kMlirFormat.size();
+    size_t code_size = executable->binary->GetDataSize();
+    if (program->code == nullptr) {
+      program->code_size = code_size;
+    } else {
+      if (program->code_size < code_size) {
+        return MakeError(
+            iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                             "expected code_size >= %lu, got code_size = %lu",
+                             code_size, program->code_size));
+      }
+      std::memcpy(program->code, executable->code.c_str(),
+                  executable->code.size());
+    }
+    return nullptr;
   };
   api->PJRT_Executable_GetCostAnalysis =
       +[](PJRT_Executable_GetCostAnalysis_Args* args) -> PJRT_Error* {

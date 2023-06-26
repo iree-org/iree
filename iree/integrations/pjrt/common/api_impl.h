@@ -289,8 +289,8 @@ class EventInstance {
 //===----------------------------------------------------------------------===//
 
 struct ExecutableImage {
-  ExecutableImage(std::unique_ptr<CompilerOutput> binary)
-      : ref_count(1), binary(std::move(binary)) {}
+  ExecutableImage(std::unique_ptr<CompilerOutput> binary, std::string code)
+      : ref_count(1), binary(std::move(binary)), code(code) {}
   operator PJRT_Executable*() {
     return reinterpret_cast<PJRT_Executable*>(this);
   }
@@ -313,6 +313,9 @@ struct ExecutableImage {
  public:
   // Raw compiler output.
   std::unique_ptr<CompilerOutput> binary;
+
+  // Original code fed to the compiler. Stored for debugging.
+  const std::string code;
 
   // Meta-data about the executable is lazily set when an Executable is obtained
   // from a LoadedExecutable.
