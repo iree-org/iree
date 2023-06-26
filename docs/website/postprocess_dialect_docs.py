@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -5,6 +6,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # MLIR dialect markdown document postprocessor for website generation.
+#
+# Usage (typically invoked by generate_extra_files.sh):
+#   postprocess_dialect_docs.py ${WEBSITE_DOCS_BUILD_DIRECTORY}
 
 import argparse
 import os
@@ -16,13 +20,33 @@ def main(args):
     directory = args.directory
     files = [os.path.join(directory, f) for f in os.listdir(directory)]
 
+    # Replace certain headings depth 5, lining up with the table-of-contents
+    # (toc) max depth setting of 4 (`toc_depth: 4`).
+    #
+    # Skipping heading levels is usually discouraged, but we aren't getting much
+    # value from treating these as subsections and we don't want them showing up
+    # in the rendered table of contents.
+    #
+    # (We could also use another form of emphasis like bolt/italics instead)
+    #
+    # Example:
+    #
+    #   # 'foo' Dialect
+    #   ## Operation definition
+    #   ### 'group bar' Ops
+    #   #### `foo.bar.baz` (foo::BarBazOp)
+    #   ##### Attributes:                       <--- No change needed
+    #   ##### Operands:                         <--- No change needed
+    #   ##### Results:                          <--- No change needed
+    #   ### `foo.ungrouped` (foo::UngroupedOp)
+    #   #### Attributes:                        <--- Change this heading level
+    #   #### Operands:                          <--- Change this heading level
+    #   #### Results:                           <--- Change this heading level
+    #   ## Attribute definition
+    #   ### FooAttr
+    #   #### Parameters:                        <--- Change this heading level
     with fileinput.input(files=files, inplace=True) as f:
         for line in f:
-            # Replace certain headings with one level deeper.
-            # Skipping heading levels is usually discouraged, but we aren't
-            # getting much value from treating these as subsections and we
-            # don't want them showing up in the rendered table of contents.
-            # (We could use another form of emphasis like bolt/italics instead)
             line = re.sub(r"^#### Attributes", "##### Attributes", line)
             line = re.sub(r"^#### Parameters", "##### Parameters", line)
             line = re.sub(r"^#### Operands", "##### Operands", line)
