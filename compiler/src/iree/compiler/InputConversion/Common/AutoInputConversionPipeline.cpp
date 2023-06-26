@@ -31,12 +31,13 @@ namespace {
 struct AutoInputConversionPipelinePass final
     : AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   AutoInputConversionPipelinePass(
-      const AutoInputConversionPipelineOptions &inputOptions)
-      : options(inputOptions) {}
+      const AutoInputConversionPipelineOptions &inputOptions) {
+    demoteI64ToI32 = inputOptions.demoteI64ToI32;
+    demoteF64ToF32 = inputOptions.demoteF64ToF32;
+    promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
+  }
   void runOnOperation() override;
   void getDependentDialects(DialectRegistry &registry) const override;
-
-  AutoInputConversionPipelineOptions options;
 };
 
 // All the features seen that should be handled during input conversion.
