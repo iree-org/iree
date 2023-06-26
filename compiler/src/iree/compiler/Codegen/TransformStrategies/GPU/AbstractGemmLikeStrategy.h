@@ -9,6 +9,7 @@
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MappingInfo.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 namespace llvm {
@@ -19,10 +20,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
-struct GPUModel;
-
-struct AbstractGemmLikeStrategy {
-  AbstractGemmLikeStrategy() {}
+struct AbstractGemmLikeStrategy : GPUStrategy {
+  AbstractGemmLikeStrategy(const GPUModel &gpuModel) : GPUStrategy(gpuModel) {}
 
   virtual ~AbstractGemmLikeStrategy();
 

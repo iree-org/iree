@@ -30,8 +30,9 @@ struct GPUModel;
 class MatmulStrategy : public AbstractGemmLikeStrategy {
 public:
   MatmulStrategy(MLIRContext *context,
-                 const transform_ext::MatchedMatmulCaptures &captures)
-      : AbstractGemmLikeStrategy(), ctx(context), captures(captures) {
+                 const transform_ext::MatchedMatmulCaptures &captures,
+                 const GPUModel &gpuModel)
+      : AbstractGemmLikeStrategy(gpuModel), ctx(context), captures(captures) {
     initDefaultValues();
   }
 

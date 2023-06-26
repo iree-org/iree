@@ -67,7 +67,6 @@ static llvm::cl::opt<bool> clPeelPipelineEpilogue(
     llvm::cl::init(false));
 
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
-using iree_compiler::gpu::kCudaWarpSize;
 
 /// Key function for vtable.
 AbstractGemmLikeStrategy::~AbstractGemmLikeStrategy() {}
@@ -112,7 +111,7 @@ AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(OpBuilder &b) const {
 
 LogicalResult
 AbstractGemmLikeStrategy::validate(const GPUModel &gpuModel) const {
-  if (totalNumThreads() != totalNumWarps() * kCudaWarpSize) {
+  if (totalNumThreads() != totalNumWarps() * gpuModel.subgroupSize) {
     llvm::errs() << "Number of threads specified by warps must match total "
                     "number of threads\n";
     return failure();
