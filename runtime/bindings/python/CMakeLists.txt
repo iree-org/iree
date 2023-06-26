@@ -5,17 +5,22 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 if(NOT nanobind_FOUND)
-  find_package(Python COMPONENTS Interpreter Development.Module NumPy REQUIRED)
-  execute_process(
-    COMMAND "${Python3_EXECUTABLE}" -m nanobind --cmake_dir
-    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
-  list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+  # nanobind requires Python >= 3.8.
+  find_package(Python 3.8 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  find_package(nanobind CONFIG QUIET)
+  if(NOT nanobind_FOUND)
+    execute_process(
+      COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      OUTPUT_VARIABLE NB_DIR
+      RESULT_VARIABLE RC)
+    if(RC AND NOT RC EQUAL 0)
+      message(WARNING "Probing for nanobind failed. Please install the project's Python dependencies or '${Python_EXECUTABLE} -m pip install nanobind'")
+    endif()
+    list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+  endif()
   find_package(nanobind CONFIG REQUIRED)
 endif()
-
-set(NUMPY_DEPS "")
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
 set(_PYTHON_EXTRA_SRCS)
 set(_EXTRA_INSTALL_TOOL_TARGETS)
@@ -90,56 +95,21 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   Python::NumPy
 )
 
+target_compile_options(iree_runtime_bindings_python_PyExtRt
+  PRIVATE
+  ${IREE_DEFAULT_COPTS}
+  # Default COPTS disable exceptions/rtti. Re-enable them.
+  ${_RTTI_AND_EXCEPTION_COPTS}
+)
 target_compile_definitions(iree_runtime_bindings_python_PyExtRt
   PRIVATE
   IREE_TRACING_HOOK_CPP_NEW_DELETE=0
 )
 
-# target_compile_options(
-#   iree_runtime_bindings_python_PyExtRt
-#   PRIVATE
-#   ${_RTTI_AND_EXCEPTION_COPTS}
-# )
-
 set_target_properties(
   iree_runtime_bindings_python_PyExtRt
   PROPERTIES OUTPUT_NAME "iree/_runtime"
 )
-
-# iree_pyext_module(
-#   NAME
-#     PyExtRt
-#   MODULE_NAME iree/_runtime
-#   SRCS
-#     "binding.h"
-#     "initialize_module.cc"
-#     "invoke.h"
-#     "invoke.cc"
-#     "hal.h"
-#     "hal.cc"
-#     "py_module.h"
-#     "py_module.cc"
-#     "status_utils.cc"
-#     "status_utils.h"
-#     "vm.h"
-#     "vm.cc"
-#   UNIX_LINKER_SCRIPT
-#     "unix_version.lds"
-#   DEFINES
-#     # Pybind code seems to be incompatible with C++ allocation tracing
-#     # hooks so disable it.
-#     IREE_TRACING_HOOK_CPP_NEW_DELETE=0
-#   DEPS
-#     iree::base
-#     iree::base::internal::flags
-#     iree::hal
-#     iree::hal::drivers
-#     iree::hal::utils::allocators
-#     iree::modules::hal
-#     iree::tooling::modules
-#     iree::vm
-#     iree::vm::bytecode::module
-# )
 
 iree_py_library(
   NAME
