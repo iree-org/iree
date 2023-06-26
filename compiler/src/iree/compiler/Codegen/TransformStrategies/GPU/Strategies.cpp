@@ -41,7 +41,7 @@
 
 using namespace mlir;
 
-#define DEBUG_TYPE "iree-transform-strategy-builder"
+#define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(llvm::dbgs() << '[' << DEBUG_TYPE << "] " << X)
 
@@ -370,12 +370,6 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
-  if (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
-      !captures.outputElementType.isF32()) {
-    LDBG("--Matmul strategy elemental type check failed\n");
-    return failure();
-  }
-
   // TODO: Generalize to a good mix of sizes, alignments and element types.
   const auto &matmulSize = captures.matmulOpSizes;
   if (matmulSize.size() != 3) {
@@ -414,12 +408,11 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
   iree_compiler::gpu::MatmulStrategy strategy =
       getMatmulConfig(op->getContext(), captures, gpuModel);
+  LLVM_DEBUG(strategy.dump());
 
   // Validate the strategy configuration against the compilation target.
   if (failed(strategy.validate(gpuModel))) {
     LDBG("--Matmul strategy failed to validate\n");
-    LLVM_DEBUG(strategy.dump());
-
     return failure();
   }
 

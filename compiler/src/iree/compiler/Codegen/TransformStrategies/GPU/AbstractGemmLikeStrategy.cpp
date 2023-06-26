@@ -60,6 +60,11 @@ static llvm::cl::opt<int64_t> clPipelineDepth(
     "td-matmul-strategy-pipeline-depth",
     llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"),
     llvm::cl::init(3));
+static llvm::cl::opt<bool> clPeelPipelineEpilogue(
+    "td-matmul-strategy-peel-pipeline-epilogue",
+    llvm::cl::desc("whether to peel the pipeline epilogue for the transform "
+                   "dialect matmul strategy"),
+    llvm::cl::init(false));
 
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
 using iree_compiler::gpu::kCudaWarpSize;
@@ -78,6 +83,7 @@ void AbstractGemmLikeStrategy::initDefaultValues() {
   useWmma = clUseWmma;
   useFma = clUseFma;
   pipelineDepth = clPipelineDepth;
+  peelPipelineEpilogue = clPeelPipelineEpilogue;
 
   if (!clBlockTileSizes.isDefaultAssigned() ||
       !clNumThreads.isDefaultAssigned() || !clNumWarps.isDefaultAssigned() ||
@@ -86,7 +92,8 @@ void AbstractGemmLikeStrategy::initDefaultValues() {
       useMmaSync != clUseMmaSync.getDefault().getValue() ||
       useWmma != clUseWmma.getDefault().getValue() ||
       useFma != clUseFma.getDefault().getValue() ||
-      pipelineDepth != clPipelineDepth.getDefault().getValue()) {
+      pipelineDepth != clPipelineDepth.getDefault().getValue() ||
+      peelPipelineEpilogue != clPeelPipelineEpilogue.getDefault().getValue()) {
     cliOptionsSpecified = true;
   }
 }
@@ -141,7 +148,9 @@ AbstractGemmLikeStrategy::validate(const GPUModel &gpuModel) const {
   }
 
   if (pipelineDepth > 1 && reductionTileSize * pipelineDepth > k()) {
-    llvm::errs() << "pipeline depth too large for reduction tile size";
+    llvm::errs() << "pipeline depth " << pipelineDepth
+                 << " too large for reduction tile size " << reductionTileSize
+                 << " given k " << k();
     return failure();
   }
 

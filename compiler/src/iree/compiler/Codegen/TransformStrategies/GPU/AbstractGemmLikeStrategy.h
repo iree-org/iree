@@ -110,6 +110,7 @@ struct AbstractGemmLikeStrategy {
   bool useWmma;
   bool useFma;
   int64_t pipelineDepth;
+  bool peelPipelineEpilogue;
   virtual MappingInfo computeMapping() const = 0;
 
   virtual LogicalResult validate(const GPUModel &gpuModel) const;

@@ -795,7 +795,7 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
                       ? PipeliningSchedulingStrategy::nvidiaTensorCore
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
-      rewriter, forOp, schedule, false, depth);
+      rewriter, forOp, schedule, getPeelEpilogue(), depth);
   if (failed(pipelinedFor)) {
     results.push_back(forOp);
     return DiagnosedSilenceableFailure::success();

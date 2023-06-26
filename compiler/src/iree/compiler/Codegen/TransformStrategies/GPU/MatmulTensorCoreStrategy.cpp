@@ -77,9 +77,27 @@ void MatmulStrategy::print(llvm::raw_ostream &os) const {
 }
 
 LogicalResult MatmulStrategy::validate(const GPUModel &gpuModel) const {
-  // Validate the parent strategy.
+  // First validate the parent strategy.
   if (failed(AbstractGemmLikeStrategy::validate(gpuModel)))
     return failure();
+
+  // Unlike for wmma/mma, we have no special type requirements for fma.
+  if (useFma)
+    return success();
+
+  Type lhsElementType = captures.lhsElementType;
+  Type rhsElementType = captures.rhsElementType;
+  Type resElementType = captures.outputElementType;
+  if (!lhsElementType.isF32() || !rhsElementType.isF32() ||
+      !resElementType.isF32()) {
+    LDBG("--Tensorcore matmul strategy only supported for f32: "
+         << lhsElementType << ", " << rhsElementType << ", " << resElementType);
+    return failure();
+  }
+  if (lhsElementType != rhsElementType) {
+    LDBG("--Tensorcore matmul strategy mixed input types unsupported\n");
+    return failure();
+  }
 
   return success();
 }
