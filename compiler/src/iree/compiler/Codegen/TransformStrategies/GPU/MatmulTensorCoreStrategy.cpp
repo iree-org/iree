@@ -44,7 +44,6 @@ using iree_compiler::gpu::buildHoistOutputPaddingOp;
 using iree_compiler::gpu::buildMatmulVectorization;
 using iree_compiler::gpu::buildMultiBuffering;
 using iree_compiler::gpu::buildPipelineSharedMemoryCopies;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MappingInfo;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
