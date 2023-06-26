@@ -51,6 +51,8 @@ struct AbstractGemmLikeStrategy : GPUStrategy {
   virtual int64_t blockTileM() const = 0;
   virtual int64_t blockTileN() const = 0;
 
+  virtual int64_t numThreadsX() const = 0;
+  virtual int64_t numThreadsY() const = 0;
   virtual int64_t numWarpsX() const = 0;
   virtual int64_t numWarpsY() const = 0;
 

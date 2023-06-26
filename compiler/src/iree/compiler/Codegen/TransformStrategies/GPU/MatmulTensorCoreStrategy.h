@@ -12,8 +12,11 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/AbstractGemmLikeStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/CopyMapping.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
 
@@ -71,6 +74,14 @@ public:
     return blockTileSizes[1];
   }
 
+  int64_t numThreadsX() const override {
+    assert(numThreads.size() >= 2 && "need at least 2 thread sizes");
+    return numThreads[0];
+  }
+  int64_t numThreadsY() const override {
+    assert(numThreads.size() >= 2 && "need at least 2 thread sizes");
+    return numThreads[1];
+  }
   int64_t numWarpsX() const override {
     assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
     return numWarps[0];
@@ -93,12 +104,31 @@ public:
                        /*vectorSize=*/std::nullopt};
   }
 
+  auto map(ArrayRef<AffineExpr> exprs) const {
+    return AffineMap::get(captures.rank(), 0, exprs, ctx);
+  };
+
   // LHS copy is of size mxk.
   MappingInfo lhsCopyMapping() const override {
+    int64_t alignment;
+    SmallVector<int64_t> copySizes;
+    AffineExpr m, n, k;
+    bindDims(ctx, m, n, k);
+    if (captures.lhsIndexing() == map({m, k})) {
+      alignment = this->k();
+      copySizes = SmallVector<int64_t>{blockTileM(), reductionTileSize};
+    } else if (captures.lhsIndexing() == map({k, m})) {
+      alignment = this->m();
+      copySizes = SmallVector<int64_t>{reductionTileSize, blockTileM()};
+    } else {
+      captures.lhsIndexing().dump();
+      llvm_unreachable("unsupported lhs indexing");
+    }
     return CopyMapping::getMappingInfo(
-        ctx, totalNumThreads(),
-        /*alignment=*/k(),
-        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), reductionTileSize},
+        ctx,
+        /*totalNumThreads=*/totalNumThreads(),
+        /*alignment=*/alignment,
+        /*copySizes=*/copySizes,
         /*favorPredication=*/false,
         /*elementalBitWidth=*/lhsElementalBitWidth());
   }
@@ -116,10 +146,25 @@ public:
 
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
+    int64_t alignment;
+    SmallVector<int64_t> copySizes;
+    AffineExpr m, n, k;
+    bindDims(ctx, m, n, k);
+    if (captures.rhsIndexing() == map({k, n})) {
+      alignment = this->n();
+      copySizes = SmallVector<int64_t>{reductionTileSize, blockTileN()};
+    } else if (captures.rhsIndexing() == map({n, k})) {
+      alignment = this->k();
+      copySizes = SmallVector<int64_t>{blockTileN(), reductionTileSize};
+    } else {
+      captures.rhsIndexing().dump();
+      llvm_unreachable("unsupported rhs indexing");
+    }
     return CopyMapping::getMappingInfo(
-        ctx, totalNumThreads(),
-        /*alignment=*/n(),
-        /*copySizes=*/ArrayRef<int64_t>{reductionTileSize, blockTileN()},
+        ctx,
+        /*totalNumThreads=*/totalNumThreads(),
+        /*alignment=*/alignment,
+        /*copySizes=*/copySizes,
         /*favorPredication=*/false,
         /*elementalBitWidth=*/rhsElementalBitWidth());
   }
@@ -137,10 +182,25 @@ public:
 
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
+    int64_t alignment;
+    SmallVector<int64_t> copySizes;
+    AffineExpr m, n, k;
+    bindDims(ctx, m, n, k);
+    if (captures.resIndexing() == map({m, n})) {
+      alignment = this->n();
+      copySizes = SmallVector<int64_t>{blockTileM(), blockTileN()};
+    } else if (captures.resIndexing() == map({n, m})) {
+      alignment = this->m();
+      copySizes = SmallVector<int64_t>{blockTileN(), blockTileM()};
+    } else {
+      captures.resIndexing().dump();
+      llvm_unreachable("unsupported res indexing");
+    }
     return CopyMapping::getMappingInfo(
-        ctx, totalNumThreads(),
-        /*alignment=*/n(),
-        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), blockTileN()},
+        ctx,
+        /*totalNumThreads=*/totalNumThreads(),
+        /*alignment=*/alignment,
+        /*copySizes=*/copySizes,
         /*favorPredication=*/false,
         /*elementalBitWidth=*/resElementalBitWidth());
   }
@@ -162,9 +222,13 @@ public:
     if (useFma) {
       // When using FMA we don't need to map to warps, instead just match what
       // the copy does.
-      return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
-                                         /*alignment=*/n(),
-                                         {blockTileM(), blockTileN()});
+      // return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
+      //                                    /*alignment=*/n(),
+      //                                    {blockTileM(), blockTileN()});
+      return MappingInfo{/*numThreads=*/{numThreadsY(), numThreadsX()},
+                         /*tileSizes=*/{},
+                         /*threadMapping=*/{threadY(ctx), threadX(ctx)},
+                         /*vectorSize=*/std::nullopt};
     }
     return MappingInfo{/*numThreads=*/{numWarpsY(), numWarpsX()},
                        /*tileSizes=*/{},

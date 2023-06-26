@@ -576,6 +576,32 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, CaptureDims captures) {
 }
 
 transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::indexingMaps(
+    CaptureIndexingMaps indexingMaps) {
+  return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "capture contraction dimensions\n");
+    indexingMaps.value = linalgOp.getIndexingMapsArray();
+    return true;
+  });
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::contractionDims(
+    CaptureContractionDims contractionDims) {
+  return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "capture contraction dimensions\n");
+    StringRef convMessage = linalg::detail::getMatchContractionMessage(
+        mlir::linalg::detail::isContractionInterfaceImpl(
+            linalgOp, &contractionDims.value));
+    if (convMessage.empty())
+      return true;
+    LLVM_DEBUG(DBGS() << "capture contraction dimensions failed: "
+                      << convMessage << "\n");
+    return false;
+  });
+}
+
+transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::convolutionDims(CaptureConvDims convDims) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "capture convolution dimensions\n");
@@ -1373,13 +1399,18 @@ void transform_ext::makeMatmulMatcher(
     transform_ext::StructuredOpMatcher *&fillCapture,
     transform_ext::StructuredOpMatcher *&trailingCapture,
     transform_ext::MatchedMatmulCaptures &captures, bool mustMatchEntireFunc) {
-  auto &matmul = transform_ext::m_StructuredOp<linalg::MatmulOp>(matcherContext)
-                     // Capture op sizes.
-                     .dim(AllDims(), CaptureDims(captures.matmulOpSizes))
-                     // Capture input/output element types.
-                     .input(0, CaptureElementType(captures.lhsElementType))
-                     .input(1, CaptureElementType(captures.rhsElementType))
-                     .output(0, CaptureElementType(captures.outputElementType));
+  auto &matmul =
+      transform_ext::m_StructuredOp<linalg::GenericOp, linalg::MatmulOp,
+                                    linalg::MatmulTransposeAOp,
+                                    linalg::MatmulTransposeBOp>(matcherContext)
+          // Capture op sizes, op iterators and indexing maps.
+          .dim(AllDims(), CaptureDims(captures.matmulOpSizes))
+          .contractionDims(CaptureContractionDims(captures.contractionDims))
+          .indexingMaps(CaptureIndexingMaps(captures.indexingMaps))
+          // Capture input/output element types.
+          .input(0, CaptureElementType(captures.lhsElementType))
+          .input(1, CaptureElementType(captures.rhsElementType))
+          .output(0, CaptureElementType(captures.outputElementType));
   matmulCapture = &matmul;
   // Mandatory FillOp must create the unique output of the reduction.
   auto &fill = transform_ext::m_StructuredOp<linalg::FillOp>(matcherContext);

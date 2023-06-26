@@ -363,6 +363,17 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
+  // Only support matmul with m, n, k iteration order atm.
+  // Permutations of (m, k), (k, n), (m, n) are supported
+  if (captures.contractionDims.batch.size() > 0 ||
+      captures.contractionDims.m.size() != 1 ||
+      captures.contractionDims.n.size() != 1 ||
+      captures.contractionDims.k.size() != 1 || captures.m() != 0 ||
+      captures.n() != 1 || captures.k() != 2) {
+    LDBG("--Only support matmul with m, n, k iteration order atm\n");
+    return failure();
+  }
+
   // We are very peculiar about the dispatches we want to match for now:
   //   - f32 only atm.
   //   - Mandatory fill op.
@@ -413,7 +424,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
   iree_compiler::gpu::MatmulStrategy strategy =
       getMatmulConfig(op->getContext(), captures, gpuModel);
-  LLVM_DEBUG(strategy.dump());
+  LLVM_DEBUG(strategy.print(llvm::dbgs()));
 
   // Validate the strategy configuration against the compilation target.
   if (failed(strategy.validate(gpuModel))) {

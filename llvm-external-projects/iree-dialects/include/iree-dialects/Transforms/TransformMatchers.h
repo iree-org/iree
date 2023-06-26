@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <mlir/IR/AffineMap.h>
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -69,6 +70,17 @@ struct CaptureDim : public CaptureStaticValue<int64_t> {
 
 /// Captures the (static) sizes of multiple dimensions.
 struct CaptureDims : public CaptureStaticValue<SmallVector<int64_t>> {
+  using Base::Base;
+};
+
+/// Captures the contraction dimensions of the target operation.
+struct CaptureIndexingMaps : public CaptureStaticValue<SmallVector<AffineMap>> {
+  using Base::Base;
+};
+
+/// Captures the contraction dimensions of the target operation.
+struct CaptureContractionDims
+    : public CaptureStaticValue<mlir::linalg::ContractionDimensions> {
   using Base::Base;
 };
 
@@ -667,6 +679,8 @@ public:
   StructuredOpMatcher &rank(CaptureRank capture);
   StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
   StructuredOpMatcher &dim(AllDims tag, CaptureDims captures);
+  StructuredOpMatcher &indexingMaps(CaptureIndexingMaps indexingMaps);
+  StructuredOpMatcher &contractionDims(CaptureContractionDims contractionDims);
   StructuredOpMatcher &convolutionDims(CaptureConvDims convDims);
 
   //===-------------------------------------------------------------------===//
@@ -1009,8 +1023,45 @@ struct MatchedReductionCaptures {
 };
 
 struct MatchedMatmulCaptures {
+  linalg::ContractionDimensions contractionDims = {};
   Type lhsElementType, rhsElementType, outputElementType;
   SmallVector<int64_t> matmulOpSizes = {};
+  SmallVector<AffineMap> indexingMaps;
+
+  /// Helper functions.
+  int64_t rank() const { return matmulOpSizes.size(); }
+  /// Return all batches.
+  ArrayRef<unsigned> batches() const { return contractionDims.batch; }
+  /// Return the most minor candidate dimension for `m`.
+  int64_t m() const { return contractionDims.m.back(); }
+  /// Return the most minor candidate dimension for `n`.
+  int64_t n() const { return contractionDims.n.back(); }
+  /// Return the most minor candidate dimension for `k`.
+  int64_t k() const { return contractionDims.k.back(); }
+  /// AffineMap for indexing into the LHS.
+  AffineMap lhsIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[0];
+  }
+  /// AffineMap for indexing into the RHS.
+  AffineMap rhsIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[1];
+  }
+  /// AffineMap for indexing into the RES.
+  AffineMap resIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[2];
+  }
+};
+
+struct MatchedConvolutionCaptures {
+  mlir::linalg::detail::ConvolutionDimensions convolutionDims = {};
+  SmallVector<int64_t> convolutionOpSizes = {};
+  SmallVector<int64_t> trailingOpSizes = {};
+  int64_t convolutionOutputElementalTypeBitWidth = 0;
+  int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
+  int64_t maybeFillElementalTypeBitWidth = 0;
 };
 
 /// Creates a group of matchers for:
@@ -1057,15 +1108,6 @@ void makeMatmulMatcher(MatcherContext &matcherContext,
 void makeSoftmaxMatcher(MatcherContext &context,
                         StructuredOpMatcher *&maxReductionCapture,
                         StructuredOpMatcher *&softmaxRootCapture);
-
-struct MatchedConvolutionCaptures {
-  mlir::linalg::detail::ConvolutionDimensions convolutionDims = {};
-  SmallVector<int64_t> convolutionOpSizes = {};
-  SmallVector<int64_t> trailingOpSizes = {};
-  int64_t convolutionOutputElementalTypeBitWidth = 0;
-  int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
-  int64_t maybeFillElementalTypeBitWidth = 0;
-};
 
 /// Creates a group of matchers for:
 ///
