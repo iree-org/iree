@@ -192,31 +192,6 @@ class HalMappedMemory {
     return HalMappedMemory(mapped_memory, bv.raw_ptr());
   }
 
-  // py::buffer_info ToBufferInfo() {
-  //   std::vector<iree_hal_dim_t> shape(iree_hal_buffer_view_shape_rank(bv_));
-  //   CheckApiStatus(
-  //       iree_hal_buffer_view_shape(bv_, shape.size(), shape.data(), nullptr),
-  //       "Error getting buffer view shape");
-  //   iree_hal_element_type_t element_type =
-  //       iree_hal_buffer_view_element_type(bv_);
-  //   int32_t element_size = iree_hal_element_dense_byte_count(element_type);
-  //   std::vector<py::ssize_t> dims(shape.size());
-  //   for (int i = 0; i < shape.size(); ++i) {
-  //     dims[i] = shape[i];
-  //   }
-  //   std::vector<py::ssize_t> strides(shape.size());
-  //   if (!strides.empty()) {
-  //     strides[shape.size() - 1] = element_size;
-  //     for (int i = shape.size() - 2; i >= 0; --i) {
-  //       strides[i] = strides[i + 1] * shape[i + 1];
-  //     }
-  //   }
-
-  //   return py::buffer_info(mapped_memory_.contents.data, element_size,
-  //                          py::format_descriptor<float>::format(),
-  //                          shape.size(), dims, strides);
-  // }
-
   iree_hal_buffer_mapping_t& mapped_memory() { return mapped_memory_; }
 
  private:
