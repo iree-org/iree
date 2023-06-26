@@ -2,7 +2,11 @@
 requires = [
     "setuptools>=42",
     "wheel",
-    "cmake",
+    "cmake==3.25.0",
+    # Note that the compiler wheel does not presently need nanobind, but
+    # it's build is enabled by the same flag which enables the runtime
+    # configuration, which does.
+    "nanobind==1.4.0",
     "ninja",
     # MLIR build depends.
     "numpy",

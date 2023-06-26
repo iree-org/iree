@@ -11,7 +11,7 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "numpy/arrayobject.h"
 
-namespace iree::python {
+namespace iree::python::numpy {
 
 namespace {
 
@@ -67,6 +67,22 @@ int ConvertHalElementTypeToNumPyTypeNum(iree_hal_element_type_t t) {
   }
 }
 
+py::object DescrNewFromType(int typenum) {
+  PyArray_Descr *dtype = PyArray_DescrNewFromType(typenum);
+  if (!dtype) {
+    throw py::python_error();
+  }
+  return py::steal((PyObject *)dtype);
+}
+
+int TypenumFromDescr(py::handle dtype) {
+  if (!PyArray_DescrCheck(dtype.ptr())) {
+    throw py::cast_error();
+  }
+  PyArray_Descr *descr = (PyArray_Descr *)dtype.ptr();
+  return descr->type_num;
+}
+
 py::object SimpleNewFromData(int nd, intptr_t const *dims, int typenum,
                              void *data, py::handle base_object) {
   PyObject *array_c = PyArray_SimpleNewFromData(nd, dims, typenum, data);
@@ -82,4 +98,4 @@ py::object SimpleNewFromData(int nd, intptr_t const *dims, int typenum,
   return array;
 }
 
-}  // namespace iree::python
+}  // namespace iree::python::numpy

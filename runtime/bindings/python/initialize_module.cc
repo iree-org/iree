@@ -18,7 +18,7 @@ namespace iree {
 namespace python {
 
 NB_MODULE(_runtime, m) {
-  InitializeNumPyInterop();
+  numpy::InitializeNumPyInterop();
 
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));

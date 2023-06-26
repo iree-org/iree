@@ -548,11 +548,9 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
       .export_values()
       .def_static("map_to_dtype", [](iree_hal_element_type_t element_type) {
-        // TODO: We used to have dedicated dtypes. Now they are just
-        // the element type.
-        return element_type;
+        int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(element_type);
+        return numpy::DescrNewFromType(typenum);
       });
-  //.def_static("map_to_dtype", &MapElementTypeToDType);
 
   py::class_<HalDevice>(m, "HalDevice")
       .def_prop_ro(
@@ -681,18 +679,16 @@ void SetupHalBindings(nanobind::module_ m) {
                    })
       .def("__repr__", &HalBufferView::Repr);
 
-  py::class_<HalMappedMemory>(m, "MappedMemory" /*, py::buffer_protocol() */)
-      // TODO: Implement buffer protocol.
-      //.def_buffer(&HalMappedMemory::ToBufferInfo)
+  py::class_<HalMappedMemory>(m, "MappedMemory")
       .def(
           "asarray",
           [](HalMappedMemory* self, std::vector<iree_host_size_t> shape,
-             iree_hal_element_type_t element_type) {
+             py::object dtype) {
             py::object py_mapped_memory = py::cast(self);
-            int typenum = ConvertHalElementTypeToNumPyTypeNum(element_type);
             static_assert(sizeof(shape[0]) == sizeof(intptr_t),
                           "size_t not of same size as intptr_t");
-            return SimpleNewFromData(
+            int typenum = numpy::TypenumFromDescr(dtype);
+            return numpy::SimpleNewFromData(
                 shape.size(), reinterpret_cast<intptr_t const*>(shape.data()),
                 typenum, self->mapped_memory().contents.data, py_mapped_memory);
           },

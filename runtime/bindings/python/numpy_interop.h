@@ -10,8 +10,7 @@
 #include "./binding.h"
 #include "iree/hal/api.h"
 
-namespace iree {
-namespace python {
+namespace iree::python::numpy {
 
 // Must be called in init of extension module.
 void InitializeNumPyInterop();
@@ -19,11 +18,16 @@ void InitializeNumPyInterop();
 // Converts an IREE element type to a NumPy NPY_TYPES value.
 int ConvertHalElementTypeToNumPyTypeNum(iree_hal_element_type_t t);
 
+// Wraps a call to PyArray_DescrNewFromType(int).
+py::object DescrNewFromType(int typenum);
+
+// Extracts a typenum from a dtype (descriptor) object.
+int TypenumFromDescr(py::handle dtype);
+
 // Delegates to PyArray_SimpleNewFromData and sets the base_object.
 py::object SimpleNewFromData(int nd, intptr_t const *dims, int typenum,
                              void *data, py::handle base_object);
 
-}  // namespace python
-}  // namespace iree
+}  // namespace iree::python::numpy
 
 #endif  // IREE_BINDINGS_PYTHON_NUMPY_INTEROP_H_
