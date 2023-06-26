@@ -855,14 +855,27 @@ iree_compiler_output_t *wrap(Output *output) {
 
 void ireeCompilerEnumerateRegisteredHALTargetBackends(
     void (*callback)(const char *backend, void *userData), void *userData) {
-  // TODO: Replace this entry point with one on the invocation where we can
+  // Note: plugins may register target backends, so the global registry does not
   // reliably enumerate all targets.
+
+  // This API is a kludge, really only suitable for global CLI-like tools.
+  // In order to maximize it's utility, we'll create an ephemeral Session and
+  // activate plugins so the list of backends is as complete as possible.
+  if (!globalInit) {
+    fprintf(stderr, "FATAL ERROR: Not initialized\n");
+    abort();
+  }
+  Session *session = new Session(*globalInit);
+  // HACK: activate plugins and ignore failures.
+  (void)session->activatePluginsOnce();
+
   auto registeredTargetBackends =
-      mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal()
-          .getRegisteredTargetBackends();
+      session->targetRegistry.getRegisteredTargetBackends();
   for (auto &b : registeredTargetBackends) {
     callback(b.c_str(), userData);
   }
+
+  delete session;
 }
 
 void ireeCompilerEnumeratePlugins(void (*callback)(const char *pluginName,
