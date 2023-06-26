@@ -2,8 +2,8 @@
 requires = [
     "setuptools>=42",
     "wheel",
-    "cmake==3.25.0",
-    "nanobind==1.4.0",
+    "cmake",
+    "nanobind>=1.4.0",
     "ninja",
     "numpy",
     "packaging",
