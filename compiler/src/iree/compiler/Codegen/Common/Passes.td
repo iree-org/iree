@@ -212,6 +212,21 @@ def FuseTensorPadWithConsumer :
   let constructor = "mlir::iree_compiler::createFuseTensorPadWithConsumerPass()";
 }
 
+def GenericVectorization :
+    Pass<"iree-codegen-generic-vectorization", "func::FuncOp"> {
+  let summary = "Pass to perform vectorization on tensor/linalg ops.";
+  let options = [
+    Option<"enableVectorMasking", "enable-vector-masking", "bool",/*default=*/"false",
+      "Enable vector masking during vectorization.">,
+    Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
+      "Rewrite all tensor.pad ops in the function to vector form.">,
+    Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
+      "Enable vectorizaiton of operations that may generate vector.gather operations.">,
+  ];
+  let constructor =
+      "mlir::iree_compiler::createGenericVectorizationPass()";
+}
+
 def HoistStaticallyBoundAllocations :
     Pass<"iree-hoist-statically-bound-allocations", "func::FuncOp"> {
   let summary = "Hoist statically bound alloca ops to the entry block of functions";

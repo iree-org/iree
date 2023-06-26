@@ -125,6 +125,15 @@ std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFuseTensorPadWithConsumerPass();
 
+struct GenericVectorizationPassOptions {
+  bool enableVectorMasking = false;
+  bool vectorizePadding = false;
+  bool vectorizeGatherAccesses = false;
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createGenericVectorizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
 
