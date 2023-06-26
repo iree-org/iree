@@ -179,6 +179,11 @@ void ireeCompilerGlobalShutdown() {
   __ireeCompilerGlobalShutdown();
 }
 
+void ireeCompilerEnumerateRegisteredHALTargetBackends(
+    void (*callback)(const char *backend, void *userData), void *userData) {
+  __ireeCompilerEnumerateRegisteredHALTargetBackends(callback, userData);
+}
+
 void ireeCompilerEnumeratePlugins(void (*callback)(const char *pluginName,
                                                    void *userData),
                                   void *userData) {
@@ -243,13 +248,6 @@ void ireeCompilerInvocationSetCrashHandler(
     void *userData) {
   __ireeCompilerInvocationSetCrashHandler(inv, genLocalReproducer,
                                           onCrashCallback, userData);
-}
-
-void ireeCompilerInvocationEnumerateRegisteredHALTargetBackends(
-    iree_compiler_invocation_t *inv,
-    void (*callback)(const char *backend, void *userData), void *userData) {
-  __ireeCompilerInvocationEnumerateRegisteredHALTargetBackends(inv, callback,
-                                                               userData);
 }
 
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *run,

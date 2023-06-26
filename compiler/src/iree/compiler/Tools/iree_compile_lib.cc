@@ -115,24 +115,12 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           "Lists all registered target backends for executable compilation."),
       llvm::cl::init(false), llvm::cl::ValueDisallowed,
       llvm::cl::callback([&](const bool &) {
-        // Sequencing this is tricky - this flag relies on session/invocation
-        // state, but init generally requires that flags are already parsed.
-        // Since this callback runs during flag parsing and this is going to
-        // `exit(0)` anyways, we can just create a session and invocation here.
-        iree_compiler_session_t *session = ireeCompilerSessionCreate();
-        iree_compiler_invocation_t *inv = ireeCompilerInvocationCreate(session);
-
         llvm::outs() << "Registered target backends:\n";
-        ireeCompilerInvocationEnumerateRegisteredHALTargetBackends(
-            inv,
+        ireeCompilerEnumerateRegisteredHALTargetBackends(
             [](const char *backend, void *userData) {
               llvm::outs() << "  " << backend << "\n";
             },
             nullptr);
-
-        ireeCompilerInvocationDestroy(inv);
-        ireeCompilerSessionDestroy(session);
-        ireeCompilerGlobalShutdown();
         exit(0);
       }));
   llvm::cl::opt<bool> listPlugins(

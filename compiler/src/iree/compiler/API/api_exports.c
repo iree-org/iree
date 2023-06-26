@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 extern void ireeCompilerEnumeratePlugins();
+extern void ireeCompilerEnumerateRegisteredHALTargetBackends();
 extern void ireeCompilerErrorDestroy();
 extern void ireeCompilerErrorGetMessage();
 extern void ireeCompilerGetAPIVersion();
@@ -20,7 +21,6 @@ extern void ireeCompilerInvocationCreate();
 extern void ireeCompilerInvocationDestroy();
 extern void ireeCompilerInvocationEnableCallbackDiagnostics();
 extern void ireeCompilerInvocationEnableConsoleDiagnostics();
-extern void ireeCompilerInvocationEnumerateRegisteredHALTargetBackends();
 extern void ireeCompilerInvocationImportModule();
 extern void ireeCompilerInvocationOutputHALExecutable();
 extern void ireeCompilerInvocationOutputIR();
@@ -643,6 +643,7 @@ extern void mlirVectorTypeGetTypeID();
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
   x += (uintptr_t)&ireeCompilerEnumeratePlugins;
+  x += (uintptr_t)&ireeCompilerEnumerateRegisteredHALTargetBackends;
   x += (uintptr_t)&ireeCompilerErrorDestroy;
   x += (uintptr_t)&ireeCompilerErrorGetMessage;
   x += (uintptr_t)&ireeCompilerGetAPIVersion;
@@ -654,7 +655,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerInvocationDestroy;
   x += (uintptr_t)&ireeCompilerInvocationEnableCallbackDiagnostics;
   x += (uintptr_t)&ireeCompilerInvocationEnableConsoleDiagnostics;
-  x += (uintptr_t)&ireeCompilerInvocationEnumerateRegisteredHALTargetBackends;
   x += (uintptr_t)&ireeCompilerInvocationImportModule;
   x += (uintptr_t)&ireeCompilerInvocationOutputHALExecutable;
   x += (uintptr_t)&ireeCompilerInvocationOutputIR;

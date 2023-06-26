@@ -117,6 +117,13 @@ IREE_EMBED_EXPORTED void ireeCompilerSetupGlobalCL(int argc, const char **argv,
 // This must be called prior to library unloading.
 IREE_EMBED_EXPORTED void ireeCompilerGlobalShutdown();
 
+// Invokes a callback with each registered HAL target backend.
+//
+// This is really only suitable for global CLI-like tools, as plugins may
+// register target backends and plugins are activated at the session level.
+IREE_EMBED_EXPORTED void ireeCompilerEnumerateRegisteredHALTargetBackends(
+    void (*callback)(const char *backend, void *userData), void *userData);
+
 // Enumerates all plugins that are linked into the compiler.
 // Available since: 1.2
 IREE_EMBED_EXPORTED void ireeCompilerEnumeratePlugins(
@@ -209,12 +216,6 @@ IREE_EMBED_EXPORTED void ireeCompilerInvocationSetCrashHandler(
     iree_compiler_error_t *(*onCrashCallback)(
         iree_compiler_output_t **outOutput, void *userData),
     void *userData);
-
-// Invokes a callback with each registered HAL target backend.
-IREE_EMBED_EXPORTED void
-ireeCompilerInvocationEnumerateRegisteredHALTargetBackends(
-    iree_compiler_invocation_t *inv,
-    void (*callback)(const char *backend, void *userData), void *userData);
 
 // Parses a source into this instance in preparation for performing a
 // compilation action.

@@ -853,6 +853,31 @@ iree_compiler_output_t *wrap(Output *output) {
 // C API implementation
 //===----------------------------------------------------------------------===//
 
+void ireeCompilerEnumerateRegisteredHALTargetBackends(
+    void (*callback)(const char *backend, void *userData), void *userData) {
+  // Note: plugins may register target backends, so the global registry does not
+  // reliably enumerate all targets.
+
+  // This API is a kludge, really only suitable for global CLI-like tools.
+  // In order to maximize it's utility, we'll create an ephemeral Session and
+  // activate plugins so the list of backends is as complete as possible.
+  if (!globalInit) {
+    fprintf(stderr, "FATAL ERROR: Not initialized\n");
+    abort();
+  }
+  Session *session = new Session(*globalInit);
+  // HACK: activate plugins and ignore failures.
+  (void)session->activatePluginsOnce();
+
+  auto registeredTargetBackends =
+      session->targetRegistry.getRegisteredTargetBackends();
+  for (auto &b : registeredTargetBackends) {
+    callback(b.c_str(), userData);
+  }
+
+  delete session;
+}
+
 void ireeCompilerEnumeratePlugins(void (*callback)(const char *pluginName,
                                                    void *userData),
                                   void *userData) {
@@ -1052,18 +1077,6 @@ void ireeCompilerInvocationSetCrashHandler(
         return std::make_unique<StreamImpl>(output);
       },
       /*genLocalReproducer=*/genLocalReproducer);
-}
-
-void ireeCompilerInvocationEnumerateRegisteredHALTargetBackends(
-    iree_compiler_invocation_t *inv,
-    void (*callback)(const char *backend, void *userData), void *userData) {
-  // HACK: activate plugins and ignore failures.
-  (void)unwrap(inv)->session.activatePluginsOnce();
-  auto registeredTargetBackends =
-      unwrap(inv)->session.targetRegistry.getRegisteredTargetBackends();
-  for (auto &b : registeredTargetBackends) {
-    callback(b.c_str(), userData);
-  }
 }
 
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
