@@ -7,7 +7,6 @@
 #include "iree/hal/local/plugins/system_library_plugin.h"
 
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/tracing.h"
 
 typedef struct iree_hal_system_library_executable_plugin_t {
   iree_hal_executable_plugin_t base;

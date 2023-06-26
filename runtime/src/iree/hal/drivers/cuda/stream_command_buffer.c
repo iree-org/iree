@@ -6,7 +6,6 @@
 
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/cuda_event.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
@@ -365,8 +364,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_update_buffer(
                     iree_hal_buffer_byte_offset(target_buffer) + target_offset;
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuMemcpyHtoDAsync_v2(dst, src, length, command_buffer->stream),
-      "cuMemcpyHtoDAsync_v2");
+      cuMemcpyHtoDAsync(dst, src, length, command_buffer->stream),
+      "cuMemcpyHtoDAsync");
 
   return iree_ok_status();
 }

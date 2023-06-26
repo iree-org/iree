@@ -57,7 +57,6 @@ iree_cc_binary(
     benchmark
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::hal::types
     iree::tooling::context_util
@@ -77,7 +76,6 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::testing::benchmark
@@ -96,10 +94,8 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::check
     iree::testing::gtest
@@ -178,7 +174,6 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::tooling::context_util
     iree::tooling::run_module
@@ -194,7 +189,6 @@ iree_cc_binary(
     iree::base
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::tooling::device_util
@@ -215,7 +209,6 @@ iree_cc_binary(
     iree::base::internal::cpu
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::tooling::device_util
@@ -236,20 +229,21 @@ if(IREE_BUILD_COMPILER)
     )
   endif()
 
+  # Tablegen binaries are special snowflakes among special snowflakes.
+  # They must be statically linked against internal LLVM libraries, and they
+  # therefore must not depend on anything outside of the upstream tablegen
+  # libraries. These targets are specially set up to link in the correct
+  # way. This is a necessary diversion from how Bazel deals with it (which
+  # must deep-link to everything to satisfy its checks).
   iree_cc_binary(
     NAME
       iree-tblgen
     SRCS
-      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+      "iree-tblgen.cpp"
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
-      LLVMSupport
-      LLVMTableGen
-      MLIRSupport
-      MLIRTableGen
       MLIRTblgenLib
-      iree::compiler::Utils
     HOSTONLY
   )
 
@@ -300,7 +294,6 @@ if(IREE_BUILD_COMPILER)
     DEPS
       iree::base
       iree::base::internal::flags
-      iree::base::tracing
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
       iree::hal

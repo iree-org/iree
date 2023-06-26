@@ -16,13 +16,13 @@ namespace HAL {
 
 template <typename ConcreteType>
 class DeviceQuery : public OpTrait::TraitBase<ConcreteType, DeviceQuery> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace OpTrait
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace OpTrait
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_IR_HALTRAITS_H_
+#endif // IREE_COMPILER_DIALECT_HAL_IR_HALTRAITS_H_

@@ -22,7 +22,7 @@ namespace iree_compiler {
 // to the VM dialect.
 class VMConversionDialectInterface
     : public DialectInterface::Base<VMConversionDialectInterface> {
- public:
+public:
   VMConversionDialectInterface(Dialect *dialect) : Base(dialect) {}
 
   // Returns a module containing one or more vm.modules with vm.import ops.
@@ -40,10 +40,11 @@ class VMConversionDialectInterface
   //
   // |importSymbols| contains all vm.imports that have been queried from all
   // used dialects, not just this dialect.
-  virtual void populateVMConversionPatterns(
-      SymbolTable &importSymbols, RewritePatternSet &patterns,
-      ConversionTarget &conversionTarget,
-      TypeConverter &typeConverter) const = 0;
+  virtual void
+  populateVMConversionPatterns(SymbolTable &importSymbols,
+                               RewritePatternSet &patterns,
+                               ConversionTarget &conversionTarget,
+                               TypeConverter &typeConverter) const = 0;
 
   // Walks all child attributes defined within a custom dialect attribute;
   // returns false on unknown attributes.
@@ -53,16 +54,16 @@ class VMConversionDialectInterface
     return success();
   }
 
- protected:
+protected:
   // Parses the vm.import module to be cached by the caller.
   virtual OwningOpRef<mlir::ModuleOp> parseVMImportModule() const = 0;
 
- private:
+private:
   mutable std::once_flag importParseFlag;
   mutable OwningOpRef<mlir::ModuleOp> importModuleRef;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONDIALECTINTERFACE_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONDIALECTINTERFACE_H_

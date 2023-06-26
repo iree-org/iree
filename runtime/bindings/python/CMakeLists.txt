@@ -49,7 +49,6 @@ iree_pyext_module(
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::hal::drivers
     iree::hal::utils::allocators
@@ -74,6 +73,7 @@ iree_py_library(
     "iree/runtime/tracing.py"
     "iree/runtime/scripts/iree_benchmark_trace/__main__.py"
     "iree/runtime/scripts/iree_benchmark_module/__main__.py"
+    "iree/runtime/scripts/iree_cpuinfo/__main__.py"
     "iree/runtime/scripts/iree_run_trace/__main__.py"
     "iree/runtime/scripts/iree_run_module/__main__.py"
     ${_PYTHON_EXTRA_SRCS}
@@ -91,6 +91,12 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-benchmark-trace
   TO_EXE_NAME iree/runtime/iree-benchmark-trace
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-cpuinfo
+  TO_EXE_NAME iree/runtime/iree-cpuinfo
 )
 
 iree_symlink_tool(
@@ -154,24 +160,28 @@ iree_py_test(
 
 iree_py_test(
   NAME
-    system_api_test
-  SRCS
-    "tests/system_api_test.py"
-)
-
-iree_py_test(
-  NAME
     system_setup_test
   SRCS
     "tests/system_setup_test.py"
 )
 
-iree_py_test(
-  NAME
-    vm_test
-  SRCS
-    "tests/vm_test.py"
-)
+# These tests perform linking via the Compiler API, which is only supported
+# in bundled-LLVM builds at the moment (#14086).
+if(IREE_BUILD_BUNDLED_LLVM)
+  iree_py_test(
+    NAME
+      system_api_test
+    SRCS
+      "tests/system_api_test.py"
+  )
+
+  iree_py_test(
+    NAME
+      vm_test
+    SRCS
+      "tests/vm_test.py"
+  )
+endif()
 
 iree_py_test(
   NAME
@@ -226,6 +236,7 @@ cmake_language(EVAL CODE "
 cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
   CALL install
   TARGETS
+    iree-cpuinfo
     iree-benchmark-module
     iree-benchmark-trace
     iree-run-module

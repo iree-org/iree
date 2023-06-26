@@ -33,3 +33,63 @@ func.func @complex_element_type(%input: tensor<4xi32>, %table: tensor<8x2xcomple
 //  CHECK-SAME:       ins(%{{.+}}, %[[CST]] : tensor<4xi32>, tensor<4x2xcomplex<f32>>)
 //  CHECK-SAME:       outs(%[[EMPTY]] : tensor<4x2xcomplex<f32>>)
 //       CHECK:   flow.return
+
+// -----
+
+func.func @complex_constant_clone(%input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+  %cst = complex.constant [1.000000e+00 : f32, 2.000000e+00 : f32] : complex<f32>
+  %empty = tensor.empty() : tensor<4x2xcomplex<f32>>
+  %0 = linalg.fill ins(%cst : complex<f32>) outs(%empty : tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>>
+  %1 = flow.dispatch.region -> (tensor<4x2xcomplex<f32>>) {
+    %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%input : tensor<4x2xcomplex<f32>>) outs(%0 : tensor<4x2xcomplex<f32>>) {
+    ^bb0(%in: complex<f32>, %out: complex<f32>):
+      %2 = complex.mul %in, %out : complex<f32>
+      linalg.yield %2 : complex<f32>
+    } -> tensor<4x2xcomplex<f32>>
+    flow.return %generic : tensor<4x2xcomplex<f32>>
+  }
+  return %1 : tensor<4x2xcomplex<f32>>
+}
+
+// CHECK-LABEL: @complex_constant_clone
+// CHECK: flow.dispatch.region
+// CHECK: tensor.empty
+// CHECK: complex.constant
+// CHECK: linalg.fill
+// CHECK: linalg.generic
+// CHECK: complex.mul
+// CHECK: linalg.yield
+// CHECK: flow.return
+
+// -----
+
+func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+  %cst = complex.create %real, %imag : complex<f32>
+  %empty = tensor.empty() : tensor<4x2xcomplex<f32>>
+  %0 = linalg.fill ins(%cst : complex<f32>) outs(%empty : tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>>
+  %1 = flow.dispatch.region -> (tensor<4x2xcomplex<f32>>) {
+    %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%input : tensor<4x2xcomplex<f32>>) outs(%0 : tensor<4x2xcomplex<f32>>) {
+    ^bb0(%in: complex<f32>, %out: complex<f32>):
+      %2 = complex.mul %in, %out : complex<f32>
+      linalg.yield %2 : complex<f32>
+    } -> tensor<4x2xcomplex<f32>>
+    flow.return %generic : tensor<4x2xcomplex<f32>>
+  }
+  return %0 : tensor<4x2xcomplex<f32>>
+}
+
+// CHECK-LABEL: @complex_create
+// CHECK: flow.dispatch.region
+// CHECK: tensor.empty
+// CHECK: complex.create
+// CHECK: linalg.fill
+// CHECK: linalg.generic
+// CHECK: complex.mul
+// CHECK: linalg.yield
+// CHECK: flow.return

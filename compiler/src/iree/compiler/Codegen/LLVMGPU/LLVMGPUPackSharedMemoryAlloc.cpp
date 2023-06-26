@@ -30,7 +30,8 @@ static void addBarrier(func::FuncOp funcOp, Operation *alloc,
     needBarrier = true;
   } else {
     for (Operation &op : entryBlock->getOperations()) {
-      if (&op == alloc) break;
+      if (&op == alloc)
+        break;
       if (op.getNumRegions() != 0) {
         needBarrier = true;
         break;
@@ -41,7 +42,8 @@ static void addBarrier(func::FuncOp funcOp, Operation *alloc,
       }
     }
   }
-  if (!needBarrier) return;
+  if (!needBarrier)
+    return;
   OpBuilder builder(alloc);
   // TODO: make it a option if needed.
   bool hasAsyncCopies = true;
@@ -60,7 +62,7 @@ namespace {
 struct LLVMGPUPackSharedMemoryAllocPass
     : public LLVMGPUPackSharedMemoryAllocBase<
           LLVMGPUPackSharedMemoryAllocPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<nvgpu::NVGPUDialect>();
   }
@@ -79,7 +81,8 @@ struct LLVMGPUPackSharedMemoryAllocPass
     SmallVector<AliasGroup> aliasGroups;
     analyseAllocsForPacking(funcOp, allocs, aliasGroups);
     // If there is 1 or less alias group there is nothing to do.
-    if (aliasGroups.size() <= 1) return;
+    if (aliasGroups.size() <= 1)
+      return;
 
     // Pack all the allocations into one i8 alloc.
     // We may need to add extra barriers to make sure we are done writting or
@@ -94,12 +97,12 @@ struct LLVMGPUPackSharedMemoryAllocPass
     packAllocs(builder, funcOp, aliasGroups);
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUPackSharedMemoryAlloc() {
   return std::make_unique<LLVMGPUPackSharedMemoryAllocPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

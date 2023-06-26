@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -18,6 +19,7 @@
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define DBGSNL() (llvm::dbgs() << "\n")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
@@ -28,9 +30,10 @@ namespace iree_compiler {
 // GPU processor IDs and sizes
 //===----------------------------------------------------------------------===//
 
-llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
-    mlir::OpBuilder &builder, mlir::Location loc, unsigned numDims,
-    llvm::ArrayRef<int64_t> workgroupSize) {
+llvm::SmallVector<mlir::linalg::ProcInfo, 2>
+getGPUThreadIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
+                         unsigned numDims,
+                         llvm::ArrayRef<int64_t> workgroupSize) {
   assert(numDims <= kNumGPUDims);
   llvm::SmallVector<mlir::linalg::ProcInfo, 2> procInfo(numDims);
   std::array<gpu::Dimension, kNumGPUDims> dimAttr{
@@ -46,9 +49,10 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
   return procInfo;
 }
 
-llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    mlir::OpBuilder &builder, mlir::Location loc, unsigned warpSize,
-    unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups) {
+llvm::SmallVector<mlir::linalg::ProcInfo, 2>
+getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
+                        unsigned warpSize, unsigned numDims,
+                        llvm::ArrayRef<int64_t> numSubgroups) {
   assert(numDims <= kNumGPUDims);
   llvm::SmallVector<mlir::linalg::ProcInfo, 2> procInfo(numDims);
   std::array<gpu::Dimension, kNumGPUDims> dimAttr{
@@ -96,30 +100,35 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
   // Verify that each dimension of the shape can be distributed on the
   // threads
   // For zero dim tensor, consider it's too small to access using all threads.
-  if (shape.size() == 0) return false;
+  if (shape.size() == 0)
+    return false;
   int64_t threadsAvailable = threadCount;
   for (const auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
     int64_t numElementPerThread = index == 0 ? vectorSize : 1;
     int64_t numThreads = dim / numElementPerThread;
-    if (numThreads == 0) return false;
+    if (numThreads == 0)
+      return false;
     if (numThreads > threadsAvailable) {
       // If there are no enough remaining threads to distribute the current
       // dimension, try to use all remaining threads. But we still need to make
       // sure all work can be distributed to these threads evenly.
-      if (numThreads % threadsAvailable != 0) return false;
+      if (numThreads % threadsAvailable != 0)
+        return false;
       numThreads = threadsAvailable;
     }
-    if (threadsAvailable % numThreads != 0) return false;
+    if (threadsAvailable % numThreads != 0)
+      return false;
     threadsAvailable = threadsAvailable / numThreads;
-    if (threadsAvailable == 1) break;
+    if (threadsAvailable == 1)
+      break;
   }
   return threadsAvailable == 1;
 }
 
 /// Pick an unrolling order that will allow tensorcore operation to reuse LHS
 /// register. This is needed to get good performance on sm_80 target.
-std::optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
-    vector::ContractionOp contract) {
+std::optional<SmallVector<int64_t>>
+gpuMmaUnrollOrder(vector::ContractionOp contract) {
   SmallVector<int64_t> order;
   // First make reduction the outer dimensions.
   for (auto [index, iter] : llvm::enumerate(contract.getIteratorTypes())) {
@@ -158,14 +167,16 @@ std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
   OpBuilder::InsertionGuard guard(builder);
 
   func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
-  if (!funcOp) return std::nullopt;
+  if (!funcOp)
+    return std::nullopt;
 
   // The subview size bounds are expected to be constant; they specify the shape
   // of the allocation.
   SmallVector<int64_t, 2> shape;
   for (Value bound : sizeBounds) {
     APInt value;
-    if (!matchPattern(bound, m_ConstantInt(&value))) return std::nullopt;
+    if (!matchPattern(bound, m_ConstantInt(&value)))
+      return std::nullopt;
     shape.push_back(value.getSExtValue());
   }
 
@@ -198,8 +209,10 @@ static bool propagateCopyDestIntoProducerFill(memref::CopyOp copyOp) {
     }
 
     auto fillOp = dyn_cast<linalg::FillOp>(prevOp);
-    if (!fillOp) break;
-    if (fillOp.output() != copyOp.getSource()) break;
+    if (!fillOp)
+      break;
+    if (fillOp.output() != copyOp.getSource())
+      break;
     // Move the fillOp and change the destination to the copy destination.
     fillOp->moveBefore(copyOp);
     fillOp.getOutputsMutable().assign(copyOp.getTarget());
@@ -238,8 +251,9 @@ static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
 
 /// Propagate the shared memory copy into the consumer op if it's a fully
 /// parallel linalg.generic.
-static bool propagateCopySourceIntoConsumerGeneric(
-    memref::CopyOp copyOp, SmallVector<Operation *> &toDelete) {
+static bool
+propagateCopySourceIntoConsumerGeneric(memref::CopyOp copyOp,
+                                       SmallVector<Operation *> &toDelete) {
   // Look for a generic Op reading the copyOp target.
   Operation *nextOp = copyOp->getNextNode();
   while (nextOp) {
@@ -252,7 +266,8 @@ static bool propagateCopySourceIntoConsumerGeneric(
         !consumer.getMatchingIndexingMap(consumer.getDpsInitOperand(0))
              .isIdentity())
       break;
-    if (*consumer.getOutputs().begin() != copyOp.getTarget()) break;
+    if (*consumer.getOutputs().begin() != copyOp.getTarget())
+      break;
     insertInputValueIntoGeneric(copyOp.getSource(), consumer);
     toDelete.push_back(consumer);
     return true;
@@ -272,7 +287,8 @@ void propagateSharedMemoryCopy(func::FuncOp funcOp) {
         toDelete.push_back(copyOp.getOperation());
     }
   });
-  for (Operation *op : toDelete) op->erase();
+  for (Operation *op : toDelete)
+    op->erase();
 }
 
 void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp) {
@@ -389,35 +405,35 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
                                           vector::CombiningKind combiningKind,
                                           Type type) {
   switch (combiningKind) {
-    case vector::CombiningKind::ADD:
-      return builder.getZeroAttr(type);
-    case vector::CombiningKind::MUL: {
-      if (type.isIntOrIndex()) {
-        return builder.getIntegerAttr(type, 1);
-      }
-      return builder.getFloatAttr(type, 1);
-    }
-    case vector::CombiningKind::MINUI:
-    case vector::CombiningKind::MINSI:
-      return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::max());
-    case vector::CombiningKind::MAXUI:
-    case vector::CombiningKind::MAXSI:
-      return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::min());
-    case vector::CombiningKind::AND:
+  case vector::CombiningKind::ADD:
+    return builder.getZeroAttr(type);
+  case vector::CombiningKind::MUL: {
+    if (type.isIntOrIndex()) {
       return builder.getIntegerAttr(type, 1);
-    case vector::CombiningKind::OR:
-    case vector::CombiningKind::XOR:
-      return builder.getZeroAttr(type);
-    case vector::CombiningKind::MINF: {
-      auto posInfApFloat = APFloat::getInf(
-          llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
-      return builder.getFloatAttr(type, posInfApFloat);
     }
-    case vector::CombiningKind::MAXF: {
-      auto negInfApFloat = APFloat::getInf(
-          llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);
-      return builder.getFloatAttr(type, negInfApFloat);
-    }
+    return builder.getFloatAttr(type, 1);
+  }
+  case vector::CombiningKind::MINUI:
+  case vector::CombiningKind::MINSI:
+    return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::max());
+  case vector::CombiningKind::MAXUI:
+  case vector::CombiningKind::MAXSI:
+    return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::min());
+  case vector::CombiningKind::AND:
+    return builder.getIntegerAttr(type, 1);
+  case vector::CombiningKind::OR:
+  case vector::CombiningKind::XOR:
+    return builder.getZeroAttr(type);
+  case vector::CombiningKind::MINF: {
+    auto posInfApFloat = APFloat::getInf(
+        llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
+    return builder.getFloatAttr(type, posInfApFloat);
+  }
+  case vector::CombiningKind::MAXF: {
+    auto negInfApFloat = APFloat::getInf(
+        llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);
+    return builder.getFloatAttr(type, negInfApFloat);
+  }
   }
   return TypedAttr();
 }
@@ -578,9 +594,11 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     VectorType sliceType;
     for (Operation *users : op->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract) return std::nullopt;
+      if (!extract)
+        return std::nullopt;
       auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-      if (sliceType && sliceType != vecType) return std::nullopt;
+      if (sliceType && sliceType != vecType)
+        return std::nullopt;
       sliceType = vecType;
     }
     return llvm::to_vector(sliceType.getShape());
@@ -589,7 +607,8 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       // TODO: The condition for unrolling elementwise should be restricted
       // only to operations that need unrolling (connected to the contract).
-      if (vecType.getRank() < 2) return std::nullopt;
+      if (vecType.getRank() < 2)
+        return std::nullopt;
 
       // First check whether there is a slice to infer the shape from. This is
       // required for cases where the accumulator type differs from the input
@@ -598,12 +617,15 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
       VectorType sliceType;
       for (Operation *users : op->getUsers()) {
         auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-        if (!extract) return std::nullopt;
+        if (!extract)
+          return std::nullopt;
         auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-        if (sliceType && sliceType != vecType) return std::nullopt;
+        if (sliceType && sliceType != vecType)
+          return std::nullopt;
         sliceType = vecType;
       }
-      if (sliceType) return llvm::to_vector(sliceType.getShape());
+      if (sliceType)
+        return llvm::to_vector(sliceType.getShape());
 
       // Else unroll for trailing elementwise.
       SmallVector<int64_t> nativeSize(vecType.getRank() - 2, 1);
@@ -619,34 +641,42 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
 // getMmaNativeVectorSize
 //===----------------------------------------------------------------------===//
 /// Returns vector::ContractionOp operand's index where the result is used.
-static std::optional<int> getVectorContractOpOperandId(
-    vector::ContractionOp contractOp, OpResult result) {
-  if (contractOp.getLhs() == result) return 0;
-  if (contractOp.getRhs() == result) return 1;
-  if (contractOp.getAcc() == result) return 2;
+static std::optional<int>
+getVectorContractOpOperandId(vector::ContractionOp contractOp,
+                             OpResult result) {
+  if (contractOp.getLhs() == result)
+    return 0;
+  if (contractOp.getRhs() == result)
+    return 1;
+  if (contractOp.getAcc() == result)
+    return 2;
   return std::nullopt;
 }
 
 /// Returns vector::ContractionOp operand's index  where the
 /// vector::TransferReadOp is consumed either consumed directly or via
 /// vector::ExtractStridedSliceOp.
-static std::optional<int> getVectorContractOpOperandIdForVectorReadOp(
-    Operation *op) {
+static std::optional<int>
+getVectorContractOpOperandIdForVectorReadOp(Operation *op) {
   vector::ContractionOp contractOp;
 
   // Check if the vector::TransferReadOp is consumed directly by
   // vector::ContractionOp.
-  if (op->use_empty()) return std::nullopt;
+  if (op->use_empty())
+    return std::nullopt;
   Operation *firstLevelUser = *((op->getUsers()).begin());
-  if (!firstLevelUser) return std::nullopt;
+  if (!firstLevelUser)
+    return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
     return getVectorContractOpOperandId(contractOp, op->getResult(0));
 
   // Check if the vector::TransferReadOp is consumed indirectly by
   // vector::ContractionOp. Only check until the second level of use-def chain.
-  if (firstLevelUser->use_empty()) return std::nullopt;
+  if (firstLevelUser->use_empty())
+    return std::nullopt;
   Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
-  if (!secondLevelUser) return std::nullopt;
+  if (!secondLevelUser)
+    return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
     return getVectorContractOpOperandId(contractOp,
                                         firstLevelUser->getResult(0));
@@ -673,13 +703,19 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       mmaShapeK = 16;
     else if (sourceType.isF32())
       mmaShapeK = 8;
-    else
+    else {
+      LDBG("unsupported shape for vector.contract: ");
       return std::nullopt;
+    }
 
     // Initialize/set the starting dims of the ranked shape, such as batch,
     // to 1.
     SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
     mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
+    LLVM_DEBUG({
+      llvm::interleaveComma(mmaShape, DBGS() << "shape for vector.contract: ");
+      llvm::dbgs() << "\n";
+    });
     return mmaShape;
   }
 
@@ -687,6 +723,11 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
+    LLVM_DEBUG({
+      llvm::interleaveComma(outputShape,
+                            DBGS() << "shape for vector.xfer_write: ");
+      llvm::dbgs() << "\n";
+    });
     return outputShape;
   }
 
@@ -700,7 +741,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
       LLVM_DEBUG({
-        DBGS() << "Failed to get operandId for vector::TransferReadOp: " << *op
+        DBGS() << "Failed to get operandId for vector::xfer_read: " << *op
                << "\n";
       });
       return std::nullopt;
@@ -712,6 +753,11 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
 
@@ -729,9 +775,13 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         // OptimizeVectorTransfer, matrixC reads are moved above the mainloop
         // and writes are moved below the mainloop. Thus, mma.sync read/write
         // accumulator inplace.
-
         SmallVector<int64_t> readShape;
         readShape.append({16, 16});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
     }
@@ -745,12 +795,22 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
       // For matrixA.
       if (*operandId == 0) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeK});
+        LLVM_DEBUG({
+          llvm::interleaveComma(readShape,
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return readShape;
       }
       // For matrixB.
@@ -762,15 +822,23 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         VectorType sliceType;
         for (Operation *users : op->getUsers()) {
           auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-          if (!extract) return std::nullopt;
+          if (!extract)
+            return std::nullopt;
           auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-          if (sliceType && sliceType != vecType) return std::nullopt;
+          if (sliceType && sliceType != vecType)
+            return std::nullopt;
           sliceType = vecType;
         }
+        LLVM_DEBUG({
+          llvm::interleaveComma(sliceType.getShape(),
+                                DBGS() << "shape for vector.xfer_read: ");
+          llvm::dbgs() << "\n";
+        });
         return llvm::to_vector(sliceType.getShape());
       }
     }
   }
+  LDBG("unsupported shape for " << op->getName().getStringRef());
   return std::nullopt;
 }
 
@@ -799,5 +867,5 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
   return false;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

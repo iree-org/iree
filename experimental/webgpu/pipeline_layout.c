@@ -10,7 +10,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_webgpu_descriptor_set_layout_t
@@ -56,7 +55,7 @@ iree_status_t iree_hal_webgpu_descriptor_set_layout_create(
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "bindings must be in the range of 0-%d; binding "
-                              "%zu is has ordinal %d",
+                              "%" PRIhsz " is has ordinal %d",
                               IREE_HAL_WEBGPU_MAX_DESCRIPTOR_SET_BINDING_COUNT,
                               i, bindings[i].binding);
     }

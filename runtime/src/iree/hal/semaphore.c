@@ -8,7 +8,6 @@
 
 #include <stddef.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
 #include "iree/hal/resource.h"
@@ -29,7 +28,7 @@ iree_hal_semaphore_create(iree_hal_device_t* device, uint64_t initial_value,
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, initial_value);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, initial_value);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_semaphore)(
           device, initial_value, out_semaphore);
@@ -45,7 +44,7 @@ iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       _VTABLE_DISPATCH(semaphore, query)(semaphore, out_value);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, *out_value);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, *out_value);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -54,7 +53,7 @@ IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, new_value);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_value);
   iree_status_t status =
       _VTABLE_DISPATCH(semaphore, signal)(semaphore, new_value);
   IREE_TRACE_ZONE_END(z0);
@@ -65,7 +64,7 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
                                              iree_status_t status) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, iree_status_code(status));
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, iree_status_code(status));
   _VTABLE_DISPATCH(semaphore, fail)(semaphore, status);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -74,7 +73,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
     iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, value);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
   iree_status_t status =
       _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout);
   IREE_TRACE_ZONE_END(z0);

@@ -45,12 +45,15 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
   // vectors larger than what would fit in register skip vectorization.
   f.addFilter([maxVectorSize](Operation *op) {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp) return success();
+    if (!linalgOp)
+      return success();
     int64_t maxFlatVecSize = 1;
     for (OpOperand &operand : linalgOp->getOpOperands()) {
       auto type = llvm::dyn_cast<ShapedType>(operand.get().getType());
-      if (!type) continue;
-      if (!type.hasStaticShape()) return failure();
+      if (!type)
+        continue;
+      if (!type.hasStaticShape())
+        return failure();
       maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
     }
     return success(maxFlatVecSize <= maxVectorSize);
@@ -106,13 +109,13 @@ struct GPUVectorizationPass
     linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
   }
 };
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
-    bool generateContract, int64_t maxVectorSize) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUVectorizationPass(bool generateContract, int64_t maxVectorSize) {
   return std::make_unique<GPUVectorizationPass>(generateContract,
                                                 maxVectorSize);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

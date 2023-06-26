@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/vm/bytecode/archive.h"
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/bytecode/verifier.h"
@@ -114,10 +113,10 @@ static iree_status_t iree_vm_bytecode_map_internal_ordinal(
     // Look up the internal ordinal index of this export in the function table.
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
-    IREE_ASSERT_LT(ordinal,
-                   iree_vm_ExportFunctionDef_vec_len(exported_functions),
-                   "export ordinal out of range (0 < %zu < %zu)", ordinal,
-                   iree_vm_ExportFunctionDef_vec_len(exported_functions));
+    IREE_ASSERT_LT(
+        ordinal, iree_vm_ExportFunctionDef_vec_len(exported_functions),
+        "export ordinal out of range (0 < %" PRIhsz " < %" PRIhsz ")", ordinal,
+        iree_vm_ExportFunctionDef_vec_len(exported_functions));
     iree_vm_ExportFunctionDef_table_t function_def =
         iree_vm_ExportFunctionDef_vec_at(exported_functions, function.ordinal);
     ordinal = iree_vm_ExportFunctionDef_internal_ordinal(function_def);
@@ -132,10 +131,10 @@ static iree_status_t iree_vm_bytecode_map_internal_ordinal(
   }
 
   if (ordinal >= module->function_descriptor_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "function ordinal out of range (0 < %u < %zu)",
-                            function.ordinal,
-                            module->function_descriptor_count);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "function ordinal out of range (0 < %u < %" PRIhsz ")",
+        function.ordinal, module->function_descriptor_count);
   }
 
   *out_ordinal = ordinal;
@@ -332,7 +331,7 @@ static iree_status_t iree_vm_bytecode_module_get_function(
     if (ordinal >= iree_vm_ImportFunctionDef_vec_len(imported_functions)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "import ordinal out of range (0 < %zu < %zu)", ordinal,
+          "import ordinal out of range (0 < %" PRIhsz " < %zu)", ordinal,
           iree_vm_ImportFunctionDef_vec_len(imported_functions));
     }
     iree_vm_ImportFunctionDef_table_t import_def =
@@ -349,7 +348,7 @@ static iree_status_t iree_vm_bytecode_module_get_function(
     if (ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "export ordinal out of range (0 < %zu < %zu)", ordinal,
+          "export ordinal out of range (0 < %" PRIhsz " < %zu)", ordinal,
           iree_vm_ExportFunctionDef_vec_len(exported_functions));
     }
     iree_vm_ExportFunctionDef_table_t export_def =
@@ -415,9 +414,10 @@ static iree_status_t iree_vm_bytecode_module_get_function_attr(
           function_signatures,
           iree_vm_ExportFunctionDef_internal_ordinal(function_def));
   if (!signature_def) {
-    return iree_make_status(
-        IREE_STATUS_NOT_FOUND,
-        "reflection attribute at index %zu not found; no signature", index);
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "reflection attribute at index %" PRIhsz
+                            " not found; no signature",
+                            index);
   }
   iree_vm_AttrDef_vec_t attrs =
       iree_vm_FunctionSignatureDef_attrs(signature_def);
@@ -694,7 +694,8 @@ static iree_status_t iree_vm_bytecode_module_resolve_import(
       (iree_vm_bytecode_module_state_t*)module_state;
   if (ordinal >= state->import_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "import ordinal out of range (0 < %zu < %zu)",
+                            "import ordinal out of range (0 < %" PRIhsz
+                            " < %" PRIhsz ")",
                             ordinal, state->import_count);
   }
 
@@ -720,7 +721,7 @@ static iree_status_t iree_vm_bytecode_module_resolve_import(
       import->results, /*segment_size_list=*/NULL, &result_buffer_size));
   if (argument_buffer_size > 16 * 1024 || result_buffer_size > 16 * 1024) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "ABI marshaling buffer overflow on import %zu",
+                            "ABI marshaling buffer overflow on import %" PRIhsz,
                             ordinal);
   }
   import->argument_buffer_size = (uint16_t)argument_buffer_size;

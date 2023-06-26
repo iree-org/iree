@@ -29,9 +29,9 @@ WebGPUTargetOptions getWebGPUTargetOptionsFromFlags();
 void registerWebGPUTargetBackends(
     std::function<WebGPUTargetOptions()> queryOptions);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_WEBGPU_WEBGPUTARGET_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_WEBGPU_WEBGPUTARGET_H_

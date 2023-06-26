@@ -27,13 +27,13 @@ namespace {
 // continue.
 class FixedPointIteratorPass
     : public FixedPointIteratorBase<FixedPointIteratorPass> {
- public:
+public:
   FixedPointIteratorPass() = default;
   FixedPointIteratorPass(const FixedPointIteratorPass &other)
       : FixedPointIteratorBase<FixedPointIteratorPass>(other) {}
   FixedPointIteratorPass(OpPassManager pipeline);
 
- private:
+private:
   LogicalResult initializeOptions(StringRef options) override;
   void getDependentDialects(DialectRegistry &registry) const override;
   void runOnOperation() override;
@@ -56,8 +56,10 @@ FixedPointIteratorPass::FixedPointIteratorPass(OpPassManager pipeline)
 }
 
 LogicalResult FixedPointIteratorPass::initializeOptions(StringRef options) {
-  if (failed(Pass::initializeOptions(options))) return failure();
-  if (pipeline) return success();
+  if (failed(Pass::initializeOptions(options)))
+    return failure();
+  if (pipeline)
+    return success();
 
   // Pipelines are expected to be of the form `<op-name>(<pipeline>)`.
   // TODO: This was lifted from the Inliner pass. We should provide a parse
@@ -114,14 +116,14 @@ void FixedPointIteratorPass::runOnOperation() {
   return signalPassFailure();
 }
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
-    OpPassManager pipeline) {
+std::unique_ptr<OperationPass<void>>
+createFixedPointIteratorPass(OpPassManager pipeline) {
   return std::make_unique<FixedPointIteratorPass>(std::move(pipeline));
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

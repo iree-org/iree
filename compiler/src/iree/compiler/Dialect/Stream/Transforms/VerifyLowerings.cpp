@@ -31,7 +31,7 @@ namespace Stream {
 //===----------------------------------------------------------------------===//
 
 class Verifier {
- public:
+public:
   enum class Legality {
     LEGAL,
     RECURSIVELY_LEGAL,
@@ -103,29 +103,31 @@ class Verifier {
       // Check for op legality - can skip the expensive work if known-illegal.
       auto legality = getOpLegality(op);
       switch (legality) {
-        case Legality::LEGAL:
-          // Op itself is legal but may not have valid operands/results.
-          break;
-        case Legality::RECURSIVELY_LEGAL:
-          // If the entire op w/ nested ops is legal then skip.
-          return WalkResult::skip();
-        default:
-        case Legality::ILLEGAL:
-          // Early-exit on illegal ops without recursing.
-          emitIllegalOpError(op);
-          foundAnyIllegal = true;
-          return WalkResult::skip();
+      case Legality::LEGAL:
+        // Op itself is legal but may not have valid operands/results.
+        break;
+      case Legality::RECURSIVELY_LEGAL:
+        // If the entire op w/ nested ops is legal then skip.
+        return WalkResult::skip();
+      default:
+      case Legality::ILLEGAL:
+        // Early-exit on illegal ops without recursing.
+        emitIllegalOpError(op);
+        foundAnyIllegal = true;
+        return WalkResult::skip();
       }
 
       // Check types for operands/results.
       for (auto operandType : llvm::enumerate(op->getOperandTypes())) {
-        if (isTypeLegal(operandType.value())) continue;
+        if (isTypeLegal(operandType.value()))
+          continue;
         emitIllegalTypeError(op, "operand", operandType.index(),
                              operandType.value());
         foundAnyIllegal = true;
       }
       for (auto resultType : llvm::enumerate(op->getResultTypes())) {
-        if (isTypeLegal(resultType.value())) continue;
+        if (isTypeLegal(resultType.value()))
+          continue;
         emitIllegalTypeError(op, "result", resultType.index(),
                              resultType.value());
         foundAnyIllegal = true;
@@ -136,7 +138,7 @@ class Verifier {
     return success(!foundAnyIllegal);
   }
 
- private:
+private:
   Legality getOpLegality(Operation *op) {
     auto opName = op->getName();
 
@@ -251,7 +253,7 @@ static void markStreamCmdOpsIllegal(Verifier &verifier) {
 namespace {
 
 class VerifyInputPass : public VerifyInputBase<VerifyInputPass> {
- public:
+public:
   VerifyInputPass() = default;
 
   void runOnOperation() override {
@@ -269,7 +271,7 @@ class VerifyInputPass : public VerifyInputBase<VerifyInputPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyInputPass() {
   return std::make_unique<VerifyInputPass>();
@@ -298,7 +300,7 @@ namespace {
 
 class VerifyLoweringToTensorsPass
     : public VerifyLoweringToTensorsBase<VerifyLoweringToTensorsPass> {
- public:
+public:
   VerifyLoweringToTensorsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -319,7 +321,7 @@ class VerifyLoweringToTensorsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createVerifyLoweringToTensorsPass() {
@@ -334,7 +336,7 @@ namespace {
 
 class VerifyLoweringToAsyncPass
     : public VerifyLoweringToAsyncBase<VerifyLoweringToAsyncPass> {
- public:
+public:
   VerifyLoweringToAsyncPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -368,7 +370,8 @@ class VerifyLoweringToAsyncPass
           }
 
           // Allow metadata ops outside of execution regions.
-          if (op.isMetadata()) return Verifier::Legality::LEGAL;
+          if (op.isMetadata())
+            return Verifier::Legality::LEGAL;
 
           // TODO(benvanik): execution region interface to make this generic.
           if (!op->template getParentOfType<IREE::Stream::AsyncExecuteOp>()) {
@@ -385,7 +388,7 @@ class VerifyLoweringToAsyncPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createVerifyLoweringToAsyncPass() {
@@ -400,7 +403,7 @@ namespace {
 
 class VerifyLoweringToCmdPass
     : public VerifyLoweringToCmdBase<VerifyLoweringToCmdPass> {
- public:
+public:
   VerifyLoweringToCmdPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -429,13 +432,13 @@ class VerifyLoweringToCmdPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyLoweringToCmdPass() {
   return std::make_unique<VerifyLoweringToCmdPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

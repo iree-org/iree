@@ -51,7 +51,8 @@ static void hoistImmutableLoads(Region &region,
     auto ops =
         llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOpInterface>());
     for (auto &op : ops) {
-      if (!immutableGlobals.contains(op.getGlobalName())) continue;
+      if (!immutableGlobals.contains(op.getGlobalName()))
+        continue;
       auto globalRef = llvm::cast<Attribute>(op.getGlobalAttr());
       auto it = loadOps.find(globalRef);
       if (it == loadOps.end()) {
@@ -88,22 +89,25 @@ static bool doesOpBlockMotion(Operation *op) {
 
 static void moveOpUpInBlock(Block &block, Operation *op) {
   while (op->getPrevNode()) {
-    if (doesOpBlockMotion(op->getPrevNode())) break;
+    if (doesOpBlockMotion(op->getPrevNode()))
+      break;
     op->moveBefore(op->getPrevNode());
   }
 }
 
 static void moveOpDownInBlock(Block &block, Operation *op) {
   while (op->getNextNode()) {
-    if (doesOpBlockMotion(op->getNextNode())) break;
+    if (doesOpBlockMotion(op->getNextNode()))
+      break;
     op->moveAfter(op->getNextNode());
   }
 }
 
 // Optimizes the load/store ops for each given bucket.
 // Returns true if any op was removed.
-static bool optimizeBuckets(
-    Block &block, std::map<StringRef, SmallVector<Operation *>> &buckets) {
+static bool
+optimizeBuckets(Block &block,
+                std::map<StringRef, SmallVector<Operation *>> &buckets) {
   bool didRemoveAny = false;
   for (auto &bucket : buckets) {
     // First perform basic load-store forwarding and such.
@@ -152,7 +156,8 @@ static bool optimizeBuckets(
         didRemoveAny = true;
       }
     }
-    if (ops.empty()) continue;
+    if (ops.empty())
+      continue;
 
     if (auto loadOp =
             dyn_cast<IREE::Util::GlobalLoadOpInterface>(ops.front())) {
@@ -192,8 +197,9 @@ static bool optimizeBuckets(
 //     if (tail == store) move store to back
 //
 // Returns true if there were any removals and the block should be reprocessed.
-static bool rearrangeBlockGlobalAccesses(
-    Block &block, DenseSet<StringRef> &immutableGlobals) {
+static bool
+rearrangeBlockGlobalAccesses(Block &block,
+                             DenseSet<StringRef> &immutableGlobals) {
   // Gather sequences of operations that are safe to reorder.
   // Certain ops - like calls/barriers/etc - prevent us from moving any
   // global operations across them.
@@ -203,7 +209,7 @@ static bool rearrangeBlockGlobalAccesses(
   // not be needed but the global count is low and it's nice to not care about
   // op order issues.
   SmallVector<std::map<StringRef, SmallVector<Operation *>>> sequencedBuckets;
-  sequencedBuckets.push_back({});  // Start in a sequence.
+  sequencedBuckets.push_back({}); // Start in a sequence.
   block.walk([&](Operation *op) {
     auto &buckets = sequencedBuckets.back();
     if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
@@ -232,7 +238,7 @@ namespace {
 
 class SimplifyGlobalAccessesPass
     : public SimplifyGlobalAccessesBase<SimplifyGlobalAccessesPass> {
- public:
+public:
   void runOnOperation() override {
     auto callableOp = getOperation();
     if (!callableOp.getCallableRegion() ||
@@ -285,13 +291,13 @@ class SimplifyGlobalAccessesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass() {
   return std::make_unique<SimplifyGlobalAccessesPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

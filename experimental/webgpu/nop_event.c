@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 // Dummy events for now, don't do anything.
 typedef struct iree_hal_webgpu_nop_event_t {

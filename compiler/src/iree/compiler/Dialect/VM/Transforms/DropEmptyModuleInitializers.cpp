@@ -27,12 +27,12 @@ static bool isFuncEmpty(IREE::VM::FuncOp funcOp) {
           &funcOp.front().front() == funcOp.front().getTerminator());
 }
 
-}  // namespace
+} // namespace
 
 class DropEmptyModuleInitializersPass
     : public PassWrapper<DropEmptyModuleInitializersPass,
                          OperationPass<IREE::VM::ModuleOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "iree-vm-drop-empty-module-initializers";
   }
@@ -55,7 +55,8 @@ class DropEmptyModuleInitializersPass
     auto initFuncOp = symbolTable.lookup<IREE::VM::FuncOp>("__init");
     if (initFuncOp && isFuncEmpty(initFuncOp)) {
       auto exportOp = exportOps[initFuncOp.getName()];
-      if (exportOp) exportOp.erase();
+      if (exportOp)
+        exportOp.erase();
       initFuncOp.erase();
     }
 
@@ -63,7 +64,8 @@ class DropEmptyModuleInitializersPass
     auto deinitFuncOp = symbolTable.lookup<IREE::VM::FuncOp>("__deinit");
     if (deinitFuncOp && isFuncEmpty(deinitFuncOp)) {
       auto exportOp = exportOps[deinitFuncOp.getName()];
-      if (exportOp) exportOp.erase();
+      if (exportOp)
+        exportOp.erase();
       deinitFuncOp.erase();
     }
   }
@@ -76,7 +78,7 @@ createDropEmptyModuleInitializersPass() {
 
 static PassRegistration<DropEmptyModuleInitializersPass> pass;
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

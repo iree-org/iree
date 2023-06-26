@@ -6,8 +6,6 @@
 
 #include "iree/hal/utils/collective_batch.h"
 
-#include "iree/base/tracing.h"
-
 //===----------------------------------------------------------------------===//
 // Collective batching utility
 //===----------------------------------------------------------------------===//
@@ -57,7 +55,7 @@ static iree_status_t iree_hal_collective_batch_grow(
   iree_host_size_t new_capacity =
       batch->capacity == 0 ? IREE_HAL_COLLECTIVE_BATCH_INITIAL_CAPACITY
                            : batch->capacity * 2;
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, new_capacity);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_capacity);
 
   // Allocate new storage - this may fail if the system (or block pool) is over
   // capacity.

@@ -31,6 +31,7 @@
 #include "mlir/Dialect/SCF/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/IR/ValueBoundsOpInterfaceImpl.h"
+#include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 
 namespace mlir {
@@ -61,9 +62,10 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   memref::registerValueBoundsOpInterfaceExternalModels(registry);
   scf::registerTransformDialectExtension(registry);
   scf::registerValueBoundsOpInterfaceExternalModels(registry);
+  tensor::registerTransformDialectExtension(registry);
   tensor::registerValueBoundsOpInterfaceExternalModels(registry);
   vector::registerTransformDialectExtension(registry);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

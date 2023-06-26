@@ -9,8 +9,6 @@
 
 #include "iree/base/internal/cpu.h"
 
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 #include "iree/schemas/cpu_data.h"
 
 //===----------------------------------------------------------------------===//

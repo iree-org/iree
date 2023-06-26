@@ -31,7 +31,7 @@ namespace {
 Value emptyCopy(ImplicitLocOpBuilder &rewriter, Value value) {
   Type eTy = getElementTypeOrSelf(value.getType());
   SmallVector<OpFoldResult> mixedSizes =
-      tensor::createDimValues(rewriter, rewriter.getLoc(), value);
+      tensor::getMixedSizes(rewriter, rewriter.getLoc(), value);
   return rewriter.create<tensor::EmptyOp>(mixedSizes, eTy);
 }
 
@@ -179,7 +179,7 @@ struct QuantizedConvToConv
                                    /*reduce_dim*/ {false, false, false, true});
 
       // Materialize a length-1 dimension at the end of the summation.
-      SmallVector<ReassociationExprs, 4> reassociationMap(3);
+      SmallVector<ReassociationExprs> reassociationMap(3);
       for (int i = 0; i < 3; i++)
         reassociationMap[i].push_back(builder.getAffineDimExpr(i));
       reassociationMap.back().push_back(builder.getAffineDimExpr(3));
@@ -353,12 +353,12 @@ struct LinalgQuantizedConvToConvPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedConvToConvPass() {
   return std::make_unique<LinalgQuantizedConvToConvPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

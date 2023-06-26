@@ -97,7 +97,7 @@ struct GatherIsTorchIndexSelectPattern final
       }
     }
 
-    auto indexSelectShape = llvm::to_vector<4>(startIndicesTy.getShape());
+    auto indexSelectShape = llvm::to_vector(startIndicesTy.getShape());
 
     for (auto dim : operandTy.getShape().drop_front()) {
       indexSelectShape.push_back(dim);
@@ -135,11 +135,11 @@ struct GatherToTorchIndexSelect final
   }
 };
 
-}  // namespace
+} // namespace
 
 void populatePreprocessingGatherToTorchIndexSelectPatterns(
     mlir::MLIRContext *context, RewritePatternSet *patterns) {
   patterns->add<GatherIsTorchIndexSelectPattern>(context);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

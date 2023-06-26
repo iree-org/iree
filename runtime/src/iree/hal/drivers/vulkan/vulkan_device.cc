@@ -13,7 +13,6 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/builtin_executables.h"
 #include "iree/hal/drivers/vulkan/command_queue.h"
@@ -246,7 +245,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   if (iree_all_bits_set(requested_features,
                         IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
     // VK_EXT_host_query_reset:
@@ -264,7 +263,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
             VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
   }
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   *out_string_count = string_count;
   return status;
@@ -1017,9 +1016,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
       iree_hal_vulkan_infer_enabled_device_extensions(device_syms.get());
 
   iree_hal_vulkan_features_t enabled_features = 0;
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
   auto logical_device_handle = new VkDeviceHandle(

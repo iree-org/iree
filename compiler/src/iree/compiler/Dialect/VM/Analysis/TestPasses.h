@@ -36,9 +36,9 @@ inline void registerVMAnalysisTestPasses() {
   createRegisterAllocationTestPass();
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_ANALYSIS_TESTPASSES_H_
+#endif // IREE_COMPILER_DIALECT_VM_ANALYSIS_TESTPASSES_H_

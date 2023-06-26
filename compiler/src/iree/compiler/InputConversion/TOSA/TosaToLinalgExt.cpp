@@ -32,7 +32,7 @@ namespace iree_compiler {
 // LinalgExt version is not batched therefore we materialize the batch index
 // for each update.
 class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
- public:
+public:
   using OpRewritePattern<tosa::ScatterOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tosa::ScatterOp op,
@@ -55,7 +55,7 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
     // a indexing map of [[0], [1, 2]].
     llvm::SmallVector<int64_t> expandIndShape{indicesTy.getDimSize(0),
                                               indicesTy.getDimSize(1), 1};
-    SmallVector<ReassociationExprs, 4> expandIndMap;
+    SmallVector<ReassociationExprs> expandIndMap;
     expandIndMap.push_back({
         builder.getAffineDimExpr(0),
     });
@@ -115,8 +115,7 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
     auto collapseBatch = [](Value value, ImplicitLocOpBuilder &b) -> Value {
       auto valueTy = llvm::cast<ShapedType>(value.getType());
       llvm::SmallVector<int64_t> collapseShape(valueTy.getShape().drop_front());
-      llvm::SmallVector<ReassociationExprs, 4> collapseMap(valueTy.getRank() -
-                                                           1);
+      llvm::SmallVector<ReassociationExprs> collapseMap(valueTy.getRank() - 1);
       collapseMap.front().push_back(b.getAffineDimExpr(0));
       for (int i = 0, s = collapseMap.size(); i < s; ++i) {
         collapseMap[i].push_back(b.getAffineDimExpr(i + 1));
@@ -175,5 +174,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTosaToLinalgExt() {
   return std::make_unique<TosaToLinalgExtPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

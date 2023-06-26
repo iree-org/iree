@@ -22,11 +22,12 @@ namespace {
 struct GlobalConversionPattern
     : public OpConversionPattern<IREE::Util::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto newType = getTypeConverter()->convertType(op.getType());
-    if (newType == op.getType()) return failure();
+    if (newType == op.getType())
+      return failure();
     rewriter.updateRootInPlace(op, [&]() {
       // NOTE: the initial value may be invalid here! We rely on
       // dialect-specific conversions to handle it.
@@ -36,7 +37,7 @@ struct GlobalConversionPattern
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateUtilToHALPatterns(MLIRContext *context,
                                ConversionTarget &conversionTarget,
@@ -62,5 +63,5 @@ void populateUtilToHALPatterns(MLIRContext *context,
                                               typeConverter, patterns);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

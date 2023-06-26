@@ -10,7 +10,6 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/context_wrapper.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"

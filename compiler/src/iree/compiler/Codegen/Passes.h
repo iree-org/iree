@@ -13,7 +13,7 @@ namespace iree_compiler {
 /// Registers all conversion passes in this directory.
 void registerCodegenPasses();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_PASSES_H_
+#endif // IREE_COMPILER_CODEGEN_PASSES_H_

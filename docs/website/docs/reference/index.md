@@ -1,6 +1,6 @@
 # Reference pages
 
-## API Bindings
+## API bindings
 
 !!! info ""
 
@@ -15,6 +15,13 @@ Supported languages:
 Supported framework APIs:
 
 * [Runtime TensorFlow Lite bindings](./bindings/tensorflow-lite.md)
+
+## MLIR dialects
+
+Automatically generated documentation for the MLIR dialects defined in the IREE
+repository.
+
+* [Index page](./mlir-dialects/index.md)
 
 ## Other topics
 

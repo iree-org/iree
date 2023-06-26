@@ -18,7 +18,6 @@ iree_runtime_cc_library(
     hdrs = ["resolver.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/modules/vmvx",
         "//runtime/src/iree/vm",
     ],

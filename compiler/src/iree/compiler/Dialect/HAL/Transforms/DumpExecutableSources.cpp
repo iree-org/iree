@@ -27,12 +27,12 @@ static void dumpExecutableToStream(IREE::HAL::ExecutableOp executableOp,
   OpPrintingFlags flags;
   flags.useLocalScope();
   mlir::generateLocationsFromIR(os, filePath, executableOp, flags);
-  os << "\n";  // newline at end of file
+  os << "\n"; // newline at end of file
 }
 
 class DumpExecutableSourcesPass
     : public PassWrapper<DumpExecutableSourcesPass, OperationPass<ModuleOp>> {
- public:
+public:
   DumpExecutableSourcesPass() = default;
   DumpExecutableSourcesPass(const DumpExecutableSourcesPass &pass) {}
   DumpExecutableSourcesPass(StringRef path) { this->path = path.str(); }
@@ -86,14 +86,14 @@ class DumpExecutableSourcesPass
     }
   }
 
- private:
+private:
   Option<std::string> path{
       *this, "path",
       llvm::cl::desc("Path to write hal.executable source files into.")};
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createDumpExecutableSourcesPass(
-    StringRef path) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createDumpExecutableSourcesPass(StringRef path) {
   return std::make_unique<DumpExecutableSourcesPass>(path);
 }
 
@@ -101,7 +101,7 @@ static PassRegistration<DumpExecutableSourcesPass> pass([] {
   return std::make_unique<DumpExecutableSourcesPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

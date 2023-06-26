@@ -101,7 +101,7 @@ function(iree_cc_binary)
     )
   else()
     set(_DUMMY_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_NAME}_dummy.cc")
-    file(WRITE ${_DUMMY_SRC} "")
+    iree_make_empty_file("${_DUMMY_SRC}")
     target_sources(${_NAME}
       PRIVATE
         ${_DUMMY_SRC}
@@ -129,6 +129,7 @@ function(iree_cc_binary)
 
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  iree_filter_cc_deps(_RULE_DEPS)
 
   # Implicit deps.
   if(IREE_IMPLICIT_DEFS_CC_DEPS)

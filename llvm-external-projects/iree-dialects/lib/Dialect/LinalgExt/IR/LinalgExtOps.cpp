@@ -1811,7 +1811,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
 }
 
 SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
-  return tensor::createDimValues(builder, getLoc(), getOutput());
+  return tensor::getMixedSizes(builder, getLoc(), getOutput());
 }
 
 ShapedType PackOp::getPackedType(ShapedType sourceType,

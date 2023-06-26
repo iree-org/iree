@@ -816,6 +816,19 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-bd985950d72dbe45dfcaa1bf4e0a438621642c077226cb42242ec091f8d37b0f"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_9b81a2f5-bab2-4f6f-b8b5-13cc4b3e9413_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_module_bd985950d72dbe45dfcaa1bf4e0a438621642c077226cb42242ec091f8d37b0f/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+  FRIENDLY_NAME "matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-e6503d42c202eff85bcddb53e9869017943e756af09bfe2c05ffc27844ac77e9"
   SRC "${ROOT_ARTIFACTS_DIR}/model_699fd533-02a9-49f0-bf26-1902d8dbb5af_matmul_128x256x8192_f16t_tile_config_default.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f16t_tile_config_default_module_e6503d42c202eff85bcddb53e9869017943e756af09bfe2c05ffc27844ac77e9/module.vmfb"
@@ -3746,6 +3759,23 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-4d3bfb94dfe03a269350ad28fb9b1fa8db8c88ff19e2535cef09aafdbdfd83f5"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_9b81a2f5-bab2-4f6f-b8b5-13cc4b3e9413_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_module_4d3bfb94dfe03a269350ad28fb9b1fa8db8c88ff19e2535cef09aafdbdfd83f5/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_module_4d3bfb94dfe03a269350ad28fb9b1fa8db8c88ff19e2535cef09aafdbdfd83f5/scheduling_stats.json"
+  FRIENDLY_NAME "matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-371a68ee85e41abf2d2a2847fe6c9f85fdc51f76516d74e3576b9d72670c1a0b"
   SRC "${ROOT_ARTIFACTS_DIR}/model_699fd533-02a9-49f0-bf26-1902d8dbb5af_matmul_128x256x8192_f16t_tile_config_default.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f16t_tile_config_default_module_371a68ee85e41abf2d2a2847fe6c9f85fdc51f76516d74e3576b9d72670c1a0b/module.vmfb"
@@ -6336,6 +6366,7 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-8871f602-571c-4eb8-b94d-554cc8ceec5a
   ${PACKAGE_NAME}_model-8d6be288-9b88-41bd-bc5a-5644df0481bb
   ${PACKAGE_NAME}_model-9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8
+  ${PACKAGE_NAME}_model-9b81a2f5-bab2-4f6f-b8b5-13cc4b3e9413
   ${PACKAGE_NAME}_model-a55afe1c-9410-47a6-b417-04b0d75ee5f4
   ${PACKAGE_NAME}_model-a6c2b812-0a71-45e7-9ea5-f3d8529213ef
   ${PACKAGE_NAME}_model-c1be9a9d-64c3-4d88-8551-89a8b4f305ba-batch-1
@@ -6439,6 +6470,7 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-baec9d4086496a94853f349354f87acb8397bf36169134d3269d5803888dcf49
   ${PACKAGE_NAME}_iree-module-bb1cb8e00fd4cee513b2481bd5faf39842ad9c57f80f2e50ddb48763fd030721
   ${PACKAGE_NAME}_iree-module-bd0ea10065a27dea6875ceb70f769e7e0f67a08e857920ca0d0322593441e9ed
+  ${PACKAGE_NAME}_iree-module-bd985950d72dbe45dfcaa1bf4e0a438621642c077226cb42242ec091f8d37b0f
   ${PACKAGE_NAME}_iree-module-bdd904cc5614ebf77609c7802a2dfc09f139aee2a247a247d10d320de72b0e28
   ${PACKAGE_NAME}_iree-module-c0ea83b865fd0c67a3013086ef2250464e2aecfc615a95170ef46128d2e57208
   ${PACKAGE_NAME}_iree-module-c37bfe2bb995b2703170a890bd81e372b687bed57087b1d8a6d8bb16b91c5ad4
@@ -6673,6 +6705,7 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-480b59f233af720e16db8e5da1988a8d69bd61169bf5b5899f425ff98dc0dc19
   ${PACKAGE_NAME}_iree-module-4a3b570ba18c3c9eee458455aaff4aa29293a5c936a19862c698b4b3ddaf06e7
   ${PACKAGE_NAME}_iree-module-4c74339076df00d23baa17dcb3194043e0472da9d09db4e42a23841ff7bf67b0
+  ${PACKAGE_NAME}_iree-module-4d3bfb94dfe03a269350ad28fb9b1fa8db8c88ff19e2535cef09aafdbdfd83f5
   ${PACKAGE_NAME}_iree-module-4ec47dd2b4a43dd434d041d4d9db548076b70cfd63a2fec2971035394954f1d5
   ${PACKAGE_NAME}_iree-module-4f5ab4bfb26a82d0f83133b9e85585f0c5b97cdb00143de31675158a5a71b457
   ${PACKAGE_NAME}_iree-module-50567a33e0bd9aa5a32a6f61fca9ef8a70ac4d94313024f2c4ec92d9c543c599

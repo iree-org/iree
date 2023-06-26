@@ -98,7 +98,8 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
   bool needsBarrier = hasSharedMemoryAddressSpace(fromType) ||
                       hasSharedMemoryAddressSpace(toType);
-  if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
+  if (needsBarrier)
+    builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
@@ -138,9 +139,9 @@ static void addTileAndDistributeToWorkgroupsPasses(
   nestedModulePM.addPass(createCSEPass());
 }
 
-static void addSPIRVBufferizePasses(
-    OpPassManager &passManager,
-    BufferizationOptions::AllocationFn allocationFn) {
+static void
+addSPIRVBufferizePasses(OpPassManager &passManager,
+                        BufferizationOptions::AllocationFn allocationFn) {
   // Resolve dim ops first so that we don't have compute Linalg ops lingering on
   // becuase of dim op usage. This avoids bufferizing those compute ops just for
   // their shape dimensions.
@@ -190,7 +191,10 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
     spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
     return target.getResourceLimits().getMaxComputeSharedMemorySize();
   };
-  pm.addPass(createGPUCheckResourceUsagePass(getSharedMemoryLimit));
+  // TODO: query this from the target.
+  auto getIndexBitwidth = [](func::FuncOp) { return 32; };
+  pm.addPass(
+      createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
@@ -205,14 +209,16 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addPass(createSPIRVVectorizeLoadStore());
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
-  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
   pm.addNestedPass<func::FuncOp>(createSPIRVBreakDownLargeVectorPass());
 
   // Perform optimizations that need to across the scf.for region boundary.
   pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
 
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.
@@ -308,8 +314,8 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
 }
 
 void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
@@ -367,8 +373,8 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
 
   // Fold subview ops is reqiured for converting vector transfer ops into SPIR-V
   // cooperative ops in the next step.
@@ -442,10 +448,12 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
   // to hoisting. Because this is before folding all memref subview ops away, we
   // still have subview ops using the same indices, which allows for transfer
   // read/write forwarding.
-  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
+  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
 
   nestedPM.addNestedPass<func::FuncOp>(memref::createFoldMemRefAliasOpsPass());
-  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
+  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
 
   // Hoist loop invariant code to avoid pipelining it.
   nestedPM.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
@@ -503,8 +511,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
 
   // Simplify the IR for vector distribution.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -564,8 +572,8 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
+      /*flatten=*/false, /*dropUnitDims=*/false));
 }
 
 void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
@@ -595,5 +603,5 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -41,6 +41,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRArithUtils
+    MLIRComplexDialect
     MLIRFuncDialect
     MLIRIR
     MLIRInferTypeOpInterface

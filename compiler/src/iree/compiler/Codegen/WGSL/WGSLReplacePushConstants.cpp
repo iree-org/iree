@@ -97,8 +97,9 @@ class WGSLReplacePushConstantsPass
     auto funcOp = getOperation();
     auto loc = funcOp.getLoc();
     auto constantLoadOps =
-        llvm::to_vector<4>(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
-    if (constantLoadOps.empty()) return;
+        llvm::to_vector(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
+    if (constantLoadOps.empty())
+      return;
 
     OpBuilder builder(funcOp);
     builder.setInsertionPointToStart(&funcOp.getBlocks().front());
@@ -172,12 +173,12 @@ class WGSLReplacePushConstantsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWGSLReplacePushConstantsPass() {
   return std::make_unique<WGSLReplacePushConstantsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -8,7 +8,6 @@
 
 #include "experimental/webgpu/shaders/builtin_shaders.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 static const char* iree_hal_webgpu_builtins_find_code(const char* file_name) {
   const iree_file_toc_t* files = iree_hal_wgsl_builtin_shaders_create();

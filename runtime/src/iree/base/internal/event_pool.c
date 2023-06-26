@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 
 struct iree_event_pool_t {
   // Allocator used to create the event pool.

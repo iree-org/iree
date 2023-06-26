@@ -67,7 +67,7 @@ struct BubbleUpOrdinalOpsPass
     : public BubbleUpOrdinalOpsBase<BubbleUpOrdinalOpsPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void BubbleUpOrdinalOpsPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -83,5 +83,5 @@ std::unique_ptr<Pass> createBubbleUpOrdinalOpsPass() {
   return std::make_unique<BubbleUpOrdinalOpsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

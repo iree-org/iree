@@ -21,15 +21,29 @@ iree_cc_library(
     "cuda_allocator.h"
     "cuda_buffer.c"
     "cuda_buffer.h"
+    "cuda_device.c"
+    "cuda_device.h"
     "cuda_driver.c"
     "memory_pools.c"
     "memory_pools.h"
+    "native_executable.c"
+    "native_executable.h"
+    "nop_executable_cache.c"
+    "nop_executable_cache.h"
+    "nccl_channel.c"
+    "nccl_channel.h"
+    "pipeline_layout.c"
+    "pipeline_layout.h"
+    "tracing.c"
+    "tracing.h"
   DEPS
     ::dynamic_symbols
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
+    iree::base::internal
+    iree::base::internal::arena
+    iree::base::internal::flatcc::parsing
     iree::hal
+    iree::hal::utils::buffer_transfer
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )
@@ -54,10 +68,9 @@ iree_cc_library(
     "nccl_status_util.c"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree_cuda::headers
+    nccl::headers
   PUBLIC
 )
 

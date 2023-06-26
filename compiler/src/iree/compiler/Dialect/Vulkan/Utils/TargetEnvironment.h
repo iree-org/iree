@@ -16,7 +16,7 @@ namespace IREE {
 namespace Vulkan {
 
 /// Returns the Vulkan target environment attribute for the given GPU triple.
-Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext* context,
+Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext *context,
                                             llvm::StringRef triple);
 
 /// Converts the given Vulkan target environment into the corresponding SPIR-V
@@ -34,9 +34,9 @@ Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext* context,
 /// domains.
 spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv);
 
-}  // namespace Vulkan
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Vulkan
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VULKAN_UTILS_TARGETENVIRONMENT_H_
+#endif // IREE_COMPILER_DIALECT_VULKAN_UTILS_TARGETENVIRONMENT_H_

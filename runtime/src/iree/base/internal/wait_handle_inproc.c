@@ -16,7 +16,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/target_platform.h"
 
 // This implementation uses iree_notification_t - backed by a futex in most
 // cases - to simulate system wait handles. When using a single handle such as
@@ -113,13 +112,13 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
                                      iree_wait_set_t** out_set) {
   // Be reasonable; 64K objects is too high.
   if (capacity >= UINT16_MAX) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "wait set capacity of %zu is unreasonably large",
-                            capacity);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "wait set capacity of %" PRIhsz " is unreasonably large", capacity);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)capacity);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)capacity);
   *out_set = NULL;
 
   iree_wait_set_t* set = NULL;

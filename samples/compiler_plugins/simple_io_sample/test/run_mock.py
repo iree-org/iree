@@ -17,22 +17,20 @@ input_file = sys.argv[1]
 print(f"--- Loading {input_file}")
 
 with open(input_file, "rb") as f:
-  vmfb_contents = f.read()
+    vmfb_contents = f.read()
 
 
 def create_simple_io_module():
+    class SimpleIO:
+        def __init__(self, iface):
+            ...
 
-  class SimpleIO:
+        def print_impl(self):
+            print("+++ HELLO FROM SIMPLE_IO")
 
-    def __init__(self, iface):
-      ...
-
-    def print_impl(self):
-      print("+++ HELLO FROM SIMPLE_IO")
-
-  iface = rt.PyModuleInterface("simple_io", SimpleIO)
-  iface.export("print", "0v_v", SimpleIO.print_impl)
-  return iface.create()
+    iface = rt.PyModuleInterface("simple_io", SimpleIO)
+    iface.export("print", "0v_v", SimpleIO.print_impl)
+    return iface.create()
 
 
 config = rt.Config("local-sync")

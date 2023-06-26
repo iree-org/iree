@@ -65,30 +65,37 @@ void LLVMCPUTilePass::runOnOperation() {
   auto funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+  FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
       getLoweringConfig(computeOps);
-  if (failed(maybeLoweringConfig)) {
+  if (failed(rootLoweringConfig)) {
     LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
-    return;
-  }
-  SmallVector<int64_t> tileSizes =
-      maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
-  if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
-    LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
     return;
   }
 
   for (auto computeOp : computeOps) {
     auto op = cast<TilingInterface>(computeOp);
-    if (op.getLoopIteratorTypes().empty()) continue;
+    if (op.getLoopIteratorTypes().empty())
+      continue;
 
     // For now do not tile `tensor.pad` operations. The `tensor.pad`
     // operations might be those introduced by the padding-based
     // codegeneration strategy. Those are not meant to be tiled again.
     // Need a better way for handling this, but this works for now.
-    if (isa<tensor::PadOp>(computeOp)) continue;
+    if (isa<tensor::PadOp>(computeOp))
+      continue;
 
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
+    SmallVector<int64_t> tileSizes;
+    if (auto loweringConfig = getLoweringConfig(op)) {
+      tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+    } else {
+      tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
+    }
+
+    if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
+      LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
+      continue;
+    }
 
     IRRewriter rewriter(context);
     auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
@@ -97,7 +104,8 @@ void LLVMCPUTilePass::runOnOperation() {
         });
     FailureOr<scf::SCFTilingResult> tiledResults =
         scf::tileUsingSCFForOp(rewriter, op, options);
-    if (failed(tiledResults)) continue;
+    if (failed(tiledResults))
+      continue;
     rewriter.replaceOp(op, tiledResults->replacements);
   }
 
@@ -113,12 +121,12 @@ void LLVMCPUTilePass::runOnOperation() {
     return signalPassFailure();
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
-    int64_t tilingLevel) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTilePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTilePass>(tilingLevel);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

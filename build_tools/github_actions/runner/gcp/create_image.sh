@@ -26,13 +26,15 @@ ZONE="${ZONE:-us-central1-a}"
 PROJECT=iree-oss
 BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230531}"
 
-GPU_MACHINE_TYPE="a2-highgpu-1g"
+# We create the image using n1 machines with attached T4 GPUs. This image works
+# for the A100 machines as well though.
+GPU_MACHINE_TYPE="n1-standard-16"
 CPU_MACHINE_TYPE="e2-medium"
 CPU_IMAGE_SIZE_GB=10
 # We need enough space to fetch Docker images that we test with
 # TODO(gcmn): See if we can make the image smaller, e.g. by resizing after setup
 # or using a local ssd for scratch space during setup.
-GPU_IMAGE_SIZE_GB=50
+GPU_IMAGE_SIZE_GB=100
 
 # It takes a little bit to bring up ssh on the instance. I haven't found a
 # better way to wait for this than just polling.
@@ -145,11 +147,13 @@ function create_image() {
         local machine_type="${CPU_MACHINE_TYPE}"
         local image_size_gb="${CPU_IMAGE_SIZE_GB}"
         local maintenance_policy=MIGRATE
+        local -a extra_args=()
         ;;
       gpu)
         local machine_type="${GPU_MACHINE_TYPE}"
         local image_size_gb="${GPU_IMAGE_SIZE_GB}"
         local maintenance_policy=TERMINATE
+        local -a extra_args=("--accelerator=count=1,type=nvidia-tesla-t4")
         ;;
       *)
         echo "Unrecognized RUNNER_TYPE=${RUNNER_TYPE}"
@@ -182,7 +186,9 @@ function create_image() {
       --metadata="github-runner-type=${RUNNER_TYPE}"
       --machine-type="${machine_type}"
       --create-disk="boot=yes,device-name=${INSTANCE_NAME},image=${BASE_IMAGE},mode=rw,size=${image_size_gb},type=projects/${PROJECT}/zones/${ZONE}/diskTypes/pd-balanced,auto-delete=yes"
+      "${extra_args[@]}"
     )
+
     (set -x; "${create_instance_cmd[@]}")
   fi
 

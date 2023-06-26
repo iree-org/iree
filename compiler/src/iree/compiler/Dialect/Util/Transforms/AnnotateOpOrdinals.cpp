@@ -19,7 +19,7 @@ namespace {
 
 class AnnotateOpOrdinalsPass
     : public AnnotateOpOrdinalsBase<AnnotateOpOrdinalsPass> {
- public:
+public:
   void runOnOperation() override {
     auto *context = &getContext();
     auto attrName = StringAttr::get(context, "util.ordinal");
@@ -31,13 +31,13 @@ class AnnotateOpOrdinalsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createAnnotateOpOrdinalsPass() {
   return std::make_unique<AnnotateOpOrdinalsPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

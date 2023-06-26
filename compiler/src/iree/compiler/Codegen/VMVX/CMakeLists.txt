@@ -41,6 +41,7 @@ iree_cc_library(
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CommonPasses
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR

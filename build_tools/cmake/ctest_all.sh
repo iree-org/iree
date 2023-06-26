@@ -72,7 +72,7 @@ if [[ "${IREE_VULKAN_F16_DISABLE}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
 if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE}" == 1 ]]; then
-  label_exclude_args+=("^requires-gpu-nvidia$")
+  label_exclude_args+=("^requires-gpu$")
 fi
 
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"

@@ -26,9 +26,9 @@ void populateCheckToHALPatterns(MLIRContext *context,
                                 RewritePatternSet &patterns,
                                 TypeConverter &typeConverter);
 
-}  // namespace Check
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Check
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_CHECK_CONVERSION_CONVERSION_PATTERNS_H_
+#endif // IREE_COMPILER_MODULES_CHECK_CONVERSION_CONVERSION_PATTERNS_H_

@@ -20,12 +20,13 @@ namespace iree_compiler {
 
 namespace {
 struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
-    if (!isEntryPoint(funcOp)) return;
+    if (!isEntryPoint(funcOp))
+      return;
 
     auto workgroupSize = llvm::map_to_vector(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
@@ -37,14 +38,15 @@ struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
         mlir::transform::gpu::mapNestedForallToThreadsImpl(
             rewriter, std::nullopt, funcOp, workgroupSize, /*warpDims=*/{},
             false);
-    if (!result.succeeded()) return signalPassFailure();
+    if (!result.succeeded())
+      return signalPassFailure();
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute() {
   return std::make_unique<GPUDistributePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

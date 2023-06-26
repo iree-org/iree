@@ -26,8 +26,9 @@ class VerifyInputLegalityPass
     target.addLegalOp<tosa::ApplyScaleOp>();
     // We're already depending on the Tosa Dialect
     target.addIllegalDialect<tosa::TosaDialect>();
-    // Avoid MHLO dependency
-    target.addIllegalDialect("mhlo");
+    // Avoid StableHLO dependency
+    target.addIllegalDialect("chlo");
+    target.addIllegalDialect("stablehlo");
     target.addIllegalOp<UnrealizedConversionCastOp>();
 
     if (failed(iree_compiler::verifyAllOperationsAreLegal(getOperation(),
@@ -36,13 +37,13 @@ class VerifyInputLegalityPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createVerifyInputLegalityPass() {
   return std::make_unique<VerifyInputLegalityPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

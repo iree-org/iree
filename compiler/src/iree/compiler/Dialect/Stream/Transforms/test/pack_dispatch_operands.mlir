@@ -158,11 +158,11 @@ stream.executable private @ex4 attributes {stream.resources = #resourceIndex64} 
     // CHECK-SAME: (%[[DEV_LO32:.+]]: i32, %[[DEV_HI32:.+]]: i32, %{{.+}}: !stream.binding)
     func.func @device_index_64(%arg0: index {stream.alignment = 16 : index, stream.values = [0 : index, 1234 : index]}, %arg1: !stream.binding) {
       // 64-bit device size requires joining after it was split into lo/hi:
-      // CHECK: %[[DEV_LO64:.+]] = arith.extui %[[DEV_LO32]] : i32 to i64
-      // CHECK: %[[DEV_HI64:.+]] = arith.extui %[[DEV_HI32]] : i32 to i64
-      // CHECK: %[[DEV_HISHL:.+]] = arith.shli %[[DEV_HI64]], %c32
-      // CHECK: %[[DEV_I64:.+]] = arith.ori %[[DEV_LO64]], %[[DEV_HISHL]] : i64
-      // CHECK: %[[DEV_INDEX:.+]] = arith.index_castui %[[DEV_I64]] {
+      // CHECK-DAG: %[[DEV_LO64:.+]] = arith.extui %[[DEV_LO32]] : i32 to i64
+      // CHECK-DAG: %[[DEV_HI64:.+]] = arith.extui %[[DEV_HI32]] : i32 to i64
+      // CHECK-DAG: %[[DEV_HISHL:.+]] = arith.shli %[[DEV_HI64]], %c32
+      // CHECK-DAG: %[[DEV_I64:.+]] = arith.ori %[[DEV_LO64]], %[[DEV_HISHL]] : i64
+      // CHECK-DAG: %[[DEV_INDEX:.+]] = arith.index_castui %[[DEV_I64]] {
       // CHECK-SAME:   stream.alignment = 16 : index
       // CHECK-SAME:   stream.values = [0 : index, 1234 : index]
       // CHECK-SAME: } : i64 to index
@@ -187,6 +187,42 @@ func.func @host_index_64(%arg0: index) -> !stream.timepoint {
 
   %1 = stream.cmd.execute with(%0 as %arg1: !stream.resource<external>{%c128}) {
     stream.cmd.dispatch @ex4::@device_index_64[%c1, %c1, %c1](%arg0 : index) {
+      wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
+    }
+  } => !stream.timepoint
+  return %1 : !stream.timepoint
+}
+
+// -----
+
+stream.executable private @ex5 {
+  // CHECK-LABEL: @device_complex_f32
+  stream.executable.export public @device_complex_f32
+  builtin.module {
+    // CHECK-LABEL: func.func @device_complex_f32
+    // CHECK-SAME: (%[[DEV_REAL_I32:.+]]: i32, %[[DEV_IMAG_I32:.+]]: i32, %arg2: !stream.binding)
+    func.func @device_complex_f32(%arg0: complex<f32>, %arg1: !stream.binding) {
+      // CHECK-DAG: %[[DEV_REAL_F32:.+]] = arith.bitcast %[[DEV_REAL_I32]] : i32 to f32
+      // CHECK-DAG: %[[DEV_IMAG_F32:.+]] = arith.bitcast %[[DEV_IMAG_I32]] : i32 to f32
+      // CHECK-DAG: %[[DEV_COMPLEX:.+]] = complex.create %[[DEV_REAL_F32]], %[[DEV_IMAG_F32]]
+      // CHECK-NEXT: util.optimization_barrier %[[DEV_COMPLEX]]
+      util.optimization_barrier %arg0 : complex<f32>
+      return
+    }
+  }
+}
+func.func @host_complex_f32(%arg0: complex<f32>) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %0 = stream.resource.alloc uninitialized : !stream.resource<external>{%c128}
+  // CHECK-DAG: %[[HOST_REAL_F32:.+]] = complex.re %arg0
+  // CHECK-DAG: %[[HOST_IMAG_F32:.+]] = complex.im %arg0
+  // CHECK-DAG: %[[HOST_REAL_I32:.+]] = arith.bitcast %[[HOST_REAL_F32]] : f32 to i32
+  // CHECK-DAG: %[[HOST_IMAG_I32:.+]] = arith.bitcast %[[HOST_IMAG_F32]] : f32 to i32
+  %1 = stream.cmd.execute with(%0 as %arg1: !stream.resource<external>{%c128}) {
+    // CHECK: stream.cmd.dispatch {{.+}}(%[[HOST_REAL_I32]], %[[HOST_IMAG_I32]] : i32, i32)
+    stream.cmd.dispatch @ex5::@device_complex_f32[%c1, %c1, %c1](%arg0 : complex<f32>) {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint

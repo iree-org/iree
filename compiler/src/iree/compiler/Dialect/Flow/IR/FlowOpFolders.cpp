@@ -49,7 +49,8 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.use_empty()) return failure();
+    if (!op.use_empty())
+      return failure();
     rewriter.eraseOp(op);
     return success();
   }
@@ -58,13 +59,15 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
 // Returns true if |value| is definitely empty at runtime.
 static bool isTensorZeroElements(Value value) {
   auto type = llvm::dyn_cast<ShapedType>(value.getType());
-  if (!type) return false;
+  if (!type)
+    return false;
   // Any static dimension being zero is definitely empty.
   for (int64_t i = 0; i < type.getRank(); ++i) {
     int64_t dim = type.getDimSize(i);
-    if (dim == 0) return true;
+    if (dim == 0)
+      return true;
   }
-  return false;  // may still be dynamically empty
+  return false; // may still be dynamically empty
 }
 
 // Returns true if |value| is definitely empty at runtime.
@@ -87,7 +90,8 @@ struct ReplaceOpIfTensorOperandZeroElements : public OpRewritePattern<Op> {
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op->getOperand(OperandIdx);
-    if (!isTensorOperandZeroElements(operand)) return failure();
+    if (!isTensorOperandZeroElements(operand))
+      return failure();
     auto result = op->getResult(ResultIdx);
     auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEmptyOp>(op, result.getType(),
@@ -102,7 +106,8 @@ struct ReplaceOpIfTensorResultZeroElements : public OpRewritePattern<Op> {
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     auto result = op->getResult(ResultIdx);
-    if (!isTensorResultZeroElements(result)) return failure();
+    if (!isTensorResultZeroElements(result))
+      return failure();
     auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEmptyOp>(op, result.getType(),
                                                            dynamicDims);
@@ -117,7 +122,8 @@ struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
                                 PatternRewriter &rewriter) const override {
     auto operand = op->getOperand(OperandIdx);
     auto emptyOp = dyn_cast_or_null<TensorEmptyOp>(operand.getDefiningOp());
-    if (!emptyOp) return failure();
+    if (!emptyOp)
+      return failure();
     auto result = op->getResult(ResultIdx);
     auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEmptyOp>(op, result.getType(),
@@ -131,7 +137,8 @@ struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
 // Example: tensor<?x0x1xf32> -> tensor<0x0x1xf32>
 static Type makeZeroElementsStaticTensorType(Type type) {
   auto tensorType = llvm::cast<RankedTensorType>(type);
-  if (tensorType.hasStaticShape()) return type;
+  if (tensorType.hasStaticShape())
+    return type;
   SmallVector<int64_t> dims;
   dims.resize(tensorType.getRank());
   for (int64_t i = 0; i < tensorType.getRank(); ++i) {
@@ -145,16 +152,18 @@ static Type makeZeroElementsStaticTensorType(Type type) {
 // Returns a new set of dynamic dimensions for a shape carrying op when a type
 // is being changed. This attempts to reuse the existing dimension values if
 // they are available and will drop/insert new ones as required.
-static SmallVector<Value, 4> refreshDimsOnTypeChange(
-    Operation *op, Type oldType, Type newType, ValueRange oldDims,
-    PatternRewriter &rewriter) {
-  if (oldType == newType) return llvm::to_vector<4>(oldDims);
+static SmallVector<Value> refreshDimsOnTypeChange(Operation *op, Type oldType,
+                                                  Type newType,
+                                                  ValueRange oldDims,
+                                                  PatternRewriter &rewriter) {
+  if (oldType == newType)
+    return llvm::to_vector(oldDims);
 
   // Build an expanded list of all the dims - constants will be nullptr.
   // This lets us map back the new types without worrying about whether some
   // subset become static or dynamic.
   auto oldShapedType = llvm::cast<ShapedType>(oldType);
-  SmallVector<Value, 4> allOldDims(oldShapedType.getRank());
+  SmallVector<Value> allOldDims(oldShapedType.getRank());
   for (unsigned i = 0; i < oldShapedType.getRank(); ++i) {
     if (oldShapedType.isDynamicDim(i)) {
       allOldDims[i] = oldDims.front();
@@ -163,7 +172,7 @@ static SmallVector<Value, 4> refreshDimsOnTypeChange(
   }
 
   auto newShapedType = llvm::cast<ShapedType>(newType);
-  SmallVector<Value, 4> newDims;
+  SmallVector<Value> newDims;
   for (unsigned i = 0; i < newShapedType.getRank(); ++i) {
     if (newShapedType.isDynamicDim(i)) {
       auto oldValue = allOldDims[i];
@@ -218,7 +227,8 @@ struct ReplaceDispatchResultIfZeroElements
     // will drop it.
     bool didReplaceAny = false;
     for (auto result : op.getResults()) {
-      if (result.use_empty()) continue;
+      if (result.use_empty())
+        continue;
       if (isTensorResultZeroElements(result)) {
         auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
         auto emptyOp = rewriter.create<IREE::Flow::TensorEmptyOp>(
@@ -461,11 +471,12 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
                                MutableOperandRange mutableDimValues) {
   auto dynamicDimsOr = IREE::Util::findDynamicDims(tensorValue, op->getBlock(),
                                                    Block::iterator(op));
-  if (!dynamicDimsOr.has_value()) return false;
+  if (!dynamicDimsOr.has_value())
+    return false;
   auto dynamicDims = dynamicDimsOr.value();
   bool anyChanged = false;
   OperandRange oldValueRange = mutableDimValues;
-  auto oldValues = llvm::to_vector<4>(oldValueRange);
+  auto oldValues = llvm::to_vector(oldValueRange);
   for (unsigned i = 0; i < dynamicDims.size(); ++i) {
     if (oldValues[i] != dynamicDims[i]) {
       rewriter.updateRootInPlace(
@@ -524,11 +535,11 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
 /// `flow.dispatch.tensor.store`) is also passed in. The type of the slice to
 /// use in the canonicalized op is returned.
 template <typename OpTy>
-static FailureOr<RankedTensorType> canonicalizeSubViewParts(
-    OpTy op, RankedTensorType sliceType,
-    SmallVector<OpFoldResult> &mixedOffsets,
-    SmallVector<OpFoldResult> &mixedSizes,
-    SmallVector<OpFoldResult> &mixedStrides) {
+static FailureOr<RankedTensorType>
+canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
+                         SmallVector<OpFoldResult> &mixedOffsets,
+                         SmallVector<OpFoldResult> &mixedSizes,
+                         SmallVector<OpFoldResult> &mixedStrides) {
   // If there are no constant operands then we return early before the more
   // expensive work below.
   if (llvm::none_of(op.offsets(),
@@ -561,7 +572,8 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   llvm::SmallVector<int64_t> newShape;
   llvm::SmallBitVector droppedDims = op.getDroppedDims();
   for (auto size : llvm::enumerate(mixedSizes)) {
-    if (droppedDims.test(size.index())) continue;
+    if (droppedDims.test(size.index()))
+      continue;
     std::optional<int64_t> staticSize = getConstantIntValue(size.value());
     newShape.push_back(staticSize ? staticSize.value() : ShapedType::kDynamic);
   }
@@ -581,7 +593,8 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     RankedTensorType resultType = loadOp.getType();
     auto newResultType = canonicalizeSubViewParts(
         loadOp, resultType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newResultType)) return failure();
+    if (failed(newResultType))
+      return failure();
 
     // We need to resolve the new inferred type with the specified type.
     Location loc = loadOp.getLoc();
@@ -597,7 +610,7 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
   }
 };
 
-}  // namespace
+} // namespace
 
 void DispatchTensorLoadOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -644,7 +657,8 @@ struct FoldCastOpIntoDispatchStoreOp
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = storeOp.getValue().getDefiningOp<tensor::CastOp>();
-    if (!parentOp || !tensor::canFoldIntoConsumerOp(parentOp)) return failure();
+    if (!parentOp || !tensor::canFoldIntoConsumerOp(parentOp))
+      return failure();
 
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, parentOp.getSource(), storeOp.getTarget(),
@@ -664,7 +678,8 @@ struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
     RankedTensorType valueType = storeOp.getValueType();
     auto newValueType = canonicalizeSubViewParts(
         storeOp, valueType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newValueType)) return failure();
+    if (failed(newValueType))
+      return failure();
 
     Value value = storeOp.getValue();
     Location loc = storeOp.getLoc();
@@ -678,7 +693,7 @@ struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
   }
 };
 
-}  // namespace
+} // namespace
 
 void DispatchTensorStoreOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -778,7 +793,7 @@ struct ExpandDynamicShapeConstant : public OpRewritePattern<TensorConstantOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
@@ -833,7 +848,8 @@ struct FlattenTensorReshapeChain : public OpRewritePattern<TensorReshapeOp> {
                                 PatternRewriter &rewriter) const override {
     auto sourceOp = dyn_cast_or_null<TensorReshapeOp>(
         reshapeOp.getSource().getDefiningOp());
-    if (!sourceOp) return failure();
+    if (!sourceOp)
+      return failure();
 
     // We want the same result value/shape but to source from the ancestor. We
     // need to pull any dynamic dims from that as we don't care about the
@@ -855,7 +871,8 @@ struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
     auto sourceOp =
         dyn_cast_or_null<TensorSplatOp>(loadOp.getSource().getDefiningOp());
 
-    if (!sourceOp) return failure();
+    if (!sourceOp)
+      return failure();
 
     rewriter.replaceOp(loadOp, sourceOp.getValue());
     return success();
@@ -867,11 +884,13 @@ struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
 
   LogicalResult matchAndRewrite(TensorSplatOp splatOp,
                                 PatternRewriter &rewriter) const override {
-    if (!splatOp.getResult().hasOneUse()) return failure();
+    if (!splatOp.getResult().hasOneUse())
+      return failure();
 
     auto reshapeOp = dyn_cast_or_null<TensorReshapeOp>(
         splatOp.getResult().use_begin()->getOwner());
-    if (!reshapeOp) return failure();
+    if (!reshapeOp)
+      return failure();
 
     rewriter.replaceOpWithNewOp<TensorSplatOp>(
         reshapeOp, reshapeOp.getResult().getType(), splatOp.getValue(),
@@ -917,7 +936,8 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
     }
     unsigned dimOffset = 0;
     for (unsigned i = 0; i < idx; ++i) {
-      if (shapedType.isDynamicDim(i)) ++dimOffset;
+      if (shapedType.isDynamicDim(i))
+        ++dimOffset;
     }
     rewriter.replaceOp(op, dynamicDims.value()[dimOffset]);
 
@@ -925,7 +945,7 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
@@ -948,7 +968,7 @@ OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
           llvm::dyn_cast_if_present<ElementsAttr>(operands.getSource())) {
     // Load directly from the constant source tensor.
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
-      return source.getValues<Attribute>()[llvm::map_to_vector<4>(
+      return source.getValues<Attribute>()[llvm::map_to_vector(
           operands.getIndices(), [](Attribute value) {
             return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
           })];
@@ -968,7 +988,8 @@ void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
   auto value = operands.getValue();
-  if (!value) return {};
+  if (!value)
+    return {};
   if (auto target =
           llvm::dyn_cast_if_present<ElementsAttr>(operands.getTarget())) {
     // Store into the constant target tensor.
@@ -979,7 +1000,7 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
       uint64_t offset = getFlattenedIndex(
           targetType,
-          llvm::map_to_vector<4>(operands.getIndices(), [](Attribute value) {
+          llvm::map_to_vector(operands.getIndices(), [](Attribute value) {
             return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
           }));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
@@ -1058,7 +1079,7 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
                                 uint64_t start, uint64_t length) {
   auto tensorType = cast<ShapedType>(tensor.getType());
-  auto shape = llvm::to_vector<4>(tensorType.getShape());
+  auto shape = llvm::to_vector(tensorType.getShape());
   if (length == shape[dim]) {
     // No need to slice.
     return tensor;
@@ -1067,7 +1088,7 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
   outputShape[dim] = length;
   auto outputType =
       RankedTensorType::get(outputShape, getElementTypeOrSelf(tensor));
-  llvm::SmallVector<Attribute, 4> newContents;
+  llvm::SmallVector<Attribute> newContents;
   newContents.reserve(outputType.getNumElements());
   auto valuesBegin = tensor.getValues<Attribute>().begin();
   int64_t step =
@@ -1088,11 +1109,11 @@ OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
     auto tensor = llvm::cast<ElementsAttr>(operands.getSource());
     int64_t rank = llvm::cast<ShapedType>(getSource().getType()).getRank();
     auto start =
-        llvm::map_to_vector<4>(operands.getStartIndices(), [](Attribute value) {
+        llvm::map_to_vector(operands.getStartIndices(), [](Attribute value) {
           return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
         });
     auto length =
-        llvm::map_to_vector<4>(operands.getLengths(), [](Attribute value) {
+        llvm::map_to_vector(operands.getLengths(), [](Attribute value) {
           return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
         });
     for (int64_t dim = 0; dim < rank; ++dim) {
@@ -1132,15 +1153,14 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
     return update;
   }
 
-  auto startIndex =
-      llvm::map_to_vector<4>(startIndicesAttrs, [](Attribute value) {
-        return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
-      });
-  auto targetValues = llvm::to_vector<4>(target.getValues<Attribute>());
+  auto startIndex = llvm::map_to_vector(startIndicesAttrs, [](Attribute value) {
+    return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+  });
+  auto targetValues = llvm::to_vector(target.getValues<Attribute>());
   // target indices start from startIndicesAttrs and update indices start from
   // all zeros.
-  llvm::SmallVector<uint64_t, 4> targetIndex(startIndex);
-  llvm::SmallVector<uint64_t, 4> updateIndex(rank, 0);
+  llvm::SmallVector<uint64_t> targetIndex(startIndex);
+  llvm::SmallVector<uint64_t> updateIndex(rank, 0);
   int64_t numElements = updateType.getNumElements();
   while (numElements--) {
     targetValues[getFlattenedIndex(targetType, targetIndex)] =
@@ -1194,7 +1214,8 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
                                 PatternRewriter &rewriter) const override {
     auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();
     auto updateCastOp = updateOp.getUpdate().getDefiningOp<tensor::CastOp>();
-    if (!targetCastOp && !updateCastOp) return failure();
+    if (!targetCastOp && !updateCastOp)
+      return failure();
     Value target = (targetCastOp ? cast<Value>(targetCastOp.getSource())
                                  : cast<Value>(updateOp.getTarget()));
     Value update = (updateCastOp ? cast<Value>(updateCastOp.getSource())
@@ -1221,13 +1242,14 @@ struct ReplaceOpIfTensorUpdateOperandZeroElements
   LogicalResult matchAndRewrite(TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op.getUpdate();
-    if (!isTensorOperandZeroElements(operand)) return failure();
+    if (!isTensorOperandZeroElements(operand))
+      return failure();
     rewriter.replaceOp(op, op.getTarget());
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void TensorUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
@@ -1248,7 +1270,7 @@ void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

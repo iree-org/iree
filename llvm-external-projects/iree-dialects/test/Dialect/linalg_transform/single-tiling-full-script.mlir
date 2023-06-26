@@ -23,9 +23,6 @@ transform.sequence failures(propagate) {
   transform.structured.vectorize %2 { vectorize_padding } : (!transform.any_op) -> !transform.any_op
   %module_op1 = transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
     {bufferize_function_boundaries = true} : (!transform.any_op) -> !transform.any_op
-  %3 = transform.structured.match ops{["func.func"]} in %module_op1
-    : (!transform.any_op) -> !transform.any_op
-
 
   %func = transform.structured.match ops{["func.func"]} in %module_op1
     : (!transform.any_op) -> !transform.any_op

@@ -6,8 +6,6 @@
 
 #include "iree/hal/local/plugins/static_plugin.h"
 
-#include "iree/base/tracing.h"
-
 typedef struct iree_hal_static_executable_plugin_t {
   iree_hal_executable_plugin_t base;
   iree_allocator_t host_allocator;

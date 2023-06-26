@@ -13,13 +13,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/api.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/target_platform.h"
 
 #if IREE_WAIT_API == IREE_WAIT_API_WIN32
-
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Platform utilities
@@ -142,9 +138,9 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
 
   // Be reasonable; 64 MAXIMUM_WAIT_OBJECTS is low, but 64K objects is too high.
   if (capacity >= UINT16_MAX) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "wait set capacity of %zu is unreasonably large",
-                            capacity);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "wait set capacity of %" PRIhsz " is unreasonably large", capacity);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

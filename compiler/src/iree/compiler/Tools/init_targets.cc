@@ -10,22 +10,22 @@
 
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.h"
-#endif  // IREE_HAVE_LLVM_CPU_TARGET
+#endif // IREE_HAVE_LLVM_CPU_TARGET
 #ifdef IREE_HAVE_METALSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
-#endif  // IREE_HAVE_METALSPIRV_TARGET
+#endif // IREE_HAVE_METALSPIRV_TARGET
 #ifdef IREE_HAVE_ROCM_TARGET
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
-#endif  // IREE_HAVE_ROCM_TARGET
+#endif // IREE_HAVE_ROCM_TARGET
 #ifdef IREE_HAVE_VMVX_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
-#endif  // IREE_HAVE_VMVX_TARGET
+#endif // IREE_HAVE_VMVX_TARGET
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
-#endif  // IREE_HAVE_VULKANSPIRV_TARGET
+#endif // IREE_HAVE_VULKANSPIRV_TARGET
 #ifdef IREE_HAVE_WEBGPU_TARGET
 #include "iree/compiler/Dialect/HAL/Target/WebGPU/WebGPUTarget.h"
-#endif  // IREE_HAVE_WEBGPU_TARGET
+#endif // IREE_HAVE_WEBGPU_TARGET
 
 namespace mlir {
 namespace iree_compiler {
@@ -40,28 +40,28 @@ void registerHALTargetBackends() {
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
     IREE::HAL::registerLLVMCPUTargetBackends(
         []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
-#endif  // IREE_HAVE_LLVM_CPU_TARGET
+#endif // IREE_HAVE_LLVM_CPU_TARGET
 #ifdef IREE_HAVE_METALSPIRV_TARGET
     IREE::HAL::registerMetalSPIRVTargetBackends();
-#endif  // IREE_HAVE_METALSPIRV_TARGET
+#endif // IREE_HAVE_METALSPIRV_TARGET
 #ifdef IREE_HAVE_ROCM_TARGET
     IREE::HAL::registerROCMTargetBackends();
-#endif  // IREE_HAVE_ROCM_TARGET
+#endif // IREE_HAVE_ROCM_TARGET
 #ifdef IREE_HAVE_VMVX_TARGET
     IREE::HAL::registerVMVXTargetBackends();
-#endif  // IREE_HAVE_VMVX_TARGET
+#endif // IREE_HAVE_VMVX_TARGET
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
     IREE::HAL::registerVulkanSPIRVTargetBackends(
         []() { return IREE::HAL::getVulkanSPIRVTargetOptionsFromFlags(); });
-#endif  // IREE_HAVE_VULKANSPIRV_TARGET
+#endif // IREE_HAVE_VULKANSPIRV_TARGET
 #ifdef IREE_HAVE_WEBGPU_TARGET
     IREE::HAL::registerWebGPUTargetBackends(
         []() { return IREE::HAL::getWebGPUTargetOptionsFromFlags(); });
-#endif  // IREE_HAVE_WEBGPU_TARGET
+#endif // IREE_HAVE_WEBGPU_TARGET
     return true;
   }();
   (void)init_once;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

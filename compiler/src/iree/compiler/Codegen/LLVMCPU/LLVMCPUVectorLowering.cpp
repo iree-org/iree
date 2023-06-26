@@ -23,7 +23,8 @@ static bool has16x16Transpose(func::FuncOp funcOp) {
   bool res = false;
   funcOp.walk([&](vector::TransposeOp op) {
     auto srcGtOneDims = isTranspose2DSlice(op);
-    if (failed(srcGtOneDims)) return WalkResult::advance();
+    if (failed(srcGtOneDims))
+      return WalkResult::advance();
     VectorType srcType = op.getSourceVectorType();
     int64_t m = srcType.getDimSize(std::get<0>(srcGtOneDims.value()));
     int64_t n = srcType.getDimSize(std::get<1>(srcGtOneDims.value()));
@@ -40,7 +41,7 @@ namespace {
 /// Pass to lower Vector ops before conversion to LLVM.
 class LLVMCPUVectorLoweringPass
     : public LLVMCPUVectorLoweringBase<LLVMCPUVectorLoweringPass> {
- public:
+public:
   using LLVMCPUVectorLoweringBase::LLVMCPUVectorLoweringBase;
   LLVMCPUVectorLoweringPass(const LLVMCPUVectorLoweringPassOptions &options) {
     this->splitVectorTransfersTo = options.splitVectorTransfersTo;
@@ -84,7 +85,12 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions,
         /*benefit=*/1,
-        /*disableOuterProductLowering=*/true);
+        /*disableOuterProductLowering=*/false);
+    // This pattern will transform vector loads whose elements are used in a
+    // scalar fashion into scalar loads. This will let scalar loads to be folded
+    // into broadcast/arithmetic operations and reduce register pressure.
+    vector::populateScalarVectorTransferLoweringPatterns(
+        patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
     vector::populateVectorMultiReductionLoweringPatterns(
         patterns, vectorMultiReductionLowering);
@@ -101,14 +107,10 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
+  // TODO (dcaballe): We should run full canonicalization here.
   {
     RewritePatternSet patterns(ctx);
-    SmallVector<Dialect *> dialects;
-    dialects.push_back(ctx->getLoadedDialect<vector::VectorDialect>());
-    dialects.push_back(ctx->getLoadedDialect<memref::MemRefDialect>());
-    dialects.push_back(ctx->getLoadedDialect<linalg::LinalgDialect>());
-    for (auto &dialect : dialects)
-      dialect->getCanonicalizationPatterns(patterns);
+    vector::TransposeOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
@@ -166,7 +168,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 }
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass() {
   return std::make_unique<LLVMCPUVectorLoweringPass>();
@@ -175,5 +177,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options) {
   return std::make_unique<LLVMCPUVectorLoweringPass>(options);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

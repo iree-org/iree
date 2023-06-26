@@ -11,7 +11,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
@@ -246,15 +245,15 @@ static iree_status_t iree_hal_vulkan_populate_memory_types(
   // let us correlate the memory types with vulkan-info and see if we got the
   // "right" ones.
   IREE_TRACE_ZONE_APPEND_TEXT(z0, "dispatch:");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, out_memory_types->dispatch_idx);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->dispatch_idx);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, "bulk-upload:");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, out_memory_types->bulk_upload_idx);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->bulk_upload_idx);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, "bulk-download:");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, out_memory_types->bulk_download_idx);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->bulk_download_idx);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, "staging-upload:");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, out_memory_types->staging_upload_idx);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->staging_upload_idx);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, "staging-download:");
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, out_memory_types->staging_download_idx);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->staging_download_idx);
   IREE_TRACE_ZONE_END(z0);
 
   // Check to make sure all memory types were found. If we didn't find any
@@ -568,7 +567,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_query_memory_heaps(
   }
 
   if (out_count) *out_count = count;
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
   IREE_TRACE_ZONE_END(z0);
   if (capacity < count) {
     // NOTE: lightweight as this is hit in normal pre-sizing usage.

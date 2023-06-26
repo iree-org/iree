@@ -373,9 +373,10 @@ using namespace mlir::linalg;
 // LowerToLLVMOp
 //===---------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
-                                    mlir::transform::TransformState &state) {
+DiagnosedSilenceableFailure transform_ext::LowerToLLVMOp::apply(
+    mlir::transform::TransformRewriter &rewriter,
+    mlir::transform::TransformResults &result,
+    mlir::transform::TransformState &state) {
   auto payloadOps = state.getPayloadOps(getTarget());
   if (!llvm::hasSingleElement(payloadOps) ||
       !isa<ModuleOp>(*payloadOps.begin()))
@@ -475,6 +476,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_ext::MatchCallbackOp::apply(
+    mlir::transform::TransformRewriter &rewriter,
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
   auto setEmptyResults = [&results, this] {
@@ -907,6 +909,7 @@ padCallback(transform_ext::MatchCallbackResult &res, Location loc,
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
+    mlir::transform::TransformRewriter &rewriter,
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
   auto &registry = state.addExtension<transform_ext::MatchCallbacksRegistry>();
@@ -939,7 +942,8 @@ void transform_ext::RegisterMatchCallbacksOp::getEffects(
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform_ext::TakeFirstOp::apply(mlir::transform::TransformResults &results,
+transform_ext::TakeFirstOp::apply(mlir::transform::TransformRewriter &rewriter,
+                                  mlir::transform::TransformResults &results,
                                   mlir::transform::TransformState &state) {
   SmallVector<Operation *> concatenated;
   bool found = false;
@@ -973,7 +977,8 @@ void transform_ext::TakeFirstOp::getEffects(
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_ext::EmitRemarkOp::applyToOne(
-    Operation *target, mlir::transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    mlir::transform::ApplyToEachResultList &results,
     mlir::transform::TransformState &state) {
   for (Operation *payload : state.getPayloadOps(getHandle())) {
     payload->emitRemark(getMessage());

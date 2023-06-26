@@ -57,9 +57,20 @@ Value applyConvolutionPadding(Location loc, Value input,
 
   IntegerType indexType = rewriter.getIntegerType(64);
   auto attrType = RankedTensorType::get({rank}, indexType);
-  Value zero = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(
-               RankedTensorType::get({}, inputType.getElementType())));
+
+  Value zero;
+  if (auto complexType = dyn_cast<ComplexType>(inputType.getElementType())) {
+    auto zeroElement = rewriter.getZeroAttr(complexType.getElementType());
+    auto zeroAttr = rewriter.getArrayAttr({zeroElement, zeroElement});
+    zero = rewriter.create<complex::ConstantOp>(loc, complexType, zeroAttr);
+    zero = rewriter.create<tensor::FromElementsOp>(
+        loc, RankedTensorType::get({}, complexType), zero);
+  } else {
+    zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(
+                 RankedTensorType::get({}, inputType.getElementType())));
+  }
+
   return rewriter.create<mlir::stablehlo::PadOp>(
       loc, input, zero, DenseIntElementsAttr::get(attrType, padLow),
       DenseIntElementsAttr::get(attrType, padHigh),
@@ -160,14 +171,16 @@ struct NormalConvolutionOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConvolutionOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!hasCanonicalDimensionNumbers(op.getDimensionNumbers())) {
       return failure();
     }
-    if (op.getFeatureGroupCount() != 1u) return failure();
-    if (op.getBatchGroupCount() != 1u) return failure();
+    if (op.getFeatureGroupCount() != 1u)
+      return failure();
+    if (op.getBatchGroupCount() != 1u)
+      return failure();
 
     Location loc = op.getLoc();
     Value input = adaptor.getLhs();
@@ -217,33 +230,33 @@ struct NormalConvolutionOpConversion final
                                     rewriter);
 
     switch (rank) {
-      case 2: {
-        res = rewriter.create<linalg::MatmulOp>(
-            loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
-            linalg::getPrunedAttributeList(op));
-        break;
-      }
-      case 3: {
-        res = rewriter.create<linalg::Conv1DNwcWcfOp>(
-            loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
-            strides, dilations, linalg::getPrunedAttributeList(op));
-        break;
-      }
-      case 4: {
-        res = rewriter.create<linalg::Conv2DNhwcHwcfOp>(
-            loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
-            strides, dilations, linalg::getPrunedAttributeList(op));
-        break;
-      }
-      case 5: {
-        res = rewriter.create<linalg::Conv3DNdhwcDhwcfOp>(
-            loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
-            strides, dilations, linalg::getPrunedAttributeList(op));
-        break;
-      }
-      default: {
-        return rewriter.notifyMatchFailure(op, "expected 1/2/3D conv op");
-      }
+    case 2: {
+      res = rewriter.create<linalg::MatmulOp>(
+          loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
+          linalg::getPrunedAttributeList(op));
+      break;
+    }
+    case 3: {
+      res = rewriter.create<linalg::Conv1DNwcWcfOp>(
+          loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
+          strides, dilations, linalg::getPrunedAttributeList(op));
+      break;
+    }
+    case 4: {
+      res = rewriter.create<linalg::Conv2DNhwcHwcfOp>(
+          loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
+          strides, dilations, linalg::getPrunedAttributeList(op));
+      break;
+    }
+    case 5: {
+      res = rewriter.create<linalg::Conv3DNdhwcDhwcfOp>(
+          loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
+          strides, dilations, linalg::getPrunedAttributeList(op));
+      break;
+    }
+    default: {
+      return rewriter.notifyMatchFailure(op, "expected 1/2/3D conv op");
+    }
     }
     rewriter.replaceOp(op, res.getOperation()->getResults());
     return success();
@@ -280,9 +293,9 @@ struct ConvolutionOpGeneralConversion final
   /// 7. Create the linalg.generic that computes the multiply-add
   /// 8. Reshape the output to the original shape if it was reshaped by the
   ///    feature or group count attributes.
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     MLIRContext *ctx = op.getContext();
 
@@ -293,7 +306,8 @@ struct ConvolutionOpGeneralConversion final
     }
 
     auto reshapedResultShape = resultType.getShape().vec();
-    if (!resultType.hasStaticShape()) return failure();
+    if (!resultType.hasStaticShape())
+      return failure();
 
     // Immediately emit an EmptyOp for output tensors with zero dimension.
     if (llvm::is_contained(reshapedResultShape, 0)) {
@@ -421,9 +435,9 @@ struct ConvolutionOpGeneralConversion final
       {
         dstExprs.insert(dstExprs.begin() + outputFeatureDimension, parallelDim);
         updateDimMappingFromOffset(resultIndexMapping, outputFeatureDimension);
-        reshapedResultShape.insert(
-            reshapedResultShape.begin() + outputFeatureDimension,
-            featureGroupCount);
+        reshapedResultShape.insert(reshapedResultShape.begin() +
+                                       outputFeatureDimension,
+                                   featureGroupCount);
         reshapedResultShape[outputFeatureDimension + 1] /= featureGroupCount;
       }
     }
@@ -556,12 +570,14 @@ struct DepthwiseConvolutionOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConvolutionOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (op.getBatchGroupCount() != 1) return failure();
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (op.getBatchGroupCount() != 1)
+      return failure();
     // Fall into the normal convolution cases.
-    if (op.getFeatureGroupCount() == 1) return failure();
+    if (op.getFeatureGroupCount() == 1)
+      return failure();
 
     const mlir::stablehlo::ConvDimensionNumbersAttr &dimensionNumbers =
         op.getDimensionNumbers();
@@ -630,12 +646,13 @@ struct DepthwiseConvolutionOpConversion final
                                     rewriter);
 
     auto filterDims =
-        llvm::to_vector<4>(cast<ShapedType>(op.getRhs().getType()).getShape());
+        llvm::to_vector(cast<ShapedType>(op.getRhs().getType()).getShape());
 
     auto getReassociationIndicesToCollapseLastTwoDims = [](Value v) {
       SmallVector<ReassociationIndices> reassociations;
       int64_t rank = cast<ShapedType>(v.getType()).getRank();
-      for (int64_t i = 0; i < rank - 1; ++i) reassociations.emplace_back(1, i);
+      for (int64_t i = 0; i < rank - 1; ++i)
+        reassociations.emplace_back(1, i);
       reassociations.back().push_back(rank - 1);
       return reassociations;
     };
@@ -685,38 +702,38 @@ struct DepthwiseConvolutionOpConversion final
           reshapedOutputDims, resultType.getElementType());
       Value conv;
       switch (spatialRank) {
-        case 1: {
-          conv = rewriter
-                     .create<linalg::DepthwiseConv1DNwcWcmOp>(
-                         loc, reshapedOutputType,
-                         ValueRange{input, reshapedFilter},
-                         ValueRange{zeroTensor}, windowStrides, rhsDilation,
-                         linalg::getPrunedAttributeList(op))
-                     .getResult(0);
-          break;
-        }
-        case 2: {
-          conv = rewriter
-                     .create<linalg::DepthwiseConv2DNhwcHwcmOp>(
-                         loc, reshapedOutputType,
-                         ValueRange{input, reshapedFilter},
-                         ValueRange{zeroTensor}, windowStrides, rhsDilation,
-                         linalg::getPrunedAttributeList(op))
-                     .getResult(0);
-          break;
-        }
-        case 3: {
-          conv = rewriter
-                     .create<linalg::DepthwiseConv3DNdhwcDhwcmOp>(
-                         loc, reshapedOutputType,
-                         ValueRange{input, reshapedFilter},
-                         ValueRange{zeroTensor}, windowStrides, rhsDilation,
-                         linalg::getPrunedAttributeList(op))
-                     .getResult(0);
-          break;
-        }
-        default:
-          llvm_unreachable("Unhandled case");
+      case 1: {
+        conv =
+            rewriter
+                .create<linalg::DepthwiseConv1DNwcWcmOp>(
+                    loc, reshapedOutputType, ValueRange{input, reshapedFilter},
+                    ValueRange{zeroTensor}, windowStrides, rhsDilation,
+                    linalg::getPrunedAttributeList(op))
+                .getResult(0);
+        break;
+      }
+      case 2: {
+        conv =
+            rewriter
+                .create<linalg::DepthwiseConv2DNhwcHwcmOp>(
+                    loc, reshapedOutputType, ValueRange{input, reshapedFilter},
+                    ValueRange{zeroTensor}, windowStrides, rhsDilation,
+                    linalg::getPrunedAttributeList(op))
+                .getResult(0);
+        break;
+      }
+      case 3: {
+        conv =
+            rewriter
+                .create<linalg::DepthwiseConv3DNdhwcDhwcmOp>(
+                    loc, reshapedOutputType, ValueRange{input, reshapedFilter},
+                    ValueRange{zeroTensor}, windowStrides, rhsDilation,
+                    linalg::getPrunedAttributeList(op))
+                .getResult(0);
+        break;
+      }
+      default:
+        llvm_unreachable("Unhandled case");
       }
 
       // Create a Linalg reshape op that converts the output from 5 dimensions
@@ -749,24 +766,24 @@ struct DepthwiseConvolutionOpConversion final
           getReassociationIndicesToCollapseLastTwoDims(filter));
 
       switch (spatialRank) {
-        case 1:
-          rewriter.replaceOpWithNewOp<linalg::DepthwiseConv1DNwcWcOp>(
-              op, resultType, ValueRange{input, reshapedFilter},
-              ValueRange{zeroTensor}, windowStrides, rhsDilation,
-              linalg::getPrunedAttributeList(op));
-          break;
-        case 2:
-          rewriter.replaceOpWithNewOp<linalg::DepthwiseConv2DNhwcHwcOp>(
-              op, resultType, ValueRange{input, reshapedFilter},
-              ValueRange{zeroTensor}, windowStrides, rhsDilation,
-              linalg::getPrunedAttributeList(op));
-          break;
-        case 3:
-          rewriter.replaceOpWithNewOp<linalg::DepthwiseConv3DNdhwcDhwcOp>(
-              op, resultType, ValueRange{input, reshapedFilter},
-              ValueRange{zeroTensor}, windowStrides, rhsDilation,
-              linalg::getPrunedAttributeList(op));
-          break;
+      case 1:
+        rewriter.replaceOpWithNewOp<linalg::DepthwiseConv1DNwcWcOp>(
+            op, resultType, ValueRange{input, reshapedFilter},
+            ValueRange{zeroTensor}, windowStrides, rhsDilation,
+            linalg::getPrunedAttributeList(op));
+        break;
+      case 2:
+        rewriter.replaceOpWithNewOp<linalg::DepthwiseConv2DNhwcHwcOp>(
+            op, resultType, ValueRange{input, reshapedFilter},
+            ValueRange{zeroTensor}, windowStrides, rhsDilation,
+            linalg::getPrunedAttributeList(op));
+        break;
+      case 3:
+        rewriter.replaceOpWithNewOp<linalg::DepthwiseConv3DNdhwcDhwcOp>(
+            op, resultType, ValueRange{input, reshapedFilter},
+            ValueRange{zeroTensor}, windowStrides, rhsDilation,
+            linalg::getPrunedAttributeList(op));
+        break;
       }
     }
 
@@ -774,7 +791,7 @@ struct DepthwiseConvolutionOpConversion final
   }
 };
 
-}  // namespace
+} // namespace
 
 namespace detail {
 void populateStableHloConvolutionToLinalgConversionPatterns(
@@ -788,5 +805,5 @@ void populateStableHloConvolutionToLinalgConversionPatterns(
 
   patterns->add<ConvolutionOpGeneralConversion>(typeConverter, context);
 }
-}  // namespace detail
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace detail
+} // namespace mlir::iree_compiler::stablehlo

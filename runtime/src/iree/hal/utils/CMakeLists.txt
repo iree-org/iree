@@ -21,7 +21,6 @@ iree_cc_library(
     ::caching_allocator
     ::debug_allocator
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -35,7 +34,6 @@ iree_cc_library(
     "buffer_transfer.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -49,7 +47,6 @@ iree_cc_library(
     "debug_allocator.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -65,7 +62,6 @@ iree_cc_library(
     ::resource_set
     iree::base
     iree::base::internal::arena
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -80,7 +76,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -96,7 +91,6 @@ iree_cc_library(
     ::resource_set
     iree::base
     iree::base::internal::arena
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -112,7 +106,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -139,7 +132,6 @@ iree_cc_library(
   DEPS
     ::libmpi
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -155,7 +147,6 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::arena
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -197,7 +188,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
   PUBLIC
 )

@@ -1,0 +1,30 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+iree_hal_cts_test_suite(
+  DRIVER_NAME
+    cuda2
+  DRIVER_REGISTRATION_HDR
+    "experimental/cuda2/registration/driver_module.h"
+  DRIVER_REGISTRATION_FN
+    "iree_hal_cuda2_driver_module_register"
+  COMPILER_TARGET_BACKEND
+    "cuda"
+  EXECUTABLE_FORMAT
+    "\"PTXE\""
+  DEPS
+    iree::experimental::cuda2::registration
+  INCLUDED_TESTS
+    "allocator"
+    "buffer_mapping"
+    "executable_cache"
+    "descriptor_set_layout"
+    "driver"
+    "pipeline_layout"
+  LABELS
+    driver=cuda2
+    requires-gpu-nvidia
+)

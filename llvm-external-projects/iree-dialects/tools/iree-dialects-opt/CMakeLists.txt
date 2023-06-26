@@ -17,6 +17,7 @@ set(LIBS
   MLIRControlFlowDialect
   MLIRDialect
   MLIRFuncDialect
+  MLIRFuncInlinerExtension
   MLIRIndexToLLVM
   MLIRLinalgDialect
   MLIRLinalgTransformOps

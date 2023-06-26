@@ -445,7 +445,8 @@ static iree_status_t iree_tooling_dump_module_metadata(
     fprintf(stdout, "\n");
   }
 
-  fprintf(stdout, "FlatBuffer: %zu bytes\n", flatbuffer_contents.data_length);
+  fprintf(stdout, "FlatBuffer: %" PRIhsz " bytes\n",
+          flatbuffer_contents.data_length);
   if (iree_vm_BytecodeModuleDef_bytecode_data_is_present(module_def)) {
     flatbuffers_uint8_vec_t bytecode_data =
         iree_vm_BytecodeModuleDef_bytecode_data(module_def);

@@ -44,7 +44,7 @@ Value processTuple(Type type, Location loc, Block &block, OpBuilder &builder) {
     return block.addArgument(type, loc);
   }
 
-  llvm::SmallVector<Value, 4> values;
+  llvm::SmallVector<Value> values;
   values.reserve(tupleType.size());
   for (Type subtype : tupleType.getTypes()) {
     values.push_back(processTuple(subtype, loc, block, builder));
@@ -101,10 +101,9 @@ Value recursiveRetuple(Type oldType, Operation::result_range *values,
 }
 
 template <typename T>
-LogicalResult untupleAndLookupValues(T values,
-                                     llvm::SmallVectorImpl<Value> &newValues,
-                                     OpBuilder &builder, Location loc,
-                                     IRMapping &mapping) {
+LogicalResult
+untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> &newValues,
+                       OpBuilder &builder, Location loc, IRMapping &mapping) {
   for (auto operand : values) {
     auto newValue = mapping.lookupOrNull(operand);
     if (!newValue) {
@@ -131,13 +130,13 @@ LogicalResult convertOp(mlir::func::ReturnOp op, OpBuilder &builder,
 
 LogicalResult convertOp(func::CallOp oldOp, OpBuilder &builder,
                         IRMapping &mapping) {
-  llvm::SmallVector<Value, 4> newArgs;
+  llvm::SmallVector<Value> newArgs;
   if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
                                     oldOp.getLoc(), mapping))) {
     return failure();
   }
 
-  SmallVector<Type, 4> resultTypes;
+  SmallVector<Type> resultTypes;
   untupleTypes(oldOp.getResultTypes(), resultTypes);
   auto newOp = builder.create<func::CallOp>(oldOp->getLoc(), oldOp.getCallee(),
                                             resultTypes, newArgs);
@@ -156,7 +155,7 @@ LogicalResult convertOp(func::CallOp oldOp, OpBuilder &builder,
 
 LogicalResult convertOp(func::CallIndirectOp oldOp, OpBuilder &builder,
                         IRMapping &mapping) {
-  llvm::SmallVector<Value, 4> newArgs;
+  llvm::SmallVector<Value> newArgs;
   if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
                                     oldOp.getLoc(), mapping))) {
     return failure();
@@ -176,7 +175,7 @@ LogicalResult convertOp(func::CallIndirectOp oldOp, OpBuilder &builder,
 
 LogicalResult convertOp(cf::BranchOp oldOp, OpBuilder &builder,
                         IRMapping &mapping) {
-  llvm::SmallVector<Value, 4> newArgs;
+  llvm::SmallVector<Value> newArgs;
   if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
                                     oldOp.getLoc(), mapping))) {
     return failure();
@@ -191,13 +190,13 @@ LogicalResult convertOp(cf::BranchOp oldOp, OpBuilder &builder,
 
 LogicalResult convertOp(cf::CondBranchOp oldOp, OpBuilder &builder,
                         IRMapping &mapping) {
-  llvm::SmallVector<Value, 4> trueArgs;
+  llvm::SmallVector<Value> trueArgs;
   if (failed(untupleAndLookupValues(oldOp.getTrueOperands(), trueArgs, builder,
                                     oldOp.getLoc(), mapping))) {
     return failure();
   }
 
-  llvm::SmallVector<Value, 4> falseArgs;
+  llvm::SmallVector<Value> falseArgs;
   if (failed(untupleAndLookupValues(oldOp.getFalseOperands(), falseArgs,
                                     builder, oldOp.getLoc(), mapping))) {
     return failure();
@@ -339,5 +338,5 @@ struct FlattenTuplesInCFG final
   }
 };
 
-}  // namespace
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace
+} // namespace mlir::iree_compiler::stablehlo

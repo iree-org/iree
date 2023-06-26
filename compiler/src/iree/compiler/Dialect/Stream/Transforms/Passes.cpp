@@ -287,8 +287,9 @@ void buildStreamOptimizationPassPipeline(
   // add/remove operands.
   passManager.addPass(IREE::Stream::createPackDispatchOperandsPass());
 
-  // Folding operands requires that CSE folds the inputs that we check for.
-  passManager.addPass(mlir::createCSEPass());
+  // Folding operands requires that canonicalization/CSE folds the inputs that
+  // we check for.
+  addCleanupPatterns(passManager);
   passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
 
   // Only want to specialize after we've added all the operands we need above.
@@ -383,8 +384,8 @@ void registerStreamTransformPassPipelines() {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerStreamPasses() {
   // Generated.
@@ -394,7 +395,7 @@ void registerStreamPasses() {
   registerStreamTransformPassPipelines();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

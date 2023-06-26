@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -39,11 +40,15 @@ void IREECodegenDialect::initialize() {
 
   addOperations<
 #define GET_OP_LIST
+#include "iree/compiler/Codegen/Dialect/IREECodegenOps.cpp.inc"
+      >();
+  addOperations<
+#define GET_OP_LIST
 #include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc"
       >();
 }
 
-}  // namespace Codegen
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Codegen
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

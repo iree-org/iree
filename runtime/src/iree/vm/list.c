@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/vm/instance.h"
 
 static uint8_t iree_vm_value_type_size(iree_vm_type_def_t type) {
@@ -163,10 +162,10 @@ IREE_API_EXPORT iree_status_t iree_vm_list_initialize(
   iree_host_size_t required_storage_size =
       storage_offset + iree_host_align(capacity * element_size, 8);
   if (storage.data_length < required_storage_size) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "storage buffer underflow: provided=%zu < required=%zu",
-        storage.data_length, required_storage_size);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "storage buffer underflow: provided=%" PRIhsz
+                            " < required=%" PRIhsz,
+                            storage.data_length, required_storage_size);
   }
   memset(storage.data, 0, required_storage_size);
 
@@ -624,7 +623,8 @@ iree_vm_list_get_value(const iree_vm_list_t* list, iree_host_size_t i,
                        iree_vm_value_t* out_value) {
   if (i >= list->count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "index %zu out of bounds (%zu)", i, list->count);
+                            "index %" PRIhsz " out of bounds (%" PRIhsz ")", i,
+                            list->count);
   }
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   memset(out_value, 0, sizeof(*out_value));
@@ -651,8 +651,9 @@ iree_vm_list_get_value(const iree_vm_list_t* list, iree_host_size_t i,
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant = (iree_vm_variant_t*)element_ptr;
       if (!iree_vm_type_def_is_value(variant->type)) {
-        return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                                "variant at index %zu is not a value type", i);
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "variant at index %" PRIhsz " is not a value type", i);
       }
       out_value->type = iree_vm_type_def_as_value(variant->type);
       memcpy(out_value->value_storage, variant->value_storage,
@@ -670,7 +671,8 @@ IREE_API_EXPORT iree_status_t iree_vm_list_get_value_as(
     iree_vm_value_type_t value_type, iree_vm_value_t* out_value) {
   if (i >= list->count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "index %zu out of bounds (%zu)", i, list->count);
+                            "index %" PRIhsz " out of bounds (%" PRIhsz ")", i,
+                            list->count);
   }
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   iree_vm_value_t value;
@@ -698,8 +700,9 @@ IREE_API_EXPORT iree_status_t iree_vm_list_get_value_as(
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant = (iree_vm_variant_t*)element_ptr;
       if (!iree_vm_variant_is_value(*variant)) {
-        return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                                "variant at index %zu is not a value type", i);
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "variant at index %" PRIhsz " is not a value type", i);
       }
       value.type = iree_vm_type_def_as_value(variant->type);
       memcpy(value.value_storage, variant->value_storage,
@@ -718,7 +721,8 @@ IREE_API_EXPORT iree_status_t iree_vm_list_set_value(
     iree_vm_list_t* list, iree_host_size_t i, const iree_vm_value_t* value) {
   if (i >= list->count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "index %zu out of bounds (%zu)", i, list->count);
+                            "index %" PRIhsz " out of bounds (%" PRIhsz ")", i,
+                            list->count);
   }
   iree_vm_value_type_t target_type;
   switch (list->storage_mode) {
@@ -803,7 +807,8 @@ static iree_status_t iree_vm_list_get_ref_assign_or_retain(
     iree_vm_ref_t* out_value) {
   if (i >= list->count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "index %zu out of bounds (%zu)", i, list->count);
+                            "index %" PRIhsz " out of bounds (%" PRIhsz ")", i,
+                            list->count);
   }
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   switch (list->storage_mode) {
@@ -847,7 +852,8 @@ static iree_status_t iree_vm_list_set_ref(iree_vm_list_t* list,
                                           iree_vm_ref_t* value) {
   if (i >= list->count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "index %zu out of bounds (%zu)", i, list->count);
+                            "index %" PRIhsz " out of bounds (%" PRIhsz ")", i,
+                            list->count);
   }
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   switch (list->storage_mode) {
@@ -945,7 +951,8 @@ static iree_status_t iree_vm_list_get_variant(const iree_vm_list_t* list,
   IREE_ASSERT_ARGUMENT(out_variant);
   if (i >= list->count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "index %zu out of bounds (%zu)", i, list->count);
+                            "index %" PRIhsz " out of bounds (%" PRIhsz ")", i,
+                            list->count);
   }
   iree_vm_variant_reset(out_variant);
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;

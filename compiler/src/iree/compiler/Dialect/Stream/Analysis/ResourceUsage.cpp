@@ -59,7 +59,7 @@ template <typename ElementT>
 class AbstractResourceUsage
     : public DFX::StateWrapper<DFX::BitIntegerState<uint16_t, 4095, 0>,
                                ElementT> {
- public:
+public:
   using BaseType =
       DFX::StateWrapper<DFX::BitIntegerState<uint16_t, 4095, 0>, ElementT>;
 
@@ -67,7 +67,7 @@ class AbstractResourceUsage
   enum {
     NOT_INDIRECT = 1u << 0,
     NOT_EXTERNAL = 1u << 1,
-    NOT_MUTATED = 1u << 2,  // beyond definition
+    NOT_MUTATED = 1u << 2, // beyond definition
     NOT_CONSTANT = 1u << 3,
     NOT_TRANSFER_READ = 1u << 4,
     NOT_TRANSFER_WRITE = 1u << 5,
@@ -136,27 +136,39 @@ class AbstractResourceUsage
 
   const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
-    if (!isValidState()) return "*";
+    if (!isValidState())
+      return "*";
     auto append = [&](const char *part) {
-      if (!str.empty()) str += '|';
+      if (!str.empty())
+        str += '|';
       str += part;
     };
-    if (!this->isAssumed(NOT_INDIRECT)) append("indirect");
+    if (!this->isAssumed(NOT_INDIRECT))
+      append("indirect");
     append(this->isAssumed(NOT_EXTERNAL) ? "internal" : "external");
     append(this->isAssumed(NOT_MUTATED) ? "immutable" : "mutable");
-    if (!this->isAssumed(NOT_CONSTANT)) append("constant");
-    if (!this->isAssumed(NOT_TRANSFER_READ)) append("transfer_read");
-    if (!this->isAssumed(NOT_TRANSFER_WRITE)) append("transfer_write");
-    if (!this->isAssumed(NOT_STAGING_READ)) append("staging_read");
-    if (!this->isAssumed(NOT_STAGING_WRITE)) append("staging_write");
-    if (!this->isAssumed(NOT_DISPATCH_READ)) append("dispatch_read");
-    if (!this->isAssumed(NOT_DISPATCH_WRITE)) append("dispatch_write");
-    if (!this->isAssumed(NOT_GLOBAL_READ)) append("global_read");
-    if (!this->isAssumed(NOT_GLOBAL_WRITE)) append("global_write");
+    if (!this->isAssumed(NOT_CONSTANT))
+      append("constant");
+    if (!this->isAssumed(NOT_TRANSFER_READ))
+      append("transfer_read");
+    if (!this->isAssumed(NOT_TRANSFER_WRITE))
+      append("transfer_write");
+    if (!this->isAssumed(NOT_STAGING_READ))
+      append("staging_read");
+    if (!this->isAssumed(NOT_STAGING_WRITE))
+      append("staging_write");
+    if (!this->isAssumed(NOT_DISPATCH_READ))
+      append("dispatch_read");
+    if (!this->isAssumed(NOT_DISPATCH_WRITE))
+      append("dispatch_write");
+    if (!this->isAssumed(NOT_GLOBAL_READ))
+      append("global_read");
+    if (!this->isAssumed(NOT_GLOBAL_WRITE))
+      append("global_write");
     return str.empty() ? "*" : str;
   }
 
- protected:
+protected:
   explicit AbstractResourceUsage(const Position &pos) : BaseType(pos) {}
 
   // Add known bits based on the static type information available.
@@ -164,42 +176,42 @@ class AbstractResourceUsage
   void initializeFromType(IREE::Stream::ResourceType type) {
     BaseType::intersectAssumedBits(BEST_STATE);
     switch (type.getLifetime()) {
-      case Lifetime::Unknown:
-        break;
-      case Lifetime::External:
-        BaseType::intersectAssumedBits(BEST_STATE & ~NOT_EXTERNAL);
-        BaseType::addKnownBits(NOT_CONSTANT | NOT_STAGING_READ |
-                               NOT_STAGING_WRITE);
-        break;
-      case Lifetime::Staging:
-        BaseType::intersectAssumedBits(
-            BEST_STATE & (~NOT_STAGING_READ | ~NOT_STAGING_WRITE |
-                          ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
-        BaseType::addKnownBits(NOT_EXTERNAL | NOT_CONSTANT | NOT_DISPATCH_READ |
-                               NOT_DISPATCH_WRITE | NOT_GLOBAL_READ |
-                               NOT_GLOBAL_WRITE);
-        break;
-      case Lifetime::Transient:
-        BaseType::intersectAssumedBits(
-            BEST_STATE & (~NOT_DISPATCH_READ | ~NOT_DISPATCH_WRITE |
-                          ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
-        BaseType::addKnownBits(NOT_EXTERNAL | NOT_CONSTANT | NOT_STAGING_READ |
-                               NOT_STAGING_WRITE);
-        break;
-      case Lifetime::Variable:
-        BaseType::intersectAssumedBits(
-            BEST_STATE & (~NOT_GLOBAL_READ | ~NOT_GLOBAL_WRITE |
-                          ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
-        BaseType::addKnownBits(NOT_EXTERNAL | NOT_CONSTANT | NOT_STAGING_READ |
-                               NOT_STAGING_WRITE);
-        break;
-      case Lifetime::Constant:
-        BaseType::intersectAssumedBits(
-            BEST_STATE &
-            (~NOT_CONSTANT | ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
-        BaseType::addKnownBits(NOT_MUTATED | NOT_EXTERNAL | NOT_STAGING_READ |
-                               NOT_STAGING_WRITE);
-        break;
+    case Lifetime::Unknown:
+      break;
+    case Lifetime::External:
+      BaseType::intersectAssumedBits(BEST_STATE & ~NOT_EXTERNAL);
+      BaseType::addKnownBits(NOT_CONSTANT | NOT_STAGING_READ |
+                             NOT_STAGING_WRITE);
+      break;
+    case Lifetime::Staging:
+      BaseType::intersectAssumedBits(
+          BEST_STATE & (~NOT_STAGING_READ | ~NOT_STAGING_WRITE |
+                        ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
+      BaseType::addKnownBits(NOT_EXTERNAL | NOT_CONSTANT | NOT_DISPATCH_READ |
+                             NOT_DISPATCH_WRITE | NOT_GLOBAL_READ |
+                             NOT_GLOBAL_WRITE);
+      break;
+    case Lifetime::Transient:
+      BaseType::intersectAssumedBits(
+          BEST_STATE & (~NOT_DISPATCH_READ | ~NOT_DISPATCH_WRITE |
+                        ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
+      BaseType::addKnownBits(NOT_EXTERNAL | NOT_CONSTANT | NOT_STAGING_READ |
+                             NOT_STAGING_WRITE);
+      break;
+    case Lifetime::Variable:
+      BaseType::intersectAssumedBits(
+          BEST_STATE & (~NOT_GLOBAL_READ | ~NOT_GLOBAL_WRITE |
+                        ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
+      BaseType::addKnownBits(NOT_EXTERNAL | NOT_CONSTANT | NOT_STAGING_READ |
+                             NOT_STAGING_WRITE);
+      break;
+    case Lifetime::Constant:
+      BaseType::intersectAssumedBits(
+          BEST_STATE &
+          (~NOT_CONSTANT | ~NOT_TRANSFER_READ | ~NOT_TRANSFER_WRITE));
+      BaseType::addKnownBits(NOT_MUTATED | NOT_EXTERNAL | NOT_STAGING_READ |
+                             NOT_STAGING_WRITE);
+      break;
     }
   }
 };
@@ -207,7 +219,7 @@ class AbstractResourceUsage
 // Starts with the best assumed state of the value never being used for anything
 // and then works towards a worst state of it being used for everything.
 class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
- public:
+public:
   using BaseType = AbstractResourceUsage<DFX::ValueElement>;
 
   static ValueResourceUsage &createForPosition(const Position &pos,
@@ -223,7 +235,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
 
   static const char ID;
 
- private:
+private:
   explicit ValueResourceUsage(const Position &pos) : BaseType(pos) {}
 
   // Starts analysis of the |value| with known bits based on its resource type.
@@ -237,7 +249,8 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
   // itself is under analysis.
   void updateFromDefiningOp(Value value, OpResult result, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) return;
+    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType()))
+      return;
 
     TypeSwitch<Operation *, void>(result.getOwner())
         .Case([&](mlir::arith::SelectOp op) {
@@ -263,12 +276,12 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
           auto globalType = llvm::cast<IREE::Stream::ResourceType>(
               globalInfo->op.getGlobalType());
           switch (globalType.getLifetime()) {
-            case IREE::Stream::Lifetime::Constant:
-              removeAssumedBits(NOT_CONSTANT);
-              break;
-            case IREE::Stream::Lifetime::Variable:
-            default:
-              break;
+          case IREE::Stream::Lifetime::Constant:
+            removeAssumedBits(NOT_CONSTANT);
+            break;
+          case IREE::Stream::Lifetime::Variable:
+          default:
+            break;
           }
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getLoadedGlobalValue()),
@@ -450,7 +463,8 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
   // This walks through tied uses as well.
   void updateFromUse(Value value, OpOperand &operand, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!llvm::isa<IREE::Stream::ResourceType>(operand.get().getType())) return;
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.get().getType()))
+      return;
 
     auto *userOp = operand.getOwner();
     unsigned operandIdx = operand.getOperandNumber();
@@ -502,12 +516,12 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
           auto globalType = llvm::cast<IREE::Stream::ResourceType>(
               globalInfo->op.getGlobalType());
           switch (globalType.getLifetime()) {
-            case IREE::Stream::Lifetime::Constant:
-              removeAssumedBits(NOT_CONSTANT);
-              break;
-            case IREE::Stream::Lifetime::Variable:
-            default:
-              break;
+          case IREE::Stream::Lifetime::Constant:
+            removeAssumedBits(NOT_CONSTANT);
+            break;
+          case IREE::Stream::Lifetime::Variable:
+          default:
+            break;
           }
         })
         .Case([&](IREE::Util::GlobalStoreIndirectOpInterface op) {
@@ -703,7 +717,8 @@ std::optional<ResourceUsageBitfield>
 ResourceUsageAnalysis::tryLookupResourceUsage(Value value) {
   auto resourceUsage =
       solver.lookupElementFor<ValueResourceUsage>(Position::forValue(value));
-  if (!resourceUsage) return std::nullopt;
+  if (!resourceUsage)
+    return std::nullopt;
   return resourceUsage->getAssumedUsage();
 }
 
@@ -733,7 +748,7 @@ LogicalResult ResourceUsageAnalysis::run() {
   return solver.run();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

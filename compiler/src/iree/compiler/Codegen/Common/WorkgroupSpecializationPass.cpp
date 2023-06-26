@@ -49,8 +49,8 @@ static llvm::cl::opt<bool> clEnableWorkgroupSpecialization(
     "iree-codegen-enable-workgroup-specialization",
     llvm::cl::desc("Enable workgroup specialization."), llvm::cl::init(true));
 
-static std::optional<int64_t> getConstantLowerBound(
-    affine::AffineMinOp affineMinOp) {
+static std::optional<int64_t>
+getConstantLowerBound(affine::AffineMinOp affineMinOp) {
   for (AffineExpr expr : affineMinOp.getMap().getResults()) {
     if (auto cst = expr.dyn_cast<AffineConstantExpr>()) {
       return cst.getValue();
@@ -112,7 +112,7 @@ static void specializeFunction(func::FuncOp funcOp) {
   builder.setInsertionPointAfter(minSizeOps.back());
   // create a condition for scf.if
   Value cond;
-  SmallVector<Value> constantOps;  // ConstantIndexOps for tile sizes
+  SmallVector<Value> constantOps; // ConstantIndexOps for tile sizes
   for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
     affine::AffineMinOp minOp = minSizeOps[i];
     int64_t lowerBound = *getConstantLowerBound(minOp);
@@ -130,7 +130,7 @@ static void specializeFunction(func::FuncOp funcOp) {
 
   // Transfer the original body to the scf.else body.
   auto origBodyBegin = ++Block::iterator(ifOp);
-  auto origBodyEnd = --block->end();  // yield
+  auto origBodyEnd = --block->end(); // yield
 
   Block *elseBlock = ifOp.elseBlock();
   elseBlock->getOperations().splice(elseBlock->begin(), block->getOperations(),
@@ -159,18 +159,19 @@ struct WorkgroupSpecializationPass
   }
 
   void runOnOperation() override {
-    if (!clEnableWorkgroupSpecialization) return;
+    if (!clEnableWorkgroupSpecialization)
+      return;
 
     func::FuncOp funcOp = getOperation();
     specializeFunction(funcOp);
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWorkgroupSpecializationPass() {
   return std::make_unique<WorkgroupSpecializationPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -13,7 +13,7 @@ namespace mlir {
 namespace iree_compiler {
 // A placeholder for chooseDynamicEncodingInfoVMVXMicrokernels. See
 // Common/EncodingInfo.h for more details.
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_VMVX_ENCODINGINFO_H_
+#endif // IREE_COMPILER_CODEGEN_VMVX_ENCODINGINFO_H_

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/testing/benchmark.h"
 
 int64_t iree_benchmark_get_range(iree_benchmark_state_t* state,

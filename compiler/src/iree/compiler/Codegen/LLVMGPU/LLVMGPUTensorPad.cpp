@@ -23,8 +23,9 @@ namespace iree_compiler {
 
 namespace {
 
-static FailureOr<SmallVector<int64_t>> getPaddedShapeFromTensorLoad(
-    IREE::Flow::DispatchTensorLoadOp tensorLoad, ArrayRef<int64_t> origShape) {
+static FailureOr<SmallVector<int64_t>>
+getPaddedShapeFromTensorLoad(IREE::Flow::DispatchTensorLoadOp tensorLoad,
+                             ArrayRef<int64_t> origShape) {
   // Determine the padded shape from the load.
   SmallVector<int64_t> paddedShape(origShape.begin(), origShape.end());
   for (const auto &[index, size] :
@@ -37,16 +38,17 @@ static FailureOr<SmallVector<int64_t>> getPaddedShapeFromTensorLoad(
               presburger::BoundType::UB, size.get<Value>(),
               /*dim=*/std::nullopt,
               /*stopCondition=*/nullptr, /*closedUB=*/true);
-      if (failed(upperBound)) return failure();
+      if (failed(upperBound))
+        return failure();
       paddedShape[index] = *upperBound;
     }
   }
   return paddedShape;
 }
 
-static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
-    IRRewriter &rewriter, linalg::LinalgOp linalgOp,
-    linalg::LinalgOp &paddedOp) {
+static FailureOr<SmallVector<Value>>
+rewriteAsPaddedOp(IRRewriter &rewriter, linalg::LinalgOp linalgOp,
+                  linalg::LinalgOp &paddedOp) {
   Location loc = linalgOp.getLoc();
 
   IRRewriter::InsertionGuard g(rewriter);
@@ -67,7 +69,8 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
     }
     FailureOr<SmallVector<int64_t>> maybePaddedShape =
         getPaddedShapeFromTensorLoad(tensorLoad, linalgOp.getShape(&opOperand));
-    if (failed(maybePaddedShape)) return failure();
+    if (failed(maybePaddedShape))
+      return failure();
     auto paddedShape = *maybePaddedShape;
 
     Value paddingValue = rewriter.create<arith::ConstantOp>(
@@ -103,7 +106,8 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
         llvm::cast<RankedTensorType>(paddedResult.getType()).getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> sizes;
-    for (OpFoldResult v : reifiedResultShapes[resultNumber]) sizes.push_back(v);
+    for (OpFoldResult v : reifiedResultShapes[resultNumber])
+      sizes.push_back(v);
     SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
     paddedSubviewResults.push_back(rewriter.create<tensor::ExtractSliceOp>(
         loc, paddedResult, offsets, sizes, strides));
@@ -127,7 +131,8 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
 
   FailureOr<SmallVector<int64_t>> maybePaddedShape =
       getPaddedShapeFromTensorLoad(tensorLoad, op.getDestType().getShape());
-  if (failed(maybePaddedShape)) return failure();
+  if (failed(maybePaddedShape))
+    return failure();
   auto paddedShape = *maybePaddedShape;
 
   // Pad to the shape that makes tensor.unpack ops produce full tiles.
@@ -216,11 +221,11 @@ struct LLVMGPUTensorPadPass
     });
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass() {
   return std::make_unique<LLVMGPUTensorPadPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

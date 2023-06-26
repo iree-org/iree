@@ -17,11 +17,13 @@ BIG_CORES = common_definitions.DeviceSpec.build(
     architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
     device_parameters=[device_parameters.ARM_BIG_CORES],
-    tags=["big-core"])
+    tags=["big-core"],
+)
 LITTLE_CORES = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_4 + "-little-core",
     device_name=DEVICE_NAME,
     architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
     device_parameters=[device_parameters.ARM_LITTLE_CORES],
-    tags=["little-core"])
+    tags=["little-core"],
+)

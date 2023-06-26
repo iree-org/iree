@@ -12,7 +12,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
@@ -507,7 +506,7 @@ static iree_status_t iree_hal_cmd_fill_tile(
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_fill(
       cmd->target_buffer, cmd->target_offset + slice_offset, slice_length,
@@ -646,7 +645,7 @@ static iree_status_t iree_hal_cmd_copy_tile(
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_copy(
       cmd->source_buffer, cmd->source_offset + slice_offset, cmd->target_buffer,
@@ -742,7 +741,8 @@ static iree_status_t iree_hal_task_command_buffer_push_constants(
   if (IREE_UNLIKELY(offset + values_length >=
                     sizeof(command_buffer->state.push_constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "push constant range %zu (length=%zu) out of range",
+                            "push constant range %" PRIhsz " (length=%" PRIhsz
+                            ") out of range",
                             offset, values_length);
   }
 

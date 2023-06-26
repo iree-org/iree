@@ -40,7 +40,7 @@ namespace {
 // We should add native VM ops for supporting them.
 template <typename OpTy, arith::CmpIPredicate pred>
 struct MaxMinIOpConverter : public OpRewritePattern<OpTy> {
- public:
+public:
   using OpRewritePattern<OpTy>::OpRewritePattern;
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const final {
@@ -57,7 +57,7 @@ struct MaxMinIOpConverter : public OpRewritePattern<OpTy> {
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
 template <typename T>
-SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
+SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
   moduleOp.walk([&](Operation *op) {
     // Special case for declarations which may reference builtins.
@@ -72,15 +72,17 @@ SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
       // Generic dialect lookup.
       dialect = op->getDialect();
     }
-    if (!dialect) return;
+    if (!dialect)
+      return;
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
-    if (!dialectInterface) return;
+    if (!dialectInterface)
+      return;
     resultSet.insert(dialectInterface);
   });
 
   // NOTE: to ensure deterministic output we sort the result so that imports are
   // always added in a consistent order.
-  SmallVector<const T *, 4> results = {resultSet.begin(), resultSet.end()};
+  SmallVector<const T *> results = {resultSet.begin(), resultSet.end()};
   llvm::sort(
       results, +[](const T *a, const T *b) {
         return a->getDialect()->getNamespace().compare(
@@ -89,12 +91,12 @@ SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   return results;
 }
 
-}  // namespace
+} // namespace
 
 // Runs conversion with registered input dialects.
 class ConversionPass
     : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
- public:
+public:
   explicit ConversionPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -111,7 +113,8 @@ class ConversionPass
   }
 
   void runOnOperation() override {
-    if (getOperation().getBody()->empty()) return;
+    if (getOperation().getBody()->empty())
+      return;
 
     auto *context = &getContext();
     VMConversionTarget conversionTarget(context);
@@ -175,12 +178,12 @@ class ConversionPass
     }
   }
 
- private:
+private:
   TargetOptions targetOptions_;
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
-    TargetOptions targetOptions) {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createConversionPass(TargetOptions targetOptions) {
   return std::make_unique<ConversionPass>(targetOptions);
 }
 
@@ -191,7 +194,7 @@ static PassRegistration<ConversionPass> pass(
       return std::make_unique<ConversionPass>(options);
     });
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

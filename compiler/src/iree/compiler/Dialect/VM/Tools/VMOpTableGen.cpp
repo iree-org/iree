@@ -80,6 +80,6 @@ static GenRegistration genVMOpDispatcherDefs(
       return emitOpTableDefs(records, os);
     });
 
-}  // namespace
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace
+} // namespace iree_compiler
+} // namespace mlir

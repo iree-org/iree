@@ -13,5 +13,5 @@ namespace iree_compiler {
 LogicalResult setUserConfig(func::FuncOp entryPointFn, Operation *computeOp,
                             IREE::Codegen::CompilationInfoAttr compilationInfo);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

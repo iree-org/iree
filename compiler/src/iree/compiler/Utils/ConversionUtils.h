@@ -25,7 +25,7 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
 Attribute convertAttribute(Location loc, Attribute oldAttr,
                            TypeConverter &typeConverter);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_CONVERSIONUTILS_H_
+#endif // IREE_COMPILER_UTILS_CONVERSIONUTILS_H_

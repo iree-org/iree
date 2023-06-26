@@ -26,45 +26,44 @@ import tempfile
 import urllib
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('file', '', 'file to update')
+flags.DEFINE_string("file", "", "file to update")
 
-file_dict = dict({
-    "mobilenet_v1.tflite":
-        "https://tfhub.dev/tensorflow/lite-model/mobilenet_v1_1.0_160/1/default/1?lite-format=tflite",
-    "posenet_i8.tflite":
-        "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/int8/4?lite-format=tflite",
-    "posenet_i8_input.jpg":
-        "https://github.com/tensorflow/examples/raw/master/lite/examples/pose_estimation/raspberry_pi/test_data/image3.jpeg"
-})
+file_dict = dict(
+    {
+        "mobilenet_v1.tflite": "https://tfhub.dev/tensorflow/lite-model/mobilenet_v1_1.0_160/1/default/1?lite-format=tflite",
+        "posenet_i8.tflite": "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/int8/4?lite-format=tflite",
+        "posenet_i8_input.jpg": "https://github.com/tensorflow/examples/raw/master/lite/examples/pose_estimation/raspberry_pi/test_data/image3.jpeg",
+    }
+)
 
 BUCKET_NAME = "iree-model-artifacts"
 FOLDER_NAME = "tflite-integration-tests"
 
 
 def upload_model(source, destination, tmpfile):
-  """Uploads a file to the bucket."""
-  urllib.request.urlretrieve(source, tmpfile)
+    """Uploads a file to the bucket."""
+    urllib.request.urlretrieve(source, tmpfile)
 
-  storage_client = storage.Client()
-  bucket = storage_client.get_bucket(BUCKET_NAME)
-  blob = bucket.blob("/".join([FOLDER_NAME, destination]))
-  blob.upload_from_filename(tmpfile)
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(BUCKET_NAME)
+    blob = bucket.blob("/".join([FOLDER_NAME, destination]))
+    blob.upload_from_filename(tmpfile)
 
 
 def main(argv):
-  tf = tempfile.NamedTemporaryFile()
+    tf = tempfile.NamedTemporaryFile()
 
-  items = file_dict.items()
+    items = file_dict.items()
 
-  if FLAGS.file in file_dict:
-    items = [(FLAGS.file, file_dict[FLAGS.file])]
-  elif FLAGS.file != "all":
-    print('Unknown file to upload: ', "\"" + FLAGS.file + "\"")
-    exit()
+    if FLAGS.file in file_dict:
+        items = [(FLAGS.file, file_dict[FLAGS.file])]
+    elif FLAGS.file != "all":
+        print("Unknown file to upload: ", '"' + FLAGS.file + '"')
+        exit()
 
-  for dst, src in items:
-    upload_model(src, dst, tf.name)
+    for dst, src in items:
+        upload_model(src, dst, tf.name)
 
 
-if __name__ == '__main__':
-  app.run(main)
+if __name__ == "__main__":
+    app.run(main)

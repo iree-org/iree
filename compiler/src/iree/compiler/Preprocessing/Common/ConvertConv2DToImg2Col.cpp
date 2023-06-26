@@ -30,13 +30,15 @@ static bool hasAllOneValues(DenseIntElementsAttr attr) {
 
 static Value createAdd(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt) return builder.create<arith::AddIOp>(loc, x, y);
+  if (isInt)
+    return builder.create<arith::AddIOp>(loc, x, y);
   return builder.create<arith::AddFOp>(loc, x, y);
 }
 
 static Value createMul(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt) return builder.create<arith::MulIOp>(loc, x, y);
+  if (isInt)
+    return builder.create<arith::MulIOp>(loc, x, y);
   return builder.create<arith::MulFOp>(loc, x, y);
 }
 
@@ -77,7 +79,7 @@ namespace {
 // multplication.
 class ConvertConv2DNhwcHwcf final
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
@@ -91,7 +93,8 @@ class ConvertConv2DNhwcHwcf final
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -110,7 +113,7 @@ class ConvertConv2DNhwcHwcf final
 
     auto loc = convOp.getLoc();
 
-    SmallVector<int64_t, 4> colTensorShape = {n, oh, ow, fh, fw, ic};
+    SmallVector<int64_t> colTensorShape = {n, oh, ow, fh, fw, ic};
 
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
@@ -123,8 +126,8 @@ class ConvertConv2DNhwcHwcf final
     auto swSym = rewriter.getAffineConstantExpr(
         convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr, 4> inputExprs = {nDim, ohDim * shSym + khDim,
-                                             owDim * swSym + kwDim, icDim};
+    SmallVector<AffineExpr> inputExprs = {nDim, ohDim * shSym + khDim,
+                                          owDim * swSym + kwDim, icDim};
 
     auto nloops = colTensorShape.size();
 
@@ -132,7 +135,7 @@ class ConvertConv2DNhwcHwcf final
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
 
-    SmallVector<AffineMap, 4> img2colIndexingMaps = {
+    SmallVector<AffineMap> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
@@ -228,7 +231,7 @@ class ConvertConv2DNhwcHwcf final
 // is a batched matrix-vector product.
 class ConvertDepthwiseConv2DNhwcHwc final
     : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
- public:
+public:
   using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
@@ -245,7 +248,8 @@ class ConvertDepthwiseConv2DNhwcHwc final
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     auto loc = convOp.getLoc();
 
@@ -254,12 +258,12 @@ class ConvertDepthwiseConv2DNhwcHwc final
       auto nloops = indices.size();
       auto inputShape = operandTensorType.getShape();
 
-      SmallVector<AffineExpr, 4> exprs =
-          llvm::map_to_vector<4>(indices, [&](int64_t index) -> AffineExpr {
+      SmallVector<AffineExpr> exprs =
+          llvm::map_to_vector(indices, [&](int64_t index) -> AffineExpr {
             return rewriter.getAffineDimExpr(index);
           });
 
-      SmallVector<int64_t> targetShape = llvm::map_to_vector<4>(
+      SmallVector<int64_t> targetShape = llvm::map_to_vector(
           indices, [&](int64_t index) -> int64_t { return inputShape[index]; });
 
       Value outputTensor = rewriter.create<tensor::EmptyOp>(
@@ -302,7 +306,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
     const int fh = filterTShape[1];
     const int fw = filterTShape[2];
 
-    SmallVector<int64_t, 4> colTensorShape = {n, c, oh, ow, fh, fw};
+    SmallVector<int64_t> colTensorShape = {n, c, oh, ow, fh, fw};
     Value transposedOutputTensor = transposeOperand(output, {0, 3, 1, 2});
 
     AffineExpr nDim, cDim, ohDim, owDim, khDim, kwDim;
@@ -384,7 +388,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
 // (i.e. (D, C x Kh x Kw) * (C x Kh x Kw, Ho x Wo))
 class ConvertConv2DNchwFchw final
     : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
@@ -398,7 +402,8 @@ class ConvertConv2DNchwFchw final
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -417,7 +422,7 @@ class ConvertConv2DNchwFchw final
 
     auto loc = convOp.getLoc();
 
-    SmallVector<int64_t, 4> colTensorShape = {n, ic, fh, fw, oh, ow};
+    SmallVector<int64_t> colTensorShape = {n, ic, fh, fw, oh, ow};
 
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
@@ -430,8 +435,8 @@ class ConvertConv2DNchwFchw final
     auto swSym = rewriter.getAffineConstantExpr(
         convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr, 4> inputExprs = {nDim, icDim, ohDim * shSym + khDim,
-                                             owDim * swSym + kwDim};
+    SmallVector<AffineExpr> inputExprs = {nDim, icDim, ohDim * shSym + khDim,
+                                          owDim * swSym + kwDim};
 
     auto nloops = colTensorShape.size();
 
@@ -439,7 +444,7 @@ class ConvertConv2DNchwFchw final
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
 
-    SmallVector<AffineMap, 4> img2colIndexingMaps = {
+    SmallVector<AffineMap> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
@@ -545,12 +550,12 @@ struct ConvertConv2DToImg2ColPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass() {
   return std::make_unique<ConvertConv2DToImg2ColPass>();
 }
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -170,7 +170,7 @@ std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 // Transform dialect version of tile and decompose attention
 SmallVector<Operation *>
 tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
-                          IRRewriter &rewriter);
+                          RewriterBase &rewriter);
 
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.

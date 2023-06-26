@@ -9,7 +9,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
 #include "iree/task/submission.h"

@@ -60,7 +60,7 @@ $ python3 configure_bazel.py
 Run all core tests that pass on our OSS CI:
 
 ```shell
-$ bazel test -k //iree/... \
+$ bazel test -k //... \
   --test_env=IREE_VULKAN_DISABLE=1 \
   --build_tag_filters="-nokokoro" \
   --test_tag_filters="--nokokoro,-driver=vulkan"

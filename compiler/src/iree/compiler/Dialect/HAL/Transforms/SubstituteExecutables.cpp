@@ -27,9 +27,9 @@ namespace HAL {
 //
 // To support round-tripping with --iree-hal-dump-executable-sources-to= we
 // support stripping file names of |prefix| when present.
-static LogicalResult scanSearchPath(
-    std::string prefix, StringRef searchPath,
-    std::unordered_map<std::string, std::string> &substitutions) {
+static LogicalResult
+scanSearchPath(std::string prefix, StringRef searchPath,
+               std::unordered_map<std::string, std::string> &substitutions) {
   if (!llvm::sys::fs::is_directory(searchPath)) {
     llvm::errs() << "iree-hal-substitute-executables source path `"
                  << searchPath << "` not found or not a directory\n";
@@ -41,25 +41,26 @@ static LogicalResult scanSearchPath(
        dir != dir_end && !ec; dir.increment(ec)) {
     auto childPath = dir->path();
     llvm::sys::fs::file_status status;
-    if (llvm::sys::fs::status(childPath, status)) continue;
+    if (llvm::sys::fs::status(childPath, status))
+      continue;
     switch (status.type()) {
-      case llvm::sys::fs::file_type::regular_file:
-      case llvm::sys::fs::file_type::symlink_file:
-      case llvm::sys::fs::file_type::type_unknown: {
-        // File we can access.
-        auto childName = llvm::sys::path::stem(childPath);
-        if (!childName.empty() && childName != "." && childName != "..") {
-          if (childName.starts_with(prefix)) {
-            // Strip prefix.
-            childName = childName.substr(prefix.size());
-          }
-          substitutions[std::string(childName)] = childPath;
+    case llvm::sys::fs::file_type::regular_file:
+    case llvm::sys::fs::file_type::symlink_file:
+    case llvm::sys::fs::file_type::type_unknown: {
+      // File we can access.
+      auto childName = llvm::sys::path::stem(childPath);
+      if (!childName.empty() && childName != "." && childName != "..") {
+        if (childName.starts_with(prefix)) {
+          // Strip prefix.
+          childName = childName.substr(prefix.size());
         }
-        break;
+        substitutions[std::string(childName)] = childPath;
       }
-      default:
-        // Directory/etc we skip.
-        break;
+      break;
+    }
+    default:
+      // Directory/etc we skip.
+      break;
     }
   }
   if (ec) {
@@ -96,12 +97,14 @@ static OwningOpRef<Operation *> loadModuleObject(MLIRContext *context,
 
 // Loads the MLIR at |filePath| and replaces |executableOp| with an executable
 // with the same name from the file.
-static LogicalResult replaceExecutableOpWithMLIR(
-    IREE::HAL::ExecutableOp executableOp, StringRef filePath) {
+static LogicalResult
+replaceExecutableOpWithMLIR(IREE::HAL::ExecutableOp executableOp,
+                            StringRef filePath) {
   // Load the replacement IR. It may have any mix of stuff in it including
   // multiple other executables.
   auto rootOpRef = loadModuleObject(executableOp.getContext(), filePath);
-  if (!rootOpRef) return failure();
+  if (!rootOpRef)
+    return failure();
   IREE::HAL::ExecutableOp replacementOp;
   if (auto moduleOp = dyn_cast<mlir::ModuleOp>(rootOpRef.get())) {
     // We expect a `hal.executable` with the same name as the one we are
@@ -140,8 +143,9 @@ static LogicalResult replaceExecutableOpWithMLIR(
 }
 
 // Drops the implementation of |executableOp| and links against |filePath|.
-static LogicalResult externalizeExecutableOp(
-    IREE::HAL::ExecutableOp executableOp, StringRef filePath) {
+static LogicalResult
+externalizeExecutableOp(IREE::HAL::ExecutableOp executableOp,
+                        StringRef filePath) {
   // Can't support multiple variants on this path. We could allow some magic way
   // to specify the full #hal.executable.objects dictionary but that's a stretch
   // for this developer tool.
@@ -160,7 +164,8 @@ static LogicalResult externalizeExecutableOp(
   auto fileObjectAttr = builder.getAttr<IREE::HAL::ExecutableObjectAttr>(
       builder.getStringAttr(filePath), nullptr);
   auto fileContents = fileObjectAttr.loadData();
-  if (!fileContents) return failure();
+  if (!fileContents)
+    return failure();
 
   // Link the referenced object file contents. We fully replace the existing
   // objects in case there were any as this does entire executable replacement -
@@ -187,8 +192,9 @@ static LogicalResult externalizeExecutableOp(
   return success();
 }
 
-static LogicalResult substituteExecutableOp(
-    IREE::HAL::ExecutableOp executableOp, StringRef filePath) {
+static LogicalResult
+substituteExecutableOp(IREE::HAL::ExecutableOp executableOp,
+                       StringRef filePath) {
   if (filePath.ends_with_insensitive(".mlir") ||
       filePath.ends_with_insensitive(".mlirbc")) {
     return replaceExecutableOpWithMLIR(executableOp, filePath);
@@ -199,7 +205,7 @@ static LogicalResult substituteExecutableOp(
 
 class SubstituteExecutablesPass
     : public PassWrapper<SubstituteExecutablesPass, OperationPass<ModuleOp>> {
- public:
+public:
   SubstituteExecutablesPass() = default;
   SubstituteExecutablesPass(const SubstituteExecutablesPass &pass) {}
   SubstituteExecutablesPass(ArrayRef<std::string> substitutions) {
@@ -251,7 +257,8 @@ class SubstituteExecutablesPass
       uniqueSubstitutions[std::string(key)] = value;
     }
 
-    if (uniqueSubstitutions.empty()) return;  // no-op
+    if (uniqueSubstitutions.empty())
+      return; // no-op
 
     // Walk each substitution and process the matching executable if found.
     for (auto &[executableName, filePath] : uniqueSubstitutions) {
@@ -279,7 +286,7 @@ class SubstituteExecutablesPass
     }
   }
 
- private:
+private:
   ListOption<std::string> substitutions{
       *this, "substitutions",
       llvm::cl::desc(
@@ -289,13 +296,13 @@ class SubstituteExecutablesPass
       llvm::cl::desc("Path to source executable substitutions from.")};
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
-    ArrayRef<std::string> substitutions) {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSubstituteExecutablesPass(ArrayRef<std::string> substitutions) {
   return std::make_unique<SubstituteExecutablesPass>(substitutions);
 }
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
-    std::string searchPath) {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSubstituteExecutablesPass(std::string searchPath) {
   return std::make_unique<SubstituteExecutablesPass>(std::move(searchPath));
 }
 
@@ -303,7 +310,7 @@ static PassRegistration<SubstituteExecutablesPass> pass([] {
   return std::make_unique<SubstituteExecutablesPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

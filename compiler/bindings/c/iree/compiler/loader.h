@@ -22,4 +22,4 @@ bool ireeCompilerLoadLibrary(const char *libraryPath);
 }
 #endif
 
-#endif  // IREE_COMPILER_LOADER_H
+#endif // IREE_COMPILER_LOADER_H

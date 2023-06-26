@@ -19,63 +19,74 @@ import requests
 
 
 def parse_arguments():
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--repo",
-                      "--repository",
-                      default="openxla/iree",
-                      help="The GitHub repository to fetch releases from.")
-  parser.add_argument(
-      "--output",
-      default="-",
-      help="The file to write the HTML to or '-' for stdout (the default)")
-  return parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--repo",
+        "--repository",
+        default="openxla/iree",
+        help="The GitHub repository to fetch releases from.",
+    )
+    parser.add_argument(
+        "--output",
+        default="-",
+        help="The file to write the HTML to or '-' for stdout (the default)",
+    )
+    return parser.parse_args()
 
 
 class ReleaseFetcher:
+    def __init__(self, repo, per_page=100):
+        self._session = requests.Session()
+        self._repo = repo
+        self._per_page = per_page
 
-  def __init__(self, repo, per_page=100):
-    self._session = requests.Session()
-    self._repo = repo
-    self._per_page = per_page
+    def get_all(self):
+        url = f"https://api.github.com/repos/{self._repo}/releases"
+        page = 1
 
-  def get_all(self):
-    url = f"https://api.github.com/repos/{self._repo}/releases"
-    page = 1
-
-    while True:
-      response = self._session.get(url,
-                                   params={
-                                       "page": page,
-                                       "per_page": self._per_page,
-                                   })
-      for release in response.json():
-        yield release
-      if "next" not in response.links:
-        break
-      page += 1
+        while True:
+            response = self._session.get(
+                url,
+                params={
+                    "page": page,
+                    "per_page": self._per_page,
+                },
+            )
+            for release in response.json():
+                yield release
+            if "next" not in response.links:
+                break
+            page += 1
 
 
 def main(args):
-  fetcher = ReleaseFetcher(repo=args.repo)
-  with (sys.stdout if args.output == "-" else open(args.output, "w")) as f:
-    f.write(
-        textwrap.dedent("""\
+    fetcher = ReleaseFetcher(repo=args.repo)
+    with sys.stdout if args.output == "-" else open(args.output, "w") as f:
+        f.write(
+            textwrap.dedent(
+                """\
             <!DOCTYPE html>
             <html>
               <body>
-            """))
-    for release in fetcher.get_all():
-      if release["draft"]:
-        continue
-      for asset in release["assets"]:
-        url = html.escape(asset['browser_download_url'])
-        name = html.escape(asset['name'])
-        f.write(f"    <a href={url}>{name}</a><br />\n")
-    f.write(textwrap.dedent("""\
+            """
+            )
+        )
+        for release in fetcher.get_all():
+            if release["draft"]:
+                continue
+            for asset in release["assets"]:
+                url = html.escape(asset["browser_download_url"])
+                name = html.escape(asset["name"])
+                f.write(f"    <a href={url}>{name}</a><br />\n")
+        f.write(
+            textwrap.dedent(
+                """\
       </body>
     </html>
-    """))
+    """
+            )
+        )
 
 
 if __name__ == "__main__":
-  main(parse_arguments())
+    main(parse_arguments())

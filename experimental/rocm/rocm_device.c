@@ -20,7 +20,6 @@
 #include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
 //===----------------------------------------------------------------------===//

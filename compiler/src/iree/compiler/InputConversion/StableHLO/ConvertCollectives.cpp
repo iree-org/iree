@@ -112,8 +112,8 @@ convertToFlowCollectiveReductionOp(const Operation &op) {
   return std::nullopt;
 }
 
-static IREE::Flow::CollectiveElementTypeAttr getCollectiveElementTypeAttr(
-    MLIRContext *context, RankedTensorType type) {
+static IREE::Flow::CollectiveElementTypeAttr
+getCollectiveElementTypeAttr(MLIRContext *context, RankedTensorType type) {
   std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
       convertToFlowCollectiveElementType(type.getElementType());
   if (!collectiveElemType) {
@@ -156,7 +156,8 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
                                                     OpBuilder &builder) {
   IndexSet indexSet(loc, builder);
   Value noColor = indexSet.get(-1);
-  if (!groups) return std::make_pair(noColor, noColor);
+  if (!groups)
+    return std::make_pair(noColor, noColor);
 
   auto groupsType = llvm::cast<RankedTensorType>(groups.getType());
   assert(groupsType.getRank() == 2);
@@ -202,9 +203,9 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
   return std::make_pair(color, key);
 }
 
-static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
-    DenseIntElementsAttr replicaGroups, int32_t numPartitions,
-    OpBuilder &builder) {
+static DenseIntElementsAttr
+convertToRankGroupsByCrossReplica(DenseIntElementsAttr replicaGroups,
+                                  int32_t numPartitions, OpBuilder &builder) {
   if (numPartitions <= 1) {
     // Treat as a single partition.
     return replicaGroups;
@@ -236,9 +237,9 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplica(
   return DenseIntElementsAttr::get(type, newValues);
 }
 
-static DenseIntElementsAttr convertToRankGroupsByCrossPartition(
-    DenseIntElementsAttr partitionGroups, int32_t numReplicas,
-    OpBuilder &builder) {
+static DenseIntElementsAttr
+convertToRankGroupsByCrossPartition(DenseIntElementsAttr partitionGroups,
+                                    int32_t numReplicas, OpBuilder &builder) {
   if (numReplicas <= 1) {
     // Treat as a single replica.
     return partitionGroups;
@@ -344,8 +345,9 @@ enum class CollectiveOpGroupMode {
 // |                    |    > 0    | true               | FlattenedIds             |
 // +--------------------+-----------+--------------------+--------------------------+
 // clang-format on
-static CollectiveOpGroupMode getCollectiveOpGroupMode(
-    int64_t channelId, std::optional<bool> useGlobalDeviceIds) {
+static CollectiveOpGroupMode
+getCollectiveOpGroupMode(int64_t channelId,
+                         std::optional<bool> useGlobalDeviceIds) {
   if (channelId <= 0) {
     assert(!useGlobalDeviceIds.has_value() || !*useGlobalDeviceIds);
     return CollectiveOpGroupMode::CrossReplica;
@@ -368,7 +370,8 @@ static Value createChannelWithGroupInfo(
     DenseIntElementsAttr replicaGroups, std::optional<bool> useGlobalDeviceIds,
     OpBuilder &builder) {
   // Set numPartitions to 1 if not set by the user.
-  if (numPartitions == -1) numPartitions = 1;
+  if (numPartitions == -1)
+    numPartitions = 1;
 
   // Base channel that may be split by the group info.
   Value baseChannel =
@@ -457,9 +460,9 @@ struct PartitionIdOpConversion
   using OpConversionPattern<
       mlir::stablehlo::PartitionIdOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::PartitionIdOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::PartitionIdOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     // PartitionId = rank % numPartitions
     auto moduleOp = op->getParentOfType<ModuleOp>();
@@ -477,7 +480,7 @@ struct PartitionIdOpConversion
       value = rewriter.create<arith::RemUIOp>(loc, rank, cst);
     }
     auto resultType =
-        llvm::cast<RankedTensorType>(op.getType());  // tensor<ui32>
+        llvm::cast<RankedTensorType>(op.getType()); // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, value);
@@ -494,9 +497,9 @@ struct ReplicaIdOpConversion
     : public OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
   using OpConversionPattern<mlir::stablehlo::ReplicaIdOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReplicaIdOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReplicaIdOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
         loc, /*group=*/StringAttr{});
@@ -512,7 +515,7 @@ struct ReplicaIdOpConversion
     }
 
     auto resultType =
-        llvm::cast<RankedTensorType>(op.getType());  // tensor<ui32>
+        llvm::cast<RankedTensorType>(op.getType()); // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, rank);
@@ -528,9 +531,9 @@ struct AllGatherOpConversion final
     : OpConversionPattern<mlir::stablehlo::AllGatherOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::AllGatherOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::AllGatherOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
@@ -587,9 +590,9 @@ struct AllReduceOpConversion final
     : OpConversionPattern<mlir::stablehlo::AllReduceOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::AllReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::AllReduceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
@@ -717,9 +720,9 @@ struct AllToAllOpConversion final
     : OpConversionPattern<mlir::stablehlo::AllToAllOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::AllToAllOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::AllToAllOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
     auto moduleOp = op->getParentOfType<ModuleOp>();
@@ -781,9 +784,9 @@ struct ReduceScatterOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReduceScatterOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReduceScatterOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReduceScatterOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
@@ -890,9 +893,9 @@ struct CollectivePermuteOpConversion
   using OpConversionPattern<
       mlir::stablehlo::CollectivePermuteOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::CollectivePermuteOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::CollectivePermuteOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
     auto moduleOp = op->getParentOfType<ModuleOp>();
@@ -909,7 +912,8 @@ struct CollectivePermuteOpConversion
     int64_t numParticipants = mode == CollectiveOpGroupMode::CrossReplica
                                   ? numReplicas
                                   : numPartitions;
-    if (numParticipants == -1) numParticipants = 1;
+    if (numParticipants == -1)
+      numParticipants = 1;
     SmallVector<Attribute> replicaGroups;
     for (int64_t i = 0; i < numParticipants; ++i) {
       replicaGroups.push_back(rewriter.getI64IntegerAttr(i));
@@ -980,7 +984,7 @@ struct CollectivePermuteOpConversion
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateStableHloCollectivesConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
@@ -992,4 +996,4 @@ void populateStableHloCollectivesConversionPatterns(
                                                               context);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

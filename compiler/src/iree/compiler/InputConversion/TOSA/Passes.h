@@ -44,7 +44,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTosaToLinalgExt();
 
 void registerTOSAConversionPasses();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_TOSA_PASSES_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_TOSA_PASSES_H_

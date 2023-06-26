@@ -179,9 +179,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyLoweringToCmdPass();
 
 void registerStreamPasses();
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_

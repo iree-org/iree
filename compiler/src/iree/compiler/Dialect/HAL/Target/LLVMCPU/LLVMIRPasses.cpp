@@ -27,12 +27,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-std::unique_ptr<llvm::TargetMachine> createTargetMachine(
-    const LLVMTarget &target, const LLVMTargetOptions &targetOptions) {
+std::unique_ptr<llvm::TargetMachine>
+createTargetMachine(const LLVMTarget &target,
+                    const LLVMTargetOptions &targetOptions) {
   std::string errorMessage;
   auto llvmTarget =
       llvm::TargetRegistry::lookupTarget(target.triple, errorMessage);
-  if (!llvmTarget) return nullptr;
+  if (!llvmTarget)
+    return nullptr;
   std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
       target.triple, target.cpu /* cpu e.g k8*/,
       target.cpuFeatures /* cpu features e.g avx512fma*/, targetOptions.options,
@@ -68,35 +70,34 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
                                    cGSCCAnalysisManager, moduleAnalysisManager);
 
   switch (options.sanitizerKind) {
-    case SanitizerKind::kNone:
-      break;
-    case SanitizerKind::kAddress: {
-      passBuilder.registerOptimizerLastEPCallback(
-          [](llvm::ModulePassManager &modulePassManager,
-             llvm::OptimizationLevel Level) {
-            llvm::AddressSanitizerOptions opts;
-            // Can use Never or Always, just not the default Runtime, which
-            // introduces a reference to
-            // __asan_option_detect_stack_use_after_return, causing linker
-            // errors, and anyway we wouldn't really want bother to with a
-            // runtime switch for that.
-            opts.UseAfterReturn =
-                llvm::AsanDetectStackUseAfterReturnMode::Always;
-            bool moduleUseAfterScope = false;
-            bool useOdrIndicator = false;
-            modulePassManager.addPass(llvm::AddressSanitizerPass(
-                opts, moduleUseAfterScope, useOdrIndicator));
-          });
-    } break;
-    case SanitizerKind::kThread: {
-      passBuilder.registerOptimizerLastEPCallback(
-          [](llvm::ModulePassManager &modulePassManager,
-             llvm::OptimizationLevel Level) {
-            modulePassManager.addPass(llvm::ModuleThreadSanitizerPass());
-            modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(
-                llvm::ThreadSanitizerPass()));
-          });
-    } break;
+  case SanitizerKind::kNone:
+    break;
+  case SanitizerKind::kAddress: {
+    passBuilder.registerOptimizerLastEPCallback(
+        [](llvm::ModulePassManager &modulePassManager,
+           llvm::OptimizationLevel Level) {
+          llvm::AddressSanitizerOptions opts;
+          // Can use Never or Always, just not the default Runtime, which
+          // introduces a reference to
+          // __asan_option_detect_stack_use_after_return, causing linker
+          // errors, and anyway we wouldn't really want bother to with a
+          // runtime switch for that.
+          opts.UseAfterReturn = llvm::AsanDetectStackUseAfterReturnMode::Always;
+          bool moduleUseAfterScope = false;
+          bool useOdrIndicator = false;
+          modulePassManager.addPass(llvm::AddressSanitizerPass(
+              opts, moduleUseAfterScope, useOdrIndicator));
+        });
+  } break;
+  case SanitizerKind::kThread: {
+    passBuilder.registerOptimizerLastEPCallback(
+        [](llvm::ModulePassManager &modulePassManager,
+           llvm::OptimizationLevel Level) {
+          modulePassManager.addPass(llvm::ModuleThreadSanitizerPass());
+          modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(
+              llvm::ThreadSanitizerPass()));
+        });
+  } break;
   }
 
   if (options.optimizerOptLevel != llvm::OptimizationLevel::O0 ||
@@ -107,7 +108,8 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
     modulePassManager.run(*module, moduleAnalysisManager);
   }
 
-  if (llvm::verifyModule(*module)) return failure();
+  if (llvm::verifyModule(*module))
+    return failure();
 
   return success();
 }
@@ -135,7 +137,7 @@ LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
   return success();
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

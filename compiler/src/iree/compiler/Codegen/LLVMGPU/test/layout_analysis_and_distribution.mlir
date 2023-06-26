@@ -977,7 +977,7 @@ builtin.module {
   ^bb1(%variant_op: !transform.any_op):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %reordered_func = transform.iree.reorder_transpose %top_level_func : (!transform.any_op) -> !transform.any_op
-    transform.iree.apply_patterns %reordered_func { cse } : (!transform.any_op) -> ()
+     transform.iree.apply_cse %reordered_func : !transform.any_op
   }
 }
 

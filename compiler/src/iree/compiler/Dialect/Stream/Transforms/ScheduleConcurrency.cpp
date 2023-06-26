@@ -55,12 +55,14 @@ struct WavePartitionBuilder {
     Operation *insertionPt = nullptr;
     for (auto in : partition->ins) {
       auto *definingOp = in.getDefiningOp();
-      if (!definingOp) continue;
-      if (definingOp->getBlock() != parentBlock) continue;
+      if (!definingOp)
+        continue;
+      if (definingOp->getBlock() != parentBlock)
+        continue;
       if (!insertionPt) {
-        insertionPt = definingOp;  // first defining op
+        insertionPt = definingOp; // first defining op
       } else if (insertionPt->isBeforeInBlock(definingOp)) {
-        insertionPt = definingOp;  // moving insertion point down
+        insertionPt = definingOp; // moving insertion point down
       }
     }
     OpBuilder parentBuilder(context);
@@ -82,7 +84,8 @@ struct WavePartitionBuilder {
       resultTypes.push_back(out.getType());
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, out, parentBuilder);
-      if (resultSize) resultSizes.push_back(resultSize);
+      if (resultSize)
+        resultSizes.push_back(resultSize);
     }
     SmallVector<Value> operands;
     SmallVector<Type> operandTypes;
@@ -91,12 +94,14 @@ struct WavePartitionBuilder {
     operandTypes.reserve(partition->ins.size());
     operandSizes.reserve(partition->ins.size());
     for (auto in : partition->ins) {
-      if (!llvm::isa<IREE::Stream::ResourceType>(in.getType())) continue;
+      if (!llvm::isa<IREE::Stream::ResourceType>(in.getType()))
+        continue;
       operands.push_back(in);
       operandTypes.push_back(in.getType());
       auto operandSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, in, parentBuilder);
-      if (operandSize) operandSizes.push_back(operandSize);
+      if (operandSize)
+        operandSizes.push_back(operandSize);
     }
 
     // TODO(benvanik): tie operands, or leave to canonicalization.
@@ -130,7 +135,8 @@ struct WavePartitionBuilder {
   //
   // Returns true if the operation was cloned into the partition.
   bool visit(Operation *op) {
-    if (!partition->ops.contains(op)) return false;
+    if (!partition->ops.contains(op))
+      return false;
 
     // Clone the op into the partition and remap it.
     auto *clonedOp = builder.clone(*op, mapping);
@@ -154,7 +160,8 @@ struct WavePartitionBuilder {
       results.push_back(newResult);
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           concurrentOp.getLoc(), newResult, builder);
-      if (resultSize) resultSizes.push_back(resultSize);
+      if (resultSize)
+        resultSizes.push_back(resultSize);
     }
     builder.create<IREE::Stream::YieldOp>(concurrentOp.getLoc(), results,
                                           resultSizes);
@@ -169,7 +176,7 @@ struct WavePartitionBuilder {
 
 class ScheduleConcurrencyPass
     : public ScheduleConcurrencyBase<ScheduleConcurrencyPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
@@ -183,7 +190,8 @@ class ScheduleConcurrencyPass
     }
     for (auto executeOp :
          parentOp.getCallableRegion()->getOps<IREE::Stream::AsyncExecuteOp>()) {
-      if (failed(runOnRegion(executeOp))) return signalPassFailure();
+      if (failed(runOnRegion(executeOp)))
+        return signalPassFailure();
     }
   }
 
@@ -199,8 +207,10 @@ class ScheduleConcurrencyPass
     // Compute a set of partitions covering all of the streamable ops in the
     // execution region.
     auto waveSet = partitionRegionConcurrency(configAttr, block);
-    if (waveSet.empty()) return success();
-    if (failed(waveSet.verify(parentOp.getLoc()))) return failure();
+    if (waveSet.empty())
+      return success();
+    if (failed(waveSet.verify(parentOp.getLoc())))
+      return failure();
 
     // Create partition builders for each partition.
     // We'll clone ops into each and insert them into the block at the
@@ -209,7 +219,8 @@ class ScheduleConcurrencyPass
     SmallVector<WavePartitionBuilder> partitionBuilders;
     partitionBuilders.reserve(waveSet.size());
     for (auto partition : llvm::enumerate(waveSet.partitions)) {
-      if (partition.value().ops.size() == 1) continue;
+      if (partition.value().ops.size() == 1)
+        continue;
       partitionBuilders.push_back(WavePartitionBuilder(block, partition.index(),
                                                        &partition.value(),
                                                        mapping, &getContext()));
@@ -222,7 +233,8 @@ class ScheduleConcurrencyPass
     // creates a lot of new IR (up to O(op*partitions)).
     SetVector<Operation *> deadOps;
     for (auto &op : *block) {
-      if (op.hasTrait<OpTrait::IsTerminator>()) continue;
+      if (op.hasTrait<OpTrait::IsTerminator>())
+        continue;
       bool handled = false;
       for (auto &partitionBuilder : partitionBuilders) {
         handled = partitionBuilder.visit(&op) || handled;
@@ -260,14 +272,14 @@ class ScheduleConcurrencyPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<CallableOpInterface>>
 createScheduleConcurrencyPass() {
   return std::make_unique<ScheduleConcurrencyPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

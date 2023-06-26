@@ -10,7 +10,6 @@
 
 #include "experimental/webgpu/buffer.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 iree_status_t iree_hal_webgpu_staging_buffer_initialize(
     WGPUDevice device, const WGPULimits* limits,
@@ -27,8 +26,8 @@ iree_status_t iree_hal_webgpu_staging_buffer_initialize(
   if ((host_buffer_capacity % limits->minUniformBufferOffsetAlignment) != 0) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "host buffer capacity (%zu) must match the buffer "
-                            "offset alignment (%d)",
+                            "host buffer capacity (%" PRIhsz
+                            ") must match the buffer offset alignment (%d)",
                             host_buffer_capacity,
                             limits->minUniformBufferOffsetAlignment);
   }

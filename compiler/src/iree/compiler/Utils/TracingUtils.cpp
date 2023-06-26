@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Utils/TracingUtils.h"
 
-#if IREE_ENABLE_COMPILER_TRACING && \
+#if IREE_ENABLE_COMPILER_TRACING &&                                            \
     IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #include "mlir/IR/SymbolTable.h"
@@ -21,7 +21,7 @@ namespace iree_compiler {
 
 namespace {
 thread_local llvm::SmallVector<iree_zone_id_t, 8> passTraceZonesStack;
-}  // namespace
+} // namespace
 
 static void prettyPrintOpBreadcrumb(Operation *op, llvm::raw_ostream &os) {
   auto parentOp = op->getParentOp();
@@ -63,7 +63,7 @@ namespace {
 
 class TraceFrameMarkBeginPass
     : public PassWrapper<TraceFrameMarkBeginPass, OperationPass<ModuleOp>> {
- public:
+public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TraceFrameMarkBeginPass);
 
   TraceFrameMarkBeginPass() = default;
@@ -83,7 +83,7 @@ class TraceFrameMarkBeginPass
 
 class TraceFrameMarkEndPass
     : public PassWrapper<TraceFrameMarkEndPass, OperationPass<ModuleOp>> {
- public:
+public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TraceFrameMarkEndPass);
 
   TraceFrameMarkEndPass() = default;
@@ -98,20 +98,20 @@ class TraceFrameMarkEndPass
   llvm::StringRef name;
 };
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkBeginPass(
-    llvm::StringRef name) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createTraceFrameMarkBeginPass(llvm::StringRef name) {
   return std::make_unique<TraceFrameMarkBeginPass>(name);
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkEndPass(
-    llvm::StringRef name) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createTraceFrameMarkEndPass(llvm::StringRef name) {
   return std::make_unique<TraceFrameMarkEndPass>(name);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // Allocation tracking
@@ -140,11 +140,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkEndPass(
 // Avoid potential sharp edge by making allocation tracking and sanitizers
 // mutually exclusive. They _might_ work together, but here's a warning anyway.
 #if defined(__has_feature)
-#if __has_feature(address_sanitizer) || __has_feature(memory_sanitizer) || \
+#if __has_feature(address_sanitizer) || __has_feature(memory_sanitizer) ||     \
     __has_feature(thread_sanitizer)
 #error Compiler IREE_TRACING_FEATURE_ALLOCATION_TRACKING not compatible with sanitizers
-#endif  // __has_feature(*_sanitizer)
-#endif  // defined(__has_feature)
+#endif // __has_feature(*_sanitizer)
+#endif // defined(__has_feature)
 
 #include <new>
 
@@ -245,6 +245,6 @@ void operator delete[](void *ptr, size_t sz, std::align_val_t al) noexcept {
   iree_aligned_free(ptr);
 }
 
-#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+#endif // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
-#endif  // IREE_ENABLE_COMPILER_TRACING + IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif // IREE_ENABLE_COMPILER_TRACING + IREE_TRACING_FEATURE_INSTRUMENTATION

@@ -59,9 +59,9 @@ static void collectTiledAndFusedOps(Operation *rootOp,
 /// For IREEs use case we dont need this. So this folds away the `if` condition.
 /// Note this is a fairly hacky workaround, but the current pad operation
 /// semantics force us down this path.
-static FailureOr<tensor::PadOp> foldIfGeneratedFromPadding(
-    RewriterBase &rewriter, tensor::PadOp untiledPadOp,
-    tensor::PadOp tiledPadOp) {
+static FailureOr<tensor::PadOp>
+foldIfGeneratedFromPadding(RewriterBase &rewriter, tensor::PadOp untiledPadOp,
+                           tensor::PadOp tiledPadOp) {
   auto ifOp = dyn_cast<scf::IfOp>(tiledPadOp->getParentOp());
   if (!ifOp) {
     return failure();
@@ -150,7 +150,8 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
                                    tilingResult->loops);
-    if (!fusedProducer) continue;
+    if (!fusedProducer)
+      continue;
 
     // Check if the fused producer has other uses that require the value
     // to be yielded from within the tiled loop.
@@ -189,7 +190,8 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   TilingInterface consumerOp;
   funcOp.walk<WalkOrder::PostOrder, ReverseIterator>([&](TilingInterface op) {
     // Find the next consumer op if it does not have loops.
-    if (op.getLoopIteratorTypes().empty()) return WalkResult::advance();
+    if (op.getLoopIteratorTypes().empty())
+      return WalkResult::advance();
     consumerOp = op;
     return WalkResult::interrupt();
   });
@@ -201,27 +203,34 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   LLVM_DEBUG(llvm::dbgs() << "consumerOp: " << consumerOp << "\n");
   LLVM_DEBUG(llvm::dbgs() << "tilingLevel: " << tilingLevel << "\n");
 
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-      getLoweringConfig(getComputeOps(funcOp));
-  if (failed(maybeLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip TileAndFuse");
-    return;
+  // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
+  // fallback to find a lowering_config from other operations.
+  SmallVector<int64_t> tileSizes;
+  if (auto loweringConfig = getLoweringConfig(consumerOp)) {
+    tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+  } else {
+    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+        getLoweringConfig(getComputeOps(funcOp));
+    if (failed(maybeLoweringConfig)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "can't find lowering_config, skip TileAndFuse");
+      return;
+    }
+    tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
   }
 
   int numLoops = consumerOp.getLoopIteratorTypes().size();
-  SmallVector<int64_t> tilingSizes =
-      maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
-  if (numLoops > tilingSizes.size()) {
-    tilingSizes.append(numLoops - tilingSizes.size(), 0);
+  if (numLoops > tileSizes.size()) {
+    tileSizes.append(numLoops - tileSizes.size(), 0);
   }
-  tilingSizes.resize(numLoops);
+  tileSizes.resize(numLoops);
 
-  if (llvm::all_of(tilingSizes, [&](int64_t size) { return size == 0; })) {
+  if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
     return;
   }
 
-  auto options = scf::SCFTilingOptions().setTileSizes(tilingSizes);
+  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
   IRRewriter rewriter(context);
   if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
@@ -242,12 +251,12 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return signalPassFailure();
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
-    int64_t tilingLevel) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTileAndFusePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTileAndFusePass>(tilingLevel);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

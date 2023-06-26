@@ -18,8 +18,8 @@ void populateStandardToVMVXPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     TypeConverter &typeConverter);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VMVX_CONVERSION_STANDARDTOVMVX_CONVERTSTANDARDTOVMVX_H_
-        // // NOLINT
+#endif // IREE_COMPILER_DIALECT_VMVX_CONVERSION_STANDARDTOVMVX_CONVERTSTANDARDTOVMVX_H_
+       // // NOLINT

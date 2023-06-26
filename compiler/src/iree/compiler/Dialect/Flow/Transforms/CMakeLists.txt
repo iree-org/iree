@@ -47,6 +47,7 @@ iree_cc_library(
     "ExportBenchmarkFuncs.cpp"
     "FormDispatchRegions.cpp"
     "FormDispatchWorkgroups.cpp"
+    "FormScalarDispatches.cpp"
     "FusionOfTensorOps.cpp"
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
@@ -80,6 +81,7 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
+    MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR

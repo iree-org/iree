@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -91,11 +92,12 @@ struct StripResourceConversionCastPattern
   }
 };
 
-}  // namespace
+} // namespace
 
 StreamDialect::StreamDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<StreamDialect>()) {
   context->loadDialect<IREE::Util::UtilDialect>();
+  context->loadDialect<mlir::complex::ComplexDialect>();
 
   registerAttributes();
   registerTypes();
@@ -126,7 +128,7 @@ Operation *StreamDialect::materializeConstant(OpBuilder &builder,
   return nullptr;
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
