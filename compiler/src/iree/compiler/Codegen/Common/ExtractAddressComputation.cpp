@@ -71,8 +71,8 @@ static memref::StoreOp rebuildStoreOp(RewriterBase &rewriter,
                                           storeOp.getNontemporal());
 }
 
-SmallVector<OpFoldResult> getStoreOpViewSizeForEachDim(
-    RewriterBase &rewriter, memref::StoreOp storeOp) {
+SmallVector<OpFoldResult>
+getStoreOpViewSizeForEachDim(RewriterBase &rewriter, memref::StoreOp storeOp) {
   MemRefType ldTy = storeOp.getMemRefType();
   unsigned loadRank = ldTy.getRank();
   return SmallVector<OpFoldResult>(loadRank, rewriter.getIndexAttr(1));
@@ -101,7 +101,7 @@ struct ExtractAddressComputationPass
     : public ExtractAddressComputationBase<ExtractAddressComputationPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void ExtractAddressComputationPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
@@ -115,5 +115,5 @@ void ExtractAddressComputationPass::runOnOperation() {
 std::unique_ptr<Pass> createExtractAddressComputationPass() {
   return std::make_unique<ExtractAddressComputationPass>();
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

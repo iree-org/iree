@@ -18,4 +18,4 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h.inc" // IWYU pragma: export
 // clang-format on
 
-#endif  // #ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENOPS_H_
+#endif // #ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENOPS_H_

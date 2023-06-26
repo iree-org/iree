@@ -16,17 +16,17 @@ class DialectRegistry;
 
 namespace scf {
 class ForallOp;
-}  // namespace scf
+} // namespace scf
 
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 class DispatchWorkgroupsOp;
 class DispatchRegionOp;
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensionsOps.h.inc"
@@ -43,12 +43,12 @@ namespace transform_dialect {
 // Hook to register Flow transformations to the transform dialect.
 class FlowExtensions
     : public transform::TransformDialectExtension<FlowExtensions> {
- public:
+public:
   FlowExtensions();
 };
-}  // namespace transform_dialect
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace transform_dialect
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS_H_
+#endif // IREE_COMPILER_CODEGEN_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS_H_

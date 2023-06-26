@@ -23,9 +23,9 @@ namespace Check {
 template <typename T, typename Adaptor = typename T::Adaptor>
 struct OptionalCheckImportConversion : public VMImportOpConversion<T, Adaptor> {
   using VMImportOpConversion<T, Adaptor>::VMImportOpConversion;
-  LogicalResult matchAndRewrite(
-      T op, typename T::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(T op, typename T::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto hasImport = rewriter.create<IREE::VM::ImportResolvedOp>(
         op.getLoc(), rewriter.getI32Type(), this->importOp.getName());
     auto *followingBlock = rewriter.splitBlock(rewriter.getInsertionBlock(),
@@ -37,7 +37,8 @@ struct OptionalCheckImportConversion : public VMImportOpConversion<T, Adaptor> {
     rewriter.setInsertionPointToStart(callBlock);
     auto results = rewriteToCall(op, adaptor, this->importOp,
                                  *this->getTypeConverter(), rewriter);
-    if (!results.has_value()) return failure();
+    if (!results.has_value())
+      return failure();
     rewriter.replaceOp(op, results.value());
     rewriter.create<IREE::VM::BranchOp>(op.getLoc(), followingBlock);
     return success();
@@ -72,7 +73,7 @@ void populateCheckToHALPatterns(MLIRContext *context,
                                                               typeConverter);
 }
 
-}  // namespace Check
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Check
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

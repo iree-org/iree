@@ -67,5 +67,5 @@ void populateHALInlineToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal_inline.device.query.i64");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -13,13 +13,13 @@ namespace iree_compiler {
 
 class StatusCheckOkOpConversion
     : public OpConversionPattern<IREE::Util::StatusCheckOkOp> {
- public:
+public:
   StatusCheckOkOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::StatusCheckOkOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::StatusCheckOkOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // If status value is non-zero, fail.
     rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
         op, adaptor.getStatus(), op.getMessage().value_or(""));
@@ -35,5 +35,5 @@ void populateUtilStatusToVMPatterns(MLIRContext *context,
   patterns.insert<StatusCheckOkOpConversion>(context, typeConverter);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

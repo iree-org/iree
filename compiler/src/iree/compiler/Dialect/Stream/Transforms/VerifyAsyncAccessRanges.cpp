@@ -24,15 +24,17 @@ namespace Stream {
 namespace {
 
 static std::optional<int64_t> matchConstant(Value value) {
-  if (!value) return std::nullopt;
+  if (!value)
+    return std::nullopt;
   APInt constant;
-  if (!matchPattern(value, m_ConstantInt(&constant))) return std::nullopt;
+  if (!matchPattern(value, m_ConstantInt(&constant)))
+    return std::nullopt;
   return constant.getSExtValue();
 }
 
-static LogicalResult verifyAsyncAccessRange(
-    IREE::Stream::AsyncAccessOpInterface accessOp,
-    IREE::Stream::AsyncAccessRange &range) {
+static LogicalResult
+verifyAsyncAccessRange(IREE::Stream::AsyncAccessOpInterface accessOp,
+                       IREE::Stream::AsyncAccessRange &range) {
   auto start = matchConstant(range.start);
   auto length = matchConstant(range.length);
   auto end = matchConstant(range.end);
@@ -94,8 +96,8 @@ static LogicalResult verifyAsyncAccessRange(
 
 // Statically verifies that the ranges used by |accessOp| are in bounds.
 // Emits errors for all ranges declared on the op that are invalid.
-static LogicalResult verifyAsyncAccessOp(
-    IREE::Stream::AsyncAccessOpInterface accessOp) {
+static LogicalResult
+verifyAsyncAccessOp(IREE::Stream::AsyncAccessOpInterface accessOp) {
   SmallVector<AsyncAccessRange> ranges;
   accessOp.getAsyncAccessRanges(ranges);
   bool allSucceeded = true;
@@ -109,7 +111,7 @@ static LogicalResult verifyAsyncAccessOp(
 
 class VerifyAsyncAccessRangesPass
     : public VerifyAsyncAccessRangesBase<VerifyAsyncAccessRangesPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Stream::StreamDialect>();
   }
@@ -130,14 +132,14 @@ class VerifyAsyncAccessRangesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createVerifyAsyncAccessRangesPass() {
   return std::make_unique<VerifyAsyncAccessRangesPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

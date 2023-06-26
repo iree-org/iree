@@ -81,7 +81,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
       }
 
       int equalsIndex = str.find(" =");
-      if (equalsIndex != std::string::npos) {  // heh
+      if (equalsIndex != std::string::npos) { // heh
         auto results = str.substr(0, equalsIndex);
         valueNames.push_back(builder.getStringAttr(results));
       } else {
@@ -154,8 +154,8 @@ void ValueLiveness::calculateOpOrdering(IREE::VM::FuncOp funcOp) {
   }
 }
 
-LogicalResult ValueLiveness::computeInitialLivenessSets(
-    IREE::VM::FuncOp funcOp) {
+LogicalResult
+ValueLiveness::computeInitialLivenessSets(IREE::VM::FuncOp funcOp) {
   for (auto &block : funcOp.getBlocks()) {
     auto &blockSets = blockLiveness_[&block];
 
@@ -261,11 +261,14 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values entering the block and dying within.
     for (auto value : blockSets.liveIn) {
-      if (blockSets.liveOut.count(value)) continue;
+      if (blockSets.liveOut.count(value))
+        continue;
       Operation *lastUse = &block.front();
       for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block) continue;
-        if (lastUse == use.getOwner()) continue;
+        if (use.getOwner()->getBlock() != &block)
+          continue;
+        if (lastUse == use.getOwner())
+          continue;
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }
@@ -275,12 +278,14 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values defined within the block and not escaping.
     for (auto value : blockSets.defined) {
-      if (blockSets.liveOut.count(value)) continue;
+      if (blockSets.liveOut.count(value))
+        continue;
       Operation *firstUse =
           value.getDefiningOp() ? value.getDefiningOp() : &block.front();
       Operation *lastUse = firstUse;
       for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block) continue;
+        if (use.getOwner()->getBlock() != &block)
+          continue;
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }
@@ -329,5 +334,5 @@ bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
   return false;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

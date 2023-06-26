@@ -26,7 +26,7 @@ namespace HAL {
 // support multiple devices we'll need to change this to be per-device.
 class MemoizeDeviceQueriesPass
     : public PassWrapper<MemoizeDeviceQueriesPass, OperationPass<ModuleOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "iree-hal-memoize-device-queries";
   }
@@ -127,7 +127,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass() {
 
 static PassRegistration<MemoizeDeviceQueriesPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

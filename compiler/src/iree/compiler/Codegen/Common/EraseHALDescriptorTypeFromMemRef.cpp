@@ -38,9 +38,11 @@ struct MemRefTypeConverter final : public TypeConverter {
     addConversion([](BaseMemRefType memRefType) -> std::optional<Type> {
       // Expect #hal.descriptor_type memory spaces.
       Attribute spaceAttr = memRefType.getMemorySpace();
-      if (!spaceAttr) return std::nullopt;
+      if (!spaceAttr)
+        return std::nullopt;
       auto dtAttr = llvm::dyn_cast<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
-      if (!dtAttr) return std::nullopt;
+      if (!dtAttr)
+        return std::nullopt;
 
       // Erase the #hal.descriptor_type memory space.
       if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
@@ -81,9 +83,9 @@ struct EraseMemorySpacePattern final : public ConversionPattern {
   EraseMemorySpacePattern(MLIRContext *context, TypeConverter &converter)
       : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
 
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override;
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override;
 };
 
 LogicalResult EraseMemorySpacePattern::matchAndRewrite(
@@ -123,7 +125,7 @@ struct EraseHALDescriptorTypeFromMemRefPass final
   }
 };
 
-}  // namespace
+} // namespace
 
 LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp) {
   MLIRContext *context = funcOp.getContext();
@@ -142,5 +144,5 @@ createEraseHALDescriptorTypeFromMemRefPass() {
   return std::make_unique<EraseHALDescriptorTypeFromMemRefPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -37,13 +37,13 @@ class VerifyInputLegalityPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createVerifyInputLegalityPass() {
   return std::make_unique<VerifyInputLegalityPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

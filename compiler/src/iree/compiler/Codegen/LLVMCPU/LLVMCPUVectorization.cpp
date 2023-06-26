@@ -113,8 +113,8 @@ static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
 
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis.
 /// Returns failure if vector sizes can't be inferred.
-static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
-    linalg::LinalgOp linalgOp) {
+static FailureOr<SmallVector<int64_t>>
+inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
   LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
 
   SmallVector<int64_t> vectorSizes;
@@ -171,8 +171,9 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
 
 // Give the canonical vector shape of a dispatch, returns the vector sizes for a
 // particular linalg op within that dispatch.
-static SmallVector<int64_t> getVectorSizes(
-    linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
+static SmallVector<int64_t>
+getVectorSizes(linalg::LinalgOp linalgOp,
+               ArrayRef<int64_t> canonicalVectorShape) {
   // Try to infer the vector sizes from the IR. If it fails, try to get them
   // from the lowering config.
   auto inferredVectorSizes = inferVectorSizesFromIR(linalgOp);
@@ -202,7 +203,8 @@ static SmallVector<int64_t> getVectorSizes(
   SmallVector<int64_t> vecSize(
       canonicalVectorShape.take_front(linalgOp.getNumLoops()));
   for (auto [idx, val] : llvm::enumerate(linalgOp.getStaticLoopRanges())) {
-    if (ShapedType::isDynamic(val)) continue;
+    if (ShapedType::isDynamic(val))
+      continue;
     vecSize[idx] = std::max(vecSize[idx], val);
   }
 
@@ -211,7 +213,7 @@ static SmallVector<int64_t> getVectorSizes(
 
 class LLVMCPUVectorizationPass
     : public LLVMCPUVectorizationBase<LLVMCPUVectorizationPass> {
- public:
+public:
   using LLVMCPUVectorizationBase::LLVMCPUVectorizationBase;
   LLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options) {
     this->enableVectorMasking.setValue(options.enableVectorMasking);
@@ -237,7 +239,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op)) candidates.push_back(op);
+    if (isa<linalg::LinalgOp>(op))
+      candidates.push_back(op);
     if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
       candidates.push_back(op);
   });
@@ -250,7 +253,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         auto ty = padOp.getResultType();
         // TODO(hanchung): Infer the vector sizes for pad op after
         // maskedVectorize method allows dynamic result shapes.
-        if (!ty.hasStaticShape()) continue;
+        if (!ty.hasStaticShape())
+          continue;
         vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
       }
     }
@@ -297,14 +301,14 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   linalg::hoistRedundantVectorTransfers(funcOp);
   linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
 }
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass() {
   return std::make_unique<LLVMCPUVectorizationPass>();
 }
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
-    const LLVMCPUVectorizationPassOptions &options) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options) {
   return std::make_unique<LLVMCPUVectorizationPass>(options);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

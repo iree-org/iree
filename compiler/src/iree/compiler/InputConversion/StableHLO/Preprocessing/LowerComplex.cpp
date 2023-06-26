@@ -111,15 +111,15 @@ template <typename T>
 ElementsAttr getSplat(Builder *b, Value val, T constant) {
   return getSplat(b, cast<RankedTensorType>(val.getType()), constant);
 }
-}  // end anonymous namespace
+} // end anonymous namespace
 
 namespace {
 #include "iree/compiler/InputConversion/StableHLO/Preprocessing/ComplexLoweringPatterns.h.inc"
-}  // end anonymous namespace
+} // end anonymous namespace
 
 void populatePreprocessingComplexPatterns(MLIRContext *context,
                                           RewritePatternSet *patterns) {
   patterns->add<ConvertComplexDot>(context);
   populateWithGenerated(*patterns);
 }
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

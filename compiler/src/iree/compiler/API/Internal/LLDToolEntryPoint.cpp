@@ -66,9 +66,11 @@ static Flavor getFlavor(StringRef s) {
 static Flavor parseFlavor(std::vector<const char *> &v) {
   // Parse -flavor option.
   if (v.size() > 1 && v[1] == StringRef("-flavor")) {
-    if (v.size() <= 2) die("missing arg value for '-flavor'");
+    if (v.size() <= 2)
+      die("missing arg value for '-flavor'");
     Flavor f = getFlavor(v[2]);
-    if (f == Invalid) die("Unknown flavor: " + StringRef(v[2]));
+    if (f == Invalid)
+      die("Unknown flavor: " + StringRef(v[2]));
     v.erase(v.begin() + 1, v.begin() + 3);
     return f;
   }
@@ -88,35 +90,34 @@ int ireeCompilerRunLldMain(int argc, char **argv) {
 
   std::vector<const char *> args(argv, argv + argc);
   switch (parseFlavor(args)) {
-    case Gnu:
+  case Gnu:
 #ifndef IREE_COMPILER_LLD_ELF_DISABLED
-      return !elf::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
+    return !elf::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
 #else
-      die("lld is not compiled with ELF support");
+    die("lld is not compiled with ELF support");
 #endif
-    case WinLink:
+  case WinLink:
 #ifndef IREE_COMPILER_LLD_COFF_DISABLED
-      return !coff::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
+    return !coff::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
 #else
-      die("lld is not compiled with COFF support");
+    die("lld is not compiled with COFF support");
 #endif
-    case Darwin:
+  case Darwin:
 #ifndef IREE_COMPILER_LLD_MACHO_DISABLED
-      return !macho::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
+    return !macho::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
 #else
-      die("lld is not compiled with MachO support");
+    die("lld is not compiled with MachO support");
 #endif
-    case Wasm:
+  case Wasm:
 #ifndef IREE_COMPILER_LLD_WASM_DISABLED
-      return !lld::wasm::link(args, stdoutOS, stderrOS, exitEarly,
-                              disableOutput);
+    return !lld::wasm::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
 #else
-      die("lld is not compiled with WASM support");
+    die("lld is not compiled with WASM support");
 #endif
-    default:
-      die("lld is a generic driver.\n"
-          "Invoke ld.lld (Unix), ld64.lld (macOS), lld-link (Windows), wasm-ld"
-          " (WebAssembly) instead");
+  default:
+    die("lld is a generic driver.\n"
+        "Invoke ld.lld (Unix), ld64.lld (macOS), lld-link (Windows), wasm-ld"
+        " (WebAssembly) instead");
   }
 }
-#endif  // IREE_COMPILER_LLD_DISABLED
+#endif // IREE_COMPILER_LLD_DISABLED

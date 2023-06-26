@@ -35,10 +35,11 @@ namespace Codegen {
 
 /// Helper method to generate a function declaration at a module scope,
 /// and a call to that function
-static FailureOr<func::CallOp> createFunctionCall(
-    RewriterBase &rewriter, Operation *op, StringRef fnName,
-    TypeRange callArgumentTypes, TypeRange callReturnTypes,
-    ValueRange callOperands, ArrayRef<NamedAttribute> fnDefAttrs) {
+static FailureOr<func::CallOp>
+createFunctionCall(RewriterBase &rewriter, Operation *op, StringRef fnName,
+                   TypeRange callArgumentTypes, TypeRange callReturnTypes,
+                   ValueRange callOperands,
+                   ArrayRef<NamedAttribute> fnDefAttrs) {
   FunctionType functionType =
       rewriter.getFunctionType(callArgumentTypes, callReturnTypes);
 
@@ -181,14 +182,14 @@ std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
-FailureOr<func::CallOp> UKernelGenericOp::lowerToFunctionCall(
-    RewriterBase &rewriter) {
+FailureOr<func::CallOp>
+UKernelGenericOp::lowerToFunctionCall(RewriterBase &rewriter) {
   return lowerUKernelGenericToFunctionCall(rewriter, *this, getUKernelFnName(),
                                            getStridedOuterDimsAttr());
 }
 
-}  // namespace Codegen
-}  // namespace IREE
+} // namespace Codegen
+} // namespace IREE
 
 //===---------------------------------------------------------------------===//
 // Register bufferization interface.
@@ -199,9 +200,9 @@ template <typename OpTy>
 struct UKernelOpsBufferizationInterface
     : public bufferization::DstBufferizableOpInterfaceExternalModel<
           UKernelOpsBufferizationInterface<OpTy>, OpTy> {
-  LogicalResult bufferize(
-      Operation *op, RewriterBase &rewriter,
-      const bufferization::BufferizationOptions &options) const {
+  LogicalResult
+  bufferize(Operation *op, RewriterBase &rewriter,
+            const bufferization::BufferizationOptions &options) const {
     // TODO: Handle operations with regions if needed.
     if (op->getNumRegions() != 0) {
       op->emitOpError(
@@ -229,7 +230,8 @@ struct UKernelOpsBufferizationInterface
     // Ignore all result types that are tensor types.
     SmallVector<Type> resultTypes;
     for (auto resultType : op->getResultTypes()) {
-      if (llvm::isa<RankedTensorType>(resultType)) continue;
+      if (llvm::isa<RankedTensorType>(resultType))
+        continue;
       resultTypes.push_back(resultType);
     }
 
@@ -251,7 +253,7 @@ struct RegisterUKernelOpsBufferizationInterface {
      ...);
   }
 };
-}  // namespace
+} // namespace
 
 void registerUKernelBufferizationInterface(DialectRegistry &registry) {
   registry.addExtension(
@@ -263,5 +265,5 @@ void registerUKernelBufferizationInterface(DialectRegistry &registry) {
       });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

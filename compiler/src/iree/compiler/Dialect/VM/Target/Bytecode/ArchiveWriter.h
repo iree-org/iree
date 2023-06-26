@@ -27,7 +27,7 @@ namespace VM {
 //  - FlatBuffer is written
 //  - embedded files are flushed
 class ArchiveWriter {
- public:
+public:
   struct File {
     // Name of the file when exposed to users; informational only.
     std::string fileName;
@@ -48,9 +48,9 @@ class ArchiveWriter {
   // Declares an embedded file in the archive and reserves a location for it.
   // The relative offset returned will be stable despite the variable-length
   // FlatBuffer header as it is relative to the header and not the archive 0.
-  virtual File declareFile(
-      std::string fileName, uint64_t fileAlignment, uint64_t fileLength,
-      std::function<LogicalResult(llvm::raw_ostream &os)> write) = 0;
+  virtual File
+  declareFile(std::string fileName, uint64_t fileAlignment, uint64_t fileLength,
+              std::function<LogicalResult(llvm::raw_ostream &os)> write) = 0;
 
   // Writes an in-memory FlatBuffer to the archive as the header and flushes
   // all archive contents.
@@ -63,7 +63,7 @@ class ArchiveWriter {
 // Archive structure:
 //   {json text}
 class JSONArchiveWriter : public ArchiveWriter {
- public:
+public:
   explicit JSONArchiveWriter(Location loc, llvm::raw_ostream &os);
   ~JSONArchiveWriter() override;
   bool supportsFiles() override { return false; }
@@ -72,7 +72,7 @@ class JSONArchiveWriter : public ArchiveWriter {
       std::function<LogicalResult(llvm::raw_ostream &os)> write) override;
   LogicalResult flush(FlatbufferBuilder &fbb) override;
 
- private:
+private:
   Location loc;
   llvm::raw_ostream &os;
 };
@@ -90,7 +90,7 @@ class JSONArchiveWriter : public ArchiveWriter {
 //   [declared file 1]
 //   ...
 class FlatArchiveWriter : public ArchiveWriter {
- public:
+public:
   explicit FlatArchiveWriter(Location loc, llvm::raw_ostream &os);
   ~FlatArchiveWriter() override;
   bool supportsFiles() override { return true; }
@@ -99,10 +99,10 @@ class FlatArchiveWriter : public ArchiveWriter {
       std::function<LogicalResult(llvm::raw_ostream &os)> write) override;
   LogicalResult flush(FlatbufferBuilder &fbb) override;
 
- private:
+private:
   Location loc;
   llvm::raw_ostream &os;
-  uint64_t tailFileOffset = 0;  // unpadded
+  uint64_t tailFileOffset = 0; // unpadded
   SmallVector<File> files;
 };
 
@@ -125,7 +125,7 @@ class FlatArchiveWriter : public ArchiveWriter {
 //  - [zip central directory]
 //    [zip locators]
 class ZIPArchiveWriter : public ArchiveWriter {
- public:
+public:
   explicit ZIPArchiveWriter(Location loc, llvm::raw_ostream &os);
   ~ZIPArchiveWriter() override;
   bool supportsFiles() override { return true; }
@@ -134,16 +134,16 @@ class ZIPArchiveWriter : public ArchiveWriter {
       std::function<LogicalResult(llvm::raw_ostream &os)> write) override;
   LogicalResult flush(FlatbufferBuilder &fbb) override;
 
- private:
+private:
   Location loc;
   llvm::raw_ostream &os;
-  uint64_t tailFileOffset = 0;  // unpadded
+  uint64_t tailFileOffset = 0; // unpadded
   SmallVector<File> files;
 };
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_ARCHIVE_WRITER_H_
+#endif // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_ARCHIVE_WRITER_H_

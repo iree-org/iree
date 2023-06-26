@@ -85,9 +85,9 @@ struct LLVMTargetOptions {
 // Returns LLVMTargetOptions struct intialized with the iree-llvmcpu-* flags.
 LLVMTargetOptions getLLVMTargetOptionsFromFlags();
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMTARGETOPTIONS_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMTARGETOPTIONS_H_

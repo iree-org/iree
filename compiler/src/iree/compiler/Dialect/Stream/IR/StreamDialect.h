@@ -17,7 +17,7 @@ namespace IREE {
 namespace Stream {
 
 class StreamDialect : public Dialect {
- public:
+public:
   explicit StreamDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "stream"; }
 
@@ -32,14 +32,14 @@ class StreamDialect : public Dialect {
   Type parseType(DialectAsmParser &parser) const override;
   void printType(Type type, DialectAsmPrinter &p) const override;
 
- private:
+private:
   void registerAttributes();
   void registerTypes();
 };
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_IR_STREAMDIALECT_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAMDIALECT_H_

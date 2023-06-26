@@ -84,8 +84,8 @@ std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
 // Pass to convert a tensor.pad operation into a linalg.fill +
 // tensor.insert_slice.
-std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
-    bool skipSingleLinalgOpUses = false);
+std::unique_ptr<Pass>
+createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses = false);
 
 // Create a pass to detach elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
@@ -249,8 +249,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantVariablesPass();
 
 /// Creates a pass to dump a graph for dispatches
-std::unique_ptr<Pass> createDumpDispatchGraphPass(
-    raw_ostream &os = llvm::errs());
+std::unique_ptr<Pass>
+createDumpDispatchGraphPass(raw_ostream &os = llvm::errs());
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -258,9 +258,9 @@ std::unique_ptr<Pass> createDumpDispatchGraphPass(
 
 void registerFlowPasses();
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_

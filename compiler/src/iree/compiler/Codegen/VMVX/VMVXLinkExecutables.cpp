@@ -26,7 +26,8 @@ struct VMVXLinkExecutablesPass
 
     auto sourceExecutableOps =
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
-    if (sourceExecutableOps.size() <= 1) return;
+    if (sourceExecutableOps.size() <= 1)
+      return;
 
     // Guess a module name, if needed, to make the output files readable.
     auto moduleName = guessModuleName(moduleOp, "vmvx_module");
@@ -70,11 +71,11 @@ struct VMVXLinkExecutablesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass() {
   return std::make_unique<VMVXLinkExecutablesPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

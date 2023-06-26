@@ -31,7 +31,7 @@ namespace {
 Value emptyCopy(ImplicitLocOpBuilder &rewriter, Value value) {
   Type eTy = getElementTypeOrSelf(value.getType());
   SmallVector<OpFoldResult> mixedSizes =
-      tensor::createDimValues(rewriter, rewriter.getLoc(), value);
+      tensor::getMixedSizes(rewriter, rewriter.getLoc(), value);
   return rewriter.create<tensor::EmptyOp>(mixedSizes, eTy);
 }
 
@@ -353,12 +353,12 @@ struct LinalgQuantizedConvToConvPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedConvToConvPass() {
   return std::make_unique<LinalgQuantizedConvToConvPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

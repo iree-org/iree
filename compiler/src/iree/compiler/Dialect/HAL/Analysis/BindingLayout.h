@@ -58,7 +58,7 @@ struct PipelineLayout {
 //
 // NOTE: erasing dispatch ops will invalidate this analysis.
 class BindingLayoutAnalysis {
- public:
+public:
   using ExportDispatchMap =
       DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>;
   using ExportLayoutMap = DenseMap<Operation *, PipelineLayout>;
@@ -66,14 +66,14 @@ class BindingLayoutAnalysis {
   explicit BindingLayoutAnalysis(Operation *rootOp);
 
   // Returns all of the dispatches to the given executable export.
-  SmallVector<IREE::Stream::CmdDispatchOp> getExportDispatches(
-      IREE::Stream::ExecutableExportOp exportOp) const;
+  SmallVector<IREE::Stream::CmdDispatchOp>
+  getExportDispatches(IREE::Stream::ExecutableExportOp exportOp) const;
 
   // Returns a layout used for the given executable export op.
-  const PipelineLayout &getPipelineLayout(
-      IREE::Stream::ExecutableExportOp exportOp) const;
+  const PipelineLayout &
+  getPipelineLayout(IREE::Stream::ExecutableExportOp exportOp) const;
 
- private:
+private:
   // All dispatches to a particular executable IREE::Stream::ExecutableExportOp.
   ExportDispatchMap exportDispatches;
   // Pipeline layout for each IREE::Stream::ExecutableExportOp.
@@ -81,9 +81,9 @@ class BindingLayoutAnalysis {
   ExportLayoutMap exportLayouts;
 };
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_
+#endif // IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_

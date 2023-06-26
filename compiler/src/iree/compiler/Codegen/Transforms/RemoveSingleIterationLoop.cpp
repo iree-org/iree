@@ -54,7 +54,8 @@ static AffineMap substituteMin(AffineMap map, SmallVectorImpl<Value> &dims,
       for (unsigned dimIdx = 0; dimIdx < dims.size(); ++dimIdx) {
         Value dim = dims[dimIdx];
         auto minMax = getMinMaxExpr(dim, dims, symbols);
-        if (!minMax) continue;
+        if (!minMax)
+          continue;
         AffineExpr dimExpr = getAffineDimExpr(dimIdx, expr.getContext());
         LLVM_DEBUG(DBGS() << "Subst: " << dim << " @ " << dimExpr << "\n");
         LLVM_DEBUG(DBGS() << "Before: " << expr << "\n");
@@ -71,7 +72,8 @@ static AffineMap substituteMin(AffineMap map, SmallVectorImpl<Value> &dims,
       for (unsigned symIdx = 0; symIdx < symbols.size(); ++symIdx) {
         Value sym = symbols[symIdx];
         auto minMax = getMinMaxExpr(sym, dims, symbols);
-        if (!minMax) continue;
+        if (!minMax)
+          continue;
         AffineExpr symExpr = getAffineSymbolExpr(symIdx, expr.getContext());
         LLVM_DEBUG(DBGS() << "Subst: " << sym << " @ " << symExpr << "\n");
         LLVM_DEBUG(DBGS() << "Before: " << expr << "\n");
@@ -128,7 +130,8 @@ static bool alwaysRunsFirstIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   AffineMap simplifiedMap = substituteMin(map, dims, symbols, getMinMax);
   assert(simplifiedMap.getNumResults() == 1);
   if (auto cst = simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
-    if (cst.getValue() > 0) return true;
+    if (cst.getValue() > 0)
+      return true;
   }
   return false;
 }
@@ -153,7 +156,8 @@ static bool neverRunsSecondIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   AffineMap simplifiedMap = substituteMin(map, dims, symbols, getMinMax);
   assert(simplifiedMap.getNumResults() == 1);
   if (auto cst = simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
-    if (cst.getValue() >= 0) return true;
+    if (cst.getValue() >= 0)
+      return true;
   }
   return false;
 }
@@ -184,16 +188,16 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     return success();
   }
 
- private:
+private:
   GetMinMaxExprFn getMinMax;
 };
 
-}  // namespace
+} // namespace
 
 void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
                                               GetMinMaxExprFn getMinMaxFn) {
   patterns.add<SimplifyTrivialLoops>(patterns.getContext(), getMinMaxFn);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

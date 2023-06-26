@@ -59,7 +59,8 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
                                          /*numHandles=*/N);
   assert(matchOp->getNumResults() == N && "Unexpected number of results");
   std::array<Value, N> a;
-  for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
+  for (int64_t i = 0; i < N; ++i)
+    a[i] = matchOp->getResult(i);
   return std::tuple_cat(a);
 }
 
@@ -75,16 +76,18 @@ int64_t mlir::iree_compiler::nextMultipleOf(int64_t val, int64_t multiple) {
   return ((val + multiple - 1) / multiple) * multiple;
 }
 
-FailureOr<int64_t> mlir::iree_compiler::maxDivisorOfValueBelowLimit(
-    int64_t value, int64_t limit) {
+FailureOr<int64_t>
+mlir::iree_compiler::maxDivisorOfValueBelowLimit(int64_t value, int64_t limit) {
   // Conservatively return failure when `limit` is greater than 1024 to avoid
   // prohibitively long compile time overheads.
   // TODO: approximate with a faster implementation based on a few desirable
   // primes.
-  if (limit > 1024) return failure();
+  if (limit > 1024)
+    return failure();
   // If either value or limit is <= 0, the loop is skipped and we fail.
   for (int64_t i = std::min(value, limit); i > 1; --i)
-    if (value % i == 0) return i;
+    if (value % i == 0)
+      return i;
   return failure();
 }
 
@@ -118,8 +121,10 @@ void mlir::iree_compiler::createTransformRegion(
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
 void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
                                      ValueRange handles) {
-  if (handles.empty()) b.create<PrintOp>();
-  for (auto h : handles) b.create<PrintOp>(h);
+  if (handles.empty())
+    b.create<PrintOp>();
+  for (auto h : handles)
+    b.create<PrintOp>(h);
 }
 
 /// Create an ApplyPatternsOp that performs a set of key canonicalizations and
@@ -135,7 +140,8 @@ void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
     b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
     b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
     b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
-    if (populatePatternsFn) populatePatternsFn(b, loc);
+    if (populatePatternsFn)
+      populatePatternsFn(b, loc);
   });
   b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
   b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
@@ -150,8 +156,9 @@ void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
 /// This is used as a normalization operation that replaces conditionals, either
 /// in C++ or in transform IR.
 /// This can be thought of as a control-flow -> data-dependent conversion.
-std::pair<Value, Value> mlir::iree_compiler::buildSelectFirstNonEmpty(
-    ImplicitLocOpBuilder &b, Value handle1, Value handle2) {
+std::pair<Value, Value>
+mlir::iree_compiler::buildSelectFirstNonEmpty(ImplicitLocOpBuilder &b,
+                                              Value handle1, Value handle2) {
   auto anyOpType = transform::AnyOpType::get(b.getContext());
   auto selector = b.create<TakeFirstOp>(anyOpType, anyOpType,
                                         ArrayRef<Value>{handle1, handle2});
@@ -363,16 +370,16 @@ struct ReductionSplitResult {
   /// was not re-matched.
   Value trailingEltwiseH;
 };
-}  // namespace
+} // namespace
 
 /// Builds transform IR requesting to bubble up the "expand_shape" operation
 /// produced as parent of reduction splitting if necessary for fusion of the
 /// leading elementwise operation.
 // TODO: consider passing a problem-specific struct to control information.
-static ReductionSplitResult createBubbleExpand(
-    ImplicitLocOpBuilder &b, Value variantH,
-    SplitReductionOp splitReductionTransformOp, bool hasLeadingEltwise,
-    bool hasTrailingEltwise) {
+static ReductionSplitResult
+createBubbleExpand(ImplicitLocOpBuilder &b, Value variantH,
+                   SplitReductionOp splitReductionTransformOp,
+                   bool hasLeadingEltwise, bool hasTrailingEltwise) {
   ReductionSplitResult result;
   if (!hasLeadingEltwise) {
     result.splitFillH = splitReductionTransformOp.getFillOp();

@@ -23,7 +23,8 @@ static bool has16x16Transpose(func::FuncOp funcOp) {
   bool res = false;
   funcOp.walk([&](vector::TransposeOp op) {
     auto srcGtOneDims = isTranspose2DSlice(op);
-    if (failed(srcGtOneDims)) return WalkResult::advance();
+    if (failed(srcGtOneDims))
+      return WalkResult::advance();
     VectorType srcType = op.getSourceVectorType();
     int64_t m = srcType.getDimSize(std::get<0>(srcGtOneDims.value()));
     int64_t n = srcType.getDimSize(std::get<1>(srcGtOneDims.value()));
@@ -40,7 +41,7 @@ namespace {
 /// Pass to lower Vector ops before conversion to LLVM.
 class LLVMCPUVectorLoweringPass
     : public LLVMCPUVectorLoweringBase<LLVMCPUVectorLoweringPass> {
- public:
+public:
   using LLVMCPUVectorLoweringBase::LLVMCPUVectorLoweringBase;
   LLVMCPUVectorLoweringPass(const LLVMCPUVectorLoweringPassOptions &options) {
     this->splitVectorTransfersTo = options.splitVectorTransfersTo;
@@ -167,7 +168,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 }
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass() {
   return std::make_unique<LLVMCPUVectorLoweringPass>();
@@ -176,5 +177,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options) {
   return std::make_unique<LLVMCPUVectorLoweringPass>(options);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -57,7 +57,7 @@ class TransformDialectInterpreterPass
     : public mlir::transform::TransformInterpreterPassBase<
           TransformDialectInterpreterPass,
           iree_compiler::TransformDialectInterpreterBase> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // TODO: this is only necessary to make registry subset happy when running
     // the lowering to LLVM. The lowering should be changed to stop using the
@@ -122,16 +122,17 @@ class TransformDialectInterpreterPass
   TransformDialectInterpreterPass(const TransformDialectInterpreterPass &pass) =
       default;
 };
-}  // namespace
+} // namespace
 
 namespace mlir {
 namespace iree_compiler {
 /// Create a Transform dialect interpreter pass.
-std::unique_ptr<Pass> createTransformDialectInterpreterPass(
-    llvm::StringRef transformFileName, llvm::StringRef debugPayloadRootTag,
-    llvm::StringRef debugTransformRootTag) {
+std::unique_ptr<Pass>
+createTransformDialectInterpreterPass(llvm::StringRef transformFileName,
+                                      llvm::StringRef debugPayloadRootTag,
+                                      llvm::StringRef debugTransformRootTag) {
   return std::make_unique<TransformDialectInterpreterPass>(
       transformFileName, debugPayloadRootTag, debugTransformRootTag);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

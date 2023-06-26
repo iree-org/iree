@@ -61,12 +61,13 @@ namespace iree_compiler {
 // and dyamic cases are handled the same way. When the tile+distribute moves
 // away from using `scf.for` to using a construct that better captures
 // distribution (like `scf.forall`) this information can be dropped.
-static LogicalResult getTileAndDistributeConfig(
-    ArrayRef<Operation *> computeOps, Operation *&dispatchRootOp,
-    SmallVectorImpl<int64_t> &tileSizes,
-    SmallVectorImpl<int64_t> &staticLoopRanges,
-    SmallVectorImpl<int64_t> &interchange,
-    SmallVectorImpl<unsigned> &partitionableLoops) {
+static LogicalResult
+getTileAndDistributeConfig(ArrayRef<Operation *> computeOps,
+                           Operation *&dispatchRootOp,
+                           SmallVectorImpl<int64_t> &tileSizes,
+                           SmallVectorImpl<int64_t> &staticLoopRanges,
+                           SmallVectorImpl<int64_t> &interchange,
+                           SmallVectorImpl<unsigned> &partitionableLoops) {
   // Find the lowering configuration of the root operation.
   Operation *rootOp = nullptr;
   for (Operation *op : llvm::reverse(computeOps)) {
@@ -106,7 +107,8 @@ static LogicalResult getTileAndDistributeConfig(
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
   for (auto loopId : llvm::seq<unsigned>(0, tileSizes.size())) {
-    if (partitionableLoopsSet.count(loopId)) continue;
+    if (partitionableLoopsSet.count(loopId))
+      continue;
     tileSizes[loopId] = 0;
   }
 
@@ -156,9 +158,10 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(workgroupCountOp);
   auto workloadValues = workgroupCountOp.getOperands();
-  SmallVector<OpFoldResult> tileSizes = llvm::map_to_vector(
-      givenTileSizes,
-      [&](int64_t v) -> OpFoldResult { return rewriter.getIndexAttr(v); });
+  SmallVector<OpFoldResult> tileSizes =
+      llvm::map_to_vector(givenTileSizes, [&](int64_t v) -> OpFoldResult {
+        return rewriter.getIndexAttr(v);
+      });
 
   Attribute zero = rewriter.getIndexAttr(0);
   tileSizes.resize(workloadValues.size(), zero);
@@ -199,8 +202,10 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
   // slowest varying.
   SmallVector<Value> numWorkgroups;
   for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
-    if (partitionedLoop >= tileSizes.size()) continue;
-    if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
+    if (partitionedLoop >= tileSizes.size())
+      continue;
+    if (isConstantIntValue(tileSizes[partitionedLoop], 0))
+      continue;
     Value numTileAlongDim = getValueOrCreateConstantIndexOp(
         rewriter, loc, numTiles[partitionedLoop]);
     if (numWorkgroups.size() == maxWorkgroupParallelDims) {
@@ -294,7 +299,7 @@ struct TileAndDistributeToWorkgroupsPass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -310,7 +315,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
   for (func::FuncOp funcOp : innerModule.getOps<func::FuncOp>()) {
     auto exportOp = entryPoints.lookup(funcOp.getName());
-    if (!exportOp) continue;
+    if (!exportOp)
+      continue;
 
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     SmallVector<int64_t> tileSizes, staticLoopRanges, interchange;
@@ -455,5 +461,5 @@ createTileAndDistributeToWorkgroupsPass(
       maxWorkgroupParallelDims, distributionMethod);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

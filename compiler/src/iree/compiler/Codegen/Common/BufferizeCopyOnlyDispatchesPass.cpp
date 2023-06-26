@@ -47,7 +47,7 @@ struct BufferizeCopyOnlyDispatchesPass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   ModuleOp module = getOperation();
@@ -62,13 +62,15 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
           return success(isReadOnly(storeOp.getValue()));
         });
-    if (walkResult.wasInterrupted()) continue;
+    if (walkResult.wasInterrupted())
+      continue;
     // The function is just a copy.
     copyOnlyFunctions.push_back(funcOp);
   }
 
   // There are no copy-only functions. So nothing to do.
-  if (copyOnlyFunctions.empty()) return;
+  if (copyOnlyFunctions.empty())
+    return;
 
   // Bufferize the dispatch to create a `linalg.generic` as a copy operation.
   // This can then be used by the backends to tile and distribute.
@@ -125,5 +127,5 @@ createBufferizeCopyOnlyDispatchesPass() {
   return std::make_unique<BufferizeCopyOnlyDispatchesPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -95,8 +95,8 @@ void populateScalarHloToArithConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns,
     llvm::function_ref<bool(Operation *)> filterFn = nullptr);
-}  // namespace detail
+} // namespace detail
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_REWRITERS_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_REWRITERS_H_

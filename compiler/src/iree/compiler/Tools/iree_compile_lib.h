@@ -12,7 +12,7 @@ namespace iree_compiler {
 
 int runIreecMain(int argc, char **argv);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_IREE_COMPILE_LIB_H
+#endif // IREE_COMPILER_TOOLS_IREE_COMPILE_LIB_H

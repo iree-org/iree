@@ -18,9 +18,9 @@ struct InitializerOpConversion
     : public OpConversionPattern<IREE::Util::InitializerOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::InitializerOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto newOp = rewriter.create<IREE::VM::InitializerOp>(op.getLoc());
     rewriter.cloneRegionBefore(op.getBody(), newOp.getBody(),
                                newOp.getBody().begin());
@@ -42,22 +42,22 @@ struct InitializerReturnOpConversion
     : public OpConversionPattern<IREE::Util::InitializerReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::InitializerReturnOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::InitializerReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(op);
     return success();
   }
 };
 
 class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
- public:
+public:
   GlobalOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Operation *newOp = nullptr;
     auto convertedType = typeConverter.convertType(op.getType());
     if (llvm::isa<IREE::VM::RefType>(convertedType) ||
@@ -113,37 +113,37 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
     return success();
   }
 
- private:
+private:
   TypeConverter &typeConverter;
 };
 
 class GlobalAddressOpConversion
     : public OpConversionPattern<IREE::Util::GlobalAddressOp> {
- public:
+public:
   GlobalAddressOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalAddressOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalAddressOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalAddressOp>(
         op, typeConverter.convertType(op.getType()), op.getGlobal());
     return success();
   }
 
- private:
+private:
   TypeConverter &typeConverter;
 };
 
 class GlobalLoadOpConversion
     : public OpConversionPattern<IREE::Util::GlobalLoadOp> {
- public:
+public:
   GlobalLoadOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalLoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto operandType = op.getType();
     auto convertedType = typeConverter.convertType(operandType);
     if (IREE::VM::RefType::isCompatible(operandType)) {
@@ -167,20 +167,20 @@ class GlobalLoadOpConversion
     return success();
   }
 
- private:
+private:
   TypeConverter &typeConverter;
 };
 
 class GlobalLoadIndirectOpConversion
     : public OpConversionPattern<IREE::Util::GlobalLoadIndirectOp> {
- public:
+public:
   GlobalLoadIndirectOpConversion(MLIRContext *context,
                                  TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadIndirectOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalLoadIndirectOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto operandType = op.getType();
     auto convertedType = typeConverter.convertType(operandType);
     if (IREE::VM::RefType::isCompatible(operandType)) {
@@ -204,19 +204,19 @@ class GlobalLoadIndirectOpConversion
     return success();
   }
 
- private:
+private:
   TypeConverter &typeConverter;
 };
 
 class GlobalStoreOpConversion
     : public OpConversionPattern<IREE::Util::GlobalStoreOp> {
- public:
+public:
   GlobalStoreOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalStoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getValue().getType();
     if (llvm::isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreRefOp>(
@@ -242,14 +242,14 @@ class GlobalStoreOpConversion
 
 class GlobalStoreIndirectOpConversion
     : public OpConversionPattern<IREE::Util::GlobalStoreIndirectOp> {
- public:
+public:
   GlobalStoreIndirectOpConversion(MLIRContext *context,
                                   TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreIndirectOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalStoreIndirectOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getValue().getType();
     if (llvm::isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectRefOp>(
@@ -273,7 +273,7 @@ class GlobalStoreIndirectOpConversion
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateUtilGlobalToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
@@ -294,5 +294,5 @@ void populateUtilGlobalToVMPatterns(MLIRContext *context,
       context, typeConverter);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

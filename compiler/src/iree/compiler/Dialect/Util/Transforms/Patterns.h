@@ -19,9 +19,9 @@ namespace Util {
 // upstreamed after some more exhaustive investigation.
 void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns);
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PATTERNS_H_
+#endif // IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PATTERNS_H_

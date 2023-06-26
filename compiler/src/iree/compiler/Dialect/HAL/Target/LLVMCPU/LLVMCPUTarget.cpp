@@ -115,7 +115,7 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
 
   // Matches iree_hal_system_executable_footer_t.
   struct Footer {
-    uint8_t magic[8];  // IREEDBG\0
+    uint8_t magic[8]; // IREEDBG\0
     uint32_t version;
     uint32_t flags;
     uint64_t libraryOffset;
@@ -146,15 +146,17 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
 // drive everything.
 static bool hasMicrokernel(IREE::HAL::ExecutableVariantOp variantOp) {
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
-  if (!targetAttr) return false;
+  if (!targetAttr)
+    return false;
   auto config = targetAttr.getConfiguration();
-  if (!config) return false;
+  if (!config)
+    return false;
   auto attr = config.getAs<BoolAttr>("ukernels");
   return attr && attr.getValue();
 }
 
 class LLVMCPUTargetBackend final : public TargetBackend {
- public:
+public:
   explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {
     initializeConfiguration(options_);
@@ -177,8 +179,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // clang-format on
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -205,9 +207,11 @@ class LLVMCPUTargetBackend final : public TargetBackend {
   LLVMTarget getVariantTarget(IREE::HAL::ExecutableVariantOp variantOp) {
     auto configAttr = variantOp.getTarget().getConfiguration();
     auto tryAttrLookup = [&](StringRef name, StringRef fallback) {
-      if (!configAttr) return fallback.str();
+      if (!configAttr)
+        return fallback.str();
       auto value = llvm::dyn_cast_if_present<StringAttr>(configAttr.get(name));
-      if (!value) return fallback.str();
+      if (!value)
+        return fallback.str();
       return value.str();
     };
     LLVMTarget target;
@@ -291,22 +295,22 @@ class LLVMCPUTargetBackend final : public TargetBackend {
                                   LibraryBuilder::Version::LATEST);
 
     switch (options_.sanitizerKind) {
-      case SanitizerKind::kNone: {
-        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
-        break;
+    case SanitizerKind::kNone: {
+      libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
+      break;
+    }
+    case SanitizerKind::kAddress: {
+      libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::ADDRESS);
+      for (auto &function : llvmModule->getFunctionList()) {
+        function.addFnAttr(llvm::Attribute::SanitizeAddress);
       }
-      case SanitizerKind::kAddress: {
-        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::ADDRESS);
-        for (auto &function : llvmModule->getFunctionList()) {
-          function.addFnAttr(llvm::Attribute::SanitizeAddress);
-        }
-      } break;
-      case SanitizerKind::kThread: {
-        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::THREAD);
-        for (auto &function : llvmModule->getFunctionList()) {
-          function.addFnAttr(llvm::Attribute::SanitizeThread);
-        }
-      } break;
+    } break;
+    case SanitizerKind::kThread: {
+      libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::THREAD);
+      for (auto &function : llvmModule->getFunctionList()) {
+        function.addFnAttr(llvm::Attribute::SanitizeThread);
+      }
+    } break;
     }
 
     // Declare dynamically imported functions.
@@ -499,7 +503,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // Strip any compiler identifiers that may have snuck in. We let the linker
     // tag the module.
     auto *llvmIdent = llvmModule->getNamedMetadata("llvm.ident");
-    if (llvmIdent) llvmIdent->clearOperands();
+    if (llvmIdent)
+      llvmIdent->clearOperands();
 
     // Dump all linked bitcode prior to optimization.
     if (!options.dumpIntermediatesPath.empty()) {
@@ -685,25 +690,25 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       const char *mimeType = nullptr;
       const char *extension = "";
       switch (targetTriple.getObjectFormat()) {
-        case llvm::Triple::ObjectFormatType::COFF:
-          mimeType = "application/x-msdownload";
-          extension = ".dll";
-          break;
-        case llvm::Triple::ObjectFormatType::ELF:
-          mimeType = "application/x-elf";
-          extension = ".so";
-          break;
-        case llvm::Triple::ObjectFormatType::MachO:
-          mimeType = "application/x-dylib";
-          extension = ".dylib";
-          break;
-        case llvm::Triple::ObjectFormatType::Wasm:
-          mimeType = "application/wasm";
-          extension = ".wasm";
-          break;
-        default:
-          mimeType = "application/octet-stream";
-          break;
+      case llvm::Triple::ObjectFormatType::COFF:
+        mimeType = "application/x-msdownload";
+        extension = ".dll";
+        break;
+      case llvm::Triple::ObjectFormatType::ELF:
+        mimeType = "application/x-elf";
+        extension = ".so";
+        break;
+      case llvm::Triple::ObjectFormatType::MachO:
+        mimeType = "application/x-dylib";
+        extension = ".dylib";
+        break;
+      case llvm::Triple::ObjectFormatType::Wasm:
+        mimeType = "application/wasm";
+        extension = ".wasm";
+        break;
+      default:
+        mimeType = "application/octet-stream";
+        break;
       }
 
       // Load the linked system library and optionally tag on the debug
@@ -742,7 +747,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
@@ -750,8 +755,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context) const {
     std::string format;
     if (options_.linkStatic) {
       // Static libraries are just string references when serialized so we don't
@@ -767,21 +772,21 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         // System-specific shared library format.
         format += "system-";
         switch (targetTriple.getObjectFormat()) {
-          case llvm::Triple::ObjectFormatType::COFF:
-            format += "dll-";
-            break;
-          case llvm::Triple::ObjectFormatType::ELF:
-            format += "elf-";
-            break;
-          case llvm::Triple::ObjectFormatType::MachO:
-            format += "dylib-";
-            break;
-          case llvm::Triple::ObjectFormatType::Wasm:
-            format += "wasm-";
-            break;
-          default:
-            format += "unknown-";
-            break;
+        case llvm::Triple::ObjectFormatType::COFF:
+          format += "dll-";
+          break;
+        case llvm::Triple::ObjectFormatType::ELF:
+          format += "elf-";
+          break;
+        case llvm::Triple::ObjectFormatType::MachO:
+          format += "dylib-";
+          break;
+        case llvm::Triple::ObjectFormatType::Wasm:
+          format += "wasm-";
+          break;
+        default:
+          format += "unknown-";
+          break;
         }
       }
       format += getIreeArchNameForTargetTriple(targetTriple);
@@ -888,11 +893,11 @@ void registerLLVMCPUTargetBackends(
 // require build support, which is a pain to manage across platforms.
 //
 // See comments below.
-#define LLVM_INITIALIZE_GENERIC(TargetName) \
-  LLVMInitialize##TargetName##Target();     \
-  LLVMInitialize##TargetName##TargetMC();   \
-  LLVMInitialize##TargetName##TargetInfo(); \
-  LLVMInitialize##TargetName##AsmPrinter(); \
+#define LLVM_INITIALIZE_GENERIC(TargetName)                                    \
+  LLVMInitialize##TargetName##Target();                                        \
+  LLVMInitialize##TargetName##TargetMC();                                      \
+  LLVMInitialize##TargetName##TargetInfo();                                    \
+  LLVMInitialize##TargetName##AsmPrinter();                                    \
   LLVMInitialize##TargetName##AsmParser();
 
 // CPU targets that we care about and have hard-linked against are here.
@@ -902,7 +907,7 @@ void registerLLVMCPUTargetBackends(
 #define LLVM_INITIALIZE_TARGET_ARM() LLVM_INITIALIZE_GENERIC(ARM)
 #define LLVM_INITIALIZE_TARGET_RISCV() LLVM_INITIALIZE_GENERIC(RISCV)
 #define LLVM_INITIALIZE_TARGET_X86() LLVM_INITIALIZE_GENERIC(X86)
-#define LLVM_INITIALIZE_TARGET_WebAssembly() \
+#define LLVM_INITIALIZE_TARGET_WebAssembly()                                   \
   LLVM_INITIALIZE_GENERIC(WebAssembly)
 
 // We must no-op the name of each target we don't care about. This is annoying,
@@ -935,7 +940,7 @@ void registerLLVMCPUTargetBackends(
   static TargetBackendRegistration registration("llvm-cpu", backendFactory);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

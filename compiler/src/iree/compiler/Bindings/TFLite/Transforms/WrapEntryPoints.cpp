@@ -47,7 +47,7 @@ namespace TFLite {
 //   util.global private mutable @_tflite_xx_arg0_dim2 : index
 class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect,
                     mlir::tensor::TensorDialect, IREE::HAL::HALDialect,
@@ -101,7 +101,7 @@ class WrapEntryPointsPass
     wrapEntryPoint(entryFuncOps.front());
   }
 
- private:
+private:
   // Globals representing each dynamic dimension of an IO tensor.
   struct DynamicDims {
     TensorType tensorType;
@@ -348,7 +348,8 @@ class WrapEntryPointsPass
     auto shapeType = dynamicDims.tensorType;
     unsigned dynamicDimIdx = 0;
     for (unsigned i = 0; i < shapeType.getRank(); ++i) {
-      if (!shapeType.isDynamicDim(i)) continue;
+      if (!shapeType.isDynamicDim(i))
+        continue;
       auto dimValue =
           builder
               .create<IREE::Util::ListGetOp>(
@@ -651,7 +652,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createWrapEntryPointsPass() {
 
 static PassRegistration<WrapEntryPointsPass> pass;
 
-}  // namespace TFLite
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace TFLite
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

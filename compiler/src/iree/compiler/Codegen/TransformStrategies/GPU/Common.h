@@ -89,9 +89,9 @@ Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
 /// the variant op.
 // TODO: abstract away AbstractReductionStrategy, this is supposed to be
 // retargetable.
-std::pair<Value, Value> buildCommonTrailingStrategy(
-    ImplicitLocOpBuilder &b, Value variantH,
-    ArrayRef<int64_t> numThreadsInBlock);
+std::pair<Value, Value>
+buildCommonTrailingStrategy(ImplicitLocOpBuilder &b, Value variantH,
+                            ArrayRef<int64_t> numThreadsInBlock);
 
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
@@ -149,9 +149,10 @@ std::tuple<Value, Value> buildDistributeOnePadOrCopyWithTileSizes(
 
 /// Distribute the explicit copies involved in a matmul operation
 /// `paddedMatmulOpH`.
-std::tuple<Value, Value, Value> buildDistributeMatmulCopies(
-    ImplicitLocOpBuilder &b, Value variantH, Value paddedMatmulOpH,
-    const AbstractGemmLikeStrategy &strategy);
+std::tuple<Value, Value, Value>
+buildDistributeMatmulCopies(ImplicitLocOpBuilder &b, Value variantH,
+                            Value paddedMatmulOpH,
+                            const AbstractGemmLikeStrategy &strategy);
 
 /// Specific pattern to perform masked vectorization of copies give as
 /// parameters, cleanup and vectorize the rest.
@@ -195,8 +196,8 @@ LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,
                                            Operation *op,
                                            const GPUModel &gpuModel);
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_

@@ -21,6 +21,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h.inc"  // IWYU pragma: keep
+#include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h.inc" // IWYU pragma: keep
 
-#endif  // IREE_COMPILER_MODULES_HAL_INLINE_IR_HALINLINEOPS_H_
+#endif // IREE_COMPILER_MODULES_HAL_INLINE_IR_HALINLINEOPS_H_

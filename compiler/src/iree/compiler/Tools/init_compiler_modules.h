@@ -19,7 +19,7 @@ inline void registerIreeCompilerModuleDialects(DialectRegistry &registry) {
   // clang-format on
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_
+#endif // IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_

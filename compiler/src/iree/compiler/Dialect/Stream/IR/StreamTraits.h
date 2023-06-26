@@ -16,25 +16,25 @@ namespace Stream {
 
 template <typename ConcreteType>
 class TensorPhaseOp : public OpTrait::TraitBase<ConcreteType, TensorPhaseOp> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
 template <typename ConcreteType>
 class AsyncPhaseOp : public OpTrait::TraitBase<ConcreteType, AsyncPhaseOp> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
 template <typename ConcreteType>
 class CmdPhaseOp : public OpTrait::TraitBase<ConcreteType, CmdPhaseOp> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace OpTrait
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace OpTrait
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_IR_STREAMTRAITS_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAMTRAITS_H_

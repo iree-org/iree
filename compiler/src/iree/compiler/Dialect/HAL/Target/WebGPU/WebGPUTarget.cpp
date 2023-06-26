@@ -57,7 +57,7 @@ static spirv::TargetEnvAttr getWebGPUTargetEnv(MLIRContext *context) {
 }
 
 class WebGPUTargetBackend : public TargetBackend {
- public:
+public:
   WebGPUTargetBackend(WebGPUTargetOptions options)
       : options_(std::move(options)) {}
 
@@ -73,8 +73,8 @@ class WebGPUTargetBackend : public TargetBackend {
                     spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -93,7 +93,8 @@ class WebGPUTargetBackend : public TargetBackend {
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     // For now we disable translation if the variant has external object files.
-    if (variantOp.isExternal()) return;
+    if (variantOp.isExternal())
+      return;
 
     // WebGPU does not support push constants (yet?), so replace loads from
     // push constants with loads from uniform buffers.
@@ -161,7 +162,7 @@ class WebGPUTargetBackend : public TargetBackend {
           mlir::StringAttr::get(variantOp->getContext(), symbolName);
 
       symbolUsers.replaceAllUsesWith(entryPointFunc, nameAttr);
-      exportOp.setName(symbolName);  // Same symbol reference? Not in table?
+      exportOp.setName(symbolName); // Same symbol reference? Not in table?
       SymbolTable::setSymbolName(entryPointFunc, symbolName);
 
       // We only have one shader module right now, so all point to index 0.
@@ -249,7 +250,7 @@ class WebGPUTargetBackend : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // If we had multiple target environments we would generate one target attr
@@ -259,8 +260,9 @@ class WebGPUTargetBackend : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context, spirv::TargetEnvAttr targetEnv) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context,
+                      spirv::TargetEnvAttr targetEnv) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -288,7 +290,7 @@ void registerWebGPUTargetBackends(
   static TargetBackendRegistration registration1("webgpu-wgsl", backendFactory);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

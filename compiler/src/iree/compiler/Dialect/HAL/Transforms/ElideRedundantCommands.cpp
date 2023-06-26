@@ -85,7 +85,7 @@ struct CommandBufferState {
 
 using CommandBufferStateMap = DenseMap<Value, CommandBufferState>;
 
-}  // namespace
+} // namespace
 
 static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
                       CommandBufferState &state) {
@@ -133,7 +133,8 @@ static LogicalResult processOp(IREE::HAL::CommandBufferPushConstantsOp op,
       stateValue = value.value();
     }
   }
-  if (redundantIndices.none()) return success();  // no-op
+  if (redundantIndices.none())
+    return success(); // no-op
 
   // If all bits are set we can just kill the op.
   if (redundantIndices.all()) {
@@ -165,7 +166,8 @@ static LogicalResult processOp(IREE::HAL::CommandBufferPushConstantsOp op,
 static LogicalResult processOp(IREE::HAL::CommandBufferPushDescriptorSetOp op,
                                CommandBufferState &state) {
   auto *setState = state.getDescriptorSet(op.getSet());
-  if (!setState) return failure();
+  if (!setState)
+    return failure();
 
   bool isLayoutEqual = setState->pipelineLayout == op.getPipelineLayout();
   setState->pipelineLayout = op.getPipelineLayout();
@@ -190,7 +192,7 @@ static LogicalResult processOp(IREE::HAL::CommandBufferPushDescriptorSetOp op,
 
   // Bail early if no redundant bindings.
   if (isLayoutEqual && redundantIndices.none()) {
-    return success();  // no-op
+    return success(); // no-op
   }
 
   // If all bits are set we can just kill the op.
@@ -204,7 +206,7 @@ static LogicalResult processOp(IREE::HAL::CommandBufferPushDescriptorSetOp op,
 
 class ElideRedundantCommandsPass
     : public PassWrapper<ElideRedundantCommandsPass, OperationPass<void>> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
   }
@@ -240,7 +242,8 @@ class ElideRedundantCommandsPass
           stateMap[commandBuffer].previousFullBarrier = {};
         };
         for (auto &op : llvm::make_early_inc_range(block.getOperations())) {
-          if (!op.getDialect()) continue;
+          if (!op.getDialect())
+            continue;
           TypeSwitch<Operation *>(&op)
               .Case([&](IREE::HAL::CommandBufferFinalizeOp op) {
                 invalidateState(op.getCommandBuffer());
@@ -293,7 +296,7 @@ std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass() {
 
 static PassRegistration<ElideRedundantCommandsPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

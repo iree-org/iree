@@ -34,7 +34,7 @@ using MemorySpaceMapping =
 void populateGpuMemorySpaceAttributeConversions(
     TypeConverter &typeConverter, const MemorySpaceMapping &mapping);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_

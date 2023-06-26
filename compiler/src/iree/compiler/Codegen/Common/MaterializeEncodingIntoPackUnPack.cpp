@@ -56,7 +56,8 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
       getMixedValues(dispatchTensorType.getShape(), dynamicDims, builder);
   auto innerTileSizes = getInnerTileSizesOfr(
       builder, loc, boundTensorType, *encodingInfo, materializeEncodingValueFn);
-  if (failed(innerTileSizes)) return failure();
+  if (failed(innerTileSizes))
+    return failure();
   SmallVector<OpFoldResult> convertedTargetShape =
       tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
                                      encodingInfo->innerDimsPos,
@@ -97,9 +98,10 @@ struct MaterializeInterfaceBindingEncoding
   using OpMaterializeEncodingPattern<
       IREE::HAL::InterfaceBindingSubspanOp>::OpMaterializeEncodingPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
         subspanOp.getResult().getType());
     if (!resultType) {
@@ -149,9 +151,9 @@ struct MaterializeFlowDispatchTensorLoadOp
   using OpMaterializeEncodingPattern<
       IREE::Flow::DispatchTensorLoadOp>::OpMaterializeEncodingPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchTensorLoadOp loadOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::DispatchTensorLoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the load covers the entire
     // `!flow.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial loads.
@@ -199,9 +201,9 @@ struct MaterializeFlowDispatchTensorStoreOp
   using OpMaterializeEncodingPattern<
       IREE::Flow::DispatchTensorStoreOp>::OpMaterializeEncodingPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchTensorStoreOp storeOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the store covers the entire
     // `!flow.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial stores.
@@ -241,32 +243,32 @@ struct MaterializeFlowDispatchTensorStoreOp
   }
 };
 
-}  // namespace
+} // namespace
 
-IREE::LinalgExt::MaterializeEncodingInfo chooseEncodingInfoForMatmul(
-    MatmulType type, MatmulOperandRole operandRole,
-    MatmulTileParams tileParams) {
+IREE::LinalgExt::MaterializeEncodingInfo
+chooseEncodingInfoForMatmul(MatmulType type, MatmulOperandRole operandRole,
+                            MatmulTileParams tileParams) {
   MaterializeEncodingInfo encodingInfo;
   encodingInfo.innerDimsPos = {0, 1};
   switch (operandRole) {
-    case (MatmulOperandRole::LHS): {
-      encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
-      break;
-    }
-    case (MatmulOperandRole::RHS): {
-      encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
-      encodingInfo.innerDimsPos = {1, 0};
-      encodingInfo.outerDimsPerm = {1, 0};
-      break;
-    }
-    case (MatmulOperandRole::RESULT): {
-      encodingInfo.innerTileSizes = {tileParams.M, tileParams.N};
-      break;
-    }
-    default: {
-      assert(false);
-      return {};
-    }
+  case (MatmulOperandRole::LHS): {
+    encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
+    break;
+  }
+  case (MatmulOperandRole::RHS): {
+    encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
+    encodingInfo.innerDimsPos = {1, 0};
+    encodingInfo.outerDimsPerm = {1, 0};
+    break;
+  }
+  case (MatmulOperandRole::RESULT): {
+    encodingInfo.innerTileSizes = {tileParams.M, tileParams.N};
+    break;
+  }
+  default: {
+    assert(false);
+    return {};
+  }
   }
   return encodingInfo;
 }
@@ -277,16 +279,19 @@ void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
     int64_t size = shape[encodingInfo.innerDimsPos[i]];
     // Dynamic sizes are assumed to be large enough, not to be candidates for
     // narrow kernels.
-    if (ShapedType::isDynamic(size)) continue;
+    if (ShapedType::isDynamic(size))
+      continue;
     int64_t &tileSize = encodingInfo.innerTileSizes[i];
     // Let's not try to handle any dynamic tile sizes here. We could handle the
     // case where size==1 (as whatever is the runtime value of tileSize, it
     // can't be less than that, so it should be OK to replace it with 1) but
     // in general, adjusting dynamic tile sizes has to be done by the
     // materializeEncodingValueFn which we obtain those tileSizes from.
-    if (ShapedType::isDynamic(tileSize)) continue;
+    if (ShapedType::isDynamic(tileSize))
+      continue;
     auto generateNarrowTileSize = [&](int64_t n) {
-      if (size <= n && tileSize >= n) tileSize = n;
+      if (size <= n && tileSize >= n)
+        tileSize = n;
     };
     generateNarrowTileSize(1);
     generateNarrowTileSize(2);
@@ -305,8 +310,8 @@ chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
   return result;
 }
 
-MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr) {
+MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (isVMVXBackend(targetAttr) && hasMicrokernels(targetAttr)) {
     return chooseDynamicEncodingInfoVMVXMicrokernels;
   }
@@ -335,7 +340,8 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
         auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
             subspanOp.getResult().getType());
         // For types that are not `Flow::DispatchTensorType` mark as legal.
-        if (!resultType) return true;
+        if (!resultType)
+          return true;
         return resultType == typeConverter.convertType(resultType);
       });
 
@@ -347,5 +353,5 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
       context, typeConverter, materializeEncodingValueFn);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

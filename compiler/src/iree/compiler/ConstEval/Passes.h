@@ -21,8 +21,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createJitGlobalsPass();
 
 void registerConstEvalPasses();
 
-}  // namespace ConstEval
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ConstEval
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CONSTEVAL_PASSES_H_
+#endif // IREE_COMPILER_CONSTEVAL_PASSES_H_

@@ -28,7 +28,7 @@ namespace gpu {
 struct GPUModel;
 
 class MatmulStrategy : public AbstractGemmLikeStrategy {
- public:
+public:
   MatmulStrategy(MLIRContext *context,
                  const transform_ext::MatchedMatmulCaptures &captures)
       : AbstractGemmLikeStrategy(), ctx(context), captures(captures) {
@@ -169,8 +169,8 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   LLVM_DUMP_METHOD void dump() const;
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_TENSOR_CORE_MATMUL_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_TENSOR_CORE_MATMUL_STRATEGY_H_

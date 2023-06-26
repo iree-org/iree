@@ -23,7 +23,8 @@ namespace {
 static bool isUnsupported(mlir::stablehlo::ReduceOp op) {
   // Empty reductions are not supported. We expect canonicalization patterns to
   // handle them.
-  if (op.getDimensions().empty()) return true;
+  if (op.getDimensions().empty())
+    return true;
 
   // We require all reduce shapes to be the same, up to the element types, so
   // we can just the first operand and the first result as a representative.
@@ -56,17 +57,20 @@ AffineMap getTransposeMapForReduction(MLIRContext *context, int rank,
   return inversePermutation(map);
 }
 
-SmallVector<Value, 8> getReduceOpEmptyTensorDynSizes(
-    OpBuilder &b, Location loc, Value arg, ShapedType resultType,
-    ArrayRef<int64_t> reductionDims) {
+SmallVector<Value, 8>
+getReduceOpEmptyTensorDynSizes(OpBuilder &b, Location loc, Value arg,
+                               ShapedType resultType,
+                               ArrayRef<int64_t> reductionDims) {
   llvm::SmallSetVector<int, 4> s(reductionDims.begin(), reductionDims.end());
 
   SmallVector<unsigned> parallelDims;
   SmallVector<Value, 8> dynShape;
   int rank = cast<RankedTensorType>(arg.getType()).getRank();
   for (int i = 0, j = 0; i < rank; ++i) {
-    if (s.contains(i)) continue;
-    if (!resultType.isDynamicDim(j++)) continue;
+    if (s.contains(i))
+      continue;
+    if (!resultType.isDynamicDim(j++))
+      continue;
     dynShape.push_back(b.create<tensor::DimOp>(loc, arg, i));
   }
 
@@ -77,9 +81,9 @@ struct ReduceRegionReturnOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReturnOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!isInBodyOfLinalgOps(op)) {
       return failure();
     }
@@ -100,9 +104,9 @@ struct ReduceOpToGenericConverter final
     : OpConversionPattern<mlir::stablehlo::ReduceOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (isUnsupported(op)) {
       return rewriter.notifyMatchFailure(op,
                                          "unsupported reduce (noop or empty)");
@@ -145,10 +149,10 @@ struct ReduceOpToGenericConverter final
     // Prepare indexing maps for linalg generic op. The elements are for src
     // and dst. Transpose `src` to make the reduction loops be the innermost,
     // because it's easier to fully utilize processors.
-    indexingMaps.append(
-        numOperands,
-        getTransposeMapForReduction(rewriter.getContext(),
-                                    static_cast<int>(srcRank), reductionDims));
+    indexingMaps.append(numOperands,
+                        getTransposeMapForReduction(rewriter.getContext(),
+                                                    static_cast<int>(srcRank),
+                                                    reductionDims));
 
     // The indexing map of `dst` should drop the reduction loops. Since the
     // reduction loops now are all in the innermost, drops
@@ -208,9 +212,9 @@ struct ReduceOpToReduceConverter final
     : OpConversionPattern<mlir::stablehlo::ReduceOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (isUnsupported(op)) {
       return rewriter.notifyMatchFailure(op,
                                          "unsupported reduce (noop or empty)");
@@ -317,9 +321,9 @@ struct ReduceWindowOpOnTensorsGenericConversion final
     : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     MLIRContext *ctx = op->getContext();
     Location loc = op.getLoc();
     llvm::SmallVector<Value> initValues = adaptor.getInitValues();
@@ -361,7 +365,8 @@ struct ReduceWindowOpOnTensorsGenericConversion final
     for (int64_t i = 0; i < rank; i++) {
       AffineExpr srcExpr = mlir::getAffineDimExpr(i, ctx);
 
-      if (windowStrides[i] != 1) srcExpr = srcExpr * windowStrides[i];
+      if (windowStrides[i] != 1)
+        srcExpr = srcExpr * windowStrides[i];
 
       if (windowDimensions[i] != 1) {
         filteredWindowDims.push_back(windowDimensions[i]);
@@ -396,7 +401,8 @@ struct ReduceWindowOpOnTensorsGenericConversion final
     for (uint64_t i = 0, s = initValues.size(); i < s; i++) {
       Value initValue = initValues[i];
       auto resultTy = llvm::cast<ShapedType>(resultTypes[i]);
-      if (!resultTy.hasStaticShape()) return failure();
+      if (!resultTy.hasStaticShape())
+        return failure();
 
       auto broadcastSizes = rewriter.getI64TensorAttr(resultTy.getShape());
       broadcastValues.push_back(rewriter.create<mlir::stablehlo::BroadcastOp>(
@@ -492,14 +498,17 @@ struct ReduceWindowOpConversion final
     auto returnOp =
         cast<mlir::stablehlo::ReturnOp>(op.getBody().front().getTerminator());
     Operation *computeOp = returnOp.getResults()[resultIndex].getDefiningOp();
-    if (computeOp->getNumOperands() != 2) return nullptr;
+    if (computeOp->getNumOperands() != 2)
+      return nullptr;
     auto arg0 = llvm::dyn_cast<BlockArgument>(computeOp->getOperand(0));
     auto arg1 = llvm::dyn_cast<BlockArgument>(computeOp->getOperand(1));
-    if (!arg0 || !arg1) return nullptr;
+    if (!arg0 || !arg1)
+      return nullptr;
     int64_t arg0Num = arg0.getArgNumber();
     int64_t arg1Num = arg1.getArgNumber();
     int64_t otherArgIndex = resultIndex + op.getInputs().size();
-    if (arg0Num == resultIndex && arg1Num == otherArgIndex) return computeOp;
+    if (arg0Num == resultIndex && arg1Num == otherArgIndex)
+      return computeOp;
     if (arg0Num == otherArgIndex && arg1Num == resultIndex &&
         computeOp->hasTrait<mlir::OpTrait::IsCommutative>())
       return computeOp;
@@ -540,9 +549,9 @@ struct ReduceWindowOpConversion final
     return PoolingType::kInvalid;
   }
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     int rank = llvm::cast<ShapedType>(op.getResultTypes()[0]).getRank();
     if (rank != 4 && rank != 5) {
@@ -620,7 +629,8 @@ struct ReduceWindowOpConversion final
 
       SmallVector<Value> resultDynamicDims;
       for (const auto &en : llvm::enumerate(resultType.getShape())) {
-        if (en.value() != ShapedType::kDynamic) continue;
+        if (en.value() != ShapedType::kDynamic)
+          continue;
         Value dimSize = rewriter.create<tensor::DimOp>(loc, input, en.index());
         if (en.index() == 0 || static_cast<int64_t>(en.index()) == rank - 1) {
           // batch dims and channel dims can be derived from input dims
@@ -666,38 +676,32 @@ struct ReduceWindowOpConversion final
       linalg::LinalgOp poolingOp;
       PoolingType poolingType = getPoolingType(op, result.getResultNumber());
       switch (poolingType) {
-        case PoolingType::k2DMin: {
-          poolingOp =
-              createOp(static_cast<linalg::PoolingNhwcMinOp *>(nullptr));
-          break;
-        }
-        case PoolingType::k3DMin: {
-          poolingOp =
-              createOp(static_cast<linalg::PoolingNdhwcMinOp *>(nullptr));
-          break;
-        }
-        case PoolingType::k2DMax: {
-          poolingOp =
-              createOp(static_cast<linalg::PoolingNhwcMaxOp *>(nullptr));
-          break;
-        }
-        case PoolingType::k3DMax: {
-          poolingOp =
-              createOp(static_cast<linalg::PoolingNdhwcMaxOp *>(nullptr));
-          break;
-        }
-        case PoolingType::k2DAdd: {
-          poolingOp =
-              createOp(static_cast<linalg::PoolingNhwcSumOp *>(nullptr));
-          break;
-        }
-        case PoolingType::k3DAdd: {
-          poolingOp =
-              createOp(static_cast<linalg::PoolingNdhwcSumOp *>(nullptr));
-          break;
-        }
-        case PoolingType::kInvalid:
-          return rewriter.notifyMatchFailure(op, "unknown reduction operation");
+      case PoolingType::k2DMin: {
+        poolingOp = createOp(static_cast<linalg::PoolingNhwcMinOp *>(nullptr));
+        break;
+      }
+      case PoolingType::k3DMin: {
+        poolingOp = createOp(static_cast<linalg::PoolingNdhwcMinOp *>(nullptr));
+        break;
+      }
+      case PoolingType::k2DMax: {
+        poolingOp = createOp(static_cast<linalg::PoolingNhwcMaxOp *>(nullptr));
+        break;
+      }
+      case PoolingType::k3DMax: {
+        poolingOp = createOp(static_cast<linalg::PoolingNdhwcMaxOp *>(nullptr));
+        break;
+      }
+      case PoolingType::k2DAdd: {
+        poolingOp = createOp(static_cast<linalg::PoolingNhwcSumOp *>(nullptr));
+        break;
+      }
+      case PoolingType::k3DAdd: {
+        poolingOp = createOp(static_cast<linalg::PoolingNdhwcSumOp *>(nullptr));
+        break;
+      }
+      case PoolingType::kInvalid:
+        return rewriter.notifyMatchFailure(op, "unknown reduction operation");
       }
       poolingOps.push_back(poolingOp->getResult(0));
     }
@@ -706,7 +710,7 @@ struct ReduceWindowOpConversion final
   }
 };
 
-}  // namespace
+} // namespace
 
 namespace detail {
 void populateStableHloReductionToLinalgConversionPatterns(
@@ -726,5 +730,5 @@ void populateStableHloReductionToLinalgConversionPatterns(
   patterns->add<ReduceWindowOpConversion>(typeConverter, context,
                                           PatternBenefit(2));
 }
-}  // namespace detail
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace detail
+} // namespace mlir::iree_compiler::stablehlo

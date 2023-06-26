@@ -116,13 +116,13 @@ struct IntegerStateBase : public AbstractState {
   // Returns the assumed state encoding.
   base_t getAssumed() const { return assumed; }
 
-  bool operator==(
-      const IntegerStateBase<base_t, BestState, WorstState> &rhs) const {
+  bool
+  operator==(const IntegerStateBase<base_t, BestState, WorstState> &rhs) const {
     return this->getAssumed() == rhs.getAssumed() &&
            this->getKnown() == rhs.getKnown();
   }
-  bool operator!=(
-      const IntegerStateBase<base_t, BestState, WorstState> &rhs) const {
+  bool
+  operator!=(const IntegerStateBase<base_t, BestState, WorstState> &rhs) const {
     return !(*this == rhs);
   }
 
@@ -148,7 +148,7 @@ struct IntegerStateBase : public AbstractState {
     joinAND(rhs.getAssumed(), rhs.getKnown());
   }
 
- protected:
+protected:
   // Handles a new known value |value|. Subtype dependent.
   virtual void handleNewKnownValue(base_t value) = 0;
 
@@ -194,12 +194,14 @@ struct BooleanState : public IntegerStateBase<bool, 1, 0> {
   // Sets the assumed value to |value| but never below the known one.
   void setAssumed(bool value) { assumed &= (known | value); }
 
- private:
+private:
   void handleNewKnownValue(base_t value) override {
-    if (value) known = (assumed = value);
+    if (value)
+      known = (assumed = value);
   }
   void handleNewAssumedValue(base_t value) override {
-    if (!value) assumed = known;
+    if (!value)
+      assumed = known;
   }
 
   void joinOR(base_t assumedValue, base_t knownValue) override {
@@ -260,7 +262,7 @@ struct BitIntegerState
     return intersectAssumedBits(~BitsEncoding);
   }
 
- private:
+private:
   void handleNewKnownValue(base_t value) override { addKnownBits(value); }
   void handleNewAssumedValue(base_t value) override {
     intersectAssumedBits(value);
@@ -295,8 +297,8 @@ struct IncIntegerState
 
   // Returns the best possible representable state.
   static constexpr base_t getBestState() { return BestState; }
-  static constexpr base_t getBestState(
-      const IncIntegerState<BaseTy, BestState, WorstState> &) {
+  static constexpr base_t
+  getBestState(const IncIntegerState<BaseTy, BestState, WorstState> &) {
     return getBestState();
   }
 
@@ -315,7 +317,7 @@ struct IncIntegerState
     return *this;
   }
 
- private:
+private:
   void handleNewKnownValue(base_t value) override { takeKnownMaximum(value); }
   void handleNewAssumedValue(base_t value) override {
     takeAssumedMinimum(value);
@@ -357,7 +359,7 @@ struct DecIntegerState : public IntegerStateBase<BaseTy, 0, ~BaseTy(0)> {
     return *this;
   }
 
- private:
+private:
   void handleNewKnownValue(base_t value) override { takeKnownMinimum(value); }
   void handleNewAssumedValue(base_t value) override {
     takeAssumedMaximum(value);
@@ -422,9 +424,12 @@ struct PotentialValuesState : AbstractState {
   }
 
   bool operator==(const PotentialValuesState &rhs) const {
-    if (isValidState() != rhs.isValidState()) return false;
-    if (!isValidState() && !rhs.isValidState()) return true;
-    if (isUndefContained() != rhs.isUndefContained()) return false;
+    if (isValidState() != rhs.isValidState())
+      return false;
+    if (!isValidState() && !rhs.isValidState())
+      return true;
+    if (isUndefContained() != rhs.isUndefContained())
+      return false;
     return set == rhs.getAssumedSet();
   }
 
@@ -466,7 +471,7 @@ struct PotentialValuesState : AbstractState {
     return *this;
   }
 
- private:
+private:
   // Checks the size of this set and invalidates when the size exceeds the
   // specified maxPotentialValues threshold.
   void checkAndInvalidate() {
@@ -483,7 +488,8 @@ struct PotentialValuesState : AbstractState {
 
   // Inserts an element into this set.
   void insert(const MemberTy &c) {
-    if (!isValidState()) return;
+    if (!isValidState())
+      return;
     set.insert(c);
     checkAndInvalidate();
   }
@@ -491,13 +497,15 @@ struct PotentialValuesState : AbstractState {
   // Takes union with |rhs|.
   void unionWith(const PotentialValuesState &rhs) {
     // If this is a full set, do nothing.
-    if (!isValidState()) return;
+    if (!isValidState())
+      return;
     // If rhs is full set, change L to a full set.
     if (!rhs.isValidState()) {
       indicatePessimisticFixpoint();
       return;
     }
-    for (const MemberTy &c : rhs.set) set.insert(c);
+    for (const MemberTy &c : rhs.set)
+      set.insert(c);
     undefIsContained |= rhs.isUndefContained();
     checkAndInvalidate();
   }
@@ -511,7 +519,8 @@ struct PotentialValuesState : AbstractState {
   // Takes intersection with |rhs|.
   void intersectWith(const PotentialValuesState &rhs) {
     // If rhs is a full set, do nothing.
-    if (!rhs.isValidState()) return;
+    if (!rhs.isValidState())
+      return;
     // If this is a full set, change this to rhs.
     if (!isValidState()) {
       *this = rhs;
@@ -519,7 +528,8 @@ struct PotentialValuesState : AbstractState {
     }
     SetTy intersectSet;
     for (const MemberTy &c : set) {
-      if (rhs.set.count(c)) intersectSet.insert(c);
+      if (rhs.set.count(c))
+        intersectSet.insert(c);
     }
     set = intersectSet;
     undefIsContained &= rhs.isUndefContained();
@@ -569,7 +579,7 @@ struct StateWrapper : public BaseType, public StateTy {
   const StateType &getState() const override { return *this; }
 };
 
-}  // namespace DFX
+} // namespace DFX
 
 //===----------------------------------------------------------------------===//
 // Debugging utilities
@@ -581,17 +591,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const DFX::AbstractState &state);
 
 template <typename base_ty, base_ty BestState, base_ty WorstState>
-llvm::raw_ostream &operator<<(
-    llvm::raw_ostream &os,
-    const DFX::IntegerStateBase<base_ty, BestState, WorstState> &state) {
+llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const DFX::IntegerStateBase<base_ty, BestState, WorstState> &state) {
   return os << "(" << state.getKnown() << "-" << state.getAssumed() << ")"
             << static_cast<const DFX::AbstractState &>(state);
 }
 
-llvm::raw_ostream &operator<<(
-    llvm::raw_ostream &os, const DFX::PotentialConstantIntValuesState &state);
+llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const DFX::PotentialConstantIntValuesState &state);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_STATE_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_STATE_H_

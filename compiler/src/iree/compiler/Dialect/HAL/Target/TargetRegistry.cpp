@@ -66,8 +66,8 @@ void TargetBackendRegistry::mergeFrom(const TargetBackendRegistry &registry) {
   }
 }
 
-std::vector<std::string> TargetBackendRegistry::getRegisteredTargetBackends()
-    const {
+std::vector<std::string>
+TargetBackendRegistry::getRegisteredTargetBackends() const {
   std::vector<std::string> result;
   for (auto &entry : registrations) {
     result.push_back(entry.getKey().str());
@@ -77,8 +77,8 @@ std::vector<std::string> TargetBackendRegistry::getRegisteredTargetBackends()
   return result;
 }
 
-std::shared_ptr<TargetBackend> TargetBackendRegistry::getTargetBackend(
-    StringRef targetName) const {
+std::shared_ptr<TargetBackend>
+TargetBackendRegistry::getTargetBackend(StringRef targetName) const {
   for (auto &entry : registrations) {
     if (entry.getKey() == targetName) {
       return entry.getValue()->acquire();
@@ -103,8 +103,8 @@ TargetBackendRegistry::getTargetBackends(
   return matches;
 }
 
-SmallVector<std::string> gatherExecutableTargetNames(
-    IREE::HAL::ExecutableOp executableOp) {
+SmallVector<std::string>
+gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp) {
   SmallVector<std::string> targetNames;
   llvm::SmallDenseSet<StringRef> targets;
   executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
@@ -132,7 +132,7 @@ SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp) {
   return targetNames;
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

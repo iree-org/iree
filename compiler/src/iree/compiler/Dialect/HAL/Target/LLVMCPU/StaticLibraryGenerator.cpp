@@ -72,9 +72,10 @@ static void generateSuffix(llvm::raw_ostream &os,
      << "_\n";
 }
 
-static bool generateExecutableLibraryHeader(
-    const std::string &library_name, const std::string &query_function_name,
-    const std::string &header_file_path) {
+static bool
+generateExecutableLibraryHeader(const std::string &library_name,
+                                const std::string &query_function_name,
+                                const std::string &header_file_path) {
   std::error_code ec;
   llvm::raw_fd_ostream os(header_file_path, ec);
 
@@ -106,7 +107,7 @@ bool outputStaticLibrary(const std::string &library_name,
                                          header_file_path.c_str());
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -32,9 +32,10 @@ namespace Flow {
 // Example:
 //  util.global @some_fn_arg0 = 4 : i32
 //  util.global @some_fn_arg0 = dense<4> : tensor<4xi32>
-static IREE::Util::GlobalOp createPrimitiveDefaultGlobalOp(
-    std::string name, Location loc, Type type, SymbolTable& symbolTable,
-    OpBuilder& moduleBuilder) {
+static IREE::Util::GlobalOp
+createPrimitiveDefaultGlobalOp(std::string name, Location loc, Type type,
+                               SymbolTable &symbolTable,
+                               OpBuilder &moduleBuilder) {
   // Get a zero-initialized constant attribute for the type, if supported.
   auto initialValue = moduleBuilder.getZeroAttr(type);
   if (!initialValue) {
@@ -54,9 +55,10 @@ static IREE::Util::GlobalOp createPrimitiveDefaultGlobalOp(
 
 // Creates a util.global of the given |globalType| and initializes a buffer or
 // buffer view as a zeroed |tensorType|.
-static IREE::Util::GlobalOp createBufferLikeGlobalOp(
-    std::string name, Location loc, Type globalType, TensorType tensorType,
-    SymbolTable& symbolTable, OpBuilder& moduleBuilder) {
+static IREE::Util::GlobalOp
+createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
+                         TensorType tensorType, SymbolTable &symbolTable,
+                         OpBuilder &moduleBuilder) {
   // Create !hal.buffer global for the storage buffer or buffer view.
   auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
       loc, name,
@@ -99,14 +101,15 @@ static IREE::Util::GlobalOp createBufferLikeGlobalOp(
 // ->
 //  util.global @some_fn_arg0 : !hal.buffer_view
 //  util.initializer { ... }
-static IREE::Util::GlobalOp createImportBufferViewGlobalOp(
-    std::string name, BlockArgument arg, SymbolTable& symbolTable,
-    OpBuilder& moduleBuilder, Explorer& explorer) {
+static IREE::Util::GlobalOp
+createImportBufferViewGlobalOp(std::string name, BlockArgument arg,
+                               SymbolTable &symbolTable,
+                               OpBuilder &moduleBuilder, Explorer &explorer) {
   auto loc = arg.getLoc();
 
   // Find a hal.tensor.import user.
   IREE::HAL::TensorImportOp importOp;
-  if (explorer.walkTransitiveUsers(arg, [&](Operation* op) -> WalkResult {
+  if (explorer.walkTransitiveUsers(arg, [&](Operation *op) -> WalkResult {
         importOp = dyn_cast<IREE::HAL::TensorImportOp>(op);
         return importOp ? WalkResult::interrupt() : WalkResult::advance();
       }) == TraversalResult::INCOMPLETE) {
@@ -140,14 +143,14 @@ static IREE::Util::GlobalOp createImportBufferViewGlobalOp(
 //  util.initializer { ... }
 static IREE::Util::GlobalOp createExportBufferGlobalOp(std::string name,
                                                        BlockArgument arg,
-                                                       SymbolTable& symbolTable,
-                                                       OpBuilder& moduleBuilder,
-                                                       Explorer& explorer) {
+                                                       SymbolTable &symbolTable,
+                                                       OpBuilder &moduleBuilder,
+                                                       Explorer &explorer) {
   auto loc = arg.getLoc();
 
   // Find a hal.tensor.export user.
   IREE::HAL::TensorExportOp exportOp;
-  if (explorer.walkTransitiveUsers(arg, [&](Operation* op) -> WalkResult {
+  if (explorer.walkTransitiveUsers(arg, [&](Operation *op) -> WalkResult {
         exportOp = dyn_cast<IREE::HAL::TensorExportOp>(op);
         return exportOp ? WalkResult::interrupt() : WalkResult::advance();
       }) == TraversalResult::INCOMPLETE) {
@@ -170,11 +173,11 @@ static IREE::Util::GlobalOp createExportBufferGlobalOp(std::string name,
                                   symbolTable, moduleBuilder);
 }
 
-static IREE::Util::GlobalOp createDummyInput(const std::string& namePrefix,
+static IREE::Util::GlobalOp createDummyInput(const std::string &namePrefix,
                                              BlockArgument arg,
-                                             SymbolTable& symbolTable,
-                                             OpBuilder& moduleBuilder,
-                                             Explorer& explorer) {
+                                             SymbolTable &symbolTable,
+                                             OpBuilder &moduleBuilder,
+                                             Explorer &explorer) {
   std::string name = namePrefix + "_arg" + std::to_string(arg.getArgNumber());
   return TypeSwitch<Type, IREE::Util::GlobalOp>(arg.getType())
       .Case([&](IREE::HAL::BufferViewType type) {
@@ -191,9 +194,10 @@ static IREE::Util::GlobalOp createDummyInput(const std::string& namePrefix,
       });
 }
 
-static LogicalResult createEntryPointBenchmarkFunc(
-    mlir::ModuleOp moduleOp, mlir::func::FuncOp entryFuncOp,
-    Explorer& explorer) {
+static LogicalResult
+createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
+                              mlir::func::FuncOp entryFuncOp,
+                              Explorer &explorer) {
   auto symbolTable = explorer.getSymbolTables().getSymbolTable(moduleOp);
   OpBuilder moduleBuilder(moduleOp.getContext());
   moduleBuilder.setInsertionPointAfter(entryFuncOp);
@@ -207,7 +211,8 @@ static LogicalResult createEntryPointBenchmarkFunc(
   for (auto arg : entryFuncOp.getArguments()) {
     auto dummyVar =
         createDummyInput(funcName, arg, symbolTable, moduleBuilder, explorer);
-    if (!dummyVar) return failure();
+    if (!dummyVar)
+      return failure();
     dummyInputVariableOps.push_back(dummyVar);
   }
 
@@ -223,7 +228,7 @@ static LogicalResult createEntryPointBenchmarkFunc(
   };
   funcOp->setAttr("iree.reflection",
                   moduleBuilder.getDictionaryAttr(reflectionAttrs));
-  Block* block = funcOp.addEntryBlock();
+  Block *block = funcOp.addEntryBlock();
 
   // Call the existing function with dummy arguments.
   auto blockBuilder = OpBuilder::atBlockBegin(block);
@@ -255,8 +260,8 @@ static LogicalResult createEntryPointBenchmarkFunc(
 // The input are provided using util.globals.
 class ExportBenchmarkFuncsPass
     : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
- public:
-  void getDependentDialects(DialectRegistry& registry) const override {
+public:
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect, IREE::Util::UtilDialect>();
   }
@@ -291,7 +296,7 @@ createExportBenchmarkFuncsPass() {
   return std::make_unique<ExportBenchmarkFuncsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

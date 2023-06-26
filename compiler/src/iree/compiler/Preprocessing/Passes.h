@@ -29,8 +29,8 @@ void buildPreprocessingPassPipeline(
 
 void registerPreprocessingPasses();
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_PREPROCESSING_PASSES_H_
+#endif // IREE_COMPILER_PREPROCESSING_PASSES_H_

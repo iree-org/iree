@@ -82,8 +82,9 @@ static LogicalResult verifyResultDimsFunc(FunctionType functionType,
 
 // Converts a func.func with the iree.abi.streamable attribute into a flow.func
 // and fixes all func.call ops to be flow.call across the module.
-static std::optional<StreamableFunc> convertStreamableFunc(
-    mlir::ModuleOp moduleOp, func::FuncOp funcOp, SymbolTable &symbolTable) {
+static std::optional<StreamableFunc>
+convertStreamableFunc(mlir::ModuleOp moduleOp, func::FuncOp funcOp,
+                      SymbolTable &symbolTable) {
   OpBuilder moduleBuilder(funcOp);
   auto functionType = funcOp.getFunctionType();
 
@@ -264,7 +265,8 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
     for (auto [i, resultType] : llvm::enumerate(callOp.getResultTypes())) {
       if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
         const auto &resultDimArgs = streamableFunc.resultDimArgs[i];
-        if (resultDimArgs.empty()) continue;
+        if (resultDimArgs.empty())
+          continue;
         if (resultDimArgs.front() == kTiedDim) {
           // Source from a tied operand. Types must match exactly.
           assert(streamableFunc.tiedOperands[i] !=
@@ -299,9 +301,9 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
   return success();
 }
 
-static LogicalResult convertStreamableCalls(
-    mlir::ModuleOp moduleOp,
-    DenseMap<StringRef, StreamableFunc> &streamableFuncs) {
+static LogicalResult
+convertStreamableCalls(mlir::ModuleOp moduleOp,
+                       DenseMap<StringRef, StreamableFunc> &streamableFuncs) {
   auto walkResult = moduleOp.walk([&](func::CallOp callOp) {
     auto it = streamableFuncs.find(callOp.getCallee());
     if (it != streamableFuncs.end()) {
@@ -316,7 +318,7 @@ static LogicalResult convertStreamableCalls(
 
 class ConvertStreamableOpsPass
     : public PassWrapper<ConvertStreamableOpsPass, OperationPass<ModuleOp>> {
- public:
+public:
   ConvertStreamableOpsPass() = default;
   ConvertStreamableOpsPass(const ConvertStreamableOpsPass &pass) {}
 
@@ -358,7 +360,8 @@ class ConvertStreamableOpsPass
     for (auto originalFuncOp : originalFuncOps) {
       auto streamableFuncOr =
           convertStreamableFunc(moduleOp, originalFuncOp, symbolTable);
-      if (!streamableFuncOr.has_value()) return signalPassFailure();
+      if (!streamableFuncOr.has_value())
+        return signalPassFailure();
       auto streamableFunc = std::move(streamableFuncOr).value();
       streamableFuncs[streamableFunc.funcOp.getName()] =
           std::move(streamableFunc);
@@ -377,7 +380,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertStreamableOpsPass() {
 
 static PassRegistration<ConvertStreamableOpsPass> pass;
 
-}  // namespace ABI
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ABI
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -29,5 +29,5 @@ void buildVMVXLinkingPassPipeline(OpPassManager &passManager) {
           createVMVXAssignConstantOrdinalsPass());
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

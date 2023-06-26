@@ -9,12 +9,12 @@
 namespace mlir::iree_compiler::stablehlo {
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/InputConversion/StableHLO/Preprocessing/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/InputConversion/StableHLO/Preprocessing/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerStableHLOPreprocessingPasses() {
   // Generated.
   registerPasses();
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

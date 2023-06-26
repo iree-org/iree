@@ -55,7 +55,9 @@ ${scripts_dir}/run_buildifier.sh
 git diff --exit-code
 
 echo "***** black *****"
-git diff main --name-only -- '*.py' ':!third_party' | xargs -r black
+# The filter lowercase `d` means to exclude deleted files.
+git diff main --name-only --diff-filter=d -- '*.py' ':!third_party' \
+  | xargs -r black
 
 echo "***** pytype *****"
 ./build_tools/pytype/check_diff.sh

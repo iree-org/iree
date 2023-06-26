@@ -31,23 +31,23 @@ LogicalResult encodeCallingConventionType(Operation *op, Type type,
     return success();
   } else if (auto integerType = llvm::dyn_cast<IntegerType>(type)) {
     switch (integerType.getIntOrFloatBitWidth()) {
-      default:
-      case 32:
-        s.push_back('i');
-        return success();
-      case 64:
-        s.push_back('I');
-        return success();
+    default:
+    case 32:
+      s.push_back('i');
+      return success();
+    case 64:
+      s.push_back('I');
+      return success();
     }
   } else if (auto floatType = llvm::dyn_cast<FloatType>(type)) {
     switch (floatType.getIntOrFloatBitWidth()) {
-      default:
-      case 32:
-        s.push_back('f');
-        return success();
-      case 64:
-        s.push_back('F');
-        return success();
+    default:
+    case 32:
+      s.push_back('f');
+      return success();
+    case 64:
+      s.push_back('F');
+      return success();
     }
   } else if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
     // Flatten tuple (so tuple<i32, i64> -> `...iI...`).
@@ -74,11 +74,11 @@ LogicalResult encodeVariadicCallingConventionType(Operation *op, Type type,
   return result;
 }
 
-std::optional<std::string> makeImportCallingConventionString(
-    IREE::VM::ImportOp importOp) {
+std::optional<std::string>
+makeImportCallingConventionString(IREE::VM::ImportOp importOp) {
   auto functionType = importOp.getFunctionType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
-    return std::string("0v_v");  // Valid but empty.
+    return std::string("0v_v"); // Valid but empty.
   }
 
   SmallVector<char, 8> s = {'0'};
@@ -113,11 +113,11 @@ std::optional<std::string> makeImportCallingConventionString(
   return std::string(s.data(), s.size());
 }
 
-std::optional<std::string> makeCallingConventionString(
-    IREE::VM::FuncOp funcOp) {
+std::optional<std::string>
+makeCallingConventionString(IREE::VM::FuncOp funcOp) {
   auto functionType = funcOp.getFunctionType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
-    return std::string("0v_v");  // Valid but empty.
+    return std::string("0v_v"); // Valid but empty.
   }
 
   SmallVector<char, 8> s = {'0'};
@@ -145,7 +145,7 @@ std::optional<std::string> makeCallingConventionString(
   return std::string(s.data(), s.size());
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

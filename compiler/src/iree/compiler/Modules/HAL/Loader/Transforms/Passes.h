@@ -61,10 +61,10 @@ createResolveExportOrdinalsPass();
 
 void registerHALLoaderPasses();
 
-}  // namespace Loader
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Loader
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_HAL_LOADER_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_MODULES_HAL_LOADER_TRANSFORMS_PASSES_H_

@@ -18,7 +18,7 @@ namespace iree_compiler {
 
 namespace {
 #include "iree/compiler/Codegen/Common/FoldTensorExtractOp.cpp.inc"
-}  // namespace
+} // namespace
 
 namespace {
 /// Upstream canonicalization passes fold
@@ -53,7 +53,7 @@ class FoldTensorExtractOpPass
     : public FoldTensorExtractOpBase<FoldTensorExtractOpPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void FoldTensorExtractOpPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
@@ -66,5 +66,5 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass() {
   return std::make_unique<FoldTensorExtractOpPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -20,17 +20,18 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-static SmallVector<Value> filterTensorValues(ValueRange&& range) {
+static SmallVector<Value> filterTensorValues(ValueRange &&range) {
   SmallVector<Value> result;
   for (auto value : range) {
-    if (llvm::isa<TensorType>(value.getType())) result.push_back(value);
+    if (llvm::isa<TensorType>(value.getType()))
+      result.push_back(value);
   }
   return result;
 }
 
 class InjectDispatchTracingPass
     : public InjectDispatchTracingBase<InjectDispatchTracingPass> {
- public:
+public:
   InjectDispatchTracingPass() = default;
 
   void runOnOperation() override {
@@ -65,7 +66,7 @@ createInjectDispatchTracingPass() {
   return std::make_unique<InjectDispatchTracingPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -24,7 +24,7 @@ namespace Stream {
 enum class ResourceUsageBitfield : uint32_t {
   Indirect = 1u << 0,
   External = 1u << 1,
-  Mutated = 1u << 2,  // beyond definition
+  Mutated = 1u << 2, // beyond definition
   Constant = 1u << 3,
   TransferRead = 1u << 4,
   TransferWrite = 1u << 5,
@@ -65,7 +65,7 @@ inline bool bitEnumContains(ResourceUsageBitfield bits,
 // All `!stream.resource` SSA values will be analyzed and their usage will be
 // available for querying via the lookup functions.
 class ResourceUsageAnalysis {
- public:
+public:
   explicit ResourceUsageAnalysis(Operation *rootOp);
   ~ResourceUsageAnalysis();
 
@@ -84,15 +84,15 @@ class ResourceUsageAnalysis {
   // Returns the analyzed resource usage of the |value| resource, if analyzed.
   std::optional<ResourceUsageBitfield> tryLookupResourceUsage(Value value);
 
- private:
+private:
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;
 };
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_ANALYSIS_RESOURCE_USAGE_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_ANALYSIS_RESOURCE_USAGE_H_

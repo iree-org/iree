@@ -95,7 +95,7 @@ void buildHALInlineStaticTransformPassPipeline(
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h.inc"
-}  // namespace
+} // namespace
 
 void registerHALInlinePasses() {
   // Generated.
@@ -111,8 +111,8 @@ void registerHALInlinePasses() {
       });
 }
 
-}  // namespace Inline
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Inline
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

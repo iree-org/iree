@@ -23,7 +23,8 @@ struct LLVMCPUAssignImportOrdinalsPass
 
     // Ignore non-LLVMCPU variants.
     // TODO(benvanik): a way to nest this in the pipeline via dynamic passes.
-    if (variantOp.getTarget().getBackend().getValue() != "llvm-cpu") return;
+    if (variantOp.getTarget().getBackend().getValue() != "llvm-cpu")
+      return;
 
     auto *context = variantOp.getContext();
     auto unitAttr = UnitAttr::get(context);
@@ -40,11 +41,13 @@ struct LLVMCPUAssignImportOrdinalsPass
     for (auto globalOp :
          llvm::make_early_inc_range(moduleOp.getOps<LLVM::GlobalOp>())) {
       auto keyAttr = globalOp->getAttrOfType<StringAttr>(importKeyAttr);
-      if (!keyAttr) continue;
+      if (!keyAttr)
+        continue;
       uniqueKeys.insert(keyAttr);
       ordinalGlobals[keyAttr].push_back(globalOp);
     }
-    if (uniqueKeys.empty()) return;
+    if (uniqueKeys.empty())
+      return;
     auto sortedKeys = uniqueKeys.takeVector();
     llvm::stable_sort(sortedKeys, [](auto lhs, auto rhs) {
       return lhs.getValue() < rhs.getValue();
@@ -75,12 +78,12 @@ struct LLVMCPUAssignImportOrdinalsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPUAssignImportOrdinalsPass() {
   return std::make_unique<LLVMCPUAssignImportOrdinalsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

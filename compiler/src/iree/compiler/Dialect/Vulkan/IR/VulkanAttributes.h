@@ -12,7 +12,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h.inc" // IWYU pragma: export
 
 namespace mlir {
 namespace iree_compiler {
@@ -21,14 +21,14 @@ namespace Vulkan {
 
 namespace detail {
 struct TargetEnvAttributeStorage;
-}  // namespace detail
+} // namespace detail
 
 /// An attribute that specifies the target version, supported extensions, and
 /// resource limits. These information describles a Vulkan target environment.
 class TargetEnvAttr
     : public Attribute::AttrBase<TargetEnvAttr, Attribute,
                                  detail::TargetEnvAttributeStorage> {
- public:
+public:
   using Base::Base;
 
   /// Gets a TargetEnvAttr instance.
@@ -85,9 +85,9 @@ class TargetEnvAttr
                               CapabilitiesAttr capabilities);
 };
 
-}  // namespace Vulkan
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Vulkan
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_
+#endif // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_

@@ -40,12 +40,12 @@ struct SPIRVBreakDownLargeVectorPass final
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVBreakDownLargeVectorPass() {
   return std::make_unique<SPIRVBreakDownLargeVectorPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

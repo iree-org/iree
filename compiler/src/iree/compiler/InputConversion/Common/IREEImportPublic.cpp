@@ -49,22 +49,22 @@ struct IREEImportPublicPass
 };
 
 class IREETypeConverter : public TypeConverter {
- public:
+public:
   IREETypeConverter();
 };
 
 // Generic 1:1 conversion pattern which effectively just renames an op.
 // It does not support regions or ops with successors.
 class OneToOneConverionPattern : public ConversionPattern {
- public:
+public:
   OneToOneConverionPattern(TypeConverter &converter, StringRef srcName,
                            StringRef targetName, MLIRContext *context,
                            PatternBenefit benefit)
       : ConversionPattern(converter, srcName, benefit, context),
         targetName(targetName) {}
-  LogicalResult matchAndRewrite(
-      Operation *srcOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *srcOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     SmallVector<Type> resultTypes;
     if (failed(typeConverter->convertTypes(srcOp->getResultTypes(),
                                            resultTypes))) {
@@ -79,7 +79,7 @@ class OneToOneConverionPattern : public ConversionPattern {
     return success();
   }
 
- private:
+private:
   StringRef targetName;
 };
 
@@ -87,12 +87,13 @@ class BufferViewToTensorPattern
     : public OpConversionPattern<IREE::Input::BufferViewToTensorOp> {
   using OpConversionPattern<
       IREE::Input::BufferViewToTensorOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     TensorType resultType = llvm::dyn_cast_if_present<TensorType>(
         typeConverter->convertType(srcOp.getTarget().getType()));
-    if (!resultType) return failure();
+    if (!resultType)
+      return failure();
     if (adaptor.getTargetDims().empty() && !resultType.hasStaticShape()) {
       // For the input dialect, we allow ops that don't have their dims
       // specified and we reify them here with the specific builder that does
@@ -115,12 +116,13 @@ class TensorToBufferViewPattern
     : public OpConversionPattern<IREE::Input::TensorToBufferViewOp> {
   using OpConversionPattern<
       IREE::Input::TensorToBufferViewOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type resultType = typeConverter->convertType(srcOp.getTarget().getType());
     auto sourceType = llvm::dyn_cast<TensorType>(adaptor.getSource().getType());
-    if (!resultType || !sourceType) return failure();
+    if (!resultType || !sourceType)
+      return failure();
     if (adaptor.getSourceDims().empty() && !sourceType.hasStaticShape()) {
       // For the input dialect, we allow ops that don't have their dims
       // specified and we reify them here with the specific builder that does
@@ -142,9 +144,9 @@ class TensorToBufferViewPattern
 
 class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      func::FuncOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
@@ -201,11 +203,12 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
 
 class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Input::GlobalOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Input::GlobalOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type newType = typeConverter->convertType(srcOp.getType());
-    if (!newType) return failure();
+    if (!newType)
+      return failure();
     auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
         srcOp, srcOp.getName(), srcOp.getIsMutable(), newType,
         srcOp.getInitialValue());
@@ -228,13 +231,13 @@ class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
 
 // Matches any op and generically converts types. Matches with benefit 0.
 class GenericTypeConvert : public ConversionPattern {
- public:
+public:
   GenericTypeConvert(TypeConverter &converter, MLIRContext *context,
                      PatternBenefit benefit)
       : ConversionPattern(converter, MatchAnyOpTypeTag(), benefit, context) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     llvm::SmallVector<NamedAttribute> newAttr;
     llvm::append_range(newAttr, op->getAttrs());
     llvm::SmallVector<Type> newResults;
@@ -255,7 +258,7 @@ class GenericTypeConvert : public ConversionPattern {
   }
 };
 
-}  // namespace
+} // namespace
 
 IREETypeConverter::IREETypeConverter() {
   addConversion([](Type t) { return t; });
@@ -264,12 +267,14 @@ IREETypeConverter::IREETypeConverter() {
   });
   addConversion([=](IREE::Input::ListType t) -> IREE::Util::ListType {
     auto subType = convertType(t.getElementType());
-    if (!subType) return nullptr;
+    if (!subType)
+      return nullptr;
     return IREE::Util::ListType::get(subType);
   });
   addConversion([=](IREE::Input::PtrType t) -> IREE::Util::PtrType {
     auto subType = convertType(t.getTargetType());
-    if (!subType) return nullptr;
+    if (!subType)
+      return nullptr;
     return IREE::Util::PtrType::get(subType);
   });
   addConversion([](IREE::Input::VariantType t) {
@@ -292,24 +297,29 @@ void IREEImportPublicPass::runOnOperation() {
   };
   auto isLegallyTypedOp = [&](Operation *op) -> bool {
     for (Type type : op->getResultTypes()) {
-      if (isIllegalType(type)) return false;
+      if (isIllegalType(type))
+        return false;
     }
     for (Type type : op->getOperandTypes()) {
-      if (isIllegalType(type)) return false;
+      if (isIllegalType(type))
+        return false;
     }
     return true;
   };
 
   target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
     for (Type type : funcOp.getFunctionType().getInputs()) {
-      if (isIllegalType(type)) return false;
+      if (isIllegalType(type))
+        return false;
     }
     for (Type type : funcOp.getFunctionType().getResults()) {
-      if (isIllegalType(type)) return false;
+      if (isIllegalType(type))
+        return false;
     }
     for (Block &block : funcOp.getFunctionBody()) {
       for (Type type : block.getArgumentTypes()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalType(type))
+          return false;
       }
     }
     return true;
@@ -327,9 +337,9 @@ void IREEImportPublicPass::runOnOperation() {
                                              specific_benefit);
   patterns.insert<GlobalOpPattern>(typeConverter, &getContext(), 0);
 
-#define ONE_TO_ONE(SrcOpTy, TargetOpTy)           \
-  patterns.insert<OneToOneConverionPattern>(      \
-      typeConverter, SrcOpTy::getOperationName(), \
+#define ONE_TO_ONE(SrcOpTy, TargetOpTy)                                        \
+  patterns.insert<OneToOneConverionPattern>(                                   \
+      typeConverter, SrcOpTy::getOperationName(),                              \
       TargetOpTy::getOperationName(), &getContext(), specific_benefit)
 
   ONE_TO_ONE(IREE::Input::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
@@ -364,5 +374,5 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass() {
   return std::make_unique<IREEImportPublicPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -15,7 +15,7 @@ namespace iree_compiler {
 class RegisterAllocationTestPass
     : public PassWrapper<RegisterAllocationTestPass,
                          OperationPass<IREE::VM::FuncOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "test-iree-vm-register-allocation";
   }
@@ -37,10 +37,10 @@ std::unique_ptr<OperationPass<IREE::VM::FuncOp>>
 createRegisterAllocationTestPass() {
   return std::make_unique<RegisterAllocationTestPass>();
 }
-}  // namespace VM
-}  // namespace IREE
+} // namespace VM
+} // namespace IREE
 
 static PassRegistration<RegisterAllocationTestPass> pass;
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -125,7 +125,7 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
     llvm::raw_fd_ostream inputStream(inputFd, /*shouldClose=*/true);
     executableOp.print(inputStream,
                        OpPrintingFlags().useLocalScope().enableDebugInfo());
-    inputStream << "\n";  // newline at end of file
+    inputStream << "\n"; // newline at end of file
   }
 
   // LLVM wants all the args split up to launch the command so we tokenize here.
@@ -138,10 +138,11 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
   auto Tokenize = llvm::cl::TokenizeWindowsCommandLine;
 #else
   auto Tokenize = llvm::cl::TokenizeGNUCommandLine;
-#endif  // _WIN32
+#endif // _WIN32
   Tokenize(command, stringSaver, rawArgs, /*MarkEOLs=*/false);
   SmallVector<StringRef> args;
-  for (auto rawArg : rawArgs) args.push_back(StringRef(rawArg));
+  for (auto rawArg : rawArgs)
+    args.push_back(StringRef(rawArg));
 
   // Try to find the tool either by absolute path or by looking it up in env.
   auto tool = findTool(args[0].str());
@@ -152,7 +153,8 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
 
   LLVM_DEBUG({
     llvm::dbgs() << "Launching hal.executable preprocessor: ";
-    for (auto arg : args) llvm::dbgs() << arg << " ";
+    for (auto arg : args)
+      llvm::dbgs() << arg << " ";
     llvm::dbgs() << " 1> " << stdoutFile.str() << " 2> " << stderrFile.str()
                  << "\n";
   });
@@ -216,7 +218,7 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
 class PreprocessExecutablesPass
     : public PassWrapper<PreprocessExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
- public:
+public:
   PreprocessExecutablesPass() = default;
   PreprocessExecutablesPass(const PreprocessExecutablesPass &pass) {}
   PreprocessExecutablesPass(std::optional<std::string> pipeline,
@@ -274,7 +276,7 @@ class PreprocessExecutablesPass
     }
   }
 
- private:
+private:
   Option<std::string> pipeline{
       *this,
       "pipeline",
@@ -315,7 +317,7 @@ static PassRegistration<PreprocessExecutablesPass> pass([] {
   return std::make_unique<PreprocessExecutablesPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

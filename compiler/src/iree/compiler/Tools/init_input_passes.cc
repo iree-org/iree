@@ -10,15 +10,15 @@
 
 #ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
-#endif  // IREE_HAVE_STABLEHLO_INPUT
+#endif // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#endif  // IREE_HAVE_TORCH_INPUT
+#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"
-#endif  // IREE_HAVE_TOSA_INPUT
+#endif // IREE_HAVE_TOSA_INPUT
 
 namespace mlir {
 namespace iree_compiler {
@@ -28,7 +28,7 @@ void registerInputPasses() {
 
 #ifdef IREE_HAVE_STABLEHLO_INPUT
   stablehlo::registerStableHLOConversionPasses();
-#endif  // IREE_HAVE_STABLEHLO_INPUT
+#endif // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
   TMTensor::registerTMTensorConversionPasses();
 #endif
@@ -37,8 +37,8 @@ void registerInputPasses() {
   registerTosaToArithPass();
   registerTosaToLinalgPass();
   registerTosaToTensorPass();
-#endif  // IREE_HAVE_TOSA_INPUT
+#endif // IREE_HAVE_TOSA_INPUT
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

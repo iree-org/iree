@@ -82,14 +82,15 @@ spirv::GlobalVariableOp createResourceVariable(Location loc, Type type,
   OpBuilder builder(moduleOp.getContext());
   auto variable =
       builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
-  if (alias) variable->setAttr("aliased", builder.getUnitAttr());
+  if (alias)
+    variable->setAttr("aliased", builder.getUnitAttr());
   symbolTable->insert(variable, moduleOp.getBody()->begin());
   return variable;
 }
 
 /// Returns the (set, binding) pair for the given interface op.
-std::pair<int32_t, int32_t> getInterfaceSetAndBinding(
-    IREE::HAL::InterfaceBindingSubspanOp op) {
+std::pair<int32_t, int32_t>
+getInterfaceSetAndBinding(IREE::HAL::InterfaceBindingSubspanOp op) {
   return {op.getSet().getSExtValue(), op.getBinding().getSExtValue()};
 }
 
@@ -114,7 +115,8 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
 
     func.walk([&](Operation *op) {
       auto subspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
-      if (!subspanOp || subspanOp.use_empty()) return;
+      if (!subspanOp || subspanOp.use_empty())
+        return;
       subspanOps.emplace_back(subspanOp);
       setBindings.emplace_back(getInterfaceSetAndBinding(subspanOp));
       setBindingTypes[setBindings.back()].insert(subspanOp.getType());
@@ -158,7 +160,7 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
   return interfaceToResourceVars;
 }
 
-}  // namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Conversion patterns
@@ -171,9 +173,9 @@ struct HALInterfaceLoadConstantConverter final
     : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO(#1519): this conversion should look up the entry point information
     // to get the total push constant count.
     auto variantOp = loadOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
@@ -204,9 +206,9 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
     : public OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.getDimension().getSExtValue());
     auto i32Type = rewriter.getIntegerType(32);
     Value spirvBuiltin =
@@ -240,9 +242,10 @@ struct HALInterfaceBindingSubspanConverter final
       : OpConversionPattern(typeConverter, context, benefit),
         interfaceToResourceVars(interfaceToResourceVars) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (subspanOp.use_empty()) {
       rewriter.eraseOp(subspanOp);
       return success();
@@ -270,7 +273,7 @@ struct HALInterfaceBindingSubspanConverter final
     return success();
   }
 
- private:
+private:
   const InterfaceResourceMap &interfaceToResourceVars;
 };
 
@@ -278,9 +281,9 @@ struct HALInterfaceBindingSubspanConverter final
 template <typename OpTy>
 struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, adaptor.getOperands());
     return success();
   }
@@ -308,9 +311,9 @@ struct RemoveStaticDynamicCast final : public OpRewritePattern<memref::CastOp> {
 struct RemoveIdentityConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      UnrealizedConversionCastOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(UnrealizedConversionCastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (op->getNumOperands() == 1 && op->getNumResults() == 1 &&
         adaptor.getOperands().front().getType() ==
             op->getResultTypes().front()) {
@@ -332,7 +335,7 @@ struct RemoveIdentityConversionCast final
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 class ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
   }
@@ -341,7 +344,8 @@ class ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
       : enableFastMath(enableFastMath), indexBits(indexBits) {}
 
   LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) return failure();
+    if (failed(Pass::initializeOptions(options)))
+      return failure();
     // Use pass option if present.
     enableFastMath |= enableFastMathOption;
     indexBits = indexBitsOption;
@@ -350,14 +354,14 @@ class ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
 
   void runOnOperation() override;
 
- private:
+private:
   // Enable fast math when doing type conversion by assuming no NaN or infinite
   // values.
   bool enableFastMath;
   // Use 64 bits for index widths.
   unsigned indexBits;
 };
-}  // namespace
+} // namespace
 
 void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -367,11 +371,13 @@ void ConvertToSPIRVPass::runOnOperation() {
       getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp) continue;
+    if (!exportOp)
+      continue;
     // TODO(ravishankarm): This needs to be removed after ConvertToGPU is
     // deprecated. All passes must set the `workgroup_size` on the
     // `hal.executable.export` directly and not on the function.
-    if (funcOp->hasAttr(spirv::getEntryPointABIAttrName())) continue;
+    if (funcOp->hasAttr(spirv::getEntryPointABIAttrName()))
+      continue;
     SmallVector<int64_t> workgroupSize = getWorkgroupSize(exportOp);
     if (workgroupSize.empty()) {
       exportOp.emitOpError(
@@ -382,7 +388,8 @@ void ConvertToSPIRVPass::runOnOperation() {
     auto workgroupSize32 = llvm::map_to_vector(
         workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); });
     std::optional<int> subgroupSize32;
-    if (subgroupSize) subgroupSize32 = *subgroupSize;
+    if (subgroupSize)
+      subgroupSize32 = *subgroupSize;
     funcOp->setAttr(
         spirv::getEntryPointABIAttrName(),
         spirv::getEntryPointABIAttr(context, workgroupSize32, subgroupSize32));
@@ -494,7 +501,8 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SmallVector<func::FuncOp, 1> functions;
   for (func::FuncOp fn : moduleOp.getOps<func::FuncOp>()) {
-    if (!fn.isPublic()) continue;
+    if (!fn.isPublic())
+      continue;
     functions.push_back(fn);
   }
 
@@ -514,8 +522,10 @@ void ConvertToSPIRVPass::runOnOperation() {
   Dialect *spvDialect = spvModule->getDialect();
   for (Operation &op : llvm::make_early_inc_range(*moduleOp.getBody())) {
     // Skip the newly created spirv.module itself.
-    if (&op == spvModule) continue;
-    if (op.getDialect() == spvDialect) op.moveBefore(body, body->end());
+    if (&op == spvModule)
+      continue;
+    if (op.getDialect() == spvDialect)
+      op.moveBefore(body, body->end());
   }
 }
 
@@ -523,10 +533,10 @@ void ConvertToSPIRVPass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath, unsigned indexBits) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertToSPIRVPass(bool enableFastMath, unsigned indexBits) {
   return std::make_unique<ConvertToSPIRVPass>(enableFastMath, indexBits);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

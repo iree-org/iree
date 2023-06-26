@@ -23,7 +23,7 @@ namespace {
 class ConvertStandardToVMTestPass
     : public PassWrapper<ConvertStandardToVMTestPass,
                          OperationPass<mlir::ModuleOp>> {
- public:
+public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertStandardToVMTestPass)
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -65,7 +65,7 @@ class ConvertStandardToVMTestPass
   }
 };
 
-}  // namespace
+} // namespace
 
 namespace IREE {
 namespace VM {
@@ -73,10 +73,10 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createConvertStandardToVMTestPass() {
   return std::make_unique<ConvertStandardToVMTestPass>();
 }
-}  // namespace VM
-}  // namespace IREE
+} // namespace VM
+} // namespace IREE
 
 static PassRegistration<ConvertStandardToVMTestPass> pass;
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

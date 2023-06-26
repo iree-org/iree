@@ -40,7 +40,8 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (dim.value() != ShapedType::kDynamic) continue;
+    if (dim.value() != ShapedType::kDynamic)
+      continue;
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
   }
@@ -48,11 +49,13 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
 
 /// Follow the reverse SSA use-def chain of the given value (always taking the
 /// tied operand) and return the first value outside of `regionOp`.
-static std::optional<Value> findFirstTiedValueOutsideOfRegionOp(
-    Flow::DispatchRegionOp regionOp, Value value) {
+static std::optional<Value>
+findFirstTiedValueOutsideOfRegionOp(Flow::DispatchRegionOp regionOp,
+                                    Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
-    if (llvm::isa<OpResult>(v)) return !regionOp->isAncestor(v.getDefiningOp());
+    if (llvm::isa<OpResult>(v))
+      return !regionOp->isAncestor(v.getDefiningOp());
     assert(v.isa<BlockArgument>() && "expected bbArg");
     // DispatchRegionOp does not have block arguments.
     return true;
@@ -72,7 +75,7 @@ static std::optional<Value> findFirstTiedValueOutsideOfRegionOp(
   return value;
 }
 
-}  // namespace
+} // namespace
 
 /// Rewrite the DispatchRegionOp into a DispatchWorkgroupsOp. The
 /// DispatchRegionOp is not isolated from above and may capture any SSA value
@@ -83,7 +86,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     Flow::DispatchRegionOp regionOp, RewriterBase &rewriter) {
   // Only ops with a single block are supported.
   Region &region = regionOp.getBody();
-  if (!region.hasOneBlock()) return failure();
+  if (!region.hasOneBlock())
+    return failure();
   Block &body = region.front();
   auto terminator = cast<Flow::ReturnOp>(body.getTerminator());
   unsigned numResults = terminator->getNumOperands();
@@ -105,7 +109,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   SmallVector<Value> argumentDims;
   for (Value tensor : argumentsSet) {
     auto tensorType = llvm::dyn_cast<RankedTensorType>(tensor.getType());
-    if (!tensorType) continue;
+    if (!tensorType)
+      continue;
     appendDynamicDims(rewriter, loc, argumentDims, tensor);
   }
 
@@ -116,11 +121,13 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   for (const auto &it : llvm::enumerate(terminator->getOperands())) {
     auto tiedArgument =
         findFirstTiedValueOutsideOfRegionOp(regionOp, it.value());
-    if (!tiedArgument.has_value()) continue;
+    if (!tiedArgument.has_value())
+      continue;
     assert(argumentsSet.contains(*tiedArgument) &&
            "expected that tiedArgument is already an argument");
     // Do not tie an argument to multiple results.
-    if (tiedArgumentsSet.contains(*tiedArgument)) continue;
+    if (tiedArgumentsSet.contains(*tiedArgument))
+      continue;
     tiedArgumentsSet.insert(*tiedArgument);
     tiedArguments[it.index()] = std::distance(
         argumentsSet.begin(), llvm::find(argumentsSet, *tiedArgument));
@@ -166,7 +173,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   rewriter.setInsertionPointToStart(&newBody);
   for (const auto &it : llvm::enumerate(arguments)) {
     auto tensorType = llvm::dyn_cast<RankedTensorType>(it.value().getType());
-    if (!tensorType) continue;
+    if (!tensorType)
+      continue;
     auto inputBbArg = workgroupsOp.getInputBlockArgument(it.index());
     auto dims =
         Util::findVariadicDynamicDims(it.index(), arguments, argumentDims);
@@ -205,7 +213,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     auto tensorType = it.value().getType().cast<RankedTensorType>();
     assert(dims.size() == tensorType.getNumDynamicDims() &&
            "mismatching number of dynamic dims");
-#endif  // NDEBUG
+#endif // NDEBUG
     SmallVector<Value> bbArgDims =
         llvm::map_to_vector(dims, [&](Value v) { return bvm.lookup(v); });
     rewriter.create<IREE::Flow::DispatchTensorStoreOp>(loc, it.value(),
@@ -241,13 +249,13 @@ struct ConvertRegionToWorkgroupsPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass() {
   return std::make_unique<ConvertRegionToWorkgroupsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -78,7 +78,8 @@ void MatmulStrategy::print(llvm::raw_ostream &os) const {
 
 LogicalResult MatmulStrategy::validate(const GPUModel &gpuModel) const {
   // Validate the parent strategy.
-  if (failed(AbstractGemmLikeStrategy::validate(gpuModel))) return failure();
+  if (failed(AbstractGemmLikeStrategy::validate(gpuModel)))
+    return failure();
 
   return success();
 }
@@ -188,7 +189,8 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   if (strategy.useAsyncCopies) {
     // Step 10. Multi-buffering.
-    if (strategy.pipelineDepth > 1) buildMultiBuffering(b, funcH, strategy);
+    if (strategy.pipelineDepth > 1)
+      buildMultiBuffering(b, funcH, strategy);
 
     // Step 11. Convert to async copies.
     // TODO: avoid consuming handles and returning here.

@@ -23,7 +23,7 @@ struct LowerUKernelOpsToCallsPass
   }
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void LowerUKernelOpsToCallsPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -58,5 +58,5 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass() {
   return std::make_unique<LowerUKernelOpsToCallsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

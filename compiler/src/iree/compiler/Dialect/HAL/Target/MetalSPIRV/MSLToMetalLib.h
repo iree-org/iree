@@ -19,13 +19,13 @@ namespace HAL {
 // Invokes system commands to compile the given |mslCode| into a Metal library
 // and returns the library binary code. |fileName| will be used as a hint for
 // creating intermediate files.
-std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(
-    MetalTargetPlatform targetPlatform, llvm::StringRef mslCode,
-    llvm::StringRef fileName);
+std::unique_ptr<llvm::MemoryBuffer>
+compileMSLToMetalLib(MetalTargetPlatform targetPlatform,
+                     llvm::StringRef mslCode, llvm::StringRef fileName);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_MSLTOMETALLIB_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_MSLTOMETALLIB_H_

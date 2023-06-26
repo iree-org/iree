@@ -23,7 +23,7 @@ namespace {
 /// operands, and then truncating the result back to f16.
 template <typename Op>
 struct ExpandF16OpToF32Pattern : public OpRewritePattern<Op> {
- public:
+public:
   using OpRewritePattern<Op>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(Op op,
@@ -65,11 +65,11 @@ struct ExpandF16OpToF32Pass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createExpandF16OpToF32Pass() {
   return std::make_unique<ExpandF16OpToF32Pass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

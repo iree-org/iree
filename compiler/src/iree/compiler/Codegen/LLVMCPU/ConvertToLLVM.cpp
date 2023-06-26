@@ -104,10 +104,11 @@ struct ConvertHALEntryPointFuncOp
                              LLVMTypeConverter &typeConverter)
       : ConvertOpToLLVMWithABIPattern(abi, typeConverter,
                                       /*benefit=*/100) {}
-  LogicalResult matchAndRewrite(
-      func::FuncOp stdFuncOp, func::FuncOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!stdFuncOp.isPublic()) return failure();
+  LogicalResult
+  matchAndRewrite(func::FuncOp stdFuncOp, func::FuncOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!stdFuncOp.isPublic())
+      return failure();
     FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
       stdFuncOp->emitWarning()
@@ -193,15 +194,15 @@ struct ConvertHALExecutableConstantLoadOp
     : public ConvertOpToLLVMWithABIPattern<
           IREE::HAL::ExecutableConstantLoadOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::ExecutableConstantLoadOp loadOp,
-      IREE::HAL::ExecutableConstantLoadOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::ExecutableConstantLoadOp loadOp,
+                  IREE::HAL::ExecutableConstantLoadOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         typeConverter->convertType(loadOp->getResult(0).getType());
-    rewriter.replaceOp(
-        loadOp, abi.loadExecutableConstant(loadOp, loadOp.getKey(), resultType,
-                                           rewriter));
+    rewriter.replaceOp(loadOp,
+                       abi.loadExecutableConstant(loadOp, loadOp.getKey(),
+                                                  resultType, rewriter));
     return success();
   }
 };
@@ -212,10 +213,10 @@ struct ConvertHALExecutableConstantLoadOp
 struct ConvertHALInterfaceWorkgroupIDOp
     : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceWorkgroupIDOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupIDOp idOp,
-      IREE::HAL::InterfaceWorkgroupIDOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceWorkgroupIDOp idOp,
+                  IREE::HAL::InterfaceWorkgroupIDOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     int32_t dim = (int32_t)idOp.getDimension().getZExtValue();
     auto resultType = typeConverter->convertType(idOp->getResult(0).getType());
     rewriter.replaceOp(idOp,
@@ -231,10 +232,10 @@ struct ConvertHALInterfaceWorkgroupSizeOp
     : public ConvertOpToLLVMWithABIPattern<
           IREE::HAL::InterfaceWorkgroupSizeOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupSizeOp sizeOp,
-      IREE::HAL::InterfaceWorkgroupSizeOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp sizeOp,
+                  IREE::HAL::InterfaceWorkgroupSizeOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     int32_t dim = (int32_t)sizeOp.getDimension().getZExtValue();
     auto resultType =
         typeConverter->convertType(sizeOp->getResult(0).getType());
@@ -251,10 +252,10 @@ struct ConvertHALInterfaceWorkgroupCountOp
     : public ConvertOpToLLVMWithABIPattern<
           IREE::HAL::InterfaceWorkgroupCountOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupCountOp countOp,
-      IREE::HAL::InterfaceWorkgroupCountOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceWorkgroupCountOp countOp,
+                  IREE::HAL::InterfaceWorkgroupCountOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     int32_t dim = (int32_t)countOp.getDimension().getZExtValue();
     auto resultType =
         typeConverter->convertType(countOp->getResult(0).getType());
@@ -270,10 +271,10 @@ struct ConvertHALInterfaceWorkgroupCountOp
 struct ConvertHALInterfaceConstantLoadOp
     : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceConstantLoadOp loadOp,
-      IREE::HAL::InterfaceConstantLoadOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp,
+                  IREE::HAL::InterfaceConstantLoadOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     int64_t index = loadOp.getIndex().getZExtValue();
     auto resultType =
         typeConverter->convertType(loadOp->getResult(0).getType());
@@ -290,10 +291,10 @@ struct ConvertHALInterfaceBindingSubspanOp
     : public ConvertOpToLLVMWithABIPattern<
           IREE::HAL::InterfaceBindingSubspanOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp subspanOp,
-      IREE::HAL::InterfaceBindingSubspanOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                  IREE::HAL::InterfaceBindingSubspanOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     MemRefType memRefType =
         llvm::dyn_cast<MemRefType>(subspanOp->getResult(0).getType());
     if (!memRefType) {
@@ -319,11 +320,9 @@ struct InstrumentationEntry {
 };
 
 // entrySize must be 16-byte aligned
-static InstrumentationEntry acquireInstrumentationEntry(Location loc,
-                                                        Value buffer,
-                                                        Value bufferPtr,
-                                                        Value entrySize,
-                                                        OpBuilder &builder) {
+static InstrumentationEntry
+acquireInstrumentationEntry(Location loc, Value buffer, Value bufferPtr,
+                            Value entrySize, OpBuilder &builder) {
   auto i64Type = builder.getI64Type();
   auto bufferType = llvm::cast<MemRefType>(buffer.getType());
   int64_t totalBufferSize =
@@ -393,10 +392,10 @@ static int64_t getMemoryAccessByteSize(Type type) {
 struct ConvertHALInstrumentWorkgroupOp
     : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentWorkgroupOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InstrumentWorkgroupOp instrumentOp,
-      IREE::HAL::InstrumentWorkgroupOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InstrumentWorkgroupOp instrumentOp,
+                  IREE::HAL::InstrumentWorkgroupOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = instrumentOp.getLoc();
     auto dataLayout =
         getTypeConverter()->getDataLayoutAnalysis()->getAbove(instrumentOp);
@@ -405,14 +404,14 @@ struct ConvertHALInstrumentWorkgroupOp
 
     auto entryType = LLVM::LLVMStructType::getLiteral(
         getContext(), {
-                          i32Type,  // header
-                          i32Type,  // workgroup_id_x
-                          i32Type,  // workgroup_id_y
-                          i32Type,  // workgroup_id_z
-                          i32Type,  // workgroup_count_x
-                          i32Type,  // workgroup_count_y
-                          i32Type,  // workgroup_count_z
-                          i32Type,  // processor_id
+                          i32Type, // header
+                          i32Type, // workgroup_id_x
+                          i32Type, // workgroup_id_y
+                          i32Type, // workgroup_id_z
+                          i32Type, // workgroup_count_x
+                          i32Type, // workgroup_count_y
+                          i32Type, // workgroup_count_z
+                          i32Type, // processor_id
                       });
 
     // 8 bit tag = 00 | 24 bit dispatch id
@@ -421,7 +420,7 @@ struct ConvertHALInstrumentWorkgroupOp
     Value rawDispatchId = instrumentOp.getDispatchId();
     Value header = rewriter.create<LLVM::ShlOp>(
         loc, i32Type, rawDispatchId,
-        rewriter.create<LLVM::ConstantOp>(loc, i32Type, 8));  // | 8bit tag
+        rewriter.create<LLVM::ConstantOp>(loc, i32Type, 8)); // | 8bit tag
 
     auto entry = appendInstrumentationEntry(
         loc, instrumentOp.getBuffer(), operands.getBuffer(), entryType,
@@ -457,29 +456,29 @@ static std::optional<uint64_t> mapValueType(Type type) {
       .Case<IntegerType>([&](Type type) -> std::optional<uint64_t> {
         if (type.isUnsignedInteger()) {
           switch (type.getIntOrFloatBitWidth()) {
-            case 8:
-              return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_8;
-            case 16:
-              return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_16;
-            case 32:
-              return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_32;
-            case 64:
-              return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_64;
-            default:
-              return std::nullopt;
+          case 8:
+            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_8;
+          case 16:
+            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_16;
+          case 32:
+            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_32;
+          case 64:
+            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_UINT_64;
+          default:
+            return std::nullopt;
           }
         }
         switch (type.getIntOrFloatBitWidth()) {
-          case 8:
-            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_8;
-          case 16:
-            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_16;
-          case 32:
-            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_32;
-          case 64:
-            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_64;
-          default:
-            return std::nullopt;
+        case 8:
+          return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_8;
+        case 16:
+          return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_16;
+        case 32:
+          return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_32;
+        case 64:
+          return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_64;
+        default:
+          return std::nullopt;
         }
       })
       .Case<FloatType>([&](Type type) -> std::optional<uint64_t> {
@@ -487,14 +486,14 @@ static std::optional<uint64_t> mapValueType(Type type) {
           return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_BFLOAT_16;
         }
         switch (type.getIntOrFloatBitWidth()) {
-          case 16:
-            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_FLOAT_16;
-          case 32:
-            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_FLOAT_32;
-          case 64:
-            return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_FLOAT_64;
-          default:
-            return std::nullopt;
+        case 16:
+          return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_FLOAT_16;
+        case 32:
+          return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_FLOAT_32;
+        case 64:
+          return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_FLOAT_64;
+        default:
+          return std::nullopt;
         }
       })
       .Case<IndexType>([&](Type type) -> std::optional<uint64_t> {
@@ -506,10 +505,10 @@ static std::optional<uint64_t> mapValueType(Type type) {
 struct ConvertHALInstrumentValueOp
     : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentValueOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InstrumentValueOp instrumentOp,
-      IREE::HAL::InstrumentValueOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InstrumentValueOp instrumentOp,
+                  IREE::HAL::InstrumentValueOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = instrumentOp.getLoc();
 
     // Only convert ops we can handle, otherwise warn and discard.
@@ -533,8 +532,8 @@ struct ConvertHALInstrumentValueOp
 
     auto entryType =
         LLVM::LLVMStructType::getLiteral(getContext(), {
-                                                           i64Type,  // header
-                                                           i64Type,  // value
+                                                           i64Type, // header
+                                                           i64Type, // value
                                                        });
 
     // 8 bit tag
@@ -574,10 +573,10 @@ struct ConvertHALInstrumentValueOp
 struct ConvertHALInstrumentMemoryLoadOp
     : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentMemoryLoadOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InstrumentMemoryLoadOp instrumentOp,
-      IREE::HAL::InstrumentMemoryLoadOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InstrumentMemoryLoadOp instrumentOp,
+                  IREE::HAL::InstrumentMemoryLoadOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = instrumentOp.getLoc();
     auto dataLayout =
         getTypeConverter()->getDataLayoutAnalysis()->getAbove(instrumentOp);
@@ -585,8 +584,8 @@ struct ConvertHALInstrumentMemoryLoadOp
 
     auto entryType =
         LLVM::LLVMStructType::getLiteral(getContext(), {
-                                                           i64Type,  // header
-                                                           i64Type,  // address
+                                                           i64Type, // header
+                                                           i64Type, // address
                                                        });
 
     // 8 bit tag = 100 (read), 101 (write)
@@ -621,10 +620,10 @@ struct ConvertHALInstrumentMemoryLoadOp
 struct ConvertHALInstrumentMemoryStoreOp
     : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentMemoryStoreOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InstrumentMemoryStoreOp instrumentOp,
-      IREE::HAL::InstrumentMemoryStoreOpAdaptor operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InstrumentMemoryStoreOp instrumentOp,
+                  IREE::HAL::InstrumentMemoryStoreOpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = instrumentOp.getLoc();
     auto dataLayout =
         getTypeConverter()->getDataLayoutAnalysis()->getAbove(instrumentOp);
@@ -632,8 +631,8 @@ struct ConvertHALInstrumentMemoryStoreOp
 
     auto entryType =
         LLVM::LLVMStructType::getLiteral(getContext(), {
-                                                           i64Type,  // header
-                                                           i64Type,  // address
+                                                           i64Type, // header
+                                                           i64Type, // address
                                                        });
 
     // 8 bit tag = 10 (read), 11 (write)
@@ -672,9 +671,10 @@ static SmallVector<StringRef> getExtraFields(Operation *forOp) {
   SmallVector<StringRef> extraFields;
   if (auto extraFieldsAttr =
           forOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
-    extraFields = llvm::map_to_vector(
-        extraFieldsAttr.getValue(),
-        [](Attribute attr) { return llvm::cast<StringAttr>(attr).getValue(); });
+    extraFields =
+        llvm::map_to_vector(extraFieldsAttr.getValue(), [](Attribute attr) {
+          return llvm::cast<StringAttr>(attr).getValue();
+        });
   }
   return extraFields;
 }
@@ -697,8 +697,7 @@ static IREE::HAL::CallingConvention getCallingConvention(Operation *forOp) {
 /// pattern.
 struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
   RewriteFuncOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
-      : OpRewritePattern(&typeConverter.getContext()),
-        abi(abi),
+      : OpRewritePattern(&typeConverter.getContext()), abi(abi),
         typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(LLVM::LLVMFuncOp funcOp,
@@ -743,7 +742,7 @@ struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
     return success();
   }
 
- private:
+private:
   HALDispatchABI &abi;
   LLVMTypeConverter &typeConverter;
 };
@@ -757,15 +756,15 @@ struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
 /// pattern.
 struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
   RewriteCallOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
-      : OpRewritePattern(&typeConverter.getContext()),
-        abi(abi),
+      : OpRewritePattern(&typeConverter.getContext()), abi(abi),
         typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(LLVM::CallOp callOp,
                                 PatternRewriter &rewriter) const override {
     auto symbol = callOp.getCallableForCallee().dyn_cast<SymbolRefAttr>();
     auto flatSymbol = llvm::dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
-    if (!flatSymbol) return failure();
+    if (!flatSymbol)
+      return failure();
 
     // Ensure the target function is extern.
     // To support conversion inserting calls in local patterns that can't add
@@ -791,7 +790,7 @@ struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
     return success();
   }
 
- private:
+private:
   HALDispatchABI &abi;
   LLVMTypeConverter &typeConverter;
 };
@@ -806,15 +805,15 @@ struct RewriteExternCallOpToDynamicImportCallOp
     : public OpRewritePattern<LLVM::CallOp> {
   RewriteExternCallOpToDynamicImportCallOp(HALDispatchABI &abi,
                                            LLVMTypeConverter &typeConverter)
-      : OpRewritePattern(&typeConverter.getContext()),
-        abi(abi),
+      : OpRewritePattern(&typeConverter.getContext()), abi(abi),
         typeConverter(typeConverter) {}
   LogicalResult matchAndRewrite(LLVM::CallOp callOp,
                                 PatternRewriter &rewriter) const override {
     // Ignore indirect calls (they're probably already converted imports).
     auto symbol = callOp.getCallableForCallee().dyn_cast<SymbolRefAttr>();
     auto flatSymbol = llvm::dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
-    if (!flatSymbol) return failure();
+    if (!flatSymbol)
+      return failure();
 
     // Ensure the target function is extern.
     // To support conversion inserting calls in local patterns that can't add
@@ -878,7 +877,7 @@ struct RewriteExternCallOpToDynamicImportCallOp
 /// any 64-bit constants that would otherwise prevent the code from being
 /// vectorized.
 class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
- public:
+public:
   using OpRewritePattern<arith::MulSIExtendedOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(arith::MulSIExtendedOp op,
@@ -917,7 +916,7 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
 };
 
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
- public:
+public:
   ConvertToLLVMPass(bool reassociateFpReductions) {
     targetReassociateFpReductions.setValue(reassociateFpReductions);
   }
@@ -928,7 +927,7 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
 
   void runOnOperation() override;
 
- private:
+private:
   Option<std::string> targetTriple{
       *this, "target-triple", llvm::cl::desc("Code generation target triple."),
       llvm::cl::init("")};
@@ -942,7 +941,7 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
       llvm::cl::init("false")};
 };
 
-}  // namespace
+} // namespace
 
 static std::string getStringAttrFromTargetAttr(ModuleOp module,
                                                StringRef attrName) {
@@ -1108,10 +1107,10 @@ void ConvertToLLVMPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
-    bool reassociateFpReductions) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertToLLVMPass(bool reassociateFpReductions) {
   return std::make_unique<ConvertToLLVMPass>(reassociateFpReductions);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
