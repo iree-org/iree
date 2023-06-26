@@ -24,7 +24,8 @@ namespace {
 // stages.
 void collectLoopsToPeel(RewriterBase &rewriter, Operation *op,
                         SmallVectorImpl<scf::ForOp> &loopsToPeel) {
-  if (!iree_compiler::getLoweringConfig(op)) return;
+  if (!iree_compiler::getLoweringConfig(op))
+    return;
 
   int maxNumLoopsToPeel = TypeSwitch<Operation *, int>(op)
                               .Case<linalg::LinalgOp>([](auto linalgOp) {
@@ -37,7 +38,8 @@ void collectLoopsToPeel(RewriterBase &rewriter, Operation *op,
   for (int i = 0; i < maxNumLoopsToPeel; ++i) {
     op = op->getParentOfType<scf::ForOp>();
     auto loop = llvm::cast_or_null<scf::ForOp>(op);
-    if (!loop || iree_compiler::isTiledAndDistributedLoop(loop)) break;
+    if (!loop || iree_compiler::isTiledAndDistributedLoop(loop))
+      break;
     loopsToPeel.push_back(loop);
   }
 
@@ -45,7 +47,7 @@ void collectLoopsToPeel(RewriterBase &rewriter, Operation *op,
 }
 
 class LLVMCPUPeelPass : public LLVMCPUPeelBase<LLVMCPUPeelPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, linalg::LinalgDialect,
                     scf::SCFDialect>();
@@ -85,10 +87,10 @@ void LLVMCPUPeelPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass() {
   return std::make_unique<LLVMCPUPeelPass>();
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

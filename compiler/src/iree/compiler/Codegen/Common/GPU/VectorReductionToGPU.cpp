@@ -49,15 +49,19 @@ static bool isUniformLoad(Operation *op) {
   using namespace IREE::HAL;
 
   auto loadOp = dyn_cast<memref::LoadOp>(op);
-  if (!loadOp) return false;
+  if (!loadOp)
+    return false;
   auto space = loadOp.getMemRefType().getMemorySpace();
   auto attr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
-  if (!attr) return false;
+  if (!attr)
+    return false;
 
-  if (attr.getValue() == DescriptorType::UniformBuffer) return true;
+  if (attr.getValue() == DescriptorType::UniformBuffer)
+    return true;
 
   auto subspan = loadOp.getMemRef().getDefiningOp<InterfaceBindingSubspanOp>();
-  if (!subspan) return false;
+  if (!subspan)
+    return false;
   if (auto flags = subspan.getDescriptorFlags()) {
     if (bitEnumContainsAll(*flags, IREE::HAL::DescriptorFlags::ReadOnly))
       return true;
@@ -67,19 +71,23 @@ static bool isUniformLoad(Operation *op) {
 
 /// Hoist uniform operations as well as special hal operations that have side
 /// effect but are safe to move out of the warp single lane region.
-static void moveScalarAndBindingUniformCode(
-    vector::WarpExecuteOnLane0Op warpOp) {
+static void
+moveScalarAndBindingUniformCode(vector::WarpExecuteOnLane0Op warpOp) {
   /// Hoist ops without side effect as well as special binding ops.
   auto canBeHoisted = [](Operation *op,
                          function_ref<bool(Value)> definedOutside) {
-    if (op->getNumRegions() != 0) return false;
-    if (!llvm::all_of(op->getOperands(), definedOutside)) return false;
-    if (isMemoryEffectFree(op)) return true;
+    if (op->getNumRegions() != 0)
+      return false;
+    if (!llvm::all_of(op->getOperands(), definedOutside))
+      return false;
+    if (isMemoryEffectFree(op))
+      return true;
 
     if (isa<IREE::HAL::InterfaceBindingSubspanOp,
             IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(op))
       return true;
-    if (isUniformLoad(op)) return true;
+    if (isUniformLoad(op))
+      return true;
 
     return false;
   };
@@ -108,7 +116,8 @@ static void moveScalarAndBindingUniformCode(
   }
 
   // Move all the ops marked as uniform outside of the region.
-  for (Operation *op : opsToMove) op->moveBefore(warpOp);
+  for (Operation *op : opsToMove)
+    op->moveBefore(warpOp);
 }
 
 namespace {
@@ -117,12 +126,13 @@ namespace {
 /// MultiDimReduction distribution is supported.
 class InsertElementToBroadcast final
     : public OpRewritePattern<vector::InsertElementOp> {
- public:
+public:
   using OpRewritePattern<vector::InsertElementOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::InsertElementOp insertOp,
                                 PatternRewriter &rewriter) const override {
-    if (insertOp.getDestVectorType().getNumElements() != 1) return failure();
+    if (insertOp.getDestVectorType().getNumElements() != 1)
+      return failure();
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
         insertOp, insertOp.getDestVectorType(), insertOp.getSource());
     return success();
@@ -147,7 +157,7 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 
 class VectorReduceToGPUPass
     : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
- public:
+public:
   explicit VectorReduceToGPUPass(std::function<int(func::FuncOp)> getWarpSize)
       : getWarpSize(getWarpSize) {}
 
@@ -230,7 +240,8 @@ class VectorReduceToGPUPass
       auto distributionFn = [](Value val) {
         AffineMap map = AffineMap::get(val.getContext());
         auto vecType = llvm::dyn_cast<VectorType>(val.getType());
-        if (!vecType) return map;
+        if (!vecType)
+          return map;
         // Create a map (d0, d1) -> (d1) to distribute along the inner
         // dimension. Once we support n-d distribution we can add more
         // complex cases.
@@ -274,11 +285,11 @@ class VectorReduceToGPUPass
     });
   }
 
- private:
+private:
   std::function<int(func::FuncOp)> getWarpSize;
 };
 
-}  // anonymous namespace
+} // anonymous namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
@@ -286,5 +297,5 @@ createConvertVectorReductionToGPUPass(
   return std::make_unique<VectorReduceToGPUPass>(getWarpSize);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

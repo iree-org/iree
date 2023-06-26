@@ -29,7 +29,7 @@ static const char *kConstantBlockSetterName = "__set_constants";
 
 class MaterializeConstantsPass
     : public MaterializeConstantsBase<MaterializeConstantsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     arith::ArithDialect, func::FuncDialect>();
@@ -51,7 +51,8 @@ class MaterializeConstantsPass
     });
 
     // No constants found; omit the constant block entirely.
-    if (allLoadOps.empty()) return;
+    if (allLoadOps.empty())
+      return;
 
     // Create global ops for each constant and replace the HAL ops so they load
     // from them. Each global will track what constant key it represents for
@@ -135,7 +136,7 @@ createMaterializeConstantsPass() {
   return std::make_unique<MaterializeConstantsPass>();
 }
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

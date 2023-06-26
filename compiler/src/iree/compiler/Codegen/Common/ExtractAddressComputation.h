@@ -42,7 +42,8 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
     auto ldTy = srcMemRef.getType().cast<MemRefType>();
     unsigned storeLoadRank = ldTy.getRank();
     // Don't waste compile time if there is nothing to rewrite.
-    if (storeLoadRank == 0) return failure();
+    if (storeLoadRank == 0)
+      return failure();
 
     // If our load already has only zeros as indices there is nothing
     // to do.
@@ -82,6 +83,6 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
 /// before hand. In other words, the address computation is not part of
 /// the memory access anymore.
 void populateExtractAddressComputationPatterns(RewritePatternSet &patterns);
-}  // namespace iree_compiler
-}  // namespace mlir
-#endif  // IREE_COMPILER_CODEGEN_COMMON_EXTRACTADDRESSCOMPUTATION_H_
+} // namespace iree_compiler
+} // namespace mlir
+#endif // IREE_COMPILER_CODEGEN_COMMON_EXTRACTADDRESSCOMPUTATION_H_

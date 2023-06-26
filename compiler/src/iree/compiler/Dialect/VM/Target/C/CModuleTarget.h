@@ -47,9 +47,9 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
                                  CTargetOptions targetOptions,
                                  llvm::raw_ostream &output);
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_C_CMODULETARGET_H_
+#endif // IREE_COMPILER_DIALECT_VM_TARGET_C_CMODULETARGET_H_

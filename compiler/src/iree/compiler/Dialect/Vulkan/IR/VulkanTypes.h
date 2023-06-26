@@ -14,7 +14,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanEnums.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanEnums.h.inc" // IWYU pragma: export
 // clang-format on
 
-#endif  // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANTYPES_H_
+#endif // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANTYPES_H_

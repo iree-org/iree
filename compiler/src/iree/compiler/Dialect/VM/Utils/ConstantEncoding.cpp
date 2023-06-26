@@ -89,34 +89,34 @@ LogicalResult serializeConstantArray(Location loc, ElementsAttr elementsAttr,
 
   if (auto attr = elementsAttr.dyn_cast<DenseIntElementsAttr>()) {
     switch (bitwidth) {
-      case 8:
-        serializeConstantI8Array(attr, alignment, dst);
-        break;
-      case 16:
-        serializeConstantI16Array(attr, alignment, dst);
-        break;
-      case 32:
-        serializeConstantI32Array(attr, alignment, dst);
-        break;
-      case 64:
-        serializeConstantI64Array(attr, alignment, dst);
-        break;
-      default:
-        return emitError(loc) << "unhandled element bitwidth " << bitwidth;
+    case 8:
+      serializeConstantI8Array(attr, alignment, dst);
+      break;
+    case 16:
+      serializeConstantI16Array(attr, alignment, dst);
+      break;
+    case 32:
+      serializeConstantI32Array(attr, alignment, dst);
+      break;
+    case 64:
+      serializeConstantI64Array(attr, alignment, dst);
+      break;
+    default:
+      return emitError(loc) << "unhandled element bitwidth " << bitwidth;
     }
   } else if (auto attr = elementsAttr.dyn_cast<DenseFPElementsAttr>()) {
     switch (bitwidth) {
-      case 16:
-        serializeConstantF16Array(attr, alignment, dst);
-        break;
-      case 32:
-        serializeConstantF32Array(attr, alignment, dst);
-        break;
-      case 64:
-        serializeConstantF64Array(attr, alignment, dst);
-        break;
-      default:
-        return emitError(loc) << "unhandled element bitwidth " << bitwidth;
+    case 16:
+      serializeConstantF16Array(attr, alignment, dst);
+      break;
+    case 32:
+      serializeConstantF32Array(attr, alignment, dst);
+      break;
+    case 64:
+      serializeConstantF64Array(attr, alignment, dst);
+      break;
+    default:
+      return emitError(loc) << "unhandled element bitwidth " << bitwidth;
     }
   } else {
     return emitError(loc) << "unimplemented attribute encoding: "
@@ -126,7 +126,7 @@ LogicalResult serializeConstantArray(Location loc, ElementsAttr elementsAttr,
   return success();
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

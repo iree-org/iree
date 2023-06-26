@@ -30,7 +30,7 @@ struct EraseUnusedLinalgOperandsPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 Flow::createEraseUnusedLinalgOperands() {

@@ -46,9 +46,11 @@ struct FoldBlockArgumentsPattern
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(CallableOpInterface op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getCallableRegion()) return failure();
+    if (!op.getCallableRegion())
+      return failure();
     auto &region = *op.getCallableRegion();
-    if (region.empty()) return failure();
+    if (region.empty())
+      return failure();
 
     // Analyze all branches in the op to compute the information we'll need to
     // analyze across branch sources.
@@ -86,7 +88,7 @@ struct FoldBlockArgumentsPattern
       }
     }
     if (!hasAnyDupes) {
-      return failure();  // no dupes at all
+      return failure(); // no dupes at all
     }
 
     rewriter.startRootUpdate(op);
@@ -97,9 +99,11 @@ struct FoldBlockArgumentsPattern
     for (auto &block : llvm::make_range(++region.getBlocks().begin(),
                                         region.getBlocks().end())) {
       unsigned numArgs = block.getNumArguments();
-      if (numArgs == 0) continue;
+      if (numArgs == 0)
+        continue;
       auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
-      if (blockSources.size() == 0) continue;
+      if (blockSources.size() == 0)
+        continue;
 
       // Which args we'll end up erasing.
       // We need to do the actual removal after we've done the remapping below
@@ -110,15 +114,15 @@ struct FoldBlockArgumentsPattern
       // See if each block argument is foldable across all block sources.
       // In order to fold we need each source to share some duplicates but note
       // that the sources may not have identical sets.
-      llvm::BitVector sameValues(numArgs);    // reused
-      llvm::BitVector sourceValues(numArgs);  // reused
+      llvm::BitVector sameValues(numArgs);   // reused
+      llvm::BitVector sourceValues(numArgs); // reused
       for (unsigned argIndex = 0; argIndex < numArgs; ++argIndex) {
         // Each bit represents an argument that duplicates the arg at argIndex.
         // We walk all the sources and AND their masks together to get the safe
         // set of duplicate operands.
         // Example for %0: (%a, %b, %a) -> b001
         // Example for %1: (%a, %b, %a) -> b000
-        sameValues.set();  // note reused
+        sameValues.set(); // note reused
         for (auto &blockSource : blockSources) {
           sourceValues.reset();
           for (auto mit = blockSource.duplicates.findLeader(argIndex);
@@ -128,7 +132,7 @@ struct FoldBlockArgumentsPattern
           sameValues &= sourceValues;
         }
         if (sameValues.none()) {
-          continue;  // arg unused/not duplicated
+          continue; // arg unused/not duplicated
         }
 
         // Remove the base argument from the set so we don't erase it and can
@@ -187,9 +191,11 @@ struct ElideBranchOperandsPattern
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(CallableOpInterface op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getCallableRegion()) return failure();
+    if (!op.getCallableRegion())
+      return failure();
     auto &region = *op.getCallableRegion();
-    if (region.empty()) return failure();
+    if (region.empty())
+      return failure();
     DominanceInfo dominance(op);
 
     // Analyze all branches to build a map of blocks to their sources.
@@ -220,9 +226,11 @@ struct ElideBranchOperandsPattern
     for (auto &block : llvm::make_range(++region.getBlocks().begin(),
                                         region.getBlocks().end())) {
       unsigned numArgs = block.getNumArguments();
-      if (numArgs == 0) continue;
+      if (numArgs == 0)
+        continue;
       auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
-      if (blockSources.size() == 0) continue;
+      if (blockSources.size() == 0)
+        continue;
 
       // Which args we'll end up erasing.
       // We need to do the actual removal after we've done the remapping below
@@ -262,7 +270,8 @@ struct ElideBranchOperandsPattern
           uniformValue = nullptr;
           break;
         }
-        if (!uniformValue) continue;
+        if (!uniformValue)
+          continue;
 
         // See if the uniform value dominates this block; if so we can use it.
         if (!uniformValue.getDefiningOp() ||
@@ -273,7 +282,8 @@ struct ElideBranchOperandsPattern
           elidedArgs.set(argIndex);
         }
       }
-      if (elidedArgs.none()) continue;
+      if (elidedArgs.none())
+        continue;
 
       // Erase all the block arguments we remapped.
       for (auto &blockSource : blockSources) {
@@ -300,7 +310,7 @@ struct ElideBranchOperandsPattern
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
   context->getOrLoadDialect<IREE::Util::UtilDialect>()
@@ -311,7 +321,7 @@ void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
       context);
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -23,7 +23,8 @@ namespace {
 
 int getNextPotBitWidth(int bitWidth, int minBitWidth = 8) {
   for (int i = minBitWidth;; i *= 2) {
-    if (i >= bitWidth) return i;
+    if (i >= bitWidth)
+      return i;
   }
 }
 
@@ -115,7 +116,8 @@ struct TensorEmptyCast
   LogicalResult matchAndRewrite(IREE::Util::NumericCastOpInterface castOp,
                                 PatternRewriter &rewriter) const override {
     auto emptyOp = castOp.getInput().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyOp) return failure();
+    if (!emptyOp)
+      return failure();
     Type resultType = castOp.getCasted().getType();
 
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(castOp, resultType,
@@ -133,7 +135,8 @@ struct LinalgFillCast
                                 PatternRewriter &rewriter) const override {
     auto loc = castOp.getLoc();
     auto fillOp = castOp.getInput().getDefiningOp<linalg::FillOp>();
-    if (!fillOp) return failure();
+    if (!fillOp)
+      return failure();
     Type toElementType = getElementTypeOrSelf(castOp.getCastedType());
 
     Value fillInput = fillOp.value();
@@ -280,13 +283,13 @@ class OptimizeNumericsPass : public OptimizeNumericsBase<OptimizeNumericsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createOptimizeNumericsPass() {
   return std::make_unique<OptimizeNumericsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

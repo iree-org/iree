@@ -94,7 +94,7 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   } else {
     // Adjust the vector size to the max power of 2 that divides the reduction,
     // this dimensions the vector properly, whatever the elemental type.
-    assert((maxVectorSize & maxVectorSize - 1) == 0 &&
+    assert((maxVectorSize & (maxVectorSize - 1)) == 0 &&
            "maxVectorSize must be a power of 2");
     // TODO: we could also split out the first multiple of vectorSize instead
     // of reducing the vectorSize. This is better done with future stride /
@@ -102,7 +102,8 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
     // TODO: splitting here also requires the post-bufferization privatization
     // analysis (see #11715).
     for (vectorSize = maxVectorSize; vectorSize > 1; vectorSize >>= 1)
-      if (reductionDimensionSize % vectorSize == 0) break;
+      if (reductionDimensionSize % vectorSize == 0)
+        break;
     // Pad to the next multiple of the warp size above
     // `reductionDimensionSize / vectorSize` but below `maxNumThreadsToUse`.
     numThreadsXInBlock = std::min(
@@ -123,7 +124,7 @@ static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value Forall,
 }
 
 static void buildStagedReductionStrategyThreadLevel(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value gridReductionH,
+    ImplicitLocOpBuilder &b, Value variantH, Value gridReductionH,
     Value gridFillH, Value maybeTiledLeadingH, Value maybeTiledTrailingH,
     const StagedReductionStrategy &strategy) {
   MLIRContext *ctx = b.getContext();
@@ -136,7 +137,7 @@ static void buildStagedReductionStrategyThreadLevel(
     assert((vectorSize & (vectorSize - 1)) == 0 && "size must be power of 2");
     build1DSplittingStrategyWithOptionalThreadMapping(
         /*b=*/b,
-        /*isolatedParentOpH=*/isolatedParentOpH,
+        /*variantH=*/variantH,
         /*opH=*/maybeTiledLeadingH,
         /*rank=*/strategy.captures.maybeLeadingRank,
         // TODO: capture and generalize mostMinorDim.
@@ -151,7 +152,7 @@ static void buildStagedReductionStrategyThreadLevel(
   auto [blockParallelForallOp, blockParallelFillH, blockCombinerOpH] =
       buildTileReductionUsingScfForeach(
           /*b=*/b,
-          /*isolatedParentOpH=*/isolatedParentOpH,
+          /*isolatedParentOpH=*/variantH,
           /*reductionH=*/gridReductionH,
           /*reductionRank=*/strategy.captures.reductionRank,
           /*tileSize=*/strategy.getNumThreadsInBlock().front(),
@@ -185,7 +186,7 @@ static void buildStagedReductionStrategyThreadLevel(
   }
   iree_compiler::buildTileFuseDistToForallWithTileSizes(
       /*b=*/b,
-      /*isolatedParentOpH=*/isolatedParentOpH,
+      /*variantH=*/variantH,
       /*rootH=*/root,
       /*opsToFuse=*/opsToFuse,
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
@@ -199,7 +200,7 @@ static void buildStagedReductionStrategyThreadLevel(
         strategy.captures.maybeTrailingOutputElementalTypeBitWidth;
     build1DSplittingStrategyWithOptionalThreadMapping(
         /*b=*/b,
-        /*isolatedParentOpH=*/isolatedParentOpH,
+        /*variantH=*/variantH,
         /*opH=*/maybeTiledTrailingH,
         /*rank=*/strategy.captures.maybeTrailingRank,
         // TODO: capture and generalize mostMinorDim.
@@ -228,10 +229,9 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  buildStagedReductionStrategyThreadLevel(
-      b,
-      /*isolatedParentOpH=*/variantH, gridReductionH, gridFillH,
-      maybeLeadingHBlock, maybeTiledTrailingHBlock, strategy);
+  buildStagedReductionStrategyThreadLevel(b, variantH, gridReductionH,
+                                          gridFillH, maybeLeadingHBlock,
+                                          maybeTiledTrailingHBlock, strategy);
 
   // Step 3. Make sure we don't create allocation by sharing forall
   // output. This amounts to injecting user-defined static information that each

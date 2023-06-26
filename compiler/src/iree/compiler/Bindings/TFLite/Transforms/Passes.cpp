@@ -38,7 +38,7 @@ void registerTransformPassPipeline() {
       });
 }
 
-}  // namespace TFLite
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace TFLite
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -46,7 +46,7 @@ Value calculateStorageElementOffsetInBytes(Location loc,
                                            Value linearizedIndex,
                                            OpBuilder &builder);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_TYPEUTILS_H_
+#endif // IREE_COMPILER_UTILS_TYPEUTILS_H_

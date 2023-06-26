@@ -4,6 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# IREE's runtime follows Google style while its compiler follows mostly LLVM
-# style (for naming/etc.) but using Google formatting.
+# IREE's runtime follows Google style while its compiler follows the
+# LLVM/MLIR variable naming and formatting style.
 BasedOnStyle: Google

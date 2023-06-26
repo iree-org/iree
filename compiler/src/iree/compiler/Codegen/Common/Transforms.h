@@ -16,7 +16,7 @@
 namespace mlir {
 namespace bufferization {
 struct OneShotBufferizationOptions;
-}  // namespace bufferization
+} // namespace bufferization
 
 namespace iree_compiler {
 
@@ -26,8 +26,9 @@ LogicalResult eliminateEmptyTensors(
     const bufferization::OneShotBufferizationOptions &options);
 
 /// Bufferizes the given op with One-Shot Bufferize.
-LogicalResult runIREEOneShotBufferize(
-    Operation *op, const IREEOneShotBufferizationOptions &options);
+LogicalResult
+runIREEOneShotBufferize(Operation *op,
+                        const IREEOneShotBufferizationOptions &options);
 
 /// For a given operation within a dispatch, tile and distribute the operation
 /// to workgroups as well as tile + fuse its producers. Returns the
@@ -38,16 +39,16 @@ struct IREETileAndFuseResult {
   SmallVector<Value> workgroupCount;
 };
 
-FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
-    RewriterBase &rewriter, TilingInterface op,
-    linalg::LinalgTilingOptions tilingOptions);
+FailureOr<IREETileAndFuseResult>
+tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
+                                 linalg::LinalgTilingOptions tilingOptions);
 
 /// Populate patterns related to clean up the IR after tile and distribute to
 /// workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_

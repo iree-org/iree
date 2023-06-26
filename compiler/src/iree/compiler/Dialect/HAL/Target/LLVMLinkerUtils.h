@@ -40,24 +40,25 @@ LogicalResult linkBitcodeModule(
 
 // Loads a bitcode file specified by the |objectAttr| and specializes it for
 // |targetMachine|.
-llvm::Expected<std::unique_ptr<llvm::Module>> loadBitcodeObject(
-    IREE::HAL::ExecutableObjectAttr objectAttr, llvm::LLVMContext &context);
+llvm::Expected<std::unique_ptr<llvm::Module>>
+loadBitcodeObject(IREE::HAL::ExecutableObjectAttr objectAttr,
+                  llvm::LLVMContext &context);
 
 // Links all .bc objects in |objectAttrs| into |linker|.
-LogicalResult linkBitcodeObjects(
-    Location loc, llvm::Linker &linker, unsigned linkerFlags,
-    llvm::TargetMachine &targetMachine, ArrayAttr objectAttrs,
-    llvm::LLVMContext &context,
-    ModuleSpecializationCallback specializationCallback = {});
+LogicalResult
+linkBitcodeObjects(Location loc, llvm::Linker &linker, unsigned linkerFlags,
+                   llvm::TargetMachine &targetMachine, ArrayAttr objectAttrs,
+                   llvm::LLVMContext &context,
+                   ModuleSpecializationCallback specializationCallback = {});
 
 LogicalResult linkCmdlineBitcodeFile(Location loc, llvm::Linker &linker,
                                      unsigned linkerFlags,
                                      llvm::TargetMachine &targetMachine,
                                      llvm::LLVMContext &context);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  //  IREE_COMPILER_DIALECT_HAL_TARGET_LLVMLINKERUTILS_H_
+#endif //  IREE_COMPILER_DIALECT_HAL_TARGET_LLVMLINKERUTILS_H_

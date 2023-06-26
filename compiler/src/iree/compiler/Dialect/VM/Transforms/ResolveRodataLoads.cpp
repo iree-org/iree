@@ -30,8 +30,9 @@ namespace VM {
 
 // Returns the vm.rodata that is stored into the global.
 // Returns nullptr if the rodata values stored differ across multiple stores.
-static IREE::VM::RodataOp findUniformlyStoredRodata(
-    Explorer &explorer, const Explorer::GlobalInfo *globalInfo) {
+static IREE::VM::RodataOp
+findUniformlyStoredRodata(Explorer &explorer,
+                          const Explorer::GlobalInfo *globalInfo) {
   // This will be the first op found; we'll use it to lookup the rodata.
   IREE::VM::RodataOp uniformRodataOp;
   for (auto storeOp : globalInfo->getStores()) {
@@ -65,9 +66,11 @@ static void processBufferGlobal(Explorer &explorer,
                                 const Explorer::GlobalInfo *globalInfo,
                                 DenseSet<Operation *> &deadOps) {
   // Ignore indirect/unanalyzable globals.
-  if (globalInfo->isIndirect) return;
+  if (globalInfo->isIndirect)
+    return;
   // Ignore mutable globals, as they could be changed to various values.
-  if (globalInfo->op.isGlobalMutable()) return;
+  if (globalInfo->op.isGlobalMutable())
+    return;
 
   // If there are no stores to the global then it's always null.
   if (globalInfo->getStores().empty()) {
@@ -86,7 +89,8 @@ static void processBufferGlobal(Explorer &explorer,
   // the program (there may be multiple initializers or control flow that
   // determines the stored value).
   auto rodataOp = findUniformlyStoredRodata(explorer, globalInfo);
-  if (!rodataOp) return;
+  if (!rodataOp)
+    return;
 
   // All stores to the global are of the same rodata.
   // Replace all of the loads with direct references to the rodata and then
@@ -109,7 +113,7 @@ static void processBufferGlobal(Explorer &explorer,
 class ResolveRodataLoadsPass
     : public PassWrapper<ResolveRodataLoadsPass,
                          OperationPass<IREE::VM::ModuleOp>> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VM::VMDialect>();
   }
@@ -144,7 +148,8 @@ class ResolveRodataLoadsPass
     });
 
     // Erase all ops after we're done iterating them.
-    for (auto *deadOp : deadOps) deadOp->erase();
+    for (auto *deadOp : deadOps)
+      deadOp->erase();
   }
 };
 
@@ -155,7 +160,7 @@ createResolveRodataLoadsPass() {
 
 static PassRegistration<ResolveRodataLoadsPass> pass;
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -42,7 +42,7 @@ static size_t getGlobalStorageSize(IREE::Util::GlobalOpInterface globalOp) {
 // clustered together to make use of paging in memory mapped files.
 class OrdinalAllocationPass
     : public PassWrapper<OrdinalAllocationPass, OperationPass<ModuleOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "iree-vm-ordinal-allocation";
   }
@@ -94,7 +94,8 @@ class OrdinalAllocationPass
     int globalBytes = 0;
     for (auto sizeGlobalOps : llvm::enumerate(primitiveGlobalOps)) {
       size_t storageSize = sizeGlobalOps.index();
-      if (sizeGlobalOps.value().empty()) continue;
+      if (sizeGlobalOps.value().empty())
+        continue;
       nextGlobalBytesOrdinal =
           llvm::alignTo(nextGlobalBytesOrdinal, storageSize);
       for (auto &globalOp : sizeGlobalOps.value()) {
@@ -140,7 +141,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createOrdinalAllocationPass() {
 
 static PassRegistration<OrdinalAllocationPass> pass;
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

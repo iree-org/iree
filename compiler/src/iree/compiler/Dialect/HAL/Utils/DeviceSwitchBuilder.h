@@ -20,16 +20,13 @@ namespace HAL {
 
 // See DeviceSwitchBuilder for details.
 class DeviceSwitchCaseBuilder {
- public:
+public:
   DeviceSwitchCaseBuilder(Location loc, TypeRange resultTypes, Value device,
                           Attribute initialCondition,
                           SmallVectorImpl<IREE::HAL::DeviceSwitchOp> &caseOps,
                           OpBuilder &builder)
-      : loc_(loc),
-        resultTypes_(resultTypes),
-        device_(device),
-        initialCondition_(initialCondition),
-        caseOps_(caseOps),
+      : loc_(loc), resultTypes_(resultTypes), device_(device),
+        initialCondition_(initialCondition), caseOps_(caseOps),
         builder_(builder) {}
 
   // Result types that each region must return.
@@ -68,7 +65,7 @@ class DeviceSwitchCaseBuilder {
     return nest(conditionAttr).addRegion();
   }
 
- private:
+private:
   Location loc_;
   SmallVector<Type> resultTypes_;
   Value device_;
@@ -96,12 +93,10 @@ class DeviceSwitchCaseBuilder {
 // region that captured them. You must query the returned Region entry block
 // arguments to use them within the region.
 class DeviceSwitchBuilder {
- public:
+public:
   DeviceSwitchBuilder(Location loc, TypeRange resultTypes, Value device,
                       OpBuilder builder)
-      : loc_(loc),
-        resultTypes_(resultTypes),
-        device_(device),
+      : loc_(loc), resultTypes_(resultTypes), device_(device),
         builder_(builder) {}
 
   // Pushes a new condition onto the stack and returns a builder that must have
@@ -134,7 +129,7 @@ class DeviceSwitchBuilder {
     return switchOp;
   }
 
- private:
+private:
   Location loc_;
   SmallVector<Type> resultTypes_;
   Value device_;
@@ -144,12 +139,10 @@ class DeviceSwitchBuilder {
 
 // Rewriter-compatible version of DeviceSwitchBuilder.
 class DeviceSwitchRewriter {
- public:
+public:
   DeviceSwitchRewriter(Location loc, TypeRange resultTypes, Value device,
                        ConversionPatternRewriter &rewriter)
-      : loc_(loc),
-        resultTypes_(resultTypes),
-        device_(device),
+      : loc_(loc), resultTypes_(resultTypes), device_(device),
         rewriter_(rewriter) {}
 
   // Pushes a new condition onto the stack and returns a builder that must have
@@ -198,7 +191,7 @@ class DeviceSwitchRewriter {
 
   ConversionPatternRewriter &getRewriter() const { return rewriter_; }
 
- private:
+private:
   Location loc_;
   SmallVector<Type> resultTypes_;
   Value device_;
@@ -206,9 +199,9 @@ class DeviceSwitchRewriter {
   ConversionPatternRewriter &rewriter_;
 };
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_UTILS_DEVICE_SWITCH_BUILDER_H_
+#endif // IREE_COMPILER_DIALECT_HAL_UTILS_DEVICE_SWITCH_BUILDER_H_

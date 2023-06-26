@@ -22,4 +22,4 @@
 #define IREE_EMBED_EXPORTED __attribute__((visibility("default")))
 #endif
 
-#endif  // IREE_COMPILER_API_SUPPORT_H
+#endif // IREE_COMPILER_API_SUPPORT_H

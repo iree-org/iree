@@ -25,7 +25,7 @@ namespace VM {
 
 class SinkDefiningOpsPass
     : public PassWrapper<SinkDefiningOpsPass, OperationPass<ModuleOp>> {
- public:
+public:
   StringRef getArgument() const override { return "iree-vm-sink-defining-ops"; }
 
   StringRef getDescription() const override {
@@ -90,7 +90,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createSinkDefiningOpsPass() {
 
 static PassRegistration<SinkDefiningOpsPass> pass;
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

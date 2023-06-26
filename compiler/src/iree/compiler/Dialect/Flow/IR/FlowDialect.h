@@ -17,7 +17,7 @@ namespace IREE {
 namespace Flow {
 
 class FlowDialect : public Dialect {
- public:
+public:
   explicit FlowDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "flow"; }
 
@@ -35,14 +35,14 @@ class FlowDialect : public Dialect {
            op->getDialect()->getNamespace() == getDialectNamespace();
   }
 
- private:
+private:
   void registerAttributes();
   void registerTypes();
 };
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_IR_FLOWDIALECT_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_IR_FLOWDIALECT_H_

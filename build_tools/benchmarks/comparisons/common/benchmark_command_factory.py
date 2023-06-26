@@ -10,15 +10,16 @@ from common.benchmark_command import BenchmarkCommand
 
 
 class BenchmarkCommandFactory(abc.ABC):
-  """ An abstract factory that generates commands depending on config.
-  Args:
-    device: Currently 'desktop' or 'mobile' are supported.
-    driver: Currently 'cpu' or 'gpu' are supported.
-  Returns:
-    An array containing `BenchmarkCommand` objects.
-  """
+    """An abstract factory that generates commands depending on config.
+    Args:
+      device: Currently 'desktop' or 'mobile' are supported.
+      driver: Currently 'cpu' or 'gpu' are supported.
+    Returns:
+      An array containing `BenchmarkCommand` objects.
+    """
 
-  @abc.abstractmethod
-  def generate_benchmark_commands(self, device: str,
-                                  driver: str) -> list[BenchmarkCommand]:
-    pass
+    @abc.abstractmethod
+    def generate_benchmark_commands(
+        self, device: str, driver: str
+    ) -> list[BenchmarkCommand]:
+        pass

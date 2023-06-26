@@ -78,11 +78,12 @@ struct Artifacts {
 
 // Base type for linker tools that can turn object files into shared objects.
 class LinkerTool {
- public:
+public:
   // Gets an instance of a linker tool for the given target options. This may
   // be a completely different toolchain than that of the host.
-  static std::unique_ptr<LinkerTool> getForTarget(
-      const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+  static std::unique_ptr<LinkerTool>
+  getForTarget(const llvm::Triple &targetTriple,
+               LLVMTargetOptions &targetOptions);
 
   explicit LinkerTool(llvm::Triple targetTriple,
                       LLVMTargetOptions targetOptions)
@@ -97,18 +98,19 @@ class LinkerTool {
 
   // Configures a module prior to compilation with any additional
   // functions/exports it may need, such as shared object initializer functions.
-  virtual LogicalResult configureModule(
-      llvm::Module *llvmModule, ArrayRef<llvm::Function *> exportedFuncs) {
+  virtual LogicalResult
+  configureModule(llvm::Module *llvmModule,
+                  ArrayRef<llvm::Function *> exportedFuncs) {
     return success();
   }
 
   // Links the given object files into a dynamically loadable library.
   // The resulting library (and other associated artifacts) will be returned on
   // success.
-  virtual std::optional<Artifacts> linkDynamicLibrary(
-      StringRef libraryName, ArrayRef<Artifact> objectFiles) = 0;
+  virtual std::optional<Artifacts>
+  linkDynamicLibrary(StringRef libraryName, ArrayRef<Artifact> objectFiles) = 0;
 
- protected:
+protected:
   // Runs the given command line on the shell, logging failures.
   LogicalResult runLinkCommand(std::string commandLine, StringRef env = "");
 
@@ -116,9 +118,9 @@ class LinkerTool {
   LLVMTargetOptions targetOptions;
 };
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LINKERTOOL_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LINKERTOOL_H_

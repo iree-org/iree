@@ -21,12 +21,15 @@ namespace iree_compiler {
 /// compute alloc sizes.
 static Value skipAffineMaxZero(Value dim) {
   auto affineMax = dim.getDefiningOp<affine::AffineMaxOp>();
-  if (!affineMax) return dim;
+  if (!affineMax)
+    return dim;
   for (AffineExpr expr : affineMax.getMap().getResults()) {
     if (auto cst = expr.dyn_cast<AffineConstantExpr>()) {
-      if (cst.getValue() == 0) continue;
+      if (cst.getValue() == 0)
+        continue;
     } else if (auto symExpr = expr.dyn_cast<AffineSymbolExpr>()) {
-      if (symExpr.getPosition() == 0) continue;
+      if (symExpr.getPosition() == 0)
+        continue;
     }
     return dim;
   }
@@ -56,7 +59,8 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
     dimSize = *ub;
     sizes.push_back(dim);
   }
-  if (dynamicDimIdx == 0) return success();
+  if (dynamicDimIdx == 0)
+    return success();
   Type elType = allocOp.getType().getElementType();
   MemRefType allocType = MemRefType::get(shape, elType, AffineMap(),
                                          allocOp.getType().getMemorySpace());
@@ -82,15 +86,16 @@ struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
     funcOp.walk(
         [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
     for (memref::AllocOp alloc : sharedMemAllocs) {
-      if (failed(padAlloc(context, alloc))) return signalPassFailure();
+      if (failed(padAlloc(context, alloc)))
+        return signalPassFailure();
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc() {
   return std::make_unique<PadDynamicAllocPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

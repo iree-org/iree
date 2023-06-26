@@ -232,14 +232,16 @@ static Value recomposeFromI32sAndConvert(
   // Preserve the arg attrs on either the final op or the function argument
   // if none was required.
   if (auto definingOp = value.getDefiningOp()) {
-    if (oldArgAttr) definingOp->setAttrs(oldArgAttr);
+    if (oldArgAttr)
+      definingOp->setAttrs(oldArgAttr);
     newArgAttrs.push_back(nullptr);
   } else {
     newArgAttrs.push_back(oldArgAttr);
   }
   // Note that if we had decomposed the arg we'll expect that there are two attr
   // dicts for the two new args.
-  if (wasDecomposed) newArgAttrs.push_back(nullptr);
+  if (wasDecomposed)
+    newArgAttrs.push_back(nullptr);
 
   return value;
 }
@@ -283,7 +285,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
 
 class PackDispatchOperandsPass
     : public PackDispatchOperandsBase<PackDispatchOperandsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::complex::ComplexDialect>();
@@ -320,13 +322,13 @@ class PackDispatchOperandsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createPackDispatchOperandsPass() {
   return std::make_unique<PackDispatchOperandsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

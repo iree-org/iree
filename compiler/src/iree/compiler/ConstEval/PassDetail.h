@@ -17,8 +17,8 @@ namespace ConstEval {
 #define GEN_PASS_CLASSES
 #include "iree/compiler/ConstEval/Passes.h.inc"
 
-}  // namespace ConstEval
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ConstEval
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CONSTEVAL_PASSDETAIL_H_
+#endif // IREE_COMPILER_CONSTEVAL_PASSDETAIL_H_

@@ -36,7 +36,7 @@ namespace iree_compiler {
 // options of built-in scalar types (string, ints, bool, etc) and enums. Lists
 // of built-in scalar types are also supported.
 class OptionsBinder {
- public:
+public:
   static OptionsBinder global() { return OptionsBinder(); }
 
   static OptionsBinder local() {
@@ -104,7 +104,7 @@ class OptionsBinder {
   // and is stable.
   llvm::SmallVector<std::string> printArguments(bool nonDefaultOnly = false);
 
- private:
+private:
   struct LocalOptionInfo {
     using ChangedCallback = std::function<bool()>;
     using PrintCallback = std::function<void(llvm::raw_ostream &)>;
@@ -183,8 +183,8 @@ class OptionsBinder {
 
   // List changed specialization.
   template <typename V>
-  static LocalOptionInfo::ChangedCallback makeListChangedCallback(
-      V *currentValue) {
+  static LocalOptionInfo::ChangedCallback
+  makeListChangedCallback(V *currentValue) {
     return [currentValue]() -> bool { return !currentValue->empty(); };
   }
 
@@ -199,7 +199,8 @@ class OptionsBinder {
     return [optionName, values](llvm::raw_ostream &os) {
       os << "--" << optionName << "=";
       for (auto it : llvm::enumerate(*values)) {
-        if (it.index() > 0) os << ",";
+        if (it.index() > 0)
+          os << ",";
         os << it.value();
       }
     };
@@ -216,26 +217,26 @@ class OptionsBinder {
 //   IREE_DEFINE_COMPILER_OPTION_FLAGS(DerivedTy);
 template <typename DerivedTy>
 class OptionsFromFlags {
- public:
+public:
   static DerivedTy &get();
 };
 
-#define IREE_DEFINE_COMPILER_OPTION_FLAGS(DerivedTy)                   \
-  template <>                                                          \
-  DerivedTy &mlir::iree_compiler::OptionsFromFlags<DerivedTy>::get() { \
-    struct InitializedTy : DerivedTy {                                 \
-      InitializedTy() {                                                \
-        mlir::iree_compiler::OptionsBinder binder =                    \
-            mlir::iree_compiler::OptionsBinder::global();              \
-        DerivedTy::bindOptions(binder);                                \
-      }                                                                \
-    };                                                                 \
-    static InitializedTy singleton;                                    \
-    return singleton;                                                  \
+#define IREE_DEFINE_COMPILER_OPTION_FLAGS(DerivedTy)                           \
+  template <>                                                                  \
+  DerivedTy &mlir::iree_compiler::OptionsFromFlags<DerivedTy>::get() {         \
+    struct InitializedTy : DerivedTy {                                         \
+      InitializedTy() {                                                        \
+        mlir::iree_compiler::OptionsBinder binder =                            \
+            mlir::iree_compiler::OptionsBinder::global();                      \
+        DerivedTy::bindOptions(binder);                                        \
+      }                                                                        \
+    };                                                                         \
+    static InitializedTy singleton;                                            \
+    return singleton;                                                          \
   }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 namespace llvm {
 namespace cl {
@@ -256,7 +257,7 @@ extern template class basic_parser<PowerOf2ByteSize>;
 
 template <>
 class parser<ByteSize> : public basic_parser<ByteSize> {
- public:
+public:
   parser(Option &O) : basic_parser(O) {}
   bool parse(Option &O, StringRef ArgName, StringRef Arg, ByteSize &Val);
   StringRef getValueName() const override { return "byte size"; }
@@ -267,7 +268,7 @@ class parser<ByteSize> : public basic_parser<ByteSize> {
 
 template <>
 class parser<PowerOf2ByteSize> : public basic_parser<PowerOf2ByteSize> {
- public:
+public:
   parser(Option &O) : basic_parser(O) {}
   bool parse(Option &O, StringRef ArgName, StringRef Arg,
              PowerOf2ByteSize &Val);
@@ -277,7 +278,7 @@ class parser<PowerOf2ByteSize> : public basic_parser<PowerOf2ByteSize> {
   void anchor() override;
 };
 
-}  // namespace cl
-}  // namespace llvm
+} // namespace cl
+} // namespace llvm
 
-#endif  // IREE_COMPILER_UTILS_FLAG_UTILS_H
+#endif // IREE_COMPILER_UTILS_FLAG_UTILS_H

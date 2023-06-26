@@ -121,7 +121,8 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
   if (options.enableVectorMasking)
     vectorSizes.append(options.vectorSizeComputationFunction(
         linalgOp, options.canonicalVectorSizes));
-  return vectorize(rewriter, linalgOp, vectorSizes,
+  SmallVector<bool> scalableVecDims(vectorSizes.size(), false);
+  return vectorize(rewriter, linalgOp, vectorSizes, scalableVecDims,
                    options.vectorizeGatherAccesses);
 }
 

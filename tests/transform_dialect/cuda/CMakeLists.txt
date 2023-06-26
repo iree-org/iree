@@ -23,7 +23,6 @@ iree_lit_test_suite(
     "reduction_eltwise.mlir"
     "reduction_v2.mlir"
     "reduction_v2_uneven.mlir"
-    "reduction_v3.mlir"
     "softmax.mlir"
     "softmax_partial.mlir"
     "softmax_v2.mlir"
@@ -40,7 +39,6 @@ iree_lit_test_suite(
     reduction_codegen_spec.mlir
     reduction_eltwise_codegen_spec.mlir
     reduction_v2_codegen_spec.mlir
-    reduction_v3_codegen_spec.mlir
     softmax_codegen_spec.mlir
     softmax_dispatch_spec.mlir
     softmax_partial_codegen_spec.mlir

@@ -54,7 +54,7 @@ static bool isDefinedImmediate(Value value) {
 class IsGlobalImmediate
     : public DFX::StateWrapper<
           DFX::BooleanState, DFX::TypedOperationElement<IREE::Util::GlobalOp>> {
- public:
+public:
   using BaseType =
       DFX::StateWrapper<DFX::BooleanState,
                         DFX::TypedOperationElement<IREE::Util::GlobalOp>>;
@@ -77,7 +77,7 @@ class IsGlobalImmediate
     return std::string("is_immediate: ") + std::to_string(isAssumed());
   }
 
- private:
+private:
   explicit IsGlobalImmediate(const Position &pos) : BaseType(pos) {}
 
   void initializeOperation(IREE::Util::GlobalOp globalOp,
@@ -125,7 +125,7 @@ const char IsGlobalImmediate::ID = 0;
 // Boolean state will be set to false if any sources are non-immediate.
 class IsImmediate
     : public DFX::StateWrapper<DFX::BooleanState, DFX::ValueElement> {
- public:
+public:
   using BaseType = DFX::StateWrapper<DFX::BooleanState, DFX::ValueElement>;
 
   static IsImmediate &createForPosition(const Position &pos,
@@ -146,7 +146,7 @@ class IsImmediate
     return std::string("is_immediate: ") + std::to_string(isAssumed());
   }
 
- private:
+private:
   explicit IsImmediate(const Position &pos) : BaseType(pos) {}
 
   void initializeValue(Value value, DFX::Solver &solver) override {
@@ -310,7 +310,7 @@ ChangeStatus IsGlobalImmediate::updateOperation(IREE::Util::GlobalOp globalOp,
 class TimepointCoverage
     : public DFX::StateWrapper<DFX::PotentialValuesState<Value>,
                                DFX::ValueElement> {
- public:
+public:
   using BaseType =
       DFX::StateWrapper<DFX::PotentialValuesState<Value>, DFX::ValueElement>;
 
@@ -351,7 +351,7 @@ class TimepointCoverage
     return str;
   }
 
- private:
+private:
   explicit TimepointCoverage(const Position &pos) : BaseType(pos) {}
 
   void initializeValue(Value value, DFX::Solver &solver) override {
@@ -511,7 +511,7 @@ class TimepointCoverage
 const char TimepointCoverage::ID = 0;
 
 class TimepointCoverageAnalysis {
- public:
+public:
   explicit TimepointCoverageAnalysis(Operation *rootOp)
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
@@ -595,7 +595,8 @@ class TimepointCoverageAnalysis {
     };
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region || region->empty()) continue;
+      if (!region || region->empty())
+        continue;
       seedRegion(*region);
     }
 
@@ -612,7 +613,8 @@ class TimepointCoverageAnalysis {
 
   // Returns true if |value| is known to be immediately resolved.
   bool isImmediate(Value value) {
-    if (isDefinedImmediate(value)) return true;
+    if (isDefinedImmediate(value))
+      return true;
     auto &isImmediate =
         solver.getOrCreateElementFor<IsImmediate>(Position::forValue(value));
     return isImmediate.isValidState() && isImmediate.isKnown();
@@ -622,14 +624,15 @@ class TimepointCoverageAnalysis {
   bool unionTransitivelyReachedTimepoints(Value value, SetVector<Value> &set) {
     auto coverage = solver.getOrCreateElementFor<TimepointCoverage>(
         Position::forValue(value));
-    if (!coverage.isValidState() || coverage.isUndefContained()) return false;
+    if (!coverage.isValidState() || coverage.isUndefContained())
+      return false;
     for (auto reached : coverage.getAssumedSet()) {
       set.insert(reached);
     }
     return true;
   }
 
- private:
+private:
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;
@@ -638,9 +641,9 @@ class TimepointCoverageAnalysis {
 
 // Prunes |possibleTimepoints| into a set of required timepoints.
 // Any timepoints not in the resulting set are required.
-static SetVector<Value> buildRequiredCoverageSet(
-    SmallVector<Value> possibleTimepoints,
-    TimepointCoverageAnalysis &analysis) {
+static SetVector<Value>
+buildRequiredCoverageSet(SmallVector<Value> possibleTimepoints,
+                         TimepointCoverageAnalysis &analysis) {
   // Build a map that effectively tracks an incoming edge counter for each
   // timepoint. Values with no incoming edges are required.
   DenseMap<Value, int> coverageMap;
@@ -654,7 +657,8 @@ static SetVector<Value> buildRequiredCoverageSet(
     if (isValid) {
       for (auto reachedTimepoint : reachedTimepoints) {
         // TODO(benvanik): avoid self-references so we don't need this check.
-        if (reachedTimepoint == possibleTimepoint) continue;
+        if (reachedTimepoint == possibleTimepoint)
+          continue;
         ++coverageMap[reachedTimepoint];
       }
     }
@@ -706,7 +710,8 @@ static bool tryElideTimepointsInRegion(Region &region,
   // Elides |elidedTimepoint| by replacing all its uses by |op| with an
   // immediate timepoint value.
   auto elideTimepointOperand = [&](Operation *op, Value elidedTimepoint) {
-    if (isDefinedImmediate(elidedTimepoint)) return;  // already immediate
+    if (isDefinedImmediate(elidedTimepoint))
+      return; // already immediate
     auto immediateTimepoint = makeImmediate(elidedTimepoint, OpBuilder(op));
     elidedTimepoint.replaceUsesWithIf(
         immediateTimepoint,
@@ -717,8 +722,10 @@ static bool tryElideTimepointsInRegion(Region &region,
   // Elides all timepoint operands of |op| that are immediately resolved.
   auto elideTimepointOperands = [&](Operation *op) {
     for (auto operand : llvm::make_early_inc_range(op->getOperands())) {
-      if (!llvm::isa<IREE::Stream::TimepointType>(operand.getType())) continue;
-      if (isDefinedImmediate(operand)) continue;
+      if (!llvm::isa<IREE::Stream::TimepointType>(operand.getType()))
+        continue;
+      if (isDefinedImmediate(operand))
+        continue;
       if (analysis.isImmediate(operand)) {
         LLVM_DEBUG({
           llvm::dbgs() << "  >>> eliding known-immediate operand ";
@@ -733,8 +740,10 @@ static bool tryElideTimepointsInRegion(Region &region,
   // Elides |elidedTimepoint| by replacing all its uses with an immediate
   // timepoint value. The original value will end up with zero uses.
   auto elideTimepointResult = [&](Operation *op, Value elidedTimepoint) {
-    if (elidedTimepoint.use_empty()) return;          // no-op
-    if (isDefinedImmediate(elidedTimepoint)) return;  // already immediate
+    if (elidedTimepoint.use_empty())
+      return; // no-op
+    if (isDefinedImmediate(elidedTimepoint))
+      return; // already immediate
     OpBuilder afterBuilder(op);
     afterBuilder.setInsertionPointAfterValue(elidedTimepoint);
     Value immediateTimepoint =
@@ -753,8 +762,10 @@ static bool tryElideTimepointsInRegion(Region &region,
     //  %imm0 = immediate
     //  %imm1 = immediate
     for (auto result : llvm::reverse(op->getResults())) {
-      if (!llvm::isa<IREE::Stream::TimepointType>(result.getType())) continue;
-      if (isDefinedImmediate(result)) continue;
+      if (!llvm::isa<IREE::Stream::TimepointType>(result.getType()))
+        continue;
+      if (isDefinedImmediate(result))
+        continue;
       if (analysis.isImmediate(result)) {
         LLVM_DEBUG({
           llvm::dbgs() << "  >>> eliding known-immediate result ";
@@ -772,7 +783,8 @@ static bool tryElideTimepointsInRegion(Region &region,
   auto processTimelineOp = [&](IREE::Stream::TimelineOpInterface op) {
     auto resultTimepoint = op.getResultTimepoint();
     auto awaitTimepoints = op.getAwaitTimepoints();
-    if (awaitTimepoints.empty()) return;
+    if (awaitTimepoints.empty())
+      return;
 
     LLVM_DEBUG({
       llvm::dbgs() << "[ElideTimepoints] pruning " << op->getName()
@@ -819,7 +831,8 @@ static bool tryElideTimepointsInRegion(Region &region,
     }
 
     // If there's only one timepoint we don't have to worry with coverage.
-    if (possibleTimepoints.size() <= 1) return;
+    if (possibleTimepoints.size() <= 1)
+      return;
 
     // Perform the analysis on the possible timepoints to find which are covered
     // by others and elide all of those known-covered.
@@ -890,7 +903,7 @@ static bool tryElideTimepointsInRegion(Region &region,
 //   %timepoint1 = ... await(%timepoint0)
 //   %timepoint2 = %timepoint1
 class ElideTimepointsPass : public ElideTimepointsBase<ElideTimepointsPass> {
- public:
+public:
   ElideTimepointsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -900,7 +913,8 @@ class ElideTimepointsPass : public ElideTimepointsBase<ElideTimepointsPass> {
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
 
     // Perform whole-program analysis to find for each timepoint what other
     // timepoints are known to be reached.
@@ -917,21 +931,23 @@ class ElideTimepointsPass : public ElideTimepointsBase<ElideTimepointsPass> {
     // fixed-point iteration continues.
     for (auto callableOp : analysis.getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region || region->empty()) continue;
+      if (!region || region->empty())
+        continue;
       didChange = tryElideTimepointsInRegion(*region, analysis) || didChange;
     }
 
-    if (didChange) signalFixedPointModified(moduleOp);
+    if (didChange)
+      signalFixedPointModified(moduleOp);
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideTimepointsPass() {
   return std::make_unique<ElideTimepointsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

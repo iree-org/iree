@@ -64,9 +64,9 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 }
 
 // Returns the Vulkan target environment for conversion.
-static spirv::TargetEnvAttr getSPIRVTargetEnv(
-    const std::string &vulkanTargetEnv, const std::string &vulkanTargetTriple,
-    MLIRContext *context) {
+static spirv::TargetEnvAttr
+getSPIRVTargetEnv(const std::string &vulkanTargetEnv,
+                  const std::string &vulkanTargetTriple, MLIRContext *context) {
   if (!vulkanTargetEnv.empty()) {
     if (auto attr = parseAttribute(vulkanTargetEnv, context)) {
       if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
@@ -86,7 +86,7 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
 }
 
 class VulkanSPIRVTargetBackend : public TargetBackend {
- public:
+public:
   VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
       : options_(std::move(options)) {}
 
@@ -98,8 +98,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                     spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -120,7 +120,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // For now we disable translation if the variant has external object files.
     // We could instead perform linking with those objects (if they're .spv
     // files we could use spirv-link or import them into MLIR and merge here).
-    if (variantOp.isExternal()) return;
+    if (variantOp.isExternal())
+      return;
 
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
@@ -224,9 +225,10 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     return success();
   }
 
-  LogicalResult serializeExternalExecutable(
-      const SerializationOptions &options,
-      IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder) {
+  LogicalResult
+  serializeExternalExecutable(const SerializationOptions &options,
+                              IREE::HAL::ExecutableVariantOp variantOp,
+                              OpBuilder &executableBuilder) {
     if (!variantOp.getObjects().has_value()) {
       return variantOp.emitOpError()
              << "no objects defined for external variant";
@@ -283,7 +285,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // If we had multiple target environments we would generate one target attr
@@ -294,8 +296,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context, spirv::TargetEnvAttr targetEnv) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context,
+                      spirv::TargetEnvAttr targetEnv) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -324,7 +327,7 @@ void registerVulkanSPIRVTargetBackends(
                                                  backendFactory);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

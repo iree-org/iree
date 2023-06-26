@@ -16,7 +16,7 @@ namespace VM {
 
 template <typename ConcreteType>
 class DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify debug-only.
     return success();
@@ -25,7 +25,7 @@ class DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
 
 template <typename ConcreteType>
 class FullBarrier : public OpTrait::TraitBase<ConcreteType, FullBarrier> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify full barrier.
     return success();
@@ -34,7 +34,7 @@ class FullBarrier : public OpTrait::TraitBase<ConcreteType, FullBarrier> {
 
 template <typename ConcreteType>
 class PseudoOp : public OpTrait::TraitBase<ConcreteType, PseudoOp> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify pseudo op (not serializable?).
     return success();
@@ -43,7 +43,7 @@ class PseudoOp : public OpTrait::TraitBase<ConcreteType, PseudoOp> {
 
 template <typename ConcreteType>
 class AssignmentOp : public OpTrait::TraitBase<ConcreteType, AssignmentOp> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) {
     if (op->getNumOperands() != op->getNumResults()) {
       return op->emitOpError()
@@ -55,7 +55,7 @@ class AssignmentOp : public OpTrait::TraitBase<ConcreteType, AssignmentOp> {
 
 template <typename ConcreteType>
 class ExtF32 : public OpTrait::TraitBase<ConcreteType, ExtF32> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify f32 ext is supported.
     return success();
@@ -64,16 +64,16 @@ class ExtF32 : public OpTrait::TraitBase<ConcreteType, ExtF32> {
 
 template <typename ConcreteType>
 class ExtF64 : public OpTrait::TraitBase<ConcreteType, ExtF64> {
- public:
+public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify f64 ext is supported.
     return success();
   }
 };
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace OpTrait
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace OpTrait
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_IR_VMTRAITS_H_
+#endif // IREE_COMPILER_DIALECT_VM_IR_VMTRAITS_H_

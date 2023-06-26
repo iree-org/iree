@@ -19,7 +19,8 @@ namespace {
 using DlHandle = HMODULE;
 DlHandle loadLibrary(const char *libraryPath) {
   HMODULE lib = LoadLibraryExA(libraryPath, nullptr, 0);
-  if (lib) return lib;
+  if (lib)
+    return lib;
   DWORD errorMessageID = GetLastError();
   LPSTR messageBuffer = nullptr;
   size_t size = FormatMessageA(
@@ -37,7 +38,7 @@ DlHandle loadLibrary(const char *libraryPath) {
 void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
   return (void *)GetProcAddress(lib, symbol);
 }
-}  // namespace
+} // namespace
 #else
 // Posix impl
 #include <dlfcn.h>
@@ -47,7 +48,8 @@ DlHandle loadLibrary(const char *libraryPath) {
   DlHandle lib = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL);
   if (!lib) {
     const char *reason = dlerror();
-    if (!reason) reason = "";
+    if (!reason)
+      reason = "";
     fprintf(stderr,
             "IREE COMPILER ERROR: Could not open compiler library %s : %s\n",
             libraryPath, reason);
@@ -58,7 +60,7 @@ DlHandle loadLibrary(const char *libraryPath) {
 void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
   return dlsym(lib, symbol);
 }
-}  // namespace
+} // namespace
 #endif
 
 // Some operating systems have a prefix for cdecl exported symbols.
@@ -78,13 +80,14 @@ DlHandle libraryHandle = nullptr;
 #undef HANDLE_VERSIONED_SYMBOL
 
 void assertLoaded() {
-  if (libraryHandle) return;
+  if (libraryHandle)
+    return;
   fprintf(stderr,
           "FATAL ERROR: Attempt to call IREE compiler stub methods before "
           "library loaded\n");
   abort();
 }
-}  // namespace
+} // namespace
 
 bool ireeCompilerLoadLibrary(const char *libraryPath) {
   if (libraryHandle) {
@@ -100,27 +103,26 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
   int (*apiVersionFn)() = (int (*)())lookupLibrarySymbol(
       localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX "ireeCompilerGetAPIVersion");
   if (!apiVersionFn) {
-    fprintf(stderr,
-            "IREE COMPILER ERROR: Could not find symbol "
-            "'ireeCompilerGetAPIVersion'\n");
+    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol "
+                    "'ireeCompilerGetAPIVersion'\n");
     return false;
   }
   int packedApiVersion = apiVersionFn();
   int apiMinor = packedApiVersion & 0xffff;
   int apiMajor = packedApiVersion >> 16;
 
-#define HANDLE_SYMBOL(fn_name)                                           \
-  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(              \
-      localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX #fn_name);            \
-  if (!__##fn_name) {                                                    \
-    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol '%s'\n", \
-            IREE_CDECL_SYMBOL_PREFIX #fn_name);                          \
-    return false;                                                        \
+#define HANDLE_SYMBOL(fn_name)                                                 \
+  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(                    \
+      localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX #fn_name);                  \
+  if (!__##fn_name) {                                                          \
+    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol '%s'\n",       \
+            IREE_CDECL_SYMBOL_PREFIX #fn_name);                                \
+    return false;                                                              \
   }
-#define HANDLE_VERSIONED_SYMBOL(fn_name, availApiMajor, availApiMinor) \
-  if (apiMajor > availApiMajor ||                                      \
-      (apiMajor == availApiMajor && apiMinor >= availApiMinor)) {      \
-    HANDLE_SYMBOL(fn_name);                                            \
+#define HANDLE_VERSIONED_SYMBOL(fn_name, availApiMajor, availApiMinor)         \
+  if (apiMajor > availApiMajor ||                                              \
+      (apiMajor == availApiMajor && apiMinor >= availApiMinor)) {              \
+    HANDLE_SYMBOL(fn_name);                                                    \
   }
 #include "./handle_symbols.inc"
 #undef HANDLE_SYMBOL
@@ -201,8 +203,9 @@ void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   __ireeCompilerSessionDestroy(session);
 }
 
-iree_compiler_error_t *ireeCompilerSessionSetFlags(
-    iree_compiler_session_t *session, int argc, const char *const *argv) {
+iree_compiler_error_t *
+ireeCompilerSessionSetFlags(iree_compiler_session_t *session, int argc,
+                            const char *const *argv) {
   assertLoaded();
   return __ireeCompilerSessionSetFlags(session, argc, argv);
 }
@@ -215,8 +218,8 @@ void ireeCompilerSessionGetFlags(
                                        userData);
 }
 
-iree_compiler_invocation_t *ireeCompilerInvocationCreate(
-    iree_compiler_session_t *session) {
+iree_compiler_invocation_t *
+ireeCompilerInvocationCreate(iree_compiler_session_t *session) {
   return __ireeCompilerInvocationCreate(session);
 }
 
@@ -257,8 +260,9 @@ void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *run,
   __ireeCompilerInvocationSetCompileToPhase(run, phase);
 }
 
-IREE_EMBED_EXPORTED void ireeCompilerInvocationSetVerifyIR(
-    iree_compiler_invocation_t *run, bool enable) {
+IREE_EMBED_EXPORTED void
+ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *run,
+                                  bool enable) {
   __ireeCompilerInvocationSetVerifyIR(run, enable);
 }
 
@@ -267,23 +271,27 @@ bool ireeCompilerInvocationPipeline(iree_compiler_invocation_t *run,
   return __ireeCompilerInvocationPipeline(run, pipeline);
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputIR(
-    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputIR(iree_compiler_invocation_t *run,
+                               iree_compiler_output_t *output) {
   return __ireeCompilerInvocationOutputIR(run, output);
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputVMBytecode(
-    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputVMBytecode(iree_compiler_invocation_t *run,
+                                       iree_compiler_output_t *output) {
   return __ireeCompilerInvocationOutputVMBytecode(run, output);
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputVMCSource(
-    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputVMCSource(iree_compiler_invocation_t *run,
+                                      iree_compiler_output_t *output) {
   return __ireeCompilerInvocationOutputVMCSource(run, output);
 }
 
-iree_compiler_error_t *ireeCompilerInvocationOutputHALExecutable(
-    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+iree_compiler_error_t *
+ireeCompilerInvocationOutputHALExecutable(iree_compiler_invocation_t *run,
+                                          iree_compiler_output_t *output) {
   return __ireeCompilerInvocationOutputHALExecutable(run, output);
 }
 
@@ -291,16 +299,18 @@ void ireeCompilerSourceDestroy(iree_compiler_source_t *source) {
   __ireeCompilerSourceDestroy(source);
 }
 
-iree_compiler_error_t *ireeCompilerSourceOpenFile(
-    iree_compiler_session_t *session, const char *filePath,
-    iree_compiler_source_t **out_source) {
+iree_compiler_error_t *
+ireeCompilerSourceOpenFile(iree_compiler_session_t *session,
+                           const char *filePath,
+                           iree_compiler_source_t **out_source) {
   return __ireeCompilerSourceOpenFile(session, filePath, out_source);
 }
 
-iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
-    iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, bool isNullTerminated,
-    iree_compiler_source_t **out_source) {
+iree_compiler_error_t *
+ireeCompilerSourceWrapBuffer(iree_compiler_session_t *session,
+                             const char *bufferName, const char *buffer,
+                             size_t length, bool isNullTerminated,
+                             iree_compiler_source_t **out_source) {
   return __ireeCompilerSourceWrapBuffer(session, bufferName, buffer, length,
                                         isNullTerminated, out_source);
 }
@@ -316,18 +326,19 @@ void ireeCompilerOutputDestroy(iree_compiler_output_t *output) {
   __ireeCompilerOutputDestroy(output);
 }
 
-iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    const char *filePath, iree_compiler_output_t **out_output) {
+iree_compiler_error_t *
+ireeCompilerOutputOpenFile(const char *filePath,
+                           iree_compiler_output_t **out_output) {
   return __ireeCompilerOutputOpenFile(filePath, out_output);
 }
 
-iree_compiler_error_t *ireeCompilerOutputOpenFD(
-    int fd, iree_compiler_output_t **out_output) {
+iree_compiler_error_t *
+ireeCompilerOutputOpenFD(int fd, iree_compiler_output_t **out_output) {
   return __ireeCompilerOutputOpenFD(fd, out_output);
 }
 
-iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
-    iree_compiler_output_t **out_output) {
+iree_compiler_error_t *
+ireeCompilerOutputOpenMembuffer(iree_compiler_output_t **out_output) {
   return __ireeCompilerOutputOpenMembuffer(out_output);
 }
 
@@ -335,8 +346,9 @@ void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
   __ireeCompilerOutputKeep(output);
 }
 
-iree_compiler_error_t *ireeCompilerOutputMapMemory(
-    iree_compiler_output_t *output, void **contents, uint64_t *size) {
+iree_compiler_error_t *
+ireeCompilerOutputMapMemory(iree_compiler_output_t *output, void **contents,
+                            uint64_t *size) {
   return __ireeCompilerOutputMapMemory(output, contents, size);
 }
 

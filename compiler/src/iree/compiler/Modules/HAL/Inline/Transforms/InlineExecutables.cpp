@@ -30,7 +30,7 @@ namespace Inline {
 
 class InlineExecutablesPass
     : public InlineExecutablesBase<InlineExecutablesPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::HAL::Inline::HALInlineDialect, arith::ArithDialect,
@@ -110,11 +110,11 @@ class InlineExecutablesPass
       }
       SmallVector<Type> inputTypes;
       inputTypes.append(exportOp.getWorkgroupCountBody()->getNumArguments() - 1,
-                        indexType);  // workload
+                        indexType); // workload
       inputTypes.append(layoutAttr.getPushConstants(), i32Type);
-      inputTypes.append(totalBindingCount, bufferType);  // buffers
-      inputTypes.append(totalBindingCount, indexType);   // offsets
-      inputTypes.append(totalBindingCount, indexType);   // lengths
+      inputTypes.append(totalBindingCount, bufferType); // buffers
+      inputTypes.append(totalBindingCount, indexType);  // offsets
+      inputTypes.append(totalBindingCount, indexType);  // lengths
       auto dispatchFuncType =
           innerModuleBuilder.getFunctionType(inputTypes, {});
 
@@ -137,7 +137,7 @@ class InlineExecutablesPass
                                              bodyFuncOp))) {
           return failure();
         }
-        bodyFuncOp.setPrivate();  // so we only do it once
+        bodyFuncOp.setPrivate(); // so we only do it once
       }
       buildDispatchFunc(exportOp, layoutAttr, totalBindingCount, bodyFuncOp,
                         dispatchFuncOp);
@@ -180,9 +180,9 @@ class InlineExecutablesPass
   // Whenever better IPO and util.list optimizations are added we could back
   // this out to keep things vanilla and have fewer places making assumptions
   // about the function signatures.
-  LogicalResult rewriteWorkgroupSignature(
-      IREE::HAL::PipelineLayoutAttr layoutAttr, size_t totalBindingCount,
-      func::FuncOp bodyFuncOp) {
+  LogicalResult
+  rewriteWorkgroupSignature(IREE::HAL::PipelineLayoutAttr layoutAttr,
+                            size_t totalBindingCount, func::FuncOp bodyFuncOp) {
     auto *entryBlock = &bodyFuncOp.front();
     auto builder = OpBuilder::atBlockBegin(entryBlock);
     auto indexType = builder.getIndexType();
@@ -384,13 +384,13 @@ class InlineExecutablesPass
     }
 
     int workgroupXYZOffset = workgroupArgs.size();
-    workgroupArgs.push_back(nullptr);            // workgroup_x, set below
-    workgroupArgs.push_back(nullptr);            // workgroup_y, set below
-    workgroupArgs.push_back(nullptr);            // workgroup_z, set below
-    workgroupArgs.append(3, indexSet.get(1));    // workgroup_size_xyz
-    workgroupArgs.push_back(workgroupCount[0]);  // workgroup_count_x
-    workgroupArgs.push_back(workgroupCount[1]);  // workgroup_count_y
-    workgroupArgs.push_back(workgroupCount[2]);  // workgroup_count_z
+    workgroupArgs.push_back(nullptr);           // workgroup_x, set below
+    workgroupArgs.push_back(nullptr);           // workgroup_y, set below
+    workgroupArgs.push_back(nullptr);           // workgroup_z, set below
+    workgroupArgs.append(3, indexSet.get(1));   // workgroup_size_xyz
+    workgroupArgs.push_back(workgroupCount[0]); // workgroup_count_x
+    workgroupArgs.push_back(workgroupCount[1]); // workgroup_count_y
+    workgroupArgs.push_back(workgroupCount[2]); // workgroup_count_z
 
     // Z -> Y -> Z loop nest.
     builder.create<scf::ForOp>(
@@ -426,8 +426,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createInlineExecutablesPass() {
   return std::make_unique<InlineExecutablesPass>();
 }
 
-}  // namespace Inline
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Inline
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

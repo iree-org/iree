@@ -28,7 +28,7 @@ namespace HAL {
 
 class AssignTargetDevicesPass
     : public PassWrapper<AssignTargetDevicesPass, OperationPass<ModuleOp>> {
- public:
+public:
   AssignTargetDevicesPass()
       : targetRegistry(TargetBackendRegistry::getGlobal()) {}
   AssignTargetDevicesPass(const AssignTargetDevicesPass &pass)
@@ -106,7 +106,7 @@ class AssignTargetDevicesPass
                       ArrayAttr::get(moduleOp.getContext(), targetAttrs));
   }
 
- private:
+private:
   ListOption<std::string> targets{*this, "targets",
                                   llvm::cl::desc("List of devices to target."),
                                   llvm::cl::ZeroOrMore};
@@ -114,9 +114,9 @@ class AssignTargetDevicesPass
   const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createAssignTargetDevicesPass(
-    const TargetBackendRegistry &targetRegistry,
-    ArrayRef<std::string> targets) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createAssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
+                              ArrayRef<std::string> targets) {
   return std::make_unique<AssignTargetDevicesPass>(targetRegistry, targets);
 }
 
@@ -124,7 +124,7 @@ static PassRegistration<AssignTargetDevicesPass> pass([] {
   return std::make_unique<AssignTargetDevicesPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

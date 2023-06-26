@@ -36,7 +36,8 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
            << stringifyEnum(CodeGenPipeline::SPIRVMatmulPromoteVectorize);
   }
 
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) return success();
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op))
+    return success();
 
   LLVM_DEBUG({
     llvm::dbgs() << "verifying op: " << *op << "\n";
@@ -53,7 +54,8 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
 
   auto funcOp = op->getParentOfType<func::FuncOp>();
   const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
-  if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
+  if (!subgroupSize)
+    return funcOp->emitError("failed to query subgroup size");
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
   const auto maxWorkGroupSize = llvm::map_to_vector<3>(
       limits.getMaxComputeWorkgroupSize().getAsValueRange<IntegerAttr>(),
@@ -157,7 +159,8 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
 
   auto funcOp = op->getParentOfType<func::FuncOp>();
   const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
-  if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
+  if (!subgroupSize)
+    return funcOp->emitError("failed to query subgroup size");
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
   const auto maxWorkGroupSize = llvm::map_to_vector<3>(
       limits.getMaxComputeWorkgroupSize().getAsValueRange<IntegerAttr>(),
@@ -358,5 +361,5 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
   return success();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -15,7 +15,7 @@ namespace {
 
 class SPIRVAnnotateWinogradLoopsPass final
     : public SPIRVAnnotateWinogradLoopsBase<SPIRVAnnotateWinogradLoopsPass> {
- public:
+public:
   SPIRVAnnotateWinogradLoopsPass() = default;
   SPIRVAnnotateWinogradLoopsPass(const SPIRVAnnotateWinogradLoopsPass &pass) =
       default;
@@ -24,24 +24,26 @@ class SPIRVAnnotateWinogradLoopsPass final
     func::FuncOp funcOp = getOperation();
     SmallVector<scf::ForOp> forOps;
     funcOp.walk([&](scf::ForOp forOp) {
-      if (!isTiledAndDistributedLoop(forOp)) forOps.push_back(forOp);
+      if (!isTiledAndDistributedLoop(forOp))
+        forOps.push_back(forOp);
     });
 
     MLIRContext *context = &getContext();
     OpBuilder builder(context);
     const char *attrName = getSPIRVDistributeAttrName();
     for (auto [index, forOp] : llvm::enumerate(forOps)) {
-      if (index > kNumGPUDims) break;
+      if (index > kNumGPUDims)
+        break;
       forOp->setAttr(attrName, builder.getIndexAttr(index));
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVAnnotateWinogradLoopsPass() {
   return std::make_unique<SPIRVAnnotateWinogradLoopsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

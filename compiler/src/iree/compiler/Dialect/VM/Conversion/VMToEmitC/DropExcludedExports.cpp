@@ -16,7 +16,7 @@ namespace VM {
 class DropExcludedExportsPass
     : public PassWrapper<DropExcludedExportsPass,
                          OperationPass<IREE::VM::ModuleOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "iree-vm-drop-excluded-exports";
   }
@@ -48,7 +48,7 @@ createDropExcludedExportsPass() {
 
 static PassRegistration<DropExcludedExportsPass> pass;
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

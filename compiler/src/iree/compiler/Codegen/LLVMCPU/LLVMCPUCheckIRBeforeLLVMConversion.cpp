@@ -29,12 +29,13 @@ struct LLVMCPUCheckIRBeforeLLVMConversionPass
           LLVMCPUCheckIRBeforeLLVMConversionPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 /// Returns success if the cummulative stack allocation size is less than the
 /// limit set by clMaxAllocationSizeInBytes.
 static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
-  if (funcOp.getBody().empty()) return success();
+  if (funcOp.getBody().empty())
+    return success();
 
   SmallVector<memref::AllocaOp> allocaOps;
   funcOp.walk(
@@ -53,7 +54,8 @@ static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
     int allocaSize = 1;
     auto allocaType = llvm::cast<ShapedType>(allocaOp.getType());
     for (auto dimSize : allocaType.getShape()) {
-      if (ShapedType::isDynamic(dimSize)) continue;
+      if (ShapedType::isDynamic(dimSize))
+        continue;
       allocaSize *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
@@ -98,5 +100,5 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass() {
   return std::make_unique<LLVMCPUCheckIRBeforeLLVMConversionPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

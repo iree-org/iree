@@ -31,7 +31,7 @@ Type convertShapedType(ShapedType shapedType) {
   return shapedType;
 }
 
-std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
+std::optional<Value> materializeCastFromIllegal(OpBuilder &builder, Type type,
                                                 ValueRange inputs,
                                                 Location loc) {
   Type fromType = getElementTypeOrSelf(inputs[0].getType());
@@ -44,7 +44,7 @@ std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
       ->getResult(0);
 }
 
-std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
+std::optional<Value> materializeCastToIllegal(OpBuilder &builder, Type type,
                                               ValueRange inputs, Location loc) {
   Type fromType = getElementTypeOrSelf(inputs[0].getType());
   Type toType = getElementTypeOrSelf(type);
@@ -56,7 +56,7 @@ std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
       ->getResult(0);
 }
 
-std::optional<Value> scalarToTensor(OpBuilder& builder, Type /*type*/,
+std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
                                     ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
   if (llvm::isa<ShapedType>(inputs.front().getType())) {
@@ -69,7 +69,7 @@ std::optional<Value> scalarToTensor(OpBuilder& builder, Type /*type*/,
       .getResult();
 }
 
-}  // namespace
+} // namespace
 
 RemoveSignTypeConverter::RemoveSignTypeConverter() {
   addConversion([](Type type) { return type; });
@@ -86,4 +86,4 @@ LinalgTypeConverter::LinalgTypeConverter() : RemoveSignTypeConverter() {
   addArgumentMaterialization(scalarToTensor);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

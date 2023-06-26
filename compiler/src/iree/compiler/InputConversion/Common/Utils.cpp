@@ -30,7 +30,8 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
   llvm::SmallVector<int64_t> staticSizes;
   SmallVector<Value> dynSizes;
   for (int i = 0, s = is_reduction.size(); i < s; i++) {
-    if (is_reduction[i]) continue;
+    if (is_reduction[i])
+      continue;
 
     staticSizes.push_back(ty.getDimSize(i));
     if (ty.isDynamicDim(i)) {
@@ -83,5 +84,5 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
       .getResult(0);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

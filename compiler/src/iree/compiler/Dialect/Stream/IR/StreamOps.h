@@ -28,6 +28,6 @@
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Stream/IR/StreamOps.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h.inc" // IWYU pragma: export
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_IR_STREAMOPS_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAMOPS_H_

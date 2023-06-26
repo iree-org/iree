@@ -69,7 +69,8 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
            {maybeLeadingHBlock, strategy.captures.maybeLeadingRank},
            {gridReductionH, strategy.captures.reductionRank},
            {maybeTiledTrailingHBlock, strategy.captures.maybeTrailingRank}}) {
-    if (rank == 0) continue;
+    if (rank == 0)
+      continue;
     SmallVector<int64_t> tileSizes(rank - 1, 0);
     tileSizes.push_back(strategy.getVectorSize());
     buildTileFuseToScfFor(b, variantH, val, {},

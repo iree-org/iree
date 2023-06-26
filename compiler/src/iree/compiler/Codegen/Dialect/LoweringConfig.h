@@ -27,8 +27,8 @@ namespace iree_compiler {
 /// Typedef for tile sizes to use at different levels of tiling.
 using TileSizesListType = SmallVector<SmallVector<int64_t>>;
 using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t>>;
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 // clang-format off
 #include "iree/compiler/Codegen/Dialect/LoweringConfigEnums.h.inc"
@@ -46,14 +46,15 @@ namespace iree_compiler {
 /// Gets the translate executable info attribute value associated with
 /// `exportOp`. It expects that the attribute is stored using the identifier
 /// `translation_info`.
-IREE::Codegen::TranslationInfoAttr getTranslationInfo(
-    IREE::HAL::ExecutableExportOp exportOp);
+IREE::Codegen::TranslationInfoAttr
+getTranslationInfo(IREE::HAL::ExecutableExportOp exportOp);
 /// Returns the translation info for the `funcOp` (by looking at the entry
 /// point). Returns `nullptr` on failure.
-inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
-    func::FuncOp funcOp) {
+inline IREE::Codegen::TranslationInfoAttr
+getTranslationInfo(func::FuncOp funcOp) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp)) return nullptr;
+  if (failed(exportOp))
+    return nullptr;
   return getTranslationInfo(*exportOp);
 }
 
@@ -77,9 +78,9 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
 /// Sets and overwites the translate executable info for the given entry point.
 /// Returns failure if the given entry point is not exported via
 /// hal.executable.export.
-LogicalResult setTranslationInfo(
-    func::FuncOp entryPoint,
-    IREE::Codegen::TranslationInfoAttr translationInfo);
+LogicalResult
+setTranslationInfo(func::FuncOp entryPoint,
+                   IREE::Codegen::TranslationInfoAttr translationInfo);
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.lowering_config` attribute on root
@@ -91,8 +92,8 @@ LogicalResult setTranslationInfo(
 ///
 /// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
-FailureOr<Operation *> getLoweringConfigCarryingOp(
-    ArrayRef<Operation *> computeOps);
+FailureOr<Operation *>
+getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps);
 
 /// Returns the lowering configuration set for an operation. Returns `nullptr`
 /// if no value is set.  It expects that the attribute is stored using the
@@ -104,8 +105,8 @@ IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op);
 ///
 /// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
-FailureOr<IREE::Codegen::LoweringConfigAttr> getLoweringConfig(
-    ArrayRef<Operation *> computeOps);
+FailureOr<IREE::Codegen::LoweringConfigAttr>
+getLoweringConfig(ArrayRef<Operation *> computeOps);
 
 /// Returns the tile sizes for a particular operation if the
 /// `iree_codegen.lowering_config` attribute is set on it.
@@ -160,7 +161,7 @@ void setCompilationInfo(Operation *op,
 /// operation.
 void eraseCompilationInfo(Operation *op);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
+#endif // IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_

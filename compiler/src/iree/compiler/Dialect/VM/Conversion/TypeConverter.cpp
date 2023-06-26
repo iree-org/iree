@@ -121,7 +121,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
          Location loc) -> Value { return inputs.front(); });
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

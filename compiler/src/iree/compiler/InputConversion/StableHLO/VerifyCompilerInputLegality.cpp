@@ -67,5 +67,5 @@ struct VerifyCompilerStableHloInputLegality final
   }
 };
 
-}  // namespace
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace
+} // namespace mlir::iree_compiler::stablehlo

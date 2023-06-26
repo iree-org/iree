@@ -13,17 +13,18 @@ from options import parse_generator_arguments
 ###############################################################################
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Generates MLIR operations for "
+        "verification and profiling of IREE compiled dispatches."
+    )
 
-  parser = argparse.ArgumentParser(description="Generates MLIR operations for "\
-                     "verification and profiling of IREE compiled dispatches.")
+    args = parse_generator_arguments(parser)
 
-  args = parse_generator_arguments(parser)
+    # Manifest dispatches for a group of accompanying operations and configurations.
+    manifest = Manifest(args)
 
-  # Manifest dispatches for a group of accompanying operations and configurations.
-  manifest = Manifest(args)
+    # Load all the pre-defined dispatches in a manifest.
+    manifest.initialize()
 
-  # Load all the pre-defined dispatches in a manifest.
-  manifest.initialize()
-
-  # Emit the dispatches in MLIR source files.
-  manifest.emit()
+    # Emit the dispatches in MLIR source files.
+    manifest.emit()

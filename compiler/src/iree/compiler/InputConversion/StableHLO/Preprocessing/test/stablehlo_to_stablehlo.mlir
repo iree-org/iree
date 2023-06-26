@@ -211,6 +211,19 @@ func.func @reorder_broadcast_in_dim_scalar_unary_diff_type(%arg0: tensor<complex
 
 // -----
 
+// CHECK-LABEL: @rng_bitcast_f32 
+// CHECK-SAME:  (%[[ARG0:.*]]: tensor<4xi32>)
+func.func @rng_bitcast_f32(%arg0: tensor<4xi32>) -> (tensor<4xi32>, tensor<8xf32>) {
+  // CHECK: %[[OUT_STATE:.*]], %[[OUT_INT:.*]] = stablehlo.rng_bit_generator %[[ARG0]]
+  // CHECK-SAME: -> (tensor<4xi32>, tensor<8xi32>)
+  %output_state, %output = "stablehlo.rng_bit_generator"(%arg0) {rng_algorithm = #stablehlo<rng_algorithm PHILOX>} : (tensor<4xi32>) -> (tensor<4xi32>, tensor<8xf32>)
+  // CHECK: %[[OUT_FLOAT:.*]] stablehlo.bitcast_convert %[[OUT_INT:.*]] -> tensor<8xf32>
+  // CHECK: return %[[OUT_STATE:.*]], %[[OUT_FLOAT:.*]]
+  return %output_state, %output : tensor<4xi32>, tensor<8xf32>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @rng_normal
 // CHECK-SAME:              (%[[ARG0:.+]]: tensor<f32>, %[[ARG1:.+]]: tensor<f32>)
 func.func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32> {

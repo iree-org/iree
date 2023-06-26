@@ -22,7 +22,7 @@ namespace {
 /// A pattern to pad statically shaped matmul operands to the next integer
 /// multiple of padSize.
 class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
- public:
+public:
   PadMatmulOp(MLIRContext *context, int size, PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern(context, benefit), paddingSize(size) {}
 
@@ -31,7 +31,8 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     Operation *op = linalgOp.getOperation();
     const bool isBatchMatmul = isa<linalg::BatchMatmulOp>(op);
     const bool isMatmul = isa<linalg::MatmulOp>(op);
-    if (!isBatchMatmul && !isMatmul) return failure();
+    if (!isBatchMatmul && !isMatmul)
+      return failure();
 
     Location loc = linalgOp.getLoc();
     Value lhs = linalgOp.getDpsInputOperand(0)->get();
@@ -42,7 +43,8 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     auto rhsType = llvm::dyn_cast<RankedTensorType>(rhs.getType());
     auto resultType = llvm::dyn_cast<RankedTensorType>(result.getType());
 
-    if (!lhsType || !rhsType) return failure();
+    if (!lhsType || !rhsType)
+      return failure();
 
     if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape())
       return failure();
@@ -67,7 +69,8 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 
     auto getFullShape = [&](ArrayRef<int> dims) {
       SmallVector<int64_t, 3> shape;
-      if (isBatchMatmul) shape.push_back(B);
+      if (isBatchMatmul)
+        shape.push_back(B);
       llvm::append_range(shape, dims);
       return shape;
     };
@@ -148,12 +151,12 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     return success();
   }
 
- private:
+private:
   int paddingSize;
 };
 
 class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -168,12 +171,12 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass() {
   return std::make_unique<PadLinalgOpsPass>();
 }
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

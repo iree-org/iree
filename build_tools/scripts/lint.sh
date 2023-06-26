@@ -54,9 +54,10 @@ echo "***** buildifier *****"
 ${scripts_dir}/run_buildifier.sh
 git diff --exit-code
 
-echo "***** yapf *****"
-# Don't fail script if condition is false
-git diff -U0 main | ./third_party/format_diff/format_diff.py yapf -i
+echo "***** black *****"
+# The filter lowercase `d` means to exclude deleted files.
+git diff main --name-only --diff-filter=d -- '*.py' ':!third_party' \
+  | xargs -r black
 
 echo "***** pytype *****"
 ./build_tools/pytype/check_diff.sh

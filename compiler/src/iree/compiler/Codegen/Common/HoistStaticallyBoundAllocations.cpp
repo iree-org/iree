@@ -24,7 +24,7 @@ struct HoistStaticallyBoundAllocationsPass
   void runOnOperation() override;
 };
 
-}  // namespace
+} // namespace
 
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
@@ -37,5 +37,5 @@ createHoistStaticallyBoundAllocationsPass() {
   return std::make_unique<HoistStaticallyBoundAllocationsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

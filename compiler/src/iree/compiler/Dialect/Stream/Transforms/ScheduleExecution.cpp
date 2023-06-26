@@ -56,11 +56,12 @@ struct ExecutePartitionBuilder {
     // This is at the last op in the partition.
     Operation *insertionPt = nullptr;
     for (auto *op : partition->ops) {
-      if (op->getBlock() != parentBlock) continue;
+      if (op->getBlock() != parentBlock)
+        continue;
       if (!insertionPt) {
-        insertionPt = op;  // first defining op
+        insertionPt = op; // first defining op
       } else if (insertionPt->isBeforeInBlock(op)) {
-        insertionPt = op;  // moving insertion point down
+        insertionPt = op; // moving insertion point down
       }
     }
     OpBuilder parentBuilder(context);
@@ -82,7 +83,8 @@ struct ExecutePartitionBuilder {
       resultTypes.push_back(out.getType());
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, out, parentBuilder);
-      if (resultSize) resultSizes.push_back(resultSize);
+      if (resultSize)
+        resultSizes.push_back(resultSize);
     }
     SmallVector<Value> operands;
     SmallVector<Type> operandTypes;
@@ -91,12 +93,14 @@ struct ExecutePartitionBuilder {
     operandTypes.reserve(partition->ins.size());
     operandSizes.reserve(partition->ins.size());
     for (auto in : partition->ins) {
-      if (!llvm::isa<IREE::Stream::ResourceType>(in.getType())) continue;
+      if (!llvm::isa<IREE::Stream::ResourceType>(in.getType()))
+        continue;
       operands.push_back(in);
       operandTypes.push_back(in.getType());
       auto operandSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, in, parentBuilder);
-      if (operandSize) operandSizes.push_back(operandSize);
+      if (operandSize)
+        operandSizes.push_back(operandSize);
     }
 
     // TODO(benvanik): tie operands, or leave to canonicalization.
@@ -132,7 +136,8 @@ struct ExecutePartitionBuilder {
   //
   // Returns true if the operation was cloned into the partition.
   bool visit(Operation *op) {
-    if (!partition->ops.contains(op)) return false;
+    if (!partition->ops.contains(op))
+      return false;
 
     // Clone the op into the partition and remap it.
     auto *clonedOp = builder.clone(*op, mapping);
@@ -166,7 +171,8 @@ struct ExecutePartitionBuilder {
       results.push_back(newResult);
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           executeOp.getLoc(), newResult, builder);
-      if (resultSize) resultSizes.push_back(resultSize);
+      if (resultSize)
+        resultSizes.push_back(resultSize);
     }
     builder.create<IREE::Stream::YieldOp>(executeOp.getLoc(), results,
                                           resultSizes);
@@ -196,7 +202,8 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(Region &region) {
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0) return;
+    if (markedBlocks.count(block) > 0)
+      return;
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
       visit(childBlock->getBlock());
     }
@@ -212,7 +219,7 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(Region &region) {
 
 class ScheduleExecutionPass
     : public ScheduleExecutionBase<ScheduleExecutionPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
@@ -239,7 +246,8 @@ class ScheduleExecutionPass
       // Compute a set of partitions covering all of the streamable ops in the
       // block.
       auto partitionSet = partitionStreamableOps(configAttr, block);
-      if (partitionSet.empty()) continue;
+      if (partitionSet.empty())
+        continue;
       if (failed(partitionSet.verify(parentOp.getLoc()))) {
         return signalPassFailure();
       }
@@ -262,7 +270,8 @@ class ScheduleExecutionPass
       // creates a lot of new IR (up to O(op*partitions)).
       SetVector<Operation *> deadOps;
       for (auto &op : *block) {
-        if (op.hasTrait<OpTrait::IsTerminator>()) continue;
+        if (op.hasTrait<OpTrait::IsTerminator>())
+          continue;
         for (auto &partitionBuilder : partitionBuilders) {
           partitionBuilder.visit(&op);
         }
@@ -327,14 +336,14 @@ class ScheduleExecutionPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<CallableOpInterface>>
 createScheduleExecutionPass() {
   return std::make_unique<ScheduleExecutionPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

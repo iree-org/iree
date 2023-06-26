@@ -87,7 +87,7 @@ function(cuda_kernel_ptx_clang _ARCH)
     DEPENDS
       ${_PTX_SRC_NAME}
       ${IREE_CLANG_TARGET}
-    COMMAND ${IREE_CLANG_TARGET}
+    COMMAND ${IREE_CLANG_BINARY}
       -x cuda
       -Wno-unknown-cuda-version
       --cuda-path=${CUDAToolkit_ROOT}

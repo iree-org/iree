@@ -24,7 +24,7 @@ namespace VM {
 class DeduplicateRodataPass
     : public PassWrapper<DeduplicateRodataPass,
                          OperationPass<IREE::VM::ModuleOp>> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VM::VMDialect>();
   }
@@ -101,7 +101,7 @@ createDeduplicateRodataPass() {
 
 static PassRegistration<DeduplicateRodataPass> pass;
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

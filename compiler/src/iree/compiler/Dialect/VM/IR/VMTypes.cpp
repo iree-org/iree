@@ -15,8 +15,8 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc"  // IWYU pragma: keep
-#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -46,7 +46,7 @@ struct ListTypeStorage : public TypeStorage {
   Type elementType;
 };
 
-}  // namespace detail
+} // namespace detail
 
 // static
 bool ListType::isCompatible(Type type) {
@@ -101,7 +101,7 @@ struct RefTypeStorage : public TypeStorage {
   Type objectType;
 };
 
-}  // namespace detail
+} // namespace detail
 
 // static
 bool RefType::isCompatible(Type type) {
@@ -139,7 +139,7 @@ Type RefType::getObjectType() { return getImpl()->objectType; }
 void VMDialect::registerAttributes() {
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc" // IWYU pragma: keep
       >();
 }
 void VMDialect::registerTypes() {
@@ -156,7 +156,8 @@ Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
   Attribute genAttr;
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, &mnemonic, type, genAttr);
-  if (parseResult.has_value()) return genAttr;
+  if (parseResult.has_value())
+    return genAttr;
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};
@@ -170,7 +171,7 @@ void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   });
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -18,7 +18,7 @@ struct DecomposeAffineOpsPass
   void runOnOperation() override;
 };
 
-}  // namespace
+} // namespace
 
 void DecomposeAffineOpsPass::runOnOperation() {
   IRRewriter rewriter(&getContext());
@@ -32,5 +32,5 @@ void DecomposeAffineOpsPass::runOnOperation() {
 std::unique_ptr<Pass> createDecomposeAffineOpsPass() {
   return std::make_unique<DecomposeAffineOpsPass>();
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

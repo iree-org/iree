@@ -82,16 +82,16 @@ emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) {
   if (auto iType = llvm::dyn_cast<IntegerType>(type)) {
     std::string typeLiteral;
     switch (iType.getWidth()) {
-      case 32: {
-        typeLiteral = "int32_t";
-        break;
-      }
-      case 64: {
-        typeLiteral = "int64_t";
-        break;
-      }
-      default:
-        return {};
+    case 32: {
+      typeLiteral = "int32_t";
+      break;
+    }
+    case 64: {
+      typeLiteral = "int64_t";
+      break;
+    }
+    default:
+      return {};
     }
     return emitc::OpaqueType::get(type.getContext(), typeLiteral);
   }
@@ -99,16 +99,16 @@ emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) {
   if (auto fType = llvm::dyn_cast<FloatType>(type)) {
     std::string typeLiteral;
     switch (fType.getWidth()) {
-      case 32: {
-        typeLiteral = "float";
-        break;
-      }
-      case 64: {
-        typeLiteral = "double";
-        break;
-      }
-      default:
-        return {};
+    case 32: {
+      typeLiteral = "float";
+      break;
+    }
+    case 64: {
+      typeLiteral = "double";
+      break;
+    }
+    default:
+      return {};
     }
     return emitc::OpaqueType::get(type.getContext(), typeLiteral);
   }
@@ -166,7 +166,7 @@ std::optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   return applyOp.getResult();
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -229,20 +229,21 @@ if(IREE_BUILD_COMPILER)
     )
   endif()
 
+  # Tablegen binaries are special snowflakes among special snowflakes.
+  # They must be statically linked against internal LLVM libraries, and they
+  # therefore must not depend on anything outside of the upstream tablegen
+  # libraries. These targets are specially set up to link in the correct
+  # way. This is a necessary diversion from how Bazel deals with it (which
+  # must deep-link to everything to satisfy its checks).
   iree_cc_binary(
     NAME
       iree-tblgen
     SRCS
-      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+      "iree-tblgen.cpp"
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
-      LLVMSupport
-      LLVMTableGen
-      MLIRSupport
-      MLIRTableGen
       MLIRTblgenLib
-      iree::compiler::Utils
     HOSTONLY
   )
 

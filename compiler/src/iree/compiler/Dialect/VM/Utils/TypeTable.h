@@ -26,9 +26,9 @@ struct TypeDef {
 // the vector to the type represented by the type ordinal.
 std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp);
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_UTILS_TYPETABLE_H_
+#endif // IREE_COMPILER_DIALECT_VM_UTILS_TYPETABLE_H_

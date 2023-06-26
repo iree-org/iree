@@ -50,9 +50,9 @@ static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
 }
 
 // Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
-static LogicalResult verifyDispatchWorkload(
-    Operation *op, IREE::Stream::ExecutableExportOp exportOp,
-    ValueRange workload) {
+static LogicalResult
+verifyDispatchWorkload(Operation *op, IREE::Stream::ExecutableExportOp exportOp,
+                       ValueRange workload) {
   // If the target has a workgroup count computation function we can verify that
   // the workload here matches what is expected.
   if (!exportOp.getWorkgroupCount().empty()) {
@@ -143,8 +143,10 @@ static LogicalResult verifyAllResourcesCaptured(Region &region) {
       availableResources.insert(result);
     }
     for (auto operand : op.getOperands()) {
-      if (!operand) continue;
-      if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) continue;
+      if (!operand)
+        continue;
+      if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
+        continue;
       if (!availableResources.contains(operand)) {
         return op.emitOpError() << "used resource not listed in explicit "
                                    "captures (or produced internally)";
@@ -192,7 +194,8 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
   DenseSet<Value> processedValues;
   SmallVector<Value> worklist;
   auto enqueueValue = [&](Value value) {
-    if (processedValues.contains(value)) return;
+    if (processedValues.contains(value))
+      return;
     processedValues.insert(value);
     worklist.push_back(value);
   };
@@ -232,7 +235,8 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
       if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user)) {
         auto tiedIndices = tiedOp.getTiedResultOperandIndices();
         for (int64_t tiedIndex : tiedIndices) {
-          if (tiedIndex == IREE::Util::TiedOpInterface::kUntiedIndex) continue;
+          if (tiedIndex == IREE::Util::TiedOpInterface::kUntiedIndex)
+            continue;
           auto operand = user->getOperand(tiedIndex);
           if (operand == value) {
             // Tied operand.
@@ -255,7 +259,8 @@ static void eraseStreamRegionResults(Region &region,
                                      ArrayRef<unsigned> excludedResultIndices) {
   for (auto &block : region.getBlocks()) {
     auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
-    if (!yieldOp) continue;
+    if (!yieldOp)
+      continue;
     llvm::SmallVector<Value> newOperands;
     for (auto i : llvm::reverse(excludedResultIndices)) {
       yieldOp.getResourceOperandsMutable().erase(i);
@@ -351,10 +356,12 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
   p << ")";
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1) p << "(";
+    if (resultTypes.size() != 1)
+      p << "(";
     printShapedResultList(p, op, operands, operandTypes, operandSizes,
                           resultTypes, resultSizes, tiedOperands);
-    if (resultTypes.size() != 1) p << ")";
+    if (resultTypes.size() != 1)
+      p << ")";
   }
   p << " ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
@@ -447,7 +454,8 @@ static ParseResult parsePackSliceRanges(
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute> lifetimeRangeValues;
   do {
-    if (failed(parser.parseOptionalLSquare())) break;
+    if (failed(parser.parseOptionalLSquare()))
+      break;
     IntegerAttr lifetimeStart;
     IntegerAttr lifetimeEnd;
     OpAsmParser::UnresolvedOperand dynamicSliceSize;
@@ -471,7 +479,8 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
                                  ArrayAttr lifetimeIntervals,
                                  ValueRange dynamicSliceSizes,
                                  TypeRange packedOffsetTypes) {
-  if (packedOffsetTypes.empty()) return;
+  if (packedOffsetTypes.empty())
+    return;
   for (unsigned i = 0; i < packedOffsetTypes.size(); ++i) {
     auto lifetimeStart = lifetimeIntervals[i * 2];
     auto lifetimeEnd = lifetimeIntervals[i * 2 + 1];
@@ -483,7 +492,8 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
     p.printAttributeWithoutType(lifetimeEnd);
     p << "] = ";
     p.printOperand(sliceSize);
-    if (i < packedOffsetTypes.size() - 1) p << ",";
+    if (i < packedOffsetTypes.size() - 1)
+      p << ",";
   }
   p.printNewline();
 }
@@ -521,14 +531,16 @@ static ParseResult parseConstantValueList(
 static void printConstantValueList(OpAsmPrinter &p, Operation *op,
                                    TypeRange resultTypes,
                                    ValueRange resultSizes, ArrayAttr values) {
-  if (resultTypes.empty()) return;
+  if (resultTypes.empty())
+    return;
   for (unsigned i = 0; i < resultTypes.size(); ++i) {
     p.printNewline();
     p << "  ";
     printSizeAwareType(p, op, resultTypes[i], resultSizes[i]);
     p << " = ";
     p.printAttribute(values[i]);
-    if (i < resultTypes.size() - 1) p << ",";
+    if (i < resultTypes.size() - 1)
+      p << ",";
   }
 }
 
@@ -582,11 +594,13 @@ static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
 
 static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
                                       Region &body) {
-  if (body.empty()) return;
+  if (body.empty())
+    return;
   p << "workgroups(";
   auto args = body.getArguments();
   for (unsigned i = 0; i < args.size(); ++i) {
-    if (i > 0) p << ", ";
+    if (i > 0)
+      p << ", ";
     p.printRegionArgument(args[i]);
   }
   p << ")";
@@ -743,13 +757,13 @@ Value ResourceSubviewOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::std::optional<unsigned> ResourceSubviewOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+ResourceSubviewOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> ResourceSubviewOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 // static
@@ -795,13 +809,13 @@ Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::std::optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+TensorImportOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> TensorImportOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 //===----------------------------------------------------------------------===//
@@ -822,13 +836,13 @@ Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::std::optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // source
+::std::optional<unsigned>
+TensorExportOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
 }
 
 SmallVector<int64_t> TensorExportOp::getTiedResultOperandIndices() {
-  return {0};  // source
+  return {0}; // source
 }
 
 //===----------------------------------------------------------------------===//
@@ -965,13 +979,13 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+TensorUpdateOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 //===----------------------------------------------------------------------===//
@@ -992,13 +1006,13 @@ Value TensorFillOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> TensorFillOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+TensorFillOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> TensorFillOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 //===----------------------------------------------------------------------===//
@@ -1041,13 +1055,13 @@ Value TensorStoreOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> TensorStoreOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+TensorStoreOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> TensorStoreOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 //===----------------------------------------------------------------------===//
@@ -1162,13 +1176,13 @@ Value AsyncFillOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> AsyncFillOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+AsyncFillOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> AsyncFillOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void AsyncFillOp::getAsyncAccessRanges(
@@ -1196,13 +1210,13 @@ Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> AsyncUpdateOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+AsyncUpdateOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> AsyncUpdateOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void AsyncUpdateOp::getAsyncAccessRanges(
@@ -1239,13 +1253,13 @@ Value AsyncCopyOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> AsyncCopyOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+AsyncCopyOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> AsyncCopyOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void AsyncCopyOp::getAsyncAccessRanges(
@@ -1265,18 +1279,18 @@ void AsyncCopyOp::getAsyncAccessRanges(
 static const char *getCollectiveParamKeyword(Attribute opAttr) {
   auto attr = llvm::cast<IREE::Stream::CollectiveAttr>(opAttr);
   switch (attr.getKind()) {
-    case IREE::Stream::CollectiveKind::Broadcast:
-      return "source";
-    case IREE::Stream::CollectiveKind::Reduce:
-      return "target";
-    case IREE::Stream::CollectiveKind::Send:
-      return "target";
-    case IREE::Stream::CollectiveKind::Recv:
-      return "source";
-    case IREE::Stream::CollectiveKind::SendRecv:
-      return "source_target_pair";
-    default:
-      return nullptr;
+  case IREE::Stream::CollectiveKind::Broadcast:
+    return "source";
+  case IREE::Stream::CollectiveKind::Reduce:
+    return "target";
+  case IREE::Stream::CollectiveKind::Send:
+    return "target";
+  case IREE::Stream::CollectiveKind::Recv:
+    return "source";
+  case IREE::Stream::CollectiveKind::SendRecv:
+    return "source_target_pair";
+  default:
+    return nullptr;
   }
 }
 
@@ -1284,7 +1298,8 @@ static ParseResult parseCollectiveParam(
     OpAsmParser &parser, Attribute opAttr,
     std::optional<OpAsmParser::UnresolvedOperand> &optionalParamValue) {
   const char *keyword = getCollectiveParamKeyword(opAttr);
-  if (!keyword) return success();  // optional
+  if (!keyword)
+    return success(); // optional
   OpAsmParser::UnresolvedOperand paramValue;
   if (failed(parser.parseKeyword(keyword)) || failed(parser.parseLParen()) ||
       failed(parser.parseOperand(paramValue)) || failed(parser.parseRParen())) {
@@ -1336,13 +1351,13 @@ Value AsyncCollectiveOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> AsyncCollectiveOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+AsyncCollectiveOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> AsyncCollectiveOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 void AsyncCollectiveOp::getAsyncAccessRanges(
@@ -1404,13 +1419,13 @@ Value AsyncStoreOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::std::optional<unsigned> AsyncStoreOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
-  return {0};  // target
+::std::optional<unsigned>
+AsyncStoreOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // target
 }
 
 SmallVector<int64_t> AsyncStoreOp::getTiedResultOperandIndices() {
-  return {0};  // target
+  return {0}; // target
 }
 
 //===----------------------------------------------------------------------===//
@@ -1423,13 +1438,16 @@ static ParseResult parseDispatchOperands(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEnds,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths) {
-  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseLParen()))
+    return failure();
   // Handle the case of no operands specially.
-  if (succeeded(parser.parseOptionalRParen())) return success();
+  if (succeeded(parser.parseOptionalRParen()))
+    return success();
   do {
     // All entries at least have an %operand.
     resourceOperands.emplace_back();
-    if (failed(parser.parseOperand(resourceOperands.back()))) return failure();
+    if (failed(parser.parseOperand(resourceOperands.back())))
+      return failure();
     // Resources have a range.
     if (succeeded(parser.parseOptionalLSquare())) {
       resourceOffsets.emplace_back();
@@ -1445,7 +1463,8 @@ static ParseResult parseDispatchOperands(
       }
     }
   } while (succeeded(parser.parseOptionalComma()));
-  if (failed(parser.parseRParen())) return failure();
+  if (failed(parser.parseRParen()))
+    return failure();
   return success();
 }
 
@@ -1499,8 +1518,8 @@ LogicalResult AsyncDispatchOp::verify() {
   return success();
 }
 
-LogicalResult AsyncDispatchOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
+LogicalResult
+AsyncDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
   auto exportOp =
       symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
@@ -1526,7 +1545,7 @@ LogicalResult AsyncDispatchOp::verifySymbolUses(
 }
 
 std::pair<unsigned, unsigned> AsyncDispatchOp::getTiedOperandsIndexAndLength() {
-  return getODSOperandIndexAndLength(1);  // $operands
+  return getODSOperandIndexAndLength(1); // $operands
 }
 
 void AsyncDispatchOp::getAsyncAccessRanges(
@@ -1534,7 +1553,8 @@ void AsyncDispatchOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) continue;
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
+      continue;
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
     if (!tiedResults.empty()) {
@@ -1602,10 +1622,12 @@ void AsyncFuncOp::build(OpBuilder &builder, OperationState &state,
 
 bool AsyncFuncOp::isResultTied(int resultIndex) {
   auto tiedOperandsAttr = getTiedOperandsAttr();
-  if (!tiedOperandsAttr) return false;
+  if (!tiedOperandsAttr)
+    return false;
   auto indexAttr = llvm::dyn_cast_if_present<IntegerAttr>(
       tiedOperandsAttr.getValue()[resultIndex]);
-  if (!indexAttr) return false;
+  if (!indexAttr)
+    return false;
   return indexAttr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
 }
 
@@ -1655,8 +1677,8 @@ LogicalResult AsyncCallOp::verify() {
   return success();
 }
 
-LogicalResult AsyncCallOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
+LogicalResult
+AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
   auto calleeOp =
       symbolTable.lookupNearestSymbolFrom<IREE::Stream::AsyncFuncOp>(
@@ -1674,7 +1696,8 @@ LogicalResult AsyncCallOp::verifySymbolUses(
            << expectedType << " but callee is " << calleeType;
   }
   auto typesCompatible = [](Type actual, Type expected) {
-    if (actual == expected) return true;
+    if (actual == expected)
+      return true;
     auto calleeResource = llvm::dyn_cast<IREE::Stream::ResourceType>(actual);
     auto expectedResource =
         llvm::dyn_cast<IREE::Stream::ResourceType>(expected);
@@ -1713,7 +1736,7 @@ FunctionType AsyncCallOp::getCalleeType() {
 }
 
 std::pair<unsigned, unsigned> AsyncCallOp::getTiedOperandsIndexAndLength() {
-  return getODSOperandIndexAndLength(0);  // $operands
+  return getODSOperandIndexAndLength(0); // $operands
 }
 
 void AsyncCallOp::getAsyncAccessRanges(
@@ -1721,7 +1744,8 @@ void AsyncCallOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) continue;
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
+      continue;
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
     if (!tiedResults.empty()) {
@@ -1763,7 +1787,8 @@ void AsyncExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operands);
   state.addOperands(operandSizes);
   state.addOperands(resultSizes);
-  if (awaitTimepoint) state.addOperands(awaitTimepoint);
+  if (awaitTimepoint)
+    state.addOperands(awaitTimepoint);
   state.addAttributes(attributes);
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
@@ -1798,8 +1823,8 @@ std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
   return {0, getResults().size()};
 }
 
-OperandRange AsyncExecuteOp::getSuccessorEntryOperands(
-    std::optional<unsigned> index) {
+OperandRange
+AsyncExecuteOp::getSuccessorEntryOperands(std::optional<unsigned> index) {
   assert(index && index.value() == 0 && "invalid region index");
   return getResourceOperands();
 }
@@ -1820,13 +1845,15 @@ void AsyncExecuteOp::getSuccessorRegions(
 // Gets the async access ranges for the generic stream execution op capturing
 // resources.
 template <typename Op>
-static void getExecutionAsyncAccessRanges(
-    Op op, SmallVectorImpl<AsyncAccessRange> &ranges) {
+static void
+getExecutionAsyncAccessRanges(Op op,
+                              SmallVectorImpl<AsyncAccessRange> &ranges) {
   unsigned tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
   for (auto [i, operand, operandSize] : llvm::zip_equal(
            llvm::seq<unsigned>(0, op.getResourceOperands().size()),
            op.getResourceOperands(), op.getResourceOperandSizes())) {
-    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) continue;
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
+      continue;
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = op.getOperandTiedResults(tiedOperandBase + i);
     if (!tiedResults.empty()) {
@@ -1864,8 +1891,8 @@ Operation::result_range AsyncExecuteOp::getClosureResults() {
 
 bool AsyncExecuteOp::canClosureContainOp(Operation *op) { return false; }
 
-IREE::Util::ValueAccess AsyncExecuteOp::getOperandAccess(
-    unsigned operandIndex) {
+IREE::Util::ValueAccess
+AsyncExecuteOp::getOperandAccess(unsigned operandIndex) {
   auto arg = getBody().getArgument(operandIndex);
   return computeValueAccess(arg);
 }
@@ -1904,7 +1931,8 @@ AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
 
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices) eraseIndices.set(i);
+  for (auto i : excludedOperandIndices)
+    eraseIndices.set(i);
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -1951,8 +1979,8 @@ LogicalResult AsyncConcurrentOp::verify() {
   return success();
 }
 
-OperandRange AsyncConcurrentOp::getSuccessorEntryOperands(
-    std::optional<unsigned> index) {
+OperandRange
+AsyncConcurrentOp::getSuccessorEntryOperands(std::optional<unsigned> index) {
   assert(index && index.value() == 0 && "invalid region index");
   return getResourceOperands();
 }
@@ -1985,14 +2013,14 @@ Operation::result_range AsyncConcurrentOp::getClosureResults() {
 
 bool AsyncConcurrentOp::canClosureContainOp(Operation *op) { return false; }
 
-IREE::Util::ValueAccess AsyncConcurrentOp::getOperandAccess(
-    unsigned operandIndex) {
+IREE::Util::ValueAccess
+AsyncConcurrentOp::getOperandAccess(unsigned operandIndex) {
   auto arg = getBody().getArgument(operandIndex);
   return computeValueAccess(arg);
 }
 
-IREE::Util::ValueAccess AsyncConcurrentOp::getResultAccess(
-    unsigned resultIndex) {
+IREE::Util::ValueAccess
+AsyncConcurrentOp::getResultAccess(unsigned resultIndex) {
   auto yieldOp = cast<YieldOp>(getBody().getBlocks().front().getTerminator());
   return computeValueAccess(yieldOp.getOperand(resultIndex));
 }
@@ -2023,7 +2051,8 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
   eraseStreamRegionResults(newBody, excludedResultIndices);
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices) eraseIndices.set(i);
+  for (auto i : excludedOperandIndices)
+    eraseIndices.set(i);
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -2110,19 +2139,19 @@ LogicalResult CmdCollectiveOp::verify() {
       IREE::Stream::ResourceAccessBitfield::None,
   };
   switch (getOp().getKind()) {
-    default:
-      requiredCount = 2;  // send & recv
-      requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Read;
-      requiredAccess[1] = IREE::Stream::ResourceAccessBitfield::Write;
-      break;
-    case IREE::Stream::CollectiveKind::Send:
-      requiredCount = 1;  // send
-      requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Read;
-      break;
-    case IREE::Stream::CollectiveKind::Recv:
-      requiredCount = 1;  // recv
-      requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Write;
-      break;
+  default:
+    requiredCount = 2; // send & recv
+    requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Read;
+    requiredAccess[1] = IREE::Stream::ResourceAccessBitfield::Write;
+    break;
+  case IREE::Stream::CollectiveKind::Send:
+    requiredCount = 1; // send
+    requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Read;
+    break;
+  case IREE::Stream::CollectiveKind::Recv:
+    requiredCount = 1; // recv
+    requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Write;
+    break;
   }
   if (resourceCount != requiredCount) {
     return op->emitOpError()
@@ -2161,8 +2190,8 @@ LogicalResult CmdDispatchOp::verify() {
   return success();
 }
 
-LogicalResult CmdDispatchOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
+LogicalResult
+CmdDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
   auto entryPointRefs = getEntryPointRefs();
   if (entryPointRefs.empty()) {
@@ -2199,13 +2228,16 @@ static ParseResult parseDispatchEntryPoints(OpAsmParser &parser,
   if (succeeded(parser.parseOptionalLBrace())) {
     do {
       SymbolRefAttr entryPointAttr;
-      if (failed(parser.parseAttribute(entryPointAttr))) return failure();
+      if (failed(parser.parseAttribute(entryPointAttr)))
+        return failure();
       entryPointAttrs.push_back(entryPointAttr);
     } while (succeeded(parser.parseOptionalComma()));
-    if (failed(parser.parseRBrace())) return failure();
+    if (failed(parser.parseRBrace()))
+      return failure();
   } else {
     SymbolRefAttr entryPointAttr;
-    if (failed(parser.parseAttribute(entryPointAttr))) return failure();
+    if (failed(parser.parseAttribute(entryPointAttr)))
+      return failure();
     entryPointAttrs.push_back(entryPointAttr);
   }
   entryPointAttrsArray = parser.getBuilder().getArrayAttr(entryPointAttrs);
@@ -2269,13 +2301,11 @@ static ParseResult parseDispatchResources(
   return success();
 }
 
-static void printDispatchResources(OpAsmPrinter &p, Operation *op,
-                                   ValueRange resources,
-                                   TypeRange resourceTypes,
-                                   ValueRange resourceSizes,
-                                   ValueRange resourceOffsets,
-                                   ValueRange resourceLengths,
-                                   ArrayAttr resourceAccesses) {
+static void
+printDispatchResources(OpAsmPrinter &p, Operation *op, ValueRange resources,
+                       TypeRange resourceTypes, ValueRange resourceSizes,
+                       ValueRange resourceOffsets, ValueRange resourceLengths,
+                       ArrayAttr resourceAccesses) {
   for (size_t i = 0; i < resources.size(); ++i) {
     auto resource = resources[i];
     auto resourceType = resourceTypes[i];
@@ -2307,18 +2337,20 @@ static void printDispatchResources(OpAsmPrinter &p, Operation *op,
     p.printOperand(resourceLength);
     p << "] : ";
     printSizeAwareType(p, op, resourceType, resourceSize);
-    if (i < resources.size() - 1) p << ",";
+    if (i < resources.size() - 1)
+      p << ",";
   }
 }
 
 // This is sloppy because the function has interleaved bindings and operands;
 // if we had our own op we could just reuse the map we have for operands.
 // static
-SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(
-    mlir::func::FuncOp funcOp) {
-  unsigned operandCount = llvm::count_if(
-      funcOp.getArgumentTypes(),
-      [](Type type) { return !llvm::isa<IREE::Stream::BindingType>(type); });
+SmallVector<unsigned>
+CmdDispatchOp::makeOperandToArgMap(mlir::func::FuncOp funcOp) {
+  unsigned operandCount =
+      llvm::count_if(funcOp.getArgumentTypes(), [](Type type) {
+        return !llvm::isa<IREE::Stream::BindingType>(type);
+      });
   SmallVector<unsigned> map(operandCount);
   unsigned operandIdx = 0;
   for (auto it : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -2332,11 +2364,12 @@ SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(
 }
 
 // static
-SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(
-    mlir::func::FuncOp funcOp) {
-  unsigned operandCount = llvm::count_if(
-      funcOp.getArgumentTypes(),
-      [](Type type) { return llvm::isa<IREE::Stream::BindingType>(type); });
+SmallVector<unsigned>
+CmdDispatchOp::makeResourceToArgMap(mlir::func::FuncOp funcOp) {
+  unsigned operandCount =
+      llvm::count_if(funcOp.getArgumentTypes(), [](Type type) {
+        return llvm::isa<IREE::Stream::BindingType>(type);
+      });
   SmallVector<unsigned> map(operandCount);
   unsigned operandIdx = 0;
   for (auto it : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -2395,7 +2428,8 @@ static ParseResult parseDispatchFunctionArgumentList(
   SmallVector<Attribute> argAttrsVec;
   do {
     OpAsmParser::UnresolvedOperand arg;
-    if (failed(parser.parseOperand(arg))) return failure();
+    if (failed(parser.parseOperand(arg)))
+      return failure();
     bool hasOffsetLength = false;
     OpAsmParser::UnresolvedOperand offsetArg;
     OpAsmParser::UnresolvedOperand lengthArg;
@@ -2433,9 +2467,10 @@ static ParseResult parseDispatchFunctionArgumentList(
   return success();
 }
 
-static ParseResult parseDispatchFunctionResultList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &resultTypes,
-    ArrayAttr &resultAttrs) {
+static ParseResult
+parseDispatchFunctionResultList(OpAsmParser &parser,
+                                SmallVectorImpl<Type> &resultTypes,
+                                ArrayAttr &resultAttrs) {
   SmallVector<Attribute> resultAttrsVec;
   SmallVector<int64_t> tiedOperandIndices;
   do {
@@ -2469,7 +2504,8 @@ static void printDispatchFunctionResultList(OpAsmPrinter &p, Operation *op,
         p.printOptionalAttrDict(attrs.getValue());
       }
     }
-    if (i < resultTypes.size() - 1) p << ", ";
+    if (i < resultTypes.size() - 1)
+      p << ", ";
   }
 }
 
@@ -2480,7 +2516,8 @@ ParseResult parseDispatchFunctionSignature(OpAsmParser &parser,
   SmallVector<OpAsmParser::UnresolvedOperand> args;
   SmallVector<Type> argTypes;
   SmallVector<Type> resultTypes;
-  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseLParen()))
+    return failure();
   if (failed(parser.parseOptionalRParen())) {
     if (failed(parseDispatchFunctionArgumentList(parser, args, argTypes,
                                                  argAttrs)) ||
@@ -2513,7 +2550,8 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto functionType = llvm::cast<FunctionType>(functionTypeAttr.getValue());
   p << "(";
   for (size_t argIndex = 0; argIndex < functionType.getNumInputs();) {
-    if (argIndex) p << ", ";
+    if (argIndex)
+      p << ", ";
     int baseArgIndex = argIndex;
     auto type = functionType.getInput(baseArgIndex);
     p << "%arg";
@@ -2521,9 +2559,9 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
     if (llvm::isa<IREE::Stream::ResourceType>(type)) {
       p << "[%arg" << (baseArgIndex + 1) << " for %arg" << (baseArgIndex + 2)
         << "]";
-      argIndex += 3;  // <resource, offset, length>
+      argIndex += 3; // <resource, offset, length>
     } else {
-      argIndex += 1;  // unmodified arg
+      argIndex += 1; // unmodified arg
     }
     p << ": ";
     p.printType(type);
@@ -2539,9 +2577,11 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto resultTypes = functionType.getResults();
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1) p << "(";
+    if (resultTypes.size() != 1)
+      p << "(";
     printDispatchFunctionResultList(p, op, resultTypes, resultAttrs);
-    if (resultTypes.size() != 1) p << ")";
+    if (resultTypes.size() != 1)
+      p << ")";
   }
 }
 
@@ -2603,9 +2643,11 @@ static ParseResult parseCmdCallOperands(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths,
     ArrayAttr &resourceAccesses) {
-  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseLParen()))
+    return failure();
   // Handle the case of no operands specially.
-  if (succeeded(parser.parseOptionalRParen())) return success();
+  if (succeeded(parser.parseOptionalRParen()))
+    return success();
   SmallVector<Attribute> accessAttrs;
   do {
     StringRef accessStr;
@@ -2644,7 +2686,8 @@ static ParseResult parseCmdCallOperands(
     }
   } while (succeeded(parser.parseOptionalComma()));
   resourceAccesses = parser.getBuilder().getArrayAttr(accessAttrs);
-  if (failed(parser.parseRParen())) return failure();
+  if (failed(parser.parseRParen()))
+    return failure();
   return success();
 }
 
@@ -2690,7 +2733,8 @@ static void printCmdCallOperands(OpAsmPrinter &p, Operation *op,
       // Primitive/custom type.
       p.printOperand(operand);
     }
-    if (i < resourceOperands.size() - 1) p << ", ";
+    if (i < resourceOperands.size() - 1)
+      p << ", ";
   }
   p << ")";
 }
@@ -2706,7 +2750,8 @@ void CmdExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addTypes(IREE::Stream::TimepointType::get(builder.getContext()));
   state.addOperands(operands);
   state.addOperands(operandSizes);
-  if (awaitTimepoint) state.addOperands(awaitTimepoint);
+  if (awaitTimepoint)
+    state.addOperands(awaitTimepoint);
   state.addAttributes(attributes);
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
@@ -2740,13 +2785,14 @@ LogicalResult CmdExecuteOp::verify() {
     return failure();
   }
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp))) return failure();
+    if (failed(verifyCmdOp(&nestedOp)))
+      return failure();
   }
   return success();
 }
 
-OperandRange CmdExecuteOp::getSuccessorEntryOperands(
-    std::optional<unsigned> index) {
+OperandRange
+CmdExecuteOp::getSuccessorEntryOperands(std::optional<unsigned> index) {
   assert(index && index.value() == 0 && "invalid region index");
   return getResourceOperands();
 }
@@ -2802,7 +2848,8 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
   newBody.takeBody(getClosureBodyRegion());
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices) eraseIndices.set(i);
+  for (auto i : excludedOperandIndices)
+    eraseIndices.set(i);
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -2814,7 +2861,8 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
 LogicalResult CmdSerialOp::verify() {
   CmdSerialOp op = *this;
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp))) return failure();
+    if (failed(verifyCmdOp(&nestedOp)))
+      return failure();
   }
   return success();
 }
@@ -2839,7 +2887,8 @@ void CmdSerialOp::getSuccessorRegions(
 LogicalResult CmdConcurrentOp::verify() {
   CmdConcurrentOp op = *this;
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp))) return failure();
+    if (failed(verifyCmdOp(&nestedOp)))
+      return failure();
   }
   return success();
 }
@@ -2884,8 +2933,8 @@ Value TimepointBarrierOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getResource());
 }
 
-::std::optional<unsigned> TimepointBarrierOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
+::std::optional<unsigned>
+TimepointBarrierOp::getTiedResultOperandIndex(unsigned resultIndex) {
   return {0};
 }
 
@@ -2917,7 +2966,7 @@ void TimepointAwaitOp::build(OpBuilder &builder, OperationState &state,
                      builder.getDenseI32ArrayAttr({
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandSizes.size()),
-                         static_cast<int32_t>(1),  // timepoint
+                         static_cast<int32_t>(1), // timepoint
                      }));
 }
 
@@ -2932,8 +2981,8 @@ LogicalResult TimepointAwaitOp::verify() {
   return success();
 }
 
-::std::optional<unsigned> TimepointAwaitOp::getTiedResultOperandIndex(
-    unsigned resultIndex) {
+::std::optional<unsigned>
+TimepointAwaitOp::getTiedResultOperandIndex(unsigned resultIndex) {
   return {resultIndex};
 }
 
@@ -3023,7 +3072,8 @@ LogicalResult ExecutableExportOp::verify() {
 ::mlir::func::FuncOp ExecutableExportOp::lookupFunctionRef() {
   auto executableOp =
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
-  if (!executableOp) return {};
+  if (!executableOp)
+    return {};
   return executableOp.getInnerModule().lookupSymbol<::mlir::func::FuncOp>(
       getFunctionRef());
 }
@@ -3047,8 +3097,8 @@ LogicalResult BindingSubspanOp::verify() {
 // stream.return
 //===----------------------------------------------------------------------===//
 
-MutableOperandRange ReturnOp::getMutableSuccessorOperands(
-    std::optional<unsigned> index) {
+MutableOperandRange
+ReturnOp::getMutableSuccessorOperands(std::optional<unsigned> index) {
   return getOperandsMutable();
 }
 
@@ -3056,19 +3106,19 @@ MutableOperandRange ReturnOp::getMutableSuccessorOperands(
 // stream.yield
 //===----------------------------------------------------------------------===//
 
-MutableOperandRange YieldOp::getMutableSuccessorOperands(
-    std::optional<unsigned> index) {
+MutableOperandRange
+YieldOp::getMutableSuccessorOperands(std::optional<unsigned> index) {
   return getResourceOperandsMutable();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Stream/IR/StreamOps.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.cpp.inc" // IWYU pragma: keep

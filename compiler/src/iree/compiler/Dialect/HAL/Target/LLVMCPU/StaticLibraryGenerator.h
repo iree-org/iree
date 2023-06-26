@@ -24,9 +24,9 @@ bool outputStaticLibrary(const std::string &library_name,
                          const std::string &library_output_path,
                          const std::string &temp_object_path);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_STATICLIBRARYGENERATOR_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_STATICLIBRARYGENERATOR_H_

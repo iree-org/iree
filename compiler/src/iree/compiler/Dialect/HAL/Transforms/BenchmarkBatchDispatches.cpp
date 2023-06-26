@@ -20,13 +20,13 @@ namespace {
 class BenchmarkBatchDispatchesPass
     : public PassWrapper<BenchmarkBatchDispatchesPass,
                          OperationPass<func::FuncOp>> {
- public:
+public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(BenchmarkBatchDispatchesPass)
 
   explicit BenchmarkBatchDispatchesPass(unsigned repeatCount)
       : repeatCount_(repeatCount) {}
 
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<func::FuncDialect, IREE::HAL::HALDialect>();
   }
 
@@ -61,14 +61,14 @@ class BenchmarkBatchDispatchesPass
     }
   }
 
- private:
+private:
   unsigned repeatCount_;
 };
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createBenchmarkBatchDispatchesPass(
-    unsigned repeatCount) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createBenchmarkBatchDispatchesPass(unsigned repeatCount) {
   return std::make_unique<BenchmarkBatchDispatchesPass>(repeatCount);
 }
 
@@ -76,7 +76,7 @@ static PassRegistration<BenchmarkBatchDispatchesPass> pass([] {
   return std::make_unique<BenchmarkBatchDispatchesPass>(2);
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -11,11 +11,11 @@ namespace IREE {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/Preprocessing/Common/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void registerCommonPreprocessingPasses() { registerPasses(); }
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -30,12 +30,12 @@ struct FuseTensorPadWithConsumerPass final
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFuseTensorPadWithConsumerPass() {
   return std::make_unique<FuseTensorPadWithConsumerPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

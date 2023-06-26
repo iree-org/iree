@@ -92,9 +92,9 @@ static Value getByteLength(OpBuilder &builder, Location loc,
 template <typename OpTy>
 struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, adaptor.getOperands());
     return success();
   }
@@ -105,9 +105,9 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
 template <typename OpTy>
 struct ElideNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return success();
   }
@@ -115,9 +115,9 @@ struct ElideNoOp final : public OpConversionPattern<OpTy> {
 
 struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      memref::GlobalOp globalOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::GlobalOp globalOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!isRankZeroOrOneMemRef(globalOp.getType())) {
       return rewriter.notifyMatchFailure(
           globalOp,
@@ -159,9 +159,9 @@ struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
 struct ConvertMemRefGetGlobalOp
     : public OpConversionPattern<memref::GetGlobalOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      memref::GetGlobalOp getOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::GetGlobalOp getOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!isRankZeroOrOneMemRef(getOp.getResult().getType())) {
       return rewriter.notifyMatchFailure(
           getOp, "only rank-0 and rank-1 memrefs are supported; flatten first");
@@ -174,9 +174,9 @@ struct ConvertMemRefGetGlobalOp
 
 struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      memref::AllocaOp allocaOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::AllocaOp allocaOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Location loc = allocaOp.getLoc();
     auto allocationSize = getByteLength(rewriter, loc, allocaOp.getMemref());
     uint64_t alignment = allocaOp.getAlignment().value_or(0);
@@ -189,9 +189,9 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
 
 struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      memref::DimOp dimOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::DimOp dimOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!isRankZeroOrOneMemRef(dimOp.getSource().getType())) {
       return rewriter.notifyMatchFailure(
           dimOp, "only rank-0 and rank-1 memrefs are supported; flatten first");
@@ -210,9 +210,9 @@ struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
 
 struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      memref::LoadOp loadOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!isRankZeroOrOneMemRef(loadOp.getMemref().getType())) {
       return rewriter.notifyMatchFailure(
           loadOp,
@@ -248,9 +248,9 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
 
 struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      memref::StoreOp storeOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!isRankZeroOrOneMemRef(storeOp.getMemref().getType())) {
       return rewriter.notifyMatchFailure(
           storeOp,
@@ -289,15 +289,15 @@ struct ConvertMemRefReinterpretCastOp
     : public OpConversionPattern<memref::ReinterpretCastOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      memref::ReinterpretCastOp castOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(memref::ReinterpretCastOp castOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(castOp, adaptor.getSource());
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateMemRefToUtilPatterns(MLIRContext *context,
                                   ConversionTarget &conversionTarget,
@@ -329,5 +329,5 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
           typeConverter, context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

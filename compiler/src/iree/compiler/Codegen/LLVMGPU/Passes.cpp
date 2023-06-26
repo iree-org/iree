@@ -37,9 +37,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<unsigned> logSwizzleTile(
-    "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
-    llvm::cl::init(0));
+static llvm::cl::opt<unsigned>
+    logSwizzleTile("iree-codegen-log-swizzle-tile",
+                   llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
 
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
@@ -68,7 +68,8 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
+  if (needsBarrier)
+    builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
@@ -91,8 +92,9 @@ static void addBufferizePasses(OpPassManager &passManager) {
       createEraseHALDescriptorTypeFromMemRefPass());
 }
 
-static void tileAndDistributeToWorkgroup(
-    OpPassManager &pm, bool useWARForCooperativeMatrixCodegen = false) {
+static void
+tileAndDistributeToWorkgroup(OpPassManager &pm,
+                             bool useWARForCooperativeMatrixCodegen = false) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass(
       /*maxWorkgroupParallelDims=*/1,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
@@ -535,7 +537,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
   // Cast address spaces of all function arguments to generic
-  if (!useROCM) pm.addPass(createLLVMGPUCastAddressSpaceFunction());
+  if (!useROCM)
+    pm.addPass(createLLVMGPUCastAddressSpaceFunction());
   if (useROCM) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());
@@ -588,5 +591,5 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

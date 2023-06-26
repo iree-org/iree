@@ -243,7 +243,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   return targetOptions;
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

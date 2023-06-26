@@ -85,5 +85,5 @@ HALTypeConverter::HALTypeConverter(
   });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

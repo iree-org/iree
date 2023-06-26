@@ -27,7 +27,7 @@ struct AbstractReductionStrategy {
   SmallVector<int64_t> workgroupTileSizes;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_ABSTRACT_REDUCTION_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_ABSTRACT_REDUCTION_STRATEGY_H_

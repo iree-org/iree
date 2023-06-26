@@ -250,9 +250,9 @@ struct MMTKernel {
   const char *asmClobbers = nullptr;
 
   void validate() const {
-    assert(m0 * k0 == lhsRegSize * lhsRegs);  // number of elements of LHS
-    assert(n0 * k0 == rhsRegSize * rhsRegs);  // number of elements of RHS
-    assert(m0 * n0 == accRegSize * accRegs);  // number of elements of Accum
+    assert(m0 * k0 == lhsRegSize * lhsRegs); // number of elements of LHS
+    assert(n0 * k0 == rhsRegSize * rhsRegs); // number of elements of RHS
+    assert(m0 * n0 == accRegSize * accRegs); // number of elements of Accum
     assert(lhsType != ScalarType::None);
     assert(rhsType != ScalarType::None);
     assert(accType != ScalarType::None);
@@ -292,15 +292,15 @@ MMTKernel MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm() {
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
-  kernel.m0 = 8;  // shape: 8x1x8, outer-product.
-  kernel.k0 = 1;  // note: we would have enough registers to widen to 12x1x8
-  kernel.n0 = 8;  // if needed.
-  kernel.lhsRegSize = 8;  // LHS NEON register type: int8x8
-  kernel.rhsRegSize = 8;  // RHS NEON register type: int8x8
-  kernel.accRegSize = 4;  // Accum NEON register type: int32x4
+  kernel.m0 = 8; // shape: 8x1x8, outer-product.
+  kernel.k0 = 1; // note: we would have enough registers to widen to 12x1x8
+  kernel.n0 = 8; // if needed.
+  kernel.lhsRegSize = 8; // LHS NEON register type: int8x8
+  kernel.rhsRegSize = 8; // RHS NEON register type: int8x8
+  kernel.accRegSize = 4; // Accum NEON register type: int32x4
   kernel.lhsRegs = 1;
   kernel.rhsRegs = 1;
-  kernel.accRegs = 16;  // = 8*8/4 for 8x8 accumulators, 4 per register
+  kernel.accRegs = 16; // = 8*8/4 for 8x8 accumulators, 4 per register
   kernel.asmImpl = R"ASM(
       // NEON does not have instructions to multiply int8 values and accumulate
       // into int32. This kernel sign-extends int8 to int16, then uses
@@ -337,15 +337,15 @@ MMTKernel MMTKernel_8x8x1_i8i8i32_Aarch64_Baseline_InlineAsm() {
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
-  kernel.m0 = 8;  // shape: 8x8x1, matrix*vector
+  kernel.m0 = 8; // shape: 8x8x1, matrix*vector
   kernel.k0 = 8;
   kernel.n0 = 1;
-  kernel.lhsRegSize = 16;  // LHS NEON register type: int8x16
-  kernel.rhsRegSize = 8;   // RHS NEON register type: int8x8
-  kernel.accRegSize = 4;   // Accum NEON register type: int32x4
-  kernel.lhsRegs = 4;      // = 8x8/16 for 8x8 LHS elems, 16 per register
+  kernel.lhsRegSize = 16; // LHS NEON register type: int8x16
+  kernel.rhsRegSize = 8;  // RHS NEON register type: int8x8
+  kernel.accRegSize = 4;  // Accum NEON register type: int32x4
+  kernel.lhsRegs = 4;     // = 8x8/16 for 8x8 LHS elems, 16 per register
   kernel.rhsRegs = 1;
-  kernel.accRegs = 2;  // = 8/4 for 8 accumulators, 4 per register
+  kernel.accRegs = 2; // = 8/4 for 8 accumulators, 4 per register
   kernel.asmImpl = R"ASM(
     // This kernel multiplies int8 values into temporary int16 values in
     // registers v8--v15, then performs additions. We can't use
@@ -407,15 +407,15 @@ MMTKernel MMTKernel_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm() {
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
-  kernel.m0 = 8;  // shape: 8x4x8. We would have enough registers to widen this
-  kernel.k0 = 4;  // to 12x4x8 if needed.
+  kernel.m0 = 8; // shape: 8x4x8. We would have enough registers to widen this
+  kernel.k0 = 4; // to 12x4x8 if needed.
   kernel.n0 = 8;
-  kernel.lhsRegSize = 16;  // LHS NEON register type: int8x16
-  kernel.rhsRegSize = 16;  // RHS NEON register type: int8x16
-  kernel.accRegSize = 4;   // Accum NEON register type: int32x4
-  kernel.lhsRegs = 2;      // = 8x4/16 for 8x4 LHS elems, 16 per register
-  kernel.rhsRegs = 2;      // = 8x4/16 for 8x4 RHS elems, 16 per register
-  kernel.accRegs = 16;     // = 8x8/4 for 8x8 Accum elems, 4 per register
+  kernel.lhsRegSize = 16; // LHS NEON register type: int8x16
+  kernel.rhsRegSize = 16; // RHS NEON register type: int8x16
+  kernel.accRegSize = 4;  // Accum NEON register type: int32x4
+  kernel.lhsRegs = 2;     // = 8x4/16 for 8x4 LHS elems, 16 per register
+  kernel.rhsRegs = 2;     // = 8x4/16 for 8x4 RHS elems, 16 per register
+  kernel.accRegs = 16;    // = 8x8/4 for 8x8 Accum elems, 4 per register
   kernel.asmImpl = R"ASM(
       // Note on the operands ordering: RHS before LHS, because we want
       // to multiply a 4x4 tile from RHS against a row-vector from LHS to
@@ -450,19 +450,19 @@ MMTKernel MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm() {
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
-  kernel.m0 = 8;  // shape: 8x4x1.
+  kernel.m0 = 8; // shape: 8x4x1.
   kernel.k0 = 4;
   kernel.n0 = 1;
-  kernel.lhsRegSize = 16;  // LHS NEON register type: int8x16
-  kernel.rhsRegSize = 4;   // RHS NEON register type: int8x4. This is very small
-                           // and forces sub-optimal codegen. This needs to be
-                           // widened by peeling the surrounding loop, not by
-                           // increasing the k0 of this MMT, which would change
-                           // the data layout in an unwanted way.
-  kernel.accRegSize = 4;   // LHS NEON register type: int8x16
-  kernel.lhsRegs = 2;      // = 8x4/16 for 8x4 LHS elems, 16 per register
-  kernel.rhsRegs = 1;      // = 4/4 for 4 LHS elems, 4 per register
-  kernel.accRegs = 2;      // = 8/4 for 8 Accum elems, 4 per register
+  kernel.lhsRegSize = 16; // LHS NEON register type: int8x16
+  kernel.rhsRegSize = 4;  // RHS NEON register type: int8x4. This is very small
+                          // and forces sub-optimal codegen. This needs to be
+                          // widened by peeling the surrounding loop, not by
+                          // increasing the k0 of this MMT, which would change
+                          // the data layout in an unwanted way.
+  kernel.accRegSize = 4;  // LHS NEON register type: int8x16
+  kernel.lhsRegs = 2;     // = 8x4/16 for 8x4 LHS elems, 16 per register
+  kernel.rhsRegs = 1;     // = 4/4 for 4 LHS elems, 4 per register
+  kernel.accRegs = 2;     // = 8/4 for 8 Accum elems, 4 per register
   kernel.asmImpl = R"ASM(
       sdot $(acc:0).4s, $(lhs:0).16b, $(rhs:0).4b[0]
       sdot $(acc:1).4s, $(lhs:1).16b, $(rhs:0).4b[0]
@@ -479,15 +479,15 @@ MMTKernel MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm() {
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
-  kernel.m0 = 8;  // shape: 8x8x8. We would have enough registers to widen this
-  kernel.k0 = 8;  // to 12x8x8 if needed.
+  kernel.m0 = 8; // shape: 8x8x8. We would have enough registers to widen this
+  kernel.k0 = 8; // to 12x8x8 if needed.
   kernel.n0 = 8;
-  kernel.lhsRegSize = 16;  // LHS NEON register type: int8x16
-  kernel.rhsRegSize = 16;  // RHS NEON register type: int8x16
-  kernel.accRegSize = 4;   // Accum NEON register type: int32x4
-  kernel.lhsRegs = 4;      // = 8x8/16 for 8x4 LHS elems, 16 per register
-  kernel.rhsRegs = 4;      // = 8x8/16 for 8x4 RHS elems, 16 per register
-  kernel.accRegs = 16;     // = 8x8/4 for 8x8 Accum elems, 4 per register
+  kernel.lhsRegSize = 16; // LHS NEON register type: int8x16
+  kernel.rhsRegSize = 16; // RHS NEON register type: int8x16
+  kernel.accRegSize = 4;  // Accum NEON register type: int32x4
+  kernel.lhsRegs = 4;     // = 8x8/16 for 8x4 LHS elems, 16 per register
+  kernel.rhsRegs = 4;     // = 8x8/16 for 8x4 RHS elems, 16 per register
+  kernel.accRegs = 16;    // = 8x8/4 for 8x8 Accum elems, 4 per register
   kernel.asmImpl = R"ASM(
       // What's with the horrendous shuffles (zip, uzp instructions) ?
       // The smmla instruction works with a 2x2 accumulator tile.
@@ -677,14 +677,14 @@ MMTKernel MMTKernel_8x1x1_f32f32f32_Aarch64_Baseline_InlineAsm() {
 // Constructs the mlir::Type corresponding to a scalar type.
 Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
   switch (t) {
-    case MMTKernel::ScalarType::None:
-      break;
-    case MMTKernel::ScalarType::I8:
-      return IntegerType::get(context, 8, IntegerType::Signless);
-    case MMTKernel::ScalarType::I32:
-      return IntegerType::get(context, 32, IntegerType::Signless);
-    case MMTKernel::ScalarType::F32:
-      return FloatType::getF32(context);
+  case MMTKernel::ScalarType::None:
+    break;
+  case MMTKernel::ScalarType::I8:
+    return IntegerType::get(context, 8, IntegerType::Signless);
+  case MMTKernel::ScalarType::I32:
+    return IntegerType::get(context, 32, IntegerType::Signless);
+  case MMTKernel::ScalarType::F32:
+    return FloatType::getF32(context);
   }
   assert(false);
   return Type();
@@ -693,7 +693,7 @@ Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
 // This class is a helper for patterns generating custom kernels based on
 // MMTKernel structs.
 class MMTKernelGenerator {
- public:
+public:
   MMTKernelGenerator(MLIRContext *context, MMTKernel kernel,
                      IREE::HAL::ExecutableTargetAttr target)
       : context(context), kernel(kernel), target(target) {
@@ -732,7 +732,7 @@ class MMTKernelGenerator {
     return VectorType::get({kernel.accRegSize}, getAccType());
   }
 
- private:
+private:
   MLIRContext *const context;
   const MMTKernel kernel;
   const IREE::HAL::ExecutableTargetAttr target;
@@ -764,7 +764,7 @@ class MMTKernelGenerator {
   }
   // Helper class to build the constraints string of an inline_asm op.
   class Constraints {
-   private:
+  private:
     // The LLVM inline asm syntax is documented here:
     // https://llvm.org/docs/LangRef.html#inline-assembler-expressions
     SmallVector<std::string> inputs;
@@ -772,20 +772,20 @@ class MMTKernelGenerator {
     SmallVector<std::string> tiedInputs;
     SmallVector<std::string> clobbers;
 
-   public:
+  public:
     enum class Kind { Input, InputOutput };
     // Add a new constraint.
     void add(Kind kind, const std::string &constraintCode) {
       switch (kind) {
-        case Kind::Input:
-          inputs.push_back(constraintCode);
-          return;
-        case Kind::InputOutput:
-          // An input represented by a number `i` is a tied input, tied to the
-          // i-th output.
-          tiedInputs.push_back(llvm::itostr(outputs.size()));
-          outputs.push_back(std::string("=") + constraintCode);
-          return;
+      case Kind::Input:
+        inputs.push_back(constraintCode);
+        return;
+      case Kind::InputOutput:
+        // An input represented by a number `i` is a tied input, tied to the
+        // i-th output.
+        tiedInputs.push_back(llvm::itostr(outputs.size()));
+        outputs.push_back(std::string("=") + constraintCode);
+        return;
       }
       assert(false);
     }
@@ -902,10 +902,10 @@ class MMTKernelGenerator {
 ///                 [...]
 ///
 class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
- private:
+private:
   MMTKernel kernel;
 
- public:
+public:
   MMTCustomKernelPattern(MLIRContext *context, MMTKernel kernel)
       : OpRewritePattern<vector::ContractionOp>(context), kernel(kernel) {}
 
@@ -1018,7 +1018,7 @@ class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
 /// It matches the same patterns as MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
 struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     : public OpRewritePattern<vector::ContractionOp> {
- public:
+public:
   using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
@@ -1040,7 +1040,8 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     Value inLhs = getUnpromotedInput(I8Type, I32Type, lhs);
     Value inRhs = getUnpromotedInput(I8Type, I32Type, rhs);
 
-    if (!inLhs || !inRhs) return failure();
+    if (!inLhs || !inRhs)
+      return failure();
 
     auto loc = contractionOp.getLoc();
 
@@ -1117,7 +1118,7 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
 
 class VectorContractCustomKernelsPass
     : public VectorContractCustomKernelsBase<VectorContractCustomKernelsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect,
                     arm_neon::ArmNeonDialect>();
@@ -1133,11 +1134,11 @@ class VectorContractCustomKernelsPass
     }
   }
 
- private:
+private:
   IREE::HAL::ExecutableTargetAttr target;
 };
 
-}  // namespace
+} // namespace
 
 void populateVectorContractCustomKernelsPatterns(
     IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns) {
@@ -1178,5 +1179,5 @@ createVectorContractCustomKernelsPass() {
   return std::make_unique<VectorContractCustomKernelsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

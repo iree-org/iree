@@ -24,7 +24,7 @@ namespace VMVX {
 namespace {
 
 class VMVXToVMConversionInterface : public VMConversionDialectInterface {
- public:
+public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
   OwningOpRef<mlir::ModuleOp> parseVMImportModule() const override {
@@ -34,17 +34,18 @@ class VMVXToVMConversionInterface : public VMConversionDialectInterface {
         getDialect()->getContext());
   }
 
-  void populateVMConversionPatterns(
-      SymbolTable &importSymbols, RewritePatternSet &patterns,
-      ConversionTarget &conversionTarget,
-      TypeConverter &typeConverter) const override {
+  void
+  populateVMConversionPatterns(SymbolTable &importSymbols,
+                               RewritePatternSet &patterns,
+                               ConversionTarget &conversionTarget,
+                               TypeConverter &typeConverter) const override {
     conversionTarget.addIllegalDialect<IREE::VMVX::VMVXDialect>();
     populateVMVXToVMPatterns(getDialect()->getContext(), conversionTarget,
                              typeConverter, importSymbols, patterns);
   }
 };
 
-}  // namespace
+} // namespace
 
 VMVXDialect::VMVXDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VMVXDialect>()) {
@@ -56,7 +57,7 @@ VMVXDialect::VMVXDialect(MLIRContext *context)
       >();
 }
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

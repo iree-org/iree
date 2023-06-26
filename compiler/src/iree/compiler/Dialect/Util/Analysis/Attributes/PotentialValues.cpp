@@ -76,7 +76,7 @@ const std::string ConstantAttributePVS::getAsStr(AsmState &asmState) const {
   return str;
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

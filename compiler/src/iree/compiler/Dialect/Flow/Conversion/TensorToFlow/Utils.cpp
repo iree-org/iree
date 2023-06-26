@@ -18,8 +18,8 @@ namespace IREE {
 namespace Flow {
 
 /// Gets the list of non-static values from a list of `OpFoldResult`.
-static SmallVector<Value> getDynamicValues(
-    ArrayRef<OpFoldResult> valueOrAttrList) {
+static SmallVector<Value>
+getDynamicValues(ArrayRef<OpFoldResult> valueOrAttrList) {
   SmallVector<Value> dynamicDims;
   for (auto valueOrAttr : valueOrAttrList) {
     if (auto value = valueOrAttr.dyn_cast<Value>()) {
@@ -30,8 +30,8 @@ static SmallVector<Value> getDynamicValues(
 }
 
 /// Get shape of the tensor given the sizes as a list of `OpFoldResult`.
-static SmallVector<int64_t> getShapeFromSizes(
-    ArrayRef<OpFoldResult> valueOrAttrList) {
+static SmallVector<int64_t>
+getShapeFromSizes(ArrayRef<OpFoldResult> valueOrAttrList) {
   return llvm::map_to_vector(
       valueOrAttrList, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
@@ -68,17 +68,21 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamic);
     int64_t staticStride = getVal(strides[dim - 1], ShapedType::kDynamic);
 
-    if (staticStride != 1) return false;
+    if (staticStride != 1)
+      return false;
     // The offsets and sizes dont have to be static for all dimensions. When
     // `fullSlices` is true, the offset and sizes can be dynamic. But many
     // cases, the dynamic offset/size value is obtained by computing from
     // another tensor which lives on the device. To avoid host-round tripping
     // enforce that offset/size is also static.
-    if (staticSize == ShapedType::kDynamic) return false;
-    if (staticOffset == ShapedType::kDynamic) return false;
+    if (staticSize == ShapedType::kDynamic)
+      return false;
+    if (staticOffset == ShapedType::kDynamic)
+      return false;
 
     if (fullSlices == false) {
-      if (staticSize != 1) return false;
+      if (staticSize != 1)
+        return false;
     } else {
       if (!(staticOffset == 0 && staticSize != ShapedType::kDynamic &&
             baseShape[dim - 1] != ShapedType::kDynamic &&
@@ -90,8 +94,9 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
   return true;
 }
 
-LogicalResult convertInsertSliceOpToFlowUpdateOp(
-    RewriterBase &rewriter, tensor::InsertSliceOp insertOp) {
+LogicalResult
+convertInsertSliceOpToFlowUpdateOp(RewriterBase &rewriter,
+                                   tensor::InsertSliceOp insertOp) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(insertOp);
 
@@ -133,8 +138,9 @@ LogicalResult convertInsertSliceOpToFlowUpdateOp(
   return success();
 }
 
-LogicalResult convertExtractSliceOpToFlowSliceOp(
-    RewriterBase &rewriter, tensor::ExtractSliceOp sliceOp) {
+LogicalResult
+convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
+                                   tensor::ExtractSliceOp sliceOp) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(sliceOp);
 
@@ -180,7 +186,7 @@ LogicalResult convertExtractSliceOpToFlowSliceOp(
   return success();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

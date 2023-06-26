@@ -13,8 +13,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-SetVector<IREE::HAL::ExecutableTargetAttr> gatherExecutableTargets(
-    ArrayRef<IREE::HAL::ExecutableOp> executableOps) {
+SetVector<IREE::HAL::ExecutableTargetAttr>
+gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps) {
   SetVector<IREE::HAL::ExecutableTargetAttr> result;
   for (auto executableOp : executableOps) {
     auto variantOps =
@@ -28,10 +28,10 @@ SetVector<IREE::HAL::ExecutableTargetAttr> gatherExecutableTargets(
 
 // Renames |op| within |moduleOp| with a new name that is unique within both
 // |moduleOp| and |optionalSymbolTable| (if one is provided).
-static void renameWithDisambiguatedName(
-    Operation *op, Operation *moduleOp,
-    DenseMap<StringRef, Operation *> &targetSymbolMap,
-    SymbolTable *optionalSymbolTable) {
+static void
+renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
+                            DenseMap<StringRef, Operation *> &targetSymbolMap,
+                            SymbolTable *optionalSymbolTable) {
   StringRef originalName = SymbolTable::getSymbolName(op).getValue();
 
   // Iteratively try suffixes until we find one that isn't used.
@@ -63,9 +63,9 @@ static void renameWithDisambiguatedName(
 //
 // Fails if a public symbol in |sourceModuleOp| conflicts with another public
 // symbol tracked in |targetSymbolMap|.
-static LogicalResult mergeModuleInto(
-    Operation *sourceModuleOp, Operation *targetModuleOp,
-    DenseMap<StringRef, Operation *> &targetSymbolMap) {
+static LogicalResult
+mergeModuleInto(Operation *sourceModuleOp, Operation *targetModuleOp,
+                DenseMap<StringRef, Operation *> &targetSymbolMap) {
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
   auto &targetBlock = targetModuleOp->getRegion(0).front();
   SymbolTable sourceSymbolTable(sourceModuleOp);
@@ -73,7 +73,8 @@ static LogicalResult mergeModuleInto(
       llvm::map_to_vector<8>(sourceBlock, [&](Operation &op) { return &op; });
 
   for (auto &sourceOp : allOps) {
-    if (sourceOp->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (sourceOp->hasTrait<OpTrait::IsTerminator>())
+      continue;
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(sourceOp)) {
       auto symbolName = symbolOp.getName();
 
@@ -146,16 +147,19 @@ struct SymbolReplacements {
 // `@new_executable::@old_export` and an export update would then not match the
 // new/old mismatched ref. This means we have to do three walks over the entire
 // module in order to do the replacements; not great.
-static void replaceEntryPointUses(
-    mlir::ModuleOp moduleOp, const SymbolReplacements &symbolReplacements) {
+static void
+replaceEntryPointUses(mlir::ModuleOp moduleOp,
+                      const SymbolReplacements &symbolReplacements) {
   auto replaceSymbolRefs = [](Operation *rootOp,
                               const DenseMap<Attribute, Attribute> &map) {
     auto allUses = SymbolTable::getSymbolUses(rootOp);
-    if (!allUses) return;
+    if (!allUses)
+      return;
     for (auto use : *allUses) {
       auto oldAttr = use.getSymbolRef();
       auto newAttr = map.lookup(oldAttr);
-      if (!newAttr) continue;
+      if (!newAttr)
+        continue;
       auto newDict = use.getUser()->getAttrDictionary().replace(
           [&](Attribute attr) -> std::pair<Attribute, WalkResult> {
             if (attr == oldAttr) {
@@ -212,7 +216,8 @@ LogicalResult linkExecutablesInto(
       // TODO(benvanik): allow for grouping when multi-versioning is supported?
       // We could, for example, link all aarch64 variants together and then
       // use function multi-versioning to let LLVM insert runtime switches.
-      if (variantOp.getTarget() != linkedTargetOp.getTarget()) continue;
+      if (variantOp.getTarget() != linkedTargetOp.getTarget())
+        continue;
 
       // Add any required object files to the set we will link in the target.
       if (auto objectsAttr = variantOp.getObjectsAttr()) {
@@ -293,5 +298,5 @@ LogicalResult linkExecutablesInto(
   return success();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

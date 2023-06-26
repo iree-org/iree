@@ -16,7 +16,7 @@ namespace mlir {
 namespace iree_compiler {
 
 struct VMAnalysis {
- public:
+public:
   VMAnalysis() = default;
   VMAnalysis(IREE::VM::FuncOp &funcOp) {
     Operation *op = funcOp.getOperation();
@@ -70,7 +70,7 @@ struct VMAnalysis {
 
   DenseMap<int64_t, Operation *> &localRefs() { return refs; }
 
- private:
+private:
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
   DenseMap<int64_t, Operation *> refs;
@@ -79,7 +79,7 @@ struct VMAnalysis {
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_VMANALYSIS_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_VMANALYSIS_H_

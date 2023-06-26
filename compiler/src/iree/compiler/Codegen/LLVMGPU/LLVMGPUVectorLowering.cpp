@@ -62,11 +62,11 @@ struct LLVMGPUVectorLoweringPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass() {
   return std::make_unique<LLVMGPUVectorLoweringPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

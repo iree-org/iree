@@ -41,7 +41,7 @@
 
 using namespace mlir;
 
-#define DEBUG_TYPE "iree-transform-strategy-builder"
+#define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(llvm::dbgs() << '[' << DEBUG_TYPE << "] " << X)
 
@@ -53,6 +53,11 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectAlignedMatmul(
     "iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul",
     llvm::cl::desc(
         "activate the matmul tensorcore strategy for tile aligned shapes"),
+    llvm::cl::init(false));
+llvm::cl::opt<bool> clGPUEnableTransformDialectSmallMatmul(
+    "iree-codegen-llvmgpu-enable-transform-dialect-small-matmul",
+    llvm::cl::desc("activate the matmul tensorcore strategy for small shapes "
+                   "(< 16) in at least a dimension"),
     llvm::cl::init(false));
 llvm::cl::opt<bool> clGPUEnableTransformDialectPadStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
@@ -121,9 +126,9 @@ static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
 // TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
 // also work properly in the dynamic case.
 // TODO: Support more HW configs and make it more pluggable.
-static ReductionConfig getReductionConfig(
-    const transform_ext::MatchedReductionCaptures &captures,
-    const GPUModel &gpuModel) {
+static ReductionConfig
+getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
+                   const GPUModel &gpuModel) {
   auto maybeHardcodedConfiguration =
       applyKnownGoodReductionConfigurations(captures, gpuModel);
   if (succeeded(maybeHardcodedConfiguration))
@@ -251,12 +256,14 @@ static FailureOr<MatmulStrategy> applyKnownGoodMatmulConfigurations(
   return failure();
 }
 
-static int64_t selectLargestFailsafeValueIfNeeded(
-    int64_t value, int64_t limit, ArrayRef<int64_t> thresholds,
-    ArrayRef<int64_t> failSafeValues) {
+static int64_t
+selectLargestFailsafeValueIfNeeded(int64_t value, int64_t limit,
+                                   ArrayRef<int64_t> thresholds,
+                                   ArrayRef<int64_t> failSafeValues) {
   for (auto [threshold, failSafeValue] :
        llvm::zip(thresholds, failSafeValues)) {
-    if (limit < threshold && value > failSafeValue) return failSafeValue;
+    if (limit < threshold && value > failSafeValue)
+      return failSafeValue;
   }
   return value;
 }
@@ -265,16 +272,35 @@ static void failSafeOverrides(MatmulStrategy &strategy,
                               const GPUModel &gpuModel) {
   // Failsafe for blockTileM to avoid tiling by > size (i.e. no tiling).
   int64_t blockTileM = selectLargestFailsafeValueIfNeeded(
-      strategy.blockTileM(), strategy.m(), {16, 32, 64, 128}, {1, 16, 32, 64});
+      /*value=*/strategy.blockTileM(),
+      /*limit=*/strategy.m(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
   // Failsafe for blockTileN to avoid tiling by > size (i.e. no tiling).
   int64_t blockTileN = selectLargestFailsafeValueIfNeeded(
-      strategy.blockTileN(), strategy.n(), {16, 32, 64, 128}, {1, 16, 32, 64});
+      /*value=*/strategy.blockTileN(),
+      /*limit=*/strategy.n(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
   // Failsafe for reductionSize to avoid tiling by > size (i.e. no tiling).
   int64_t reductionTileSize = selectLargestFailsafeValueIfNeeded(
-      strategy.reductionTileSize, strategy.k(), {8, 16, 24, 32, 40, 48, 56, 64},
-      {1, 8, 16, 24, 32, 40, 48, 56});
+      /*value=*/strategy.reductionTileSize,
+      /*limit=*/strategy.k(),
+      /*thresholds=*/{2, 4, 8, 16, 24, 32, 40, 48, 56, 64},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 24, 32, 40, 48, 56});
+
+  // If some dimension is small, use fmas.
+  // TODO: more parallelism by locally splitting the K-loop and reducing in the
+  // fma case.
+  if (blockTileM < 16 || blockTileN < 16 || reductionTileSize < 16) {
+    strategy.useMmaSync = false;
+    strategy.useWmma = false;
+    strategy.useFma = true;
+  }
+
   strategy.blockTileSizes = {blockTileM, blockTileN};
   strategy.reductionTileSize = reductionTileSize;
+
   // Avoid too deep pipelines. This should also look at shared memory usage in
   // the future.
   if (strategy.pipelineDepth * strategy.reductionTileSize > strategy.k()) {
@@ -285,11 +311,13 @@ static void failSafeOverrides(MatmulStrategy &strategy,
 
 /// The configurations below have been determined empirically.
 // TODO: Significantly improve these heuristics.
-static MatmulStrategy getMatmulConfig(
-    MLIRContext *context, const transform_ext::MatchedMatmulCaptures &captures,
-    const GPUModel &gpuModel) {
+static MatmulStrategy
+getMatmulConfig(MLIRContext *context,
+                const transform_ext::MatchedMatmulCaptures &captures,
+                const GPUModel &gpuModel) {
   MatmulStrategy strategy(context, captures);
-  if (strategy.cliOptionsSpecified) return strategy;
+  if (strategy.cliOptionsSpecified)
+    return strategy;
 
   auto maybeHardcodedConfiguration =
       applyKnownGoodMatmulConfigurations(captures, gpuModel);
@@ -311,6 +339,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     LDBG("--Matmul strategy flag turned off\n");
     return failure();
   }
+
   if (!gpuModel.hasTF32TensorCore) {
     LDBG("--Matmul strategy no TF32 tensor core\n");
     return failure();
@@ -341,16 +370,24 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
-  if (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
-      !captures.outputElementType.isF32()) {
-    LDBG("--Matmul strategy elemental type check failed\n");
-    return failure();
-  }
-
   // TODO: Generalize to a good mix of sizes, alignments and element types.
   const auto &matmulSize = captures.matmulOpSizes;
   if (matmulSize.size() != 3) {
     LDBG("--Matmul strategy size capture failed\n");
+    return failure();
+  }
+
+  // Currently the unaligned transform strategy does not properly handle
+  // degenerate dimensions that should have been rank-reduced (e.g. `1`).
+  // Also, it is unprofitable to force small matmuls through a high latency
+  // tensorcore path, we are better off with a simple simt strategy.
+  // TODO: profitability details can be ironed out in the future when we have a
+  // heuristic to better select strategy parameters.
+  bool smallCases = (matmulSize[0] > 0 && matmulSize[0] < 16) ||
+                    (matmulSize[1] > 0 && matmulSize[1] < 16) ||
+                    (matmulSize[2] > 0 && matmulSize[2] < 16);
+  if (smallCases && !clGPUEnableTransformDialectSmallMatmul) {
+    LDBG("--Matmul strategy small size check failed\n");
     return failure();
   }
 
@@ -363,30 +400,25 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   bool guardedAlignedCases = matmulSize[0] % 64 == 0 ||
                              matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
 
-  if (guardedAlignedCases && !clGPUEnableTransformDialectAlignedMatmul) {
+  if (!smallCases && guardedAlignedCases &&
+      !clGPUEnableTransformDialectAlignedMatmul) {
     LDBG("--Matmul strategy alignment check failed\n");
     return failure();
   }
 
-  // Currently the unaligned transform strategy does not properly handle
-  // degenerate dimensions that should have been rank-reduced (e.g. `1`).
-  // Also, it is unprofitable to force small matmuls through a high latency
-  // tensorcore path, we are better off with a simple simt strategy.
-  // TODO: profitability details can be ironed out in the future when we have a
-  // heuristic to better select strategy parameters.
-  bool unsupportedSmallCases = (matmulSize[0] > 0 && matmulSize[0] < 16) ||
-                               (matmulSize[1] > 0 && matmulSize[1] < 16) ||
-                               (matmulSize[2] > 0 && matmulSize[2] < 16);
-  if (unsupportedSmallCases) {
-    LDBG("--Matmul strategy small size check failed\n");
+  iree_compiler::gpu::MatmulStrategy strategy =
+      getMatmulConfig(op->getContext(), captures, gpuModel);
+  LLVM_DEBUG(strategy.dump());
+
+  // Validate the strategy configuration against the compilation target.
+  if (failed(strategy.validate(gpuModel))) {
+    LDBG("--Matmul strategy failed to validate\n");
     return failure();
   }
 
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    iree_compiler::gpu::MatmulStrategy strategy =
-        getMatmulConfig(op->getContext(), captures, gpuModel);
     return buildMatmulTensorCoreStrategy(b, variant, strategy);
   };
 

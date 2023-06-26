@@ -11,51 +11,47 @@ import tensorflow.compat.v2 as tf
 
 
 class ControlFlowModule(tf.Module):
+    def __init__(self):
+        pass
 
-  def __init__(self):
-    pass
-
-  @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
-  def collatz(self, a):
-    i = 0.
-    while a > 1.:
-      i = i + 1.
-      if (a % 2.) > 0.:
-        a = 3. * a + 1.
-      else:
-        a = a / 2.
-    return i
+    @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
+    def collatz(self, a):
+        i = 0.0
+        while a > 1.0:
+            i = i + 1.0
+            if (a % 2.0) > 0.0:
+                a = 3.0 * a + 1.0
+            else:
+                a = a / 2.0
+        return i
 
 
 class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._modules = tf_test_utils.compile_tf_module(ControlFlowModule)
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(ControlFlowModule)
+    def test_short_sequence(self):
+        def short_sequence(module):
+            input_array = np.array(9.0, dtype=np.float32)
+            module.collatz(input_array)
 
-  def test_short_sequence(self):
+        self.compare_backends(short_sequence, self._modules)
 
-    def short_sequence(module):
-      input_array = np.array(9., dtype=np.float32)
-      module.collatz(input_array)
+    def test_long_sequence(self):
+        def long_sequence(module):
+            input_array = np.array(178.0, dtype=np.float32)
+            module.collatz(input_array)
 
-    self.compare_backends(short_sequence, self._modules)
-
-  def test_long_sequence(self):
-
-    def long_sequence(module):
-      input_array = np.array(178., dtype=np.float32)
-      module.collatz(input_array)
-
-    self.compare_backends(long_sequence, self._modules)
+        self.compare_backends(long_sequence, self._modules)
 
 
 def main(argv):
-  del argv  # Unused
-  if hasattr(tf, 'enable_v2_behavior'):
-    tf.enable_v2_behavior()
-  tf.test.main()
+    del argv  # Unused
+    if hasattr(tf, "enable_v2_behavior"):
+        tf.enable_v2_behavior()
+    tf.test.main()
 
 
-if __name__ == '__main__':
-  app.run(main)
+if __name__ == "__main__":
+    app.run(main)

@@ -22,7 +22,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.cpp.inc" // IWYU pragma: keep
 
 // Fallback asm printer for ops that do not define their own. See op-specific
 // printers in the op implementations.
@@ -141,7 +141,7 @@ struct VMFolderInterface : public DialectFoldInterface {
   }
 };
 
-}  // namespace
+} // namespace
 
 VMDialect::VMDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()),
@@ -152,7 +152,7 @@ VMDialect::VMDialect(MLIRContext *context)
 
 #define GET_OP_LIST
   addOperations<
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc" // IWYU pragma: keep
       >();
 }
 
@@ -262,7 +262,8 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
 Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                           Type type, Location loc) {
   auto typedValue = dyn_cast<TypedAttr>(value);
-  if (!typedValue) return nullptr;
+  if (!typedValue)
+    return nullptr;
 
   if (ConstI32Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstI32Op::convertConstValue(typedValue);
@@ -298,7 +299,7 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
   return nullptr;
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

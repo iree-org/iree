@@ -36,7 +36,7 @@ static void computeLoopParams(SmallVectorImpl<Value> &lbs,
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<OpFoldResult> dimValues =
-      tensor::createDimValues(builder, loc, tensor);
+      tensor::getMixedSizes(builder, loc, tensor);
   for (int i = numImageDims; i < dimValues.size(); i++) {
     lbs.push_back(zero);
     ubs.push_back(getValueOrCreateConstantIndexOp(builder, loc, dimValues[i]));

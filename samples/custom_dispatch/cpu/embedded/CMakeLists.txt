@@ -34,9 +34,9 @@ function(embedded_function_object _ARCH)
     DEPENDS
       functions.c
       ${IREE_CLANG_TARGET}
-    COMMAND ${IREE_CLANG_TARGET}
+    COMMAND ${IREE_CLANG_BINARY}
       -target ${_LLVM_ARCH}-unknown-unknown-eabi-elf
-      -isystem ${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include
+      -isystem ${IREE_CLANG_BUILTIN_HEADERS_PATH}
       -std=c17
       -ffreestanding
       -fvisibility=hidden

@@ -31,16 +31,19 @@ bool needToPackSubByteElements(RankedTensorType shapedType) {
 Type legalizeStorageElementType(Type elementType) {
   // Only handle integers; floats in MLIR all have aligned widths (today).
   auto intType = dyn_cast<IntegerType>(elementType);
-  if (!intType) return elementType;
+  if (!intType)
+    return elementType;
 
   // For sub-byte elements, default to pack them into bytes.
   unsigned bitWidth = intType.getWidth();
-  if (needToPackSubByteElementBitWidth(bitWidth)) return elementType;
+  if (needToPackSubByteElementBitWidth(bitWidth))
+    return elementType;
 
   // Otherwise, extend them to the next power-of-two bitwidth.
   unsigned alignedBitWidth =
       IREE::Util::getRoundedElementByteWidth(intType) * 8;
-  if (alignedBitWidth == bitWidth) return elementType;
+  if (alignedBitWidth == bitWidth)
+    return elementType;
   return IntegerType::get(elementType.getContext(), alignedBitWidth,
                           intType.getSignedness());
 }
@@ -59,7 +62,8 @@ Value calculateStorageElementCountInBytes(Location loc,
     staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {
-    if (!shapedType.isDynamicDim(i)) staticCount *= shapedType.getDimSize(i);
+    if (!shapedType.isDynamicDim(i))
+      staticCount *= shapedType.getDimSize(i);
   }
 
   // Scale by dynamic dims, if present.
@@ -110,5 +114,5 @@ Value calculateStorageElementOffsetInBytes(Location loc,
                                              elementBytes);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

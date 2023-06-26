@@ -18,7 +18,7 @@ namespace iree_compiler {
 namespace {
 class GPUCheckResourceUsagePass final
     : public GPUCheckResourceUsageBase<GPUCheckResourceUsagePass> {
- public:
+public:
   explicit GPUCheckResourceUsagePass(
       std::function<unsigned(func::FuncOp)> getSharedMemoryLimit,
       std::function<unsigned(func::FuncOp)> getIndexBitwidth)
@@ -27,11 +27,11 @@ class GPUCheckResourceUsagePass final
 
   void runOnOperation() override;
 
- private:
+private:
   std::function<unsigned(func::FuncOp)> getSharedMemoryLimit;
   std::function<unsigned(func::FuncOp)> getIndexBitwidth;
 };
-}  // namespace
+} // namespace
 
 static unsigned getDatalayoutIndexBitwidth(func::FuncOp func) {
   auto mod = func->getParentOfType<ModuleOp>();
@@ -39,12 +39,13 @@ static unsigned getDatalayoutIndexBitwidth(func::FuncOp func) {
   return options.getIndexBitwidth();
 }
 
-static int shapedTypeStaticSize(
-    memref::AllocOp allocOp, ShapedType shapedType,
-    std::function<unsigned(func::FuncOp)> getIndexBitwidth) {
+static int
+shapedTypeStaticSize(memref::AllocOp allocOp, ShapedType shapedType,
+                     std::function<unsigned(func::FuncOp)> getIndexBitwidth) {
   int allocSize = 1;
   for (auto dimSize : shapedType.getShape()) {
-    if (ShapedType::isDynamic(dimSize)) continue;
+    if (ShapedType::isDynamic(dimSize))
+      continue;
     allocSize *= dimSize;
   }
   if (auto elementType =
@@ -65,19 +66,22 @@ static int shapedTypeStaticSize(
 
 /// Returns success if the total shared memory allocation size is less than the
 /// limit set by limit.
-static LogicalResult checkGPUAllocationSize(
-    func::FuncOp funcOp, unsigned limit,
-    std::function<unsigned(func::FuncOp)> getIndexBitwidth) {
-  if (funcOp.getBody().empty()) return success();
+static LogicalResult
+checkGPUAllocationSize(func::FuncOp funcOp, unsigned limit,
+                       std::function<unsigned(func::FuncOp)> getIndexBitwidth) {
+  if (funcOp.getBody().empty())
+    return success();
 
   SmallVector<memref::AllocOp> allocOps;
   funcOp.walk([&](memref::AllocOp allocOp) { allocOps.push_back(allocOp); });
-  if (allocOps.empty()) return success();
+  if (allocOps.empty())
+    return success();
 
   int cumSize = 0;
   for (auto allocOp : allocOps) {
     auto allocType = llvm::cast<MemRefType>(allocOp.getType());
-    if (!hasSharedMemoryAddressSpace(allocType)) continue;
+    if (!hasSharedMemoryAddressSpace(allocType))
+      continue;
 
     if (!allocOp.getDynamicSizes().empty()) {
       return allocOp.emitOpError(
@@ -122,5 +126,5 @@ std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
                                                      getIndexBitwidth);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

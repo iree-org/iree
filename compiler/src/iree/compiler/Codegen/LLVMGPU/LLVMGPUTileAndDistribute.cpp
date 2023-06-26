@@ -101,8 +101,9 @@ static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
 
 /// Return the tile size associated to one thread or warp based on the number of
 /// element in the group.
-static SmallVector<Value> calculateDistributedTileSize(
-    ArrayRef<int64_t> numElements, OpBuilder &builder, Operation *operation) {
+static SmallVector<Value>
+calculateDistributedTileSize(ArrayRef<int64_t> numElements, OpBuilder &builder,
+                             Operation *operation) {
   SmallVector<int64_t> blockTileSize = getTileSizes(operation, 0);
   SmallVector<Value> tileSizesVal;
   // Use partitionedLoop to know what loop needs to be distributed.
@@ -124,18 +125,21 @@ static SmallVector<Value> calculateDistributedTileSize(
   unsigned idIdx = 0;
   std::reverse(distributedDim.begin(), distributedDim.end());
   for (unsigned depth : partitionedLoops) {
-    if (depth >= blockTileSize.size()) continue;
+    if (depth >= blockTileSize.size())
+      continue;
     tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
         operation->getLoc(),
         llvm::divideCeil(blockTileSize[depth], distributedDim[idIdx++]));
-    if (idIdx == kNumMaxParallelDims) break;
+    if (idIdx == kNumMaxParallelDims)
+      break;
   }
   return tileSizesVal;
 }
 
 /// Patterns for warp level tiling.
-static void populateTilingToWarpPatterns(
-    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
+static void
+populateTilingToWarpPatterns(RewritePatternSet &patterns,
+                             SmallVectorImpl<int64_t> &workgroupSize) {
   std::array<int64_t, 3> warpPerWorkgroup = {
       workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
 
@@ -168,18 +172,19 @@ static void populateTilingToWarpPatterns(
 }
 
 /// Patterns for thread level tiling.
-static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
+static void
+populateTilingToInvocationPatterns(RewritePatternSet &patterns,
+                                   SmallVectorImpl<int64_t> &workgroupSize) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
         return calculateDistributedTileSize(workgroupSize, builder, operation);
       };
-  auto getThreadProcInfoFn = [&workgroupSize](
-                                 OpBuilder &builder, Location loc,
-                                 ArrayRef<Range> parallelLoopRanges) {
-    return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
-                                    workgroupSize);
-  };
+  auto getThreadProcInfoFn =
+      [&workgroupSize](OpBuilder &builder, Location loc,
+                       ArrayRef<Range> parallelLoopRanges) {
+        return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
+                                        workgroupSize);
+      };
   linalg::LinalgLoopDistributionOptions invocationDistributionOptions;
   invocationDistributionOptions.procInfo = getThreadProcInfoFn;
 
@@ -206,11 +211,11 @@ static void populateTilingToInvocationPatterns(
 namespace {
 struct LLVMGPUTileAndDistributePass
     : public LLVMGPUTileAndDistributeBase<LLVMGPUTileAndDistributePass> {
- private:
+private:
   // Distribute the workloads to warp if true otherwise distribute to threads.
   bool distributeToWarp = false;
 
- public:
+public:
   LLVMGPUTileAndDistributePass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -219,7 +224,8 @@ struct LLVMGPUTileAndDistributePass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
-    if (!isEntryPoint(funcOp)) return;
+    if (!isEntryPoint(funcOp))
+      return;
 
     // Promote C matrix and propagate the potential  fill producer into the temp
     // allocation. This needs to be done before reduction tiling.
@@ -316,12 +322,12 @@ struct LLVMGPUTileAndDistributePass
     });
   }
 };
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUTileAndDistribute(bool distributeToWarp) {
   return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

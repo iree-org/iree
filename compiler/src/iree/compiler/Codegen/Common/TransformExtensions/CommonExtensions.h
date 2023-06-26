@@ -16,19 +16,19 @@ class DialectRegistry;
 
 namespace func {
 class FuncOp;
-}  // namespace func
+} // namespace func
 
 namespace scf {
 class ForallOp;
-}  // namespace scf
+} // namespace scf
 
 namespace transform {
 // Types needed for builders.
 struct TileSizesSpec;
 struct NumThreadsSpec;
 class TransformTypeInterface;
-}  // namespace transform
-}  // namespace mlir
+} // namespace transform
+} // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.h.inc"
@@ -45,12 +45,12 @@ namespace transform_dialect {
 /// Hook to register common transformations to the transform dialect.
 class CommonExtensions
     : public transform::TransformDialectExtension<CommonExtensions> {
- public:
+public:
   CommonExtensions();
 };
-}  // namespace transform_dialect
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace transform_dialect
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS_H_

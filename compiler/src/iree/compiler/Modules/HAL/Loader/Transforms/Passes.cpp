@@ -116,7 +116,7 @@ void buildHALInlineDynamicTransformPassPipeline(
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h.inc"
-}  // namespace
+} // namespace
 
 void registerHALLoaderPasses() {
   // Generated.
@@ -132,8 +132,8 @@ void registerHALLoaderPasses() {
       });
 }
 
-}  // namespace Loader
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Loader
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -19,5 +19,5 @@ void populateHALExperimentalToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.ex.shared_device");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -26,7 +26,7 @@ namespace {
 // a static broadcast.
 Value broadcastToFeatureDim(Location loc, RankedTensorType resultType,
                             Value value1d, Value shapeValue, int64_t featureDim,
-                            PatternRewriter& rewriter) {
+                            PatternRewriter &rewriter) {
   auto dimsType = RankedTensorType::get({1}, rewriter.getIntegerType(64));
   auto dims = DenseIntElementsAttr::get(dimsType, {featureDim});
   if (shapeValue) {
@@ -39,7 +39,7 @@ Value broadcastToFeatureDim(Location loc, RankedTensorType resultType,
 }
 
 // Get the shape of operand, assuming it is a dynamic shape with static rank.
-Value getShapeValue(Location loc, Value operand, PatternRewriter& rewriter) {
+Value getShapeValue(Location loc, Value operand, PatternRewriter &rewriter) {
   RankedTensorType resultType = cast<RankedTensorType>(operand.getType());
   return rewriter.create<mlir::shape::ShapeOfOp>(
       loc,
@@ -47,9 +47,9 @@ Value getShapeValue(Location loc, Value operand, PatternRewriter& rewriter) {
       operand);
 }
 
-Value materializeEpsilon(Operation* op, FloatAttr epsilonAttr, FloatType fpType,
+Value materializeEpsilon(Operation *op, FloatAttr epsilonAttr, FloatType fpType,
                          Value broadcastTo, RankedTensorType broadcastToType,
-                         PatternRewriter& rewriter) {
+                         PatternRewriter &rewriter) {
   ImplicitLocOpBuilder b(op->getLoc(), rewriter);
   if (epsilonAttr.getType() != fpType) {
     // Need to convert.
@@ -90,7 +90,7 @@ struct UnfuseBatchNormInferencePattern final
   using OpRewritePattern ::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::BatchNormInferenceOp bnOp,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
     // Enforce type invariants.
     // Note that we deduce the actual element type from the variance,
     // which should not be subject to quantization at a higher level.
@@ -153,8 +153,8 @@ struct UnfuseBatchNormInferencePattern final
 // Create "stablehlo.reduce", "operand" is reduce input and "zero" is init
 // value, reduce sum from operand to operand[feature_index].
 Value createReduce(Location loc, Value operand, Value zero,
-                   SmallVector<int64_t>& reduceDims, int64_t featureIndex,
-                   PatternRewriter& rewriter) {
+                   SmallVector<int64_t> &reduceDims, int64_t featureIndex,
+                   PatternRewriter &rewriter) {
   auto operandType = cast<RankedTensorType>(operand.getType());
   auto reduceResultType = RankedTensorType::get(
       {operandType.getDimSize(featureIndex)}, operandType.getElementType());
@@ -163,8 +163,8 @@ Value createReduce(Location loc, Value operand, Value zero,
       rewriter.getI64TensorAttr(reduceDims));
 
   // setup "stablehlo.reduce"'s body
-  Region& region = reduce.getBody();
-  Block& block = region.emplaceBlock();
+  Region &region = reduce.getBody();
+  Block &block = region.emplaceBlock();
   RankedTensorType blockArgumentType =
       RankedTensorType::get({}, operandType.getElementType());
   block.addArgument(blockArgumentType, loc);
@@ -184,10 +184,10 @@ Value createReduce(Location loc, Value operand, Value zero,
 
 // Calculate total reduce size, assuming it is a dynamic shape with static rank.
 // Reduce from operand to operand[feature_index]/scale
-Value calculateReduceSize(Operation* op, Value operand,
+Value calculateReduceSize(Operation *op, Value operand,
                           RankedTensorType operandType, Value scale,
                           RankedTensorType scaleType, int64_t featureIndex,
-                          PatternRewriter& rewriter) {
+                          PatternRewriter &rewriter) {
   ImplicitLocOpBuilder b(op->getLoc(), rewriter);
   Type indexType = b.getIndexType();
   if (!operandType.hasStaticShape()) {
@@ -237,7 +237,7 @@ struct UnfuseBatchNormTrainingPattern final
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::BatchNormTrainingOp bnOp,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
     auto operandType = dyn_cast<RankedTensorType>(bnOp.getOperand().getType());
     auto scaleType = dyn_cast<RankedTensorType>(bnOp.getScale().getType());
     if (!operandType || !scaleType) {
@@ -341,7 +341,7 @@ struct UnfuseBatchNormTrainingPattern final
 };
 
 struct UnfuseBatchNorm final : impl::UnfuseBatchNormBase<UnfuseBatchNorm> {
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, shape::ShapeDialect,
                     tensor::TensorDialect>();
   }
@@ -355,13 +355,13 @@ struct UnfuseBatchNorm final : impl::UnfuseBatchNormBase<UnfuseBatchNorm> {
     }
   }
 };
-}  // namespace
+} // namespace
 
-void populatePreprocessingUnfuseBatchNormPatterns(mlir::MLIRContext* context,
-                                                  RewritePatternSet* patterns) {
+void populatePreprocessingUnfuseBatchNormPatterns(mlir::MLIRContext *context,
+                                                  RewritePatternSet *patterns) {
   patterns
       ->add<UnfuseBatchNormInferencePattern, UnfuseBatchNormTrainingPattern>(
           context);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

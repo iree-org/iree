@@ -75,7 +75,8 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
 transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
@@ -88,7 +89,8 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   IREE::HAL::ExecutableExportOp exportOp;
   state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.getSymName() == target.getName()) exportOp = op;
+    if (op.getSymName() == target.getName())
+      exportOp = op;
   });
   if (!exportOp) {
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
@@ -97,20 +99,18 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getWarpDims(),
           true);
-  if (!diag.succeeded()) return diag;
+  if (!diag.succeeded())
+    return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
   rewriter.startRootUpdate(exportOp);
   exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   rewriter.finalizeRootUpdate(exportOp);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::getEffects(
@@ -139,8 +139,9 @@ void transform_dialect::VectorToWarpExecuteOnLane0Op::build(
 /// Return success if any replacement occurred, failure otherwise.
 // TODO: this is currently brittle, what we really need here is a scope-aware
 // SCCP.
-static LogicalResult replaceAllUsesOfLaneWithin(
-    RewriterBase &b, vector::WarpExecuteOnLane0Op executeOp) {
+static LogicalResult
+replaceAllUsesOfLaneWithin(RewriterBase &b,
+                           vector::WarpExecuteOnLane0Op executeOp) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(executeOp);
   Value zero = b.create<arith::ConstantIndexOp>(executeOp.getLoc(), 0);
@@ -148,7 +149,8 @@ static LogicalResult replaceAllUsesOfLaneWithin(
   Value laneId = executeOp.getLaneid();
   bool applied = false;
   for (Operation *user : llvm::make_early_inc_range(laneId.getUsers())) {
-    if (!executeOp->isProperAncestor(user)) continue;
+    if (!executeOp->isProperAncestor(user))
+      continue;
     b.startRootUpdate(user);
     user->replaceUsesOfWith(laneId, zero);
     b.finalizeRootUpdate(user);
@@ -168,14 +170,16 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
       !ifOp.getElseRegion().empty())
     return failure();
   auto pred = ifOp.getCondition().getDefiningOp<arith::CmpIOp>();
-  if (!pred) return failure();
+  if (!pred)
+    return failure();
   auto EQ = arith::CmpIPredicate::eq;
   auto SLT = arith::CmpIPredicate::slt;
   auto SLE = arith::CmpIPredicate::sle;
   auto ULT = arith::CmpIPredicate::ult;
   auto ULE = arith::CmpIPredicate::ule;
   if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.getDimension() != gpu::Dimension::x) return failure();
+    if (threadIdOp.getDimension() != gpu::Dimension::x)
+      return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getRhs(), 0))
       return threadIdOp;
     if (pred.getPredicate() == SLE && isConstantIntValue(pred.getRhs(), 0))
@@ -192,7 +196,8 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   auto UGT = arith::CmpIPredicate::ugt;
   auto UGE = arith::CmpIPredicate::uge;
   if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.getDimension() != gpu::Dimension::x) return failure();
+    if (threadIdOp.getDimension() != gpu::Dimension::x)
+      return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getLhs(), 0))
       return threadIdOp;
     if (pred.getPredicate() == SGE && isConstantIntValue(pred.getLhs(), 0))
@@ -211,13 +216,15 @@ struct VectorDistributionResult {
   vector::WarpExecuteOnLane0Op warpOp;
 };
 
-static FailureOr<VectorDistributionResult> rewriteScfIfAsWarpExecuteOnLane0(
-    RewriterBase &rewriter, Location loc, scf::IfOp ifOp,
-    int64_t workgroupSizeX, int64_t warpSize) {
+static FailureOr<VectorDistributionResult>
+rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
+                                 scf::IfOp ifOp, int64_t workgroupSizeX,
+                                 int64_t warpSize) {
   // Bail if cond is not `if (threadIdx.x == 0)`.
   FailureOr<gpu::ThreadIdOp> maybeThreadIdxxOp =
       isThreadIdxxZeroPredicate(ifOp);
-  if (failed(maybeThreadIdxxOp)) return failure();
+  if (failed(maybeThreadIdxxOp))
+    return failure();
 
   // All the code below will be executed on a single warp given a
   // fixed (threadIdxy, threadIdxz). Note, we reuse
@@ -271,12 +278,15 @@ static FailureOr<VectorDistributionResult> rewriteScfIfAsWarpExecuteOnLane0(
 }
 
 // TODO: Refactor in a generic util that can be reused.
-static HAL::ExecutableExportOp getExecutableExportOpForFunc(
-    HAL::ExecutableVariantOp halExecutableVariantOp, func::FuncOp funcOp) {
-  if (!halExecutableVariantOp || !funcOp) return {};
+static HAL::ExecutableExportOp
+getExecutableExportOpForFunc(HAL::ExecutableVariantOp halExecutableVariantOp,
+                             func::FuncOp funcOp) {
+  if (!halExecutableVariantOp || !funcOp)
+    return {};
   HAL::ExecutableExportOp exportOp;
   halExecutableVariantOp->walk([&](HAL::ExecutableExportOp op) {
-    if (op.getSymName() != funcOp.getName()) return WalkResult::advance();
+    if (op.getSymName() != funcOp.getName())
+      return WalkResult::advance();
     exportOp = op;
     return WalkResult::interrupt();
   });
@@ -285,7 +295,8 @@ static HAL::ExecutableExportOp getExecutableExportOpForFunc(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
-    scf::IfOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::IfOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     results.assign(1, nullptr);
@@ -339,10 +350,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
   }
 
   Location loc = target->getLoc();
-  IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   FailureOr<VectorDistributionResult> vectorDistributionResult =
       rewriteScfIfAsWarpExecuteOnLane0(rewriter, loc, target, workgroupSizeX,
                                        warpSize);
@@ -351,13 +359,12 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
     // nullptr.
     results.assign(1, nullptr);
     return mlir::emitSilenceableFailure(
-        target,
-        "scf::ifOp needs to be predicated on threadIdx.x == 0 "
-        "--- the transform is not applied");
+        target, "scf::ifOp needs to be predicated on threadIdx.x == 0 "
+                "--- the transform is not applied");
   }
 
   results.push_back(vectorDistributionResult->warpOp);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -416,12 +423,13 @@ namespace {
 /// until MultiDimReduction distribution is supported.
 class InsertElementToBroadcast final
     : public OpRewritePattern<vector::InsertElementOp> {
- public:
+public:
   using OpRewritePattern<vector::InsertElementOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::InsertElementOp insertOp,
                                 PatternRewriter &rewriter) const override {
-    if (insertOp.getDestVectorType().getNumElements() != 1) return failure();
+    if (insertOp.getDestVectorType().getNumElements() != 1)
+      return failure();
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
         insertOp, insertOp.getDestVectorType(), insertOp.getSource());
     return success();
@@ -451,14 +459,16 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
                                 PatternRewriter &rewriter) const override {
     OpOperand *operand = getWarpResult(
         warpOp, [](Operation *op) { return isa<memref::LoadOp>(op); });
-    if (!operand) return failure();
+    if (!operand)
+      return failure();
     auto load = operand->get().getDefiningOp<memref::LoadOp>();
     unsigned operandIndex = operand->getOperandNumber();
     Value distributedVal = warpOp.getResult(operandIndex);
 
     SmallVector<Value> indices(load.getIndices().begin(),
                                load.getIndices().end());
-    if (!indices.empty()) return failure();
+    if (!indices.empty())
+      return failure();
 
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(warpOp);
@@ -496,18 +506,20 @@ struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
     if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType()))
       return failure();
     auto warpParent = alloc->getParentOfType<vector::WarpExecuteOnLane0Op>();
-    if (!warpParent) return failure();
+    if (!warpParent)
+      return failure();
     alloc->moveBefore(warpParent);
     // Conservatively move the dealloc after the warpOp. This may
     // extend the liverange of the allocation but is always correct.
     for (Operation *user : alloc->getUsers()) {
-      if (isa<memref::DeallocOp>(user)) user->moveAfter(warpParent);
+      if (isa<memref::DeallocOp>(user))
+        user->moveAfter(warpParent);
     }
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 static void populateMultiReductionLoweringPatterns(Operation *target,
                                                    RewritePatternSet &patterns,
@@ -522,7 +534,8 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
 static AffineMap simpleDistributionFunction(Value val) {
   AffineMap map = AffineMap::get(val.getContext());
   auto vecType = llvm::dyn_cast<VectorType>(val.getType());
-  if (!vecType) return map;
+  if (!vecType)
+    return map;
   // Create a map (d0, d1) -> (d1) to distribute along the inner
   // dimension. Once we support n-d distribution we can add more
   // complex cases.
@@ -588,7 +601,8 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     target->emitOpError(
@@ -658,7 +672,8 @@ void transform_dialect::VectorToMMAConversionOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorToMMAConversionOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     target->emitOpError(
@@ -702,8 +717,6 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
                          << *target << "\n";
   });
 
-  IRRewriter rewriter(target->getContext());
-  rewriter.setListener(&listener);
   auto diag = DiagnosedSilenceableFailure::success();
   if (getUseWmma()) {
     if (failed(convertVectorToMMAOps(rewriter, target)))
@@ -740,10 +753,10 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   Location loc = target->getLoc();
-  IRRewriter rewriter(getContext());
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(target);
   SmallVector<int64_t> indices = llvm::to_vector(getIndices());
@@ -774,16 +787,19 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
 
 DiagnosedSilenceableFailure
 transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
-    scf::ForOp forOp, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::ForOp forOp,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   int64_t depth(getDepth());
   auto schedule = getUseMmaSync()
                       ? PipeliningSchedulingStrategy::nvidiaTensorCore
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
-      rewriter, forOp, schedule, false, depth);
-  if (failed(pipelinedFor)) return emitDefaultSilenceableFailure(forOp);
+      rewriter, forOp, schedule, getPeelEpilogue(), depth);
+  if (failed(pipelinedFor)) {
+    results.push_back(forOp);
+    return DiagnosedSilenceableFailure::success();
+  }
   results.push_back(pipelinedFor.value());
   return DiagnosedSilenceableFailure::success();
 }
@@ -799,9 +815,9 @@ void transform_dialect::SynchronizeLoopOp::getEffects(
 }
 
 DiagnosedSilenceableFailure transform_dialect::SynchronizeLoopOp::applyToOne(
-    scf::ForOp forOp, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::ForOp forOp,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   rewriter.setInsertionPointAfter(forOp);
   rewriter.create<gpu::BarrierOp>(forOp.getLoc());
   return DiagnosedSilenceableFailure::success();
@@ -818,14 +834,12 @@ void transform_dialect::CreateAsyncGroupsOp::getEffects(
 }
 
 DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   iree_compiler::createAsyncGroups(rewriter, cast<func::FuncOp>(target),
                                    getUseMmaSync());
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -833,9 +847,9 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
 //===---------------------------------------------------------------------===//
 DiagnosedSilenceableFailure
 transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   iree_compiler::doLayoutAnalysisAndDistribution(rewriter,
                                                  cast<func::FuncOp>(target));
   results.push_back(target);
@@ -846,9 +860,9 @@ transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
 // ReorderTransposeOp
 //===---------------------------------------------------------------------===//
 DiagnosedSilenceableFailure transform_dialect::ReorderTransposeOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   iree_compiler::reorderTranspose(rewriter, cast<func::FuncOp>(target));
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
@@ -869,16 +883,20 @@ static bool isKnownNoEffectsOpWithoutInterface(Operation *op) {
 /// Returns `true` if the op is defines the parallel region that is subject to
 /// barrier synchronization.
 static bool isParallelRegionBoundary(Operation *op) {
-  if (op->hasAttr("__parallel_region_boundary_for_test")) return true;
+  if (op->hasAttr("__parallel_region_boundary_for_test"))
+    return true;
 
   // We consider functions inside executable variants that have the same symbol
   // name as an export symbol.
   auto func = dyn_cast<FunctionOpInterface>(op);
-  if (!func) return false;
+  if (!func)
+    return false;
   auto parent = op->getParentOfType<ModuleOp>();
-  if (!parent) return false;
+  if (!parent)
+    return false;
   auto variant = parent->getParentOfType<HAL::ExecutableVariantOp>();
-  if (!variant) return false;
+  if (!variant)
+    return false;
   WalkResult result = variant.walk([&](HAL::ExecutableExportOp exportOp) {
     if (exportOp.getSymNameAttr() == func.getNameAttr())
       return WalkResult::interrupt();
@@ -919,15 +937,18 @@ static void addAllValuelessEffects(
 /// it could extract the effect information from the op, otherwise returns
 /// 'false' and conservatively populates the list with all possible effects
 /// associated with no particular value or symbol.
-static bool collectEffects(
-    Operation *op, SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
-    bool ignoreBarriers = true) {
+static bool
+collectEffects(Operation *op,
+               SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
+               bool ignoreBarriers = true) {
   // Skip over barriers to avoid infinite recursion (those barriers would ask
   // this barrier again).
-  if (ignoreBarriers && isa<gpu::BarrierOp>(op)) return true;
+  if (ignoreBarriers && isa<gpu::BarrierOp>(op))
+    return true;
 
   // Skip over ops that we know have no effects.
-  if (isKnownNoEffectsOpWithoutInterface(op)) return true;
+  if (isKnownNoEffectsOpWithoutInterface(op))
+    return true;
 
   // Collect effect instances the operation. Note that the implementation of
   // getEffects erases all effect instances that have the type other than the
@@ -943,7 +964,8 @@ static bool collectEffects(
     for (auto &region : op->getRegions()) {
       for (auto &block : region) {
         for (auto &innerOp : block)
-          if (!collectEffects(&innerOp, effects, ignoreBarriers)) return false;
+          if (!collectEffects(&innerOp, effects, ignoreBarriers))
+            return false;
       }
     }
     return true;
@@ -964,7 +986,8 @@ static bool collectEffects(
 bool getEffectsBefore(Operation *op,
                       SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
                       bool stopAtBarrier) {
-  if (!op->getBlock()) return true;
+  if (!op->getBlock())
+    return true;
 
   // If there is a non-structured control flow, bail.
   Region *region = op->getBlock()->getParent();
@@ -983,12 +1006,14 @@ bool getEffectsBefore(Operation *op,
         else
           continue;
       }
-      if (!collectEffects(it, effects)) return false;
+      if (!collectEffects(it, effects))
+        return false;
     }
   }
 
   // Stop if reached the parallel region boundary.
-  if (isParallelRegionBoundary(op->getParentOp())) return true;
+  if (isParallelRegionBoundary(op->getParentOp()))
+    return true;
 
   // Otherwise, keep collecting above the parent operation.
   if (!getEffectsBefore(op->getParentOp(), effects, stopAtBarrier))
@@ -1019,7 +1044,8 @@ bool getEffectsBefore(Operation *op,
   bool conservative = false;
   if (!hasSingleExecutionBody(op->getParentOp()))
     op->getParentOp()->walk([&](Operation *in) {
-      if (conservative) return WalkResult::interrupt();
+      if (conservative)
+        return WalkResult::interrupt();
       if (!collectEffects(in, effects)) {
         conservative = true;
         return WalkResult::interrupt();
@@ -1039,7 +1065,8 @@ bool getEffectsBefore(Operation *op,
 bool getEffectsAfter(Operation *op,
                      SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
                      bool stopAtBarrier) {
-  if (!op->getBlock()) return true;
+  if (!op->getBlock())
+    return true;
 
   // If there is a non-structured control flow, bail.
   Region *region = op->getBlock()->getParent();
@@ -1053,17 +1080,21 @@ bool getEffectsAfter(Operation *op,
     for (Operation *it = op->getNextNode(); it != nullptr;
          it = it->getNextNode()) {
       if (isa<gpu::BarrierOp>(it)) {
-        if (stopAtBarrier) return true;
+        if (stopAtBarrier)
+          return true;
         continue;
       }
-      if (!collectEffects(it, effects)) return false;
+      if (!collectEffects(it, effects))
+        return false;
     }
 
   // Stop if reached the parallel region boundary.
-  if (isParallelRegionBoundary(op->getParentOp())) return true;
+  if (isParallelRegionBoundary(op->getParentOp()))
+    return true;
 
   // Otherwise, keep collecting below the parent operation.
-  if (!getEffectsAfter(op->getParentOp(), effects, stopAtBarrier)) return false;
+  if (!getEffectsAfter(op->getParentOp(), effects, stopAtBarrier))
+    return false;
 
   // If the op is loop-like, collect effects from the leading operations until
   // we hit a barrier because they can executed after the current operation by
@@ -1080,7 +1111,8 @@ bool getEffectsAfter(Operation *op,
   // operation `op2` at iteration `i-1` and the side effects must be ordered
   // appropriately.
   if (isSequentialLoopLike(op->getParentOp())) {
-    if (isa<gpu::BarrierOp>(op->getBlock()->front())) return true;
+    if (isa<gpu::BarrierOp>(op->getBlock()->front()))
+      return true;
 
     bool exact = collectEffects(&op->getBlock()->front(), effects);
     return getEffectsAfter(&op->getBlock()->front(), effects,
@@ -1093,7 +1125,8 @@ bool getEffectsAfter(Operation *op,
   bool conservative = false;
   if (!hasSingleExecutionBody(op->getParentOp()))
     op->getParentOp()->walk([&](Operation *in) {
-      if (conservative) return WalkResult::interrupt();
+      if (conservative)
+        return WalkResult::interrupt();
       if (!collectEffects(in, effects)) {
         conservative = true;
         return WalkResult::interrupt();
@@ -1108,7 +1141,8 @@ bool getEffectsAfter(Operation *op,
 static Value getBase(Value v) {
   while (true) {
     Operation *definingOp = v.getDefiningOp();
-    if (!definingOp) break;
+    if (!definingOp)
+      break;
 
     bool shouldContinue =
         TypeSwitch<Operation *, bool>(v.getDefiningOp())
@@ -1126,7 +1160,8 @@ static Value getBase(Value v) {
               return true;
             })
             .Default([](Operation *) { return false; });
-    if (!shouldContinue) break;
+    if (!shouldContinue)
+      break;
   }
   return v;
 }
@@ -1198,7 +1233,8 @@ bool maybeCaptured(Value v) {
       }
 
       std::optional<bool> knownCaptureStatus = getKnownCapturingStatus(user, v);
-      if (!knownCaptureStatus || *knownCaptureStatus) return true;
+      if (!knownCaptureStatus || *knownCaptureStatus)
+        return true;
     }
   }
 
@@ -1267,11 +1303,14 @@ static bool mayAlias(Value first, Value second) {
   bool isArg[] = {isFunctionArgument(first), isFunctionArgument(second)};
 
   // Distinct bases (allocations) cannot have been passed as an argument.
-  if ((isDistinct[0] && isArg[1]) || (isDistinct[1] && isArg[0])) return false;
+  if ((isDistinct[0] && isArg[1]) || (isDistinct[1] && isArg[0]))
+    return false;
 
   // Non-captured base distinct values cannot conflict with another base value.
-  if (isDistinct[0] && !maybeCaptured(first)) return false;
-  if (isDistinct[1] && !maybeCaptured(second)) return false;
+  if (isDistinct[0] && !maybeCaptured(first))
+    return false;
+  if (isDistinct[1] && !maybeCaptured(second))
+    return false;
 
   // Otherwise, conservatively assume aliasing.
   DEBUG_WITH_TYPE(DEBUG_TYPE_ALIAS, DBGS_ALIAS() << "-> may alias!\n");
@@ -1312,13 +1351,14 @@ bool mayAlias(MemoryEffects::EffectInstance a,
 /// effect, there is no conflict since we are only expected to see the
 /// allocation happening in the same thread and it cannot be accessed from
 /// another thread without capture (which we do handle in alias analysis).
-static bool haveConflictingEffects(
-    ArrayRef<MemoryEffects::EffectInstance> beforeEffects,
-    ArrayRef<MemoryEffects::EffectInstance> afterEffects) {
+static bool
+haveConflictingEffects(ArrayRef<MemoryEffects::EffectInstance> beforeEffects,
+                       ArrayRef<MemoryEffects::EffectInstance> afterEffects) {
   for (const MemoryEffects::EffectInstance &before : beforeEffects) {
     for (const MemoryEffects::EffectInstance &after : afterEffects) {
       // If cannot alias, definitely no conflict.
-      if (!mayAlias(before, after)) continue;
+      if (!mayAlias(before, after))
+        continue;
 
       // Read/read is not a conflict.
       if (isa<MemoryEffects::Read>(before.getEffect()) &&
@@ -1343,7 +1383,8 @@ static bool haveConflictingEffects(
       //      conflicts.
       //   2. either the program is ill-formed and we are in undefined behavior
       //      territory.
-      if (isa<MemoryEffects::Free>(before.getEffect())) continue;
+      if (isa<MemoryEffects::Free>(before.getEffect()))
+        continue;
 
       // Other kinds of effects create a conflict, e.g. read-after-write.
       LLVM_DEBUG(
@@ -1375,7 +1416,7 @@ namespace {
 /// Parallel Constructs" by Moses et.al. in PPoPP 2023 and implementation in
 /// Polygeist.
 class BarrierElimination final : public OpRewritePattern<gpu::BarrierOp> {
- public:
+public:
   using OpRewritePattern<gpu::BarrierOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(gpu::BarrierOp barrier,
@@ -1420,7 +1461,7 @@ class BarrierElimination final : public OpRewritePattern<gpu::BarrierOp> {
     return failure();
   }
 };
-}  // namespace
+} // namespace
 
 void transform_dialect::EliminateGpuBarriersOp::build(OpBuilder &builder,
                                                       OperationState &state,
@@ -1430,7 +1471,8 @@ void transform_dialect::EliminateGpuBarriersOp::build(OpBuilder &builder,
 
 DiagnosedSilenceableFailure
 transform_dialect::EliminateGpuBarriersOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   RewritePatternSet patterns(target.getContext());
   patterns.insert<BarrierElimination>(getContext());

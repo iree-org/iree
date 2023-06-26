@@ -54,7 +54,8 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32) return failure();
+    if (bitwidth > 32)
+      return failure();
     const int multipler = 32 / bitwidth;
     const int bestTilingFactor = 16 * multipler;
     return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
@@ -64,6 +65,6 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

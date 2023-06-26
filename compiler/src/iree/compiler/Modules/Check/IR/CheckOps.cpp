@@ -28,7 +28,7 @@ struct ExpandAttributeToConst : public OpRewritePattern<SrcOp> {
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 void ExpectEqConstOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
@@ -42,10 +42,10 @@ void ExpectAlmostEqConstOp::getCanonicalizationPatterns(
           context);
 }
 
-}  // namespace Check
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Check
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Modules/Check/IR/CheckOps.cpp.inc"

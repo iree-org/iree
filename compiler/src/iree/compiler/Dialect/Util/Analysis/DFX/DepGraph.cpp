@@ -29,7 +29,7 @@ struct DOTGraphTraits<DFXDepGraph *> : public DefaultDOTGraphTraits {
   }
 };
 
-}  // end namespace llvm
+} // end namespace llvm
 
 namespace mlir {
 namespace iree_compiler {
@@ -51,11 +51,12 @@ void DepGraph::dumpGraph() {
 
   std::error_code ec;
   llvm::raw_fd_ostream file(filename, ec, llvm::sys::fs::OF_TextWithCRLF);
-  if (!ec) llvm::WriteGraph(file, this);
+  if (!ec)
+    llvm::WriteGraph(file, this);
 
   callTimes++;
 }
 
-}  // namespace DFX
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace DFX
+} // namespace iree_compiler
+} // namespace mlir

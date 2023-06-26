@@ -65,7 +65,8 @@ struct ScfForBounds {
 std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
   Block &cond = op.getCond().front();
   Block &body = op.getBody().front();
-  if (cond.getOperations().size() != 2) return std::nullopt;
+  if (cond.getOperations().size() != 2)
+    return std::nullopt;
 
   auto matchBbArg = [](Value v, Block &block) -> std::optional<unsigned> {
     if (!isa<BlockArgument>(v) || v.getParentBlock() != &block)
@@ -86,7 +87,8 @@ std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
   }
 
   std::optional<unsigned> iterArg = matchBbArg(compare.getLhs(), cond);
-  if (!iterArg) return std::nullopt;
+  if (!iterArg)
+    return std::nullopt;
 
   auto add = dyn_cast_or_null<mlir::stablehlo::AddOp>(
       body.getTerminator()->getOperand(*iterArg).getDefiningOp());
@@ -107,9 +109,9 @@ std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
 struct WhileOpPattern final : OpConversionPattern<mlir::stablehlo::WhileOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::WhileOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::WhileOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
     if (std::optional<ScfForBounds> bounds = extractForBounds(op)) {
@@ -164,9 +166,9 @@ struct WhileOpPattern final : OpConversionPattern<mlir::stablehlo::WhileOp> {
 struct IfOpPattern final : OpConversionPattern<mlir::stablehlo::IfOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::IfOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::IfOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto scfIf = rewriter.create<scf::IfOp>(
         op.getLoc(), op.getResultTypes(),
         extractTensorValue(rewriter, adaptor.getPred()),
@@ -225,9 +227,9 @@ struct CaseOpPattern : public OpConversionPattern<mlir::stablehlo::CaseOp> {
     return scfIf;
   }
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::CaseOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::CaseOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Inline the op if there is only a default block.
     if (op.getBranches().size() == 1) {
       Block &block = op.getBranches().front().front();
@@ -270,11 +272,11 @@ struct LegalizeControlFlow final
     }
   }
 };
-}  // namespace
+} // namespace
 
 void populateLegalizeControlFlowPatterns(MLIRContext *context,
                                          RewritePatternSet *patterns) {
   patterns->add<WhileOpPattern, IfOpPattern, CaseOpPattern>(context);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

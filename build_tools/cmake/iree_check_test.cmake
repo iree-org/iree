@@ -276,7 +276,7 @@ function(parse_target_cpu_features_variant _VARIANT_STRING _ENABLED_VAR
   set("${_FEATURES_NAME_VAR}" "" PARENT_SCOPE)
   set("${_FEATURES_VAR}" "" PARENT_SCOPE)
   if("${_VARIANT_STRING}" STREQUAL "default")
-    set("{_ENABLED_VAR}" TRUE PARENT_SCOPE)
+    set("${_ENABLED_VAR}" TRUE PARENT_SCOPE)
     return()
   endif()
   # Interpret _VARIANT_STRING as a CMake list (;-separated).

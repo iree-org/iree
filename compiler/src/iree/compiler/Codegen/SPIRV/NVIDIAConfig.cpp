@@ -95,6 +95,6 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

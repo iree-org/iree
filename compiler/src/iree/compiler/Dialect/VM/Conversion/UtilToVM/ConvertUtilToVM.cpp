@@ -53,9 +53,9 @@ namespace {
 
 struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::NullOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::NullOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ConstRefZeroOp>(
         op, getTypeConverter()->convertType(op.getType()));
     return success();
@@ -68,16 +68,16 @@ struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
 
 struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::CmpEQOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::CmpEQOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getLhs().getType();
     if (llvm::isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpEQRefOp>(
           op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
       return success();
     }
-    return failure();  // not used for non-ref types currently
+    return failure(); // not used for non-ref types currently
   }
 };
 
@@ -88,9 +88,9 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
 struct UnreachableOpConversion
     : public OpConversionPattern<IREE::Util::UnreachableOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::UnreachableOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::UnreachableOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
         srcOp,
         rewriter.createOrFold<IREE::VM::ConstI32Op>(
@@ -101,7 +101,7 @@ struct UnreachableOpConversion
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateUtilToVMPatterns(MLIRContext *context,
                               ConversionTarget &conversionTarget,
@@ -125,5 +125,5 @@ void populateUtilToVMPatterns(MLIRContext *context,
                                  patterns);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

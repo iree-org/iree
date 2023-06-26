@@ -31,12 +31,12 @@ namespace VM {
 /// Generic method for verifying VM fail ops.
 LogicalResult verifyFailOp(Operation *op, Value statusVal);
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/VM/IR/VMOps.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/VM/IR/VMOps.h.inc" // IWYU pragma: export
 
-#endif  // IREE_COMPILER_DIALECT_VM_IR_VMOPS_H_
+#endif // IREE_COMPILER_DIALECT_VM_IR_VMOPS_H_

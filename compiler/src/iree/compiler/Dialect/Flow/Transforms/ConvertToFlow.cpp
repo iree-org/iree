@@ -40,7 +40,7 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> Flow::createConvertToFlowPass() {
   return std::make_unique<ConvertToFlowPass>();

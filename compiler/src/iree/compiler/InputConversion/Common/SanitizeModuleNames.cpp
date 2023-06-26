@@ -28,18 +28,19 @@ struct SanitizeModuleNamesPass
 
     auto moduleOp = getOperation();
     auto optionalName = moduleOp.getName();
-    if (!optionalName.has_value()) return;
+    if (!optionalName.has_value())
+      return;
     auto name = optionalName.value();
 
     moduleOp.setName(sanitizeSymbolName(name));
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass() {
   return std::make_unique<SanitizeModuleNamesPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
