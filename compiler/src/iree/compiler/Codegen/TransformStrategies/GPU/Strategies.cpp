@@ -421,6 +421,15 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
+  // Limit the types that we choose to support without user intervention for
+  // tensor core.
+  if (!strategy.useFma && !strategy.cliOptionsSpecified &&
+      (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
+       !captures.outputElementType.isF32())) {
+    LDBG("--Matmul strategy elemental type check failed\n");
+    return failure();
+  }
+
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
