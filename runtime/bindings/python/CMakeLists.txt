@@ -4,9 +4,23 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(NUMPY_DEPS "")
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
+if(NOT nanobind_FOUND)
+  # nanobind requires Python >= 3.8.
+  find_package(Python 3.8 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  find_package(nanobind CONFIG QUIET)
+  if(NOT nanobind_FOUND)
+    execute_process(
+      COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      OUTPUT_VARIABLE NB_DIR
+      RESULT_VARIABLE RC)
+    if(RC AND NOT RC EQUAL 0)
+      message(WARNING "Probing for nanobind failed. Please install the project's Python dependencies or '${Python_EXECUTABLE} -m pip install nanobind'")
+    endif()
+    list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+  endif()
+  find_package(nanobind CONFIG REQUIRED)
+endif()
 
 set(_PYTHON_EXTRA_SRCS)
 set(_EXTRA_INSTALL_TOOL_TARGETS)
@@ -23,39 +37,78 @@ endif()
 # Package
 ################################################################################
 
-iree_pyext_module(
-  NAME
-    PyExtRt
-  MODULE_NAME iree/_runtime
-  SRCS
-    "binding.h"
-    "initialize_module.cc"
-    "invoke.h"
-    "invoke.cc"
-    "hal.h"
-    "hal.cc"
-    "py_module.h"
-    "py_module.cc"
-    "status_utils.cc"
-    "status_utils.h"
-    "vm.h"
-    "vm.cc"
-  UNIX_LINKER_SCRIPT
-    "unix_version.lds"
-  DEFINES
-    # Pybind code seems to be incompatible with C++ allocation tracing
-    # hooks so disable it.
-    IREE_TRACING_HOOK_CPP_NEW_DELETE=0
-  DEPS
-    iree::base
-    iree::base::internal::flags
-    iree::hal
-    iree::hal::drivers
-    iree::hal::utils::allocators
-    iree::modules::hal
-    iree::tooling::modules
-    iree::vm
-    iree::vm::bytecode::module
+# nanobind requires both RTTI and Exceptions, and it does not know that
+# we have disabled them globally, so turn them back on. Since this is
+# *the only* place in the codebase where we do this, just inline here.
+# Note that this is playing with fire and the extension code is structured
+# so as not to cause problems with RTTI cross-module issues.
+iree_select_compiler_opts(_RTTI_AND_EXCEPTION_COPTS
+  CLANG_OR_GCC
+    "-frtti"
+    "-fexceptions"
+  MSVC_OR_CLANG_CL
+    # Configure exception handling for standard C++ behavior.
+    # - /EHs enables C++ catch-style exceptions
+    # - /EHc breaks unwinding across extern C boundaries, dramatically reducing
+    #   unwind table size and associated exception handling overhead as the
+    #   compiler can assume no exception will ever be thrown within any function
+    #   annotated with extern "C".
+    # https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model
+    "/EHsc"
+    # Configure RTTI generation.
+    # - /GR - Enable generation of RTTI (default)
+    # - /GR- - Disables generation of RTTI
+    # https://docs.microsoft.com/en-us/cpp/build/reference/gr-enable-run-time-type-information?view=msvc-160
+    "/GR"
+)
+
+nanobind_add_module(iree_runtime_bindings_python_PyExtRt
+  NB_STATIC LTO
+  "binding.h"
+  "initialize_module.cc"
+  "invoke.h"
+  "invoke.cc"
+  "hal.h"
+  "hal.cc"
+  "numpy_interop.h"
+  "numpy_interop.cc"
+  "py_module.h"
+  "py_module.cc"
+  "status_utils.cc"
+  "status_utils.h"
+  "vm.h"
+  "vm.cc"
+)
+
+target_link_libraries(iree_runtime_bindings_python_PyExtRt
+  PRIVATE
+  iree::base
+  iree::base::internal::flags
+  iree::hal
+  iree::hal::drivers
+  iree::hal::utils::allocators
+  iree::modules::hal
+  iree::tooling::modules
+  iree::vm
+  iree::vm::bytecode::module
+
+  Python::NumPy
+)
+
+target_compile_options(iree_runtime_bindings_python_PyExtRt
+  PRIVATE
+  ${IREE_DEFAULT_COPTS}
+  # Default COPTS disable exceptions/rtti. Re-enable them.
+  ${_RTTI_AND_EXCEPTION_COPTS}
+)
+target_compile_definitions(iree_runtime_bindings_python_PyExtRt
+  PRIVATE
+  IREE_TRACING_HOOK_CPP_NEW_DELETE=0
+)
+
+set_target_properties(
+  iree_runtime_bindings_python_PyExtRt
+  PROPERTIES OUTPUT_NAME "iree/_runtime"
 )
 
 iree_py_library(
@@ -78,7 +131,7 @@ iree_py_library(
     "iree/runtime/scripts/iree_run_module/__main__.py"
     ${_PYTHON_EXTRA_SRCS}
   PYEXT_DEPS
-    ::PyExtRt
+    iree_runtime_bindings_python_PyExtRt
 )
 
 iree_symlink_tool(

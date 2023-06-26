@@ -616,8 +616,9 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # "Bootstrapping" by first looking for the optional Development component
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
-  find_package(Python3 COMPONENTS Interpreter Development)
-  find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+  # If building Python packages, we have a hard requirement on 3.8+.
+  find_package(Python3 3.8 COMPONENTS Interpreter Development)
+  find_package(Python3 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
 endif()
@@ -879,11 +880,14 @@ if(IREE_BUILD_TESTS)
 endif()
 
 if(IREE_BUILD_PYTHON_BINDINGS)
-  if(NOT TARGET pybind11::module)
-    message(STATUS "Using bundled pybind11")
-    add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-  else()
-    message(STATUS "Not including bundled pybind11 (already configured)")
+  # The compiler uses pybind11
+  if(IREE_BUILD_COMPILER)
+    if(NOT TARGET pybind11::module)
+      message(STATUS "Using bundled pybind11")
+      add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+    else()
+      message(STATUS "Not including bundled pybind11 (already configured)")
+    endif()
   endif()
 endif()
 
