@@ -271,6 +271,7 @@ void GenericVectorizationPass::runOnOperation() {
   vector::populateVectorTransferPermutationMapLoweringPatterns(
       vectorizationPatterns);
   vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
+  vector::populateFoldArithExtensionPatterns(vectorizationPatterns);
   vectorizationPatterns.add<linalg::LinalgCopyVTRForwardingPattern,
                             linalg::LinalgCopyVTWForwardingPattern>(
       funcOp.getContext(), /*benefit=*/2);
