@@ -109,13 +109,14 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    CommonPasses
+    Common
   HDRS
     "BufferizationAnalysis.h"
     "EncodingInfo.h"
     "ExtractAddressComputation.h"
     "Passes.h"
     "Transforms.h"
+    "UserConfig.h"
   SRCS
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
@@ -155,6 +156,7 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
     "TypePropagationPass.cpp"
+    "UserConfig.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders
@@ -215,72 +217,6 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VMVX::IR
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
-    iree::compiler::Utils
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    Common
-  HDRS
-    "UserConfig.h"
-  SRCS
-    "UserConfig.cpp"
-  DEPS
-    ::CommonPasses
-    ::PassHeaders
-    ::PassesIncGen
-    ::TransformDialectInterpreterPass
-    IREELinalgExtDialect
-    IREELinalgExtPasses
-    IREELinalgExtTransforms
-    LLVMSupport
-    MLIRAffineAnalysis
-    MLIRAffineDialect
-    MLIRAffineUtils
-    MLIRAnalysis
-    MLIRArithDialect
-    MLIRArithTransforms
-    MLIRArithUtils
-    MLIRBufferizationDialect
-    MLIRBufferizationTransforms
-    MLIRFuncDialect
-    MLIRGPUDialect
-    MLIRIR
-    MLIRLLVMCommonConversion
-    MLIRLLVMDialect
-    MLIRLinalgDialect
-    MLIRLinalgTransforms
-    MLIRMathDialect
-    MLIRMathTransforms
-    MLIRMemRefDialect
-    MLIRMemRefTransforms
-    MLIRPass
-    MLIRSCFDialect
-    MLIRSCFToControlFlow
-    MLIRSCFTransforms
-    MLIRSCFUtils
-    MLIRSideEffectInterfaces
-    MLIRSupport
-    MLIRTensorDialect
-    MLIRTensorTransforms
-    MLIRTilingInterface
-    MLIRTransformDialect
-    MLIRTransforms
-    MLIRValueBoundsOpInterface
-    MLIRVectorDialect
-    MLIRVectorToSCF
-    MLIRVectorTransforms
-    MLIRViewLikeInterface
-    iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::Interfaces::BufferizationInterfaces
-    iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
-    iree::compiler::Codegen::Transforms
-    iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
 )
