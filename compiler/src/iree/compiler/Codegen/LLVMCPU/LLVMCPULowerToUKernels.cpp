@@ -9,7 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

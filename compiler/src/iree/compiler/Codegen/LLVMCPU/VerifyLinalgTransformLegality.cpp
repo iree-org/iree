@@ -6,7 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"

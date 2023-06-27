@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"

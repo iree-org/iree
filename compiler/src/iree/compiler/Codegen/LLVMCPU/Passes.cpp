@@ -768,5 +768,19 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
   variantPM.addPass(createLLVMCPUAssignImportOrdinalsPass());
 }
 
+//===---------------------------------------------------------------------===//
+// Register LLVMCPU Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+} // namespace
+
+void registerCodegenLLVMCPUPasses() {
+  // Generated.
+  registerPasses();
+}
+
 } // namespace iree_compiler
 } // namespace mlir
