@@ -9,20 +9,4 @@
 
 include "mlir/Pass/PassBase.td"
 
-//------------------------------------------------------------------------------
-// VMVX Passes
-//------------------------------------------------------------------------------
-
-//------------------------------------------------------------------------------
-// WGSL Passes
-//------------------------------------------------------------------------------
-
-def WGSLReplacePushConstants :
-    Pass<"iree-wgsl-replace-push-constants", "func::FuncOp"> {
-  let summary =
-      "Replaces push constant loads with binding loads for when using "
-      "WGSL without push constant support";
-  let constructor = "mlir::iree_compiler::createWGSLReplacePushConstantsPass()";
-}
-
 #endif  // IREE_DIALECT_FLOW_PASSES

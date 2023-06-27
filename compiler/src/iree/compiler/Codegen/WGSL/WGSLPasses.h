@@ -23,6 +23,12 @@ namespace iree_compiler {
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWGSLReplacePushConstantsPass();
 
+//----------------------------------------------------------------------------//
+// Register WGSL Passes
+//----------------------------------------------------------------------------//
+
+void registerCodegenWGSLPasses();
+
 } // namespace iree_compiler
 } // namespace mlir
 

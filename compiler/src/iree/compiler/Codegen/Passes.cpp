@@ -36,6 +36,7 @@ void registerCodegenPasses() {
   registerCodegenLLVMGPUPasses();
   registerCodegenSPIRVPasses();
   registerCodegenVMVXPasses();
+  registerCodegenWGSLPasses();
   registerPasses();
 
   static PassPipelineRegistration<> LinalgLLVMPipeline(
