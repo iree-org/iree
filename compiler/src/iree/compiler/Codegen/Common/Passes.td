@@ -227,6 +227,12 @@ def GenericVectorization :
       "mlir::iree_compiler::createGenericVectorizationPass()";
 }
 
+def HoistRedundantVectorTransfers :
+    Pass<"iree-codegen-hoist-redundant-vector-transfers", "func::FuncOp"> {
+  let summary = "Hoist redundant vector transfers";
+  let constructor = "mlir::iree_compiler::createHoistRedundantVectorTransfersPass()";
+}
+
 def HoistStaticallyBoundAllocations :
     Pass<"iree-hoist-statically-bound-allocations", "func::FuncOp"> {
   let summary = "Hoist statically bound alloca ops to the entry block of functions";
