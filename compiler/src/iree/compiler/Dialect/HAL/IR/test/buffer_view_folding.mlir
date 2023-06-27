@@ -39,3 +39,21 @@ func.func @SkipBufferViewBufferOp(%buffer : !hal.buffer) -> !hal.buffer {
   // CHECK: return %[[BUFFER]]
   return %view_buffer : !hal.buffer
 }
+
+// -----
+
+// CHECK-LABEL: func.func @DoNotSkipBufferViewBufferOp
+func.func @DoNotSkipBufferViewBufferOp(%buffer : !hal.buffer) -> !hal.buffer {
+  %c1 = arith.constant 1 : i32
+  %c10 = arith.constant 10 : index
+  %c11 = arith.constant 11 : index
+  %c32 = arith.constant 32 : i32
+  %view = hal.buffer_view.create buffer(%buffer : !hal.buffer)[%c1, %c10]
+                                 shape([%c10, %c11])
+                                 type(%c32)
+                                 encoding(%c1) : !hal.buffer_view
+  // CHECK: %[[BUFFER:.+]] = hal.buffer_view.buffer
+  %view_buffer = hal.buffer_view.buffer<%view : !hal.buffer_view> : !hal.buffer
+  // CHECK: return %[[BUFFER]]
+  return %view_buffer : !hal.buffer
+}

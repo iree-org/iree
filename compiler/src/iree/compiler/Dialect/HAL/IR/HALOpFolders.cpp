@@ -176,9 +176,7 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
     if (!createOp)
       return failure();
 
-    APInt offset;
-    if (matchPattern(createOp.getSourceOffset(), m_ConstantInt(&offset)) &&
-        offset.isZero()) {
+    if (matchPattern(createOp.getSourceOffset(), m_Zero())) {
       rewriter.replaceOp(op, createOp.getSourceBuffer());
       return success();
     }
