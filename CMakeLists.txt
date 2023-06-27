@@ -617,10 +617,22 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
   # If building Python packages, we have a hard requirement on 3.8+.
-  find_package(Python3 3.8 COMPONENTS Interpreter Development)
-  find_package(Python3 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
+  find_package(Python3 3.8 COMPONENTS Interpreter Development NumPy)
+  find_package(Python3 3.8 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  # Some parts of the build use FindPython instead of FindPython3. Why? No
+  # one knows, but they are different. So make sure to bootstrap this one too.
+  # Not doing this here risks them diverging, which on multi-Python systems,
+  # can be troublesome. Note that nanobind requires FindPython.
+  set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
+  find_package(Python 3.8 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
+  find_package(Python COMPONENTS Interpreter REQUIRED)
+endif()
+
+if(NOT "${Python_EXECUTABLE}" STREQUAL "${Python3_EXECUTABLE}")
+  message(WARNING "FindPython and FindPython3 found different executables. You may need to pin -DPython_EXECUTABLE and -DPython3_EXECUTABLE (${Python_EXECUTABLE} vs ${Python3_EXECUTABLE})")
 endif()
 
 # Extended Python environment checks.
