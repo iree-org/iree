@@ -4,11 +4,26 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
+  passManager.addNestedPass<func::FuncOp>(createTypePropagationPass());
+  passManager.addPass(createBubbleUpOrdinalOpsPass());
+  passManager.addPass(createBufferizeCopyOnlyDispatchesPass());
+  passManager.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
+  // Temporary solution to avoid large allocations due to softmax lowering.
+  passManager.addNestedPass<func::FuncOp>(createRematerializeParallelOpsPass());
+}
+
+//===---------------------------------------------------------------------===//
+// Register Common Passes
+//===---------------------------------------------------------------------===//
 
 namespace {
 #define GEN_PASS_REGISTRATION

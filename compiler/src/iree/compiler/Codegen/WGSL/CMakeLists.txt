@@ -56,7 +56,6 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransforms
     MLIRVectorDialect
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect

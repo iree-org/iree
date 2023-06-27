@@ -97,7 +97,6 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR

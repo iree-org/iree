@@ -12,47 +12,15 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_gentbl_cc_library(
-    name = "PassesIncGen",
-    tbl_outs = [
-        (
-            ["--gen-pass-decls"],
-            "Passes.h.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "Passes.td",
-    deps = ["@llvm-project//mlir:PassBaseTdFiles"],
-)
-
-iree_compiler_cc_library(
-    name = "PassHeaders",
-    hdrs = [
-        "PassDetail.h",
-        "Passes.h",
-        "Passes.h.inc",
-    ],
-    deps = [
-        ":PassesIncGen",
-        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
-        "//compiler/src/iree/compiler/Dialect/HAL/IR",
-        "//compiler/src/iree/compiler/Utils",
-        "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:MemRefDialect",
-        "@llvm-project//mlir:NVGPUDialect",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Transforms",
-    ],
-)
-
 iree_compiler_cc_library(
     name = "Codegen",
     srcs = [
         "Passes.cpp",
     ],
+    hdrs = [
+        "Passes.h",
+    ],
     deps = [
-        ":PassHeaders",
-        ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Common:CommonPasses",
         "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",

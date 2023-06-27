@@ -142,7 +142,6 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::TransformStrategies::CPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

@@ -41,6 +41,13 @@ namespace {
 void registerCodegenVMVXPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> VMVXLinkingPipeline(
+      "iree-codegen-vmvx-linking-pipeline",
+      "Runs the VMVX HAL executable linking pipeline",
+      [](OpPassManager &passManager) {
+        buildVMVXLinkingPassPipeline(passManager);
+      });
 }
 
 } // namespace iree_compiler

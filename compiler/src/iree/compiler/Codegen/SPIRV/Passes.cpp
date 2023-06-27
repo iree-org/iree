@@ -615,6 +615,13 @@ namespace {
 void registerCodegenSPIRVPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> LinalgSPIRVPipeline(
+      "iree-codegen-linalg-to-spirv-pipeline",
+      "Runs the progressive lowering pipeline from linalg to SPIR-V",
+      [](OpPassManager &passManager) {
+        buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+      });
 }
 
 } // namespace iree_compiler

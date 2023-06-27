@@ -18,6 +18,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+
 /// Passes that are done on all backends before target-specific code-generation
 /// kicks in.
 void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager);

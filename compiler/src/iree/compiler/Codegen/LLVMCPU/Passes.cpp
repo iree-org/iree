@@ -780,6 +780,20 @@ namespace {
 void registerCodegenLLVMCPUPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> LinalgLLVMPipeline(
+      "iree-codegen-linalg-to-llvm-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to LLVM",
+      [](OpPassManager &passManager) {
+        buildLLVMCPUCodegenPassPipeline(passManager);
+      });
+
+  static PassPipelineRegistration<> LLVMCPULinkingPipeline(
+      "iree-codegen-llvmcpu-linking-pipeline",
+      "Runs the LLVMCPU HAL executable linking pipeline",
+      [](OpPassManager &passManager) {
+        buildLLVMCPULinkingPassPipeline(passManager);
+      });
 }
 
 } // namespace iree_compiler

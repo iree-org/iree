@@ -136,7 +136,6 @@ iree_cc_library(
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR

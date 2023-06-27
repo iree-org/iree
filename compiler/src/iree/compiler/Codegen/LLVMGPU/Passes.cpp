@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -603,6 +602,20 @@ namespace {
 void registerCodegenLLVMGPUPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> LinalgNVVMPipeline(
+      "iree-codegen-linalg-to-nvvm-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to NVVM",
+      [](OpPassManager &passManager) {
+        buildLLVMGPUTransformPassPipeline(passManager, false);
+      });
+
+  static PassPipelineRegistration<> LinalgROCDLPipeline(
+      "iree-codegen-linalg-to-rocdl-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to ROCDL",
+      [](OpPassManager &passManager) {
+        buildLLVMGPUTransformPassPipeline(passManager, true);
+      });
 }
 
 } // namespace iree_compiler
