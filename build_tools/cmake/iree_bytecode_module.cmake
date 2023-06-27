@@ -137,13 +137,8 @@ function(iree_bytecode_module)
   endif()
 
   set(_DEPENDS "")
-  iree_package_name(_PACKAGE_NAME)
+  iree_package_ns(_PACKAGE_NAME)
   list(TRANSFORM _RULE_DEPENDS REPLACE "^::" "${_PACKAGE_NAME}::")
-  foreach(_DEPEND ${_RULE_DEPENDS})
-    string(REPLACE "::" "_" _DEPEND "${_DEPEND}")
-    list(APPEND _DEPENDS ${_DEPEND})
-  endforeach()
-  message(STATUS "DEPENDS : " ${_DEPENDS})
 
   add_custom_command(
     OUTPUT
