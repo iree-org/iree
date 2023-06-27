@@ -16,7 +16,11 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
   IREE_UK_ASSERT(!(params->flags & ~allflags));
   iree_uk_uint32_t flags_type = params->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK;
   IREE_UK_ASSERT(flags_type == IREE_UK_FLAG_MMT4D_TYPE_F32F32F32 ||
-                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_I8I8I32);
+                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_I8I8I32 ||
+                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_F16F16F32 ||
+                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_F16F16F16 ||
+                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32 ||
+                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16);
   // Some implementations may wish to avoid supporting absurdly wide types. For
   // instance, K is the innermost (i.e. hottest) loop bound, so some 32bit
   // targets may benefit from K being int32, not int64. We still let K be of

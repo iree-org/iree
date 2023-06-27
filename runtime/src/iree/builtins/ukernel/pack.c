@@ -65,7 +65,9 @@ static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
   iree_uk_uint32_t flags_type = params->flags & IREE_UK_FLAG_PACK_TYPE_MASK;
   IREE_UK_ASSERT(flags_type == IREE_UK_FLAG_PACK_TYPE_F32F32 ||
                  flags_type == IREE_UK_FLAG_PACK_TYPE_I8I8 ||
-                 flags_type == IREE_UK_FLAG_PACK_TYPE_I32I32);
+                 flags_type == IREE_UK_FLAG_PACK_TYPE_I32I32 ||
+                 flags_type == IREE_UK_FLAG_PACK_TYPE_F16F16 ||
+                 flags_type == IREE_UK_FLAG_PACK_TYPE_BF16BF16);
   IREE_UK_ASSERT(params->in_stride0 >= 0);
   IREE_UK_ASSERT(params->out_stride0 >= 0);
   IREE_UK_ASSERT(params->in_size0 >= 0);

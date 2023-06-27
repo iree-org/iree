@@ -10,7 +10,11 @@ static bool iree_uk_query_tile_sizes_operation_is_matmul(
     iree_uk_uint32_t flags) {
   iree_uk_uint32_t op = iree_uk_query_tile_sizes_operation(flags);
   return op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32 ||
-         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F16 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
 }
 
 static void iree_uk_query_tile_sizes_2d_validate(
