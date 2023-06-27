@@ -12,6 +12,9 @@
 typedef enum iree_uk_unpack_type_t {
   iree_uk_unpack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
   iree_uk_unpack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),
+  iree_uk_unpack_type_f16f16 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_16, FLOAT_16),
+  iree_uk_unpack_type_bf16bf16 =
+      IREE_UK_TIE_2_TYPES_LITERAL(BFLOAT_16, BFLOAT_16),
 } iree_uk_unpack_type_t;
 
 static inline iree_uk_unpack_type_t iree_uk_unpack_type(
@@ -21,6 +24,10 @@ static inline iree_uk_unpack_type_t iree_uk_unpack_type(
       return iree_uk_unpack_type_f32f32;
     case IREE_UK_FLAG_UNPACK_TYPE_I32I32:
       return iree_uk_unpack_type_i32i32;
+    case IREE_UK_FLAG_UNPACK_TYPE_F16F16:
+      return iree_uk_unpack_type_f16f16;
+    case IREE_UK_FLAG_UNPACK_TYPE_BF16BF16:
+      return iree_uk_unpack_type_bf16bf16;
     default:
       IREE_UK_ASSUME_UNREACHABLE;
   }
