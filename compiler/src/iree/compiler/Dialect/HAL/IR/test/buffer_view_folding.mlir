@@ -26,11 +26,11 @@ func.func @FoldBufferViewCreateSubspan(%base_buffer: !hal.buffer, %subspan_offse
 // CHECK-LABEL: func.func @SkipBufferViewBufferOp
 // CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer
 func.func @SkipBufferViewBufferOp(%buffer : !hal.buffer) -> !hal.buffer {
-  %encoding = arith.constant 1 : i32
   %c0 = arith.constant 0 : index
   %c10 = arith.constant 10 : index
   %c11 = arith.constant 11 : index
   %c32 = arith.constant 32 : i32
+  %encoding = arith.constant 1 : i32
   %view = hal.buffer_view.create buffer(%buffer : !hal.buffer)[%c0, %c10]
                                  shape([%c10, %c11])
                                  type(%c32)
@@ -44,11 +44,11 @@ func.func @SkipBufferViewBufferOp(%buffer : !hal.buffer) -> !hal.buffer {
 
 // CHECK-LABEL: func.func @DoNotSkipBufferViewBufferOp
 func.func @DoNotSkipBufferViewBufferOp(%buffer : !hal.buffer) -> !hal.buffer {
-  %encoding = arith.constant 1 : i32
   %c5 = arith.constant 5 : index
   %c10 = arith.constant 10 : index
   %c11 = arith.constant 11 : index
   %c32 = arith.constant 32 : i32
+  %encoding = arith.constant 1 : i32
   %view = hal.buffer_view.create buffer(%buffer : !hal.buffer)[%c5, %c10]
                                  shape([%c10, %c11])
                                  type(%c32)
