@@ -10,7 +10,7 @@
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -589,6 +589,20 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
     pm.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
+}
+
+//===---------------------------------------------------------------------===//
+// Register LLVMGPU Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+} // namespace
+
+void registerCodegenLLVMGPUPasses() {
+  // Generated.
+  registerPasses();
 }
 
 } // namespace iree_compiler

@@ -106,6 +106,12 @@ verifyGPUMatmulPipeline(Operation *op,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize);
 
+//----------------------------------------------------------------------------//
+// Register LLVMGPU Passes
+//----------------------------------------------------------------------------//
+
+void registerCodegenLLVMGPUPasses();
+
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------
