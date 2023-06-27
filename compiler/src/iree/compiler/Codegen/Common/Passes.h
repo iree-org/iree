@@ -130,6 +130,7 @@ struct GenericVectorizationPassOptions {
   bool vectorizePadding = false;
   bool vectorizeGatherAccesses = false;
 };
+/// Creates a pass to perform vectorization on LinAlg and tensor ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createGenericVectorizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
