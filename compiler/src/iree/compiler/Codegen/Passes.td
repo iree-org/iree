@@ -13,37 +13,6 @@ include "mlir/Pass/PassBase.td"
 // VMVX Passes
 //------------------------------------------------------------------------------
 
-def VMVXMaterializeEncoding :
-    Pass<"iree-vmvx-materialize-encoding", "func::FuncOp"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend";
-  let constructor = "mlir::iree_compiler::createVMVXMaterializeEncodingPass()";
-}
-
-
-def VMVXLowerLinalgMicrokernels :
-    Pass<"iree-vmvx-lower-linalg-microkernels", ""> {
-  let summary =
-      "Lowers linalg ops to the VMVX microkernel library";
-  let constructor = "mlir::iree_compiler::createVMVXLowerLinalgMicrokernelsPass()";
-  let options = [
-    Option<"warnOnUnconverted", "warn-on-unconverted", "bool",
-           /*default=*/"false",
-           "Warns on any unconverted linalg ops which remain live">
-  ];
-}
-
-def VMVXLinkExecutables :
-    Pass<"iree-vmvx-link-executables", "mlir::ModuleOp"> {
-  let summary = "Links VMVX HAL executables within the top-level program module.";
-  let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
-}
-
-def VMVXAssignConstantOrdinals :
-    Pass<"iree-vmvx-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Assigns executable constant ordinals across all VMVX variants.";
-  let constructor = "mlir::iree_compiler::createVMVXAssignConstantOrdinalsPass()";
-}
-
 //------------------------------------------------------------------------------
 // WGSL Passes
 //------------------------------------------------------------------------------

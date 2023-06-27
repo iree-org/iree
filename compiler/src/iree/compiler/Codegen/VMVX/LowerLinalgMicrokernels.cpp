@@ -6,7 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/builtins/ukernel/exported_bits.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"

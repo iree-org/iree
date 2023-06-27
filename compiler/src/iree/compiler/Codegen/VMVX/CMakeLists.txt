@@ -10,6 +10,34 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "PassDetail.h"
+    "Passes.h.inc"
+    "VMVXPasses.h"
+  DEPS
+    ::PassesIncGen
+    MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     VMVX
@@ -23,6 +51,8 @@ iree_cc_library(
     "VMVXLinkExecutables.cpp"
     "VMVXMaterializeEncodingPass.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport

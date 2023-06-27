@@ -6,7 +6,7 @@
 
 #include "mlir/Transforms/Passes.h"
 
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -27,6 +27,20 @@ void buildVMVXLinkingPassPipeline(OpPassManager &passManager) {
   passManager.nest<IREE::HAL::ExecutableOp>()
       .addNestedPass<IREE::HAL::ExecutableVariantOp>(
           createVMVXAssignConstantOrdinalsPass());
+}
+
+//===---------------------------------------------------------------------===//
+// Register VMVX Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc"
+} // namespace
+
+void registerCodegenVMVXPasses() {
+  // Generated.
+  registerPasses();
 }
 
 } // namespace iree_compiler
