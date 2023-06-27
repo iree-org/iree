@@ -102,6 +102,18 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op) {
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
     flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
+  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+             outElemType.isF32()) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_F16F16F32;
+  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+             outElemType.isF16()) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_F16F16F16;
+  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+             outElemType.isF32()) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32;
+  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+             outElemType.isBF16()) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -161,6 +173,10 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op) {
     flags = IREE_UK_FLAG_PACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
     flags = IREE_UK_FLAG_PACK_TYPE_F32F32;
+  } else if (inElemType.isF16() && outElemType.isF16()) {
+    flags = IREE_UK_FLAG_PACK_TYPE_F16F16;
+  } else if (inElemType.isBF16() && outElemType.isBF16()) {
+    flags = IREE_UK_FLAG_PACK_TYPE_BF16BF16;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -270,6 +286,10 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op) {
     flags = IREE_UK_FLAG_UNPACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
     flags = IREE_UK_FLAG_UNPACK_TYPE_F32F32;
+  } else if (inElemType.isF16() && outElemType.isF16()) {
+    flags = IREE_UK_FLAG_UNPACK_TYPE_F16F16;
+  } else if (inElemType.isBF16() && outElemType.isBF16()) {
+    flags = IREE_UK_FLAG_UNPACK_TYPE_BF16BF16;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -358,6 +378,14 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
     flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
   } else if (*matmulType == MatmulType::I8I8I32) {
     flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
+  } else if (*matmulType == MatmulType::F16F16F32) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32;
+  } else if (*matmulType == MatmulType::F16F16F16) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F16;
+  } else if (*matmulType == MatmulType::BF16BF16F32) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32;
+  } else if (*matmulType == MatmulType::BF16BF16BF16) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
   } else {
     return failure();
   }
