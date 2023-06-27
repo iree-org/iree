@@ -114,7 +114,6 @@ void AbstractGemmLikeStrategy::initDefaultValues(const GPUModel &gpuModel) {
     numWarps = numThreads;
     numWarps[0] = mlir::ceilDiv(numWarps[0], gpuModel.subgroupSize);
   }
-  /// TODO: Restrict based on hardware support.
   if (clUseAsyncCopies.getNumOccurrences())
     useAsyncCopies = clUseAsyncCopies;
   else
