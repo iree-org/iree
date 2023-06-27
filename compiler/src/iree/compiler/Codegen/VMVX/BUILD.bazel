@@ -30,7 +30,7 @@ iree_compiler_cc_library(
     hdrs = [
         "PassDetail.h",
         "Passes.h.inc",
-        "VMVXPasses.h",
+        "Passes.h",
     ],
     deps = [
         ":PassesIncGen",
@@ -55,7 +55,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "EncodingInfo.h",
-        "VMVXPasses.h",
+        "Passes.h",
     ],
     deps = [
         ":PassHeaders",

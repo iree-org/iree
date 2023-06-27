@@ -7,7 +7,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "iree/compiler/Codegen/WGSL/PassDetail.h"
-#include "iree/compiler/Codegen/WGSL/WGSLPasses.h"
+#include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {

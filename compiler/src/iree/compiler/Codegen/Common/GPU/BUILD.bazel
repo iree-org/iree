@@ -28,7 +28,7 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
-        "CommonGPUPasses.h",
+        "Passes.h",
         "PassDetail.h",
         "Passes.h.inc",
     ],
@@ -65,7 +65,7 @@ iree_compiler_cc_library(
         "WorkgroupSpecializationPass.cpp",        
     ],
     hdrs = [
-        "CommonGPUPasses.h",
+        "Passes.h",
         "GPUPatterns.h",
     ],
     deps = [

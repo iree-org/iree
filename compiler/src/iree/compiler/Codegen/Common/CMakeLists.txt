@@ -23,8 +23,8 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "CommonPasses.h"
     "PassDetail.h"
+    "Passes.h"
     "Passes.h.inc"
   DEPS
     ::PassesIncGen
@@ -112,9 +112,9 @@ iree_cc_library(
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
-    "CommonPasses.h"
     "EncodingInfo.h"
     "ExtractAddressComputation.h"
+    "Passes.h"
     "Transforms.h"
   SRCS
     "BubbleUpOrdinalOps.cpp"

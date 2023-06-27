@@ -6,8 +6,8 @@
 
 #define DEBUG_TYPE "iree-codegen-expand-strided-metadata"
 
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"

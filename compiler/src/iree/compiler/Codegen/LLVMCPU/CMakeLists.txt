@@ -23,8 +23,8 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "LLVMCPUPasses.h"
     "PassDetail.h"
+    "Passes.h"
     "Passes.h.inc"
   DEPS
     ::PassesIncGen
@@ -44,7 +44,7 @@ iree_cc_library(
   HDRS
     "DispatchABI.h"
     "KernelDispatch.h"
-    "LLVMCPUPasses.h"
+    "Passes.h"
     "TargetMLTransformInfo.h"
     "TileSizeSelection.h"
     "Utils.h"

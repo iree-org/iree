@@ -30,7 +30,7 @@ iree_compiler_cc_library(
     hdrs = [
         "PassDetail.h",
         "Passes.h.inc",
-        "WGSLPasses.h",
+        "Passes.h",
     ],
     deps = [
         ":PassesIncGen",
@@ -51,7 +51,7 @@ iree_compiler_cc_library(
         "WGSLReplacePushConstants.cpp",
     ],
     hdrs = [
-        "WGSLPasses.h",
+        "Passes.h",
     ],
     deps = [
         ":PassHeaders",

@@ -23,8 +23,8 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "CommonGPUPasses.h"
     "PassDetail.h"
+    "Passes.h"
     "Passes.h.inc"
   DEPS
     ::PassesIncGen
@@ -43,8 +43,8 @@ iree_cc_library(
   NAME
     CommonGPUPasses
   HDRS
-    "CommonGPUPasses.h"
     "GPUPatterns.h"
+    "Passes.h"
   SRCS
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"

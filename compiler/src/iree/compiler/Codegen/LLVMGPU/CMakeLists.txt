@@ -23,8 +23,8 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "LLVMGPUPasses.h"
     "PassDetail.h"
+    "Passes.h"
     "Passes.h.inc"
   DEPS
     ::PassesIncGen
@@ -45,7 +45,7 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
-    "LLVMGPUPasses.h"
+    "Passes.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"

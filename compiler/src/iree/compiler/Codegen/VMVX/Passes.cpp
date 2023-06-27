@@ -7,7 +7,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "iree/compiler/Codegen/VMVX/PassDetail.h"
-#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {

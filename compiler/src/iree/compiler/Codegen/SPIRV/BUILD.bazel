@@ -30,7 +30,7 @@ iree_compiler_cc_library(
     hdrs = [
         "PassDetail.h",
         "Passes.h.inc",
-        "SPIRVPasses.h",
+        "Passes.h",
     ],
     deps = [
         ":PassesIncGen",
@@ -76,7 +76,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "KernelConfig.h",
-        "SPIRVPasses.h",
+        "Passes.h",
         "Utils.h",
     ],
     deps = [

@@ -24,8 +24,8 @@ iree_cc_library(
     PassHeaders
   HDRS
     "PassDetail.h"
+    "Passes.h"
     "Passes.h.inc"
-    "SPIRVPasses.h"
   DEPS
     ::PassesIncGen
     MLIRLinalgTransforms
@@ -44,7 +44,7 @@ iree_cc_library(
     SPIRV
   HDRS
     "KernelConfig.h"
-    "SPIRVPasses.h"
+    "Passes.h"
     "Utils.h"
   SRCS
     "AMDConfig.cpp"

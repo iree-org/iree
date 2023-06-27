@@ -11,7 +11,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/VMVX/EncodingInfo.h"
 #include "iree/compiler/Codegen/VMVX/PassDetail.h"
-#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"

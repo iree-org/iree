@@ -7,10 +7,10 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"

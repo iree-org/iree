@@ -24,8 +24,8 @@ iree_cc_library(
     PassHeaders
   HDRS
     "PassDetail.h"
+    "Passes.h"
     "Passes.h.inc"
-    "VMVXPasses.h"
   DEPS
     ::PassesIncGen
     MLIRLinalgTransforms
@@ -43,7 +43,7 @@ iree_cc_library(
     VMVX
   HDRS
     "EncodingInfo.h"
-    "VMVXPasses.h"
+    "Passes.h"
   SRCS
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
