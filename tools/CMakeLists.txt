@@ -243,6 +243,7 @@ if(IREE_BUILD_COMPILER)
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
+      LLVMSupport
       MLIRTblgenLib
     HOSTONLY
   )
