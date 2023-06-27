@@ -5,11 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Common classes for benchmark definitions."""
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Sequence
+
 from e2e_test_framework import serialization, unique_ids
-import dataclasses
 
 
 class ArchitectureType(Enum):
@@ -152,10 +153,10 @@ class DeviceSpec(object):
         cls,
         id: str,
         device_name: str,
-        tags: Sequence[str],
         host_environment: HostEnvironment,
         architecture: DeviceArchitecture,
         device_parameters: Optional[Sequence[str]] = None,
+        tags: Sequence[str] = (),
     ):
         tag_part = ",".join(tags)
         # Format: <device_name>[<tag>,...]
