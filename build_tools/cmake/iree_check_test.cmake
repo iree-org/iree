@@ -40,6 +40,7 @@ endfunction()
 #       to use for the generated IREE module (.vmfb).
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
+#   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
 function(iree_check_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -57,7 +58,7 @@ function(iree_check_test)
     _RULE
     ""
     "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DEPENDS;TIMEOUT"
     ${ARGN}
   )
 
@@ -84,7 +85,7 @@ function(iree_check_test)
   if (_RULE_TARGET_CPU_FEATURES)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
-
+  
   iree_bytecode_module(
     NAME
       "${_MODULE_NAME}"
@@ -95,6 +96,8 @@ function(iree_check_test)
     FLAGS
       "${_BASE_COMPILER_FLAGS}"
       "${_RULE_COMPILER_FLAGS}"
+    DEPENDS
+      "${_RULE_DEPENDS}"
   )
 
   set(_RUNNER_TARGET "iree-check-module")
@@ -154,6 +157,7 @@ endfunction()
 #       is added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
+#   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
 function(iree_check_single_backend_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -167,7 +171,7 @@ function(iree_check_single_backend_test_suite)
     _RULE
     ""
     "NAME;TARGET_BACKEND;DRIVER"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;TIMEOUT"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DEPENDS;TIMEOUT"
     ${ARGN}
   )
 
@@ -239,6 +243,8 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_LABELS}
       TARGET_CPU_FEATURES
         ${_RULE_TARGET_CPU_FEATURES}
+      DEPENDS
+        ${_RULE_DEPENDS}
       TIMEOUT
         ${_RULE_TIMEOUT}
     )

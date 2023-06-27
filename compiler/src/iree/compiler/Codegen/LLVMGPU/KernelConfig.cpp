@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -850,6 +851,16 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
       workgroupSize);
 }
 
+/// Make UKernels take the LLVMGPUDefault lowering pipeline.
+static LogicalResult
+setUKernelConfig(func::FuncOp entryPoint,
+                 IREE::Codegen::UKernelOpInterface ukernelOp) {
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint->getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault);
+  return setTranslationInfo(entryPoint, translationInfo);
+}
+
 /// Decides the tiling and distribution parameters for one convolution
 /// dimension. Returns true if we can succesfully deduce.
 ///
@@ -1061,6 +1072,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   }
   if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
     return setPackConfig(entryPointFn, packOp);
+  }
+  if (auto ukernelOp = dyn_cast<IREE::Codegen::UKernelOpInterface>(computeOp)) {
+    return setUKernelConfig(entryPointFn, ukernelOp);
   }
 
   return setRootDefaultConfig(entryPointFn, computeOp);

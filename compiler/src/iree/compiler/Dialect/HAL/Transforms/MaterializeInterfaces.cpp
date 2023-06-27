@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/Analysis/BindingLayout.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -339,10 +340,26 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
     for (auto variantOp : variantOps) {
       // Declare the entry point on the target.
       OpBuilder targetBuilder(variantOp.getInnerModule());
+      // Check if workgroup size is set externally.
+      ArrayAttr workgroupSize;
+      for (auto attr : exportOp->getAttrs()) {
+        if (attr.getValue().isa<IREE::Codegen::ExportConfigAttr>()) {
+          workgroupSize = attr.getValue()
+                              .cast<IREE::Codegen::ExportConfigAttr>()
+                              .getWorkgroupSize();
+          if (workgroupSize.size() < 3) {
+            SmallVector<Attribute> workgroupSizeVals =
+                llvm::to_vector(workgroupSize);
+            workgroupSizeVals.resize(3, targetBuilder.getIndexAttr(1));
+            workgroupSize = targetBuilder.getArrayAttr(workgroupSizeVals);
+          }
+          break;
+        }
+      }
       auto newExportOp = targetBuilder.create<IREE::HAL::ExecutableExportOp>(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.getFunctionRef()),
-          targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
+          targetBuilder.getIndexAttr(ordinal), layoutAttr, workgroupSize,
           /*subgroup_size=*/IntegerAttr{},
           /*workgroup_local_memory=*/IntegerAttr{});
 

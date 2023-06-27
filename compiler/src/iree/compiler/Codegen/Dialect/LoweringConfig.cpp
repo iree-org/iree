@@ -71,6 +71,29 @@ namespace IREE {
 namespace Codegen {
 
 //===----------------------------------------------------------------------===//
+// iree_codegen.export_config
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+ExportConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                         ArrayAttr workgroupSize) {
+  if (!workgroupSize) {
+    return success();
+  }
+  if (workgroupSize.size() > 3) {
+    return emitError() << "expected workgroup size to have atmost 3 entries";
+  }
+  if (!llvm::all_of(workgroupSize, [](Attribute attr) {
+        auto intAttr = llvm::dyn_cast<IntegerAttr>(attr);
+        return intAttr && intAttr.getType().isIndex();
+      })) {
+    return emitError()
+           << "expected workgroup size to contain values of index type";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // iree_codegen.translation_info
 //===----------------------------------------------------------------------===//
 

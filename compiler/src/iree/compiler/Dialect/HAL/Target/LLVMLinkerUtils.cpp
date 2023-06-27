@@ -17,7 +17,7 @@ namespace IREE {
 namespace HAL {
 
 static llvm::cl::opt<std::string> clBitcodeFile(
-    "iree-llvmcpu-link-bitcode",
+    "iree-link-bitcode",
     llvm::cl::desc("Paths of additional bitcode file to load and link."),
     llvm::cl::init(""));
 
@@ -131,9 +131,15 @@ LogicalResult linkCmdlineBitcodeFile(Location loc, llvm::Linker &linker,
     return mlir::emitError(loc) << "failed reading user bitcode file `"
                                 << clBitcodeFile << "`: " << ec.message();
   }
+  auto setAlwaysInline = [&](llvm::Module &module) {
+    for (auto &func : module.getFunctionList()) {
+      func.addFnAttr(llvm::Attribute::AlwaysInline);
+    }
+  };
   if (failed(linkBitcodeModule(
           loc, linker, linkerFlags, targetMachine, clBitcodeFile,
-          llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context)))) {
+          llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context),
+          setAlwaysInline))) {
     return mlir::emitError(loc) << "failed linking in user bitcode file `"
                                 << clBitcodeFile << "` for target triple '"
                                 << targetMachine.getTargetTriple().str() << "'";

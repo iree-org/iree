@@ -291,6 +291,11 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
   // Link user modules and libdevice (if required).
   // Note that linking order matters:
   llvm::Linker linker(module);
+  if (failed(linkCmdlineBitcodeFile(loc, linker, llvm::Linker::OverrideFromSrc,
+                                    targetMachine, module.getContext()))) {
+    return failure();
+  }
+
   unsigned linkerFlags =
       llvm::Linker::LinkOnlyNeeded | llvm::Linker::OverrideFromSrc;
   if (failed(linkBitcodeObjects(loc, linker, linkerFlags, targetMachine,

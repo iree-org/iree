@@ -386,13 +386,12 @@ outlineDispatchWorkgroupsOp(std::string executableOpName,
   auto exportOp = builder.create<ExecutableExportOp>(
       regionOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp));
-  if (!regionOp.getWorkgroupCount().empty())
-    exportOp.getWorkgroupCount().takeBody(regionOp.getWorkgroupCount());
 
   // Move over the workgroup count region, if present.
   if (!regionOp.getWorkgroupCount().empty()) {
     exportOp.getWorkgroupCount().takeBody(regionOp.getWorkgroupCount());
   }
+  exportOp->setDialectAttrs(regionOp->getDialectAttrs());
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
   return convertToDispatchOp(regionOp, executableOp, exportOp);
