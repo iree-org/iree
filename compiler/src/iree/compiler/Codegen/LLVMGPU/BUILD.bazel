@@ -42,7 +42,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
-    ]
+    ],
 )
 
 iree_compiler_cc_library(
