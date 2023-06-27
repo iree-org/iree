@@ -5,8 +5,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_
-#define IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_
+#ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
+#define IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -117,11 +117,18 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
     std::function<int(func::FuncOp)> getWarpSize = nullptr);
 
+/// Pass to specialize workgroup distribution loops
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWorkgroupSpecializationPass();
+
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 
+/// Register Common GPU passes.
+void registerCodegenCommonGPUPasses();
+
 } // namespace iree_compiler
 } // namespace mlir
 
-#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_

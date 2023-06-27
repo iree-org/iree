@@ -60,10 +60,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 /// Performs the final conversion to ROCDL+LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
-// Extract address computations (including the ones with GPU instructions) into
-// their own separate instructions.
-std::unique_ptr<Pass> createExtractAddressComputationGPUPass();
-
 /// Cast address space to generic in CallOp and FuncOp
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUCastAddressSpaceFunction();
@@ -109,6 +105,12 @@ verifyGPUMatmulPipeline(Operation *op,
                         IREE::Codegen::LoweringConfigAttr loweringConfig,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize);
+
+//----------------------------------------------------------------------------//
+// Register LLVMGPU Passes
+//----------------------------------------------------------------------------//
+
+void registerCodegenLLVMGPUPasses();
 
 //------------------------------------------------------------------------------
 // Test passes

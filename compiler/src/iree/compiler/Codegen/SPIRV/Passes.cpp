@@ -14,11 +14,11 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -601,6 +601,27 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
     pm.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
+}
+
+//===---------------------------------------------------------------------===//
+// Register SPIRV Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+} // namespace
+
+void registerCodegenSPIRVPasses() {
+  // Generated.
+  registerPasses();
+
+  static PassPipelineRegistration<> LinalgSPIRVPipeline(
+      "iree-codegen-linalg-to-spirv-pipeline",
+      "Runs the progressive lowering pipeline from linalg to SPIR-V",
+      [](OpPassManager &passManager) {
+        buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+      });
 }
 
 } // namespace iree_compiler

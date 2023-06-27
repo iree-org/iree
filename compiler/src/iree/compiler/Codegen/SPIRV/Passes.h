@@ -160,6 +160,12 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
 
+//----------------------------------------------------------------------------//
+// Register SPIRV Passes
+//----------------------------------------------------------------------------//
+
+void registerCodegenSPIRVPasses();
+
 } // namespace iree_compiler
 } // namespace mlir
 

@@ -18,6 +18,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+
 //------------------------------------------------------------------------------
 // VMVX passes
 //------------------------------------------------------------------------------
@@ -44,6 +45,13 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
 
 /// Populates passes needed to link HAL executables across VMVX targets.
 void buildVMVXLinkingPassPipeline(OpPassManager &passManager);
+
+//----------------------------------------------------------------------------//
+// Register VMVX Passes
+//----------------------------------------------------------------------------//
+
+void registerCodegenVMVXPasses();
+
 } // namespace iree_compiler
 } // namespace mlir
 

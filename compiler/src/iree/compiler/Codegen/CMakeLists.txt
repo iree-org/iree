@@ -10,47 +10,17 @@
 
 iree_add_all_subdirs()
 
-iree_tablegen_library(
-  NAME
-    PassesIncGen
-  TD_FILE
-    "Passes.td"
-  OUTS
-    --gen-pass-decls Passes.h.inc
-)
-
-iree_cc_library(
-  NAME
-    PassHeaders
-  HDRS
-    "PassDetail.h"
-    "Passes.h"
-    "Passes.h.inc"
-  DEPS
-    ::PassesIncGen
-    MLIRLinalgTransforms
-    MLIRMemRefDialect
-    MLIRNVGPUDialect
-    MLIRPass
-    MLIRTransforms
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Utils
-  PUBLIC
-)
-
 iree_cc_library(
   NAME
     Codegen
+  HDRS
+    "Passes.h"
   SRCS
     "Passes.cpp"
   DEPS
-    ::PassHeaders
-    ::PassesIncGen
     IREELinalgExtPasses
     MLIRPass
     iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
@@ -62,8 +32,3 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-# TODO: For some reason, these dependencies are not being added automatically.
-add_dependencies(
-  iree_compiler_Codegen_PassHeaders
-  iree_compiler_Codegen_PassesIncGen
-)

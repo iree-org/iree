@@ -219,6 +219,12 @@ createLLVMCPULinkExecutablesPass();
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
 
+//----------------------------------------------------------------------------//
+// Register LLVMCPU Passes
+//----------------------------------------------------------------------------//
+
+void registerCodegenLLVMCPUPasses();
+
 } // namespace iree_compiler
 } // namespace mlir
 
