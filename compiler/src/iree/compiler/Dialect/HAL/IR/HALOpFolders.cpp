@@ -173,15 +173,11 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
                                 PatternRewriter &rewriter) const override {
     auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
         op.getBufferView().getDefiningOp());
-    if (!createOp)
+    if (!createOp || !matchPattern(createOp.getSourceOffset(), m_Zero()))
       return failure();
 
-    if (matchPattern(createOp.getSourceOffset(), m_Zero())) {
-      rewriter.replaceOp(op, createOp.getSourceBuffer());
-      return success();
-    }
-
-    return failure();
+    rewriter.replaceOp(op, createOp.getSourceBuffer());
+    return success();
   }
 };
 
