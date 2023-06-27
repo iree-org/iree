@@ -12,6 +12,34 @@ iree_add_all_subdirs()
 
 iree_tablegen_library(
   NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "CommonPasses.h"
+    "PassDetail.h"
+    "Passes.h.inc"
+  DEPS
+    ::PassesIncGen
+    MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
     FoldTensorExtractOpIncGen
   TD_FILE
     "FoldTensorExtractOp.td"
@@ -25,6 +53,8 @@ iree_cc_library(
   SRCS
     "TransformDialectInterpreterPass.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
     IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransformOps
@@ -85,6 +115,7 @@ iree_cc_library(
     "BufferizationAnalysis.h"
     "CommonPasses.h"
     "EncodingInfo.h"
+    "ExtractAddressComputation.h"
     "Transforms.h"
   SRCS
     "BubbleUpOrdinalOps.cpp"
@@ -96,9 +127,13 @@ iree_cc_library(
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeAffineOpsPass.cpp"
+    "DecomposeConvolutionToLowerDimOps.cpp"
+    "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
+    "ExtractAddressComputation.cpp"
     "FlattenMemRefSubspanPass.cpp"
+    "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
@@ -108,9 +143,13 @@ iree_cc_library(
     "InstrumentMemoryAccesses.cpp"
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
+    "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
+    "PadDynamicAlloc.cpp"
+    "Passes.cpp"
     "PolynomialApproximationPass.cpp"
     "RematerializeParallelOps.cpp"
+    "RemoveTrivialLoops.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
@@ -118,12 +157,14 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "TypePropagationPass.cpp"
     "VectorizePad.cpp"
-    "WorkgroupSpecializationPass.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
     LLVMSupport
+    MLIRAffineAnalysis
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRAffineUtils
@@ -158,6 +199,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
@@ -183,19 +225,13 @@ iree_cc_library(
   NAME
     Common
   HDRS
-    "ExtractAddressComputation.h"
     "UserConfig.h"
   SRCS
-    "DecomposeConvolutionToLowerDimOps.cpp"
-    "DecomposeLinalgGeneric.cpp"
-    "ExtractAddressComputation.cpp"
-    "FoldAffineMinInDistributedLoops.cpp"
-    "MemrefCopyToLinalg.cpp"
-    "PadDynamicAlloc.cpp"
-    "RemoveTrivialLoops.cpp"
     "UserConfig.cpp"
   DEPS
     ::CommonPasses
+    ::PassHeaders
+    ::PassesIncGen
     ::TransformDialectInterpreterPass
     IREELinalgExtDialect
     IREELinalgExtPasses

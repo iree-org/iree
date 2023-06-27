@@ -97,6 +97,10 @@ createEraseHALDescriptorTypeFromMemRefPass();
 // Extract address computations into their own separate instructions.
 std::unique_ptr<Pass> createExtractAddressComputationPass();
 
+// Extract address computations (including the ones with GPU instructions) into
+// their own separate instructions.
+std::unique_ptr<Pass> createExtractAddressComputationGPUPass();
+
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
 /// on subspan ops to the consumer load/store ops, in preparation for lowering
 /// to backends that require linearized access.
@@ -205,10 +209,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
-/// Pass to specialize workgroup distribution loops
-std::unique_ptr<OperationPass<func::FuncOp>>
-createWorkgroupSpecializationPass();
-
 /// Erases #hal.descriptor_type as MemRef memory space.
 LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 
@@ -240,6 +240,9 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 /// out of bound semantics.
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
+
+/// Method to register all passes.
+void registerCodegenCommonPasses();
 
 } // namespace iree_compiler
 } // namespace mlir

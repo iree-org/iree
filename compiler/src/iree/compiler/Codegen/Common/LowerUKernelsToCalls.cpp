@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
-#include "iree/compiler/Codegen/PassDetail.h"
 #include "llvm/ADT/MapVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

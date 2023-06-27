@@ -30,6 +30,8 @@ namespace {
 
 void registerCodegenPasses() {
   // Generated.
+  registerCodegenCommonPasses();
+  registerCodegenCommonGPUPasses();
   registerPasses();
 
   static PassPipelineRegistration<> LinalgLLVMPipeline(

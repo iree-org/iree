@@ -117,9 +117,16 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
     std::function<int(func::FuncOp)> getWarpSize = nullptr);
 
+/// Pass to specialize workgroup distribution loops
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWorkgroupSpecializationPass();
+
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
+
+/// Register Common GPU passes.
+void registerCodegenCommonGPUPasses();
 
 } // namespace iree_compiler
 } // namespace mlir
