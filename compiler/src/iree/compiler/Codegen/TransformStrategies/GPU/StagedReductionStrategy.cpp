@@ -39,9 +39,7 @@ using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildDistributeVectors;
-using iree_compiler::gpu::kCudaMaxNumThreads;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::ReductionConfig;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::gpu::StagedReductionStrategy;
@@ -50,8 +48,8 @@ using iree_compiler::gpu::threadY;
 
 mlir::iree_compiler::gpu::StagedReductionStrategy::StagedReductionStrategy(
     const transform_ext::MatchedReductionCaptures &captures,
-    const ReductionConfig &reductionConfig)
-    : AbstractReductionStrategy(captures, {}) {
+    const ReductionConfig &reductionConfig, const GPUModel &gpuModel)
+    : AbstractReductionStrategy(captures, {}), GPUStrategy(gpuModel) {
   configure(reductionConfig);
   LLVM_DEBUG(DBGS() << "use GPU staged reduction strategy\n");
   LLVM_DEBUG(llvm::interleaveComma(workgroupTileSizes,
@@ -64,7 +62,7 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   int64_t maxNumThreadsToUse = reductionConfig.maxNumThreads;
   int64_t maxVectorSize = reductionConfig.vectorSize;
   assert(maxNumThreadsToUse > 0 && "maxNumThreadsToUse must be > 0");
-  assert(maxNumThreadsToUse >= kCudaWarpSize && "need at least a warp?");
+  assert(maxNumThreadsToUse >= subgroupSize && "need at least a warp?");
   assert(maxVectorSize > 0 && "maxVectorSize must be > 0");
 
   // Block-level
@@ -90,7 +88,7 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
     // warp size below the `maxNumThreadsToUse` limit.
     vectorSize = 1;
     numThreadsXInBlock =
-        iree_compiler::previousMultipleOf(maxNumThreadsToUse, kCudaWarpSize);
+        iree_compiler::previousMultipleOf(maxNumThreadsToUse, subgroupSize);
   } else {
     // Adjust the vector size to the max power of 2 that divides the reduction,
     // this dimensions the vector properly, whatever the elemental type.
@@ -108,8 +106,8 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
     // `reductionDimensionSize / vectorSize` but below `maxNumThreadsToUse`.
     numThreadsXInBlock = std::min(
         iree_compiler::nextMultipleOf(reductionDimensionSize / vectorSize,
-                                      kCudaWarpSize),
-        iree_compiler::previousMultipleOf(maxNumThreadsToUse, kCudaWarpSize));
+                                      subgroupSize),
+        iree_compiler::previousMultipleOf(maxNumThreadsToUse, subgroupSize));
   }
 }
 
@@ -249,14 +247,10 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   // Step 6. The staged strategy has a post-bufferization vector distribution
   // with rank-reduction. The vector distribution occurs on multiple warps and
   // is itself internally staged in 2 stages.
-  assert(strategy.getNumThreadsInBlock().front() % kCudaWarpSize == 0 &&
-         "strategy requires full warps");
-  int64_t numWarpsToUse =
-      strategy.getNumThreadsInBlock().front() / kCudaWarpSize;
   // Distribute the reduction on all the threads of the group. This allows us
   // to have the same data layout for the partial reduction and the merge and
   // therefore we can optimize away the temporary memory usage.
-  buildDistributeVectors(b, variantH2, funcH, numWarpsToUse * kCudaWarpSize);
+  buildDistributeVectors(b, variantH2, funcH, strategy.getTotalNumThreads());
 
   // Step 7. Apply clean up of memory operations.
   funcH = b.create<MatchOp>(variantH2, func::FuncOp::getOperationName());

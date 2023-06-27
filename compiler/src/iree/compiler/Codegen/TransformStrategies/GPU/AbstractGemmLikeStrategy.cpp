@@ -10,6 +10,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Support/MathExtras.h"
 
 using namespace mlir;
 
@@ -22,57 +23,48 @@ static llvm::cl::list<int64_t> clBlockTileSizes(
     "td-matmul-strategy-blk-sizes",
     llvm::cl::desc("block tile size for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::list_init(ArrayRef<int64_t>{128, 128, 1}),
     llvm::cl::CommaSeparated);
 static llvm::cl::opt<int64_t> clReductionTileSize(
     "td-matmul-strategy-reduc-size",
     llvm::cl::desc(
-        "reduction tile sized for the transform dialect matmul strategy"),
-    llvm::cl::init(16));
+        "reduction tile sized for the transform dialect matmul strategy"));
 static llvm::cl::list<int64_t> clNumThreads(
     "td-matmul-strategy-num-threads",
     llvm::cl::desc("number of threads for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::list_init(ArrayRef<int64_t>{64, 2, 1}), llvm::cl::CommaSeparated);
+    llvm::cl::CommaSeparated);
 static llvm::cl::list<int64_t> clNumWarps(
     "td-matmul-strategy-num-warps",
     llvm::cl::desc("number of warps for dims (x,y,z) for the transform "
                    "dialect matmul strategy"),
-    llvm::cl::list_init(ArrayRef<int64_t>{2, 2, 1}), llvm::cl::CommaSeparated);
+    llvm::cl::CommaSeparated);
 static llvm::cl::opt<bool> clUseAsyncCopies(
     "td-matmul-strategy-use-async-copies",
     llvm::cl::desc(
-        "use asynchronous copies for the transform dialect matmul strategy"),
-    llvm::cl::init(true));
+        "use asynchronous copies for the transform dialect matmul strategy"));
 static llvm::cl::opt<bool> clUseMmaSync(
     "td-matmul-strategy-use-mma-sync",
-    llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
-    llvm::cl::init(true));
+    llvm::cl::desc("use mma sync for the transform dialect matmul strategy"));
 static llvm::cl::opt<bool> clUseWmma(
     "td-matmul-strategy-use-wmma",
-    llvm::cl::desc("use wmma for the transform dialect matmul strategy"),
-    llvm::cl::init(false));
+    llvm::cl::desc("use wmma for the transform dialect matmul strategy"));
 static llvm::cl::opt<bool> clUseFma(
     "td-matmul-strategy-use-fma",
-    llvm::cl::desc("use fma for the transform dialect matmul strategy"),
-    llvm::cl::init(false));
+    llvm::cl::desc("use fma for the transform dialect matmul strategy"));
 static llvm::cl::opt<int64_t> clPipelineDepth(
     "td-matmul-strategy-pipeline-depth",
-    llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"),
-    llvm::cl::init(3));
+    llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"));
 static llvm::cl::opt<bool> clPeelPipelineEpilogue(
     "td-matmul-strategy-peel-pipeline-epilogue",
     llvm::cl::desc("whether to peel the pipeline epilogue for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(false));
+                   "dialect matmul strategy"));
 
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
-using iree_compiler::gpu::kCudaWarpSize;
 
 /// Key function for vtable.
 AbstractGemmLikeStrategy::~AbstractGemmLikeStrategy() {}
 
-void AbstractGemmLikeStrategy::initDefaultValues() {
+void AbstractGemmLikeStrategy::initDefaultValues(const GPUModel &gpuModel) {
   blockTileSizes =
       SmallVector<int64_t>{clBlockTileSizes.begin(), clBlockTileSizes.end()};
   numThreads = SmallVector<int64_t>{clNumThreads.begin(), clNumThreads.end()};
@@ -85,16 +77,85 @@ void AbstractGemmLikeStrategy::initDefaultValues() {
   pipelineDepth = clPipelineDepth;
   peelPipelineEpilogue = clPeelPipelineEpilogue;
 
-  if (!clBlockTileSizes.isDefaultAssigned() ||
-      !clNumThreads.isDefaultAssigned() || !clNumWarps.isDefaultAssigned() ||
-      reductionTileSize != clReductionTileSize.getDefault().getValue() ||
-      useAsyncCopies != clUseAsyncCopies.getDefault().getValue() ||
-      useMmaSync != clUseMmaSync.getDefault().getValue() ||
-      useWmma != clUseWmma.getDefault().getValue() ||
-      useFma != clUseFma.getDefault().getValue() ||
-      pipelineDepth != clPipelineDepth.getDefault().getValue() ||
-      peelPipelineEpilogue != clPeelPipelineEpilogue.getDefault().getValue()) {
+  /// cliOptionsSpecified is used to override hard-coded well known good
+  /// defaults when set.
+  if (clBlockTileSizes.getNumOccurrences() ||
+      clNumThreads.getNumOccurrences() || clNumWarps.getNumOccurrences() ||
+      clReductionTileSize.getNumOccurrences() ||
+      clUseAsyncCopies.getNumOccurrences() ||
+      clUseMmaSync.getNumOccurrences() || clUseWmma.getNumOccurrences() ||
+      clUseFma.getNumOccurrences() || clPipelineDepth.getNumOccurrences() ||
+      clPeelPipelineEpilogue.getNumOccurrences()) {
     cliOptionsSpecified = true;
+  }
+
+  /// Default configuration based on hardware properties and problem bit widths.
+  if (clBlockTileSizes.getNumOccurrences()) {
+    blockTileSizes =
+        SmallVector<int64_t>(clBlockTileSizes.begin(), clBlockTileSizes.end());
+  } else {
+    blockTileSizes = SmallVector<int64_t>{128, 128, 1};
+  }
+
+  if (clNumThreads.getNumOccurrences()) {
+    numThreads = SmallVector<int64_t>(clNumThreads.begin(), clNumThreads.end());
+  } else {
+    // Infer from warp counts if present.
+    if (clNumWarps.getNumOccurrences()) {
+      numThreads = SmallVector<int64_t>(clNumWarps.begin(), clNumWarps.end());
+      numThreads[0] *= gpuModel.subgroupSize;
+    } else {
+      numThreads = SmallVector<int64_t>{64, 2, 1};
+    }
+  }
+  if (clNumWarps.getNumOccurrences()) {
+    numWarps = SmallVector<int64_t>(clNumWarps.begin(), clNumWarps.end());
+  } else {
+    numWarps = numThreads;
+    numWarps[0] = mlir::ceilDiv(numWarps[0], gpuModel.subgroupSize);
+  }
+  if (clUseAsyncCopies.getNumOccurrences())
+    useAsyncCopies = clUseAsyncCopies;
+  else
+    useAsyncCopies = gpuModel.hasMmaSync;
+  if (clUseMmaSync.getNumOccurrences())
+    useMmaSync = clUseMmaSync;
+  if (clUseWmma.getNumOccurrences())
+    useWmma = clUseWmma;
+  if (clUseFma.getNumOccurrences())
+    useFma = clUseFma;
+  /// If not specified, select instructions to target for compute.
+  if (!useMmaSync && !useWmma && !useFma) {
+    /// First, try to use tensor core.
+    if (getLhsElementalType() == getRhsElementalType()) {
+      /// Currently all supported targets at least have WMMA.
+      /// TODO: Handle targets without tensor core.
+      if (gpuModel.hasMmaSync)
+        useMmaSync = true;
+      else
+        useWmma = true;
+    } else {
+      /// Mixed precision only supported by fma.
+      useFma = true;
+    }
+  }
+  if (clReductionTileSize.getNumOccurrences()) {
+    reductionTileSize = clReductionTileSize;
+  } else {
+    reductionTileSize = 16;
+    if (!useFma) {
+      int64_t maxInputWidth =
+          std::max(lhsElementalBitWidth(), rhsElementalBitWidth());
+      assert(maxInputWidth <= 32 && "requires <= 32-bit types");
+      reductionTileSize *= (32 / maxInputWidth);
+    }
+  }
+  if (clPipelineDepth.getNumOccurrences()) {
+    pipelineDepth = clPipelineDepth;
+  } else {
+    pipelineDepth = 0;
+    if (useAsyncCopies)
+      pipelineDepth = 3;
   }
 }
 
@@ -112,7 +173,7 @@ AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(OpBuilder &b) const {
 
 LogicalResult
 AbstractGemmLikeStrategy::validate(const GPUModel &gpuModel) const {
-  if (totalNumThreads() != totalNumWarps() * kCudaWarpSize) {
+  if (totalNumThreads() != totalNumWarps() * gpuModel.subgroupSize) {
     llvm::errs() << "Number of threads specified by warps must match total "
                     "number of threads\n";
     return failure();

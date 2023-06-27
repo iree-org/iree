@@ -18,6 +18,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
+struct GPUModel;
+
 //===----------------------------------------------------------------------===//
 // Base quantities generally useful for all GPU strategies.
 //===----------------------------------------------------------------------===//
@@ -52,8 +54,6 @@ inline Attribute linearIdZ(MLIRContext *ctx) {
 //===----------------------------------------------------------------------===//
 // General helpers.
 //===----------------------------------------------------------------------===//
-static constexpr int64_t kCudaWarpSize = 32;
-static constexpr int64_t kCudaMaxNumThreads = 1024;
 static constexpr int64_t kCudaMaxVectorLoadBitWidth = 128;
 
 /// Return max(1, (value * 32) / bitWidth).
@@ -81,7 +81,7 @@ Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
-                             Value funcH, int64_t warpSize = kCudaWarpSize);
+                             Value funcH, int64_t warpSize);
 
 /// Take care of the last common steps in a GPU strategy (i.e. vectorize,
 /// bufferize, maps to blocks and threads and distribute vectors).
@@ -185,16 +185,6 @@ void buildPipelineSharedMemoryCopies(ImplicitLocOpBuilder &b, Value funcH,
                                      const AbstractGemmLikeStrategy &strategy);
 
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH);
-
-//===----------------------------------------------------------------------===//
-// Higher-level problem-specific strategy creation APIs, these should favor
-// user-friendliness.
-//===----------------------------------------------------------------------===//
-
-/// Try to find an exisiting transform dialect strategy for a given entry point.
-LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,
-                                           Operation *op,
-                                           const GPUModel &gpuModel);
 
 } // namespace gpu
 } // namespace iree_compiler

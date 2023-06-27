@@ -30,9 +30,10 @@ struct GPUModel;
 class MatmulStrategy : public AbstractGemmLikeStrategy {
 public:
   MatmulStrategy(MLIRContext *context,
-                 const transform_ext::MatchedMatmulCaptures &captures)
-      : AbstractGemmLikeStrategy(), ctx(context), captures(captures) {
-    initDefaultValues();
+                 const transform_ext::MatchedMatmulCaptures &captures,
+                 const GPUModel &gpuModel)
+      : AbstractGemmLikeStrategy(gpuModel), ctx(context), captures(captures) {
+    initDefaultValues(gpuModel);
   }
 
   MatmulStrategy(const MatmulStrategy &) = default;
@@ -44,7 +45,7 @@ public:
 
   /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
   /// default CLI values have been overriden.
-  void initDefaultValues() override;
+  void initDefaultValues(const GPUModel &gpuModel) override;
 
   LogicalResult validate(const GPUModel &gpuModel) const override;
 
@@ -79,6 +80,12 @@ public:
     return numWarps[1];
   }
 
+  Type getLhsElementalType() const override { return captures.lhsElementType; }
+  Type getRhsElementalType() const override { return captures.rhsElementType; }
+  Type getResElementalType() const override {
+    return captures.outputElementType;
+  }
+
   MappingInfo getBlockMapping() const override {
     return MappingInfo{/*numThreads=*/{},
                        /*tileSizes=*/{blockTileM(), blockTileN()},
@@ -93,7 +100,7 @@ public:
         /*alignment=*/k(),
         /*copySizes=*/ArrayRef<int64_t>{blockTileM(), reductionTileSize},
         /*favorPredication=*/false,
-        /*elementalBitWidth=*/lhsElementalBitWidth);
+        /*elementalBitWidth=*/lhsElementalBitWidth());
   }
   LogicalResult validateLhsCopyMapping() const override {
     MappingInfo mapping = lhsCopyMapping();
@@ -114,7 +121,7 @@ public:
         /*alignment=*/n(),
         /*copySizes=*/ArrayRef<int64_t>{reductionTileSize, blockTileN()},
         /*favorPredication=*/false,
-        /*elementalBitWidth=*/rhsElementalBitWidth);
+        /*elementalBitWidth=*/rhsElementalBitWidth());
   }
   LogicalResult validateRhsCopyMapping() const override {
     MappingInfo mapping = rhsCopyMapping();
@@ -135,7 +142,7 @@ public:
         /*alignment=*/n(),
         /*copySizes=*/ArrayRef<int64_t>{blockTileM(), blockTileN()},
         /*favorPredication=*/false,
-        /*elementalBitWidth=*/resElementalBitWidth);
+        /*elementalBitWidth=*/resElementalBitWidth());
   }
 
   LogicalResult validateResCopyMapping() const override {

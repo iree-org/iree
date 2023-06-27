@@ -9,6 +9,7 @@
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MappingInfo.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 namespace llvm {
@@ -19,10 +20,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
-struct GPUModel;
-
-struct AbstractGemmLikeStrategy {
-  AbstractGemmLikeStrategy() {}
+struct AbstractGemmLikeStrategy : GPUStrategy {
+  AbstractGemmLikeStrategy(const GPUModel &gpuModel) : GPUStrategy(gpuModel) {}
 
   virtual ~AbstractGemmLikeStrategy();
 
@@ -32,7 +31,7 @@ struct AbstractGemmLikeStrategy {
 
   /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
   /// default CLI values have been overriden.
-  virtual void initDefaultValues();
+  virtual void initDefaultValues(const GPUModel &gpuModel);
 
   /// Encodes whether the user has specified any CLI options. When true, the
   /// strategy should just run what was specified and is not allowed to
@@ -81,9 +80,19 @@ struct AbstractGemmLikeStrategy {
 
   ArrayAttr getZeroPadAttrFromElementalTypes(OpBuilder &b) const;
 
-  int64_t lhsElementalBitWidth = 32;
-  int64_t rhsElementalBitWidth = 32;
-  int64_t resElementalBitWidth = 32;
+  virtual Type getLhsElementalType() const = 0;
+  virtual Type getRhsElementalType() const = 0;
+  virtual Type getResElementalType() const = 0;
+
+  int64_t lhsElementalBitWidth() const {
+    return getLhsElementalType().getIntOrFloatBitWidth();
+  }
+  int64_t rhsElementalBitWidth() const {
+    return getRhsElementalType().getIntOrFloatBitWidth();
+  }
+  int64_t resElementalBitWidth() const {
+    return getResElementalType().getIntOrFloatBitWidth();
+  }
 
   bool alignedLhs() const {
     return m() % blockTileM() == 0 && k() % reductionTileSize == 0;

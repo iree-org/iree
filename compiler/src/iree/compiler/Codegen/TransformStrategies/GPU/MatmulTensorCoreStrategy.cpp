@@ -44,7 +44,6 @@ using iree_compiler::gpu::buildHoistOutputPaddingOp;
 using iree_compiler::gpu::buildMatmulVectorization;
 using iree_compiler::gpu::buildMultiBuffering;
 using iree_compiler::gpu::buildPipelineSharedMemoryCopies;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MappingInfo;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
@@ -54,19 +53,15 @@ using iree_compiler::IREE::transform_dialect::
 using transform::MatchOp;
 using transform_ext::RegisterMatchCallbacksOp;
 
-void MatmulStrategy::initDefaultValues() {
+void MatmulStrategy::initDefaultValues(const GPUModel &gpuModel) {
   // Set the configuration for padding the matmul.
   paddingValueTypes = {captures.lhsElementType, captures.rhsElementType,
                        captures.outputElementType};
   paddingDimensions = {0, 1, 2};
   packingDimensions = {1, 1, 1};
 
-  lhsElementalBitWidth = captures.lhsElementType.getIntOrFloatBitWidth();
-  rhsElementalBitWidth = captures.rhsElementType.getIntOrFloatBitWidth();
-  resElementalBitWidth = captures.outputElementType.getIntOrFloatBitWidth();
-
   // Pull in tile configs from flags.
-  AbstractGemmLikeStrategy::initDefaultValues();
+  AbstractGemmLikeStrategy::initDefaultValues(gpuModel);
 }
 
 LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
@@ -205,6 +200,8 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // TODO: avoid consuming handles and returning here.
   funcH = buildConvertToTensorCoreOp(b, funcH, strategy);
 
+  // TODO: Support pipelining strategies without async copy (e.g. store to
+  // shared memory in stage 0).
   if (strategy.useAsyncCopies) {
     // Step 10. Multi-buffering.
     if (strategy.pipelineDepth > 1)

@@ -11,13 +11,11 @@
 
 #include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace gpu {
-
-struct GPUModel;
-struct ReductionConfig;
 
 /// Encode a strategy targeted at (very) small reductions, for which other
 /// strategies perform poorly.
@@ -41,11 +39,11 @@ struct ReductionConfig;
 // reductions without catastrophic regressions.
 // TODO: Add another strategy based on segmented scans, which can allow us
 // to force sizes that don't divide properly into warp shuffles.
-class SmallReductionStrategy : public AbstractReductionStrategy {
+class SmallReductionStrategy : public AbstractReductionStrategy, GPUStrategy {
 public:
   SmallReductionStrategy(
       const transform_ext::MatchedReductionCaptures &captures,
-      const ReductionConfig &reductionConfig);
+      const ReductionConfig &reductionConfig, const GPUModel &gpuModel);
 
   SmallReductionStrategy(const SmallReductionStrategy &) = default;
   SmallReductionStrategy &operator=(const SmallReductionStrategy &) = default;

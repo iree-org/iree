@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/PadStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/StagedReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
@@ -66,9 +67,7 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectPadStrategy(
 // TODO: significantly better namespacing.
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
 using iree_compiler::gpu::GPUModel;
-using iree_compiler::gpu::kCudaMaxNumThreads;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::PadConfig;
 using iree_compiler::gpu::PadStrategy;
@@ -146,9 +145,9 @@ getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
   bool isDynamicReduction = ShapedType::isDynamic(redSize);
   // Otherwise, still only support the small cases for now and fall back to
   // other strategies otherwise.
-  bool isSmallReduction = (redSize < 2 * kCudaWarpSize);
+  bool isSmallReduction = (redSize < 2 * gpuModel.subgroupSize);
   if (!isDynamicReduction && isSmallReduction) {
-    int64_t maxNumThreads = 4 * kCudaWarpSize;
+    int64_t maxNumThreads = 4 * gpuModel.subgroupSize;
     return ReductionConfig{maxNumThreads, 0, ReductionStrategy::Small};
   }
 
@@ -157,37 +156,43 @@ getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
   //===--------------------------------------------------------------------===//
   int64_t bitWidth = captures.reductionOutputElementalTypeBitWidth;
   int64_t vectorSize = scaleUpByBitWidth(4, bitWidth);
-  int64_t maxNumThreads = 8 * kCudaWarpSize;
+  int64_t maxNumThreads = 8 * gpuModel.subgroupSize;
   // No adjustments in the dynamic case, we need extra information to make a
   // good decision.
   if (ShapedType::isDynamic(redSize))
     return ReductionConfig{maxNumThreads, vectorSize,
                            ReductionStrategy::Staged};
   // Scale down to smaller sizes (4, 8, 16)-warps.
-  if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * kCudaWarpSize) {
+  if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * gpuModel.subgroupSize) {
     vectorSize = scaleUpByBitWidth(1, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * kCudaWarpSize) {
+    maxNumThreads = 4 * gpuModel.subgroupSize;
+  } else if (scaleUpByBitWidth(redSize, bitWidth) <=
+             8 * gpuModel.subgroupSize) {
     vectorSize = scaleUpByBitWidth(2, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * 2 * kCudaWarpSize) {
+    maxNumThreads = 4 * gpuModel.subgroupSize;
+  } else if (scaleUpByBitWidth(redSize, bitWidth) <=
+             8 * 2 * gpuModel.subgroupSize) {
     vectorSize = scaleUpByBitWidth(4, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
+    maxNumThreads = 4 * gpuModel.subgroupSize;
   }
   // Scale up to larger sizes (32, 64, 128+)-warps, using vector-4.
   if (!captures.trailingOpSizes.empty()) {
-    if (scaleUpByBitWidth(redSize, bitWidth) >= 128 * 4 * kCudaWarpSize) {
+    if (scaleUpByBitWidth(redSize, bitWidth) >=
+        128 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 32 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 64 * 4 * kCudaWarpSize) {
+      maxNumThreads = 32 * gpuModel.subgroupSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >=
+               64 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 16 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 32 * 4 * kCudaWarpSize) {
+      maxNumThreads = 16 * gpuModel.subgroupSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >=
+               32 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 8 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 16 * 4 * kCudaWarpSize) {
+      maxNumThreads = 8 * gpuModel.subgroupSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >=
+               16 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 4 * kCudaWarpSize;
+      maxNumThreads = 4 * gpuModel.subgroupSize;
     }
   }
   return ReductionConfig{maxNumThreads, vectorSize, ReductionStrategy::Staged};
@@ -226,11 +231,11 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     ReductionConfig reductionConfig = getReductionConfig(captures, gpuModel);
     if (reductionConfig.strategy == ReductionStrategy::Small) {
-      SmallReductionStrategy strategy(captures, reductionConfig);
+      SmallReductionStrategy strategy(captures, reductionConfig, gpuModel);
       return buildSmallReductionStrategy(b, variant, strategy);
     } else if (reductionConfig.strategy == ReductionStrategy::Staged) {
       // Otherwise, always fallback to the staged strategy.
-      StagedReductionStrategy strategy(captures, reductionConfig);
+      StagedReductionStrategy strategy(captures, reductionConfig, gpuModel);
       return buildStagedReductionStrategy(b, variant, strategy);
     } else {
       return llvm_unreachable("Unknown strategy");
@@ -315,7 +320,7 @@ static MatmulStrategy
 getMatmulConfig(MLIRContext *context,
                 const transform_ext::MatchedMatmulCaptures &captures,
                 const GPUModel &gpuModel) {
-  MatmulStrategy strategy(context, captures);
+  MatmulStrategy strategy(context, captures, gpuModel);
   if (strategy.cliOptionsSpecified)
     return strategy;
 
@@ -416,6 +421,15 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
+  // Limit the types that we choose to support without user intervention for
+  // tensor core.
+  if (!strategy.useFma && !strategy.cliOptionsSpecified &&
+      (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
+       !captures.outputElementType.isF32())) {
+    LDBG("--Matmul strategy elemental type check failed\n");
+    return failure();
+  }
+
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
@@ -485,7 +499,7 @@ static LogicalResult matchAndSetPadStrategy(func::FuncOp entryPoint,
   // 2. Construct the strategy builder.
   PadConfig padConfig = getPadConfig(captures, gpuModel);
   iree_compiler::gpu::PadStrategy strategy(op->getContext(), captures,
-                                           padConfig);
+                                           padConfig, gpuModel);
   if (strategy.useAsyncCopies) {
     LDBG("--Async copies not supported yet\n");
     return failure();
