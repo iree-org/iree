@@ -49,6 +49,9 @@ jobs:
       - name: Run iree-benchmark-trace
         id: run_iree_benchmark_trace
         run: ./bin/iree-benchmark-trace --help
+      - name: Run iree-dump-module
+        id: run_iree_dump_module
+        run: ./bin/iree-dump-module --help
       - name: Run iree-cpuinfo
         id: run_iree_cpuinfo
         run: ./bin/iree-cpuinfo
@@ -86,6 +89,9 @@ jobs:
       - name: Py iree-benchmark-trace
         id: py_iree_benchmark_trace
         run: iree-benchmark-trace --help
+      - name: Py iree-dump-module
+        id: py_iree_dump_module
+        run: iree-dump-module --help
       - name: Py iree-cpuinfo
         id: py_iree_cpuinfo
         run: iree-cpuinfo
