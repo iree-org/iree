@@ -10,6 +10,35 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "PassDetail.h"
+    "Passes.h.inc"
+    "SPIRVPasses.h"
+  DEPS
+    ::PassesIncGen
+    MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRNVGPUDialect
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     SPIRV
@@ -44,6 +73,8 @@ iree_cc_library(
     "Utils.cpp"
     "Verifiers.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms

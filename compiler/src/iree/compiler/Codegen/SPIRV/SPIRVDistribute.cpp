@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "llvm/Support/Debug.h"
