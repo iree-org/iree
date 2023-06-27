@@ -288,7 +288,7 @@ static inline float iree_math_f16_to_f32(const uint16_t f16_value) {
   }
   const uint32_t u32_value = sign | exp | mantissa;
   float f32_value;
-  memcpy(&f32_value, &u32_value, sizeof(f32_value));
+  memcpy(&f32_value, &u32_value, sizeof f32_value);
   return f32_value;
 }
 
@@ -298,7 +298,7 @@ static inline float iree_math_f16_to_f32(const uint16_t f16_value) {
 // we can improve this implementation over time if it is used for such cases.
 static inline uint16_t iree_math_f32_to_f16(const float f32_value) {
   uint32_t u32_value;
-  memcpy(&u32_value, &f32_value, sizeof(u32_value));
+  memcpy(&u32_value, &f32_value, sizeof u32_value);
   const uint32_t sign = ((u32_value & 0x80000000u) >> 31) << 15;
   uint32_t mantissa = (u32_value & 0x007FFFFFu) >> (23 - 10);
   int32_t exp = ((u32_value & 0x7F800000u) >> 23) - 127 + 15;
@@ -324,6 +324,27 @@ static inline uint16_t iree_math_f32_to_f16(const float f32_value) {
 // 32-bit `float`
 static inline float iree_math_round_to_nearest_f16(const float f32_value) {
   return iree_math_f16_to_f32(iree_math_f32_to_f16(f32_value));
+}
+
+// Converts a bfloat16 value to a 32-bit C `float`.
+static inline float iree_math_bf16_to_f32(const uint16_t bf16_value) {
+  uint32_t u32_value = ((uint32_t)bf16_value) << 16;
+  float f32_value;
+  memcpy(&f32_value, &u32_value, sizeof f32_value);
+  return f32_value;
+}
+
+// Converts a 32-bit C `float` value to a bfloat16 value.
+static inline uint16_t iree_math_f32_to_bf16(const float f32_value) {
+  uint32_t u32_value;
+  memcpy(&u32_value, &f32_value, sizeof u32_value);
+  return u32_value >> 16;
+}
+
+// Rounds of 32-bit C `float` value to nearest bfloat16 value and returns
+// 32-bit `float`
+static inline float iree_math_round_to_nearest_bf16(const float f32_value) {
+  return iree_math_bf16_to_f32(iree_math_f32_to_bf16(f32_value));
 }
 
 #endif  // IREE_BASE_INTERNAL_MATH_H_
