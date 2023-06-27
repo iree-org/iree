@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //===---------------------------------------------------------------------===//
-// WGSL passes
+// WGSL passes (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
 def WGSLReplacePushConstants :

@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //===---------------------------------------------------------------------===//
-// Common passes for all backends
+// Common passes for all backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
 def BubbleUpOrdinalOps : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {

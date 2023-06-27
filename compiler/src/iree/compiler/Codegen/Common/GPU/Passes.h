@@ -5,8 +5,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_
-#define IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_
+#ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
+#define IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -131,4 +131,4 @@ void registerCodegenCommonGPUPasses();
 } // namespace iree_compiler
 } // namespace mlir
 
-#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_COMMONGPUASSES_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_

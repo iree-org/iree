@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //===---------------------------------------------------------------------===//
-// VMVX passes
+// VMVX passes (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
 def VMVXAssignConstantOrdinals :

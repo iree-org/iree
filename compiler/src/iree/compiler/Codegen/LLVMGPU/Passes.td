@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //------------------------------------------------------------------------------
-// LLVMGPU
+// LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
 // TODO: Bring the argument in line with the names used elsewhere.

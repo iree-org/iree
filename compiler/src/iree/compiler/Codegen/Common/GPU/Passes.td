@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //===---------------------------------------------------------------------===//
-// Common Passes used for GPU-like backends (CUDA/Vulkan)
+// Common Passes used for GPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
 def GPUCheckResourceUsage :
