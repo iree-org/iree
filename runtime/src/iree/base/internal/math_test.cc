@@ -171,6 +171,9 @@ TEST(F16ConversionTest, F32ToF16) {
   // Within range, normal truncation.
   EXPECT_EQ(0x3400, iree_math_f32_to_f16(0.25f));
   EXPECT_EQ(0xd646, iree_math_f32_to_f16(-100.375f));
+  // Infinity
+  EXPECT_EQ(0x7c00, iree_math_f32_to_f16(INFINITY));
+  EXPECT_EQ(0xfc00, iree_math_f32_to_f16(-INFINITY));
   // Overflow
   EXPECT_EQ(0x7C00, iree_math_f32_to_f16(FLT_MAX));
   EXPECT_EQ(0xFC00, iree_math_f32_to_f16(-FLT_MAX));
@@ -182,9 +185,10 @@ TEST(F16ConversionTest, F32ToF16) {
 TEST(F16ConversionTest, F32ToF16ToF32) {
   constexpr float kF16Max = 65504.f;
   constexpr float kF16Min = 0.0000610351563f;
-  // Within range, should just recover.
+  // Within range, should just round.
   EXPECT_EQ(0.25f, iree_math_f16_to_f32(iree_math_f32_to_f16(0.25f)));
   EXPECT_EQ(-100.375f, iree_math_f16_to_f32(iree_math_f32_to_f16(-100.375f)));
+  EXPECT_EQ(-100.375f, iree_math_f16_to_f32(iree_math_f32_to_f16(-100.4f)));
   EXPECT_EQ(kF16Max, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Max)));
   EXPECT_EQ(kF16Min, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min)));
   // Overflow
@@ -202,6 +206,43 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   EXPECT_EQ(-INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(-INFINITY)));
   // Check that the result is a Nan with nan != nan.
   float nan = iree_math_f16_to_f32(iree_math_f32_to_f16(NAN));
+  EXPECT_NE(nan, nan);
+}
+
+TEST(BF16ConversionTest, F32ToBF16) {
+  // Within range, normal truncation.
+  EXPECT_EQ(0x3e80, iree_math_f32_to_bf16(0.25f));
+  EXPECT_EQ(0xc2c8, iree_math_f32_to_bf16(-100.375f));
+  // Infinity
+  EXPECT_EQ(0x7f80, iree_math_f32_to_bf16(INFINITY));
+  EXPECT_EQ(0xff80, iree_math_f32_to_bf16(-INFINITY));
+  // No overflow, just rounding, as bfloat16 has nearly the same range as
+  // float32
+  EXPECT_EQ(0x7f7f, iree_math_f32_to_bf16(FLT_MAX));
+  EXPECT_EQ(0xff7f, iree_math_f32_to_bf16(-FLT_MAX));
+  // No underflow, as bfloat16 has the same smallest normal value as float32.
+  EXPECT_EQ(0x80, iree_math_f32_to_bf16(FLT_MIN));
+  EXPECT_EQ(0x8080, iree_math_f32_to_bf16(-FLT_MIN));
+}
+
+TEST(BF16ConversionTest, F32ToBF16ToF32) {
+  constexpr float kBF16Max = 3.38953139e+38;
+  // Within range, should just round.
+  EXPECT_EQ(0.25f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(0.25f)));
+  EXPECT_EQ(-100.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-100.375f)));
+  EXPECT_EQ(kBF16Max, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MAX)));
+  EXPECT_EQ(FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MIN)));
+  // Smallest normal values.
+  EXPECT_EQ(FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MIN)));
+  EXPECT_EQ(-FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-FLT_MIN)));
+  // Denormals
+  EXPECT_EQ(1.83670992e-40f,
+            iree_math_bf16_to_f32(iree_math_f32_to_bf16(2.0e-40f)));
+  // Inf and Nan
+  EXPECT_EQ(INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(INFINITY)));
+  EXPECT_EQ(-INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-INFINITY)));
+  // Check that the result is a Nan with nan != nan.
+  float nan = iree_math_bf16_to_f32(iree_math_f32_to_bf16(NAN));
   EXPECT_NE(nan, nan);
 }
 
