@@ -7,6 +7,7 @@
 #include "./invoke.h"
 
 #include <functional>
+#include <unordered_map>
 
 #include "./hal.h"
 #include "./vm.h"

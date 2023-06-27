@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 if(NOT nanobind_FOUND)
-  # nanobind requires Python >= 3.8.
-  find_package(Python 3.8 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
   find_package(nanobind CONFIG QUIET)
   if(NOT nanobind_FOUND)
     execute_process(
