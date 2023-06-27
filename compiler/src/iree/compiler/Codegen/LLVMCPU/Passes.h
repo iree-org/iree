@@ -91,15 +91,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options);
 
-struct LLVMCPUVectorizationPassOptions {
-  bool enableVectorMasking = false;
-  bool vectorizePadding = false;
-  bool vectorizeGatherAccesses = false;
-};
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options);
-
 /// A pass that converts certain vector.contract ops to custom kernels.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createVectorContractCustomKernelsPass();

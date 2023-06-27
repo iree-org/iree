@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
-#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -21,7 +21,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-vectorization"
+#define DEBUG_TYPE "iree-codegen-generic-vectorization"
 #define VEC_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir {
@@ -211,11 +211,11 @@ getVectorSizes(linalg::LinalgOp linalgOp,
   return vecSize;
 }
 
-class LLVMCPUVectorizationPass
-    : public LLVMCPUVectorizationBase<LLVMCPUVectorizationPass> {
+class GenericVectorizationPass
+    : public GenericVectorizationBase<GenericVectorizationPass> {
 public:
-  using LLVMCPUVectorizationBase::LLVMCPUVectorizationBase;
-  LLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options) {
+  using GenericVectorizationBase::GenericVectorizationBase;
+  GenericVectorizationPass(const GenericVectorizationPassOptions &options) {
     this->enableVectorMasking.setValue(options.enableVectorMasking);
     this->vectorizePadding.setValue(options.vectorizePadding);
     this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
@@ -228,7 +228,7 @@ public:
   void runOnOperation() override;
 };
 
-void LLVMCPUVectorizationPass::runOnOperation() {
+void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
   SmallVector<int64_t> canonicalVectorShape;
@@ -303,12 +303,12 @@ void LLVMCPUVectorizationPass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass() {
-  return std::make_unique<LLVMCPUVectorizationPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createGenericVectorizationPass() {
+  return std::make_unique<GenericVectorizationPass>();
 }
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options) {
-  return std::make_unique<LLVMCPUVectorizationPass>(options);
+createGenericVectorizationPass(const GenericVectorizationPassOptions &options) {
+  return std::make_unique<GenericVectorizationPass>(options);
 }
 } // namespace iree_compiler
 } // namespace mlir
