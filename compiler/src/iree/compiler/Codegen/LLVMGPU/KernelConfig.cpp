@@ -854,7 +854,7 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
 /// Make UKernels take the LLVMGPUDefault lowering pipeline.
 static LogicalResult
 setUKernelConfig(func::FuncOp entryPoint,
-		 IREE::Codegen::UKernelOpInterface ukernelOp) {
+                 IREE::Codegen::UKernelOpInterface ukernelOp) {
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPoint->getContext(),
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault);

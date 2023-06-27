@@ -76,7 +76,7 @@ namespace Codegen {
 
 LogicalResult
 ExportConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-			 ArrayAttr workgroupSize) {
+                         ArrayAttr workgroupSize) {
   if (!workgroupSize) {
     return success();
   }
