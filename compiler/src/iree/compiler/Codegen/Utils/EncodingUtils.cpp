@@ -23,10 +23,25 @@ std::optional<MatmulType> getMatmulType(Type lhsElementType,
       resultElementType.isSignlessInteger(32)) {
     return MatmulType::I8I8I32;
   }
-
   if (lhsElementType.isF32() && rhsElementType.isF32() &&
       resultElementType.isF32()) {
     return MatmulType::F32F32F32;
+  }
+  if (lhsElementType.isF16() && rhsElementType.isF16() &&
+      resultElementType.isF32()) {
+    return MatmulType::F16F16F32;
+  }
+  if (lhsElementType.isF16() && rhsElementType.isF16() &&
+      resultElementType.isF16()) {
+    return MatmulType::F16F16F16;
+  }
+  if (lhsElementType.isBF16() && rhsElementType.isBF16() &&
+      resultElementType.isF32()) {
+    return MatmulType::BF16BF16F32;
+  }
+  if (lhsElementType.isBF16() && rhsElementType.isBF16() &&
+      resultElementType.isBF16()) {
+    return MatmulType::BF16BF16BF16;
   }
 
   return std::nullopt;
@@ -40,36 +55,50 @@ std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
   return encodingAttr.getEncoding().getValue();
 }
 
+#define IREE_GETMATMULTYPE_CASE(TYPE)                                          \
+  case TensorEncoding::MATMUL_##TYPE##_LHS:                                    \
+  case TensorEncoding::MATMUL_##TYPE##_RHS:                                    \
+  case TensorEncoding::MATMUL_##TYPE##_RESULT:                                 \
+    return MatmulType::TYPE;
+
 std::optional<MatmulType> getMatmulType(TensorEncoding encoding) {
   switch (encoding) {
-  case TensorEncoding::MATMUL_F32F32F32_LHS:
-  case TensorEncoding::MATMUL_F32F32F32_RHS:
-  case TensorEncoding::MATMUL_F32F32F32_RESULT:
-    return MatmulType::F32F32F32;
-  case TensorEncoding::MATMUL_I8I8I32_LHS:
-  case TensorEncoding::MATMUL_I8I8I32_RHS:
-  case TensorEncoding::MATMUL_I8I8I32_RESULT:
-    return MatmulType::I8I8I32;
+    IREE_GETMATMULTYPE_CASE(F32F32F32)
+    IREE_GETMATMULTYPE_CASE(I8I8I32)
+    IREE_GETMATMULTYPE_CASE(F16F16F32)
+    IREE_GETMATMULTYPE_CASE(F16F16F16)
+    IREE_GETMATMULTYPE_CASE(BF16BF16F32)
+    IREE_GETMATMULTYPE_CASE(BF16BF16BF16)
   default:
     return std::nullopt;
   }
 }
 
+#undef IREE_GETMATMULTYPE_CASE
+
+#define IREE_GETMATMULOPERANDROLE_CASE(TYPE)                                   \
+  case TensorEncoding::MATMUL_##TYPE##_LHS:                                    \
+    return MatmulOperandRole::LHS;                                             \
+  case TensorEncoding::MATMUL_##TYPE##_RHS:                                    \
+    return MatmulOperandRole::RHS;                                             \
+  case TensorEncoding::MATMUL_##TYPE##_RESULT:                                 \
+    return MatmulOperandRole::RESULT;
+
 std::optional<MatmulOperandRole> getMatmulOperandRole(TensorEncoding encoding) {
   switch (encoding) {
-  case TensorEncoding::MATMUL_F32F32F32_LHS:
-  case TensorEncoding::MATMUL_I8I8I32_LHS:
-    return MatmulOperandRole::LHS;
-  case TensorEncoding::MATMUL_F32F32F32_RHS:
-  case TensorEncoding::MATMUL_I8I8I32_RHS:
-    return MatmulOperandRole::RHS;
-  case TensorEncoding::MATMUL_F32F32F32_RESULT:
-  case TensorEncoding::MATMUL_I8I8I32_RESULT:
-    return MatmulOperandRole::RESULT;
+    IREE_GETMATMULOPERANDROLE_CASE(F32F32F32)
+    IREE_GETMATMULOPERANDROLE_CASE(I8I8I32)
+    IREE_GETMATMULOPERANDROLE_CASE(F16F16F32)
+    IREE_GETMATMULOPERANDROLE_CASE(F16F16F16)
+    IREE_GETMATMULOPERANDROLE_CASE(BF16BF16F32)
+    IREE_GETMATMULOPERANDROLE_CASE(BF16BF16BF16)
+
   default:
     return std::nullopt;
   }
 }
+
+#undef IREE_GETMATMULOPERANDROLE_CASE
 
 } // namespace iree_compiler
 } // namespace mlir
