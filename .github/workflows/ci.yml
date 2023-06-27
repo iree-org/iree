@@ -159,9 +159,13 @@ jobs:
           # Persist the cache by storing in the parent directory.
           CCACHE_DIR: ${{ github.workspace }}/../.ccache
           CCACHE_MAXSIZE: 30G
-        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        run: |
+          source .venv/bin/activate
+          bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
-        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: |
+          source .venv/bin/activate
+          bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
   build_test_all_macos_x86_64:
     needs: setup
