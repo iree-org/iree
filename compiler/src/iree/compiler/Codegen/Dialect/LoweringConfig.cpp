@@ -74,8 +74,9 @@ namespace Codegen {
 // iree_codegen.export_config
 //===----------------------------------------------------------------------===//
 
-LogicalResult ExportConfigAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError, ArrayAttr workgroupSize) {
+LogicalResult
+ExportConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+			 ArrayAttr workgroupSize) {
   if (!workgroupSize) {
     return success();
   }
