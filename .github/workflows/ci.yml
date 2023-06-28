@@ -284,7 +284,7 @@ jobs:
               CTEST_PARALLEL_LEVEL=2
               IREE_CTEST_LABEL_REGEX='^requires-gpu-sm80$'
               NVIDIA_DRIVER_CAPABILITIES=all
-    name: test [${{ matrix.runner-type }}]
+    name: test [${{ matrix.target.runner-type }}]
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -297,7 +297,7 @@ jobs:
         with:
           submodules: true
       - name: Doing GPU-specific setup
-        if: matrix.is-gpu
+        if: matrix.target.is-gpu
         run: |
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
@@ -314,7 +314,7 @@ jobs:
         run: |
           echo "./build_tools/cmake/ctest_all.sh ${BUILD_DIR}" >> "${EXEC_FILE}"
           cat <<<EOF > "${DOCKER_ENV_FILE}"
-          ${{ matrix.docker-env }}
+          ${{ matrix.target.docker-env }}
           EOF
 
           touch "${DOCKER_ARG_FILE}"
