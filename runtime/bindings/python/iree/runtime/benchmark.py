@@ -50,11 +50,17 @@ class BenchmarkToolError(Exception):
         super().__init__(self.message)
 
 
+class BenchmarkTimeoutError(Exception):
+    """Exception raised if the benchmark is cancelled by the user specified timeout."""
+
+    pass
+
+
 def benchmark_exe():
     return os.path.join(os.path.dirname(__file__), "iree-benchmark-module")
 
 
-def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
+def benchmark_module(module, entry_functiong=None, inputs=[], timeout=None, **kwargs):
     funcs = [a for a in module.function_names if a != "__init"]
     if entry_functiong is None:
         if len(funcs) > 1:
@@ -91,10 +97,18 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
         args.append(f"--input={shape}x{abitype}={values}")
     args.append(f"--module=-")
 
-    call = subprocess.Popen(
-        args=args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    out, err = call.communicate(input=flatbuffer)
+    try:
+        benchmark_process = subprocess.run(
+            args=args,
+            input=flatbuffer,
+            timeout=timeout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.TimeoutExpired:
+        raise BenchmarkTimeoutError(f"Benchmark timed out after {timeout} seconds")
+    out = benchmark_process.stdout
+    err = benchmark_process.stderr
 
     err = err.decode()
     if "INVALID_ARGUMENT;" in err:
