@@ -4,13 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- IREECodegenAttrs.h - Declares configuration for lowering Linalg ops
-//--===//
-//
-// This file declares an attribute that drives how a dispatch region containing
-// a set of operations are lowered. The attribute itself is attached to Linalg
-// operations, and help converting a Linalg operation into "scalar code".
-//
+//===- IREECodegenAttrs.h - Codegen dialect attributes -------------------===//
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_

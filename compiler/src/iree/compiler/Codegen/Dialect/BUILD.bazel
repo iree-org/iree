@@ -42,15 +42,15 @@ iree_td_library(
 iree_compiler_cc_library(
     name = "IREECodegenDialect",
     srcs = [
+        "IREECodegenAttrs.cpp",
         "IREECodegenDialect.cpp",
         "IREECodegenOps.cpp",
-        "IREECodegenAttrs.cpp",
         "UKernelOps.cpp",
     ],
     hdrs = [
+        "IREECodegenAttrs.h",
         "IREECodegenDialect.h",
         "IREECodegenOps.h",
-        "IREECodegenAttrs.h",
         "UKernelOps.h",
     ],
     textual_hdrs = [
