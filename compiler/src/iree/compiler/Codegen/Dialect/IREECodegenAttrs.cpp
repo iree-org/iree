@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -13,7 +13,7 @@
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/LoweringConfigEnums.cpp.inc"
 
 static const char kConfigAttrName[] = "lowering_config";
@@ -270,7 +270,7 @@ SmallVector<int64_t> CompilationInfoAttr::getWorkgroupSizeVals() {
 void IREECodegenDialect::initializeCodegenAttrs() {
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.cpp.inc" // IWYU pragma: keeep
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.cpp.inc" // IWYU pragma: keeep
       >();
 }
 

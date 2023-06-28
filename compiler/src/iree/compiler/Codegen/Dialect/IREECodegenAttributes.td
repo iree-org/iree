@@ -8,7 +8,7 @@
 #define IREE_CODEGEN_DIALECT_IREECODEGEN_ATTRIBUTES
 
 include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
-include "iree/compiler/Codegen/Dialect/LoweringConfig.td"
+include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.td"
 
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGEN_ATTRIBUTES
