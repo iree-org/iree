@@ -167,6 +167,11 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
   if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
           rewriter, op, state)))
     return failure();
+
+  if (failed(linalg::linalgOpAnchoredEmptyTensorEliminationStep(rewriter, op,
+                                                                state)))
+    return failure();
+
   if (failed(
           storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, op, state)))
     return failure();
