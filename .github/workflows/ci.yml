@@ -1046,13 +1046,17 @@ jobs:
     needs:
       - setup
 
-      # Platforms
+      # Basic
       - build_all
+      - test_all
+      - build_test_all_bazel
+      
+      # Platforms
       - build_test_all_windows
       - build_test_all_macos_arm64
       - build_test_all_macos_x86_64
-      - build_test_all_bazel
-      - test_all
+      
+      # Accelerators
       - test_gpu
       - test_nvidia_sm80
 
