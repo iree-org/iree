@@ -468,32 +468,13 @@ void addMultiTilingExpertPassPipeline(
                      [](int64_t size) { return size == 0; })) {
       nestedModulePM.addNestedPass<func::FuncOp>(
           createLLVMCPUTileAndFusePass(tilingConfig.getVectorParallelLevel()));
-        nestedModulePM.addNestedPass<func::FuncOp>(
-            createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
     } else {
-
-      // TODO(dcaballe): Add 'addMatmulTilingExpertPassPipeline' and
-      // interchanging capabilities to tile passes.
-      if (tilingConfig.getNumDimensions() == 3 &&
-          tilingConfig.getNumVectorParallelTiles() == 2 &&
-          tilingConfig.getNumVectorReductionTiles() == 1) {
-        auto vectorTileSizes = tilingConfig.getVectorTileSizes();
-        llvm::outs() << vectorTileSizes[0] << " " << vectorTileSizes[1] << " "
-                     << vectorTileSizes[2] << "\n";
-        nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-            ArrayRef<int64_t>({vectorTileSizes[0], 0, 0})));
-        nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-            ArrayRef<int64_t>({0, 0, vectorTileSizes[2]})));
-        nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-            ArrayRef<int64_t>({0, vectorTileSizes[1], 0})));
-      } else {
-        nestedModulePM.addNestedPass<func::FuncOp>(
-            createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
-        nestedModulePM.addNestedPass<func::FuncOp>(
-            createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
-      }
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
     }
 
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
   } else { // TODO: Unify.
     SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
     // Apply tile and fuse to all the non-distribution fusable levels. Skip

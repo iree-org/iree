@@ -91,14 +91,11 @@ void LLVMCPUTilePass::runOnOperation() {
       continue;
 
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
-
-    // Retrieve tile sizes from the IR if they were not provided.
-    if (tileSizes.empty()) {
-      if (auto loweringConfig = getLoweringConfig(op)) {
-        tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
-      } else {
-        tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
-      }
+    SmallVector<int64_t> tileSizes;
+    if (auto loweringConfig = getLoweringConfig(op)) {
+      tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+    } else {
+      tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
     }
 
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
@@ -130,18 +127,17 @@ void LLVMCPUTilePass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
 } // namespace
-} // namespace iree_compiler
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-iree_compiler::createLLVMCPUTilePass(int64_t tilingLevel) {
+createLLVMCPUTilePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTilePass>(tilingLevel);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-iree_compiler::createLLVMCPUTilePass(ArrayRef<int64_t> tileSizes) {
+createLLVMCPUTilePass(ArrayRef<int64_t> tileSizes) {
   return std::make_unique<LLVMCPUTilePass>(tileSizes);
 }
 
+} // namespace iree_compiler
 } // namespace mlir
