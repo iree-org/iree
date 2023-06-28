@@ -287,6 +287,8 @@ jobs:
           - runner-type: a100
             iree-ctest-label-regex: ^requires-gpu-sm80$
             iree-nvidia-sm80-tests-disable: 0
+      # Run other jobs even if one fails.
+      fail-fast: false
     name: test_${{ matrix.target.runner-type }}
     runs-on:
       - self-hosted # must come first
