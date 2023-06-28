@@ -359,8 +359,9 @@ Flow::clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter,
       parentRegion = parentOperation->getParentRegion();
     }
 
-    if (parentOperation && &parentRegion->front() == &body)
+    if (parentOperation && &parentRegion->front() == &body) {
       usesInsideOfRegion.push_back(&use);
+    }
   }
 
   // Clone op into dispatch region.
