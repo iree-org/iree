@@ -350,8 +350,18 @@ Flow::clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter,
   // Gather all uses of `target`.
   SmallVector<OpOperand *> usesInsideOfRegion;
   for (OpOperand &use : target->getUses()) {
-    if (regionOp->isProperAncestor(use.getOwner()))
+    Operation *parentOperation = use.getOwner();
+    Region *parentRegion = parentOperation->getParentRegion();
+
+    while ((parentOperation = parentOperation->getParentOp())) {
+      if (regionOp.getOperation() == parentOperation)
+        break;
+      parentRegion = parentOperation->getParentRegion();
+    }
+
+    if (parentOperation && &parentRegion->front() == &body) {
       usesInsideOfRegion.push_back(&use);
+    }
   }
 
   // Clone op into dispatch region.
