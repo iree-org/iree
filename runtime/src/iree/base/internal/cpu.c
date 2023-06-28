@@ -32,17 +32,70 @@
 // NOTE: not all kernel versions have all of the cap bits we need defined so as
 // a practice we always define the feature bits we need locally.
 // https://docs.kernel.org/arm64/elf_hwcaps.html
-#define IREE_HWCAP_ASIMDDP (1u << 20)
-#define IREE_HWCAP2_I8MM (1u << 13)
+#define IREE_HWCAP_FP (1 << 0)
+#define IREE_HWCAP_ATOMICS (1 << 8)
+#define IREE_HWCAP_ASIMDHP (1 << 10)
+#define IREE_HWCAP_ASIMDDP (1 << 20)
+#define IREE_HWCAP_SVE (1 << 22)
+#define IREE_HWCAP_ASIMDFHM (1 << 23)
+#define IREE_HWCAP2_SVE2 (1 << 1)
+#define IREE_HWCAP2_SVEBITPERM (1 << 4)
+#define IREE_HWCAP2_SVEF32MM (1 << 10)
+#define IREE_HWCAP2_SVEF64MM (1 << 11)
+#define IREE_HWCAP2_I8MM (1 << 13)
+#define IREE_HWCAP2_BF16 (1 << 14)
+#define IREE_HWCAP2_SME (1 << 23)
+#define IREE_HWCAP2_SME_I16I64 (1 << 24)
+#define IREE_HWCAP2_SME_F64F64 (1 << 25)
+#define IREE_HWCAP2_SVE2P1 (1UL << 36)
+#define IREE_HWCAP2_SME2 (1UL << 37)
+#define IREE_HWCAP2_SME2P1 (1UL << 38)
+#define IREE_HWCAP2_SME_F16F16 (1UL << 42)
 
 static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
-  uint32_t hwcap = getauxval(AT_HWCAP);
-  uint32_t hwcap2 = getauxval(AT_HWCAP2);
-  uint64_t out0 = 0;
-  IREE_COPY_BITS(out0, IREE_CPU_DATA0_ARM_64_DOTPROD, hwcap,
+  unsigned long hwcap = getauxval(AT_HWCAP);
+  unsigned long hwcap2 = getauxval(AT_HWCAP2);
+
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FP_ARMV8, hwcap,
+                 IREE_HWCAP_FP);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_LSE, hwcap,
+                 IREE_HWCAP_ATOMICS);
+  // LSE2/lse128 does not seem to be exposed in hwcaps.
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FULLFP16, hwcap,
+                 IREE_HWCAP_ASIMDHP);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FP16FML, hwcap,
+                 IREE_HWCAP_ASIMDFHM);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_DOTPROD, hwcap,
                  IREE_HWCAP_ASIMDDP);
-  IREE_COPY_BITS(out0, IREE_CPU_DATA0_ARM_64_I8MM, hwcap2, IREE_HWCAP2_I8MM);
-  out_fields[0] = out0;
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_I8MM, hwcap2,
+                 IREE_HWCAP2_I8MM);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_BF16, hwcap2,
+                 IREE_HWCAP2_BF16);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SVE, hwcap,
+                 IREE_HWCAP_SVE);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SVE2, hwcap2,
+                 IREE_HWCAP2_SVE2);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SVE2P1, hwcap2,
+                 IREE_HWCAP2_SVE2P1);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SVE2_BITPERM, hwcap2,
+                 IREE_HWCAP2_SVEBITPERM);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_F32MM, hwcap2,
+                 IREE_HWCAP2_SVEF32MM);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_F64MM, hwcap2,
+                 IREE_HWCAP2_SVEF64MM);
+
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SME, hwcap2,
+                 IREE_HWCAP2_SME);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SME2, hwcap2,
+                 IREE_HWCAP2_SME2);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SME2P1, hwcap2,
+                 IREE_HWCAP2_SME2P1);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SME_F16F16, hwcap2,
+                 IREE_HWCAP2_SME_F16F16);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SME_F64F64, hwcap2,
+                 IREE_HWCAP2_SME_F64F64);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_SME_I16I64, hwcap2,
+                 IREE_HWCAP2_SME_I16I64);
 }
 
 #elif defined(IREE_PLATFORM_MACOS) || defined(IREE_PLATFORM_IOS)
@@ -50,20 +103,62 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
 #include <sys/sysctl.h>
 #include <sys/types.h>
 
-#define IREE_QUERY_SYSCTL(key, field_value, field_bit)            \
-  do {                                                            \
-    int64_t result = 0;                                           \
-    size_t result_size = sizeof result;                           \
-    if (0 == sysctlbyname(key, &result, &result_size, NULL, 0)) { \
-      if (result) field_value |= field_bit;                       \
-    }                                                             \
-  } while (0)
-
 static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
-  IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_DotProd", out_fields[0],
-                    IREE_CPU_DATA0_ARM_64_DOTPROD);
-  IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_I8MM", out_fields[0],
-                    IREE_CPU_DATA0_ARM_64_I8MM);
+  typedef struct {
+    const char* sysctl_key;
+    int out_field_index;
+    uint64_t out_field_bits;
+  } feature_t;
+  const feature_t features[] = {
+      {
+          .sysctl_key = "hw.optional.floatingpoint",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_FP_ARMV8,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_LSE",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_LSE,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_LSE2",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_LSE128,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_FP16",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_FULLFP16,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_FHM",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_FP16FML,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_DotProd",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_DOTPROD,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_I8MM",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_I8MM,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_BF16",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_BF16,
+      },
+  };
+  for (int i = 0; i < IREE_ARRAYSIZE(features); ++i) {
+    const feature_t* f = &features[i];
+    int64_t result = 0;
+    size_t result_size = sizeof result;
+    if (0 == sysctlbyname(f->sysctl_key, &result, &result_size, NULL, 0)) {
+      if (result) out_fields[f->out_field_index] |= f->out_field_bits;
+    }
+  }
 }
 
 #else
