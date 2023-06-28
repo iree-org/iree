@@ -1029,7 +1029,6 @@ jobs:
 
       # Accelerators
       - test_gpu
-      - test_nvidia_sm80
 
       # Subsets
       - build_test_runtime
