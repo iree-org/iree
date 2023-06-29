@@ -186,6 +186,10 @@ Flag | Files dumped
         [`llvm-dis`](https://llvm.org/docs/CommandGuide/llvm-dis.html):
 
         ```console
+        // Build `llvm-dis` from source as needed:
+        $ cmake --build iree-build/ --target llvm-dis
+        $ iree-build/llvm-project/bin/llvm-dis --help
+
         $ cd /tmp/iree/simple_abs/
         $ llvm-dis module_abs_dispatch_0_system_elf_x86_64.codegen.bc
         $ cat module_abs_dispatch_0_system_elf_x86_64.codegen.ll
@@ -330,6 +334,10 @@ Flag | Files dumped
         [`llvm-dis`](https://llvm.org/docs/CommandGuide/llvm-dis.html):
 
         ```console
+        // Build `llvm-dis` from source as needed:
+        $ cmake --build iree-build/ --target llvm-dis
+        $ iree-build/llvm-project/bin/llvm-dis --help
+
         $ cd /tmp/iree/simple_abs/
         $ llvm-dis module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc
         $ cat module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll
