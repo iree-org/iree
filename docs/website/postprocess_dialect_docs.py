@@ -17,14 +17,14 @@ Usage (typically invoked by generate_extra_files.sh, edits files in-place):
 """
 
 import argparse
-import os
 import fileinput
+import pathlib
 import re
 
 
 def main(args):
     directory = args.directory
-    files = [os.path.join(directory, f) for f in os.listdir(directory)]
+    files = list(pathlib.Path(directory).iterdir())
 
     # Set certain headings to depth 5, lining up with the table-of-contents
     # (toc) max depth setting of 4 (`toc_depth: 4`).
