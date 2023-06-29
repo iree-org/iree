@@ -315,7 +315,6 @@ jobs:
           IREE_CTEST_LABEL_REGEX: ${{ matrix.target.iree-ctest-label-regex }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
-              --env-file "${DOCKER_ENV_FILE}" \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
               --env IREE_CTEST_LABEL_REGEX \
               --env IREE_VULKAN_F16_DISABLE=0 \
