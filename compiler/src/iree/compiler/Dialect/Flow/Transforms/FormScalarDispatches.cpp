@@ -49,7 +49,8 @@ static bool isScalarOrTensorOfLinearSizeN(int n, Type type) {
     if (!tensorType.hasStaticShape()) {
       return false;
     }
-    return tensorType.getNumElements() <= n;
+    const auto numElements = tensorType.getNumElements();
+    return numElements <= n && numElements > 0;
   }
   return false;
 }
