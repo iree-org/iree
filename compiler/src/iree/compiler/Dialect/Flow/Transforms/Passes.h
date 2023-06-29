@@ -127,6 +127,10 @@ std::unique_ptr<Pass> createSetEncodingPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createStripSignednessPass();
 
+// Removes tensors that have 0-extents.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createRemoveZeroExtentTensorsPass();
+
 // Verifies that the input to the Flow transformation pipeline is legal.
 // This includes checking for operations from dialects that are expected
 // to be legalized before this pass.
