@@ -1687,7 +1687,7 @@ non-zero integer.</p>
 <div class="highlight"><pre><span></span><code>check.expect_all_true(%arg0) : !hal.buffer_view
 check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
 </code></pre></div>
-<h4 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h4>
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1713,7 +1713,7 @@ almost equal to within an implementation-defined "reasonable" tolerance.</p>
 <div class="highlight"><pre><span></span><code>check.expect_almost_eq(%arg0, %arg1) : tensor&lt;5xf32&gt;
 </code></pre></div>
 <p>Traits: SameTypeOperands</p>
-<h4 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h4>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1743,7 +1743,7 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 <p>This op is just a convenience wrapper around the expect_almost_eq op.</p>
 <div class="highlight"><pre><span></span><code>check.expect_almost_eq_const(%const0, dense&lt;[0.999999, 2.0]&gt; : tensor&lt;5xf32&gt;) : tensor&lt;5xf32&gt;
 </code></pre></div>
-<h4 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h4>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1760,7 +1760,7 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h4>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1785,7 +1785,7 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 <div class="highlight"><pre><span></span><code>check.expect_eq(%arg0, %arg1) : tensor&lt;5xi32&gt;
 </code></pre></div>
 <p>Traits: SameTypeOperands</p>
-<h4 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h4>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1814,7 +1814,7 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 <p>This op is just a convenience wrapper around the expect_eq op.</p>
 <div class="highlight"><pre><span></span><code>check.expect_eq_const(%arg0, dense&lt;[1, 2]&gt; : tensor&lt;2xi32&gt;) : tensor&lt;2xi32&gt;
 </code></pre></div>
-<h4 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h4>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1831,7 +1831,7 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h4>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1856,7 +1856,7 @@ zero.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <div class="highlight"><pre><span></span><code>check.expect_false(%arg0) : i32
 </code></pre></div>
-<h4 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h4>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1881,7 +1881,7 @@ any non-zero integer.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <div class="highlight"><pre><span></span><code>check.expect_true(%arg0) : i32
 </code></pre></div>
-<h4 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h4>
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>

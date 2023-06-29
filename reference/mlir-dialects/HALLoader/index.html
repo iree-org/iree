@@ -1180,6 +1180,14 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#executable-ops" class="md-nav__link">
+    Executable ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Executable ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop" class="md-nav__link">
     hal_loader.executable.dispatch (HAL::Loader::ExecutableDispatchOp)
   </a>
@@ -1211,6 +1219,11 @@
   <a href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" class="md-nav__link">
     hal_loader.executable.query_support (HAL::Loader::ExecutableQuerySupportOp)
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1567,6 +1580,14 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#executable-ops" class="md-nav__link">
+    Executable ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Executable ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop" class="md-nav__link">
     hal_loader.executable.dispatch (HAL::Loader::ExecutableDispatchOp)
   </a>
@@ -1598,6 +1619,11 @@
   <a href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" class="md-nav__link">
     hal_loader.executable.query_support (HAL::Loader::ExecutableQuerySupportOp)
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1641,6 +1667,7 @@ restrictions.</p>
 <ul>
 <li><a href="#hal_loader-dialect">'hal_loader' Dialect</a><ul>
 <li><a href="#operation-definition">Operation definition</a><ul>
+<li><a href="#executable-ops">Executable ops</a><ul>
 <li><a href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop">hal_loader.executable.dispatch (HAL::Loader::ExecutableDispatchOp)</a></li>
 <li><a href="#hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop">hal_loader.executable.dispatch.symbol (HAL::Loader::ExecutableDispatchSymbolOp)</a></li>
 <li><a href="#hal_loaderexecutableload-halloaderexecutableloadop">hal_loader.executable.load (HAL::Loader::ExecutableLoadOp)</a></li>
@@ -1651,9 +1678,13 @@ restrictions.</p>
 </ul>
 </li>
 </ul>
+</li>
+</ul>
 </div>
 <h2 id="operation-definition">Operation definition<a class="headerlink" href="#operation-definition" title="Permanent link">link</a></h2>
-<h3 id="hal_loaderexecutabledispatch-halloaderexecutabledispatchop"><code>hal_loader.executable.dispatch</code> (HAL::Loader::ExecutableDispatchOp)<a class="headerlink" href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop" title="Permanent link">link</a></h3>
+<h3 id="executable-ops">Executable ops<a class="headerlink" href="#executable-ops" title="Permanent link">link</a></h3>
+<p>Ops for <code>!hal.executable</code> / <code>iree_hal_executable_t</code>.</p>
+<h4 id="hal_loaderexecutabledispatch-halloaderexecutabledispatchop"><code>hal_loader.executable.dispatch</code> (HAL::Loader::ExecutableDispatchOp)<a class="headerlink" href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop" title="Permanent link">link</a></h4>
 <p><em>Inline executable dispatch operation</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.dispatch` `executable` `(` $executable `:` type($executable) `)`
@@ -1674,7 +1705,7 @@ restrictions.</p>
 </code></pre></div>
 <p>Dispatches execution to an executable entry point with the given parameters.</p>
 <p>Traits: AttrSizedOperandSegments</p>
-<h4 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h4>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1691,7 +1722,7 @@ restrictions.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h4>
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1734,7 +1765,7 @@ restrictions.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop"><code>hal_loader.executable.dispatch.symbol</code> (HAL::Loader::ExecutableDispatchSymbolOp)<a class="headerlink" href="#hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop" title="Permanent link">link</a></h3>
+<h4 id="hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop"><code>hal_loader.executable.dispatch.symbol</code> (HAL::Loader::ExecutableDispatchSymbolOp)<a class="headerlink" href="#hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop" title="Permanent link">link</a></h4>
 <p><em>Inline executable dispatch operation</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.dispatch.symbol` `executable` `(` $executable `:` type($executable) `)`
@@ -1757,7 +1788,7 @@ restrictions.</p>
 The entry point is a symbolic reference to an exported entry point.</p>
 <p>Traits: AttrSizedOperandSegments</p>
 <p>Interfaces: SymbolUserOpInterface</p>
-<h4 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h4>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1774,7 +1805,7 @@ The entry point is a symbolic reference to an exported entry point.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h4>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1817,7 +1848,7 @@ The entry point is a symbolic reference to an exported entry point.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="hal_loaderexecutableload-halloaderexecutableloadop"><code>hal_loader.executable.load</code> (HAL::Loader::ExecutableLoadOp)<a class="headerlink" href="#hal_loaderexecutableload-halloaderexecutableloadop" title="Permanent link">link</a></h3>
+<h4 id="hal_loaderexecutableload-halloaderexecutableloadop"><code>hal_loader.executable.load</code> (HAL::Loader::ExecutableLoadOp)<a class="headerlink" href="#hal_loaderexecutableload-halloaderexecutableloadop" title="Permanent link">link</a></h4>
 <p><em>Dynamically loads an executable</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.load` `format` `(` $format `)`
@@ -1832,7 +1863,7 @@ runtime-derived parameters.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h4 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h4>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1849,7 +1880,7 @@ runtime-derived parameters.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h4>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1868,7 +1899,7 @@ runtime-derived parameters.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h4>
+<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1883,7 +1914,7 @@ runtime-derived parameters.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="hal_loaderexecutablelookup-halloaderexecutablelookupop"><code>hal_loader.executable.lookup</code> (HAL::Loader::ExecutableLookupOp)<a class="headerlink" href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" title="Permanent link">link</a></h3>
+<h4 id="hal_loaderexecutablelookup-halloaderexecutablelookupop"><code>hal_loader.executable.lookup</code> (HAL::Loader::ExecutableLookupOp)<a class="headerlink" href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" title="Permanent link">link</a></h4>
 <p><em>Executable cache lookup pseudo-op</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.lookup` `executable` `(` $executable `)`
@@ -1895,7 +1926,7 @@ possibly lazy-initialized executable.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SymbolUserOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h4 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h4>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1912,7 +1943,7 @@ possibly lazy-initialized executable.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h4>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1927,7 +1958,7 @@ possibly lazy-initialized executable.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="hal_loaderexecutablequery_support-halloaderexecutablequerysupportop"><code>hal_loader.executable.query_support</code> (HAL::Loader::ExecutableQuerySupportOp)<a class="headerlink" href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" title="Permanent link">link</a></h3>
+<h4 id="hal_loaderexecutablequery_support-halloaderexecutablequerysupportop"><code>hal_loader.executable.query_support</code> (HAL::Loader::ExecutableQuerySupportOp)<a class="headerlink" href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" title="Permanent link">link</a></h4>
 <p><em>Queries whether an executable format is supported</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.query_support` `format` `(` $executable_format `)`
@@ -1940,7 +1971,7 @@ functionality that cannot be met my the hosting runtime environment.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h4 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h4>
+<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1957,7 +1988,7 @@ functionality that cannot be met my the hosting runtime environment.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h4>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>

@@ -1236,6 +1236,14 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#abi-ops" class="md-nav__link">
+    ABI ops
+  </a>
+  
+    <nav class="md-nav" aria-label="ABI ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#vmvxbinary-vmvxbinaryop" class="md-nav__link">
     vmvx.binary (VMVX::BinaryOp)
   </a>
@@ -1257,6 +1265,26 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vmvxunary-vmvxunaryop" class="md-nav__link">
+    vmvx.unary (VMVX::UnaryOp)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#utility-ops" class="md-nav__link">
+    Utility ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Utility ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" class="md-nav__link">
     vmvx.get_buffer_descriptor (VMVX::GetBufferDescriptorOp)
   </a>
@@ -1270,10 +1298,8 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#vmvxunary-vmvxunaryop" class="md-nav__link">
-    vmvx.unary (VMVX::UnaryOp)
-  </a>
+      </ul>
+    </nav>
   
 </li>
         
@@ -1574,6 +1600,14 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#abi-ops" class="md-nav__link">
+    ABI ops
+  </a>
+  
+    <nav class="md-nav" aria-label="ABI ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#vmvxbinary-vmvxbinaryop" class="md-nav__link">
     vmvx.binary (VMVX::BinaryOp)
   </a>
@@ -1595,6 +1629,26 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vmvxunary-vmvxunaryop" class="md-nav__link">
+    vmvx.unary (VMVX::UnaryOp)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#utility-ops" class="md-nav__link">
+    Utility ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Utility ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" class="md-nav__link">
     vmvx.get_buffer_descriptor (VMVX::GetBufferDescriptorOp)
   </a>
@@ -1608,10 +1662,8 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#vmvxunary-vmvxunaryop" class="md-nav__link">
-    vmvx.unary (VMVX::UnaryOp)
-  </a>
+      </ul>
+    </nav>
   
 </li>
         
@@ -1652,12 +1704,18 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <ul>
 <li><a href="#vmvx-dialect">'vmvx' Dialect</a><ul>
 <li><a href="#operation-definition">Operation definition</a><ul>
+<li><a href="#abi-ops">ABI ops</a><ul>
 <li><a href="#vmvxbinary-vmvxbinaryop">vmvx.binary (VMVX::BinaryOp)</a></li>
 <li><a href="#vmvxcopy-vmvxcopyop">vmvx.copy (VMVX::CopyOp)</a></li>
 <li><a href="#vmvxfill2d-vmvxfill2dop">vmvx.fill2d (VMVX::Fill2DOp)</a></li>
+<li><a href="#vmvxunary-vmvxunaryop">vmvx.unary (VMVX::UnaryOp)</a></li>
+</ul>
+</li>
+<li><a href="#utility-ops">Utility ops</a><ul>
 <li><a href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop">vmvx.get_buffer_descriptor (VMVX::GetBufferDescriptorOp)</a></li>
 <li><a href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop">vmvx.get_raw_interface_binding_buffer (VMVX::GetRawInterfaceBindingBufferOp)</a></li>
-<li><a href="#vmvxunary-vmvxunaryop">vmvx.unary (VMVX::UnaryOp)</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -1665,7 +1723,8 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </ul>
 </div>
 <h2 id="operation-definition">Operation definition<a class="headerlink" href="#operation-definition" title="Permanent link">link</a></h2>
-<h3 id="vmvxbinary-vmvxbinaryop"><code>vmvx.binary</code> (VMVX::BinaryOp)<a class="headerlink" href="#vmvxbinary-vmvxbinaryop" title="Permanent link">link</a></h3>
+<h3 id="abi-ops">ABI ops<a class="headerlink" href="#abi-ops" title="Permanent link">link</a></h3>
+<h4 id="vmvxbinary-vmvxbinaryop"><code>vmvx.binary</code> (VMVX::BinaryOp)<a class="headerlink" href="#vmvxbinary-vmvxbinaryop" title="Permanent link">link</a></h4>
 <p><em>Performs a strided elementwise operation on two same-rank buffers</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.binary` `op` `` `(` $opcode `:` $element_type `)`
@@ -1680,7 +1739,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </code></pre></div></p>
 <p>Where <code>OP</code> is a concrete operation name as defined in ukernel/elementwise.h</p>
 <p>Traits: SameVariadicOperandSize</p>
-<h4 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h4>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1702,7 +1761,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h4>
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1753,7 +1812,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="vmvxcopy-vmvxcopyop"><code>vmvx.copy</code> (VMVX::CopyOp)<a class="headerlink" href="#vmvxcopy-vmvxcopyop" title="Permanent link">link</a></h3>
+<h4 id="vmvxcopy-vmvxcopyop"><code>vmvx.copy</code> (VMVX::CopyOp)<a class="headerlink" href="#vmvxcopy-vmvxcopyop" title="Permanent link">link</a></h4>
 <p><em>Copy from one buffer to another</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.copy` `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
@@ -1763,7 +1822,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
               attr-dict
 </code></pre></div>
 <p>Traits: SameVariadicOperandSize</p>
-<h4 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h4>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1780,7 +1839,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h4>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1819,7 +1878,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="vmvxfill2d-vmvxfill2dop"><code>vmvx.fill2d</code> (VMVX::Fill2DOp)<a class="headerlink" href="#vmvxfill2d-vmvxfill2dop" title="Permanent link">link</a></h3>
+<h4 id="vmvxfill2d-vmvxfill2dop"><code>vmvx.fill2d</code> (VMVX::Fill2DOp)<a class="headerlink" href="#vmvxfill2d-vmvxfill2dop" title="Permanent link">link</a></h4>
 <p><em>Fill a tile with a scalar</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.fill2d` `scalar` `` `(` $scalar `:` type($scalar) `)`
@@ -1828,7 +1887,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
               attr-dict
 </code></pre></div>
 <p>Fills a tile with dimensions [m, n] with a scalar.</p>
-<h4 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h4>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -1863,116 +1922,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop"><code>vmvx.get_buffer_descriptor</code> (VMVX::GetBufferDescriptorOp)<a class="headerlink" href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" title="Permanent link">link</a></h3>
-<p><em>Late binds a base buffer/offset/strides</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_buffer_descriptor` $source `:` type($source) `-&gt;` type(results) attr-dict
-</code></pre></div>
-<p>Queries a base buffer, offset and strides. This op is late bound to its
-source (alloca, binding, etc), allowing additional layers of
-transformations to be added as lowering progresses (or for buffers to be
-combined).</p>
-<p>This op has canonicalization rules which will bubble it up through the
-view stack. A final reconciliation pass is used explicitly to bind it to
-concrete sources.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameVariadicResultSize</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
-<h4 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th align="center">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center"><code>source</code></td>
-<td>memref of any type values</td>
-</tr>
-</tbody>
-</table>
-<h4 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th align="center">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center"><code>base_buffer</code></td>
-<td>a reference counted byte buffer</td>
-</tr>
-<tr>
-<td align="center"><code>offset</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td align="center"><code>sizes</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td align="center"><code>strides</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
-<h3 id="vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop"><code>vmvx.get_raw_interface_binding_buffer</code> (VMVX::GetRawInterfaceBindingBufferOp)<a class="headerlink" href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop" title="Permanent link">link</a></h3>
-<p><em>Gets the raw buffer associated with a binding</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_raw_interface_binding_buffer` `set` `(` $set `)` `binding` `(` $binding `)` attr-dict
-</code></pre></div>
-<p>Normally, a slice of a binding buffer is returned via
-hal.interface.binding.subspan. However, the normal VMVX lowering flow for
-this presumes that the result is a memref, and upon final conversion, it
-will offset the memref automatically to make it consistent.</p>
-<p>This op is used in situations where earlier in a lowering, we have fully
-resolved the binding to a buffer and would just like the raw backing
-buffer as passed to the interface.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
-<h4 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th align="center">Attribute</th>
-<th align="center">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center"><code>set</code></td>
-<td align="center">::mlir::IntegerAttr</td>
-<td>index attribute</td>
-</tr>
-<tr>
-<td align="center"><code>binding</code></td>
-<td align="center">::mlir::IntegerAttr</td>
-<td>index attribute</td>
-</tr>
-</tbody>
-</table>
-<h4 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th align="center">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center"><code>buffer</code></td>
-<td>a reference counted byte buffer</td>
-</tr>
-</tbody>
-</table>
-<h3 id="vmvxunary-vmvxunaryop"><code>vmvx.unary</code> (VMVX::UnaryOp)<a class="headerlink" href="#vmvxunary-vmvxunaryop" title="Permanent link">link</a></h3>
+<h4 id="vmvxunary-vmvxunaryop"><code>vmvx.unary</code> (VMVX::UnaryOp)<a class="headerlink" href="#vmvxunary-vmvxunaryop" title="Permanent link">link</a></h4>
 <p><em>Performs a strided elementwise unary operation</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.unary` `op` `` `(` $opcode `:` $element_type `)`
@@ -1986,7 +1936,7 @@ buffer as passed to the interface.</p>
 </code></pre></div></p>
 <p>Where <code>OP</code> is a concrete operation name as defined in ukernel/elementwise.h</p>
 <p>Traits: SameVariadicOperandSize</p>
-<h4 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h4>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2008,7 +1958,7 @@ buffer as passed to the interface.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h4>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2044,6 +1994,116 @@ buffer as passed to the interface.</p>
 <tr>
 <td align="center"><code>sizes</code></td>
 <td>index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="utility-ops">Utility ops<a class="headerlink" href="#utility-ops" title="Permanent link">link</a></h3>
+<h4 id="vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop"><code>vmvx.get_buffer_descriptor</code> (VMVX::GetBufferDescriptorOp)<a class="headerlink" href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" title="Permanent link">link</a></h4>
+<p><em>Late binds a base buffer/offset/strides</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_buffer_descriptor` $source `:` type($source) `-&gt;` type(results) attr-dict
+</code></pre></div>
+<p>Queries a base buffer, offset and strides. This op is late bound to its
+source (alloca, binding, etc), allowing additional layers of
+transformations to be added as lowering progresses (or for buffers to be
+combined).</p>
+<p>This op has canonicalization rules which will bubble it up through the
+view stack. A final reconciliation pass is used explicitly to bind it to
+concrete sources.</p>
+<p>Traits: AlwaysSpeculatableImplTrait, SameVariadicResultSize</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th align="center">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>source</code></td>
+<td>memref of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>base_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td align="center"><code>offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>sizes</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td align="center"><code>strides</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop"><code>vmvx.get_raw_interface_binding_buffer</code> (VMVX::GetRawInterfaceBindingBufferOp)<a class="headerlink" href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop" title="Permanent link">link</a></h4>
+<p><em>Gets the raw buffer associated with a binding</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_raw_interface_binding_buffer` `set` `(` $set `)` `binding` `(` $binding `)` attr-dict
+</code></pre></div>
+<p>Normally, a slice of a binding buffer is returned via
+hal.interface.binding.subspan. However, the normal VMVX lowering flow for
+this presumes that the result is a memref, and upon final conversion, it
+will offset the memref automatically to make it consistent.</p>
+<p>This op is used in situations where earlier in a lowering, we have fully
+resolved the binding to a buffer and would just like the raw backing
+buffer as passed to the interface.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>set</code></td>
+<td align="center">::mlir::IntegerAttr</td>
+<td>index attribute</td>
+</tr>
+<tr>
+<td align="center"><code>binding</code></td>
+<td align="center">::mlir::IntegerAttr</td>
+<td>index attribute</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>buffer</code></td>
+<td>a reference counted byte buffer</td>
 </tr>
 </tbody>
 </table>
