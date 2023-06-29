@@ -170,13 +170,62 @@ Flag | Files dumped
     simple_abs_cpu.vmfb
     ```
 
-    !!! tip
+    !!! tip "Tip - Embedded and system linking"
 
         The default value of `--iree-llvmcpu-link-embedded=true` generates
         platform-agnostic ELF files. By disabling that flag, the compiler will
         produce `.so` files for Linux, `.dll` files for Windows, etc. While ELF
         files are more portable, inspection of compiled artifacts is easier with
         platform-specific shared object files.
+
+    ??? tip "Tip - Disassembling `.bc` files with `llvm-dis`"
+
+        The `.bc` intermediate files use the
+        [LLVM BitCode](https://llvm.org/docs/BitCodeFormat.html) format, which
+        can be disassembled using
+        [`llvm-dis`](https://llvm.org/docs/CommandGuide/llvm-dis.html):
+
+        ```console
+        $ cd /tmp/iree/simple_abs/
+        $ llvm-dis module_abs_dispatch_0_system_elf_x86_64.codegen.bc
+        $ cat module_abs_dispatch_0_system_elf_x86_64.codegen.ll
+
+        ; ModuleID = 'module_abs_dispatch_0_system_elf_x86_64.codegen.bc'
+        source_filename = "abs_dispatch_0"
+        target triple = "x86_64-linux-gnu"
+
+        %iree_hal_executable_library_header_t = type { i32, ptr, i32, i32 }
+        %iree_hal_executable_dispatch_attrs_v0_t = type { i16, i16 }
+
+        ...
+
+        define internal i32 @abs_dispatch_0_generic(
+            ptr noalias nonnull align 16 %0,
+            ptr noalias nonnull align 16 %1,
+            ptr noalias nonnull align 16 %2) #0 {
+          %4 = load %iree_hal_executable_dispatch_state_v0_t, ptr %1, align 8,
+          %5 = extractvalue %iree_hal_executable_dispatch_state_v0_t %4, 10,
+          %6 = load ptr, ptr %5, align 8,
+          %7 = ptrtoint ptr %6 to i64,
+          %8 = and i64 %7, 63,
+          %9 = icmp eq i64 %8, 0,
+          call void @llvm.assume(i1 %9),
+          %10 = load %iree_hal_executable_dispatch_state_v0_t, ptr %1, align 8,
+          %11 = extractvalue %iree_hal_executable_dispatch_state_v0_t %10, 10,
+          %12 = getelementptr ptr, ptr %11, i32 1,
+          %13 = load ptr, ptr %12, align 8,
+          %14 = ptrtoint ptr %13 to i64,
+          %15 = and i64 %14, 63,
+          %16 = icmp eq i64 %15, 0,
+          call void @llvm.assume(i1 %16),
+          %17 = load float, ptr %6, align 4,
+          %18 = call float @llvm.fabs.f32(float %17),
+          store float %18, ptr %13, align 4,
+          ret i32 0,
+        }
+
+        ...
+        ```
 
 === "GPU - Vulkan"
 
@@ -197,11 +246,60 @@ Flag | Files dumped
     simple_abs_vulkan.vmfb
     ```
 
-    !!! tip
+    ??? tip "Tip - Disassembling `.spv` files with `spirv-dis`"
 
-        Consider using tools like `spirv-dis` from the
-        [SPIR-V Tools project](https://github.com/KhronosGroup/SPIRV-Tools) to
-        interact with the `.spv` files.
+        The `.spv` files use the
+        [SPIR-V](https://registry.khronos.org/SPIR-V/) binary format, which can
+        be disassembled using `spirv-dis` from
+        [SPIR-V Tools](https://github.com/KhronosGroup/SPIRV-Tools):
+
+        ```console
+        $ cd /tmp/iree/simple_abs/
+        $ spirv-dis module_abs_dispatch_0_vulkan_spirv_fb.spv
+
+        ; SPIR-V
+        ; Version: 1.0
+        ; Generator: Khronos; 22
+        ; Bound: 20
+        ; Schema: 0
+                      OpCapability Shader
+                      OpExtension "SPV_KHR_storage_buffer_storage_class"
+                %18 = OpExtInstImport "GLSL.std.450"
+                      OpMemoryModel Logical GLSL450
+                      OpEntryPoint GLCompute %abs_dispatch_0_generic "abs_dispatch_0_generic"
+                      OpExecutionMode %abs_dispatch_0_generic LocalSize 1 1 1
+                      OpName %__resource_var_0_0_ "__resource_var_0_0_"
+                      OpName %__resource_var_0_1_ "__resource_var_0_1_"
+                      OpName %abs_dispatch_0_generic "abs_dispatch_0_generic"
+                      OpDecorate %_arr_float_uint_1 ArrayStride 4
+                      OpMemberDecorate %_struct_2 0 Offset 0
+                      OpDecorate %_struct_2 Block
+                      OpDecorate %__resource_var_0_0_ Binding 0
+                      OpDecorate %__resource_var_0_0_ DescriptorSet 0
+                      OpDecorate %__resource_var_0_1_ Binding 1
+                      OpDecorate %__resource_var_0_1_ DescriptorSet 0
+              %float = OpTypeFloat 32
+              %uint = OpTypeInt 32 0
+            %uint_1 = OpConstant %uint 1
+        %_arr_float_uint_1 = OpTypeArray %float %uint_1
+          %_struct_2 = OpTypeStruct %_arr_float_uint_1
+        %_ptr_StorageBuffer__struct_2 = OpTypePointer StorageBuffer %_struct_2
+        %__resource_var_0_0_ = OpVariable %_ptr_StorageBuffer__struct_2 StorageBuffer
+        %__resource_var_0_1_ = OpVariable %_ptr_StorageBuffer__struct_2 StorageBuffer
+              %void = OpTypeVoid
+                  %9 = OpTypeFunction %void
+            %uint_0 = OpConstant %uint 0
+        %_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+        %abs_dispatch_0_generic = OpFunction %void None %9
+                %12 = OpLabel
+                %15 = OpAccessChain %_ptr_StorageBuffer_float %__resource_var_0_0_ %uint_0 %uint_0
+                %16 = OpLoad %float %15
+                %17 = OpExtInst %float %18 FAbs %16
+                %19 = OpAccessChain %_ptr_StorageBuffer_float %__resource_var_0_1_ %uint_0 %uint_0
+                      OpStore %19 %17
+                      OpReturn
+                      OpFunctionEnd
+        ```
 
 === "GPU - CUDA"
 
@@ -223,6 +321,50 @@ Flag | Files dumped
     module_abs_dispatch_0.mlir
     simple_abs_cuda.vmfb
     ```
+
+    ??? tip "Tip - Disassembling `.bc` files with `llvm-dis`"
+
+        The `.bc` intermediate files use the
+        [LLVM BitCode](https://llvm.org/docs/BitCodeFormat.html) format, which
+        can be disassembled using
+        [`llvm-dis`](https://llvm.org/docs/CommandGuide/llvm-dis.html):
+
+        ```console
+        $ cd /tmp/iree/simple_abs/
+        $ llvm-dis module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc
+        $ cat module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll
+
+        ; ModuleID = 'module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc'
+        source_filename = "abs_dispatch_0"
+
+        declare ptr @malloc(i64)
+
+        declare void @free(ptr)
+
+        declare float @__nv_fabsf(float)
+
+        define void @abs_dispatch_0_generic(ptr noalias readonly align 16 %0, ptr noalias align 16 %1) {
+          %3 = ptrtoint ptr %0 to i64
+          %4 = and i64 %3, 63
+          %5 = icmp eq i64 %4, 0
+          call void @llvm.assume(i1 %5)
+          %6 = ptrtoint ptr %1 to i64
+          %7 = and i64 %6, 63
+          %8 = icmp eq i64 %7, 0
+          call void @llvm.assume(i1 %8)
+          %9 = load float, ptr %0, align 4
+          %10 = call float @__nv_fabsf(float %9)
+          store float %10, ptr %1, align 4
+          ret void
+        }
+
+        !nvvm.annotations = !{!0, !1, !2, !3}
+
+        !0 = !{ptr @abs_dispatch_0_generic, !"kernel", i32 1}
+        !1 = !{ptr @abs_dispatch_0_generic, !"maxntidx", i32 1}
+        !2 = !{ptr @abs_dispatch_0_generic, !"maxntidy", i32 1}
+        !3 = !{ptr @abs_dispatch_0_generic, !"maxntidz", i32 1}
+        ```
 
 <!-- TODO(scotttodd): Link to a playground Colab notebook that dumps files? -->
 
