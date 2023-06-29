@@ -173,10 +173,10 @@ Flag | Files dumped
     !!! tip "Tip - Embedded and system linking"
 
         The default value of `--iree-llvmcpu-link-embedded=true` generates
-        platform-agnostic ELF files. By disabling that flag, the compiler will
-        produce `.so` files for Linux, `.dll` files for Windows, etc. While ELF
-        files are more portable, inspection of compiled artifacts is easier with
-        platform-specific shared object files.
+        embedded ELF files. By disabling that flag, the compiler will produce
+        platform-standard `.so` files for Linux, `.dll` files for Windows, etc.
+        While embedded ELF files can be smaller and more portable, inspection of
+        compiled artifacts is easier with platform-standard shared object files.
 
     ??? tip "Tip - Disassembling `.bc` files with `llvm-dis`"
 
