@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"

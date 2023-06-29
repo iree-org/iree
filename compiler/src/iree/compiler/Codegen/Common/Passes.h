@@ -12,7 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
 #define IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Pass/Pass.h"
 

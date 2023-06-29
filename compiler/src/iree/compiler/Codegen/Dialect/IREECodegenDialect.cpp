@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
