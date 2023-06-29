@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/metal/metal_shared_event.h"
+#include "experimental/metal/shared_event.h"
 
 #import <Metal/Metal.h>
 
