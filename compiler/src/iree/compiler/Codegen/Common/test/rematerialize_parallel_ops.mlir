@@ -93,3 +93,38 @@ func.func @softmax(%7 : tensor<16x32x4096xf32>) -> tensor<16x32x4096xf32> {
 // CHECK-SAME:       ["parallel", "parallel", "parallel"]
 // CHECK-SAME:       ins(%[[ARG0]], %[[MAXF]], %[[EXPF]] :
 //      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @no_rematerialize_scalar_ops(%arg0 : tensor<f32>) -> tensor<f32> {
+  %0 = tensor.empty() : tensor<f32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>],
+      iterator_types = []}
+      ins(%arg0: tensor<f32>) outs(%0 : tensor<f32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %2 = arith.addf %b0, %b0: f32
+      linalg.yield %2: f32
+  } -> tensor<f32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>],
+      iterator_types = []}
+      ins(%1: tensor<f32>) outs(%0 : tensor<f32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %4 = arith.mulf %b0, %b0: f32
+      linalg.yield %4: f32
+  } -> tensor<f32>
+  %5 = linalg.generic {
+      indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>],
+      iterator_types = []}
+      ins(%1, %3 : tensor<f32>, tensor<f32>) outs(%0 : tensor<f32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %6 = arith.addf %b0, %b1: f32
+      linalg.yield %6: f32
+  } -> tensor<f32>
+  return %5 : tensor<f32>
+}
+// CHECK-LABEL: func @no_rematerialize_scalar_ops(
+//       CHECK:   linalg.generic
+//       CHECK:   linalg.generic
+//       CHECK:   linalg.generic

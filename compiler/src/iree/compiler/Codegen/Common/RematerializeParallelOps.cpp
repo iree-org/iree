@@ -18,12 +18,30 @@ namespace iree_compiler {
 
 namespace {
 
+static bool isScalarOrTensorOfSizeOne(Type t) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(t)) {
+    return tensorType.hasStaticShape() && tensorType.getNumElements() == 1;
+  }
+  return t.isIntOrIndexOrFloat();
+}
+
 /// Merge elementwise operations into their consumers.
 struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
+    // Avoid doing this for scalar operations. This is a temporary solution
+    // to address #14258. Ideally we should apply this pass more prescriptively
+    // instead of default always.
+    auto isScalarValue = [](Value v) {
+      return isScalarOrTensorOfSizeOne(v.getType());
+    };
+    if (llvm::all_of(genericOp.getOperands(), isScalarValue) &&
+        llvm::all_of(genericOp.getResults(), isScalarValue)) {
+      return failure();
+    }
+
     // Find the first operand that is defined by another generic op on tensors.
     for (OpOperand &opOperand : genericOp->getOpOperands()) {
       if (!linalg::areElementwiseOpsFusable(&opOperand))
