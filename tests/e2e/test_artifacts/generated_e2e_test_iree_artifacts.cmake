@@ -6532,6 +6532,8 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-11a9de4ea6e17feff81429ed53e52a70e89c1cfeef0a73f10740c8420341b81d
   ${PACKAGE_NAME}_iree-module-14ce4459cb4ea8aa84b5315222e9cfe00fe8a3b456b2ae75a5eb943036279d68
   ${PACKAGE_NAME}_iree-module-152d0b6211fff7591df3418c549c979a8144fc34280c22a8b2b5ff8ea3d1b46c
+  ${PACKAGE_NAME}_iree-module-16b5b80aaf1271b5ad782570340cc0c7c1c97e10b7e6c6cc6e5f3ede8393cb6c
+  ${PACKAGE_NAME}_iree-module-16ef56b6869d10b17e983fec62e9f48e6bb87e9a348ab52a0b2faabca2b03578
   ${PACKAGE_NAME}_iree-module-178907b155b6322dedfa947937f9caca5158ff3af167470f2de90347dba357f4
   ${PACKAGE_NAME}_iree-module-1af884e597c283d319b14e8d55156eac66a86045fcb7e521c3f50aa8a6c04126
   ${PACKAGE_NAME}_iree-module-1c4bc4b5ba3b5862efdbcbb9b3bf4a02f7ff9aa36e852e9b94dbe265d6bfaa99
@@ -6562,9 +6564,11 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-4f5ab4bfb26a82d0f83133b9e85585f0c5b97cdb00143de31675158a5a71b457
   ${PACKAGE_NAME}_iree-module-50567a33e0bd9aa5a32a6f61fca9ef8a70ac4d94313024f2c4ec92d9c543c599
   ${PACKAGE_NAME}_iree-module-52ce6f195b382daa71816b068bc1d13541397d6da097276699dbaffa95de35d7
+  ${PACKAGE_NAME}_iree-module-56bc9128e294585d749b8ebe34fd03060ba34d200eef185837b6002d0dcbfccb
   ${PACKAGE_NAME}_iree-module-599701d7114956cf64777412899cff57ea5be0478f9a2331377770beaad8f923
   ${PACKAGE_NAME}_iree-module-5a4c96fc279262ad7d7f1d446d0bd3685b2ca42e06b0167df5be5737c9d42901
   ${PACKAGE_NAME}_iree-module-5afcbf3d3cd73477dba7cd674d13a936231393835addc705787daa643b051a81
+  ${PACKAGE_NAME}_iree-module-5e966f45b952e5406271a1a23edd5d9ffab75524b450b7cf4ee35263bb0830f3
   ${PACKAGE_NAME}_iree-module-5ef6657fb694df545b7f87fbb78dfa99af891778790ac0924c08a87d335c1bf9
   ${PACKAGE_NAME}_iree-module-5f03fee30980d1fb1074b82d329a1fa63b365858539743e672ad56c039dd732a
   ${PACKAGE_NAME}_iree-module-611a54141f98b17aa94abdba55d8a0487aa722bba4da6853c090f786975c5884
@@ -6572,6 +6576,7 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-63a2a9acdb2dafb66a49487fd7eecb79e49d870ec9b9ef17a1e8e9d50fe5c9ba
   ${PACKAGE_NAME}_iree-module-63d75ff4a9998a86855e0e78ab2d782f52b90b58025584f3f03ec3103a81425b
   ${PACKAGE_NAME}_iree-module-65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b
+  ${PACKAGE_NAME}_iree-module-65fa033050b916e8143d44b5081ee45db3b1946a5d77de223328a7fe92a1cc66
   ${PACKAGE_NAME}_iree-module-660bd6b0861f368e51c6ecac52d6dce2998d863bc0a4bbd9dbdd77508ea761d4
   ${PACKAGE_NAME}_iree-module-67e643dea7f2cf9e5e90ec74746ecc52c487747966a95b8140c3c0cd6f90b709
   ${PACKAGE_NAME}_iree-module-6b9353f591f5044f661ecbbaafee502d710cf263527525d4f843b26cd43f11f7
@@ -6592,9 +6597,11 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-899c2de5e339b7e19528e80de1129a38511948ba3331932c22e23223707af4ca
   ${PACKAGE_NAME}_iree-module-89a91c770dfce869ecb04e4b37e3b4d7da508a240da395cf240cc20ee8573857
   ${PACKAGE_NAME}_iree-module-8b19868be1c797cb585551c871c4171e78817e0efc49d30d91b9d722be283de9
+  ${PACKAGE_NAME}_iree-module-8e2d1286ad9a7e360b0c26019146a22ec9188f8bdf8ad99341eb5531cdea2417
   ${PACKAGE_NAME}_iree-module-8ee3c7b136703472b53bc8a19d8d28945aca93953612ccc65e55cd1b3dfda6c8
   ${PACKAGE_NAME}_iree-module-91a35228ead480e04b85998ccf3edfc891f44b5f79017b7fcab72cb66a812b07
   ${PACKAGE_NAME}_iree-module-925cdb19f2aa31a1907c81b5a9e179d91280c77b08a039c1cbf146f71683dde9
+  ${PACKAGE_NAME}_iree-module-94a5cba0f45ffc2dc028a5f9fa5780fa61ed91b27382c86c4d96de0e2cd002f3
   ${PACKAGE_NAME}_iree-module-954bc3dc1fd0c22768ebfe898a67c0db3743d74e8fb776fced75eafb0421058f
   ${PACKAGE_NAME}_iree-module-96e2ebf26260627484f375448ef478c35608ada2d2a0f81c0bec697db9ea3105
   ${PACKAGE_NAME}_iree-module-973d25bc365d73084bfa35f317464f59a9b00f67d732733b4eaa476a418ecd95
@@ -6612,6 +6619,7 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-b8ee6e3d12e6662f0c78b851876a0759da23967e71ae1a2b5569d0ec3101b43b
   ${PACKAGE_NAME}_iree-module-b975b6877510291f2ee4ca814bd9b6a5cd2a2bf90c506627eb69b305835f1197
   ${PACKAGE_NAME}_iree-module-bd015dc23ff2f9bf5d681039cbb0f6418cd3d09d09124c0238d8c2caf01dba24
+  ${PACKAGE_NAME}_iree-module-bd32992875a8fc7a494c75933b1693d6d8b845fccf2b12504a8cba64d80ad110
   ${PACKAGE_NAME}_iree-module-bfb6239769f044d2228f2efb5ce6aa51132455d9a8178e5a5ec8525ff5836e0d
   ${PACKAGE_NAME}_iree-module-c2085883b1f5c767f37508ab998a4bcd17d169fe6a5197d28e4dca8772c90253
   ${PACKAGE_NAME}_iree-module-c370b55d34f6d3c76aa838ff0a7be520de10a4824c5feaa773e2fb73a588ad8c
@@ -6621,6 +6629,7 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-d39340f50384e970b103694a38d7d21d5b1171d7304630d25e925c5c2486bf10
   ${PACKAGE_NAME}_iree-module-d6590e27e94d8aac1b2bfb1e7c60e31dcddacd3a10687cdae998979fc31720fc
   ${PACKAGE_NAME}_iree-module-d8f22b5a700abdef68fe791ad08acdfc6d238d82e00f264367d922b99b369ff7
+  ${PACKAGE_NAME}_iree-module-d967e293594998e48355d30d900dbdf77dbd6eedbff768112dbe8e7ec332b9eb
   ${PACKAGE_NAME}_iree-module-dc81a08fe0e5140f22f328d9dfea1828e7318d67899a2534d3b02ff36032cb61
   ${PACKAGE_NAME}_iree-module-dd2a6a43dceabe7a807e280b43177cdf892d4ad20fdef4e3d3b6e39be7b9b09d
   ${PACKAGE_NAME}_iree-module-ddd1657bc5433ccca5c8ce562f581626457a793670958cd8b4016c426191a9c4
@@ -6629,12 +6638,14 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-e0533bdae79e15707a6eb26eb7f09c4d7dbdbfc40b993a4ad6289cf2bb1f13cb
   ${PACKAGE_NAME}_iree-module-e6049d40d7925bccce4859e5408f2ad53eb68309aa38b46b8a7e47c94a2cd8a3
   ${PACKAGE_NAME}_iree-module-e7bd41e564750501f39ac9690c18d1a2e77dc7999da710d0c0bf80751dda84a0
+  ${PACKAGE_NAME}_iree-module-eb1b1732e5d30ce4689b871f8ec18c50b30eedd418eb80330807fe505bb78f7e
   ${PACKAGE_NAME}_iree-module-ef1ba1216f0f304c80b7a5b8bac545a987d04a100d9c1e5e66b75ce88636534c
   ${PACKAGE_NAME}_iree-module-f58c00ccab797ad4dbca3de3b50633588a68db0122aa011bdf81a9aca5ea692b
   ${PACKAGE_NAME}_iree-module-f93f9c93aaa7cf3f771a421d1f4488d840a775063dd2b8d7971c94b9d18ace59
   ${PACKAGE_NAME}_iree-module-f9df9c8ecc1b369ddc960f07ab7097a9c1dd8587441cbd9cf91e443e2639bf28
   ${PACKAGE_NAME}_iree-module-fdce9dd1dfd20592880fce8969f91ac6abe84eca6922b4df4cbffe512abbfcb6
   ${PACKAGE_NAME}_iree-module-fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07
+  ${PACKAGE_NAME}_iree-module-ff7ed59e05efe8b9a397a179726f63da68a8a1ac3ea731924b4bd24dab491b34
 )
 
 add_dependencies(iree-benchmark-suites-comp-stats-large

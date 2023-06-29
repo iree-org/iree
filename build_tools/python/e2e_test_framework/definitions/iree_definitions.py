@@ -130,15 +130,13 @@ class ModuleExecutionConfig(object):
         id: str,
         loader: RuntimeLoader,
         driver: RuntimeDriver,
-        tags: Sequence[str] = (),
-        extra_flags: Optional[Sequence[str]] = None,
+        extra_flags: Sequence[str] = (),
         tags: Sequence[str] = (),
     ):
         runtime_part = f"{driver.name}({loader.name})".lower()
         tag_part = ",".join(tags)
         # Format: <driver>(<loader>)[<tag>,...]
         name = f"{runtime_part}[{tag_part}]"
-        extra_flags = extra_flags or []
         return cls(
             id=id,
             name=name,
