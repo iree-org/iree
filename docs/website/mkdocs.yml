@@ -132,7 +132,7 @@ nav:
           - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
           - GPU - CUDA/ROCm: "guides/deployment-configurations/gpu-cuda-rocm.md"
       - "Other topics":
-          - Compiler tips and tricks: "guides/compiler-tips.md"
+          - Developer tips and tricks: "guides/developer-tips.md"
   - "Reference":
       - "reference/index.md"
       - "API bindings":

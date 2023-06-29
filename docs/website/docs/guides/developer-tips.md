@@ -1,4 +1,4 @@
-# IREE compiler tips and tricks
+# IREE developer tips and tricks
 
 The IREE compiler is built using [MLIR](https://mlir.llvm.org/), so it naturally
 supports the common
