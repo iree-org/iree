@@ -59,6 +59,10 @@ loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
     func.removeFnAttr("target-features");
   }
 
+  // Specialize the module to our target machine.
+  baseBitcode->setDataLayout(targetMachine->createDataLayout());
+  baseBitcode->setTargetTriple(targetMachine->getTargetTriple().str());
+
   return baseBitcode;
 }
 

@@ -465,19 +465,21 @@ public:
         }
       };
 
-      std::unique_ptr<llvm::Module> archBitcode =
+      std::unique_ptr<llvm::Module> ukernelBitcode =
+          loadUKernelBaseBitcode(targetMachine.get(), context);
+
+      llvm::Linker ukernelBitcodeLinker(*ukernelBitcode);
+
+      std::unique_ptr<llvm::Module> ukernelArchBitcode =
           loadUKernelArchBitcode(targetMachine.get(), context);
 
-      // The archBitcode contains overrides for weak symbols that will come in
-      // the baseBitcode below. So we link it before baseBitcode, with
-      // OverrideFromSrc.
-      if (archBitcode) {
+      if (ukernelArchBitcode) {
         // Sequence that access before we std::move(archBitcode)!
-        StringRef archBitcodeName = archBitcode->getName();
+        StringRef archBitcodeName = ukernelArchBitcode->getName();
         if (failed(linkBitcodeModule(
-                variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
-                *targetMachine, archBitcodeName, std::move(archBitcode),
-                setAlwaysInline))) {
+                variantOp.getLoc(), ukernelBitcodeLinker,
+                llvm::Linker::OverrideFromSrc, *targetMachine, archBitcodeName,
+                std::move(ukernelArchBitcode), setAlwaysInline))) {
           return mlir::emitError(variantOp.getLoc())
                  << "failed linking in architecture-specific ukernel bitcode "
                     "for target triple '"
@@ -485,15 +487,9 @@ public:
         }
       }
 
-      // The baseBitcode module contains weak symbols for fallbacks.
-      // So we link it after the archBitcode and with LinkOnlyNeeded.
-      std::unique_ptr<llvm::Module> baseBitcode =
-          loadUKernelBaseBitcode(targetMachine.get(), context);
-      // Sequence that access before we std::move(baseBitcode)!
-      StringRef baseBitcodeName = baseBitcode->getName();
       if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
                                    llvm::Linker::LinkOnlyNeeded, *targetMachine,
-                                   baseBitcodeName, std::move(baseBitcode),
+                                   "ukernel_bitcode", std::move(ukernelBitcode),
                                    setAlwaysInline))) {
         return mlir::emitError(variantOp.getLoc())
                << "failed linking in base ukernel bitcode";
