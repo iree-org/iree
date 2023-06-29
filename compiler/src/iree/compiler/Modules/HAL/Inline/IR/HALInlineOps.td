@@ -21,6 +21,13 @@ class HALInline_PureOp<string mnemonic, list<Trait> traits = []> :
 // !hal.buffer / iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
+def OpGroupBufferOps : OpDocGroup {
+  let summary = "Buffer ops";
+  let description = "Ops for `!hal.buffer` / `iree_hal_buffer_t`.";
+}
+
+let opDocGroup = OpGroupBufferOps in {
+
 def HALInline_BufferAllocateOp : HALInline_Op<"buffer.allocate", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
@@ -197,9 +204,18 @@ def HALInline_BufferStorageOp : HALInline_PureOp<"buffer.storage", [
   let hasFolder = 1;
 }
 
+} // OpGroupBufferOps
+
 //===----------------------------------------------------------------------===//
 // !hal.buffer_view / iree_hal_buffer_view_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupBufferViewOps : OpDocGroup {
+  let summary = "Buffer view ops";
+  let description = "Ops for `!hal.buffer_view` / `iree_hal_buffer_view_t`.";
+}
+
+let opDocGroup = OpGroupBufferViewOps in {
 
 def HALInline_BufferViewCreateOp : HALInline_PureOp<"buffer_view.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -412,9 +428,18 @@ def HALInline_BufferViewTraceOp : HALInline_Op<"buffer_view.trace", []> {
   }];
 }
 
+} // OpGroupBufferViewOps
+
 //===----------------------------------------------------------------------===//
 // !hal.device / iree_hal_device_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupDeviceOps : OpDocGroup {
+  let summary = "Device ops";
+  let description = "Ops for `!hal.device` / `iree_hal_device_t`.";
+}
+
+let opDocGroup = OpGroupDeviceOps in {
 
 def HALInline_DeviceQueryOp :
     HALInline_PureOp<"device.query"> {
@@ -463,5 +488,7 @@ def HALInline_DeviceQueryOp :
 
   let hasVerifier = 1;
 }
+
+} // OpGroupDeviceOps
 
 #endif  // IREE_DIALECT_MODULES_HAL_INLINE_OPS

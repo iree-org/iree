@@ -26,6 +26,13 @@ class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
 // Partitioned regions
 //===----------------------------------------------------------------------===//
 
+def OpGroupPartitionedRegionOps : OpDocGroup {
+  let summary = "Partitioned region ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupPartitionedRegionOps in {
+
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     Util_ShapeAwareOp,
     AttrSizedOperandSegments,
@@ -623,9 +630,18 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Pure, ReturnLike, Terminator]> {
   ];
 }
 
+} // OpGroupPartitionedRegionOps
+
 //===----------------------------------------------------------------------===//
 // Executables for outlined regions
 //===----------------------------------------------------------------------===//
+
+def OpGroupExecutableOps : OpDocGroup {
+  let summary = "Executable ops";
+  let description = "Executables for outlined regions.";
+}
+
+let opDocGroup = OpGroupExecutableOps in {
 
 def FLOW_ExecutableOp : FLOW_Op<"executable", [
   IsolatedFromAbove,
@@ -718,9 +734,18 @@ def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   let hasVerifier = 1;
 }
 
+} // OpGroupExecutableOps
+
 //===----------------------------------------------------------------------===//
 // Dispatch ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupDispatchOps : OpDocGroup {
+  let summary = "Dispatch ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupDispatchOps in {
 
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   AttrSizedOperandSegments,
@@ -820,9 +845,18 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let hasVerifier = 1;
 }
 
+} // OpGroupDispatchOps
+
 //===----------------------------------------------------------------------===//
 // Streamable call ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupStreamableCallOps : OpDocGroup {
+  let summary = "Streamable call ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupStreamableCallOps in {
 
 def FLOW_FuncOp : FLOW_Op<"func", [
   CallableOpInterface,
@@ -984,9 +1018,18 @@ def FLOW_CallOp : FLOW_Op<"call", [
   let hasVerifier = 1;
 }
 
+} // OpGroupStreamableCallOps
+
 //===----------------------------------------------------------------------===//
 // Tensor ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupTensorOps : OpDocGroup {
+  let summary = "Tensor ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTensorOps in {
 
 // TODO(benvanik): make this behave like std.constant if not dynamic.
 def FLOW_TensorConstantOp : FLOW_Op<"tensor.constant"> {
@@ -1568,9 +1611,18 @@ def FLOW_DispatchWorkloadOrdinalOp :
   let hasFolder = 1;
 }
 
+} // OpGroupTensorOps
+
 //===----------------------------------------------------------------------===//
 // Collective communication ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupCollectiveCommunicationOps : OpDocGroup {
+  let summary = "Collective communication ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupCollectiveCommunicationOps in {
 
 def FLOW_ChannelDefaultOp : FLOW_PureOp<"channel.default", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
@@ -1864,5 +1916,7 @@ def FLOW_CollectiveSendRecvOp : FLOW_Op<"collective.send_recv", [
       "Value":$recv)>,
   ];
 }
+
+} // OpGroupCollectiveCommunicationOps
 
 #endif  // IREE_DIALECT_FLOW_OPS
