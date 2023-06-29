@@ -16,10 +16,10 @@ include(CMakeParseArguments)
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
 # DISABLE_LLVM_LINK_LLVM_DYLIB: Disables linking against the libLLVM.so dynamic
-# library, even if the build is configured to do so. This must be used with care
-# as it can only contain dependencies and be used by binaries that also so
-# disable it (either in upstream LLVM or locally). In practice, it is used
-# for LLVM dependency chains that must always result in static-linked tools.
+#   library, even if the build is configured to do so. This must be used with
+#   care as it can only contain dependencies and be used by binaries that also
+#   so disable it (either in upstream LLVM or locally). In practice, it is used
+#   for LLVM dependency chains that must always result in static-linked tools.
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # LINKOPTS: List of link options
