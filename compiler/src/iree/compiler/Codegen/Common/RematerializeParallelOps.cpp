@@ -34,9 +34,11 @@ struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
     // Avoid doing this for scalar operations. This is a temporary solution
     // to address #14258. Ideally we should apply this pass more prescriptively
     // instead of default always.
-    if (llvm::all_of(genericOp.getResults(), [](Value v) {
-          return isScalarOrTensorOfSizeOne(v.getType());
-        })) {
+    auto isScalarValue = [](Value v) {
+      return isScalarOrTensorOfSizeOne(v.getType());
+    };
+    if (llvm::all_of(genericOp.getOperands(), isScalarValue) &&
+        llvm::all_of(genericOp.getResults(), isScalarValue)) {
       return failure();
     }
 
