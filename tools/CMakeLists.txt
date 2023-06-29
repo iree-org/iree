@@ -246,6 +246,7 @@ if(IREE_BUILD_COMPILER)
       LLVMSupport
       MLIRTblgenLib
     HOSTONLY
+    DISABLE_LLVM_LINK_LLVM_DYLIB
   )
 
   iree_cc_binary(
