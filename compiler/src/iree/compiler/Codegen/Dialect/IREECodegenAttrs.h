@@ -4,12 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- LoweringConfig.h - Declares configuration for lowering Linalg ops --===//
-//
-// This file declares an attribute that drives how a dispatch region containing
-// a set of operations are lowered. The attribute itself is attached to Linalg
-// operations, and help converting a Linalg operation into "scalar code".
-//
+//===- IREECodegenAttrs.h - Codegen dialect attributes -------------------===//
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
@@ -33,7 +28,7 @@ using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t>>;
 // clang-format off
 #include "iree/compiler/Codegen/Dialect/LoweringConfigEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h.inc"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h.inc"
 // clang-format on
 
 namespace mlir {

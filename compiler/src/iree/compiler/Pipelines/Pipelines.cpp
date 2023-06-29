@@ -60,6 +60,9 @@ void buildIREEVMTransformPassPipeline(
         passManager, inputOptions.type);
   }
   AutoInputConversionPipelineOptions autoOptions;
+  autoOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
+  autoOptions.demoteF64ToF32 = inputOptions.demoteF64ToF32;
+  autoOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
 
 #ifdef IREE_HAVE_STABLEHLO_INPUT
   stablehlo::StableHloOptions stablehloOptions;

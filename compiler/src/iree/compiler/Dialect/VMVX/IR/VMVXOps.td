@@ -20,6 +20,13 @@ class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
 // Utility ops
 //===----------------------------------------------------------------------===//
 
+def OpGroupUtilityOps : OpDocGroup {
+  let summary = "Utility ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupUtilityOps in {
+
 def VMVX_GetBufferDescriptorOp : VMVX_PureOp<"get_buffer_descriptor", [
     SameVariadicResultSize
   ]> {
@@ -75,9 +82,18 @@ def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
   }];
 }
 
+} // OpGroupUtilityOps
+
 //===----------------------------------------------------------------------===//
 // VMVX Ops: ABI
 //===----------------------------------------------------------------------===//
+
+def OpGroupABIOps : OpDocGroup {
+  let summary = "ABI ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupABIOps in {
 
 def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
   let summary = "Performs a strided elementwise operation on two same-rank buffers";
@@ -210,5 +226,7 @@ def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
     attr-dict
   }];
 }
+
+} // OpGroupABIOps
 
 #endif  // IREE_DIALECT_MODULES_VMVX_OPS

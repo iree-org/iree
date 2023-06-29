@@ -93,3 +93,37 @@ func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f
 // CHECK: complex.mul
 // CHECK: linalg.yield
 // CHECK: flow.return
+
+// ----
+
+#map = affine_map<() -> ()>
+func.func @use_in_dispatch_count(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view {
+  %c1 = arith.constant 1 : index
+  %c2_i32 = arith.constant 2 : i32
+  %c0 = arith.constant 0 : index
+  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<1xi32>
+  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<1xi32>
+  %2 = tensor.empty() : tensor<i32>
+  %extracted = tensor.extract %0[%c1] : tensor<1xi32>
+  %4 = flow.dispatch.region -> (tensor<i32>) {
+    %6 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%2 : tensor<i32>) {
+    ^bb0(%out: i32):
+      %7 = arith.addi %extracted, %c2_i32 : i32
+      linalg.yield %7 : i32
+    } -> tensor<i32>
+    flow.return %6 : tensor<i32>
+  } count() -> (index, index, index) {
+    flow.return %c1, %c1, %c1 : index, index, index
+  }
+  %5 = hal.tensor.export %4 "output 0" : tensor<i32> -> !hal.buffer_view
+  return %5 : !hal.buffer_view
+}
+
+
+// CHECK-LABEL: @use_in_dispatch_count
+// CHECK: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: flow.dispatch.region
+// CHECK: %[[C1_2:.+]] = arith.constant 1 : index
+// CHECK: linalg.generic
+// CHECK: count()
+// CHECK: flow.return %[[C1]], %[[C1]], %[[C1]]

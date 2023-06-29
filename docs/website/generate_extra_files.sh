@@ -35,17 +35,24 @@ if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi
 
-# Copy from build directory -> source directory (files are .gitignore'd).
-cp -r \
-  "${BUILD_DIR}/doc/Dialects/." \
-  "${THIS_DIR}/docs/reference/mlir-dialects/"
+# Copy into a new directory before making edits, so CMake only runs when needed.
+BUILD_DOCS_ORIGINAL_DIR="${BUILD_DIR}/doc/Dialects/"
+BUILD_DOCS_PROCESSED_DIR="${BUILD_DIR}/doc/Dialects_for_website/"
+mkdir -p "${BUILD_DOCS_PROCESSED_DIR}"
+cp -r "${BUILD_DOCS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
 
-# Delete sample dialects.
-rm "${THIS_DIR}/docs/reference/mlir-dialects/SimpleIODialect.md"
+# Delete any dialect docs we don't want to publish (e.g. sample dialects).
+rm "${BUILD_DOCS_PROCESSED_DIR}/SimpleIODialect.md"
 
 # Trim "Dialect" suffix from file names, e.g. FlowDialect.md -> Flow.md.
-for f in ${THIS_DIR}/docs/reference/mlir-dialects/*Dialect.md; do
+for f in ${BUILD_DOCS_PROCESSED_DIR}/*Dialect.md; do
   mv "$f" "${f/%Dialect.md/.md}"
 done
 
-# Note: any post-processing on the .md files could go here.
+# Postprocess the dialect docs (e.g. making tweaks to the markdown source).
+python3 "${THIS_DIR}/postprocess_dialect_docs.py" "${BUILD_DOCS_PROCESSED_DIR}"
+
+# Copy from build directory -> source directory (files are .gitignore'd).
+cp -r \
+  "${BUILD_DOCS_PROCESSED_DIR}/." \
+  "${THIS_DIR}/docs/reference/mlir-dialects/"

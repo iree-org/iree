@@ -26,6 +26,13 @@ class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
 // Generic resource ops
 //===----------------------------------------------------------------------===//
 
+def OpGroupResourceOps : OpDocGroup {
+  let summary = "Resource ops";
+  let description = "Generic resource ops.";
+}
+
+let opDocGroup = OpGroupResourceOps in {
+
 def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
@@ -602,9 +609,18 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
   let hasFolder = 1;
 }
 
+} // OpGroupResourceOps
+
 //===----------------------------------------------------------------------===//
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
+
+def OpGroupPseudoOps : OpDocGroup {
+  let summary = "Pseudo Ops";
+  let description = "Pseudo ops for conversion support.";
+}
+
+let opDocGroup = OpGroupPseudoOps in {
 
 def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
   Stream_AffinityOp,
@@ -712,9 +728,18 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
   let hasFolder = 1;
 }
 
+} // OpGroupPseudoOps
+
 //===----------------------------------------------------------------------===//
 // High-level tensor ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupTensorOps : OpDocGroup {
+  let summary = "Tensor ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTensorOps in {
 
 def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
   Stream_AffinityOp,
@@ -1236,9 +1261,18 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
+} // OpGroupTensorOps
+
 //===----------------------------------------------------------------------===//
 // Resource transfer ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupResourceTransferOps : OpDocGroup {
+  let summary = "Resource transfer ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupResourceTransferOps in {
 
 def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
@@ -1910,9 +1944,18 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupResourceTransferOps
+
 //===----------------------------------------------------------------------===//
 // Async control flow ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupAsyncControlFlowOps : OpDocGroup {
+  let summary = "Async control flow ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupAsyncControlFlowOps in {
 
 // TODO(benvanik): stream.async.if
 // TODO(benvanik): stream.async.select
@@ -2287,9 +2330,18 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupAsyncControlFlowOps
+
 //===----------------------------------------------------------------------===//
 // Explicit command ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupExplicitCommandOps : OpDocGroup {
+  let summary = "Explicit command ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExplicitCommandOps in {
 
 def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
   Stream_CmdPhaseOp,
@@ -2951,9 +3003,18 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupExplicitCommandOps
+
 //===----------------------------------------------------------------------===//
 // Synchronization ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupSynchronizationOps : OpDocGroup {
+  let summary = "Synchronization ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupSynchronizationOps in {
 
 def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   ConstantLike,
@@ -3227,9 +3288,18 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   let hasFolder = 1;
 }
 
+} // OpGroupSynchronizationOps
+
 //===----------------------------------------------------------------------===//
 // Channels
 //===----------------------------------------------------------------------===//
+
+def OpGroupChannelOps : OpDocGroup {
+  let summary = "Channel ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupChannelOps in {
 
 def Stream_ChannelCreateOp : Stream_PureOp<"channel.create", [
   AttrSizedOperandSegments,
@@ -3350,9 +3420,18 @@ def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
   let hasFolder = 1;
 }
 
+} // OpGroupChannelOps
+
 //===----------------------------------------------------------------------===//
 // Executables
 //===----------------------------------------------------------------------===//
+
+def OpGroupExecutableOps : OpDocGroup {
+  let summary = "Executable ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExecutableOps in {
 
 def Stream_ExecutableOp : Stream_Op<"executable", [
   IsolatedFromAbove,
@@ -3479,9 +3558,18 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
   }];
 }
 
+} // OpGroupExecutableOps
+
 //===----------------------------------------------------------------------===//
 // Misc
 //===----------------------------------------------------------------------===//
+
+def OpGroupMiscellaneousOps : OpDocGroup {
+  let summary = "Miscellaneous ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupMiscellaneousOps in {
 
 def Stream_ReturnOp : Stream_Op<"return", [
   ParentOneOf<[
@@ -3561,5 +3649,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 }
+
+} // OpGroupMiscellaneousOps
 
 #endif  // IREE_DIALECT_STREAM_OPS
