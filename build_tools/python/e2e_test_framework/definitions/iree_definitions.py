@@ -91,9 +91,9 @@ class CompileConfig(object):
     def build(
         cls,
         id: str,
-        tags: Sequence[str],
         compile_targets: Sequence[CompileTarget],
         extra_flags: Optional[Sequence[str]] = None,
+        tags: Sequence[str] = (),
     ):
         target_part = ",".join(str(target) for target in compile_targets)
         tag_part = ",".join(tags)
@@ -128,10 +128,10 @@ class ModuleExecutionConfig(object):
     def build(
         cls,
         id: str,
-        tags: Sequence[str],
         loader: RuntimeLoader,
         driver: RuntimeDriver,
         extra_flags: Optional[Sequence[str]] = None,
+        tags: Sequence[str] = (),
     ):
         runtime_part = f"{driver.name}({loader.name})".lower()
         tag_part = ",".join(tags)
@@ -356,7 +356,7 @@ class E2EModelRunConfig(object):
         target_device_spec: common_definitions.DeviceSpec,
         input_data: common_definitions.ModelInputData,
         tool: E2EModelRunTool,
-        tags: Optional[Sequence[str]] = None,
+        tags: Sequence[str] = (),
     ):
         composite_id = unique_ids.hash_composite_id(
             [
