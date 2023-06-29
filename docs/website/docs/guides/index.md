@@ -28,4 +28,4 @@ Guides for specific configurations:
 
 ## Other topics
 
-* [Compiler tips and tricks](./compiler-tips.md)
+* [Developer tips and tricks](./developer-tips.md)
