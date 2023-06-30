@@ -24,6 +24,8 @@ iree_cc_library(
     "cuda_device.c"
     "cuda_device.h"
     "cuda_driver.c"
+    "graph_command_buffer.c"
+    "graph_command_buffer.h"
     "memory_pools.c"
     "memory_pools.h"
     "native_executable.c"
