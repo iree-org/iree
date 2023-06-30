@@ -66,7 +66,6 @@ rm -rf ~/.local/shark_tank
 
 declare -a args=(
   --benchmark=all
-  --forked
   --update_tank
   --maxfail=500
   -k "${BENCHMARK_REGEX}"
@@ -74,6 +73,7 @@ declare -a args=(
 
 if [[ ${DRIVER} == "cuda" ]]; then
   args+=(--tf32)
+  args+=(--forked)
 fi
 
 # Run with SHARK-Runtime.
