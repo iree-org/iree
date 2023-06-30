@@ -7,7 +7,7 @@
 
 from typing import List
 
-from benchmark_suites.iree import module_execution_configs, utils
+from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import riscv_specs
@@ -52,6 +52,7 @@ class Linux_RV64_Benchmarks(object):
             module_generation_configs=gen_configs,
             module_execution_configs=[module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
             device_specs=[riscv_specs.EMULATOR_RISCV_64],
+            presets=[benchmark_presets.RISCV],
         )
         return run_configs
 
@@ -91,5 +92,6 @@ class Linux_RV32_Benchmarks(object):
             module_generation_configs=gen_configs,
             module_execution_configs=[module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
             device_specs=[riscv_specs.EMULATOR_RISCV_32],
+            presets=[benchmark_presets.RISCV],
         )
         return run_configs

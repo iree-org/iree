@@ -130,14 +130,13 @@ class ModuleExecutionConfig(object):
         id: str,
         loader: RuntimeLoader,
         driver: RuntimeDriver,
-        extra_flags: Optional[Sequence[str]] = None,
+        extra_flags: Sequence[str] = (),
         tags: Sequence[str] = (),
     ):
         runtime_part = f"{driver.name}({loader.name})".lower()
         tag_part = ",".join(tags)
         # Format: <driver>(<loader>)[<tag>,...]
         name = f"{runtime_part}[{tag_part}]"
-        extra_flags = extra_flags or []
         return cls(
             id=id,
             name=name,
@@ -256,6 +255,7 @@ class ModuleGenerationConfig(object):
     composite_id: str
     name: str
     tags: List[str]
+    presets: List[str]
     imported_model: ImportedModel
     compile_config: CompileConfig
     # Full list of flags to compile with, derived from sub-components, with
@@ -295,6 +295,7 @@ class ModuleGenerationConfig(object):
         imported_model: ImportedModel,
         compile_config: CompileConfig,
         tags: Sequence[str] = (),
+        presets: Sequence[str] = (),
     ):
         composite_id = unique_ids.hash_composite_id(
             [imported_model.composite_id, compile_config.id]
@@ -308,6 +309,7 @@ class ModuleGenerationConfig(object):
             composite_id=composite_id,
             name=name,
             tags=list(tags),
+            presets=list(presets),
             imported_model=imported_model,
             compile_config=compile_config,
             compile_flags=compile_flags,
@@ -330,6 +332,7 @@ class E2EModelRunConfig(object):
     composite_id: str
     name: str
     tags: List[str]
+    presets: List[str]
     module_generation_config: ModuleGenerationConfig
     module_execution_config: ModuleExecutionConfig
     target_device_spec: common_definitions.DeviceSpec
@@ -357,6 +360,7 @@ class E2EModelRunConfig(object):
         input_data: common_definitions.ModelInputData,
         tool: E2EModelRunTool,
         tags: Sequence[str] = (),
+        presets: Sequence[str] = (),
     ):
         composite_id = unique_ids.hash_composite_id(
             [
@@ -374,11 +378,11 @@ class E2EModelRunConfig(object):
             module_execution_config=module_execution_config,
             gpu_id=r"${GPU_ID}",
         )
-        tags_list = [] if tags is None else list(tags)
         return cls(
             composite_id=composite_id,
             name=name,
-            tags=tags_list,
+            tags=list(tags),
+            presets=list(presets),
             module_generation_config=module_generation_config,
             module_execution_config=module_execution_config,
             target_device_spec=target_device_spec,

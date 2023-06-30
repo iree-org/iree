@@ -684,40 +684,6 @@ endif()
 # dependencies to them.
 #-------------------------------------------------------------------------------
 
-if(IREE_BUILD_E2E_TEST_ARTIFACTS)
-  # iree-benchmark-import-models imports benchmark models from their source
-  # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
-  add_custom_target(iree-benchmark-import-models)
-  # Build for large benchmark suites.
-  add_custom_target(iree-benchmark-import-models-large)
-
-  # iree-benchmark-suites* fully prepares benchmark models for benchmarking:
-  #   * importing from source formats to IREE-compatible .mlir files
-  #   * compiling from .mlir files to benchmark-ready .vmfb files
-  # Build default benchmark suites.
-  add_custom_target(iree-benchmark-suites)
-  # Build large benchmark suites.
-  add_custom_target(iree-benchmark-suites-large)
-
-  # iree-e2e-compile-stats-suites* compiles the benchmark models with specific
-  # flags to collect the compilation statistics.
-  # Build for default benchmark suites.
-  add_custom_target(iree-e2e-compile-stats-suites)
-  # Build for large benchmark suites.
-  add_custom_target(iree-e2e-compile-stats-suites-large)
-
-  # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
-  # and model tests.
-  add_custom_target(iree-e2e-test-artifacts)
-  add_dependencies(iree-e2e-test-artifacts
-    iree-benchmark-import-models
-    iree-benchmark-suites
-    iree-benchmark-suites-large
-    iree-e2e-compile-stats-suites
-    iree-e2e-compile-stats-suites-large
-  )
-endif()
-
 if(IREE_BUILD_MICROBENCHMARKS)
   # Add top-level custom targets to drive generating microbenchmark suites.
   add_custom_target(iree-microbenchmark-suites)

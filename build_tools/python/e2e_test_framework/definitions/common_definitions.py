@@ -8,7 +8,7 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Sequence
+from typing import List, Sequence
 
 from e2e_test_framework import serialization, unique_ids
 
@@ -157,13 +157,12 @@ class DeviceSpec(object):
         device_name: str,
         host_environment: HostEnvironment,
         architecture: DeviceArchitecture,
-        device_parameters: Optional[Sequence[str]] = None,
+        device_parameters: Sequence[str] = (),
         tags: Sequence[str] = (),
     ):
         tag_part = ",".join(tags)
         # Format: <device_name>[<tag>,...]
         name = f"{device_name}[{tag_part}]"
-        device_parameters = device_parameters or []
         return cls(
             id=id,
             name=name,

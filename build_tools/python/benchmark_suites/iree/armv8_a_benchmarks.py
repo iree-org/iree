@@ -6,12 +6,12 @@
 """Defines IREE ARMv8-A benchmarks."""
 
 from typing import List
+
+from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import tflite_models
-from benchmark_suites.iree import module_execution_configs
-import benchmark_suites.iree.utils
 
 
 class Android_ARMv8_A_Benchmarks(object):
@@ -105,21 +105,24 @@ class Android_ARMv8_A_Benchmarks(object):
                 device_parameters={"big-cores"},
             )
         )
-        run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=default_gen_confings,
             module_execution_configs=local_sync_execution_configs
             + local_task_execution_configs,
             device_specs=all_devices,
+            presets=[benchmark_presets.ANDROID_GPU],
         )
-        run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=experimental_gen_confings,
             module_execution_configs=local_sync_execution_configs,
             device_specs=all_devices,
+            presets=[benchmark_presets.ANDROID_GPU],
         )
-        run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=experimental_gen_confings,
             module_execution_configs=local_task_execution_configs,
             device_specs=big_cores_devices,
+            presets=[benchmark_presets.ANDROID_GPU],
         )
 
         return run_configs

@@ -47,11 +47,11 @@ if [[ -n "${BENCHMARK_PRESETS}" ]]; then
   for PRESET in "${PRESET_ARRAY[@]}"; do
     case "${PRESET}" in
       comp-stats)
-        BUILD_TARGETS+=(iree-e2e-compile-stats-suites)
+        BUILD_TARGETS+=(iree-benchmark-suites-comp-stats)
         COMPILATION_PRESETS="${COMPILATION_PRESETS},${PRESET}"
         ;;
       comp-stats-large)
-        BUILD_TARGETS+=(iree-e2e-compile-stats-suites-large)
+        BUILD_TARGETS+=(iree-benchmark-suites-comp-stats-large)
         COMPILATION_PRESETS="${COMPILATION_PRESETS},${PRESET}"
         ;;
       *-large)
