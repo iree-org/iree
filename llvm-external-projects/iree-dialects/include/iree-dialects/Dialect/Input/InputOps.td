@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_INPUT_OPS_TD
 
 include "iree-dialects/Dialect/Input/InputDialect.td"
+include "iree-dialects/Dialect/Input/InputInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -548,6 +549,11 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
     AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
     AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREEInput_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+    ]>,
   ]> {
   let summary = [{updates a tensor with the contents of another tensor}];
   let description = [{
@@ -560,7 +566,8 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
     IREEInput_ShapeDynamicDims:$target_dims,
     Variadic<IREEInput_Dim>:$start_indices,
     IREEInput_Tensor:$update,
-    IREEInput_ShapeDynamicDims:$update_dims
+    IREEInput_ShapeDynamicDims:$update_dims,
+    OptionalAttr<IREEInput_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     IREEInput_Tensor:$result
@@ -569,7 +576,7 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    type($result) (`{` $target_dims^ `}`)?
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
     attr-dict-with-keyword
   }];
 
