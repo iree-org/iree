@@ -93,6 +93,8 @@ class HostEnvironment(_HostEnvironmentInfo, Enum):
     """Predefined host environment."""
 
     LINUX_X86_64 = ("linux", "x86_64")
+    LINUX_RISCV_64 = ("linux", "riscv_64")
+    LINUX_RISCV_32 = ("linux", "riscv_32")
     ANDROID_ARMV8_2_A = ("android", "armv8.2-a")
 
 

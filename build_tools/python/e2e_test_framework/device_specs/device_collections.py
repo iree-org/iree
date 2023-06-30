@@ -9,9 +9,10 @@ from typing import List, Sequence, Set
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.device_specs import (
     gcp_specs,
+    moto_edge_x30_specs,
     pixel_4_specs,
     pixel_6_pro_specs,
-    moto_edge_x30_specs,
+    riscv_specs,
 )
 
 
@@ -63,5 +64,8 @@ ALL_DEVICE_SPECS = [
     # GCP machines
     gcp_specs.GCP_C2_STANDARD_16,
     gcp_specs.GCP_A2_HIGHGPU_1G,
+    # RISCV emulators
+    riscv_specs.EMULATOR_RISCV_32,
+    riscv_specs.EMULATOR_RISCV_64,
 ]
 DEFAULT_DEVICE_COLLECTION = DeviceCollection(ALL_DEVICE_SPECS)

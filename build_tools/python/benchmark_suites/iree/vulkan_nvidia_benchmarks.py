@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE Vulkan NVIDIA benchmarks."""
 
-from typing import List, Tuple, Sequence
+from typing import List, Sequence
 from benchmark_suites.iree import benchmark_tags, module_execution_configs
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -64,10 +64,7 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
         compile_config: iree_definitions.CompileConfig,
         execution_config: iree_definitions.ModuleExecutionConfig = module_execution_configs.VULKAN_CONFIG,
         tags: Sequence[str] = [],
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=compile_config,
@@ -94,28 +91,22 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
             tags=tags,
         )
 
-        return (gen_configs, run_module_configs)
+        return run_module_configs
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
         # The `vulkan-nvidia`` tag is required to put them into the Vulkan NVIDIA
         # benchmark preset.
-        tensorcore_gen_configs, tensorcore_run_configs = self._generate_configs(
+        tensorcore_run_configs = self._generate_configs(
             model_groups.VULKAN_MODELS,
             self.TENSORCORE_COMPILE_CONFIG,
             tags=[benchmark_tags.VULKAN_NVIDIA],
         )
-        simt_gen_configs, simt_run_configs = self._generate_configs(
+        simt_run_configs = self._generate_configs(
             model_groups.VULKAN_MODELS,
             self.SIMT_COMPILE_CONFIG,
             tags=[benchmark_tags.VULKAN_NVIDIA],
         )
-        return (
-            tensorcore_gen_configs + simt_gen_configs,
-            tensorcore_run_configs + simt_run_configs,
-        )
+        return tensorcore_run_configs + simt_run_configs
