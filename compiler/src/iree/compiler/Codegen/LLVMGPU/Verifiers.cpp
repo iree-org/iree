@@ -52,6 +52,8 @@ static LogicalResult getInstructionShape(
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::
       LLVMGPUMatmulTensorCoreMmaSync:
+  case IREE::Codegen::DispatchLoweringPassPipeline::
+      LLVMGPUMatmulTensorCoreMmaSyncOnTensors:
     // Tensor Core Pipeline / MMA.SYNC
     if (inputElementType.isF16() || inputElementType.isBF16()) {
       instructionShape = {16, 8, 16};
@@ -168,6 +170,11 @@ verifyGPUMatmulPipeline(Operation *op,
   // Return success for SIMT/CUDA cores.
   if (pipeline.getValue() ==
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt)
+    return success();
+
+  // TODO(hanchung): Add a verifier once it's built completely.
+  if (pipeline.getValue() == IREE::Codegen::DispatchLoweringPassPipeline::
+                                 LLVMGPUMatmulTensorCoreMmaSyncOnTensors)
     return success();
 
   //

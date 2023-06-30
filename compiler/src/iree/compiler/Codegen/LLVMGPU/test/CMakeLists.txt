@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "linalg_transform.mlir"
     "nvvm_extract_address_computation.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"
+    "nvvm_mma_sync_tensor_pipeline_test.mlir"
     "nvvm_pipeline_test.mlir"
     "pack_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"

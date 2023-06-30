@@ -29,6 +29,12 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
                                                unsigned pipelineDepth);
 
+/// Lowering using mma.sync Tensor Core operations on tensor's path. Different
+/// from GPUMatmulTensorCoreMmaSync pipeline, it applies distribution and
+/// vectorization on tensors.
+void addGPUMatmulTensorCoreMmaSyncOnTensorsPassPipeline(OpPassManager &pm,
+                                                        unsigned pipelineDepth);
+
 /// Lowering using wmma Tensor Core operations.
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);

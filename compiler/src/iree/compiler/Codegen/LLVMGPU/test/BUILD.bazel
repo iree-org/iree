@@ -31,6 +31,7 @@ iree_lit_test_suite(
             "nvvm_extract_address_computation.mlir",
             "nvvm_pipeline_test.mlir",
             "nvvm_mma_sync_pipeline_test.mlir",
+            "nvvm_mma_sync_tensor_pipeline_test.mlir",
             "reduction_pipeline_cuda.mlir",
             "reduction_pipeline_rocm.mlir",
             "reduction_pipeline_transform_cuda.mlir",
