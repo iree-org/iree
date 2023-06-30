@@ -11,32 +11,32 @@
 #include "iree/base/api.h"
 #include "iree/hal/utils/semaphore_base.h"
 
-typedef struct iree_hal_cuda_semaphore_t {
+typedef struct iree_hal_cuda2_semaphore_t {
   iree_hal_semaphore_t base;
-  iree_hal_cuda_context_wrapper_t* context;
+  iree_hal_cuda2_context_wrapper_t* context;
   iree_atomic_int64_t value;
-} iree_hal_cuda_semaphore_t;
+} iree_hal_cuda2_semaphore_t;
 
-static const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable;
+static const iree_hal_semaphore_vtable_t iree_hal_cuda2_semaphore_vtable;
 
-static iree_hal_cuda_semaphore_t* iree_hal_cuda_semaphore_cast(
+static iree_hal_cuda2_semaphore_t* iree_hal_cuda2_semaphore_cast(
     iree_hal_semaphore_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_semaphore_vtable);
-  return (iree_hal_cuda_semaphore_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda2_semaphore_vtable);
+  return (iree_hal_cuda2_semaphore_t*)base_value;
 }
 
-iree_status_t iree_hal_cuda_semaphore_create(
-    iree_hal_cuda_context_wrapper_t* context, uint64_t initial_value,
+iree_status_t iree_hal_cuda2_semaphore_create(
+    iree_hal_cuda2_context_wrapper_t* context, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda_semaphore_t* semaphore = NULL;
+  iree_hal_cuda2_semaphore_t* semaphore = NULL;
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, sizeof(*semaphore), (void**)&semaphore);
   if (iree_status_is_ok(status)) {
-    iree_hal_semaphore_initialize(&iree_hal_cuda_semaphore_vtable,
+    iree_hal_semaphore_initialize(&iree_hal_cuda2_semaphore_vtable,
                                   &semaphore->base);
     semaphore->context = context;
     iree_atomic_store_int64(&semaphore->value, initial_value,
@@ -48,10 +48,10 @@ iree_status_t iree_hal_cuda_semaphore_create(
   return status;
 }
 
-static void iree_hal_cuda_semaphore_destroy(
+static void iree_hal_cuda2_semaphore_destroy(
     iree_hal_semaphore_t* base_semaphore) {
-  iree_hal_cuda_semaphore_t* semaphore =
-      iree_hal_cuda_semaphore_cast(base_semaphore);
+  iree_hal_cuda2_semaphore_t* semaphore =
+      iree_hal_cuda2_semaphore_cast(base_semaphore);
   iree_allocator_t host_allocator = semaphore->context->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -61,20 +61,20 @@ static void iree_hal_cuda_semaphore_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_cuda_semaphore_query(
+static iree_status_t iree_hal_cuda2_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
-  iree_hal_cuda_semaphore_t* semaphore =
-      iree_hal_cuda_semaphore_cast(base_semaphore);
+  iree_hal_cuda2_semaphore_t* semaphore =
+      iree_hal_cuda2_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely.
   *out_value =
       iree_atomic_load_int64(&semaphore->value, iree_memory_order_acquire);
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_semaphore_signal(
+static iree_status_t iree_hal_cuda2_semaphore_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
-  iree_hal_cuda_semaphore_t* semaphore =
-      iree_hal_cuda_semaphore_cast(base_semaphore);
+  iree_hal_cuda2_semaphore_t* semaphore =
+      iree_hal_cuda2_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely. Return OK currently as everything is
   // synchronized for each submit to allow things to run.
   iree_atomic_store_int64(&semaphore->value, new_value,
@@ -83,30 +83,30 @@ static iree_status_t iree_hal_cuda_semaphore_signal(
   return iree_ok_status();
 }
 
-static void iree_hal_cuda_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
-                                         iree_status_t status) {
-  iree_hal_cuda_semaphore_t* semaphore =
-      iree_hal_cuda_semaphore_cast(base_semaphore);
+static void iree_hal_cuda2_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
+                                          iree_status_t status) {
+  iree_hal_cuda2_semaphore_t* semaphore =
+      iree_hal_cuda2_semaphore_cast(base_semaphore);
   // TODO: save status and mark timepoint as failed.
   iree_status_ignore(status);
   iree_hal_semaphore_poll(&semaphore->base);
 }
 
-static iree_status_t iree_hal_cuda_semaphore_wait(
+static iree_status_t iree_hal_cuda2_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout) {
-  iree_hal_cuda_semaphore_t* semaphore =
-      iree_hal_cuda_semaphore_cast(base_semaphore);
+  iree_hal_cuda2_semaphore_t* semaphore =
+      iree_hal_cuda2_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely. Return OK currently as everything is
   // synchronized for each submit to allow things to run.
   iree_hal_semaphore_poll(&semaphore->base);
   return iree_ok_status();
 }
 
-static const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable = {
-    .destroy = iree_hal_cuda_semaphore_destroy,
-    .query = iree_hal_cuda_semaphore_query,
-    .signal = iree_hal_cuda_semaphore_signal,
-    .fail = iree_hal_cuda_semaphore_fail,
-    .wait = iree_hal_cuda_semaphore_wait,
+static const iree_hal_semaphore_vtable_t iree_hal_cuda2_semaphore_vtable = {
+    .destroy = iree_hal_cuda2_semaphore_destroy,
+    .query = iree_hal_cuda2_semaphore_query,
+    .signal = iree_hal_cuda2_semaphore_signal,
+    .fail = iree_hal_cuda2_semaphore_fail,
+    .wait = iree_hal_cuda2_semaphore_wait,
 };

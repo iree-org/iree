@@ -19,8 +19,8 @@ extern "C" {
 #endif  // __cplusplus
 
 // Create a cuda allocator.
-iree_status_t iree_hal_cuda_semaphore_create(
-    iree_hal_cuda_context_wrapper_t* context, uint64_t initial_value,
+iree_status_t iree_hal_cuda2_semaphore_create(
+    iree_hal_cuda2_context_wrapper_t* context, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore);
 
 #ifdef __cplusplus
