@@ -522,6 +522,12 @@ public:
                         variantOp.getName(), ".linked.bc", *llvmModule);
     }
 
+    // Fixup visibility from any symbols we may link in - we want to hide all
+    // but the query entry point.
+    SetVector<llvm::Function *> preservedFuncs;
+    preservedFuncs.insert(queryLibraryFunc);
+    fixupVisibility(*llvmModule, preservedFuncs);
+
     // LLVM opt passes that perform code generation optimizations/transformation
     // similar to what a frontend would do.
     if (failed(
@@ -531,12 +537,6 @@ public:
                 "targeting '"
              << targetTriple.str() << "'";
     }
-
-    // Fixup visibility from any symbols we may link in - we want to hide all
-    // but the query entry point.
-    SetVector<llvm::Function *> preservedFuncs;
-    preservedFuncs.insert(queryLibraryFunc);
-    fixupVisibility(*llvmModule, preservedFuncs);
 
     // Dump bitcode post-linking and optimization.
     if (!options.dumpIntermediatesPath.empty()) {
