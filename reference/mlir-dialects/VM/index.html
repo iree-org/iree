@@ -1222,16 +1222,16 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vmyield-vmyieldop" class="md-nav__link">
-    vm.yield (VM::YieldOp)
+  <a href="#asyncfiber-ops" class="md-nav__link">
+    Async/fiber ops
   </a>
   
-    <nav class="md-nav" aria-label="vm.yield (VM::YieldOp)">
+    <nav class="md-nav" aria-label="Async/fiber ops">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#successors" class="md-nav__link">
-    Successors:
+  <a href="#vmyield-vmyieldop" class="md-nav__link">
+    vm.yield (VM::YieldOp)
   </a>
   
 </li>
@@ -3858,16 +3858,16 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vmyield-vmyieldop" class="md-nav__link">
-    vm.yield (VM::YieldOp)
+  <a href="#asyncfiber-ops" class="md-nav__link">
+    Async/fiber ops
   </a>
   
-    <nav class="md-nav" aria-label="vm.yield (VM::YieldOp)">
+    <nav class="md-nav" aria-label="Async/fiber ops">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#successors" class="md-nav__link">
-    Successors:
+  <a href="#vmyield-vmyieldop" class="md-nav__link">
+    vm.yield (VM::YieldOp)
   </a>
   
 </li>
@@ -6236,8 +6236,8 @@ type, with the interpretation of the type encoded on the op.</p>
 <ul>
 <li><a href="#vm-dialect">'vm' Dialect</a><ul>
 <li><a href="#operation-definition">Operation definition</a><ul>
-<li><a href="#vmyield-vmyieldop">vm.yield (VM::YieldOp)</a><ul>
-<li><a href="#successors">Successors:</a></li>
+<li><a href="#asyncfiber-ops">Async/fiber ops</a><ul>
+<li><a href="#vmyield-vmyieldop">vm.yield (VM::YieldOp)</a></li>
 </ul>
 </li>
 <li><a href="#bitwise-shift-and-rotate-ops">Bitwise shift and rotate ops</a><ul>
@@ -6597,7 +6597,8 @@ type, with the interpretation of the type encoded on the op.</p>
 </ul>
 </div>
 <h2 id="operation-definition">Operation definition<a class="headerlink" href="#operation-definition" title="Permanent link">link</a></h2>
-<h3 id="vmyield-vmyieldop"><code>vm.yield</code> (VM::YieldOp)<a class="headerlink" href="#vmyield-vmyieldop" title="Permanent link">link</a></h3>
+<h3 id="asyncfiber-ops">Async/fiber ops<a class="headerlink" href="#asyncfiber-ops" title="Permanent link">link</a></h3>
+<h4 id="vmyield-vmyieldop"><code>vm.yield</code> (VM::YieldOp)<a class="headerlink" href="#vmyield-vmyieldop" title="Permanent link">link</a></h4>
 <p><em>Unconditional fiber yield operation</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.yield` $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
@@ -6626,7 +6627,7 @@ type, with the interpretation of the type encoded on the op.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="successors">Successors:<a class="headerlink" href="#successors" title="Permanent link">link</a></h4>
+<h5 id="successors">Successors:<a class="headerlink" href="#successors" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>

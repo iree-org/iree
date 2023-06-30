@@ -1290,9 +1290,22 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#device-ops" class="md-nav__link">
+    Device ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Device ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#hal_inlinedevicequery-halinlinedevicequeryop" class="md-nav__link">
     hal_inline.device.query (HAL::Inline::DeviceQueryOp)
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1787,9 +1800,22 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#device-ops" class="md-nav__link">
+    Device ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Device ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#hal_inlinedevicequery-halinlinedevicequeryop" class="md-nav__link">
     hal_inline.device.query (HAL::Inline::DeviceQueryOp)
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1853,7 +1879,10 @@ carries the same usage restrictions.</p>
 <li><a href="#hal_inlinebuffer_viewtrace-halinlinebufferviewtraceop">hal_inline.buffer_view.trace (HAL::Inline::BufferViewTraceOp)</a></li>
 </ul>
 </li>
+<li><a href="#device-ops">Device ops</a><ul>
 <li><a href="#hal_inlinedevicequery-halinlinedevicequeryop">hal_inline.device.query (HAL::Inline::DeviceQueryOp)</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -2543,7 +2572,9 @@ useful for titling/marking specific sets of buffers for easier searching.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="hal_inlinedevicequery-halinlinedevicequeryop"><code>hal_inline.device.query</code> (HAL::Inline::DeviceQueryOp)<a class="headerlink" href="#hal_inlinedevicequery-halinlinedevicequeryop" title="Permanent link">link</a></h3>
+<h3 id="device-ops">Device ops<a class="headerlink" href="#device-ops" title="Permanent link">link</a></h3>
+<p>Ops for <code>!hal.device</code> / <code>iree_hal_device_t</code>.</p>
+<h4 id="hal_inlinedevicequery-halinlinedevicequeryop"><code>hal_inline.device.query</code> (HAL::Inline::DeviceQueryOp)<a class="headerlink" href="#hal_inlinedevicequery-halinlinedevicequeryop" title="Permanent link">link</a></h4>
 <p><em>Returns a runtime configuration parameter from the device</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.device.query` `key` `(` $category `:` `` `:` $key `)`

@@ -1214,9 +1214,22 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#dispatch-ops" class="md-nav__link">
+    Dispatch ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Dispatch ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#flowdispatch-flowdispatchop" class="md-nav__link">
     flow.dispatch (Flow::DispatchOp)
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -2027,9 +2040,22 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#dispatch-ops" class="md-nav__link">
+    Dispatch ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Dispatch ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#flowdispatch-flowdispatchop" class="md-nav__link">
     flow.dispatch (Flow::DispatchOp)
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -2446,7 +2472,10 @@ workload size, shapes of inputs and outputs, etc.</p>
 <li><a href="#flowcollectivesend_recv-flowcollectivesendrecvop">flow.collective.send_recv (Flow::CollectiveSendRecvOp)</a></li>
 </ul>
 </li>
+<li><a href="#dispatch-ops">Dispatch ops</a><ul>
 <li><a href="#flowdispatch-flowdispatchop">flow.dispatch (Flow::DispatchOp)</a></li>
+</ul>
+</li>
 <li><a href="#executable-ops">Executable ops</a><ul>
 <li><a href="#flowexecutable_end-flowexecutableendop">flow.executable_end (Flow::ExecutableEndOp)</a></li>
 <li><a href="#flowexecutableexport-flowexecutableexportop">flow.executable.export (Flow::ExecutableExportOp)</a></li>
@@ -3079,7 +3108,8 @@ Interfaces: InferTypeOpInterface, TiedOpInterface</p>
 </tr>
 </tbody>
 </table>
-<h3 id="flowdispatch-flowdispatchop"><code>flow.dispatch</code> (Flow::DispatchOp)<a class="headerlink" href="#flowdispatch-flowdispatchop" title="Permanent link">link</a></h3>
+<h3 id="dispatch-ops">Dispatch ops<a class="headerlink" href="#dispatch-ops" title="Permanent link">link</a></h3>
+<h4 id="flowdispatch-flowdispatchop"><code>flow.dispatch</code> (Flow::DispatchOp)<a class="headerlink" href="#flowdispatch-flowdispatchop" title="Permanent link">link</a></h4>
 <p><em>A dispatch of workgroups across a grid</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch` $entry_point
