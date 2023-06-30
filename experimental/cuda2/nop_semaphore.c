@@ -1,10 +1,10 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/cuda/event_semaphore.h"
+#include "experimental/cuda2/nop_semaphore.h"
 
 #include <stddef.h>
 
@@ -13,7 +13,7 @@
 
 typedef struct iree_hal_cuda2_semaphore_t {
   iree_hal_semaphore_t base;
-  iree_hal_cuda2_context_wrapper_t* context;
+  iree_allocator_t host_allocator;
   iree_atomic_int64_t value;
 } iree_hal_cuda2_semaphore_t;
 
@@ -26,19 +26,18 @@ static iree_hal_cuda2_semaphore_t* iree_hal_cuda2_semaphore_cast(
 }
 
 iree_status_t iree_hal_cuda2_semaphore_create(
-    iree_hal_cuda2_context_wrapper_t* context, uint64_t initial_value,
+    uint64_t initial_value, iree_allocator_t host_allocator,
     iree_hal_semaphore_t** out_semaphore) {
-  IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cuda2_semaphore_t* semaphore = NULL;
   iree_status_t status = iree_allocator_malloc(
-      context->host_allocator, sizeof(*semaphore), (void**)&semaphore);
+      host_allocator, sizeof(*semaphore), (void**)&semaphore);
   if (iree_status_is_ok(status)) {
     iree_hal_semaphore_initialize(&iree_hal_cuda2_semaphore_vtable,
                                   &semaphore->base);
-    semaphore->context = context;
+    semaphore->host_allocator = host_allocator;
     iree_atomic_store_int64(&semaphore->value, initial_value,
                             iree_memory_order_release);
     *out_semaphore = &semaphore->base;
@@ -52,7 +51,7 @@ static void iree_hal_cuda2_semaphore_destroy(
     iree_hal_semaphore_t* base_semaphore) {
   iree_hal_cuda2_semaphore_t* semaphore =
       iree_hal_cuda2_semaphore_cast(base_semaphore);
-  iree_allocator_t host_allocator = semaphore->context->host_allocator;
+  iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_semaphore_deinitialize(&semaphore->base);
