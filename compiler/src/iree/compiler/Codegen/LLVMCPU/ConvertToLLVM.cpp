@@ -139,8 +139,8 @@ struct ConvertHALEntryPointFuncOp
     auto llvmFuncType = LLVM::LLVMFunctionType::get(int32Type, abiInputTypes);
     auto llvmFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
         stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
-        LLVM::Linkage::External, /*dso_local=*/false, /*cconv*/ LLVM::CConv::C,
-        funcAttrs);
+        LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
+        /*comdat=*/nullptr, funcAttrs);
     rewriter.inlineRegionBefore(stdFuncOp.getFunctionBody(),
                                 llvmFuncOp.getFunctionBody(), llvmFuncOp.end());
     if (failed(rewriter.convertRegionTypes(&llvmFuncOp.getFunctionBody(),
@@ -736,8 +736,8 @@ struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
     }
     rewriter.create<LLVM::LLVMFuncOp>(
         funcOp.getLoc(), funcOp.getName(), expectedType.value(),
-        funcOp.getLinkage(), funcOp.getDsoLocal(), funcOp.getCConv(), attrs,
-        argAttrs, funcOp.getFunctionEntryCount());
+        funcOp.getLinkage(), funcOp.getDsoLocal(), funcOp.getCConv(),
+        /*comdat=*/nullptr, attrs, argAttrs, funcOp.getFunctionEntryCount());
     rewriter.eraseOp(funcOp);
     return success();
   }

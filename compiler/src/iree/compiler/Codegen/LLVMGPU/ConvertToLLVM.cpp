@@ -284,8 +284,8 @@ public:
         LLVM::LLVMVoidType::get(rewriter.getContext()), llvmInputTypes);
     auto newFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
         funcOp.getLoc(), funcOp.getName(), llvmFuncType,
-        LLVM::Linkage::External, /*dso_local=*/false, /*cconv*/ LLVM::CConv::C,
-        funcAttrs);
+        LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
+        /*comdat=*/nullptr, funcAttrs);
 
     // Copy all of funcOp's operations into newFuncOp's body and perform region
     // type conversion.
@@ -469,7 +469,12 @@ public:
         argMapping.size() + ireeConstantOp.getIndex().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
-    rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(op, dstType, llvmBufferArg);
+    // llvm.zext requires that the result type has a larger bitwidth.
+    if (dstType == llvmBufferArg.getType()) {
+      rewriter.replaceOp(op, llvmBufferArg);
+    } else {
+      rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(op, dstType, llvmBufferArg);
+    }
     return success();
   }
 };
