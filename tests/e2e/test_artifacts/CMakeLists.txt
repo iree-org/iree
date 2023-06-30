@@ -66,11 +66,12 @@ add_dependencies(iree-e2e-test-artifacts
   iree-benchmark-suites-comp-stats-large
 )
 
-# Map the legacy, intuitive target to default benchmark preset.
+STRING(REPLACE "," ";" _PRESET_LIST "${IREE_BENCHMARK_SUITES_PRESETS}")
+# Map the legacy intuitive target to the chosen benchmark presets.
 add_custom_target(iree-benchmark-suites)
-add_dependencies(iree-benchmark-suites
-  iree-benchmark-suites-default
-)
+foreach(_PRESET IN LISTS _PRESET_LIST)
+  add_dependencies(iree-benchmark-suites "iree-benchmark-suites-${_PRESET}")
+endforeach()
 
 # iree-benchmark-import-models* imports benchmark models from their source
 # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
