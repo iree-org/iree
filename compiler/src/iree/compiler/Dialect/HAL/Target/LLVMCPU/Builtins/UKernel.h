@@ -20,6 +20,10 @@ loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
                        llvm::LLVMContext &context);
 
 llvm::Expected<std::unique_ptr<llvm::Module>>
+loadUKernelArchEntryPointsBitcode(llvm::TargetMachine *targetMachine,
+                                  llvm::LLVMContext &context);
+
+llvm::Expected<std::unique_ptr<llvm::Module>>
 loadUKernelArchBitcode(llvm::TargetMachine *targetMachine,
                        llvm::LLVMContext &context);
 

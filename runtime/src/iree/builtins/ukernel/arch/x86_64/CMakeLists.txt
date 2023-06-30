@@ -15,14 +15,14 @@ if(_IREE_UKERNEL_BITCODE_BUILD_X86_64)
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_base
+    ukernel_bitcode_x86_64_entry_points
   ARCH
-    x86_64
+    wasm_64
   SRCS
-    "mmt4d_x86_64.c"
-    "pack_x86_64.c"
-    "query_tile_sizes_x86_64.c"
-    "unpack_x86_64.c"
+    "mmt4d_x86_64_entry_point.c"
+    "pack_x86_64_entry_point.c"
+    "query_tile_sizes_x86_64_entry_point.c"
+    "unpack_x86_64_entry_point.c"
 )
 
 iree_bitcode_library(
@@ -86,12 +86,12 @@ iree_link_bitcode(
     "ukernel_bitcode_x86_64_avx2_fma.bc"
     "ukernel_bitcode_x86_64_avx512_base.bc"
     "ukernel_bitcode_x86_64_avx512_vnni.bc"
-    "ukernel_bitcode_x86_64_base.bc"
 
 )
 
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64.bc")
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64_entry_points.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_X86_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
@@ -218,10 +218,10 @@ iree_cc_library(
   NAME
     x86_64
   SRCS
-    "mmt4d_x86_64.c"
-    "pack_x86_64.c"
-    "query_tile_sizes_x86_64.c"
-    "unpack_x86_64.c"
+    "mmt4d_x86_64_entry_point.c"
+    "pack_x86_64_entry_point.c"
+    "query_tile_sizes_x86_64_entry_point.c"
+    "unpack_x86_64_entry_point.c"
   DEPS
     ::common_x86_64
     iree::base::core_headers

@@ -4,23 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
-#include "iree/builtins/ukernel/pack_internal.h"
-
-IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x8_x32_x86_64_avx2_fma_direct)
-IREE_UK_PACK_TILE_FUNC_DECL(
-    iree_uk_pack_tile_16x16_x32_x86_64_avx512_base_direct)
-IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x1_x32_x86_64_avx2_fma_direct)
-IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x1_x32_x86_64_avx2_fma_transpose)
-IREE_UK_PACK_TILE_FUNC_DECL(
-    iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_direct)
-IREE_UK_PACK_TILE_FUNC_DECL(
-    iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_transpose)
-IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x2_x8_x86_64_avx2_fma_direct)
-IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x2_x8_x86_64_avx2_fma_transpose)
-IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_direct)
-IREE_UK_PACK_TILE_FUNC_DECL(
-    iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_transpose)
+#include "iree/builtins/ukernel/arch/x86_64/common_x86_64_entry_point.h"
+#include "iree/builtins/ukernel/arch/x86_64/pack_x86_64_internal.h"
 
 static iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_x86_64_8x8_x32(
     const iree_uk_pack_params_t* params) {
