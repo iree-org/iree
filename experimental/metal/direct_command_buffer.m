@@ -9,9 +9,9 @@
 #import <Metal/Metal.h>
 
 #include "experimental/metal/builtin_executables.h"
+#include "experimental/metal/kernel_library.h"
 #include "experimental/metal/metal_buffer.h"
 #include "experimental/metal/metal_device.h"
-#include "experimental/metal/metal_kernel_library.h"
 #include "experimental/metal/pipeline_layout.h"
 #include "experimental/metal/staging_buffer.h"
 #include "iree/base/api.h"

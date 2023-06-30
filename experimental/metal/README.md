@@ -326,8 +326,8 @@ with the current active `MTLComputeCommandEncoder`:
 [hal-semaphore]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/semaphore.h
 [metal-device]: https://github.com/openxla/iree/tree/main/experimental/metal/metal_device.h
 [metal-driver]: https://github.com/openxla/iree/tree/main/experimental/metal/metal_driver.h
-[metal-kernel-library]: https://github.com/openxla/iree/tree/main/experimental/metal/metal_kernel_library.h
-[metal-shared-event]: https://github.com/openxla/iree/tree/main/experimental/metal/metal_shared_event.h
+[metal-kernel-library]: https://github.com/openxla/iree/tree/main/experimental/metal/kernel_library.h
+[metal-shared-event]: https://github.com/openxla/iree/tree/main/experimental/metal/shared_event.h
 [metal-spirv-target]: https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV
 [metal-builtin-kernels]: https://github.com/openxla/iree/tree/main/experimental/metal/builtin/
 [mtl-argument-buffer]: https://developer.apple.com/documentation/metal/buffers/about_argument_buffers?language=objc
