@@ -62,7 +62,7 @@ td_library(
 ################################################################################
 
 gentbl_cc_library(
-    name = "IREEInputInterfacesGen",
+    name = "IREEInputInterfacesIncGen",
     tags = ["manual"],
     tbl_outs = [
         (
@@ -74,7 +74,7 @@ gentbl_cc_library(
             "include/iree-dialects/Dialect/Input/InputOpInterfaces.cpp.inc",
         ),
     ],
-    tblgen = "//third_party/llvm/llvm-project/mlir:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "include/iree-dialects/Dialect/Input/InputInterfaces.td",
     deps = [":TdFiles"],
 )
@@ -122,7 +122,7 @@ cc_library(
     includes = ["include"],
     deps = [
         ":IREEInputIncGen",
-        ":IREEInputInterfacesGen",
+        ":IREEInputInterfacesIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:IR",
