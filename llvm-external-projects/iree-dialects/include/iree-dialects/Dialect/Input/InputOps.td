@@ -29,16 +29,18 @@ def IREEInput_NullOp : IREEInput_PureOp<"null"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Casts
+// Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
 
-def IREEInput_TensorToBufferViewOp : IREEInput_PureOp<"cast.tensor_to_buffer_view"> {
-  let summary = "Casts a tensor to a BufferView, capturing dynamic dims";
+def IREEInput_TensorExportOp : IREEInput_PureOp<"tensor.export"> {
+  let summary = "Exports a tensor to a Buffer(View), capturing dynamic dims";
   let arguments = (ins
     IREEInput_Tensor:$source,
     IREEInput_ShapeDynamicDims:$source_dims
   );
-  let results = (outs IREEInput_BufferViewType:$target);
+  let results = (outs
+    AnyTypeOf<[IREEInput_BufferType, IREEInput_BufferViewType]>:$target
+  );
 
   let assemblyFormat = [{
     $source `:` type($source) (`{` $source_dims^ `}`)? `->` type($target)
@@ -46,10 +48,10 @@ def IREEInput_TensorToBufferViewOp : IREEInput_PureOp<"cast.tensor_to_buffer_vie
   }];
 }
 
-def IREEInput_BufferViewToTensorOp : IREEInput_PureOp<"cast.buffer_view_to_tensor"> {
-  let summary = "Casts a BufferView to a tensor, providing dynamic dims";
+def IREEInput_TensorImportOp : IREEInput_PureOp<"tensor.import"> {
+  let summary = "Imports a Buffer(View) to a tensor, providing dynamic dims";
   let arguments = (ins
-    IREEInput_BufferViewType:$source,
+    AnyTypeOf<[IREEInput_BufferType, IREEInput_BufferViewType]>:$source,
     IREEInput_ShapeDynamicDims:$target_dims
   );
   let results = (outs IREEInput_Tensor:$target);
@@ -201,8 +203,60 @@ def IREEInput_GlobalStoreIndirectOp : IREEInput_Op<"global.store.indirect"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Buffer Views
+// Buffers and Buffer Views
 //===----------------------------------------------------------------------===//
+
+def IREEInput_BufferViewCreateOp : IREEInput_PureOp<"buffer_view.create"> {
+  let summary = [{buffer view reference initializer}];
+  let description = [{
+    Creates a reference to a buffer with a particular shape and element type.
+    The buffer is not copied and both the original and view references must be
+    synchronized. This makes it easier to associate commonly-carried metadata
+    along with the contents.
+  }];
+
+  let arguments = (ins
+    IREEInput_BufferType:$source_buffer,
+    IREEInput_DeviceSize:$source_offset,
+    IREEInput_DeviceSize:$source_length,
+    IREEInput_ElementType:$element_type,
+    IREEInput_EncodingType:$encoding_type,
+    IREEInput_Shape:$shape
+  );
+  let results = (outs
+    IREEInput_BufferViewType:$result
+  );
+
+  let assemblyFormat = [{
+    `buffer` `(` $source_buffer `:` type($source_buffer) `)`
+    `` `[` $source_offset `,` $source_length `]`
+    `shape` `(` `[` $shape `]` `)`
+    `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "Value":$sourceBuffer,
+      "Value":$sourceOffset,
+      "Value":$sourceLength,
+      "int32_t":$elementType,
+      "int32_t":$encodingType,
+      "ValueRange":$shape
+    )>,
+    OpBuilder<(ins
+      "Value":$sourceBuffer,
+      "Value":$sourceOffset,
+      "Value":$sourceLength,
+      "Value":$elementType,
+      "Value":$encodingType,
+      "ValueRange":$shape
+    )>,
+  ];
+}
 
 def IREEInput_BufferViewRankOp : IREEInput_PureOp<"buffer_view.rank"> {
   let summary = [{buffer view rank query}];

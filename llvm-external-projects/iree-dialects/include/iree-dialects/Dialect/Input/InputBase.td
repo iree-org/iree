@@ -88,11 +88,6 @@ def IREEInput_ElementTypeParameter : TypeParameter<
 def IREEInput_PtrTargetTypeParameter : TypeParameter<
     "::mlir::Type", "A type suitable as a target type of a pointer">;
 
-def IREEInput_Dim : TypeAlias<Index>;
-def IREEInput_Dims : Variadic<IREEInput_Dim>;
-def IREEInput_Shape : Variadic<IREEInput_Dim>;
-def IREEInput_ShapeDynamicDims : Variadic<IREEInput_Dim>;
-
 def IREEInput_GlobalRefAttr : IREEInput_AliasedSymbolRefAttr;
 def IREEInput_AnyGlobalPtr : IREEInput_AnyPtrOf<[IREEInput_Tensor, IREEInput_PrimitiveType]>;
 
@@ -112,5 +107,22 @@ def IREEInput_TiedOpStorageAttr :
     TypedArrayAttrBase<IREEInput_IndexAttr, "64-bit integer array attribute"> {
   let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
 }
+
+//===----------------------------------------------------------------------===//
+// Type aliases for working with shapes
+//===----------------------------------------------------------------------===//
+
+def IREEInput_Dim : TypeAlias<Index>;
+def IREEInput_Dims : Variadic<IREEInput_Dim>;
+def IREEInput_Shape : Variadic<IREEInput_Dim>;
+def IREEInput_ShapeDynamicDims : Variadic<IREEInput_Dim>;
+
+//===----------------------------------------------------------------------===//
+// Type aliases for working with Buffers and BufferViews
+//===----------------------------------------------------------------------===//
+
+def IREEInput_DeviceSize : TypeAlias<Index>;
+def IREEInput_ElementType : TypeAlias<I32>;
+def IREEInput_EncodingType : TypeAlias<I32>;
 
 #endif // IREE_DIALECTS_DIALECT_INPUT_BASE_TD

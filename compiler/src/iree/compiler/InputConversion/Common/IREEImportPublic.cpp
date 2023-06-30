@@ -8,7 +8,6 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -19,7 +18,6 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -83,12 +81,11 @@ private:
   StringRef targetName;
 };
 
-class BufferViewToTensorPattern
-    : public OpConversionPattern<IREE::Input::BufferViewToTensorOp> {
-  using OpConversionPattern<
-      IREE::Input::BufferViewToTensorOp>::OpConversionPattern;
+class TensorImportPattern
+    : public OpConversionPattern<IREE::Input::TensorImportOp> {
+  using OpConversionPattern<IREE::Input::TensorImportOp>::OpConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Input::TensorImportOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     TensorType resultType = llvm::dyn_cast_if_present<TensorType>(
         typeConverter->convertType(srcOp.getTarget().getType()));
@@ -112,12 +109,11 @@ class BufferViewToTensorPattern
   }
 };
 
-class TensorToBufferViewPattern
-    : public OpConversionPattern<IREE::Input::TensorToBufferViewOp> {
-  using OpConversionPattern<
-      IREE::Input::TensorToBufferViewOp>::OpConversionPattern;
+class TensorExportPattern
+    : public OpConversionPattern<IREE::Input::TensorExportOp> {
+  using OpConversionPattern<IREE::Input::TensorExportOp>::OpConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Input::TensorExportOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type resultType = typeConverter->convertType(srcOp.getTarget().getType());
     auto sourceType = llvm::dyn_cast<TensorType>(adaptor.getSource().getType());
@@ -262,6 +258,9 @@ public:
 
 IREETypeConverter::IREETypeConverter() {
   addConversion([](Type t) { return t; });
+  addConversion([=](IREE::Input::BufferType t) {
+    return IREE::HAL::BufferType::get(t.getContext());
+  });
   addConversion([=](IREE::Input::BufferViewType t) {
     return IREE::HAL::BufferViewType::get(t.getContext());
   });
@@ -331,10 +330,10 @@ void IREEImportPublicPass::runOnOperation() {
   patterns.insert<GenericTypeConvert>(typeConverter, &getContext(), 0);
   patterns.insert<BuiltinFuncOpPattern>(typeConverter, &getContext(),
                                         specific_benefit);
-  patterns.insert<BufferViewToTensorPattern>(typeConverter, &getContext(),
-                                             specific_benefit);
-  patterns.insert<TensorToBufferViewPattern>(typeConverter, &getContext(),
-                                             specific_benefit);
+  patterns.insert<TensorImportPattern>(typeConverter, &getContext(),
+                                       specific_benefit);
+  patterns.insert<TensorExportPattern>(typeConverter, &getContext(),
+                                       specific_benefit);
   patterns.insert<GlobalOpPattern>(typeConverter, &getContext(), 0);
 
 #define ONE_TO_ONE(SrcOpTy, TargetOpTy)                                        \
@@ -342,6 +341,7 @@ void IREEImportPublicPass::runOnOperation() {
       typeConverter, SrcOpTy::getOperationName(),                              \
       TargetOpTy::getOperationName(), &getContext(), specific_benefit)
 
+  ONE_TO_ONE(IREE::Input::BufferViewCreateOp, IREE::HAL::BufferViewCreateOp);
   ONE_TO_ONE(IREE::Input::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
   ONE_TO_ONE(IREE::Input::BufferViewDimOp, IREE::HAL::BufferViewDimOp);
   ONE_TO_ONE(IREE::Input::ListCreateOp, IREE::Util::ListCreateOp);
