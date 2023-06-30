@@ -469,7 +469,12 @@ public:
         argMapping.size() + ireeConstantOp.getIndex().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
-    rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(op, dstType, llvmBufferArg);
+    // llvm.zext requires that the result type has a larger bitwidth.
+    if (dstType == llvmBufferArg.getType()) {
+      rewriter.replaceOp(op, llvmBufferArg);
+    } else {
+      rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(op, dstType, llvmBufferArg);
+    }
     return success();
   }
 };
