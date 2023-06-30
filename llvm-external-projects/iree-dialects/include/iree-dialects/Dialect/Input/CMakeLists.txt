@@ -1,3 +1,11 @@
+function(_add_interfaces)
+  set(LLVM_TARGET_DEFINITIONS InputInterfaces.td)
+  mlir_tablegen(InputOpInterfaces.h.inc --gen-op-interface-decls)
+  mlir_tablegen(InputOpInterfaces.cpp.inc --gen-op-interface-defs)
+  add_public_tablegen_target(IREEInputInterfacesIncGen)
+  add_dependencies(mlir-headers IREEInputInterfacesIncGen)
+endfunction()
+
 function(_add_dialect)
   set(LLVM_TARGET_DEFINITIONS InputOps.td)
   mlir_tablegen(InputOps.h.inc -gen-op-decls)
@@ -10,4 +18,5 @@ function(_add_dialect)
   add_dependencies(mlir-headers IREEInputIncGen)
 endfunction()
 
+_add_interfaces()
 _add_dialect()
