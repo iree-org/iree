@@ -138,6 +138,7 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
+    "HoistRedundantVectorTransfers.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"

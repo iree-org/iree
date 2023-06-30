@@ -153,6 +153,8 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
@@ -204,7 +206,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // store to load forwarding. This relies on shacky alias analysis and we need
   // to move this to tensor level once we have better abstractions.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createHoistRedundantVectorTransfersPass());
 
   // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -243,6 +245,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -304,6 +308,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -354,6 +360,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
@@ -395,10 +403,11 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   addBufferizePasses(nestedModulePM);
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -428,7 +437,7 @@ void addGPUPackUnPackPasses(OpPassManager &pm) {
       createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createHoistRedundantVectorTransfersPass());
 
   addBufferizePasses(nestedModulePM);
 

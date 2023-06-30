@@ -136,6 +136,9 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
+createHoistRedundantVectorTransfersPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
 
 /// Pass to perform linalg on tensor bufferization. The function passed into
