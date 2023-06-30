@@ -508,8 +508,36 @@ static iree_status_t iree_hal_cuda2_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "queue alloca not yet implmeneted");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+
+  // NOTE: block on the semaphores here; we could avoid this by properly
+  // sequencing device work with semaphores. The CUDA HAL is not currently
+  // asynchronous.
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
+                                                    iree_infinite_timeout()));
+
+  // Allocate from the pool; likely to fail in cases of virtual memory
+  // exhaustion but the error may be deferred until a later synchronization.
+  // If pools are not supported we allocate a buffer as normal from whatever
+  // allocator is set on the device.
+  iree_status_t status = iree_ok_status();
+  if (device->supports_memory_pools) {
+    status = iree_hal_cuda_memory_pools_alloca(&device->memory_pools,
+                                               device->stream, pool, params,
+                                               allocation_size, out_buffer);
+  } else {
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(base_device), params, allocation_size,
+        iree_const_byte_span_empty(), out_buffer);
+  }
+
+  // Only signal if not returning a synchronous error - synchronous failure
+  // indicates that the stream is unchanged (it's not really since we waited
+  // above, but we at least won't deadlock like this).
+  if (iree_status_is_ok(status)) {
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  }
+  return status;
 }
 
 // TODO: implement multiple streams; today we only have one and queue_affinity
@@ -521,8 +549,29 @@ static iree_status_t iree_hal_cuda2_device_queue_dealloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "queue dealloca not yet implmeneted");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+
+  // NOTE: block on the semaphores here; we could avoid this by properly
+  // sequencing device work with semaphores. The CUDA HAL is not currently
+  // asynchronous.
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
+                                                    iree_infinite_timeout()));
+
+  // Schedule the buffer deallocation if we got it from a pool and otherwise
+  // drop it on the floor and let it be freed when the buffer is released.
+  iree_status_t status = iree_ok_status();
+  if (device->supports_memory_pools) {
+    status = iree_hal_cuda_memory_pools_dealloca(&device->memory_pools,
+                                                 device->stream, buffer);
+  }
+
+  // Only signal if not returning a synchronous error - synchronous failure
+  // indicates that the stream is unchanged (it's not really since we waited
+  // above, but we at least won't deadlock like this).
+  if (iree_status_is_ok(status)) {
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_cuda2_device_queue_execute(
@@ -531,8 +580,40 @@ static iree_status_t iree_hal_cuda2_device_queue_execute(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "queue execution not yet implmeneted");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+
+  // TODO(benvanik): trace around the entire submission.
+
+  for (iree_host_size_t i = 0; i < command_buffer_count; i++) {
+    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
+    if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
+      // Nothing to do for an inline command buffer; all the work has already
+      // been submitted. When we support semaphores we'll still need to signal
+      // their completion but do not have to worry about any waits: if there
+      // were waits we wouldn't have been able to execute inline!
+    } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
+      CUgraphExec exec =
+          iree_hal_cuda_graph_command_buffer_handle(command_buffers[i]);
+      CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
+                           cuGraphLaunch(exec, device->stream),
+                           "cuGraphLaunch");
+    } else {
+      IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
+          command_buffers[i], device->stream_command_buffer,
+          iree_hal_buffer_binding_table_empty()));
+    }
+  }
+
+  // TODO(thomasraoux): implement semaphores - for now this conservatively
+  // synchronizes after every submit.
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "cuStreamSynchronize");
+  CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
+                       cuStreamSynchronize(device->stream),
+                       "cuStreamSynchronize");
+  iree_hal_cuda_tracing_context_collect(device->tracing_context);
+  IREE_TRACE_ZONE_END(z0);
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda2_device_queue_flush(
