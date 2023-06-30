@@ -93,7 +93,7 @@ jobs:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
+      - machine-type=a2-highgpu-1g
       - os-family=Linux
     env:
       SHARK_SHA: ${{ needs.setup.outputs.shark-sha }}
