@@ -20,10 +20,14 @@ iree_hal_cts_test_suite(
   INCLUDED_TESTS
     "allocator"
     "buffer_mapping"
+    "command_buffer"
+    "command_buffer_dispatch"
+    "command_buffer_push_constants"
     "executable_cache"
     "descriptor_set_layout"
     "driver"
     "pipeline_layout"
+    "semaphore_submission"
   LABELS
     driver=cuda2
     requires-gpu-nvidia

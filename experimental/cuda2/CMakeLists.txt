@@ -48,6 +48,8 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::collective_batch
+    iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC

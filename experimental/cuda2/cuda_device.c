@@ -14,6 +14,7 @@
 #include "experimental/cuda2/cuda_buffer.h"
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "experimental/cuda2/cuda_status_util.h"
+#include "experimental/cuda2/graph_command_buffer.h"
 #include "experimental/cuda2/memory_pools.h"
 #include "experimental/cuda2/nccl_channel.h"
 #include "experimental/cuda2/nccl_dynamic_symbols.h"
@@ -440,8 +441,11 @@ static iree_status_t iree_hal_cuda2_device_create_command_buffer(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "command buffer not yet implmeneted");
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
+  return iree_hal_cuda2_graph_command_buffer_create(
+      base_device, device->cuda_symbols, device->cu_context, mode,
+      command_categories, queue_affinity, binding_capacity, &device->block_pool,
+      device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_cuda2_device_create_descriptor_set_layout(
@@ -508,7 +512,7 @@ static iree_status_t iree_hal_cuda2_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
 
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The CUDA HAL is not currently
@@ -522,9 +526,9 @@ static iree_status_t iree_hal_cuda2_device_queue_alloca(
   // allocator is set on the device.
   iree_status_t status = iree_ok_status();
   if (device->supports_memory_pools) {
-    status = iree_hal_cuda_memory_pools_alloca(&device->memory_pools,
-                                               device->stream, pool, params,
-                                               allocation_size, out_buffer);
+    status = iree_hal_cuda2_memory_pools_alloca(&device->memory_pools,
+                                                device->cu_stream, pool, params,
+                                                allocation_size, out_buffer);
   } else {
     status = iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(base_device), params, allocation_size,
@@ -549,7 +553,7 @@ static iree_status_t iree_hal_cuda2_device_queue_dealloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
 
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The CUDA HAL is not currently
@@ -561,8 +565,8 @@ static iree_status_t iree_hal_cuda2_device_queue_dealloca(
   // drop it on the floor and let it be freed when the buffer is released.
   iree_status_t status = iree_ok_status();
   if (device->supports_memory_pools) {
-    status = iree_hal_cuda_memory_pools_dealloca(&device->memory_pools,
-                                                 device->stream, buffer);
+    status = iree_hal_cuda2_memory_pools_dealloca(&device->memory_pools,
+                                                  device->cu_stream, buffer);
   }
 
   // Only signal if not returning a synchronous error - synchronous failure
@@ -580,37 +584,25 @@ static iree_status_t iree_hal_cuda2_device_queue_execute(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
 
   // TODO(benvanik): trace around the entire submission.
 
   for (iree_host_size_t i = 0; i < command_buffer_count; i++) {
-    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
-    if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
-      // Nothing to do for an inline command buffer; all the work has already
-      // been submitted. When we support semaphores we'll still need to signal
-      // their completion but do not have to worry about any waits: if there
-      // were waits we wouldn't have been able to execute inline!
-    } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
-      CUgraphExec exec =
-          iree_hal_cuda_graph_command_buffer_handle(command_buffers[i]);
-      CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                           cuGraphLaunch(exec, device->stream),
-                           "cuGraphLaunch");
-    } else {
-      IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
-          command_buffers[i], device->stream_command_buffer,
-          iree_hal_buffer_binding_table_empty()));
-    }
+    CUgraphExec exec =
+        iree_hal_cuda2_graph_command_buffer_handle(command_buffers[i]);
+    IREE_CUDA_RETURN_IF_ERROR(device->cuda_symbols,
+                              cuGraphLaunch(exec, device->cu_stream),
+                              "cuGraphLaunch");
   }
 
-  // TODO(thomasraoux): implement semaphores - for now this conservatively
+  // TODO(antiagainst): implement semaphores - for now this conservatively
   // synchronizes after every submit.
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "cuStreamSynchronize");
-  CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                       cuStreamSynchronize(device->stream),
-                       "cuStreamSynchronize");
-  iree_hal_cuda_tracing_context_collect(device->tracing_context);
+  IREE_CUDA_RETURN_IF_ERROR(device->cuda_symbols,
+                            cuStreamSynchronize(device->cu_stream),
+                            "cuStreamSynchronize");
+  iree_hal_cuda2_tracing_context_collect(device->tracing_context);
   IREE_TRACE_ZONE_END(z0);
 
   return iree_ok_status();
