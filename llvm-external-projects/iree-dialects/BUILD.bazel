@@ -107,6 +107,22 @@ gentbl_cc_library(
             ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/Input/InputTypes.cpp.inc",
         ),
+        (
+            ["--gen-attrdef-decls"],
+            "include/iree-dialects/Dialect/Input/InputAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "include/iree-dialects/Dialect/Input/InputAttrs.cpp.inc",
+        ),
+        (
+            ["--gen-enum-decls"],
+            "include/iree-dialects/Dialect/Input/InputEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "include/iree-dialects/Dialect/Input/InputEnums.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "include/iree-dialects/Dialect/Input/InputOps.td",

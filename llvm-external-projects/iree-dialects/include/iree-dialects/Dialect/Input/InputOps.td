@@ -735,6 +735,143 @@ def IREEInput_AlignOp : IREEInput_PureOp<"align", [
 }
 
 //===----------------------------------------------------------------------===//
+// Executable Source
+//===----------------------------------------------------------------------===//
+
+def IREEInput_ExecutableSourceOp : IREEInput_Op<"executable.source", [
+    IsolatedFromAbove,
+    SingleBlockImplicitTerminator<"IREE::Input::ExecutableSourceEndOp">,
+    Symbol,
+    SymbolTable,
+  ]> {
+  let summary = [{generic source contents of an executable op}];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<IREEInput_ExecutableObjectsAttr>:$objects
+  );
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
+}
+
+def IREEInput_ExecutableSourceEndOp : IREEInput_Op<"executable.source_end", [
+    HasParent<"IREE::Input::ExecutableSourceOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the executable source op}];
+  let assemblyFormat = "attr-dict";
+}
+
+def IREEInput_ExecutableExportOp : IREEInput_Op<"executable.export", [
+    Symbol,
+    HasParent<"IREE::Input::ExecutableSourceOp">,
+    IsolatedFromAbove,
+  ]> {
+  let summary = [{executable entry point declaration}];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<IREEInput_OrdinalAttr>:$ordinal,
+    IREEInput_PipelineLayoutAttr:$layout,
+    OptionalAttr<IREEInput_WorkgroupSizeAttr>:$workgroup_size,
+    OptionalAttr<IREEInput_SubgroupSizeAttr>:$subgroup_size,
+    OptionalAttr<IndexAttr>:$workgroup_local_memory
+  );
+
+  let builders = [
+    OpBuilder<(ins
+      "StringAttr":$sym_name,
+      "IntegerAttr":$ordinal,
+      "IREE::Input::PipelineLayoutAttr":$layout,
+      "ArrayAttr":$workgroup_size,
+      "IntegerAttr":$subgroup_size,
+      "IntegerAttr":$workgroup_local_memory
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, ordinal, layout,
+            workgroup_size, subgroup_size, workgroup_local_memory);
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    `ordinal` `(` $ordinal `)`
+    `layout` `(` $layout `)`
+    attr-dict-with-keyword
+  }];
+
+  // TODO(ezhulenev): Add verifier.
+}
+
+//===----------------------------------------------------------------------===//
+// Dispatch
+//===----------------------------------------------------------------------===//
+
+def IREEInput_DispatchOp : IREEInput_PureOp<"dispatch", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  DeclareOpInterfaceMethods<IREEInput_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{a dispatch of an executable across a grid}];
+
+  let arguments = (ins
+    Variadic<IREEInput_Dim>:$workload,
+    SymbolRefAttr:$entry_point,
+    Variadic<AnyType>:$arguments,
+    IREEInput_ShapeDynamicDims:$argument_dims,
+    IREEInput_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREEInput_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    $entry_point
+    (`[` $workload^ `]`)? ``
+    `(` $arguments `)` attr-dict `:`
+    custom<ShapedFunctionType>(ref($arguments),
+                               type($arguments), $argument_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayAttr":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+    OpBuilder<(ins
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayRef<int64_t>":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+      [{
+        build($_builder, $_state, exportOp, workload,
+              resultTypes, resultDims, arguments, argumentDims,
+              $_builder.getIndexArrayAttr(tiedOperands),
+              attributes);
+      }]>
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 

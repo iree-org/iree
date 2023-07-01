@@ -337,3 +337,52 @@ func.func @optimization_barrier(%arg0 : tensor<f32>) -> tensor<f32> {
   %0 = iree_input.optimization_barrier %arg0 : tensor<f32>
   return %0 : tensor<f32>
 }
+
+// -----
+// CHECK: #[[SM75:.*]] = #hal.executable.target<"cuda",
+// CHECK-SAME:           "cuda-nvptx-fb", {target_arch = "sm_75"}>
+
+// CHECK: #[[LAYOUT:.*]] = #hal.pipeline.layout<push_constants = 1,
+// CHECK-SAME: sets = [<0, bindings = [
+// CHECK-SAME:             <0, storage_buffer, ReadOnly>,
+// CHECK-SAME:             <1, storage_buffer>
+// CHECK-SAME: ]>]>
+
+// CHECK: hal.executable.source private @executable
+// CHECK-SAME: {objects = #hal.executable.objects<{
+// CHECK-SAME: #[[SM75]] = [#hal.executable.object<{path = "executable.ptx"}>]
+
+// CHECK: hal.executable.export public @add ordinal(0)
+// CHECL-SAME: layout(#[[LAYOUT]])
+// CHECK-SAME: workgroup_size = [64 : index, 1 : index, 1 : index]
+
+// CHECK: flow.dispatch @executable::@add[%c0](%arg0, %arg1) : {{.*}} -> %arg1
+
+#sm75 = #iree_input.executable.target<"cuda", "cuda-nvptx-fb", {
+  target_arch = "sm_75"
+}>
+
+builtin.module @executable_source {
+
+  iree_input.executable.source private @executable attributes {
+    objects = #iree_input.executable.objects<{
+      #sm75 = [#iree_input.executable.object<{path = "executable.ptx"}>]
+    }>
+  } {
+    iree_input.executable.export public @add ordinal(0)
+      layout(#iree_input.pipeline.layout<push_constants = 1, sets = [
+        <0, bindings = [
+            <0, storage_buffer, ReadOnly>,
+            <1, storage_buffer>
+        ]>
+      ]>) attributes {
+      workgroup_size = [64 : index, 1 : index, 1 : index]
+    }
+  }
+
+  func.func @dispatch(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
+    %c0 = arith.constant 0 : index
+    %0 = flow.dispatch @executable::@add[%c0](%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> %arg1
+    return %0 : tensor<f32>
+  }
+}
