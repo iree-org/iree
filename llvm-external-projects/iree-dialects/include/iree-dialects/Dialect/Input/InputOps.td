@@ -566,8 +566,7 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
     IREEInput_ShapeDynamicDims:$target_dims,
     Variadic<IREEInput_Dim>:$start_indices,
     IREEInput_Tensor:$update,
-    IREEInput_ShapeDynamicDims:$update_dims,
-    OptionalAttr<IREEInput_TiedOpStorageAttr>:$tied_operands
+    IREEInput_ShapeDynamicDims:$update_dims
   );
   let results = (outs
     IREEInput_Tensor:$result
@@ -576,7 +575,7 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    custom<ShapedTiedResult>(type($result), $target_dims)
     attr-dict-with-keyword
   }];
 
