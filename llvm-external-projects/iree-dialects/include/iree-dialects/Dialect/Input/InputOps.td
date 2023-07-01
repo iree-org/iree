@@ -734,4 +734,35 @@ def IREEInput_AlignOp : IREEInput_PureOp<"align", [
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// Compiler hints
+//===----------------------------------------------------------------------===//
+
+def IREEInput_OptimizationBarrierOp : IREEInput_Op<"optimization_barrier", [
+  SameOperandsAndResultType,
+]> {
+  let summary = "Prevents compiler optimizations across a value.";
+  let description = [{
+    Wraps any operands in an unoptimizable identity to prevent its results from
+    being folded. It will be dropped during the final step in compilation and
+    has no effect at runtime.
+  }];
+  let arguments = (ins Variadic<AnyType>:$operands);
+  let results = (outs Variadic<AnyType>:$results);
+
+  let assemblyFormat = [{
+    attr-dict
+    ($operands^ `:` type($operands))?
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+
+  let hasVerifier = 1;
+}
+
 #endif // IREE_DIALECTS_DIALECT_INPUT_OPS_TD

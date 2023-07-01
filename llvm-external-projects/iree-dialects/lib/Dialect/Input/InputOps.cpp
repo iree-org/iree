@@ -426,5 +426,39 @@ SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0}; // $target
 }
 
+//===----------------------------------------------------------------------===//
+// iree_input.optimization_barrier
+//===----------------------------------------------------------------------===//
+
+void OptimizationBarrierOp::build(OpBuilder &builder, OperationState &state,
+                                  ValueRange operands,
+                                  ArrayRef<NamedAttribute> attributes) {
+  state.addOperands(operands);
+  state.addTypes(llvm::to_vector<2>(operands.getTypes()));
+  state.addAttributes(attributes);
+}
+
+LogicalResult OptimizationBarrierOp::verify() {
+  Operation *op = getOperation();
+  if (op->getNumOperands() != op->getNumResults()) {
+    return op->emitOpError()
+           << "must have same number of operands and results, but has "
+           << op->getNumOperands() << " and " << op->getNumResults()
+           << ", respectively";
+  }
+
+  for (int i = 0, e = op->getNumOperands(); i < e; ++i) {
+    if (op->getOperand(i).getType() != op->getResult(i).getType()) {
+      op->emitOpError() << "must have same operand and result types, but they "
+                           "differ at index "
+                        << i;
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/Input/InputOps.cpp.inc"

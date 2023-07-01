@@ -329,3 +329,11 @@ builtin.module @global_store_indirect {
     return
   }
 }
+
+// -----
+// CHECK-LABEL: func.func @optimization_barrier
+// CHECK: util.optimization_barrier %arg0 : tensor<f32>
+func.func @optimization_barrier(%arg0 : tensor<f32>) -> tensor<f32> {
+  %0 = iree_input.optimization_barrier %arg0 : tensor<f32>
+  return %0 : tensor<f32>
+}
