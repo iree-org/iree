@@ -8,7 +8,7 @@
 
 PINNED_VERSIONS = {
   "iree": "566ed4dc140b451f7ec45b0861a73fb97c0c6b4c",
-  "xla": "8d259c5f1770cbb53789316f9d968222ba32d74a",
+  "xla": "c4eb412dcf5a3c853f012c5151ecf068277452e9",
   "jax": "404e3061b6368daed3efa3ee7b99128327254ac2"
 }
 
