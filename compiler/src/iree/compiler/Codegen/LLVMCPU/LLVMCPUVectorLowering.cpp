@@ -167,6 +167,15 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     vector::populateVectorShapeCastLoweringPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
+
+  // Lower complex vector mask related ops into simpler ops.
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorMaskMaterializationPatterns(
+        patterns, /*force32BitVectorIndices=*/false);
+    vector::populateVectorMaskOpLoweringPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 }
 } // namespace
 

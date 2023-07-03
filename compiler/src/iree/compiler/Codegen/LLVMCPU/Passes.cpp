@@ -361,6 +361,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
     options.splitVectorTransfersTo = "linalg-copy";
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   if (enableAArch64SSVE)
@@ -407,6 +409,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     options.splitVectorTransfersTo = "linalg-copy";
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 }
 
@@ -538,6 +542,8 @@ void addMultiTilingExpertPassPipeline(
     options.splitVectorTransfersTo = "linalg-copy";
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   if (enableAArch64SSVE)
@@ -606,6 +612,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     options.splitVectorTransfersTo = "shuffle";
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   if (enableAArch64SSVE)
@@ -668,6 +676,8 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
     options.splitVectorTransfersTo = "linalg-copy";
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 }
 

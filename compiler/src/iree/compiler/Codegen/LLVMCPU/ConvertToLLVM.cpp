@@ -977,9 +977,6 @@ void ConvertToLLVMPass::runOnOperation() {
     // better to use outerproduct.
     vector::populateVectorContractLoweringPatterns(
         patterns, vector::VectorTransformsOptions());
-    vector::populateVectorMaskMaterializationPatterns(
-        patterns, /*force32BitVectorIndices=*/false);
-    vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use shuffle.
