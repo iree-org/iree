@@ -47,11 +47,6 @@ std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 /// operation.
 std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass();
 
-/// Materialize the encoding of operations. The layout to use for the encoded
-/// operations are LLVMCPU specific.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUMaterializeEncodingPass();
-
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUMmt4dVectorLoweringPass();
 

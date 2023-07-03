@@ -396,7 +396,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
   auto encoding = tensorType.getEncoding()
                       .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
   if (!encoding) {
-    return rewriter.notifyMatchFailure(op, "no TensorEncoding attribute");
+    return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }
   SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
   SmallVector<Value> inputValues;

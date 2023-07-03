@@ -37,10 +37,4 @@ def VMVXLowerLinalgMicrokernels :
   ];
 }
 
-def VMVXMaterializeEncoding :
-    Pass<"iree-vmvx-materialize-encoding", "func::FuncOp"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend";
-  let constructor = "mlir::iree_compiler::createVMVXMaterializeEncodingPass()";
-}
-
 #endif // IREE_CODEGEN_VMVX_PASSES

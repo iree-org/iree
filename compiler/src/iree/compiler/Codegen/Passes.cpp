@@ -9,6 +9,7 @@
 //===---------------------------------------------------------------------===//
 // Include pass headers per target device
 //===---------------------------------------------------------------------===//
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -23,6 +24,7 @@ namespace iree_compiler {
 void registerCodegenPasses() {
   // Generated.
   registerCodegenCommonPasses();
+  registerCodegenCommonCPUPasses();
   registerCodegenCommonGPUPasses();
   registerCodegenLLVMCPUPasses();
   registerCodegenLLVMGPUPasses();

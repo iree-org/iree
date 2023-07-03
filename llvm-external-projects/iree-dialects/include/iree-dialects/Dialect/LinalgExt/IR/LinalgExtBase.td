@@ -106,17 +106,18 @@ def EncodingAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `user` `=` $user
-      `,` `role` `=` $role `>`
+    `<` `user` `=` `` $user
+    `,` `role` `=` `` $role
+    (`,` `original_type` `=` $originalType^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
-    AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role
+    AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role,
+    OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$originalType
   );
 
   let genVerifyDecl = 0;
 }
-
 
 #endif // IREE_DIALECT_LINALGEXT_BASE

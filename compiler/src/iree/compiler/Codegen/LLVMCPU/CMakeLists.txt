@@ -60,7 +60,6 @@ iree_cc_library(
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPULowerToUKernels.cpp"
-    "LLVMCPUMaterializeEncodingPass.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
     "LLVMCPUSplitReduction.cpp"
@@ -81,6 +80,7 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgExtUtils
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMBinaryFormat
@@ -137,6 +137,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
