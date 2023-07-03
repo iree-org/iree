@@ -5,17 +5,22 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -27,7 +32,16 @@ using IREE::HAL::ExecutableTargetAttr;
 
 namespace {
 
-static MatmulTileParams chooseMatmulTileParamsGeneric() { return {8, 4, 8}; }
+static MatmulTileParams
+chooseMatmulTileParamsGeneric(ExecutableTargetAttr target) {
+  if (isVMVXBackend(target) && hasMicrokernels(target)) {
+    // VMVX+ukernel uses dynamic tile shapes.
+    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  } else {
+    // Some vaguely reasonable static tile shape.
+    return {8, 4, 8};
+  }
+}
 
 static MatmulTileParams
 chooseMatmulTileParamsAArch64(EncodingUser user, ExecutableTargetAttr target) {
@@ -115,7 +129,7 @@ static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
   if (isX86_64(target)) {
     return chooseMatmulTileParamsX86_64(user, target);
   }
-  return chooseMatmulTileParamsGeneric();
+  return chooseMatmulTileParamsGeneric(target);
 }
 
 struct LLVMCPUMaterializeEncodingPass
@@ -129,6 +143,96 @@ struct LLVMCPUMaterializeEncodingPass
   void runOnOperation() override;
 };
 
+struct LLVMCPUMaterializeUpperBoundTileSizePass
+    : public LLVMCPUMaterializeEncodingBase<
+          LLVMCPUMaterializeUpperBoundTileSizePass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect>();
+  }
+  void runOnOperation() override;
+};
+
+FailureOr<MaterializeEncodingInfo>
+materializeEncodingForTarget(RankedTensorType tensorType,
+                             ExecutableTargetAttr targetAttr) {
+  IREE::LinalgExt::EncodingAttr encoding =
+      tensorType.getEncoding()
+          .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
+  if (!encoding)
+    return failure();
+  auto user = encoding.getUser().getValue();
+  auto role = encoding.getRole().getValue();
+  MatmulTileParams tileParams = chooseMatmulTileParams(user, targetAttr);
+  auto encodingInfo = chooseEncodingInfoForMatmul(role, tileParams);
+  auto originalTypeAttr = encoding.getOriginalType();
+  auto originalType = originalTypeAttr
+                          ? originalTypeAttr.getValue().cast<RankedTensorType>()
+                          : tensorType;
+  // TODO(bjacob): not sure why this causes buffer issues with VMVX.
+  if (!isVMVXBackend(targetAttr)) {
+    adjustTileSizesToNarrowStaticShape(encodingInfo, originalType.getShape());
+  }
+  return encodingInfo;
+}
+
+MaterializeEncodingFn
+getMaterializeEncodingFn(ExecutableTargetAttr targetAttr) {
+  return
+      [targetAttr](
+          RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
+        return materializeEncodingForTarget(tensorType, targetAttr);
+      };
+}
+
+// Like getMaterializeEncodingFn, but iterating over an array of targets and
+// returning the max of all tile sizes from each target, checking that other
+// materialization info (permutations) agree.
+//
+// This is useful to compute padding amounts, in the materialization of
+// UpperBoundTileSizeOp, in top-level functions that are not part of one HAL
+// executable variant. There, the padding amounts only control the size of
+// allocated buffers, so it's OK to over-estimate (only wasting some memory)
+// but not under-estimate (would cause buffer overruns) padding amounts.
+MaterializeEncodingFn
+getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
+  return
+      [targetAttrs](
+          RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
+        FailureOr<MaterializeEncodingInfo> result; // Defaults to failure.
+        for (auto targetAttr : targetAttrs) {
+          FailureOr<MaterializeEncodingInfo> info =
+              materializeEncodingForTarget(tensorType, targetAttr);
+          if (failed(info)) {
+            // No info at this iteration. Ignore and continue.
+            continue;
+          }
+          if (failed(result)) {
+            // No preexisting result. Use this iteration's info and continue.
+            result = info;
+            continue;
+          }
+          // Merge this iteration's info into preexisting result info.
+          // Check that permutations match, then record the max of tile sizes.
+          if (info->innerDimsPos != result->innerDimsPos ||
+              info->outerDimsPerm != result->outerDimsPerm) {
+            return failure();
+          }
+          if (info->innerTileSizes.size() != result->innerTileSizes.size()) {
+            return failure();
+          }
+          for (unsigned i = 0; i < info->innerTileSizes.size(); ++i) {
+            if (info->innerTileSizes[i] == ShapedType::kDynamic) {
+              result->innerTileSizes[i] = ShapedType::kDynamic;
+            } else {
+              result->innerTileSizes[i] =
+                  std::max(result->innerTileSizes[i], info->innerTileSizes[i]);
+            }
+          }
+        }
+        return result;
+      };
+}
+
 } // namespace
 
 void LLVMCPUMaterializeEncodingPass::runOnOperation() {
@@ -136,20 +240,11 @@ void LLVMCPUMaterializeEncodingPass::runOnOperation() {
   auto operation = getOperation();
   RewritePatternSet materializeEncodingPattern(context);
   auto targetAttr = ExecutableTargetAttr::lookup(operation);
-  MaterializeEncodingTypeConverter typeConverter(
-      [targetAttr](
-          RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
-        auto encoding =
-            tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
-        if (!encoding)
-          return failure();
-        auto user = encoding.getUser().getValue();
-        auto role = encoding.getRole().getValue();
-        MatmulTileParams tileParams = chooseMatmulTileParams(user, targetAttr);
-        auto encodingInfo = chooseEncodingInfoForMatmul(role, tileParams);
-        adjustTileSizesToNarrowStaticShape(encodingInfo, tensorType.getShape());
-        return encodingInfo;
-      });
+  auto materializeEncodingFn = getMaterializeEncodingFn(targetAttr);
+  if (!materializeEncodingFn) {
+    return signalPassFailure();
+  }
+  MaterializeEncodingTypeConverter typeConverter(materializeEncodingFn);
   MaterializeEncodingConversionTarget target(*context);
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(materializeEncodingPattern,
@@ -175,9 +270,34 @@ void LLVMCPUMaterializeEncodingPass::runOnOperation() {
   }
 }
 
+void LLVMCPUMaterializeUpperBoundTileSizePass::runOnOperation() {
+  MLIRContext *context = &getContext();
+  auto operation = getOperation();
+  auto targetAttrs =
+      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(operation);
+  RewritePatternSet patterns(context);
+  MaterializeEncodingFn materializeEncodingFn =
+      getUpperBoundMaterializeEncodingFn(targetAttrs);
+  if (!materializeEncodingFn) {
+    return signalPassFailure();
+  }
+  populateMaterializeUpperBoundTileSizePatterns(patterns,
+                                                materializeEncodingFn);
+  if (failed(applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
+    operation.emitOpError(
+        "encoding padding sizes materialization pattern failed");
+    return signalPassFailure();
+  }
+}
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUMaterializeEncodingPass() {
   return std::make_unique<LLVMCPUMaterializeEncodingPass>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUMaterializeUpperBoundTileSizePass() {
+  return std::make_unique<LLVMCPUMaterializeUpperBoundTileSizePass>();
 }
 
 } // namespace iree_compiler

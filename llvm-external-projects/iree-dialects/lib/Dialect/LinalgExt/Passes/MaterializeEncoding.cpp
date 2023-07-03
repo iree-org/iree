@@ -13,9 +13,12 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -176,6 +179,31 @@ static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
       *innerTileSizesOfr, materializeEncodingInfo->outerDimsPerm);
 }
 
+static FailureOr<SmallVector<Value>> lowerUpperBoundTileSizeOpToConstants(
+    RewriterBase &rewriter, UpperBoundTileSizeOp upperBoundTileSizeOp,
+    MaterializeEncodingFn materializeEncodingFn) {
+  Location loc = upperBoundTileSizeOp.getLoc();
+  RankedTensorType tensorType = upperBoundTileSizeOp.getTensorType();
+  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+      materializeEncodingFn(tensorType);
+  if (failed(materializeEncodingInfo)) {
+    return rewriter.notifyMatchFailure(upperBoundTileSizeOp,
+                                       "unhandled source encoding");
+  }
+  ArrayRef<int64_t> innerTileSizes = materializeEncodingInfo->innerTileSizes;
+  ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo->innerDimsPos;
+  SmallVector<Value> results(tensorType.getRank());
+  for (unsigned i = 0; i < innerTileSizes.size(); ++i) {
+    int64_t tileSize = innerTileSizes[i];
+    if (ShapedType::isDynamic(tileSize)) {
+      tileSize = 16;
+    }
+    results[innerDimsPos[i]] =
+        rewriter.create<arith::ConstantIndexOp>(loc, tileSize);
+  }
+  return results;
+}
+
 /// Utility method to convert from `linalg.matmul` with
 /// - lhs encoding with role=LHS
 /// - rhs encoding with role=RHS
@@ -278,8 +306,6 @@ struct SetEncodingOpToPackOpConversion
     MaterializeEncodingFn materializeEncodingFn =
         static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter())
             ->getMaterializeEncodingFn();
-    // Pack op needs a padding value. Maybe that is an overkill. For now, just
-    // use zero.
     auto packOp = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn,
         this->materializeEncodingValueFn);
@@ -313,6 +339,30 @@ struct UnsetEncodingOpToPackOpConversion
     rewriter.replaceOp(encodingOp, unpackOp->getResult());
     return success();
   }
+};
+
+/// Convert `upper_bound_tile_size` op to `constant` op.
+struct UpperBoundTileSizeToConstantOpConversion
+    : public OpRewritePattern<UpperBoundTileSizeOp> {
+  UpperBoundTileSizeToConstantOpConversion(
+      MLIRContext *context, MaterializeEncodingFn materializeEncodingFn)
+      : OpRewritePattern<UpperBoundTileSizeOp>(context),
+        materializeEncodingFn(materializeEncodingFn) {}
+
+  LogicalResult matchAndRewrite(UpperBoundTileSizeOp upperBoundTileSizeOp,
+                                PatternRewriter &rewriter) const override {
+
+    auto constants = lowerUpperBoundTileSizeOpToConstants(
+        rewriter, upperBoundTileSizeOp, materializeEncodingFn);
+    if (failed(constants)) {
+      return rewriter.notifyMatchFailure(upperBoundTileSizeOp,
+                                         "failed to convert to constant op");
+    }
+    rewriter.replaceOp(upperBoundTileSizeOp, *constants);
+    return success();
+  }
+
+  MaterializeEncodingFn materializeEncodingFn;
 };
 
 /// Generic pattern to convert operaiton that is in Destination Passing Style.
@@ -448,6 +498,12 @@ void populateMaterializeEncodingPatterns(
                   UnsetEncodingOpToPackOpConversion>(
       patterns.getContext(), typeConverter, materializeEncodingValueFn);
   ::mlir::memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+}
+
+void populateMaterializeUpperBoundTileSizePatterns(
+    RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn) {
+  patterns.insert<UpperBoundTileSizeToConstantOpConversion>(
+      patterns.getContext(), materializeEncodingFn);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass() {

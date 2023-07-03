@@ -52,6 +52,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMCPU
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion

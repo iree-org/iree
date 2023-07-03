@@ -289,13 +289,34 @@ void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
     // materializeEncodingValueFn which we obtain those tileSizes from.
     if (ShapedType::isDynamic(tileSize))
       continue;
-    auto generateNarrowTileSize = [&](int64_t n) {
-      if (size <= n && tileSize >= n)
-        tileSize = n;
-    };
-    generateNarrowTileSize(1);
-    generateNarrowTileSize(2);
-    generateNarrowTileSize(4);
+    // Adjust tile sizes for narrow cases: ensure that narrow sizes (those that
+    // are less than the normal tileSize) don't get padded to more than the
+    // next power of two, or tileSize, whichever is smaller.
+    //
+    // For example, if size==1, always adjust tileSize to be 1, so that
+    // matrix-times-vector problems remain that, instead of becoming more
+    // general matrix-times-matrix.
+    //
+    // Another example, if tileSize==6, then:
+    //
+    //   Original tensor size | adjusted tileSize
+    //   -------------------- | -----------------
+    //                      1 |                 1
+    //                      2 |                 2
+    //                      3 |                 4
+    //                      4 |                 4
+    //                      5 |                 6
+    //                   >= 6 |                 6
+    //
+    // Note: this implies that microkernels that implement a code path for
+    // a given `tileSize` value should also implement alternative code paths
+    // for all powers of two smaller than `tileSize`, as those could end up
+    // being selected here, and would fall back on slow generic code if no
+    // optimized code path is provided.
+    for (int po2 = 1; po2 < tileSize; po2 *= 2) {
+      if (size <= po2 && tileSize >= po2)
+        tileSize = po2;
+    }
   }
 }
 
