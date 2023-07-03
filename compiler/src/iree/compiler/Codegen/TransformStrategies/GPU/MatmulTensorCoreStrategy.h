@@ -172,8 +172,133 @@ public:
                        /*vectorSize=*/std::nullopt};
   }
 
-  void print(llvm::raw_ostream &os) const;
-  LLVM_DUMP_METHOD void dump() const;
+  void print(llvm::raw_ostream &os) const override;
+  LLVM_DUMP_METHOD void dump() const override;
+};
+
+/// An extension of the matmul strategy to batched matrix multiplications.
+class BatchMatmulStrategy : public MatmulStrategy {
+public:
+  /// Construct the default strategy, pulling options from the command-line
+  /// arguments if provided and using the defaults otherwise.
+  BatchMatmulStrategy(MLIRContext *context, const GPUModel &gpuModel,
+                      const transform_ext::MatchedMatmulCaptures &captures)
+      : MatmulStrategy(context, captures, gpuModel) {
+    initDefaultValues(gpuModel);
+  }
+
+  /// Initialize the default values of the strategy.
+  void initDefaultValues(const GPUModel &gpuModel) override {
+    // First, initialize as if this was a simple matmul.
+    MatmulStrategy::initDefaultValues(gpuModel);
+
+    // Make sure we pad along all dimensions.
+    paddingDimensions = {0, 1, 2, 3};
+    packingDimensions = {1, 1, 1, 1};
+  }
+
+  /// Check that the strategy is valid for the captures and the model.
+  LogicalResult validate(const GPUModel &gpuModel) const override;
+
+  /// Named accessors to shapes.
+  int64_t batch() const { return captures.matmulOpSizes[0]; }
+  int64_t m() const override { return captures.matmulOpSizes[1]; }
+  int64_t n() const override { return captures.matmulOpSizes[2]; }
+  int64_t k() const override { return captures.matmulOpSizes[3]; }
+
+  /// Named accessors to block tile sizes associated with shapes.
+  int64_t blockTileBatch() const { return blockTileSizes[0]; }
+  int64_t blockTileM() const override { return blockTileSizes[1]; }
+  int64_t blockTileN() const override { return blockTileSizes[2]; }
+
+  /// Number of threads to use.
+  int64_t numThreadsX() const { return numThreads[0]; }
+  int64_t numThreadsY() const { return numThreads[1]; }
+  int64_t numThreadsZ() const { return numThreads[2]; }
+
+  /// Number of warps to use.
+  int64_t numWarpsX() const override { return numWarps[0]; }
+  int64_t numWarpsY() const override { return numWarps[1]; }
+  int64_t numWarpsZ() const { return numWarps[2]; }
+
+  MappingInfo getBlockMapping() const override {
+    return MappingInfo{
+        /*numThreads=*/
+        {},
+        /*tileSizes=*/{blockTileBatch(), blockTileM(), blockTileN()},
+        /*threadMapping=*/{blockZ(ctx), blockY(ctx), blockX(ctx)},
+        /*vectorSize=*/std::nullopt};
+  }
+
+  // LHS copy is batch x M x K.
+  MappingInfo lhsCopyMapping() const override {
+    // TODO: generalize to transpositions, here and below.
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(), k(),
+        {blockTileBatch(), blockTileM(), reductionTileSize},
+        /*favorPredication=*/false,
+        captures.lhsElementType.getIntOrFloatBitWidth());
+  }
+
+  // RHS copy is batch x K x N.
+  MappingInfo rhsCopyMapping() const override {
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(), n(),
+        {blockTileBatch(), reductionTileSize, blockTileN()},
+        /*favorPredication=*/false,
+        captures.rhsElementType.getIntOrFloatBitWidth());
+  }
+
+  // RES copy is batch x M x N.
+  MappingInfo resCopyMapping() const override {
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(), n(),
+        {blockTileBatch(), blockTileM(), blockTileN()},
+        /*favorPredication=*/false,
+        captures.outputElementType.getIntOrFloatBitWidth());
+  }
+
+  /// Validates the mapping for one of the lhs, rhs or res copies.
+  LogicalResult validateCopyMapping(const MappingInfo &mapping,
+                                    StringRef name) const {
+    int64_t threadsUsed =
+        std::accumulate(mapping.numThreads.begin(), mapping.numThreads.end(), 1,
+                        std::multiplies<int64_t>());
+    if (totalNumThreads() < threadsUsed) {
+      InFlightDiagnostic diag = emitError(UnknownLoc::get(ctx))
+                                << "too many threads used for transferring "
+                                << name;
+
+      std::string str;
+      llvm::raw_string_ostream os(str);
+      llvm::interleave(mapping.numThreads, os, " * ");
+      os << " >= " << totalNumThreads();
+      diag.attachNote() << os.str();
+      return diag;
+    }
+
+    return success();
+  }
+
+  /// Check that the mapping computed for a copy is valid.
+  LogicalResult validateLhsCopyMapping() const override {
+    return validateCopyMapping(lhsCopyMapping(), "lhs");
+  }
+  LogicalResult validateRhsCopyMapping() const override {
+    return validateCopyMapping(rhsCopyMapping(), "rhs");
+  }
+  LogicalResult validateResCopyMapping() const override {
+    return validateCopyMapping(resCopyMapping(), "result");
+  }
+
+  // Compute is of the size batch x M x N.
+  MappingInfo computeMapping() const override {
+    assert(useFma && "only fma is currently supported");
+    return MappingInfo{{numThreadsZ(), numThreadsY(), numThreadsX()},
+                       {},
+                       {threadZ(ctx), threadY(ctx), threadX(ctx)},
+                       std::nullopt};
+  }
 };
 
 } // namespace gpu

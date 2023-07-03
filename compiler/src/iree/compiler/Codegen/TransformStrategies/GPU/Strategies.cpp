@@ -63,9 +63,15 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectSmallMatmul(
 llvm::cl::opt<bool> clGPUEnableTransformDialectPadStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
     llvm::cl::desc("activate the pad strategy"), llvm::cl::init(false));
+llvm::cl::opt<bool> clGPUEnableTransformDialectBatchMatmulStrategy(
+    "iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy",
+    llvm::cl::desc("activate the batch matmul strategy, additional "
+                   "configuration flags are shared with matmul"),
+    llvm::cl::init(false));
 
 // TODO: significantly better namespacing.
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
+using iree_compiler::gpu::BatchMatmulStrategy;
 using iree_compiler::gpu::GPUModel;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
 using iree_compiler::gpu::MatmulStrategy;
@@ -337,6 +343,91 @@ getMatmulConfig(MLIRContext *context,
   return strategy;
 }
 
+/// Update the strategy to make sure it can be consumed by the codegen. In
+/// particular, make sure that tile sizes are smaller than the problem sizes to
+/// actually trigger tiling and mapping to blocks and threads.
+static void failSafeOverrides(BatchMatmulStrategy &strategy,
+                              const GPUModel &gpuModel) {
+  // Configure the strategy as if for a matmul.
+  failSafeOverrides(static_cast<MatmulStrategy &>(strategy), gpuModel);
+
+  // Failsafe for blockTileBatch to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileBatch = selectLargestFailsafeValueIfNeeded(
+      /*value=*/strategy.blockTileBatch(),
+      /*limit=*/strategy.batch(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
+
+  // Override the matmul configuration to be suitable for batch matmul.
+  // Specifically, prepend the tile size for the batch dimension and force FMA.
+  strategy.blockTileSizes.insert(strategy.blockTileSizes.begin(),
+                                 blockTileBatch);
+
+  strategy.useMmaSync = false;
+  strategy.useWmma = false;
+  strategy.useFma = true;
+}
+
+/// Produce a strategy for the batch matmul characterized by the given capture
+/// list (shapes and types).
+static BatchMatmulStrategy getBatchMatmulConfig(MLIRContext *context,
+                                                MatchedMatmulCaptures &captures,
+                                                const GPUModel &gpuModel) {
+  // Command-line arguments trump everything.
+  BatchMatmulStrategy strategy(context, gpuModel, captures);
+  if (strategy.cliOptionsSpecified)
+    return strategy;
+
+  // TODO: fixed strategies and decision tree/heuristic.
+
+  failSafeOverrides(strategy, gpuModel);
+  return strategy;
+}
+
+/// Match the supported batch matmuls and set the transform dialect strategy for
+/// them.
+static LogicalResult matchAndSetBatchMatmulStrategy(func::FuncOp entryPoint,
+                                                    linalg::LinalgOp op,
+                                                    const GPUModel &gpuModel) {
+  if (!clGPUEnableTransformDialectBatchMatmulStrategy) {
+    LDBG("--Batch matmul strategy flag turned off\n");
+    return failure();
+  }
+
+  StructuredOpMatcher *fill;
+  StructuredOpMatcher *bmm;
+  transform_ext::MatchedMatmulCaptures captures;
+  transform_ext::MatcherContext matcherContext;
+  transform_ext::makeBatchMatmulMatcher(matcherContext, bmm, fill, captures,
+                                        /*mustMatchEntireFunc=*/true);
+  if (!matchPattern(op, *bmm)) {
+    LDBG("--Batch matmul strategy failed to match\n");
+    return failure();
+  }
+
+  if (captures.contractionDims.batch.size() != 1 ||
+      captures.contractionDims.m.size() != 1 ||
+      captures.contractionDims.n.size() != 1 ||
+      captures.contractionDims.k.size() != 1 || captures.batches()[0] != 0 ||
+      captures.m() != 1 || captures.n() != 2 || captures.k() != 3) {
+    LDBG("--Only support batch matmul with b, m, n, k iterator order atm\n");
+    return failure();
+  }
+
+  BatchMatmulStrategy strategy =
+      getBatchMatmulConfig(entryPoint->getContext(), captures, gpuModel);
+  if (failed(strategy.validate(gpuModel))) {
+    LDBG("--Batch matmul strategy failed to validate\n");
+    return failure();
+  }
+
+  iree_compiler::createTransformRegion(entryPoint, [&](ImplicitLocOpBuilder &b,
+                                                       Value variantH) {
+    return iree_compiler::gpu::buildBatchMatmulStrategy(b, variantH, strategy);
+  });
+  return success();
+}
+
 static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
                                                linalg::LinalgOp op,
                                                const GPUModel &gpuModel) {
@@ -549,6 +640,11 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
   }
   if (succeeded(matchAndSetMatmulStrategy(entryPoint, linalgOp, gpuModel))) {
     LDBG("Activate matmul\n");
+    return success();
+  }
+  if (succeeded(
+          matchAndSetBatchMatmulStrategy(entryPoint, linalgOp, gpuModel))) {
+    LDBG("Activate batch matmul\n");
     return success();
   }
   // TODO: Add more transform dialect strategy for other kind of dispatch
