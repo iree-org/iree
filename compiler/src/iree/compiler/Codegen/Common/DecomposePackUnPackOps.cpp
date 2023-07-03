@@ -85,6 +85,12 @@ struct FoldTrailingUnitTranspose
     if (numDropDims == 0)
       return failure();
 
+    // Dropping all dims. Elide now to avoid corner cases.
+    if (numDropDims == inputTy.getRank()) {
+      rewriter.replaceOp(op, op.getInput());
+      return success();
+    }
+
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> srcMixedSizes =
         tensor::getMixedSizes(rewriter, loc, op.getInput());

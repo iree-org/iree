@@ -13,9 +13,12 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -176,6 +179,51 @@ static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
       *innerTileSizesOfr, materializeEncodingInfo->outerDimsPerm);
 }
 
+static FailureOr<SmallVector<Value>> lowerEncodingPaddingSizeOpToConstants(
+    RewriterBase &rewriter, EncodingPaddingSizeOp paddingSizeOp,
+    MaterializeEncodingFn materializeEncodingFn) {
+  AffineExpr tileExpr, shapeExpr;
+  bindSymbols(rewriter.getContext(), tileExpr, shapeExpr);
+  AffineExpr resultExpr = shapeExpr.ceilDiv(tileExpr) * tileExpr - shapeExpr;
+  Location loc = paddingSizeOp.getLoc();
+  Value source = paddingSizeOp.getSource();
+  RankedTensorType tensorType = source.getType().cast<RankedTensorType>();
+  FailureOr<SmallVector<OpFoldResult>> shape =
+      IREE::LinalgExt::getDims(rewriter, loc, source);
+  if (failed(shape)) {
+    return failure();
+  }
+  RankedTensorType tensorTypeWithEncoding =
+      RankedTensorType::get(tensorType.getShape(), tensorType.getElementType(),
+                            paddingSizeOp.getEncodingAttr());
+  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+      materializeEncodingFn(tensorTypeWithEncoding);
+  if (failed(materializeEncodingInfo)) {
+    return rewriter.notifyMatchFailure(paddingSizeOp,
+                                       "unhandled source encoding");
+  }
+  ArrayRef<int64_t> innerTileSizes = materializeEncodingInfo->innerTileSizes;
+  ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo->innerDimsPos;
+  SmallVector<Value> results(tensorType.getRank());
+  for (unsigned i = 0; i < innerTileSizes.size(); ++i) {
+    int64_t tileSize = innerTileSizes[i];
+    if (ShapedType::isDynamic(tileSize)) {
+      tileSize = 16;
+    }
+    OpFoldResult resultOfr = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, resultExpr,
+        {rewriter.getIndexAttr(tileSize), (*shape)[innerDimsPos[i]]});
+    if (Value val = resultOfr.dyn_cast<Value>()) {
+      results[innerDimsPos[i]] = val;
+    } else {
+      auto attr = llvm::cast<IntegerAttr>(resultOfr.get<Attribute>());
+      results[innerDimsPos[i]] =
+          rewriter.create<arith::ConstantIndexOp>(loc, attr.getInt());
+    }
+  }
+  return results;
+}
+
 /// Utility method to convert from `linalg.matmul` with
 /// - lhs encoding with role=LHS
 /// - rhs encoding with role=RHS
@@ -278,8 +326,6 @@ struct SetEncodingOpToPackOpConversion
     MaterializeEncodingFn materializeEncodingFn =
         static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter())
             ->getMaterializeEncodingFn();
-    // Pack op needs a padding value. Maybe that is an overkill. For now, just
-    // use zero.
     auto packOp = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn,
         this->materializeEncodingValueFn);
@@ -313,6 +359,30 @@ struct UnsetEncodingOpToPackOpConversion
     rewriter.replaceOp(encodingOp, unpackOp->getResult());
     return success();
   }
+};
+
+/// Convert `encoding_padding_size` op to `constant` op.
+struct EncodingPaddingSizeToConstantOpConversion
+    : public OpRewritePattern<EncodingPaddingSizeOp> {
+  EncodingPaddingSizeToConstantOpConversion(
+      MLIRContext *context, MaterializeEncodingFn materializeEncodingFn)
+      : OpRewritePattern<EncodingPaddingSizeOp>(context),
+        materializeEncodingFn(materializeEncodingFn) {}
+
+  LogicalResult matchAndRewrite(EncodingPaddingSizeOp paddingSizeOp,
+                                PatternRewriter &rewriter) const override {
+
+    auto constants = lowerEncodingPaddingSizeOpToConstants(
+        rewriter, paddingSizeOp, materializeEncodingFn);
+    if (failed(constants)) {
+      return rewriter.notifyMatchFailure(paddingSizeOp,
+                                         "failed to convert to constant op");
+    }
+    rewriter.replaceOp(paddingSizeOp, *constants);
+    return success();
+  }
+
+  MaterializeEncodingFn materializeEncodingFn;
 };
 
 /// Generic pattern to convert operaiton that is in Destination Passing Style.
@@ -448,6 +518,12 @@ void populateMaterializeEncodingPatterns(
                   UnsetEncodingOpToPackOpConversion>(
       patterns.getContext(), typeConverter, materializeEncodingValueFn);
   ::mlir::memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+}
+
+void populateMaterializeEncodingPaddingSizePatterns(
+    RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn) {
+  patterns.insert<EncodingPaddingSizeToConstantOpConversion>(
+      patterns.getContext(), materializeEncodingFn);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass() {

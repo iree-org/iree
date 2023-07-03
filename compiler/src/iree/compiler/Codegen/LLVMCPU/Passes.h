@@ -47,10 +47,30 @@ std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 /// operation.
 std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass();
 
-/// Materialize the encoding of operations. The layout to use for the encoded
-/// operations are LLVMCPU specific.
+/// Convert encoding-specific operations based on target attributes. Examples:
+///   linalg_ext.set_encoding   -> tensor.pack
+///   linalg_ext.unset_encoding -> tensor.unpack
+///   linalg.matmul             -> linalg.mmt4d
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUMaterializeEncodingPass();
+
+/// Like createLLVMCPUMaterializeEncodingPass, but specifically for
+/// linalg_ext.encoding_padding_size, converting it to constants.
+///
+/// Unlike createLLVMCPUMaterializeEncodingPass, this does not require the
+/// op to have a specific HAL target attribute. Instead, this will iterate over
+/// all HAL target attributes, use the maximum of all padding sizes from each
+/// target. This is needed because in top-level functions outside of HAL
+/// executables, there are encoding_padding_size ops (created by SetEncoding,
+/// and computing buffer allocation sizes) and there isn't one specific HAL
+/// target.
+///
+/// In the VMVX case where padding sizes are not compile-time constants, this
+/// converts encoding_padding_size to some specific constant size (currently 16)
+/// that is the largest tile size that we can use in VMVX, and can be adjusted
+// as needed.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUMaterializeEncodingPaddingSizePass();
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUMmt4dVectorLoweringPass();

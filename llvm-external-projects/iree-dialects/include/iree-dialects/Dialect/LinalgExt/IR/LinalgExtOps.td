@@ -836,6 +836,22 @@ def IREELinalgExt_SetEncodingOp : IREELinalgExt_PureOp<"set_encoding",[
   }];
 }
 
+def IREELinalgExt_EncodingPaddingSizeOp: IREELinalgExt_PureOp<"encoding_padding_size", [Pure
+  ]> {
+  let summary = "xxx";
+  let description = [{
+    XXX
+  }];
+
+  let arguments = (ins AnyRankedTensor:$source,
+                       EncodingAttr:$encoding);
+  let results = (outs Variadic<Index>:$results);
+
+  let assemblyFormat = [{
+    attr-dict $source `:` type($source) $encoding `->` type($results)
+  }];
+}
+
 def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {

@@ -80,7 +80,11 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
         auto role = encoding.getRole().getValue();
         MatmulTileParams tileParams = chooseMatmulTileParams(targetAttr);
         auto encodingInfo = chooseEncodingInfoForMatmul(role, tileParams);
-        adjustTileSizesToNarrowStaticShape(encodingInfo, tensorType.getShape());
+        auto origTypeAttr = encoding.getOrigType();
+        auto origType = origTypeAttr
+                            ? origTypeAttr.getValue().cast<RankedTensorType>()
+                            : tensorType;
+        adjustTileSizesToNarrowStaticShape(encodingInfo, origType.getShape());
         return encodingInfo;
       });
   MaterializeEncodingConversionTarget target(*context);

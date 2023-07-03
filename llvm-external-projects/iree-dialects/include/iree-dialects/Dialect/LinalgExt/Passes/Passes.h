@@ -131,6 +131,9 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn = {});
 
+void populateMaterializeEncodingPaddingSizePatterns(
+    RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
+
 /// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
 
