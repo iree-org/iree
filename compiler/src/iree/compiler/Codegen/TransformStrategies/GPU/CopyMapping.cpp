@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/TransformStrategies/GPU/CopyMapping.h"
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -104,7 +105,8 @@ iree_compiler::gpu::MappingInfo iree_compiler::gpu::CopyMapping::getMappingInfo(
     MLIRContext *ctx, int totalNumThreads, int64_t alignment,
     ArrayRef<int64_t> copySizes, bool favorPredication,
     int64_t elementalBitWidth) {
-  assert(copySizes.size() == 2 && "only 2-D copy supported for now");
+  assert(!copySizes.empty() && copySizes.size() <= 3 &&
+         "only 1,2,3-D copies are supported for now");
   FailureOr<CopyMapping> maybeCopyMapping =
       CopyMapping::numThreadsForCopy(totalNumThreads, alignment, copySizes,
                                      favorPredication, elementalBitWidth);
@@ -117,18 +119,24 @@ iree_compiler::gpu::MappingInfo iree_compiler::gpu::CopyMapping::getMappingInfo(
         elementalBitWidth);
   }
   assert(succeeded(maybeCopyMapping) && "failed to compute copy mapping");
-  assert(maybeCopyMapping->numThreads.size() == 2 &&
-         "compute copy mapping expected size-2");
-  int64_t numThreadsY = maybeCopyMapping->numThreads[0];
-  int64_t numThreadsX = maybeCopyMapping->numThreads[1];
-  int64_t sizeY = copySizes[0];
-  int64_t sizeX = copySizes[1];
-  MappingInfo res{
-      /*numThreads=*/{numThreadsY, numThreadsX},
-      /*tilecopySizes=*/
-      {mlir::ceilDiv(sizeY, numThreadsY), mlir::ceilDiv(sizeX, numThreadsX)},
-      /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)},
-      /*vectorSize=*/maybeCopyMapping->vectorSize};
+  assert(maybeCopyMapping->numThreads.size() == copySizes.size() &&
+         "compute copy mapping expected same number of threads and copy sizes");
+
+  SmallVector<int64_t> tileSizes = llvm::to_vector(llvm::map_range(
+      llvm::zip(copySizes, maybeCopyMapping->numThreads), [](auto &&pair) {
+        int64_t size, numThreads;
+        std::tie(size, numThreads) = pair;
+        return mlir::ceilDiv(size, numThreads);
+      }));
+  SmallVector<Attribute> allThreadMappings{linearIdZ(ctx), linearIdY(ctx),
+                                           linearIdX(ctx)};
+  auto threadMapping =
+      llvm::to_vector(ArrayRef(allThreadMappings).take_back(tileSizes.size()));
+
+  MappingInfo res{/*numThreads=*/maybeCopyMapping->numThreads,
+                  /*tilecopySizes=*/tileSizes,
+                  /*threadMapping=*/threadMapping,
+                  /*vectorSize=*/maybeCopyMapping->vectorSize};
   LLVM_DEBUG(res.print(DBGS()); llvm::dbgs() << "\n");
   return res;
 }

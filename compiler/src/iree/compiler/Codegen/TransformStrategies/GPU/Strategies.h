@@ -17,6 +17,7 @@ namespace iree_compiler {
 namespace gpu {
 
 /// Forward declarations of all supported strategies.
+struct BatchMatmulStrategy;
 struct MatmulStrategy;
 class PadStrategy;
 class SmallReductionStrategy;
@@ -63,6 +64,14 @@ struct GPUStrategy {
 /// Does not support leading or trailing operations atm.
 void buildMatmulTensorCoreStrategy(ImplicitLocOpBuilder &b, Value variantH,
                                    const MatmulStrategy &strategy);
+
+//===--------------------------------------------------------------------===//
+// Batch matmul strategies.
+//===--------------------------------------------------------------------===//
+/// Entry point to build the transform IR corresponding to an FMA-based strategy
+/// for linalg.fill + linalg.batch_matmul.
+void buildBatchMatmulStrategy(ImplicitLocOpBuilder &b, Value variantH,
+                              const BatchMatmulStrategy &strategy);
 
 //===--------------------------------------------------------------------===//
 // Pad strategies.

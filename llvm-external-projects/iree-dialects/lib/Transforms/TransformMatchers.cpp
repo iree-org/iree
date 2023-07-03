@@ -424,6 +424,14 @@ transform_ext::StructuredOpMatcher::rank(NumLowerEqualTo maxRank) {
   });
 }
 
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::rank(NumEqualsTo exactRank) {
+  return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "rank == " << exactRank.value);
+    return linalgOp.getNumLoops() == exactRank.value;
+  });
+}
+
 StringRef stringifyShapeKind(transform_ext::ShapeKind kind) {
   switch (kind) {
   case transform_ext::ShapeKind::Static:
@@ -576,16 +584,40 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, CaptureDims captures) {
 }
 
 transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::indexingMaps(
+    CaptureIndexingMaps indexingMaps) {
+  return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "capture indexing maps");
+    indexingMaps.value = linalgOp.getIndexingMapsArray();
+    return true;
+  });
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::contractionDims(
+    CaptureContractionDims contractionDims) {
+  return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "capture contraction dimensions");
+    StringRef convMessage = linalg::detail::getMatchContractionMessage(
+        mlir::linalg::detail::isContractionInterfaceImpl(
+            linalgOp, &contractionDims.value));
+    if (convMessage.empty())
+      return true;
+    LLVM_DEBUG(llvm::dbgs() << " (" << convMessage << ")");
+    return false;
+  });
+}
+
+transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::convolutionDims(CaptureConvDims convDims) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "capture convolution dimensions\n");
+    LLVM_DEBUG(DBGS() << "capture convolution dimensions");
     StringRef convMessage = linalg::detail::getMatchConvolutionMessage(
         mlir::linalg::detail::isConvolutionInterfaceImpl(linalgOp,
                                                          &convDims.value));
     if (convMessage.empty())
       return true;
-    LLVM_DEBUG(DBGS() << "capture convolution dimensions failed: "
-                      << convMessage << "\n");
+    LLVM_DEBUG(llvm::dbgs() << " (" << convMessage << ")");
     return false;
   });
 }
@@ -1149,6 +1181,79 @@ transform_ext::StructuredOpMatcher::passThroughOp() {
   });
 }
 
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::hasContractionBody(
+    function_ref<bool(Operation *)> isaElemOpTy,
+    function_ref<bool(Operation *)> isaReductionOpTy, StringRef elemOpName,
+    StringRef reductionOpName) {
+  return addPredicate([=](linalg::LinalgOp linalgOp) {
+    LLVM_DEBUG(DBGS() << "op region is a " << elemOpName << "/"
+                      << reductionOpName << " contraction (");
+    auto scopeExitPrinter = llvm::make_scope_exit(
+        [] { LLVM_DEBUG(llvm::dbgs() << " check failed)"); });
+
+    Block *body = linalgOp.getBlock();
+    if (!llvm::hasNItems(*body, 3)) {
+      LLVM_DEBUG(llvm::dbgs() << "three-operation body");
+      return false;
+    }
+    if (body->getNumArguments() != 3) {
+      LLVM_DEBUG(llvm::dbgs() << "three-argument block");
+      return false;
+    }
+
+    Operation *elemOp = &(*linalgOp.getBlock()->getOperations().begin());
+    Operation *reductionOp = elemOp->getNextNode();
+    Operation *yieldOp = reductionOp->getNextNode();
+    if (!isaElemOpTy(elemOp)) {
+      LLVM_DEBUG(llvm::dbgs() << "first operation is a " << elemOpName);
+      return false;
+    }
+    if (!isaReductionOpTy(reductionOp)) {
+      LLVM_DEBUG(llvm::dbgs() << "second operation is a " << reductionOpName);
+      return false;
+    }
+    if (yieldOp->getNumOperands() != 1) {
+      LLVM_DEBUG(llvm::dbgs() << "one value yielded");
+      return false;
+    }
+    if (yieldOp->getOperand(0).getDefiningOp() != reductionOp) {
+      LLVM_DEBUG(llvm::dbgs() << "yielded value produced by the second op");
+      return false;
+    }
+    if (elemOp->getNumOperands() != 2 || elemOp->getNumResults() != 1) {
+      LLVM_DEBUG(llvm::dbgs() << "first op has two operands and one result");
+      return false;
+    }
+    if (reductionOp->getNumOperands() != 2 ||
+        reductionOp->getNumResults() != 1) {
+      LLVM_DEBUG(llvm::dbgs() << "second op has two operands and one result");
+      return false;
+    }
+
+    SmallVector<Value, 2> expectedReductionOperands = {body->getArgument(2),
+                                                       elemOp->getResult(0)};
+    if (!llvm::equal(expectedReductionOperands, reductionOp->getOperands()) &&
+        !llvm::equal(llvm::reverse(expectedReductionOperands),
+                     reductionOp->getOperands())) {
+      LLVM_DEBUG(llvm::dbgs() << "operands of the second op");
+      return false;
+    }
+
+    ValueRange expectedElemOperands = body->getArguments().take_front(2);
+    if (!llvm::equal(expectedElemOperands, elemOp->getOperands()) &&
+        !llvm::equal(llvm::reverse(expectedElemOperands),
+                     elemOp->getOperands())) {
+      LLVM_DEBUG(llvm::dbgs() << "operands of the first op");
+      return false;
+    }
+
+    scopeExitPrinter.release();
+    LLVM_DEBUG(llvm::dbgs() << "success)");
+    return true;
+  });
+}
+
 void transform_ext::detail::debugOutputForConcreteOpMatcherConstructor(
     StringRef name) {
   LLVM_DEBUG(DBGS() << "op is a " << name << "'");
@@ -1391,6 +1496,34 @@ void transform_ext::makeMatmulMatcher(
   if (mustMatchEntireFunc)
     matmul = matmul.allTilableOpsCaptured<func::FuncOp>();
   trailingCapture = &trailing;
+}
+
+void transform_ext::makeBatchMatmulMatcher(
+    transform_ext::MatcherContext &matcherContext,
+    transform_ext::StructuredOpMatcher *&bmmCapture,
+    transform_ext::StructuredOpMatcher *&fillCapture,
+    transform_ext::MatchedMatmulCaptures &captures, bool mustMatchEntireFunc) {
+  auto &bmm =
+      transform_ext::m_StructuredOp<linalg::BatchMatmulOp, linalg::GenericOp>(
+          matcherContext)
+          .hasContractionBody<arith::MulFOp, arith::AddFOp>()
+          .rank(NumEqualsTo(4))
+          .dim(AllDims(), CaptureDims(captures.matmulOpSizes))
+          .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
+          .dim(-1, utils::IteratorType::reduction)
+          .contractionDims(CaptureContractionDims(captures.contractionDims))
+          .input(NumEqualsTo(2))
+          .input(0, CaptureElementType(captures.lhsElementType))
+          .input(1, CaptureElementType(captures.rhsElementType))
+          .output(0, CaptureElementType(captures.outputElementType));
+  bmmCapture = &bmm;
+
+  auto &fill = transform_ext::m_StructuredOp<linalg::FillOp>(matcherContext);
+  bmm = bmm.output(0, fill);
+  fillCapture = &fill;
+
+  if (mustMatchEntireFunc)
+    bmm = bmm.allTilableOpsCaptured<func::FuncOp>();
 }
 
 /// Match sum(%src, broadcast(%reduction))

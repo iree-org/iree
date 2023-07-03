@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "affinemin_canonicalization.mlir",
+            "batch_matmuls.mlir",
             "bubble_up_ordinal_ops.mlir",
             "bufferize_copy_only_dispatches.mlir",
             "canonicalize_interface_load_store.mlir",
@@ -64,6 +65,7 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "batch_matmul_match_spec.mlir",
             "convolution_match_spec.mlir",
             "reductions_codegen_spec.mlir",
             "reductions_match_spec.mlir",
@@ -73,6 +75,7 @@ iree_lit_test_suite(
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
+        "batch_matmul_match_spec.mlir",
         "convolution_match_spec.mlir",
         "reductions_codegen_spec.mlir",
         "reductions_match_spec.mlir",
