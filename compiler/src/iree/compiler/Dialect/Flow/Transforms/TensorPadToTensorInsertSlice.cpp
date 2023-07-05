@@ -76,34 +76,16 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
     SmallVector<OpFoldResult> sourceShape;
     SmallVector<OpFoldResult> outputShape;
     for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
-      SmallVector<Value> mapValues;
+      SmallVector<OpFoldResult> mapOperands;
       Value sourceDim = rewriter.createOrFold<tensor::DimOp>(loc, source, dim);
-      mapValues.push_back(sourceDim);
-      if (auto cstDim = sourceDim.getDefiningOp<arith::ConstantIndexOp>()) {
-        sourceShape.push_back(cstDim.getValue());
-      } else {
-        sourceShape.push_back(sourceDim);
-      }
-      AffineExpr expr = rewriter.getAffineDimExpr(0);
-      unsigned numSymbols = 0;
-      auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          e = e + llvm::cast<IntegerAttr>(attr).getInt();
-          return e;
-        }
-        e = e + rewriter.getAffineSymbolExpr(numSymbols++);
-        mapValues.push_back(valueOrAttr.get<Value>());
-        return e;
-      };
-      expr = addValueOrAttr(expr, lowPad[dim]);
-      expr = addValueOrAttr(expr, highPad[dim]);
-      Value v = affine::applyMapToValues(
-          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
-      if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
-        outputShape.push_back(cst.getValue());
-      } else {
-        outputShape.push_back(v);
-      }
+      mapOperands.push_back(sourceDim);
+      mapOperands.push_back(lowPad[dim]);
+      mapOperands.push_back(highPad[dim]);
+      AffineExpr expr = rewriter.getAffineDimExpr(0) +
+                        rewriter.getAffineSymbolExpr(0) +
+                        rewriter.getAffineSymbolExpr(1);
+      outputShape.push_back(affine::makeComposedFoldedAffineApply(
+          rewriter, loc, AffineMap::get(1, 2, expr), mapOperands));
     }
     Value emptyTensor = rewriter.create<tensor::EmptyOp>(
         loc, outputShape, sourceType.getElementType());
