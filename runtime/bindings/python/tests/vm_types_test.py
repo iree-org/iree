@@ -81,6 +81,19 @@ class VmTypesTest(unittest.TestCase):
             with self.assertRaises(IndexError):
                 lst.get_as_object(1, rt.HalBufferView)
 
+    def test_variant_list_zero_rank_tensor_to_str(self):
+        device = rt.get_device("local-sync")
+        lst = rt.VmVariantList(1)
+        array = np.array(1234, dtype=np.int32)
+        buffer_view = device.allocator.allocate_buffer_copy(
+            memory_type=rt.MemoryType.DEVICE_LOCAL,
+            allowed_usage=(rt.BufferUsage.DEFAULT | rt.BufferUsage.MAPPING),
+            buffer=array,
+            element_type=rt.HalElementType.SINT_32,
+        )
+        lst.push_ref(buffer_view)
+        self.assertEqual(str(lst), "<VmVariantList(1): [HalBufferView(:0x20000011)]>")
+
     def test_variant_list_list(self):
         lst1 = rt.VmVariantList(5)
         lst2 = rt.VmVariantList(5)
