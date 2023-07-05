@@ -114,6 +114,8 @@ the TOSA dialect. See the
 [TFLite Integration guide](../guides/ml-frameworks/tflite.md) for details on how
 to use TFLite programs with IREE.
 
-IREE also provides runtime bindings for the
+IREE also has bindings for the
 [TFLite C API](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/lite/c),
-see the [TensorFlow Lite bindings](./bindings/tensorflow-lite.md) page.
+see the
+[`runtime/bindings/tflite/`](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite)
+directory for details.
