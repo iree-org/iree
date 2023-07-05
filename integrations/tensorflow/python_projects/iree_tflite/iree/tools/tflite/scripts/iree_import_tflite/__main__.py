@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 import sys
 import iree.tools.tflite
-from tensorflow.python.pywrap_mlir import experimental_tflite_to_tosa_bytecode
+from tensorflow.mlir import experimental_tflite_to_tosa_bytecode
 
 
 def main():

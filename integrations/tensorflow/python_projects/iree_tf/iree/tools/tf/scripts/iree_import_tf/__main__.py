@@ -64,17 +64,22 @@ def import_saved_model(
     *, output_path, saved_model_dir, exported_names, import_type, tags
 ):
     # From here there be dragons.
-    from tensorflow.python import pywrap_mlir
+    from tensorflow.mlir import (
+        experimental_convert_saved_model_to_mlir,
+        experimental_convert_saved_model_v1_to_mlir,
+        experimental_run_pass_pipeline,
+        experimental_write_bytecode,
+    )
 
     if import_type == "savedmodel_v2":
-        result = pywrap_mlir.experimental_convert_saved_model_to_mlir(
+        result = experimental_convert_saved_model_to_mlir(
             saved_model_dir, exported_names=exported_names, show_debug_info=False
         )
     elif import_type == "savedmodel_v1":
         # You saw it here, folks: The TF team just adds random positional params
         # without explanation or default. So we detect and default them on our
         # own. Because this is normal and fine.
-        sig = inspect.signature(pywrap_mlir.experimental_convert_saved_model_v1_to_mlir)
+        sig = inspect.signature(experimental_convert_saved_model_v1_to_mlir)
         dumb_extra_kwargs = {}
         if "include_variables_in_initializers" in sig.parameters:
             dumb_extra_kwargs["include_variables_in_initializers"] = False
@@ -82,7 +87,7 @@ def import_saved_model(
             dumb_extra_kwargs["upgrade_legacy"] = False
         if "lift_variables" in sig.parameters:
             dumb_extra_kwargs["lift_variables"] = True
-        result = pywrap_mlir.experimental_convert_saved_model_v1_to_mlir(
+        result = experimental_convert_saved_model_v1_to_mlir(
             saved_model_dir,
             exported_names=exported_names,
             tags=tags,
@@ -97,7 +102,7 @@ def import_saved_model(
     # This is fine and normal, and totally to be expected. :(
     result = re.sub(r"func @__inference_(.+)_[0-9]+\(", r"func @\1(", result)
     pipeline = ["tf-lower-to-mlprogram-and-hlo"]
-    result = pywrap_mlir.experimental_run_pass_pipeline(
+    result = experimental_run_pass_pipeline(
         result, ",".join(pipeline), show_debug_info=False
     )
 
@@ -105,7 +110,7 @@ def import_saved_model(
     # stablehlo dialect. Once fixed, remove this bypass.
     WRITE_BYTECODE = False
     if WRITE_BYTECODE:
-        result = pywrap_mlir.experimental_write_bytecode(output_path, result)
+        result = experimental_write_bytecode(output_path, result)
     else:
         with open(output_path, "wt") as f:
             f.write(result)
