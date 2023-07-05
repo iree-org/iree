@@ -176,7 +176,7 @@ Flag | Files dumped
         embedded ELF files. By disabling that flag, the compiler will produce
         platform-standard `.so` files for Linux, `.dll` files for Windows, etc.
         While embedded ELF files can be smaller and more portable, inspection of
-        compiled artifacts is easier with platform-standard shared object files.
+        artifacts is easier with platform-standard shared object files.
 
     ??? tip "Tip - Disassembling `.bc` files with `llvm-dis`"
 
@@ -421,4 +421,17 @@ pipeline phases.
 
 Similarly, compilation can be continued from any intermediate phase. This allows
 for interative workflows - compile to a phase, make edits to the `.mlir` file,
-then resume compilation and continue through the pipeline.
+then resume compilation and continue through the pipeline:
+
+```console
+$ iree-compile simple_abs.mlir --compile-to=abi -o simple_abs_abi.mlir
+
+$ sed \
+  -e 's/math.absf/math.exp/' \
+  -e 's/@abs/@exp/' \
+  simple_abs_abi.mlir > simple_exp_abi.mlir
+
+$ iree-compile simple_exp_abi.mlir \
+  --iree-hal-target-backends=llvm-cpu \
+  -o simple_exp_cpu.vmfb
+```
