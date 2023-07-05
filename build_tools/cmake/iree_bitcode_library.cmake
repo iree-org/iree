@@ -132,18 +132,23 @@ function(iree_cuda_bitcode_library)
   endif()
 
   set(_CUDA_ARCH "${_RULE_CUDA_ARCH}")
-  
+
   set(_COPTS
     "-x" "cuda"
-    
+
     # Target architecture.
     "--cuda-gpu-arch=${_CUDA_ARCH}"
+
+    "--cuda-path=${CUDAToolkit_ROOT}"
 
     # Suppress warnings about missing path to cuda lib,
     # and benign warning about CUDA version.
     "-Wno-unknown-cuda-version"
     "-nocudalib"
     "--cuda-device-only"
+
+    # https://github.com/llvm/llvm-project/issues/54609
+    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
 
     # Optimized and unstamped.
     "-O3"

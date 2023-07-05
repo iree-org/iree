@@ -134,7 +134,7 @@ iree_cuda_bitcode_library(
   CUDA_ARCH
     sm_60
   SRCS
-    "ukernel.cu" 
+    "ukernel.cu"
 )
 
 iree_check_single_backend_test_suite(
