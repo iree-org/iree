@@ -205,7 +205,8 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
 
     Location loc = padOp.getLoc();
     auto emptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, resultType, tensor::getMixedSizes(rewriter, loc, padOp));
+        loc, tensor::getMixedSizes(rewriter, loc, padOp),
+        resultType.getElementType());
     rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
                                                 emptyOp.getResult());
 
