@@ -315,7 +315,7 @@ EOF
     }
 
     check_docker gcr.io/iree-oss/nvidia@sha256:de6e4453614aa48059fd611d7e7255f4d6ac27ac29a47aabdc04191ec1758533
-    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:5974a2af86926a324bdfe98bea7080212db66189613a10ee19526f761c4c1400
+    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:d52c2e3d23e69b4f4c7b09e634722c0f4c6dd351bdea4d9dce11ecb448f724ba
     check_docker gcr.io/iree-oss/nvidia-bleeding-edge@sha256:522491c028ec3b4070f23910c70c8162fd9612e11d9cf062a13444df7e88ab70
 
     # Remove the docker images we've fetched. We might want to pre-fetch Docker
