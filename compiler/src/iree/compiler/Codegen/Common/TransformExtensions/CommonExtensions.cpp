@@ -33,7 +33,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/IndexingUtils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -206,8 +205,7 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
 
     Location loc = padOp.getLoc();
     auto emptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, resultType,
-        linalg::createDynamicDimensions(rewriter, loc, padOp.getResult()));
+        loc, resultType, tensor::getMixedSizes(rewriter, loc, padOp));
     rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
                                                 emptyOp.getResult());
 
