@@ -152,6 +152,12 @@ iree_symlink_tool(
 
 iree_symlink_tool(
   TARGET runtime
+  FROM_TOOL_TARGET iree-dump-module
+  TO_EXE_NAME iree/runtime/iree-dump-module
+)
+
+iree_symlink_tool(
+  TARGET runtime
   FROM_TOOL_TARGET iree-run-trace
   TO_EXE_NAME iree/runtime/iree-run-trace
 )
@@ -290,6 +296,7 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
     iree-cpuinfo
     iree-benchmark-module
     iree-benchmark-trace
+    iree-dump-module
     iree-run-module
     iree-run-trace
     ${_EXTRA_INSTALL_TOOL_TARGETS}
