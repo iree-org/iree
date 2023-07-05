@@ -114,7 +114,7 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
 
   // Step 3. Masked vectorization.
   b.create<transform::MaskedVectorizeOp>(padThreadH, ValueRange(), false,
-                                         strategy.vectorSize);
+                                         ArrayRef<bool>{}, strategy.vectorSize);
 
   // Step 4. Lower all masked vector transfers at this point, as they make
   // canonicalization generate incorrect IR.
