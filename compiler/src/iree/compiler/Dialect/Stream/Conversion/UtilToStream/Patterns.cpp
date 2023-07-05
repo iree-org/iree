@@ -272,6 +272,10 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
       [&](IREE::Util::GlobalStoreIndirectOp op) {
         return typeConverter.isLegal(op.getValue().getType());
       });
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::OptimizationBarrierOp>(
+      [&](IREE::Util::OptimizationBarrierOp op) {
+        return typeConverter.isLegal(op.getResultTypes());
+      });
 
   populateUtilToStreamConversionPatterns(context, typeConverter, patterns);
 }
