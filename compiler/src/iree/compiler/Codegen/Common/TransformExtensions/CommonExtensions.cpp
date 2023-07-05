@@ -359,10 +359,11 @@ transform_dialect::ApplyLoopIndependentCodeMotionOp::applyToOne(
     // tracking.
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
-    funcOp->walk([](Operation *op) {
+    funcOp->walk([&](Operation *op) {
       (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<affine::AffineForOp, scf::ForOp>(
-              [](auto loop) { return promoteIfSingleIteration(loop); })
+          .Case<affine::AffineForOp, scf::ForOp>([&](auto loop) {
+            return loop.promoteIfSingleIteration(rewriter);
+          })
           .Default([](Operation *) { return success(); });
     });
   });
