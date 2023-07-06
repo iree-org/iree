@@ -16,4 +16,20 @@
 #define GET_TYPEDEF_CLASSES
 #include "iree-dialects/Dialect/Input/InputTypes.h.inc"
 
+//===----------------------------------------------------------------------===//
+// IREE ABI helpers for constructing buffer views
+//===----------------------------------------------------------------------===//
+
+namespace mlir::iree_compiler::IREE::Input {
+
+// Returns a stable identifier for the MLIR element type or nullopt if the
+// type is unsupported in the ABI.
+std::optional<int32_t> getElementTypeValue(Type type);
+
+// Returns a stable identifier for the MLIR encoding type or empty optional
+// (opaque) if the type is unsupported in the ABI.
+std::optional<int32_t> getEncodingTypeValue(Attribute attr);
+
+} // namespace mlir::iree_compiler::IREE::Input
+
 #endif // IREE_DIALECTS_DIALECT_INPUT_DIALECT_H

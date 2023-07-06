@@ -1,5 +1,13 @@
 // RUN: iree-opt --split-input-file --iree-import-public %s | FileCheck %s
 
+// CHECK-LABEL: func.func @b_func
+// CHECK-SAME: (%arg0: !hal.buffer, %arg1: !hal.buffer) -> (!hal.buffer, !hal.buffer)
+// CHECK: return %arg0, %arg1 : !hal.buffer, !hal.buffer
+func.func @b_func(%arg0 : !iree_input.buffer, %arg1 : !iree_input.buffer) -> (!iree_input.buffer, !iree_input.buffer) {
+  return %arg0, %arg1 : !iree_input.buffer, !iree_input.buffer
+}
+
+// -----
 // CHECK-LABEL: func.func @bv_func
 // CHECK-SAME: (%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> (!hal.buffer_view, !hal.buffer_view)
 // CHECK: return %arg0, %arg1 : !hal.buffer_view, !hal.buffer_view
@@ -46,57 +54,86 @@ func.func @null_op() -> !iree_input.variant {
   return %0 : !iree_input.variant
 }
 
+//----
+// CHECK-LABEL: func.func @buffer_view_create
+// CHECK-SAME: (%arg0: !hal.buffer) -> !hal.buffer_view
+// CHECK: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[C2:.*]] = arith.constant 2 : index
+// CHECK: %[[C64:.*]] = arith.constant 64 : index
+// CHECK: %[[C128:.*]] = arith.constant 128 : index
+// CHECK: %[[C1:.*]] = arith.constant 1 : i32
+// CHECK: %[[C32:.*]] = arith.constant 32 : i32
+// CHECK: %view = hal.buffer_view.create
+// CHECK-SAME: buffer(%arg0 : !hal.buffer)[%[[C0]], %[[C128]]]
+// CHECK-SAME: shape([%[[C2]], %[[C64]]])
+// CHECK-SAME: type(%[[C32]])
+// CHECK-SAME: encoding(%[[C1]]) : !hal.buffer_view
+
+func.func @buffer_view_create(%arg0: !iree_input.buffer) -> !iree_input.buffer_view {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %c1_i32 = arith.constant 1 : i32
+  %c32_i32 = arith.constant 32 : i32
+  %view = iree_input.buffer_view.create buffer(%arg0 : !iree_input.buffer)[%c0, %c128]
+                                        shape([%c2, %c64])
+                                        type(%c32_i32)
+                                        encoding(%c1_i32) : !iree_input.buffer_view
+  return %view : !iree_input.buffer_view
+}
+
 // -----
-// CHECK-LABEL: func.func @tensor_to_buffer_view
+// CHECK-LABEL: func.func @tensor_export
 // CHECK: hal.tensor.export %arg0 : tensor<?x?x3xf32>{%arg1, %arg2} -> !hal.buffer_view
-func.func @tensor_to_buffer_view(%arg0 : tensor<?x?x3xf32>, %arg1 : index, %arg2 : index) -> !iree_input.buffer_view {
-  %0 = iree_input.cast.tensor_to_buffer_view %arg0 : tensor<?x?x3xf32>{%arg1, %arg2} -> !iree_input.buffer_view
+func.func @tensor_export(%arg0 : tensor<?x?x3xf32>, %arg1 : index, %arg2 : index) -> !iree_input.buffer_view {
+  %0 = iree_input.tensor.export %arg0 : tensor<?x?x3xf32>{%arg1, %arg2} -> !iree_input.buffer_view
   return %0 : !iree_input.buffer_view
 }
 
 // -----
-// CHECK-LABEL: func.func @tensor_to_buffer_view_static
+// CHECK-LABEL: func.func @tensor_export_static
 // CHECK: hal.tensor.export %arg0 : tensor<3xf32> -> !hal.buffer_view
-func.func @tensor_to_buffer_view_static(%arg0 : tensor<3xf32>) -> !iree_input.buffer_view {
-  %0 = iree_input.cast.tensor_to_buffer_view %arg0 : tensor<3xf32> -> !iree_input.buffer_view
+func.func @tensor_export_static(%arg0 : tensor<3xf32>) -> !iree_input.buffer_view {
+  %0 = iree_input.tensor.export %arg0 : tensor<3xf32> -> !iree_input.buffer_view
   return %0 : !iree_input.buffer_view
 }
 
 // -----
-// CHECK-LABEL: func.func @tensor_to_buffer_view_implicit_dims
+// CHECK-LABEL: func.func @tensor_export_implicit_dims
 // CHECK: %[[ZERO:.*]] = arith.constant 0
 // CHECK: %[[D0:.*]] = tensor.dim %arg0, %[[ZERO]]
 // CHECK: %[[ONE:.*]] = arith.constant 1
 // CHECK: %[[D1:.*]] = tensor.dim %arg0, %[[ONE]]
 // CHECK: hal.tensor.export %arg0 : tensor<?x?x3xf32>{%[[D0]], %[[D1]]} -> !hal.buffer_view
-func.func @tensor_to_buffer_view_implicit_dims(%arg0 : tensor<?x?x3xf32>) -> !iree_input.buffer_view {
-  %0 = iree_input.cast.tensor_to_buffer_view %arg0 : tensor<?x?x3xf32> -> !iree_input.buffer_view
+func.func @tensor_export_implicit_dims(%arg0 : tensor<?x?x3xf32>) -> !iree_input.buffer_view {
+  %0 = iree_input.tensor.export %arg0 : tensor<?x?x3xf32> -> !iree_input.buffer_view
   return %0 : !iree_input.buffer_view
 }
 
 // -----
-// CHECK-LABEL: func.func @buffer_view_to_tensor
+// CHECK-LABEL: func.func @tensor_import
 // CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
-func.func @buffer_view_to_tensor(%arg0 : !iree_input.buffer_view, %arg1 : index, %arg2 : index) -> tensor<?x?x3xf32> {
-  %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
+func.func @tensor_import(%arg0 : !iree_input.buffer_view, %arg1 : index, %arg2 : index) -> tensor<?x?x3xf32> {
+  %0 = iree_input.tensor.import %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
   return %0 : tensor<?x?x3xf32>
 }
 
 // -----
-// CHECK-LABEL: func.func @buffer_view_to_tensor_static
+// CHECK-LABEL: func.func @tensor_import_static
 // CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<3xf32>
-func.func @buffer_view_to_tensor_static(%arg0 : !iree_input.buffer_view) -> tensor<3xf32> {
-  %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<3xf32>
+func.func @tensor_import_static(%arg0 : !iree_input.buffer_view) -> tensor<3xf32> {
+  %0 = iree_input.tensor.import %arg0 : !iree_input.buffer_view -> tensor<3xf32>
   return %0 : tensor<3xf32>
 }
 
 // -----
-// CHECK-LABEL: func.func @buffer_view_to_tensor_implicit_dims
+// CHECK-LABEL: func.func @tensor_import_implicit_dims
 // CHECK: %[[D0:.*]] = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
 // CHECK: %[[D1:.*]] = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[1] : index
 // CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x?x3xf32>{%[[D0]], %[[D1]]}
-func.func @buffer_view_to_tensor_implicit_dims(%arg0 : !iree_input.buffer_view) -> tensor<?x?x3xf32> {
-  %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32>
+func.func @tensor_import_implicit_dims(%arg0 : !iree_input.buffer_view) -> tensor<?x?x3xf32> {
+  %0 = iree_input.tensor.import %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32>
   return %0 : tensor<?x?x3xf32>
 }
 
