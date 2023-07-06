@@ -203,15 +203,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
       getEncoding(inputs[1]->get().getType().cast<RankedTensorType>());
   std::optional<TensorEncoding> resultEncoding =
       getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
-  if (!lhsEncoding ||
-      (lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS &&
-       lhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_LHS) ||
-      !rhsEncoding ||
-      (rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS &&
-       rhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RHS) ||
-      !resultEncoding ||
-      (resultEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RESULT &&
-       resultEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RESULT)) {
+  if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
   Operation *mmt4DOp = rewriter.create<linalg::Mmt4DOp>(

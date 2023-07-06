@@ -70,6 +70,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             target_device_spec=device_spec_a,
             input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+            presets=["preset_x"],
         )
         unmatched_run_config_b = iree_definitions.E2EModelRunConfig.build(
             module_generation_config=COMMON_GEN_CONFIG,
@@ -77,6 +78,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             target_device_spec=device_spec_b,
             input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+            presets=["preset_y"],
         )
         matched_run_config_c = iree_definitions.E2EModelRunConfig.build(
             module_generation_config=COMMON_GEN_CONFIG,
@@ -84,17 +86,8 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             target_device_spec=device_spec_c,
             input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+            presets=["preset_y", "preset_z"],
         )
-        matchers = [
-            (
-                lambda config: config.target_device_spec.architecture.architecture
-                == "cuda"
-            ),
-            (
-                lambda config: config.target_device_spec.host_environment.platform
-                == "android"
-            ),
-        ]
 
         run_config_map = export_benchmark_config.filter_and_group_run_configs(
             run_configs=[
@@ -103,7 +96,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
                 matched_run_config_c,
             ],
             target_device_names={"dev_a_cpu", "dev_c"},
-            preset_matchers=matchers,
+            presets={"preset_x", "preset_y"},
         )
 
         self.assertEqual(
@@ -215,7 +208,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             },
         )
 
-    def test_filter_and_group_run_configs_set_preset_matchers(self):
+    def test_filter_and_group_run_configs_set_presets(self):
         small_model = common_definitions.Model(
             id="small_model",
             name="small_model",
@@ -270,6 +263,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             target_device_spec=device_spec_a,
             input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+            presets=["preset_x"],
         )
         run_config_b = iree_definitions.E2EModelRunConfig.build(
             module_generation_config=big_gen_config,
@@ -277,14 +271,11 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             target_device_spec=device_spec_b,
             input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+            presets=["preset_y"],
         )
 
         run_config_map = export_benchmark_config.filter_and_group_run_configs(
-            run_configs=[run_config_a, run_config_b],
-            preset_matchers=[
-                lambda config: config.module_generation_config.imported_model.model.id
-                == "small_model"
-            ],
+            run_configs=[run_config_a, run_config_b], presets={"preset_x"}
         )
 
         self.assertEqual(

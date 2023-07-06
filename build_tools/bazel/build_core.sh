@@ -63,10 +63,10 @@ default_test_tag_filters+=("-vulkan_uses_vk_khr_shader_float16_int8")
 # CUDA CI testing disabled until we setup a target for it.
 default_test_tag_filters+=("-driver=cuda")
 
-if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
+if (( IREE_VULKAN_DISABLE == 1 )); then
   default_test_tag_filters+=("-driver=vulkan")
 fi
-if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE?}" == 1 ]]; then
+if (( IREE_NVIDIA_GPU_TESTS_DISABLE == 1 )); then
   default_test_tag_filters+=("-requires-gpu-nvidia" "-requires-gpu-sm80")
 fi
 

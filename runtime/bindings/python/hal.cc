@@ -6,12 +6,12 @@
 
 #include "./hal.h"
 
+#include "./numpy_interop.h"
 #include "./vm.h"
 #include "iree/base/internal/path.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
-#include "pybind11/numpy.h"
 
 namespace iree {
 namespace python {
@@ -96,7 +96,7 @@ py::object HalAllocator::AllocateBufferCopy(
   // Acquire the backing buffer and setup RAII release.
   if (PyObject_GetBuffer(buffer.ptr(), &py_view, flags) != 0) {
     // The GetBuffer call is required to set an appropriate error.
-    throw py::error_already_set();
+    throw py::python_error();
   }
   PyBufferReleaser py_view_releaser(py_view);
 
@@ -117,7 +117,7 @@ py::object HalAllocator::AllocateBufferCopy(
 
   if (!element_type) {
     return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),
-                    py::return_value_policy::move);
+                    py::rv_policy::move);
   }
 
   // Create the buffer_view. (note that numpy shape is ssize_t, so we need to
@@ -135,7 +135,7 @@ py::object HalAllocator::AllocateBufferCopy(
   iree_hal_buffer_release(hal_buffer);
 
   return py::cast(HalBufferView::StealFromRawPtr(hal_buffer_view),
-                  py::return_value_policy::move);
+                  py::rv_policy::move);
 }
 
 //------------------------------------------------------------------------------
@@ -177,7 +177,7 @@ py::str HalBuffer::Repr() {
   std::string repr("<HalBuffer ");
   AppendHalBufferRepr(raw_ptr(), repr);
   repr.append(">");
-  return py::str(repr);
+  return py::str(py::cast(repr));
 }
 
 //------------------------------------------------------------------------------
@@ -205,36 +205,32 @@ py::str HalBufferView::Repr() {
   repr.append(", ");
   AppendHalBufferRepr(iree_hal_buffer_view_buffer(raw_ptr()), repr);
   repr.append(">");
-  return py::str(repr);
+  return py::str(py::cast(repr));
 }
 
 //------------------------------------------------------------------------------
 // HalDevice
 //------------------------------------------------------------------------------
 
-void HalDevice::BeginProfiling(const py::kwargs& kwargs) {
+void HalDevice::BeginProfiling(std::optional<std::string> mode,
+                               std::optional<std::string> file_path) {
   iree_hal_device_profiling_options_t options;
   memset(&options, 0, sizeof(options));
 
   options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
-  if (kwargs.contains("mode")) {
-    auto mode_str = kwargs["mode"].cast<std::string>();
-    if (mode_str == "queue") {
+  if (mode) {
+    if (*mode == "queue") {
       options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
-    } else if (mode_str == "dispatch") {
+    } else if (*mode == "dispatch") {
       options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
-    } else if (mode_str == "executable") {
+    } else if (*mode == "executable") {
       options.mode = IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
     } else {
       throw RaiseValueError("unrecognized profiling mode");
     }
   }
 
-  std::string file_path = kwargs.contains("file_path")
-                              ? kwargs["file_path"].cast<std::string>()
-                              : "";
-  options.file_path = !file_path.empty() ? file_path.c_str() : NULL;
-
+  options.file_path = file_path ? file_path->c_str() : nullptr;
   CheckApiStatus(iree_hal_device_profiling_begin(raw_ptr(), &options),
                  "starting device profiling");
 }
@@ -315,17 +311,17 @@ py::list HalDriver::QueryAvailableDevices() {
 
 // Configures |device| based on flags before returning it to the user.
 static iree_status_t ConfigureDevice(iree_hal_device_t* device,
-                                     const py::kwargs& kwargs) {
+                                     std::optional<py::list> allocators) {
   // Optionally wrap the base device allocator with caching/pooling.
   // Doing this here satisfies the requirement that no buffers have been
   // allocated yet - if we returned the device without doing this the caller
   // can more easily break the rules.
-  if (kwargs.contains("allocators")) {
+  if (allocators) {
     // NOTE: we need to pass string views that point to the std::string storage.
     // We do that in two passes because as we grow spec_storage it may
     // reallocate itself and invalidate the pointers - only after we're done
     // can we capture them in views.
-    auto spec_list = py::cast<py::list>(kwargs["allocators"]);
+    auto& spec_list = *allocators;
     std::vector<std::string> spec_storage;
     spec_storage.reserve(spec_list.size());
     for (auto item : spec_list) {
@@ -343,18 +339,18 @@ static iree_status_t ConfigureDevice(iree_hal_device_t* device,
   return iree_ok_status();
 }
 
-HalDevice HalDriver::CreateDefaultDevice(const py::kwargs& kwargs) {
+HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_default_device(
                      raw_ptr(), iree_allocator_system(), &device),
                  "Error creating default device");
-  CheckApiStatus(ConfigureDevice(device, kwargs),
+  CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
 HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
-                                  const py::kwargs& kwargs) {
+                                  std::optional<py::list> allocators) {
   // Since the device ids are supposed to be opaque, we need to verify
   // them by querying available devices.
   py::list available_devices = QueryAvailableDevices();
@@ -376,7 +372,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
     msg.append("Device id ");
     msg.append(std::to_string(device_id));
     msg.append(" not found. Available devices: ");
-    msg.append(py::repr(available_devices));
+    msg.append(py::cast<std::string>(py::repr(available_devices)));
     throw std::invalid_argument(std::move(msg));
   }
 
@@ -386,13 +382,13 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
                      raw_ptr(), device_id, params.size(), &params.front(),
                      iree_allocator_system(), &device),
                  "Error creating default device");
-  CheckApiStatus(ConfigureDevice(device, kwargs),
+  CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
 HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
-                                       const py::kwargs& kwargs) {
+                                       std::optional<py::list> allocators) {
   iree_hal_device_t* device;
   iree_string_view_t device_uri_sv{
       device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
@@ -400,80 +396,10 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
       iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
                                            iree_allocator_system(), &device),
       "Error creating device");
-  CheckApiStatus(ConfigureDevice(device, kwargs),
+  CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
-
-//------------------------------------------------------------------------------
-// Enum helpers
-//------------------------------------------------------------------------------
-
-namespace {
-
-py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
-  // See:
-  //   * https://numpy.org/doc/stable/reference/arrays.dtypes.html
-  //   * https://docs.python.org/3/c-api/arg.html#numbers
-  //
-  // Single letter codes can be ambiguous across platforms, so prefer explicit
-  // bit depth values, ("Type strings: Any string in numpy.sctypeDict.keys()").
-  // See https://github.com/pybind/pybind11/issues/1908
-  const char* dtype_string;
-  switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-      dtype_string = "?";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
-    case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      dtype_string = "int8";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      dtype_string = "uint8";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
-    case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      dtype_string = "int16";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      dtype_string = "uint16";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_INT_32:
-    case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      dtype_string = "int32";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      dtype_string = "uint32";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_INT_64:
-    case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      dtype_string = "int64";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      dtype_string = "uint64";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      dtype_string = "float16";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      dtype_string = "float32";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      dtype_string = "float64";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
-      dtype_string = "complex64";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
-      dtype_string = "complex128";
-      break;
-    default:
-      throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
-  }
-  return py::dtype(dtype_string);
-}
-
-}  // namespace
 
 //------------------------------------------------------------------------------
 // HAL module
@@ -492,7 +418,7 @@ VmModule CreateHalModule(VmInstance* instance, HalDevice* device) {
 // Bindings
 //------------------------------------------------------------------------------
 
-void SetupHalBindings(pybind11::module m) {
+void SetupHalBindings(nanobind::module_ m) {
   py::dict driver_cache;
 
   // Built-in module creation.
@@ -621,36 +547,46 @@ void SetupHalBindings(pybind11::module m) {
       .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
       .export_values()
-      .def_static("map_to_dtype", &MapElementTypeToDType);
+      .def_static("map_to_dtype", [](iree_hal_element_type_t element_type) {
+        int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(element_type);
+        return numpy::DescrNewFromType(typenum);
+      });
 
   py::class_<HalDevice>(m, "HalDevice")
-      .def_property_readonly(
+      .def_prop_ro(
           "allocator",
           [](HalDevice& self) {
             return HalAllocator::BorrowFromRawPtr(self.allocator());
           },
           py::keep_alive<0, 1>())
-      .def("begin_profiling", &HalDevice::BeginProfiling)
+      .def("begin_profiling", &HalDevice::BeginProfiling,
+           py::arg("mode") = py::none(), py::arg("file_path") = py::none())
       .def("end_profiling", &HalDevice::EndProfiling);
 
   py::class_<HalDriver>(m, "HalDriver")
       .def_static("query", &HalDriver::Query)
+
+      // All 'create_device' functions take optional kwargs that should be kept
+      // in sync.
       .def("create_default_device", &HalDriver::CreateDefaultDevice,
-           py::keep_alive<0, 1>())
-      .def("create_device", &HalDriver::CreateDevice, py::keep_alive<0, 1>())
+           py::keep_alive<0, 1>(), py::arg("allocators") = py::none())
+      .def("create_device", &HalDriver::CreateDevice, py::keep_alive<0, 1>(),
+           py::arg("device_id"), py::arg("allocators") = py::none())
       .def("create_device_by_uri", &HalDriver::CreateDeviceByURI,
-           py::keep_alive<0, 1>())
+           py::keep_alive<0, 1>(), py::arg("device_uri"),
+           py::arg("allocators") = py::none())
       .def(
           "create_device",
           [](HalDriver& self, py::dict device_info,
-             const py::kwargs& kwargs) -> HalDevice {
+             std::optional<py::list> allocators) -> HalDevice {
             // Alias of create_device that takes a dict as returned from
             // query_available_devices for convenience.
             auto device_id =
                 py::cast<iree_hal_device_id_t>(device_info["device_id"]);
-            return self.CreateDevice(device_id, kwargs);
+            return self.CreateDevice(device_id, allocators);
           },
-          py::keep_alive<0, 1>())
+          py::keep_alive<0, 1>(), py::arg("device_info"),
+          py::arg("allocators") = py::none())
       .def("query_available_devices", &HalDriver::QueryAvailableDevices);
 
   m.def(
@@ -667,12 +603,11 @@ void SetupHalBindings(pybind11::module m) {
              CheckApiStatus(iree_hal_allocator_trim(self.raw_ptr()),
                             "Error trim()'ing HAL allocator");
            })
-      .def_property_readonly(
+      .def_prop_ro(
           "has_statistics",
           [](HalAllocator& self) -> bool { return IREE_STATISTICS_ENABLE; })
-      .def_property_readonly("statistics", &HalAllocator::QueryStatistics)
-      .def_property_readonly("formatted_statistics",
-                             &HalAllocator::FormattedStatistics)
+      .def_prop_ro("statistics", &HalAllocator::QueryStatistics)
+      .def_prop_ro("formatted_statistics", &HalAllocator::FormattedStatistics)
       .def(
           "query_buffer_compatibility",
           [](HalAllocator& self, int memory_type, int allowed_usage,
@@ -726,37 +661,43 @@ void SetupHalBindings(pybind11::module m) {
                          iree_hal_buffer_view_retain_ref,
                          iree_hal_buffer_view_deref, iree_hal_buffer_view_isa);
   hal_buffer_view.def("map", HalMappedMemory::Create, py::keep_alive<0, 1>())
-      .def_property_readonly(
-          "shape",
-          [](HalBufferView& self) {
-            iree_host_size_t rank =
-                iree_hal_buffer_view_shape_rank(self.raw_ptr());
-            auto* dims = iree_hal_buffer_view_shape_dims(self.raw_ptr());
-            py::list result;
-            for (iree_host_size_t i = 0; i < rank; ++i) {
-              result.append(dims[i]);
-            }
-            return result;
-          })
-      .def_property_readonly(
-          "element_type",
-          [](HalBufferView& self) {
-            return iree_hal_buffer_view_element_type(self.raw_ptr());
-          })
+      .def_prop_ro("shape",
+                   [](HalBufferView& self) {
+                     iree_host_size_t rank =
+                         iree_hal_buffer_view_shape_rank(self.raw_ptr());
+                     auto* dims =
+                         iree_hal_buffer_view_shape_dims(self.raw_ptr());
+                     py::list result;
+                     for (iree_host_size_t i = 0; i < rank; ++i) {
+                       result.append(dims[i]);
+                     }
+                     return result;
+                   })
+      .def_prop_ro("element_type",
+                   [](HalBufferView& self) {
+                     return iree_hal_buffer_view_element_type(self.raw_ptr());
+                   })
       .def("__repr__", &HalBufferView::Repr);
 
-  py::class_<HalMappedMemory>(m, "MappedMemory", py::buffer_protocol())
-      .def_buffer(&HalMappedMemory::ToBufferInfo)
-      .def("asarray",
-           [](HalMappedMemory& self, std::vector<iree_host_size_t> shape,
-              py::object dtype) {
-             py::object py_mapped_memory = py::cast(self);
-             return py::array(std::move(dtype), shape,
-                              self.mapped_memory().contents.data,
-                              std::move(py_mapped_memory) /* base */);
-           });
+  py::class_<HalMappedMemory>(m, "MappedMemory")
+      .def(
+          "asarray",
+          [](HalMappedMemory* self, std::vector<iree_host_size_t> shape,
+             py::object dtype) {
+            py::object py_mapped_memory = py::cast(self);
+            static_assert(sizeof(shape[0]) == sizeof(intptr_t),
+                          "size_t not of same size as intptr_t");
+            int typenum = numpy::TypenumFromDescr(dtype);
+            return numpy::SimpleNewFromData(
+                shape.size(), reinterpret_cast<intptr_t const*>(shape.data()),
+                typenum, self->mapped_memory().contents.data, py_mapped_memory);
+          },
+          py::arg("shape"), py::arg("element_type"));
 
-  py::class_<HalShape>(m, "Shape").def(py::init(&HalShape::FromIntVector));
+  py::class_<HalShape>(m, "Shape")
+      .def("__init__", [](HalShape* self, std::vector<iree_hal_dim_t> indices) {
+        new (self) HalShape(indices);
+      });
 }
 
 }  // namespace python

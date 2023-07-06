@@ -6,11 +6,11 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -153,6 +153,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
+      addGPUDefaultPassPipeline(executableLoweringPipeline);
+      break;
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
       addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
       break;

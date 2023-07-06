@@ -165,18 +165,19 @@ void BufferViewCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
-/// the same scope and we know the origin buffer.
+/// the same scope at zero offset and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
   using OpRewritePattern<BufferViewBufferOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
-            op.getBufferView().getDefiningOp())) {
-      rewriter.replaceOp(op, createOp.getSourceBuffer());
-      return success();
-    }
-    return failure();
+    auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
+        op.getBufferView().getDefiningOp());
+    if (!createOp || !matchPattern(createOp.getSourceOffset(), m_Zero()))
+      return failure();
+
+    rewriter.replaceOp(op, createOp.getSourceBuffer());
+    return success();
   }
 };
 

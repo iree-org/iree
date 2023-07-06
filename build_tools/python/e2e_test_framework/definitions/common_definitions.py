@@ -5,11 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Common classes for benchmark definitions."""
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Sequence
+from typing import List, Sequence
+
 from e2e_test_framework import serialization, unique_ids
-import dataclasses
 
 
 class ArchitectureType(Enum):
@@ -92,6 +93,8 @@ class HostEnvironment(_HostEnvironmentInfo, Enum):
     """Predefined host environment."""
 
     LINUX_X86_64 = ("linux", "x86_64")
+    LINUX_RISCV_64 = ("linux", "riscv_64")
+    LINUX_RISCV_32 = ("linux", "riscv_32")
     ANDROID_ARMV8_2_A = ("android", "armv8.2-a")
 
 
@@ -152,15 +155,14 @@ class DeviceSpec(object):
         cls,
         id: str,
         device_name: str,
-        tags: Sequence[str],
         host_environment: HostEnvironment,
         architecture: DeviceArchitecture,
-        device_parameters: Optional[Sequence[str]] = None,
+        device_parameters: Sequence[str] = (),
+        tags: Sequence[str] = (),
     ):
         tag_part = ",".join(tags)
         # Format: <device_name>[<tag>,...]
         name = f"{device_name}[{tag_part}]"
-        device_parameters = device_parameters or []
         return cls(
             id=id,
             name=name,

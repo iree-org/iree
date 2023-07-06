@@ -207,6 +207,8 @@ int main(int argc, char** argv) {
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 3, 5, "");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 4, 2, "");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 3, 4, "");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F16F16, 6, 7, "");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_BF16BF16, 9, 2, "");
 
 #if defined(IREE_ARCH_ARM_64)
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "");

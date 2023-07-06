@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -51,7 +51,6 @@ struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
   LLVMCPUTilePass(ArrayRef<int64_t> sizes) {
     this->tileSizes.setInitialValues(sizes);
     this->tilingLevel.setValue(-1);
-    this->reductionOnly.setValue(false);
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,

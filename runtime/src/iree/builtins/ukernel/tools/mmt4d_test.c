@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 #include "iree/builtins/ukernel/tools/test.h"
@@ -16,9 +17,75 @@ static void iree_mmt4d_reference_innerloop_f32f32f32(
   float acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0.f;
   for (iree_uk_index_t k = 0; k < params->K; ++k) {
     for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
-      float lhs_val = lhs_ptr[k * params->M0 * params->K0 + k0];
-      float rhs_val = rhs_ptr[k * params->N0 * params->K0 + k0];
-      acc += lhs_val * rhs_val;
+      float lhs_f32 = lhs_ptr[k * params->M0 * params->K0 + k0];
+      float rhs_f32 = rhs_ptr[k * params->N0 * params->K0 + k0];
+      acc += lhs_f32 * rhs_f32;
+    }
+  }
+  *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_f16f16f32(
+    float* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  float acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0.f;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      float lhs_f32 =
+          iree_math_f16_to_f32(lhs_ptr[k * params->M0 * params->K0 + k0]);
+      float rhs_f32 =
+          iree_math_f16_to_f32(rhs_ptr[k * params->N0 * params->K0 + k0]);
+      acc += lhs_f32 * rhs_f32;
+    }
+  }
+  *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_f16f16f16(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  uint16_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      float lhs_f32 =
+          iree_math_f16_to_f32(lhs_ptr[k * params->M0 * params->K0 + k0]);
+      float rhs_f32 =
+          iree_math_f16_to_f32(rhs_ptr[k * params->N0 * params->K0 + k0]);
+      float acc_f32 = iree_math_f16_to_f32(acc);
+      acc = iree_math_f32_to_f16(acc_f32 + lhs_f32 * rhs_f32);
+    }
+  }
+  *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_bf16bf16f32(
+    float* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  float acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0.f;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      float lhs_f32 =
+          iree_math_bf16_to_f32(lhs_ptr[k * params->M0 * params->K0 + k0]);
+      float rhs_f32 =
+          iree_math_bf16_to_f32(rhs_ptr[k * params->N0 * params->K0 + k0]);
+      acc += lhs_f32 * rhs_f32;
+    }
+  }
+  *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  uint16_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      float lhs_f32 =
+          iree_math_bf16_to_f32(lhs_ptr[k * params->M0 * params->K0 + k0]);
+      float rhs_f32 =
+          iree_math_bf16_to_f32(rhs_ptr[k * params->N0 * params->K0 + k0]);
+      float acc_f32 = iree_math_bf16_to_f32(acc);
+      acc = iree_math_f32_to_bf16(acc_f32 + lhs_f32 * rhs_f32);
     }
   }
   *out_ptr = acc;
@@ -30,9 +97,9 @@ static void iree_mmt4d_reference_innerloop_i8i8i32(
   int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
   for (iree_uk_index_t k = 0; k < params->K; ++k) {
     for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
-      int32_t lhs_val = lhs_ptr[k * params->M0 * params->K0 + k0];
-      int32_t rhs_val = rhs_ptr[k * params->N0 * params->K0 + k0];
-      acc += lhs_val * rhs_val;
+      int32_t lhs_i32 = lhs_ptr[k * params->M0 * params->K0 + k0];
+      int32_t rhs_i32 = rhs_ptr[k * params->N0 * params->K0 + k0];
+      acc += lhs_i32 * rhs_i32;
     }
   }
   *out_ptr = acc;
@@ -71,6 +138,26 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
               iree_mmt4d_reference_innerloop_f32f32f32(
                   (float*)out_ptr, (const float*)lhs_ptr, (const float*)rhs_ptr,
                   params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_F16F16F32:
+              iree_mmt4d_reference_innerloop_f16f16f32(
+                  (float*)out_ptr, (const uint16_t*)lhs_ptr,
+                  (const uint16_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_F16F16F16:
+              iree_mmt4d_reference_innerloop_f16f16f16(
+                  (uint16_t*)out_ptr, (const uint16_t*)lhs_ptr,
+                  (const uint16_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32:
+              iree_mmt4d_reference_innerloop_bf16bf16f32(
+                  (float*)out_ptr, (const uint16_t*)lhs_ptr,
+                  (const uint16_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16:
+              iree_mmt4d_reference_innerloop_bf16bf16bf16(
+                  (uint16_t*)out_ptr, (const uint16_t*)lhs_ptr,
+                  (const uint16_t*)rhs_ptr, params);
               break;
             case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
               iree_mmt4d_reference_innerloop_i8i8i32(
@@ -239,6 +326,10 @@ int main(int argc, char** argv) {
   // in a power-of-two assumption
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 9, 6, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 2, 9, 3, "");
 
 #if defined(IREE_ARCH_ARM_64)
   // On arm64, some code paths have inline asm and intrinsics variants. For them

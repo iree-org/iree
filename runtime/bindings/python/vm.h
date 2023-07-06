@@ -171,7 +171,7 @@ class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {
   // static, disallowing further module registration (and may be more
   // efficient).
   static VmContext Create(VmInstance* instance,
-                          std::optional<std::vector<VmModule*>> modules);
+                          std::optional<std::vector<VmModule*>>& modules);
 
   // Registers additional modules. Only valid for non static contexts (i.e.
   // those created without modules.
@@ -224,20 +224,20 @@ class VmRef {
   static void BindRefProtocol(PyClass& cls, TypeFunctor type,
                               RetainRefFunctor retain_ref, DerefFunctor deref,
                               IsaFunctor isa) {
-    using WrapperType = typename PyClass::type;
+    using WrapperType = typename PyClass::Type;
     using RawPtrType = typename WrapperType::RawPtrType;
     auto ref_lambda = [=](WrapperType& self) {
       return VmRef::Steal(retain_ref(self.raw_ptr()));
     };
     cls.def_static(VmRef::kTypeAttr, [=]() { return type(); });
-    cls.def_property_readonly(VmRef::kRefAttr, ref_lambda);
-    cls.def_property_readonly("ref", ref_lambda);
+    cls.def_prop_ro(VmRef::kRefAttr, ref_lambda);
+    cls.def_prop_ro("ref", ref_lambda);
     cls.def_static(VmRef::kCastAttr, [=](VmRef& ref) -> py::object {
       if (!isa(ref.ref())) {
         return py::none();
       }
       return py::cast(WrapperType::BorrowFromRawPtr(deref(ref.ref())),
-                      py::return_value_policy::move);
+                      py::rv_policy::move);
     });
     cls.def("__eq__", [](WrapperType& self, WrapperType& other) {
       return self.raw_ptr() == other.raw_ptr();
@@ -275,7 +275,7 @@ class VmRef {
   iree_vm_ref_t ref_;
 };
 
-void SetupVmBindings(pybind11::module m);
+void SetupVmBindings(nanobind::module_ m);
 
 }  // namespace python
 }  // namespace iree

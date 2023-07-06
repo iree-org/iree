@@ -73,7 +73,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // CHECK: transform.structured.tile %{{.*}}[0, 0, 16]
-// CHECK: transform.structured.pad %{{.*}} {pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// CHECK: transform.structured.pad %{{.*}} {copy_back = false, pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: transform.structured.hoist_pad %{{.}} by 1 loops
 // CHECK: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
@@ -136,7 +136,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // The tiling is affected by td-matmul-strategy-reduc-size: 8.
 // WITH_OPTIONS: transform.structured.tile %{{.*}}[0, 0, 8]
-// WITH_OPTIONS: transform.structured.pad %{{.*}} {pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// WITH_OPTIONS: transform.structured.pad %{{.*}} {copy_back = false, pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // WITH_OPTIONS: transform.structured.hoist_pad %{{.}} by 1 loops
 // WITH_OPTIONS: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [64, 2] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
@@ -328,6 +328,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Make sure we do not canonicalize because the result is still aligned.
 // CHECK-NEXT: transform.structured.pad %tiled_linalg_op
+// CHECK-SAME:   copy_back = false
 // CHECK-SAME:   pack_paddings = [1, 1, 1]
 // CHECK-SAME:   padding_dimensions = [0, 1, 2]
 // CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
@@ -399,6 +400,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Make sure we do not canonicalize if the result is aligned to avoid folding the extract_slice on the iterator.
 // CHECK-NEXT: transform.structured.pad %tiled_linalg_op
+// CHECK-SAME:   copy_back = false
 // CHECK-SAME:   pack_paddings = [1, 1, 1]
 // CHECK-SAME:   padding_dimensions = [0, 1, 2]
 // CHECK-SAME:   padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]
@@ -511,3 +513,49 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS_2-LABEL: func @f16_matmul
 
 // WITH_OPTIONS_3-LABEL: func @f16_matmul
+
+
+// -----
+
+hal.executable @int8_matmul {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @int8_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @int8_matmul() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0 : i8
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4x2556xi8>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2556x2052xi8>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x2052xi8>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 2556], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x2556xi8>> -> tensor<4x2556xi8>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2556, 2052], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2556x2052xi8>> -> tensor<2556x2052xi8>
+      %5 = tensor.empty() : tensor<4x2052xi8>
+      %6 = linalg.fill ins(%cst : i8) outs(%5 : tensor<4x2052xi8>) -> tensor<4x2052xi8>
+      %7 = linalg.matmul ins(%3, %4 : tensor<4x2556xi8>, tensor<2556x2052xi8>) outs(%6 : tensor<4x2052xi8>) -> tensor<4x2052xi8>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [4, 2052], strides = [1, 1] : tensor<4x2052xi8> -> !flow.dispatch.tensor<writeonly:tensor<4x2052xi8>>
+      return
+    }
+  }
+}
+}
+
+// SMALL-LABEL: func @int8_matmul
+// SMALL: transform.sequence
+// SMALL-NOT: mma
+// SMALL-NOT: wmma
+
+// CHECK-LABEL: func @int8_matmul
+// CHECK-NOT: transform.sequence
+
+// WITH_OPTIONS-LABEL: func @int8_matmul
+// WITH_OPTIONS-NOT: transform.sequence
+
+// WITH_OPTIONS_2-LABEL: func @int8_matmul
+// WITH_OPTIONS_2-NOT: transform.sequence
+
+// WITH_OPTIONS_3-LABEL: func @int8_matmul
+// WITH_OPTIONS_3-NOT: transform.sequence

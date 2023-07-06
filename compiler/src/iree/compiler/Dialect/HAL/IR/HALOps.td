@@ -30,6 +30,13 @@ class HAL_MakeTupleOp<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 // TODO(benvanik): remove these as the sequencer/other HAL ops are added.
 
+def OpGroupExperimentalOps : OpDocGroup {
+  let summary = "Experimental ops";
+  let description = "Temporary hack ops expected to be removed in the future.";
+}
+
+let opDocGroup = OpGroupExperimentalOps in {
+
 def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -48,9 +55,18 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   ];
 }
 
+} // OpGroupExperimentalOps
+
 //===----------------------------------------------------------------------===//
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
+
+def OpGroupPseudoOps : OpDocGroup {
+  let summary = "Pseudo Ops";
+  let description = "Pseudo ops for conversion support.";
+}
+
+let opDocGroup = OpGroupPseudoOps in {
 
 def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   AttrSizedOperandSegments,
@@ -228,9 +244,18 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupPseudoOps
+
 //===----------------------------------------------------------------------===//
 // !hal.allocator / iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupAllocatorOps : OpDocGroup {
+  let summary = "Allocator ops";
+  let description = "Ops for `!hal.allocator` / `iree_hal_allocator_t`.";
+}
+
+let opDocGroup = OpGroupAllocatorOps in {
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -336,9 +361,18 @@ def HAL_AllocatorTryMapOp : HAL_Op<"allocator.try_map", [
   }];
 }
 
+} // OpGroupAllocatorOps
+
 //===----------------------------------------------------------------------===//
 // !hal.buffer / iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupBufferOps : OpDocGroup {
+  let summary = "Buffer ops";
+  let description = "Ops for `!hal.buffer` / `iree_hal_buffer_t`.";
+}
+
+let opDocGroup = OpGroupBufferOps in {
 
 def HAL_BufferAssertOp : HAL_Op<"buffer.assert", []> {
   let summary = [{buffer compatibility assertion}];
@@ -470,9 +504,18 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
   }];
 }
 
+} // OpGroupBufferOps
+
 //===----------------------------------------------------------------------===//
 // !hal.buffer_view / iree_hal_buffer_view_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupBufferViewOps : OpDocGroup {
+  let summary = "Buffer view ops";
+  let description = "Ops for `!hal.buffer_view` / `iree_hal_buffer_view_t`.";
+}
+
+let opDocGroup = OpGroupBufferViewOps in {
 
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -685,9 +728,18 @@ def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
   }];
 }
 
+} // OpGroupBufferViewOps
+
 //===----------------------------------------------------------------------===//
 // !hal.channel / iree_hal_channel_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupChannelOps : OpDocGroup {
+  let summary = "Channel ops";
+  let description = "Ops for `!hal.channel` / `iree_hal_channel_t`.";
+}
+
+let opDocGroup = OpGroupChannelOps in {
 
 def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -791,9 +843,18 @@ def HAL_ChannelRankAndCountOp : HAL_PureOp<"channel.rank_and_count", [
   }];
 }
 
+} // OpGroupChannelOps
+
 //===----------------------------------------------------------------------===//
 // !hal.command_buffer / iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupCommandBufferOps : OpDocGroup {
+  let summary = "Command buffer ops";
+  let description = "Ops for `!hal.command_buffer` / `iree_hal_command_buffer_t`.";
+}
+
+let opDocGroup = OpGroupCommandBufferOps in {
 
 def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -1200,9 +1261,20 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   }];
 }
 
+} // OpGroupCommandBufferOps
+
 //===----------------------------------------------------------------------===//
 // !hal.descriptor_set_layout / iree_hal_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupDescriptorSetLayoutOps : OpDocGroup {
+  let summary = "Descriptor set layout ops";
+  let description = [{
+    Ops for `!hal.descriptor_set_layout` / `iree_hal_descriptor_set_layout_t`.
+  }];
+}
+
+let opDocGroup = OpGroupDescriptorSetLayoutOps in {
 
 def HAL_DescriptorSetLayoutCreateOp :
   HAL_PureOp<"descriptor_set_layout.create", [
@@ -1261,9 +1333,18 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
   }];
 }
 
+} // OpGroupDescriptorSetLayoutOps
+
 //===----------------------------------------------------------------------===//
 // !hal.device / iree_hal_device_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupDeviceOps : OpDocGroup {
+  let summary = "Device ops";
+  let description = "Ops for `!hal.device` / `iree_hal_device_t`.";
+}
+
+let opDocGroup = OpGroupDeviceOps in {
 
 def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -1600,9 +1681,18 @@ def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
   }];
 }
 
+} // OpGroupDeviceOps
+
 //===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupExecutableOps : OpDocGroup {
+  let summary = "Executable ops";
+  let description = "Ops for `!hal.executable` / `iree_hal_executable_t`.";
+}
+
+let opDocGroup = OpGroupExecutableOps in {
 
 def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
     IsolatedFromAbove,
@@ -2105,9 +2195,18 @@ def HAL_ExecutableCalculateWorkgroupsOp : HAL_PureOp<"executable.calculate_workg
   }];
 }
 
+} // OpGroupExecutableOps
+
 //===----------------------------------------------------------------------===//
 // hal.instrument.*
 //===----------------------------------------------------------------------===//
+
+def OpGroupInstrumentOps : OpDocGroup {
+  let summary = "Instrument ops";
+  let description = "Ops for `!hal.instrument.*`.";
+}
+
+let opDocGroup = OpGroupInstrumentOps in {
 
 def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup", []> {
   let summary = [{emits a dispatch workgroup instrumentation event}];
@@ -2249,9 +2348,18 @@ def HAL_InstrumentMemoryStoreOp : HAL_PureOp<"instrument.memory.store", [
   }];
 }
 
+} // OpGroupInstrumentOps
+
 //===----------------------------------------------------------------------===//
 // hal.interface
 //===----------------------------------------------------------------------===//
+
+def OpGroupInterfaceOps : OpDocGroup {
+  let summary = "Interface ops";
+  let description = "Ops for `!hal.interface.*`.";
+}
+
+let opDocGroup = OpGroupInterfaceOps in {
 
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -2458,9 +2566,20 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   }];
 }
 
+} // OpGroupInterfaceOps
+
 //===----------------------------------------------------------------------===//
 // !hal.pipeline_layout / iree_hal_pipeline_layout_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupPipelineLayoutOps : OpDocGroup {
+  let summary = "Pipeline layout ops";
+  let description = [{
+    Ops for `!hal.pipeline_layout` / `iree_hal_pipeline_layout_t`.
+  }];
+}
+
+let opDocGroup = OpGroupPipelineLayoutOps in {
 
 def HAL_PipelineLayoutCreateOp : HAL_PureOp<"pipeline_layout.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -2520,9 +2639,18 @@ def HAL_PipelineLayoutLookupOp : HAL_PureOp<"pipeline_layout.lookup", [
   }];
 }
 
+} // OpGroupPipelineLayoutOps
+
 //===----------------------------------------------------------------------===//
 // !hal.fence / iree_hal_fence_t
 //===----------------------------------------------------------------------===//
+
+def OpGroupFenceOps : OpDocGroup {
+  let summary = "Fence ops";
+  let description = "Ops for `!hal.fence` / `iree_hal_fence_t`.";
+}
+
+let opDocGroup = OpGroupFenceOps in {
 
 def HAL_FenceCreateOp : HAL_Op<"fence.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -2667,5 +2795,7 @@ def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
 
   let hasCanonicalizer = 1;
 }
+
+} // OpGroupFenceOps
 
 #endif  // IREE_DIALECT_HAL_OPS

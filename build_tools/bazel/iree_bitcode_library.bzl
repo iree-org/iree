@@ -130,6 +130,101 @@ def iree_bitcode_library(
 
     if not out:
         out = "%s.bc" % (name)
+
+    native.genrule(
+        name = name,
+        srcs = bitcode_files,
+        outs = [out],
+        cmd = " && ".join([
+            " ".join([
+                "$(location %s)" % (link_tool),
+                "-o $(location %s)" % (out),
+                " ".join(["$(locations %s)" % (src) for src in bitcode_files]),
+            ]),
+        ]),
+        tools = [link_tool],
+        message = "Linking bitcode library %s to %s..." % (name, out),
+        output_to_bindir = 1,
+        **kwargs
+    )
+
+def iree_cuda_bitcode_library(
+        name,
+        cuda_arch,
+        srcs,
+        internal_hdrs = [],
+        copts = [],
+        out = None,
+        **kwargs):
+    """Builds an LLVM bitcode library for CUDA from an input file via clang.
+
+    Args:
+        name: Name of the target.
+        cuda_arch: Target sm architecture to compile for.
+        srcs: source files to pass to clang.
+        internal_hdrs: all headers transitively included by the source files.
+                       Unlike typical Bazel `hdrs`, these are not exposed as
+                       interface headers. This would normally be part of `srcs`,
+                       but separating it was easier for `bazel_to_cmake`, as
+                       CMake does not need this, and making this explicitly
+                       Bazel-only allows using `filegroup` on the Bazel side.
+        copts: additional flags to pass to clang.
+        out: output file name (defaults to name.bc).
+        **kwargs: any additional attributes to pass to the underlying rules.
+    """
+
+    clang_tool = "@llvm-project//clang:clang"
+    link_tool = "@llvm-project//llvm:llvm-link"
+    builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
+    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+
+    base_copts = [
+        "-x",
+        "cuda",
+
+        # Target architecture
+        "--cuda-gpu-arch=%s" % (cuda_arch),
+
+        # Suppress warnings
+        "-Wno-unknown-cuda-version",
+        "-nocudalib",
+        "--cuda-device-only",
+
+        # Optimized.
+        "-O3",
+
+        # Object file only in bitcode format:
+        "-c",
+        "-emit-llvm",
+    ]
+
+    bitcode_files = []
+    for src in srcs:
+        bitcode_out = "%s_%s.bc" % (name, src)
+        bitcode_files.append(bitcode_out)
+        native.genrule(
+            name = "gen_%s" % (bitcode_out),
+            srcs = [src, builtin_headers_dep] + internal_hdrs,
+            outs = [bitcode_out],
+            cmd = " && ".join([
+                " ".join([
+                    "$(location %s)" % (clang_tool),
+                    " ".join(base_copts + copts),
+                    "-o $(location %s)" % (bitcode_out),
+                    "$(location %s)" % (src),
+                ]),
+            ]),
+            tools = [
+                clang_tool,
+            ],
+            message = "Compiling %s to %s..." % (src, bitcode_out),
+            output_to_bindir = 1,
+            **kwargs
+        )
+
+    if not out:
+        out = "%s.bc" % (name)
+
     native.genrule(
         name = name,
         srcs = bitcode_files,

@@ -19,6 +19,7 @@ iree_cc_library(
     "util.c"
   DEPS
     iree::base
+    iree::base::internal
     iree::base::internal::cpu
     iree::base::internal::synchronization
     iree::builtins::ukernel
@@ -110,6 +111,7 @@ iree_cc_test(
     ::test
     ::util
     iree::base
+    iree::base::internal
     iree::base::internal::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers

@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/PadStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/StagedReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
@@ -41,7 +42,7 @@
 
 using namespace mlir;
 
-#define DEBUG_TYPE "iree-transform-strategy-builder"
+#define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(llvm::dbgs() << '[' << DEBUG_TYPE << "] " << X)
 
@@ -62,13 +63,17 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectSmallMatmul(
 llvm::cl::opt<bool> clGPUEnableTransformDialectPadStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
     llvm::cl::desc("activate the pad strategy"), llvm::cl::init(false));
+llvm::cl::opt<bool> clGPUEnableTransformDialectBatchMatmulStrategy(
+    "iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy",
+    llvm::cl::desc("activate the batch matmul strategy, additional "
+                   "configuration flags are shared with matmul"),
+    llvm::cl::init(false));
 
 // TODO: significantly better namespacing.
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
+using iree_compiler::gpu::BatchMatmulStrategy;
 using iree_compiler::gpu::GPUModel;
-using iree_compiler::gpu::kCudaMaxNumThreads;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::PadConfig;
 using iree_compiler::gpu::PadStrategy;
@@ -146,9 +151,9 @@ getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
   bool isDynamicReduction = ShapedType::isDynamic(redSize);
   // Otherwise, still only support the small cases for now and fall back to
   // other strategies otherwise.
-  bool isSmallReduction = (redSize < 2 * kCudaWarpSize);
+  bool isSmallReduction = (redSize < 2 * gpuModel.subgroupSize);
   if (!isDynamicReduction && isSmallReduction) {
-    int64_t maxNumThreads = 4 * kCudaWarpSize;
+    int64_t maxNumThreads = 4 * gpuModel.subgroupSize;
     return ReductionConfig{maxNumThreads, 0, ReductionStrategy::Small};
   }
 
@@ -157,37 +162,43 @@ getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
   //===--------------------------------------------------------------------===//
   int64_t bitWidth = captures.reductionOutputElementalTypeBitWidth;
   int64_t vectorSize = scaleUpByBitWidth(4, bitWidth);
-  int64_t maxNumThreads = 8 * kCudaWarpSize;
+  int64_t maxNumThreads = 8 * gpuModel.subgroupSize;
   // No adjustments in the dynamic case, we need extra information to make a
   // good decision.
   if (ShapedType::isDynamic(redSize))
     return ReductionConfig{maxNumThreads, vectorSize,
                            ReductionStrategy::Staged};
   // Scale down to smaller sizes (4, 8, 16)-warps.
-  if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * kCudaWarpSize) {
+  if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * gpuModel.subgroupSize) {
     vectorSize = scaleUpByBitWidth(1, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * kCudaWarpSize) {
+    maxNumThreads = 4 * gpuModel.subgroupSize;
+  } else if (scaleUpByBitWidth(redSize, bitWidth) <=
+             8 * gpuModel.subgroupSize) {
     vectorSize = scaleUpByBitWidth(2, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * 2 * kCudaWarpSize) {
+    maxNumThreads = 4 * gpuModel.subgroupSize;
+  } else if (scaleUpByBitWidth(redSize, bitWidth) <=
+             8 * 2 * gpuModel.subgroupSize) {
     vectorSize = scaleUpByBitWidth(4, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
+    maxNumThreads = 4 * gpuModel.subgroupSize;
   }
   // Scale up to larger sizes (32, 64, 128+)-warps, using vector-4.
   if (!captures.trailingOpSizes.empty()) {
-    if (scaleUpByBitWidth(redSize, bitWidth) >= 128 * 4 * kCudaWarpSize) {
+    if (scaleUpByBitWidth(redSize, bitWidth) >=
+        128 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 32 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 64 * 4 * kCudaWarpSize) {
+      maxNumThreads = 32 * gpuModel.subgroupSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >=
+               64 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 16 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 32 * 4 * kCudaWarpSize) {
+      maxNumThreads = 16 * gpuModel.subgroupSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >=
+               32 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 8 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 16 * 4 * kCudaWarpSize) {
+      maxNumThreads = 8 * gpuModel.subgroupSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >=
+               16 * 4 * gpuModel.subgroupSize) {
       vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 4 * kCudaWarpSize;
+      maxNumThreads = 4 * gpuModel.subgroupSize;
     }
   }
   return ReductionConfig{maxNumThreads, vectorSize, ReductionStrategy::Staged};
@@ -226,11 +237,11 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     ReductionConfig reductionConfig = getReductionConfig(captures, gpuModel);
     if (reductionConfig.strategy == ReductionStrategy::Small) {
-      SmallReductionStrategy strategy(captures, reductionConfig);
+      SmallReductionStrategy strategy(captures, reductionConfig, gpuModel);
       return buildSmallReductionStrategy(b, variant, strategy);
     } else if (reductionConfig.strategy == ReductionStrategy::Staged) {
       // Otherwise, always fallback to the staged strategy.
-      StagedReductionStrategy strategy(captures, reductionConfig);
+      StagedReductionStrategy strategy(captures, reductionConfig, gpuModel);
       return buildStagedReductionStrategy(b, variant, strategy);
     } else {
       return llvm_unreachable("Unknown strategy");
@@ -315,7 +326,7 @@ static MatmulStrategy
 getMatmulConfig(MLIRContext *context,
                 const transform_ext::MatchedMatmulCaptures &captures,
                 const GPUModel &gpuModel) {
-  MatmulStrategy strategy(context, captures);
+  MatmulStrategy strategy(context, captures, gpuModel);
   if (strategy.cliOptionsSpecified)
     return strategy;
 
@@ -330,6 +341,91 @@ getMatmulConfig(MLIRContext *context,
   failSafeOverrides(strategy, gpuModel);
 
   return strategy;
+}
+
+/// Update the strategy to make sure it can be consumed by the codegen. In
+/// particular, make sure that tile sizes are smaller than the problem sizes to
+/// actually trigger tiling and mapping to blocks and threads.
+static void failSafeOverrides(BatchMatmulStrategy &strategy,
+                              const GPUModel &gpuModel) {
+  // Configure the strategy as if for a matmul.
+  failSafeOverrides(static_cast<MatmulStrategy &>(strategy), gpuModel);
+
+  // Failsafe for blockTileBatch to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileBatch = selectLargestFailsafeValueIfNeeded(
+      /*value=*/strategy.blockTileBatch(),
+      /*limit=*/strategy.batch(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
+
+  // Override the matmul configuration to be suitable for batch matmul.
+  // Specifically, prepend the tile size for the batch dimension and force FMA.
+  strategy.blockTileSizes.insert(strategy.blockTileSizes.begin(),
+                                 blockTileBatch);
+
+  strategy.useMmaSync = false;
+  strategy.useWmma = false;
+  strategy.useFma = true;
+}
+
+/// Produce a strategy for the batch matmul characterized by the given capture
+/// list (shapes and types).
+static BatchMatmulStrategy getBatchMatmulConfig(MLIRContext *context,
+                                                MatchedMatmulCaptures &captures,
+                                                const GPUModel &gpuModel) {
+  // Command-line arguments trump everything.
+  BatchMatmulStrategy strategy(context, gpuModel, captures);
+  if (strategy.cliOptionsSpecified)
+    return strategy;
+
+  // TODO: fixed strategies and decision tree/heuristic.
+
+  failSafeOverrides(strategy, gpuModel);
+  return strategy;
+}
+
+/// Match the supported batch matmuls and set the transform dialect strategy for
+/// them.
+static LogicalResult matchAndSetBatchMatmulStrategy(func::FuncOp entryPoint,
+                                                    linalg::LinalgOp op,
+                                                    const GPUModel &gpuModel) {
+  if (!clGPUEnableTransformDialectBatchMatmulStrategy) {
+    LDBG("--Batch matmul strategy flag turned off\n");
+    return failure();
+  }
+
+  StructuredOpMatcher *fill;
+  StructuredOpMatcher *bmm;
+  transform_ext::MatchedMatmulCaptures captures;
+  transform_ext::MatcherContext matcherContext;
+  transform_ext::makeBatchMatmulMatcher(matcherContext, bmm, fill, captures,
+                                        /*mustMatchEntireFunc=*/true);
+  if (!matchPattern(op, *bmm)) {
+    LDBG("--Batch matmul strategy failed to match\n");
+    return failure();
+  }
+
+  if (captures.contractionDims.batch.size() != 1 ||
+      captures.contractionDims.m.size() != 1 ||
+      captures.contractionDims.n.size() != 1 ||
+      captures.contractionDims.k.size() != 1 || captures.batches()[0] != 0 ||
+      captures.m() != 1 || captures.n() != 2 || captures.k() != 3) {
+    LDBG("--Only support batch matmul with b, m, n, k iterator order atm\n");
+    return failure();
+  }
+
+  BatchMatmulStrategy strategy =
+      getBatchMatmulConfig(entryPoint->getContext(), captures, gpuModel);
+  if (failed(strategy.validate(gpuModel))) {
+    LDBG("--Batch matmul strategy failed to validate\n");
+    return failure();
+  }
+
+  iree_compiler::createTransformRegion(entryPoint, [&](ImplicitLocOpBuilder &b,
+                                                       Value variantH) {
+    return iree_compiler::gpu::buildBatchMatmulStrategy(b, variantH, strategy);
+  });
+  return success();
 }
 
 static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
@@ -367,12 +463,6 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   //   - Otherwise, we take it.
   if (!fill->getCaptured() || trailing->getCaptured()) {
     LDBG("--Matmul strategy fill / trailing preconditions failed\n");
-    return failure();
-  }
-
-  if (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
-      !captures.outputElementType.isF32()) {
-    LDBG("--Matmul strategy elemental type check failed\n");
     return failure();
   }
 
@@ -414,12 +504,20 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
   iree_compiler::gpu::MatmulStrategy strategy =
       getMatmulConfig(op->getContext(), captures, gpuModel);
+  LLVM_DEBUG(strategy.dump());
 
   // Validate the strategy configuration against the compilation target.
   if (failed(strategy.validate(gpuModel))) {
     LDBG("--Matmul strategy failed to validate\n");
-    LLVM_DEBUG(strategy.dump());
+    return failure();
+  }
 
+  // Limit the types that we choose to support without user intervention for
+  // tensor core.
+  if (!strategy.useFma && !strategy.cliOptionsSpecified &&
+      (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
+       !captures.outputElementType.isF32())) {
+    LDBG("--Matmul strategy elemental type check failed\n");
     return failure();
   }
 
@@ -492,7 +590,7 @@ static LogicalResult matchAndSetPadStrategy(func::FuncOp entryPoint,
   // 2. Construct the strategy builder.
   PadConfig padConfig = getPadConfig(captures, gpuModel);
   iree_compiler::gpu::PadStrategy strategy(op->getContext(), captures,
-                                           padConfig);
+                                           padConfig, gpuModel);
   if (strategy.useAsyncCopies) {
     LDBG("--Async copies not supported yet\n");
     return failure();
@@ -542,6 +640,11 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
   }
   if (succeeded(matchAndSetMatmulStrategy(entryPoint, linalgOp, gpuModel))) {
     LDBG("Activate matmul\n");
+    return success();
+  }
+  if (succeeded(
+          matchAndSetBatchMatmulStrategy(entryPoint, linalgOp, gpuModel))) {
+    LDBG("Activate batch matmul\n");
     return success();
   }
   // TODO: Add more transform dialect strategy for other kind of dispatch

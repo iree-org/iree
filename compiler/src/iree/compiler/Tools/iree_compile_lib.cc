@@ -123,18 +123,24 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
             nullptr);
         exit(0);
       }));
+  llvm::cl::opt<bool> listPlugins(
+      "iree-list-plugins", llvm::cl::desc("Lists all loaded plugins."),
+      llvm::cl::init(false), llvm::cl::ValueDisallowed,
+      llvm::cl::callback([&](const bool &) {
+        llvm::outs() << "Loaded plugins:\n";
+        ireeCompilerEnumeratePlugins(
+            [](const char *pluginName, void *userData) {
+              llvm::outs() << "  " << pluginName << "\n";
+            },
+            nullptr);
+        exit(0);
+      }));
 
   ireeCompilerGlobalInitialize();
   ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
   ireeCompilerSetupGlobalCL(argc, const_cast<const char **>(argv),
                             "IREE compilation driver\n",
                             /*installSignalHandlers=*/true);
-
-  // If a HAL executable is being compiled, it is only valid to output in that
-  // form.
-  if (compileMode == CompileMode::hal_executable) {
-    outputFormat = OutputFormat::hal_executable;
-  }
 
   // Stash our globals in an RAII instance.
   struct MainState {
@@ -197,6 +203,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     case CompileMode::vm:
       break;
     case CompileMode::hal_executable: {
+      // Compiling a HAL executable, it is only valid to output in that form.
+      outputFormat = OutputFormat::hal_executable;
       if (!ireeCompilerInvocationPipeline(
               r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
         return false;

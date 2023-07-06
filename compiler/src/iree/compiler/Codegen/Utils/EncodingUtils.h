@@ -18,6 +18,10 @@ namespace iree_compiler {
 enum class MatmulType {
   F32F32F32,
   I8I8I32,
+  F16F16F32,
+  F16F16F16,
+  BF16BF16F32,
+  BF16BF16BF16
 };
 
 // Enumeration of the operands of a matmul-like operation such as linalg.matmul.

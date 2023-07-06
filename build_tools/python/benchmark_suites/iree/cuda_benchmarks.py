@@ -5,13 +5,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE CUDA benchmarks."""
 
-from typing import List, Tuple, Sequence
-from benchmark_suites.iree import benchmark_tags, module_execution_configs
+from typing import List, Sequence
+
+from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
-import benchmark_suites.iree.utils
 
 
 class Linux_CUDA_Benchmarks(object):
@@ -48,17 +48,13 @@ class Linux_CUDA_Benchmarks(object):
         self,
         models: Sequence[common_definitions.Model],
         compile_config: iree_definitions.CompileConfig,
-        execution_config: iree_definitions.ModuleExecutionConfig = module_execution_configs.CUDA_CONFIG,
-        tags: Sequence[str] = (),
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+        execution_config: iree_definitions.ModuleExecutionConfig,
+        presets: Sequence[str],
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=compile_config,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
-                tags=tags,
             )
             for model in models
         ]
@@ -66,52 +62,47 @@ class Linux_CUDA_Benchmarks(object):
             architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
             host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         )
-        run_module_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_module_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=gen_configs,
             module_execution_configs=[execution_config],
             device_specs=sm80_devices,
-            tags=tags,
+            presets=presets,
         )
 
-        return (gen_configs, run_module_configs)
+        return run_module_configs
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
         # The CUDA tag is required to put them into the CUDA benchmark preset.
-        gen_configs, run_configs = self._generate_configs(
+        run_configs = self._generate_configs(
             model_groups.CUDA_MODELS,
             self.SM_80_COMPILE_CONFIG,
-            tags=[benchmark_tags.CUDA],
+            execution_config=module_execution_configs.CUDA_CONFIG,
+            presets=[benchmark_presets.CUDA],
         )
-        ubench_gen_configs, ubench_run_configs = self._generate_configs(
+        ubench_run_configs = self._generate_configs(
             model_groups.MICRO_MATMUL,
             self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,
             execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-            tags=[benchmark_tags.CUDA],
+            presets=[benchmark_presets.CUDA],
         )
-        ubench_splitk_gen_configs, ubench_splitk_run_configs = self._generate_configs(
+        ubench_splitk_run_configs = self._generate_configs(
             model_groups.MICRO_MATMUL_SPLITK,
             self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
             execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-            tags=[benchmark_tags.CUDA],
+            presets=[benchmark_presets.CUDA],
         )
-        large_gen_configs, large_module_configs = self._generate_configs(
+        large_module_configs = self._generate_configs(
             model_groups.CUDA_MODELS_LONG,
             self.SM_80_COMPILE_CONFIG,
-            tags=[benchmark_tags.CUDA, benchmark_tags.LARGE],
+            execution_config=module_execution_configs.CUDA_CONFIG,
+            presets=[benchmark_presets.CUDA_LARGE],
         )
         return (
-            gen_configs
-            + ubench_gen_configs
-            + ubench_splitk_gen_configs
-            + large_gen_configs,
             run_configs
             + ubench_run_configs
             + ubench_splitk_run_configs
-            + large_module_configs,
+            + large_module_configs
         )

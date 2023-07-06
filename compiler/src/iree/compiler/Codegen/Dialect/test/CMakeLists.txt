@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "invalid.mlir"
     "lowering_config_attr.mlir"
     "ukernel_ops.mlir"
   TOOLS

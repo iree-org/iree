@@ -856,6 +856,58 @@ matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+/// Match callback for linalg.batch_matmul and its linalg.generic equivalent fed
+/// by a linalg.fill.
+///
+/// Input handles:
+///
+///   - the container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - the fill op initializing the output;
+///   - the main compute op.
+static DiagnosedSilenceableFailure
+batchMatmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                    const mlir::transform::TransformState &state,
+                    ValueRange handles) {
+  if (handles.size() != 1 ||
+      !llvm::hasSingleElement(state.getPayloadOps(handles[0]))) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::StructuredOpMatcher *pattern, *fill;
+  transform_ext::MatchedMatmulCaptures ignore;
+  transform_ext::MatcherContext matcherContext;
+  transform_ext::makeBatchMatmulMatcher(matcherContext, pattern, fill, ignore,
+                                        /*mustMatchEntireFunc*/ true);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = *state.getPayloadOps(handles[0]).begin();
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    pattern->resetCapture();
+    if (!matchPattern(op, *pattern))
+      return WalkResult::advance();
+
+    // TODO: notify properly
+    LLVM_DEBUG({
+      DBGS() << "fill:" << fill->getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern->getCaptured() << "\n";
+    });
+
+    res.addPayloadGroup({fill->getCaptured()});
+    res.addPayloadGroup({pattern->getCaptured()});
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match batch matmul";
+}
+
 /// Match callback for a tensor.pad. Matches *the first* occurrence of such pad
 /// within an op associated with the given handle.
 ///
@@ -922,6 +974,7 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
                             testShapedValueMatcherCallback);
   registry.registerCallback("convolution", convolutionCallback);
   registry.registerCallback("matmul", matmulCallback);
+  registry.registerCallback("batch_matmul", batchMatmulCallback);
   registry.registerCallback("pad", wrapAsEntireFuncMatch(padCallback));
   registry.registerCallback("reduction",
                             wrapAsEntireFuncMatch(reductionCallback));

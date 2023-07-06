@@ -136,6 +136,14 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
+  set(_DEPENDS "")
+  iree_package_ns(_PACKAGE_NAME)
+  list(TRANSFORM _RULE_DEPENDS REPLACE "^::" "${_PACKAGE_NAME}::")
+  foreach(_DEPEND ${_RULE_DEPENDS})
+    string(REPLACE "::" "_" _DEPEND "${_DEPEND}")
+    list(APPEND _DEPENDS ${_DEPEND})
+  endforeach()
+
   add_custom_command(
     OUTPUT
       ${_OUTPUT_FILES}
@@ -146,7 +154,7 @@ function(iree_bytecode_module)
       ${_COMPILE_TOOL}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
-      ${_RULE_DEPENDS}
+      ${_DEPENDS}
     COMMENT
       "Generating ${_MODULE_FILE_NAME} from ${_FRIENDLY_NAME}"
     VERBATIM

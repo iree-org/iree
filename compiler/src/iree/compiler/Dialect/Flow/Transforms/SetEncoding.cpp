@@ -160,6 +160,26 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       lhsEncoding = TensorEncoding::MATMUL_F32F32F32_LHS;
       rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS;
       outEncoding = TensorEncoding::MATMUL_F32F32F32_RESULT;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF32()) {
+      lhsEncoding = TensorEncoding::MATMUL_F16F16F32_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_F16F16F32_RHS;
+      outEncoding = TensorEncoding::MATMUL_F16F16F32_RESULT;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF16()) {
+      lhsEncoding = TensorEncoding::MATMUL_F16F16F16_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_F16F16F16_RHS;
+      outEncoding = TensorEncoding::MATMUL_F16F16F16_RESULT;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isF32()) {
+      lhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_RHS;
+      outEncoding = TensorEncoding::MATMUL_BF16BF16F32_RESULT;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isBF16()) {
+      lhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RHS;
+      outEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RESULT;
     } else if (lhsElemType.isSignlessInteger(8) &&
                rhsElemType.isSignlessInteger(8) &&
                outElemType.isSignlessInteger(32)) {

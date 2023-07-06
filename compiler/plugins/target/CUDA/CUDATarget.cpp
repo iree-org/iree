@@ -6,7 +6,7 @@
 
 #include "./LLVMPasses.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -291,6 +291,11 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
   // Link user modules and libdevice (if required).
   // Note that linking order matters:
   llvm::Linker linker(module);
+  if (failed(linkCmdlineBitcodeFile(loc, linker, llvm::Linker::OverrideFromSrc,
+                                    targetMachine, module.getContext()))) {
+    return failure();
+  }
+
   unsigned linkerFlags =
       llvm::Linker::LinkOnlyNeeded | llvm::Linker::OverrideFromSrc;
   if (failed(linkBitcodeObjects(loc, linker, linkerFlags, targetMachine,

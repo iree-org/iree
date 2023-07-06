@@ -10,12 +10,41 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "PassDetail.h"
+    "Passes.h"
+    "Passes.h.inc"
+  DEPS
+    ::PassesIncGen
+    MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRNVGPUDialect
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     CommonGPUPasses
   HDRS
-    "CommonGPUPasses.h"
     "GPUPatterns.h"
+    "Passes.h"
   SRCS
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
@@ -28,9 +57,13 @@ iree_cc_library(
     "GPUTensorTile.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
+    "Passes.cpp"
     "VectorReductionToGPU.cpp"
     "WorkGroupSwizzle.cpp"
+    "WorkgroupSpecializationPass.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtTransforms
     LLVMSupport
@@ -64,7 +97,6 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR

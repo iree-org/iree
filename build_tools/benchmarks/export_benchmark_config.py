@@ -32,63 +32,30 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Sequence
+from typing import Dict, Iterable, List, Optional, Set, Sequence
 import argparse
 import collections
 import dataclasses
 import json
 import textwrap
 
-from benchmark_suites.iree import benchmark_collections, benchmark_tags
+from benchmark_suites.iree import benchmark_collections, benchmark_presets
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
-from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.definitions import iree_definitions
-
-PresetMatcher = Callable[[Any], bool]
-EXECUTION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
-    "x86_64": lambda config: (
-        benchmark_tags.X86_64 in config.tags and benchmark_tags.LARGE not in config.tags
-    ),
-    "x86_64-large": lambda config: (
-        benchmark_tags.X86_64 in config.tags and benchmark_tags.LARGE in config.tags
-    ),
-    "cuda": lambda config: (
-        benchmark_tags.CUDA in config.tags and benchmark_tags.LARGE not in config.tags
-    ),
-    "cuda-large": lambda config: (
-        benchmark_tags.CUDA in config.tags and benchmark_tags.LARGE in config.tags
-    ),
-    "vulkan-nvidia": lambda config: benchmark_tags.VULKAN_NVIDIA in config.tags,
-    "android-cpu": lambda config: (
-        config.target_device_spec.architecture.type
-        == common_definitions.ArchitectureType.CPU
-        and config.target_device_spec.host_environment.platform == "android"
-    ),
-    "android-gpu": lambda config: (
-        config.target_device_spec.architecture.type
-        == common_definitions.ArchitectureType.GPU
-        and config.target_device_spec.host_environment.platform == "android"
-    ),
-}
-
-COMPILATION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
-    "comp-stats": lambda gen_config: benchmark_tags.LARGE not in gen_config.tags,
-    "comp-stats-large": lambda gen_config: benchmark_tags.LARGE in gen_config.tags,
-}
 
 
 def filter_and_group_run_configs(
     run_configs: List[iree_definitions.E2EModelRunConfig],
     target_device_names: Optional[Set[str]] = None,
-    preset_matchers: Optional[Sequence[PresetMatcher]] = None,
+    presets: Optional[Set[str]] = None,
 ) -> Dict[str, List[iree_definitions.E2EModelRunConfig]]:
     """Filters run configs and groups by target device name.
 
     Args:
       run_configs: source e2e model run configs.
       target_device_names: list of target device names, includes all if not set.
-      preset_matchers: list of preset matcher, matches all if not set.
+      presets: set of presets, matches all if not set.
 
     Returns:
       A map of e2e model run configs keyed by target device name.
@@ -99,9 +66,7 @@ def filter_and_group_run_configs(
         device_name = run_config.target_device_spec.device_name
         if target_device_names is not None and device_name not in target_device_names:
             continue
-        if preset_matchers is not None and not any(
-            matcher(run_config) for matcher in preset_matchers
-        ):
+        if presets is not None and not presets.intersection(run_config.presets):
             continue
         grouped_run_config_map[device_name].append(run_config)
 
@@ -120,7 +85,7 @@ def _get_distinct_module_dir_paths(
 
 
 def _export_execution_handler(
-    benchmark_presets: Optional[Sequence[PresetMatcher]] = None,
+    presets: Optional[Sequence[str]] = None,
     target_device_names: Optional[Sequence[str]] = None,
     **_unused_args,
 ):
@@ -131,7 +96,7 @@ def _export_execution_handler(
     grouped_run_config_map = filter_and_group_run_configs(
         all_run_configs,
         target_device_names=target_device_name_set,
-        preset_matchers=benchmark_presets,
+        presets=None if presets is None else set(presets),
     )
 
     output_map = {}
@@ -159,24 +124,19 @@ def _export_execution_handler(
 
 
 def _export_compilation_handler(
-    benchmark_presets: Optional[Sequence[PresetMatcher]] = None, **_unused_args
+    presets: Optional[Sequence[str]] = None, **_unused_args
 ):
     all_gen_configs, _ = benchmark_collections.generate_benchmarks()
-    compile_stats_gen_configs = [
-        config
-        for config in all_gen_configs
-        if benchmark_tags.COMPILE_STATS in config.compile_config.tags
-    ]
 
-    if benchmark_presets is not None:
-        match_predicate = lambda gen_config: any(
-            matcher(gen_config) for matcher in benchmark_presets
-        )
-        compile_stats_gen_configs = [
-            gen_config
-            for gen_config in compile_stats_gen_configs
-            if match_predicate(gen_config)
-        ]
+    if presets is None:
+        presets = benchmark_presets.ALL_COMPILATION_PRESETS
+    preset_set = set(presets)
+
+    compile_stats_gen_configs = [
+        gen_config
+        for gen_config in all_gen_configs
+        if preset_set.intersection(gen_config.presets)
+    ]
 
     distinct_module_dir_paths = _get_distinct_module_dir_paths(
         compile_stats_gen_configs
@@ -194,18 +154,15 @@ def _parse_and_strip_list_argument(arg: str) -> List[str]:
     return [part.strip() for part in arg.split(",") if part != ""]
 
 
-def _parse_benchmark_presets(
-    arg: str, matcher_map: Dict[str, PresetMatcher]
-) -> List[PresetMatcher]:
-    matchers = []
+def _parse_benchmark_presets(arg: str, available_presets: Sequence[str]) -> List[str]:
+    presets = []
     for preset in _parse_and_strip_list_argument(arg):
-        matcher = matcher_map.get(preset)
-        if matcher is None:
+        if preset not in available_presets:
             raise argparse.ArgumentTypeError(
                 f"Unrecognized benchmark preset: '{preset}'."
             )
-        matchers.append(matcher)
-    return matchers
+        presets.append(preset)
+    return presets
 
 
 def _parse_arguments():
@@ -260,14 +217,15 @@ def _parse_arguments():
         ),
     )
     execution_parser.add_argument(
+        "--presets",
         "--benchmark_presets",
         type=lambda arg: _parse_benchmark_presets(
-            arg, EXECUTION_BENCHMARK_PRESET_MATCHERS
+            arg, benchmark_presets.ALL_EXECUTION_PRESETS
         ),
         help=(
             "Presets that select a bundle of benchmarks, separated by comma, "
             "multiple presets will be union. Available options: "
-            f"{','.join(EXECUTION_BENCHMARK_PRESET_MATCHERS.keys())}"
+            f"{','.join(benchmark_presets.ALL_EXECUTION_PRESETS)}"
         ),
     )
 
@@ -281,15 +239,16 @@ def _parse_arguments():
     )
     compilation_parser.set_defaults(handler=_export_compilation_handler)
     compilation_parser.add_argument(
+        "--presets",
         "--benchmark_presets",
         type=lambda arg: _parse_benchmark_presets(
-            arg, COMPILATION_BENCHMARK_PRESET_MATCHERS
+            arg, benchmark_presets.ALL_COMPILATION_PRESETS
         ),
         help=(
             "Presets `comp-stats*` that select a bundle of compilation"
             " benchmarks, separated by comma, multiple presets will be union."
             " Available options: "
-            f"{','.join(COMPILATION_BENCHMARK_PRESET_MATCHERS.keys())}"
+            f"{','.join(benchmark_presets.ALL_COMPILATION_PRESETS)}"
         ),
     )
 

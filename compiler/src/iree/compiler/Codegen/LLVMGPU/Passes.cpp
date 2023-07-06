@@ -7,11 +7,10 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -154,6 +153,8 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
@@ -205,7 +206,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // store to load forwarding. This relies on shacky alias analysis and we need
   // to move this to tensor level once we have better abstractions.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createHoistRedundantVectorTransfersPass());
 
   // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -244,6 +245,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -305,6 +308,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -355,6 +360,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
@@ -396,10 +403,11 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   addBufferizePasses(nestedModulePM);
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -429,7 +437,7 @@ void addGPUPackUnPackPasses(OpPassManager &pm) {
       createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createHoistRedundantVectorTransfersPass());
 
   addBufferizePasses(nestedModulePM);
 
@@ -449,6 +457,13 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+}
+
+void addGPUDefaultPassPipeline(OpPassManager &pm) {
+  tileAndBufferize(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 }
@@ -478,6 +493,8 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  pm.addPass(createLowerUKernelOpsToCallsPass());
 
   // LinalgExt -> SCF
   pm.addNestedPass<func::FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
@@ -589,6 +606,34 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
     pm.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
+}
+
+//===---------------------------------------------------------------------===//
+// Register LLVMGPU Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+} // namespace
+
+void registerCodegenLLVMGPUPasses() {
+  // Generated.
+  registerPasses();
+
+  static PassPipelineRegistration<> LinalgNVVMPipeline(
+      "iree-codegen-linalg-to-nvvm-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to NVVM",
+      [](OpPassManager &passManager) {
+        buildLLVMGPUTransformPassPipeline(passManager, false);
+      });
+
+  static PassPipelineRegistration<> LinalgROCDLPipeline(
+      "iree-codegen-linalg-to-rocdl-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to ROCDL",
+      [](OpPassManager &passManager) {
+        buildLLVMGPUTransformPassPipeline(passManager, true);
+      });
 }
 
 } // namespace iree_compiler

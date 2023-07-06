@@ -61,6 +61,7 @@ iree_cc_library(
     "Passes.cpp"
     "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
+    "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
     "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"

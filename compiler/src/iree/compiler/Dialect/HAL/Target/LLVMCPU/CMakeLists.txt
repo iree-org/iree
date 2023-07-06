@@ -146,8 +146,8 @@ add_library(IREELLVMCPUTargetDeps INTERFACE)
 function(_add_optional_llvm_target_deps target)
   # Key off of the CodeGen target and then include the rest.
   # Note that for LLVM DYLIB builds, we just key off of the presence of the
-  # static CodeGen target and iree_filter_cc_deps will replace it with the
-  # dylib accordingly (it is just a check to see if we have compiled in
+  # static CodeGen target and iree_redirect_llvm_dylib_deps will replace it
+  # with the dylib accordingly (it is just a check to see if we have compiled in
   # support for the target).
   if(TARGET "LLVM${target}CodeGen")
     set(_target_deps
@@ -156,7 +156,7 @@ function(_add_optional_llvm_target_deps target)
       "LLVM${target}Desc"
       "LLVM${target}Info"
     )
-    iree_filter_cc_deps(_target_deps)
+    iree_redirect_llvm_dylib_deps(_target_deps)
     target_link_libraries(IREELLVMCPUTargetDeps INTERFACE ${_target_deps})
   endif()
 endfunction()

@@ -5,13 +5,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE ARMv8-A benchmarks."""
 
-from typing import List, Tuple
+from typing import List
+
+from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import tflite_models
-from benchmark_suites.iree import module_execution_configs
-import benchmark_suites.iree.utils
 
 
 class Android_ARMv8_A_Benchmarks(object):
@@ -62,10 +62,7 @@ class Android_ARMv8_A_Benchmarks(object):
 
     def generate(
         self,
-    ) -> Tuple[
-        List[iree_definitions.ModuleGenerationConfig],
-        List[iree_definitions.E2EModelRunConfig],
-    ]:
+    ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
 
         local_sync_execution_configs = [module_execution_configs.ELF_LOCAL_SYNC_CONFIG]
@@ -108,22 +105,24 @@ class Android_ARMv8_A_Benchmarks(object):
                 device_parameters={"big-cores"},
             )
         )
-        run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=default_gen_confings,
             module_execution_configs=local_sync_execution_configs
             + local_task_execution_configs,
             device_specs=all_devices,
+            presets=[benchmark_presets.ANDROID_GPU],
         )
-        run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=experimental_gen_confings,
             module_execution_configs=local_sync_execution_configs,
             device_specs=all_devices,
+            presets=[benchmark_presets.ANDROID_GPU],
         )
-        run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=experimental_gen_confings,
             module_execution_configs=local_task_execution_configs,
             device_specs=big_cores_devices,
+            presets=[benchmark_presets.ANDROID_GPU],
         )
 
-        gen_confings = default_gen_confings + experimental_gen_confings
-        return (gen_confings, run_configs)
+        return run_configs

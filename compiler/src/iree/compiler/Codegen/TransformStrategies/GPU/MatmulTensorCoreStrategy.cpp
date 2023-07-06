@@ -19,6 +19,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Transform/IR/TransformAttrs.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformTypes.h"
@@ -36,6 +37,7 @@ using iree_compiler::buildPad;
 using iree_compiler::buildTileFuseDistToForallWithNumThreads;
 using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
+using iree_compiler::gpu::BatchMatmulStrategy;
 using iree_compiler::gpu::buildBufferize;
 using iree_compiler::gpu::buildConvertToAsyncCopies;
 using iree_compiler::gpu::buildConvertToTensorCoreOp;
@@ -44,7 +46,6 @@ using iree_compiler::gpu::buildHoistOutputPaddingOp;
 using iree_compiler::gpu::buildMatmulVectorization;
 using iree_compiler::gpu::buildMultiBuffering;
 using iree_compiler::gpu::buildPipelineSharedMemoryCopies;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MappingInfo;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
@@ -54,19 +55,15 @@ using iree_compiler::IREE::transform_dialect::
 using transform::MatchOp;
 using transform_ext::RegisterMatchCallbacksOp;
 
-void MatmulStrategy::initDefaultValues() {
+void MatmulStrategy::initDefaultValues(const GPUModel &gpuModel) {
   // Set the configuration for padding the matmul.
   paddingValueTypes = {captures.lhsElementType, captures.rhsElementType,
                        captures.outputElementType};
   paddingDimensions = {0, 1, 2};
   packingDimensions = {1, 1, 1};
 
-  lhsElementalBitWidth = captures.lhsElementType.getIntOrFloatBitWidth();
-  rhsElementalBitWidth = captures.rhsElementType.getIntOrFloatBitWidth();
-  resElementalBitWidth = captures.outputElementType.getIntOrFloatBitWidth();
-
   // Pull in tile configs from flags.
-  AbstractGemmLikeStrategy::initDefaultValues();
+  AbstractGemmLikeStrategy::initDefaultValues(gpuModel);
 }
 
 LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
@@ -77,9 +74,67 @@ void MatmulStrategy::print(llvm::raw_ostream &os) const {
 }
 
 LogicalResult MatmulStrategy::validate(const GPUModel &gpuModel) const {
-  // Validate the parent strategy.
+  // First validate the parent strategy.
   if (failed(AbstractGemmLikeStrategy::validate(gpuModel)))
     return failure();
+
+  // Unlike for wmma/mma, we have no special type requirements for fma.
+  if (useFma)
+    return success();
+
+  Type lhsElementType = captures.lhsElementType;
+  Type rhsElementType = captures.rhsElementType;
+  Type resElementType = captures.outputElementType;
+  if (!lhsElementType.isF32() || !rhsElementType.isF32() ||
+      !resElementType.isF32()) {
+    LDBG("--Tensorcore matmul strategy only supported for f32: "
+         << lhsElementType << ", " << rhsElementType << ", " << resElementType);
+    return failure();
+  }
+  if (lhsElementType != rhsElementType) {
+    LDBG("--Tensorcore matmul strategy mixed input types unsupported\n");
+    return failure();
+  }
+
+  return success();
+}
+
+LogicalResult BatchMatmulStrategy::validate(const GPUModel &gpuModel) const {
+  if (failed(MatmulStrategy::validate(gpuModel))) {
+    return failure();
+  }
+
+  if (batch() < blockTileBatch()) {
+    return emitError(UnknownLoc::get(ctx))
+           << "batch( " << batch() << ") <  blockTileBatch(" << blockTileBatch()
+           << ") this is at risk of not vectorizing and is NYI";
+  }
+
+  // Only single outermost batch dimension is currently supported.
+  if (captures.batches().size() != 1 || captures.batches().back() != 0) {
+    LDBG("--Couldn't find single outermost batch dimension\n");
+    return failure();
+  }
+
+  if (blockTileSizes.size() < 3) {
+    LDBG("--Not enough block tile sizes\n");
+    return failure();
+  }
+
+  if (numWarps.size() < 3) {
+    LDBG("--Not enough num warps\n");
+    return failure();
+  }
+
+  if (numThreads.size() < 3) {
+    LDBG("--Not enough num threads\n");
+    return failure();
+  }
+
+  if (!useFma) {
+    LDBG("--Only FMA is supported for batch matmul atm\n");
+    return failure();
+  }
 
   return success();
 }
@@ -117,22 +172,26 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
                          tileResult.tiledOpH, Value(), tileResult.forallH);
 }
 
-void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
-    ImplicitLocOpBuilder &b, Value variantH, const MatmulStrategy &strategy) {
-  LLVM_DEBUG(strategy.print(DBGS()));
+/// Builds the common part of the schedule for matmuls and batched matmuls.
+static void
+buildCommonMatmulLikeThreadSchedule(ImplicitLocOpBuilder &b, Value variantH,
+                                    Value fillH, Value matmulH,
+                                    const MatmulStrategy &strategy) {
+  using mlir::iree_compiler::buildLowerVectorMasksAndCleanup;
+  using mlir::iree_compiler::buildTileFuseToScfFor;
+  using namespace mlir::iree_compiler::gpu;
 
-  // Step 1. Apply block-level part of the strategy, keeps everything fused.
-  auto [fillH, matmulH, maybeTiledTrailingHBlock, forall] =
-      buildMatmulStrategyBlockDistribution(b, variantH, strategy);
-  // Tile reduction loop.
-  SmallVector<int64_t> tileSizes{0, 0, strategy.reductionTileSize};
+  // Tile the reduction loop (last in the list).
+  SmallVector<int64_t> tileSizes(strategy.captures.matmulOpSizes.size() - 1, 0);
+  tileSizes.push_back(strategy.reductionTileSize);
+
   // Avoid canonicalizing before the pad to avoid folding away the extract_slice
   // on the output needed to hoist the output pad.
   auto tileReductionResult = buildTileFuseToScfFor(
       b, variantH, matmulH, {}, getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)),
       /*canonicalize=*/false);
 
-  // Step 2. Pad the matmul op.
+  // Step 2. Pad the (batch) matmul op.
   auto paddedMatmulOpH =
       buildPad(b, tileReductionResult.tiledOpH,
                strategy.getZeroPadAttrFromElementalTypes(b).getValue(),
@@ -187,6 +246,8 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // TODO: avoid consuming handles and returning here.
   funcH = buildConvertToTensorCoreOp(b, funcH, strategy);
 
+  // TODO: Support pipelining strategies without async copy (e.g. store to
+  // shared memory in stage 0).
   if (strategy.useAsyncCopies) {
     // Step 10. Multi-buffering.
     if (strategy.pipelineDepth > 1)
@@ -203,4 +264,54 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   // Step 13. Late lowerings and cleanups.
   buildLowerVectorMasksAndCleanup(b, funcH);
+}
+
+void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
+    ImplicitLocOpBuilder &b, Value variantH, const MatmulStrategy &strategy) {
+  LLVM_DEBUG(strategy.print(DBGS()));
+
+  // Step 1. Apply block-level part of the strategy, keeps everything fused.
+  auto [fillH, matmulH, maybeTiledTrailingHBlock, forall] =
+      buildMatmulStrategyBlockDistribution(b, variantH, strategy);
+  buildCommonMatmulLikeThreadSchedule(b, variantH, fillH, matmulH, strategy);
+}
+
+/// Builds the transform dialect operations distributing batch matmul across
+/// blocks according to the given strategy.
+static std::tuple<Value, Value, Value>
+buildBatchMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b,
+                                          Value variantH,
+                                          const BatchMatmulStrategy &strategy) {
+  b.create<RegisterMatchCallbacksOp>();
+  auto [fillH, bmmH] = unpackRegisteredMatchCallback<2>(
+      b, "batch_matmul", transform::FailurePropagationMode::Propagate,
+      variantH);
+
+  MappingInfo blockMapping = strategy.getBlockMapping();
+  TileToForallAndFuseAndDistributeResult tileResult =
+      buildTileFuseDistToForallWithTileSizes(
+          /*builder=*/b,
+          /*variantH=*/variantH,
+          /*rootH=*/bmmH,
+          /*opsToFuseH=*/fillH,
+          /*tileSizes=*/
+          getAsOpFoldResult(b.getI64ArrayAttr(blockMapping.tileSizes)),
+          /*threadDimMapping=*/
+          b.getArrayAttr(blockMapping.threadMapping));
+
+  // Handle the workgroup count region.
+  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+      tileResult.forallH);
+  return std::make_tuple(tileResult.resultingFusedOpsHandles.front(),
+                         tileResult.tiledOpH, tileResult.forallH);
+}
+
+void iree_compiler::gpu::buildBatchMatmulStrategy(
+    ImplicitLocOpBuilder &b, Value variantH,
+    const BatchMatmulStrategy &strategy) {
+  LLVM_DEBUG(strategy.print(DBGS()));
+
+  auto [fillH, matmulH, forallH] =
+      buildBatchMatmulStrategyBlockDistribution(b, variantH, strategy);
+  buildCommonMatmulLikeThreadSchedule(b, variantH, fillH, matmulH, strategy);
 }

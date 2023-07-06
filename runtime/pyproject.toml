@@ -3,9 +3,10 @@ requires = [
     "setuptools>=42",
     "wheel",
     "cmake",
+    "nanobind>=1.4.0",
     "ninja",
+    "numpy",
     "packaging",
-    "pybind11>=2.10.1",
     "PyYAML",
 ]
 build-backend = "setuptools.build_meta"

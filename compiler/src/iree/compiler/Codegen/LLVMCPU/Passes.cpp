@@ -7,14 +7,14 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
-#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -344,11 +344,13 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
       createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   {
-    LLVMCPUVectorizationPassOptions options;
+    GenericVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorizationPass(options));
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -389,12 +391,14 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
 
   {
-    LLVMCPUVectorizationPassOptions options;
+    GenericVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorizationPass(options));
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -521,12 +525,14 @@ void addMultiTilingExpertPassPipeline(
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
-    LLVMCPUVectorizationPassOptions options;
+    GenericVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorizationPass(options));
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -584,12 +590,14 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
 
   {
     nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
-    LLVMCPUVectorizationPassOptions options;
+    GenericVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorizationPass(options));
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -638,7 +646,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
         static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorizationPass());
+        createGenericVectorizationPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
   }
 
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -662,10 +672,12 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
       createDecomposePackUnPackOpsPass());
 
   {
-    LLVMCPUVectorizationPassOptions options;
+    GenericVectorizationPassOptions options;
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorizationPass(options));
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -808,6 +820,34 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
                         .nest<IREE::HAL::ExecutableVariantOp>();
   variantPM.addPass(createLLVMCPUAssignConstantOrdinalsPass());
   variantPM.addPass(createLLVMCPUAssignImportOrdinalsPass());
+}
+
+//===---------------------------------------------------------------------===//
+// Register LLVMCPU Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+} // namespace
+
+void registerCodegenLLVMCPUPasses() {
+  // Generated.
+  registerPasses();
+
+  static PassPipelineRegistration<> LinalgLLVMPipeline(
+      "iree-codegen-linalg-to-llvm-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to LLVM",
+      [](OpPassManager &passManager) {
+        buildLLVMCPUCodegenPassPipeline(passManager);
+      });
+
+  static PassPipelineRegistration<> LLVMCPULinkingPipeline(
+      "iree-codegen-llvmcpu-linking-pipeline",
+      "Runs the LLVMCPU HAL executable linking pipeline",
+      [](OpPassManager &passManager) {
+        buildLLVMCPULinkingPassPipeline(passManager);
+      });
 }
 
 } // namespace iree_compiler

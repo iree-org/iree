@@ -519,6 +519,25 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
+    def iree_cuda_bitcode_library(
+        self, name, cuda_arch, srcs, internal_hdrs=None, copts=None
+    ):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        cuda_arch_block = self._convert_string_arg_block(
+            "CUDA_ARCH", cuda_arch, quote=False
+        )
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+
+        self._converter.body += (
+            f"iree_bitcode_library(\n"
+            f"{name_block}"
+            f"{cuda_arch_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f")\n\n"
+        )
+
     def iree_link_bitcode(self, name, bitcode_files):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         bitcode_files_block = self._convert_srcs_block(

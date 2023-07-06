@@ -6,17 +6,17 @@
 
 include(CMakeParseArguments)
 
-# iree_filter_cc_deps(DEPS_VAR)
+# iree_redirect_llvm_dylib_deps(DEPS_VAR)
 #
-# Filters a list of CC dependencies, making alterations as needed.
-# At present, this is used to redirect LLVM libraries to the libLLVM.so
-# dynamic library, when LLVM has been configured to link against it.
+# Filters a list of CC dependencies, making alterations as needed to
+# to redirect LLVM libraries to the libLLVM.so dynamic library, when LLVM
+# has been configured to link against it.
 # This is necessary to preserve the one-definition rule in the build graph
 # in a consistent way as to how AddLLVM.cmake does it.
 # Note that this only really works if libLLVM.so was configured to contain
 # "all" components. If this ever becomes unworkable, we may need to port the
 # component naming logic and selectively choose when to divert.
-function(iree_filter_cc_deps DEPS_VAR)
+function(iree_redirect_llvm_dylib_deps DEPS_VAR)
   set(_deps ${${DEPS_VAR}})
   set(_new_deps)
   set(_modified FALSE)
@@ -47,6 +47,11 @@ endfunction()
 # SRCS: List of source files for the library
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
+# DISABLE_LLVM_LINK_LLVM_DYLIB: Disables linking against the libLLVM.so dynamic
+#   library, even if the build is configured to do so. This must be used with
+#   care as it can only contain dependencies and be used by binaries that also
+#   so disable it (either in upstream LLVM or locally). In practice, it is used
+#   for LLVM dependency chains that must always result in static-linked tools.
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
@@ -90,7 +95,7 @@ endfunction()
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY;SHARED"
+    "PUBLIC;TESTONLY;SHARED;DISABLE_LLVM_LINK_LLVM_DYLIB"
     "PACKAGE;NAME;WINDOWS_DEF_FILE"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
@@ -117,7 +122,9 @@ function(iree_cc_library)
 
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
-  iree_filter_cc_deps(_RULE_DEPS)
+  if(NOT _RULE_DISABLE_LLVM_LINK_LLVM_DYLIB)
+    iree_redirect_llvm_dylib_deps(_RULE_DEPS)
+  endif()
 
   # Check if this is a header-only library.
   # Note that as of February 2019, many popular OS's (for example, Ubuntu

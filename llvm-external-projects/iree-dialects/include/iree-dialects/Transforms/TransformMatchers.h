@@ -72,6 +72,17 @@ struct CaptureDims : public CaptureStaticValue<SmallVector<int64_t>> {
   using Base::Base;
 };
 
+/// Captures the contraction dimensions of the target operation.
+struct CaptureIndexingMaps : public CaptureStaticValue<SmallVector<AffineMap>> {
+  using Base::Base;
+};
+
+/// Captures the contraction dimensions of the target operation.
+struct CaptureContractionDims
+    : public CaptureStaticValue<mlir::linalg::ContractionDimensions> {
+  using Base::Base;
+};
+
 /// Captures the convolution dimensions of the target operation.
 struct CaptureConvDims
     : public CaptureStaticValue<mlir::linalg::detail::ConvolutionDimensions> {
@@ -627,6 +638,7 @@ public:
   /// constant value.
   StructuredOpMatcher &rank(NumGreaterEqualTo minRank);
   StructuredOpMatcher &rank(NumLowerEqualTo maxRank);
+  StructuredOpMatcher &rank(NumEqualsTo exactRank);
 
   /// Adds a predicate checking that the given iteration space dimension is
   /// static/dynamic. The dimension index may be negative, in which case
@@ -667,6 +679,8 @@ public:
   StructuredOpMatcher &rank(CaptureRank capture);
   StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
   StructuredOpMatcher &dim(AllDims tag, CaptureDims captures);
+  StructuredOpMatcher &indexingMaps(CaptureIndexingMaps indexingMaps);
+  StructuredOpMatcher &contractionDims(CaptureContractionDims contractionDims);
   StructuredOpMatcher &convolutionDims(CaptureConvDims convDims);
 
   //===-------------------------------------------------------------------===//
@@ -863,6 +877,16 @@ public:
   /// using block arguments in order.
   StructuredOpMatcher &passThroughOp();
 
+  /// Check if the body of the linalg op implements a contraction of the kind
+  ///   result <ReductionOpTy>= input1 <ElemOpTy> input2
+  template <typename ElemOpTy, typename ReductionOpTy>
+  StructuredOpMatcher &hasContractionBody() {
+    return hasContractionBody(
+        [](Operation *op) { return isa<ElemOpTy>(op); },
+        [](Operation *op) { return isa<ReductionOpTy>(op); },
+        ElemOpTy::getOperationName(), ReductionOpTy::getOperationName());
+  }
+
 private:
   /// Non-template implementations of nested predicate builders for inputs,
   /// outputs and results. Should not be called directly.
@@ -881,6 +905,13 @@ private:
   // Common util for constant matcher.
   StructuredOpMatcher &input(int64_t position,
                              std::function<bool(llvm::APFloat)> floatValueFn);
+
+  /// Non-template implementation of hasContractionBody. Takes callbacks for
+  /// checking operation kinds and names for error reporting.
+  StructuredOpMatcher &
+  hasContractionBody(function_ref<bool(Operation *)> isaElemOpTy,
+                     function_ref<bool(Operation *)> isaReductionOpTy,
+                     StringRef elemOpName, StringRef reductionOpName);
 };
 
 /// Creates a matcher of an arbitrary structured op.
@@ -1009,8 +1040,36 @@ struct MatchedReductionCaptures {
 };
 
 struct MatchedMatmulCaptures {
+  linalg::ContractionDimensions contractionDims = {};
   Type lhsElementType, rhsElementType, outputElementType;
   SmallVector<int64_t> matmulOpSizes = {};
+  SmallVector<AffineMap> indexingMaps;
+
+  /// Helper functions.
+  int64_t rank() const { return matmulOpSizes.size(); }
+  /// Return all batches.
+  ArrayRef<unsigned> batches() const { return contractionDims.batch; }
+  /// Return the most minor candidate dimension for `m`.
+  int64_t m() const { return contractionDims.m.back(); }
+  /// Return the most minor candidate dimension for `n`.
+  int64_t n() const { return contractionDims.n.back(); }
+  /// Return the most minor candidate dimension for `k`.
+  int64_t k() const { return contractionDims.k.back(); }
+  /// AffineMap for indexing into the LHS.
+  AffineMap lhsIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[0];
+  }
+  /// AffineMap for indexing into the RHS.
+  AffineMap rhsIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[1];
+  }
+  /// AffineMap for indexing into the RES.
+  AffineMap resIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[2];
+  }
 };
 
 /// Creates a group of matchers for:
@@ -1045,6 +1104,19 @@ void makeMatmulMatcher(MatcherContext &matcherContext,
                        StructuredOpMatcher *&trailingCapture,
                        MatchedMatmulCaptures &captures,
                        bool mustMatchEntireFunc);
+
+/// Create a group of matchers of batch mamtul with a fill:
+///
+///  batch_matmul(*, *, fill())
+///
+/// and capture various useful quantities. If `mustMatchEntireFunc` is set, the
+/// matcher additionally checks if all tileable operations in the functions are
+/// captured.
+void makeBatchMatmulMatcher(transform_ext::MatcherContext &matcherContext,
+                            transform_ext::StructuredOpMatcher *&bmmCapture,
+                            transform_ext::StructuredOpMatcher *&fillCapture,
+                            transform_ext::MatchedMatmulCaptures &captures,
+                            bool mustMatchEntireFunc);
 
 /// Create a group of matchers for a different code sequence of operations
 /// matching exactly a softmax operation.

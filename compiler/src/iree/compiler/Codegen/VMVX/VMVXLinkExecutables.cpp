@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
-#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
+#include "iree/compiler/Codegen/VMVX/PassDetail.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Support/FormatVariadic.h"

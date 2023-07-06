@@ -111,7 +111,6 @@ void mlir::iree_compiler::createTransformRegion(
   (void)sequence;
   LDBG("transformation script:\n");
   LDBG("verification: " << sequence.verify().succeeded() << "\n");
-  LLVM_DEBUG(sequence.print(DBGS()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -276,7 +275,8 @@ Value mlir::iree_compiler::buildPad(
   return b.create<transform::PadOp>(
       opH.getType(), opH, b.getArrayAttr(paddingValues),
       b.getI64ArrayAttr(paddingDimensions), b.getI64ArrayAttr(padToMultipleOf),
-      b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs));
+      b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs),
+      /*copyBack=*/b.getBoolAttr(false));
 }
 
 /// Apply patterns and vectorize.

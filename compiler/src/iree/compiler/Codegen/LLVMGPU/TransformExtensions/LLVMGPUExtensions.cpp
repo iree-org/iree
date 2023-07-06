@@ -8,7 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -795,7 +795,7 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
                       ? PipeliningSchedulingStrategy::nvidiaTensorCore
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
-      rewriter, forOp, schedule, false, depth);
+      rewriter, forOp, schedule, getPeelEpilogue(), depth);
   if (failed(pipelinedFor)) {
     results.push_back(forOp);
     return DiagnosedSilenceableFailure::success();
@@ -1424,36 +1424,17 @@ public:
     LLVM_DEBUG(DBGS() << "checking the necessity of: " << barrier << " "
                       << barrier.getLoc() << "\n");
 
-    {
-      LLVM_DEBUG(DBGS() << "with respect to the barrier(s) before\n");
-      SmallVector<MemoryEffects::EffectInstance> beforeEffects;
-      getEffectsBefore(barrier, beforeEffects, /*stopAtBarrier=*/true);
+    SmallVector<MemoryEffects::EffectInstance> beforeEffects;
+    getEffectsBefore(barrier, beforeEffects, /*stopAtBarrier=*/true);
 
-      SmallVector<MemoryEffects::EffectInstance> afterEffects;
-      getEffectsAfter(barrier, afterEffects, /*stopAtBarrier=*/false);
+    SmallVector<MemoryEffects::EffectInstance> afterEffects;
+    getEffectsAfter(barrier, afterEffects, /*stopAtBarrier=*/true);
 
-      if (!haveConflictingEffects(beforeEffects, afterEffects)) {
-        LLVM_DEBUG(DBGS() << "the barrier(s) before is sufficient, removing "
-                          << barrier << "\n");
-        rewriter.eraseOp(barrier);
-        return success();
-      }
-    }
-
-    {
-      LLVM_DEBUG(DBGS() << "with respect to the barrier(s) after\n");
-      SmallVector<MemoryEffects::EffectInstance> beforeEffects;
-      getEffectsBefore(barrier, beforeEffects, /*stopAtBarrier*/ false);
-
-      SmallVector<MemoryEffects::EffectInstance> afterEffects;
-      getEffectsAfter(barrier, afterEffects, /*stopAtBarrier*/ true);
-
-      if (!haveConflictingEffects(beforeEffects, afterEffects)) {
-        LLVM_DEBUG(DBGS() << "the barrier(s) after is sufficient, removing "
-                          << barrier << "\n");
-        rewriter.eraseOp(barrier);
-        return success();
-      }
+    if (!haveConflictingEffects(beforeEffects, afterEffects)) {
+      LLVM_DEBUG(DBGS() << "the surrounding barriers are sufficient, removing "
+                        << barrier << "\n");
+      rewriter.eraseOp(barrier);
+      return success();
     }
 
     LLVM_DEBUG(DBGS() << "barrier is necessary: " << barrier << " "
