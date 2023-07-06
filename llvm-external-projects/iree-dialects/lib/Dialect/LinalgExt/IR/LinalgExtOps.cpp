@@ -2672,7 +2672,7 @@ DEFINE_OP_GET_EFFECTS(AttentionOp)
 
 void SetEncodingOp::build(OpBuilder &builder, OperationState &state,
                           Value source, TensorEncoding encoding) {
-  auto encodingAttr = EncodingAttr::get(builder.getContext(), encoding);
+  auto encodingAttr = TensorEncodingAttr::get(builder.getContext(), encoding);
   auto sourceType = source.getType().cast<RankedTensorType>();
   RankedTensorType encodingType = RankedTensorType::get(
       sourceType.getShape(), sourceType.getElementType(), encodingAttr);
@@ -2685,7 +2685,7 @@ LogicalResult SetEncodingOp::verify() {
     return emitOpError(
         "source of set_encoding op cannot have a tensor encoding");
   }
-  if (!getResultType().getEncoding().isa_and_nonnull<EncodingAttr>()) {
+  if (!getResultType().getEncoding().isa_and_nonnull<TensorEncodingAttr>()) {
     return emitOpError(
         "result of set_encoding op expected to have a valid tensor encoding");
   }
@@ -2723,7 +2723,7 @@ LogicalResult UnsetEncodingOp::verify() {
     return emitOpError(
         "result of unset_encoding op cannot have a tensor encoding");
   }
-  if (!getSourceType().getEncoding().isa_and_nonnull<EncodingAttr>()) {
+  if (!getSourceType().getEncoding().isa_and_nonnull<TensorEncodingAttr>()) {
     return emitOpError(
         "source of unset_encoding op expected to have a valid tensor encoding");
   }

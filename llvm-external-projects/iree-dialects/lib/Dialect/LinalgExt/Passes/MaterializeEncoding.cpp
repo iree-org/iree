@@ -27,11 +27,16 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 //===---------------------------------------------------------------------===//
 
 /// Extract encoding from the `tensorType` if specified.
-static std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
-  auto encodingAttr = tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
-  if (!encodingAttr)
+std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
+  auto encoding = tensorType.getEncoding();
+  if (!encoding) {
     return std::nullopt;
-  return encodingAttr.getEncoding().getValue();
+  }
+  auto tensorEncodingAttr = encoding.dyn_cast_or_null<TensorEncodingAttr>();
+  if (!tensorEncodingAttr) {
+    return std::nullopt;
+  }
+  return tensorEncodingAttr.getValue();
 }
 
 /// For a given tensor type with an encoding, return the materialized
