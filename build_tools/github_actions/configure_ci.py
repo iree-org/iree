@@ -321,7 +321,7 @@ def parse_jobs_trailer(
     jobs_text = trailers.get(key)
     if jobs_text is None:
         return set()
-    jobs = set(jobs_text.split(","))
+    jobs = set(name.strip() for name in jobs_text.split(","))
     if ALL_KEY in jobs:
         if len(jobs) != 1:
             print(
