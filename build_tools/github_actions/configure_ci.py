@@ -41,7 +41,7 @@ import string
 import subprocess
 import sys
 import textwrap
-from typing import Iterable, List, Mapping, Sequence, Tuple
+from typing import Iterable, List, Mapping, Sequence, Set, Tuple
 
 import yaml
 
@@ -49,6 +49,8 @@ import yaml
 # We don't get StrEnum till Python 3.11
 @enum.unique
 class Trailer(str, enum.Enum):
+    __str__ = str.__str__
+
     SKIP_CI = "skip-ci"
     SKIP_JOBS = "ci-skip"
     EXTRA_JOBS = "ci-extra"
@@ -59,7 +61,7 @@ class Trailer(str, enum.Enum):
     SKIP_LLVM_INTEGRATE_BENCHMARK = "skip-llvm-integrate-benchmark"
 
     # Before Python 3.12, it the native __contains__ doesn't work for checking
-    # member values like this:
+    # member values like this and it's not possible to easily override this.
     # https://docs.python.org/3/library/enum.html#enum.EnumType.__contains__
     @classmethod
     def contains(cls, val):
@@ -68,6 +70,7 @@ class Trailer(str, enum.Enum):
         except ValueError:
             return False
         return True
+
 
 
 # This is to help prevent typos. For now we hard error on any trailer that
@@ -302,7 +305,7 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
 
 
 def parse_jobs_trailer(trailers: Mapping[str, str], key: str,
-                       all_jobs: set[str]) -> set[str]:
+                       all_jobs: Set[str]) -> Set[str]:
     jobs_text = trailers.get(key)
     if jobs_text is None:
         return set()
@@ -326,7 +329,7 @@ def parse_jobs_trailer(trailers: Mapping[str, str], key: str,
     return jobs
 
 
-def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> set[str]:
+def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
     with open(CI_WORKFLOW_FILE) as f:
         workflow = yaml.load(f.read(), Loader=yaml.SafeLoader)
     all_jobs = set(workflow["jobs"].keys())
