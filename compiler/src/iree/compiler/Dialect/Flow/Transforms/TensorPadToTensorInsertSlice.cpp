@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -64,37 +65,9 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
       }
     }
 
-    OpBuilder::InsertionGuard g(rewriter);
-    Location loc = padTensorOp.getLoc();
-    auto lowPad = padTensorOp.getMixedLowPad();
-    auto highPad = padTensorOp.getMixedHighPad();
-    Value source = padTensorOp.getSource();
-    RankedTensorType sourceType = padTensorOp.getSourceType();
-    int64_t rank = sourceType.getRank();
-
-    // TODO(ravishankarm): Use shape inference interface to get this.
-    SmallVector<OpFoldResult> sourceShape;
-    SmallVector<OpFoldResult> outputShape;
-    for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
-      SmallVector<OpFoldResult> mapOperands;
-      Value sourceDim = rewriter.createOrFold<tensor::DimOp>(loc, source, dim);
-      mapOperands.push_back(sourceDim);
-      mapOperands.push_back(lowPad[dim]);
-      mapOperands.push_back(highPad[dim]);
-      AffineExpr expr = rewriter.getAffineDimExpr(0) +
-                        rewriter.getAffineSymbolExpr(0) +
-                        rewriter.getAffineSymbolExpr(1);
-      outputShape.push_back(affine::makeComposedFoldedAffineApply(
-          rewriter, loc, AffineMap::get(1, 2, expr), mapOperands));
-    }
-    Value emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, outputShape, sourceType.getElementType());
-    Value fill = rewriter.create<linalg::FillOp>(loc, yieldVal, emptyTensor)
-                     .getResult(0);
-    SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
-    rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
-        padTensorOp, source, fill, lowPad, sourceShape, strides);
-    return success();
+    // Rewrite tensor.pad to tensor.empty + linalg.fill + tensor.insert_slice.
+    return static_cast<LogicalResult>(
+        linalg::rewriteInDestinationPassingStyle(rewriter, padTensorOp));
   }
 
 private:
