@@ -72,7 +72,6 @@ class Trailer(str, enum.Enum):
         return True
 
 
-
 # This is to help prevent typos. For now we hard error on any trailer that
 # starts with this prefix but isn't in our list. We can add known commonly used
 # trailers to our list or we might consider relaxing this.
@@ -113,11 +112,13 @@ RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
 CONTROL_JOBS = frozenset(["setup", "summary"])
 
-POSTSUBMIT_ONLY_JOBS = frozenset([
-    "build_test_all_windows",
-    "build_test_all_macos_arm64",
-    "build_test_all_macos_x86_64",
-])
+POSTSUBMIT_ONLY_JOBS = frozenset(
+    [
+        "build_test_all_windows",
+        "build_test_all_macos_arm64",
+        "build_test_all_macos_x86_64",
+    ]
+)
 
 DEFAULT_BENCHMARK_PRESET_GROUP = [
     "cuda",
@@ -140,16 +141,13 @@ PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
 # intended to be merged and should exclude test/draft PRs as well as
 # PRs that include temporary patches to the submodule during review.
 # See also: https://github.com/openxla/iree/issues/12268
-LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm-project",
-                                          re.IGNORECASE)
-LLVM_INTEGRATE_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump",
-                                           re.IGNORECASE)
+LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm-project", re.IGNORECASE)
+LLVM_INTEGRATE_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump", re.IGNORECASE)
 LLVM_INTEGRATE_LABEL = "llvm-integrate"
 
 
 def skip_path(path: str) -> bool:
-    return any(
-        fnmatch.fnmatch(path, pattern) for pattern in SKIP_PATH_PATTERNS)
+    return any(fnmatch.fnmatch(path, pattern) for pattern in SKIP_PATH_PATTERNS)
 
 
 def set_output(d: Mapping[str, str]):
@@ -177,8 +175,10 @@ def check_description_and_show_diff(
 ):
     original_labels = sorted(original_labels)
     current_labels = sorted(current_labels)
-    if (original_description == current_description
-            and original_labels == current_labels):
+    if (
+        original_description == current_description
+        and original_labels == current_labels
+    ):
         return
 
     description_diffs = difflib.unified_diff(
@@ -188,24 +188,29 @@ def check_description_and_show_diff(
     description_diffs = "".join(description_diffs)
 
     if description_diffs != "":
-        description_diffs = textwrap.dedent("""\
+        description_diffs = textwrap.dedent(
+            """\
     ```diff
     {}
     ```
-    """).format(description_diffs)
+    """
+        ).format(description_diffs)
 
     if original_labels == current_labels:
         label_diffs = ""
     else:
-        label_diffs = textwrap.dedent("""\
+        label_diffs = textwrap.dedent(
+            """\
     ```
     Original labels: {original_labels}
     Current labels: {current_labels}
     ```
-    """).format(original_labels=original_labels, current_labels=current_labels)
+    """
+        ).format(original_labels=original_labels, current_labels=current_labels)
 
     write_job_summary(
-        textwrap.dedent("""\
+        textwrap.dedent(
+            """\
   :pushpin: Using the PR description and labels different from the original PR event that started this workflow.
 
   <details>
@@ -214,12 +219,12 @@ def check_description_and_show_diff(
   {description_diffs}
 
   {label_diffs}
-  </details>""").format(description_diffs=description_diffs,
-                        label_diffs=label_diffs))
+  </details>"""
+        ).format(description_diffs=description_diffs, label_diffs=label_diffs)
+    )
 
 
-def get_trailers_and_labels(
-        is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
+def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
     if not is_pr:
         return ({}, [])
 
@@ -238,7 +243,8 @@ def get_trailers_and_labels(
     # workflow might not parse the PR description they expect.
     if original_title is not None:
         original_description = PR_DESCRIPTION_TEMPLATE.substitute(
-            title=original_title, body=original_body)
+            title=original_title, body=original_body
+        )
         print(
             "Original PR description and labels:",
             original_description,
@@ -271,8 +277,10 @@ def get_trailers_and_labels(
         if not Trailer.contains(key):
             for prefix in RESERVED_TRAILER_PREFIXES:
                 if key.startswith(prefix):
-                    print(f"Trailer '{key}' starts with reserved prefix"
-                          f"'{prefix}' but is unknown.")
+                    print(
+                        f"Trailer '{key}' starts with reserved prefix"
+                        f"'{prefix}' but is unknown."
+                    )
             print(f"Skipping unknown trailer '{key}'", file=sys.stderr)
 
     return (trailer_map, labels)
@@ -295,25 +303,31 @@ def modifies_included_path(base_ref: str) -> bool:
 def get_runner_env(trailers: Mapping[str, str]) -> str:
     runner_env = trailers.get(Trailer.RUNNER_ENV)
     if runner_env is None:
-        print(f"Using '{RUNNER_ENV_DEFAULT}' runners because"
-              f" '{Trailer.RUNNER_ENV}' not found in {trailers}")
+        print(
+            f"Using '{RUNNER_ENV_DEFAULT}' runners because"
+            f" '{Trailer.RUNNER_ENV}' not found in {trailers}"
+        )
         runner_env = RUNNER_ENV_DEFAULT
     else:
-        print(f"Using runner environment '{runner_env}' from PR description"
-              f" trailers")
+        print(
+            f"Using runner environment '{runner_env}' from PR description" f" trailers"
+        )
     return runner_env
 
 
-def parse_jobs_trailer(trailers: Mapping[str, str], key: str,
-                       all_jobs: Set[str]) -> Set[str]:
+def parse_jobs_trailer(
+    trailers: Mapping[str, str], key: str, all_jobs: Set[str]
+) -> Set[str]:
     jobs_text = trailers.get(key)
     if jobs_text is None:
         return set()
     jobs = set(jobs_text.split(","))
     if ALL_KEY in jobs:
         if len(jobs) != 1:
-            print(f"'{ALL_KEY}' must be alone in job specification"
-                  f" trailer, but got '{key}: {jobs_text}'")
+            print(
+                f"'{ALL_KEY}' must be alone in job specification"
+                f" trailer, but got '{key}: {jobs_text}'"
+            )
             sys.exit(1)
         print(f"Expanded trailer '{key}: {jobs_text}' to all jobs")
         return all_jobs
@@ -322,9 +336,9 @@ def parse_jobs_trailer(trailers: Mapping[str, str], key: str,
     unknown_jobs = jobs - all_jobs
     if unknown_jobs:
         print(
-            f"Received unknown jobs '{','.join(unknown_jobs)}' in"
-            f" trailer '{key}'",
-            file=sys.stderr)
+            f"Received unknown jobs '{','.join(unknown_jobs)}' in" f" trailer '{key}'",
+            file=sys.stderr,
+        )
         sys.exit(1)
     return jobs
 
@@ -339,21 +353,27 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
         print(f"Workflow has job with reserved name '{ALL_KEY}'")
 
     if not is_pr:
-        print("Running all jobs because run was not triggered by a"
-              " pull request event.")
+        print(
+            "Running all jobs because run was not triggered by a" " pull request event."
+        )
         return all_jobs
 
     if Trailer.SKIP_CI in trailers:
-        if (Trailer.EXACTLY_JOBS in trailers or Trailer.EXTRA_JOBS in trailers
-                or Trailer.SKIP_JOBS in trailers):
+        if (
+            Trailer.EXACTLY_JOBS in trailers
+            or Trailer.EXTRA_JOBS in trailers
+            or Trailer.SKIP_JOBS in trailers
+        ):
             print(
                 f"Cannot specify both '{Trailer.SKIP_JOBS}' and any of"
                 f" '{Trailer.EXACTLY_JOBS}', '{Trailer.EXTRA_JOBS}', '{Trailer.SKIP_JOBS}'",
                 file=sys.stderr,
             )
             sys.exit(1)
-        print(f"Skipping all jobs because PR description has"
-              f" '{Trailer.SKIP_CI}' trailer.")
+        print(
+            f"Skipping all jobs because PR description has"
+            f" '{Trailer.SKIP_CI}' trailer."
+        )
         return set()
 
     if Trailer.EXACTLY_JOBS in trailers:
@@ -361,11 +381,11 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
             print(
                 f"Cannot mix trailer '{Trailer.EXACTLY_JOBS}' with"
                 f" '{Trailer.EXTRA_JOBS}' or '{Trailer.SKIP_JOBS}'",
-                file=sys.stderr)
+                file=sys.stderr,
+            )
             sys.exit(1)
 
-        exactly_jobs = parse_jobs_trailer(trailers, Trailer.EXACTLY_JOBS,
-                                          all_jobs)
+        exactly_jobs = parse_jobs_trailer(trailers, Trailer.EXACTLY_JOBS, all_jobs)
         return exactly_jobs
 
     skip_jobs = parse_jobs_trailer(trailers, Trailer.SKIP_JOBS, all_jobs)
@@ -373,8 +393,10 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
 
     ambiguous_jobs = skip_jobs & extra_jobs
     if ambiguous_jobs:
-        print(f"Jobs cannot be specified in both '{Trailer.SKIP_JOBS}' and"
-              f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}")
+        print(
+            f"Jobs cannot be specified in both '{Trailer.SKIP_JOBS}' and"
+            f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
+        )
         sys.exit(1)
 
     default_jobs = all_jobs - POSTSUBMIT_ONLY_JOBS
@@ -383,12 +405,16 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
     try:
         modifies = modifies_included_path(base_ref)
     except TimeoutError as e:
-        print("Computing modified files timed out. Not using PR diff to"
-              " determine jobs to run.")
+        print(
+            "Computing modified files timed out. Not using PR diff to"
+            " determine jobs to run."
+        )
 
     if not modifies:
-        print("Not including any jobs by default because all modified files"
-              " are marked as excluded.")
+        print(
+            "Not including any jobs by default because all modified files"
+            " are marked as excluded."
+        )
         default_jobs = frozenset()
 
     return (default_jobs | extra_jobs) - skip_jobs
@@ -426,19 +452,22 @@ def get_benchmark_presets(
     elif is_llvm_integrate_pr and not skip_llvm_integrate_benchmark:
         # Run all benchmark presets for LLVM integration PRs.
         preset_options = {DEFAULT_BENCHMARK_PRESET}
-        print(
-            f"Using benchmark preset '{preset_options}' for LLVM integration PR"
-        )
+        print(f"Using benchmark preset '{preset_options}' for LLVM integration PR")
     else:
         preset_options = set(
-            label.split(":", maxsplit=1)[1] for label in labels
-            if label.startswith(BENCHMARK_LABEL_PREFIX + ":"))
+            label.split(":", maxsplit=1)[1]
+            for label in labels
+            if label.startswith(BENCHMARK_LABEL_PREFIX + ":")
+        )
         trailer = trailers.get(Trailer.BENCHMARK_EXTRA)
         if trailer is not None:
             preset_options = preset_options.union(
-                option.strip() for option in trailer.split(","))
-            print(f"Using benchmark preset '{preset_options}' from trailers"
-                  f" and labels")
+                option.strip() for option in trailer.split(",")
+            )
+            print(
+                f"Using benchmark preset '{preset_options}' from trailers"
+                f" and labels"
+            )
 
     if DEFAULT_BENCHMARK_PRESET in preset_options:
         preset_options.remove(DEFAULT_BENCHMARK_PRESET)
@@ -454,7 +483,8 @@ def get_benchmark_presets(
         if preset_option not in BENCHMARK_PRESET_OPTIONS:
             raise ValueError(
                 f"Unknown benchmark preset option: '{preset_option}'.\n"
-                f"Available options: '{BENCHMARK_PRESET_OPTIONS}'.")
+                f"Available options: '{BENCHMARK_PRESET_OPTIONS}'."
+            )
 
     return ",".join(preset_options)
 
@@ -464,10 +494,12 @@ def main():
     trailers, labels = get_trailers_and_labels(is_pr)
     is_llvm_integrate_pr = bool(
         LLVM_INTEGRATE_TITLE_PATTERN.search(os.environ.get("PR_TITLE", ""))
-        or LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get(
-            "PR_BRANCH", "")) or LLVM_INTEGRATE_LABEL in labels)
-    benchmark_presets = get_benchmark_presets(trailers, labels, is_pr,
-                                              is_llvm_integrate_pr)
+        or LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", ""))
+        or LLVM_INTEGRATE_LABEL in labels
+    )
+    benchmark_presets = get_benchmark_presets(
+        trailers, labels, is_pr, is_llvm_integrate_pr
+    )
     output = {
         "enabled-jobs": sorted(get_enabled_jobs(is_pr, trailers)),
         "is-pr": is_pr,
