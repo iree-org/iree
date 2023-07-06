@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "global_ops.mlir"
+    "compiler_hints.mlir"
   TOOLS
     FileCheck
     iree-opt
