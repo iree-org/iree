@@ -26,8 +26,8 @@ namespace mlir::iree_compiler::IREE::Input {
 // type is unsupported in the ABI.
 std::optional<int32_t> getElementTypeValue(Type type);
 
-// Returns a stable identifier for the MLIR encoding type or 0 (opaque) if the
-// type is unsupported in the ABI.
+// Returns a stable identifier for the MLIR encoding type or empty optional
+// (opaque) if the type is unsupported in the ABI.
 std::optional<int32_t> getEncodingTypeValue(Attribute attr);
 
 } // namespace mlir::iree_compiler::IREE::Input
