@@ -62,7 +62,7 @@ class CurrentState:
                 return next(reversed(self.new_commits))
 
     def index_of_next_commit(self, needle_commit: str) -> int:
-        for i, (new_commit, desc) in enumerate(self.new_commits):
+        for i, (new_commit, desc) in enumerate(reversed(self.new_commits)):
             if new_commit == needle_commit:
                 return i
         return -1
