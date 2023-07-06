@@ -27,7 +27,7 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 //===---------------------------------------------------------------------===//
 
 /// Extract encoding from the `tensorType` if specified.
-std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
+static std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
   auto encoding = tensorType.getEncoding();
   if (!encoding) {
     return std::nullopt;
