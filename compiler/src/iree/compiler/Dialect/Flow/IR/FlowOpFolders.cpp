@@ -1228,8 +1228,7 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
         updateOp.getStartIndices(), update,
         refreshDimsOnTypeChange(updateOp, updateOp.getUpdate().getType(),
                                 update.getType(), updateOp.getUpdateDims(),
-                                rewriter),
-        updateOp.getTiedOperandsAttr());
+                                rewriter));
     rewriter.replaceOpWithNewOp<tensor::CastOp>(
         updateOp, updateOp.getResult().getType(), newOp.getResult());
     return success();
