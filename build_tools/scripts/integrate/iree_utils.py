@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from typing import List
+
 import os
 import re
 import shlex
@@ -174,6 +176,30 @@ def git_current_commit(*, repo_dir=None) -> Tuple[str, str]:
     parts = output.split(" ")
     # Return commit, full_summary
     return parts[0], output
+
+
+def git_log_range(refs=(), *, repo_dir=None, paths=()) -> List[Tuple[str, str]]:
+    """Does a `git log ref1 ref2 -- paths.
+
+    Returns a list of tuples of (commit, desc).
+    """
+    args = ["log", "--pretty=format:%H %s (%an on %ci)"] + list(refs)
+    if paths:
+        args.append("--")
+        args.extend(list(paths))
+    output = git_exec(args, repo_dir=repo_dir, capture_output=True)
+    lines = output.splitlines()
+    results = []
+    for line in lines:
+        commit, desc = line.split(" ", maxsplit=1)
+        results.append((commit, desc))
+    return results
+
+
+def git_merge_base(ref1, ref2, *, repo_dir=None) -> str:
+    return git_exec(
+        ["merge-base", ref1, ref2], quiet=True, capture_output=True, repo_dir=repo_dir
+    ).strip()
 
 
 def git_create_commit(*, message, add_all=False, repo_dir=None):
