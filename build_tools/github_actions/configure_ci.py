@@ -8,23 +8,23 @@
 """Determines whether CI should run on a given PR.
 
 The following environment variables are required:
-"GITHUB_EVENT_NAME",: GitHub event name, e.g. pull_request.
-"GITHUB_OUTPUT",: path to write workflow output variables.
-"GITHUB_STEP_SUMMARY",: path to write workflow summary output.
+- GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
+- GITHUB_OUTPUT: path to write workflow output variables.
+- GITHUB_STEP_SUMMARY: path to write workflow summary output.
 
 When GITHUB_EVENT_NAME is "pull_request", there are additional environment
 variables to be set:
-"PR_BRANCH", (required): PR source branch.
-"PR_TITLE", (required): PR title.
-"PR_BODY", (optional): PR description.
-"PR_LABELS", (optional): JSON list of PR label names.
-"BASE_REF", (required): base commit SHA of the PR.
-"ORIGINAL_PR_TITLE", (optional): PR title from the original PR event, showing a
+- PR_BRANCH (required): PR source branch.
+- PR_TITLE (required): PR title.
+- PR_BODY (optional): PR description.
+- PR_LABELS (optional): JSON list of PR label names.
+- BASE_REF (required): base commit SHA of the PR.
+- ORIGINAL_PR_TITLE (optional): PR title from the original PR event, showing a
     notice if PR_TITLE is different.
-"ORIGINAL_PR_BODY", (optional): PR description from the original PR event,
+- ORIGINAL_PR_BODY (optional): PR description from the original PR event,
     showing a notice if PR_BODY is different. ORIGINAL_PR_TITLE must also be
     set.
-"ORIGINAL_PR_LABELS", (optional): PR labels from the original PR event, showing a
+- ORIGINAL_PR_LABELS (optional): PR labels from the original PR event, showing a
     notice if PR_LABELS is different. ORIGINAL_PR_TITLE must also be set.
 
 Exit code 0 indicates that it should and exit code 2 indicates that it should
