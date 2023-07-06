@@ -87,7 +87,7 @@ echo "Configuring to build e2e test artifacts"
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
   --build "${BUILD_DIR}" \
-  --target "${BUILD_TARGETS[@]}" \
+  --target "${BUILD_TARGETS[@]}" unknown \
   -- -k 0
 
 E2E_TEST_ARTIFACTS_DIR="${BUILD_DIR}/e2e_test_artifacts"
