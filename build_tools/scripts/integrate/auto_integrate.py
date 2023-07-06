@@ -5,6 +5,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from typing import Optional, Tuple
+
 import argparse
 from datetime import date
 import sys
@@ -20,6 +22,8 @@ class CurrentState:
     """Current state of the llvm-project integrate."""
 
     def __init__(self, args):
+        self.args = args
+        self.current_iree_branch = iree_utils.git_current_branch()
         self.current_commit, self.current_summary = iree_utils.git_current_commit(
             repo_dir=LLVM_REPO_DIR
         )
@@ -38,6 +42,31 @@ class CurrentState:
             repo_dir=LLVM_REPO_DIR,
         )
 
+    def find_next_commit(self) -> Optional[Tuple[str, str]]:
+        """Finds the next LLVM commit to advance to.
+
+        Returns (commit, desc) or None if no eligible commit.
+        """
+        if self.args.advance_to:
+            for commit, desc in self.new_commits:
+                if commit == self.args.advance_to:
+                    return commit, desc
+            else:
+                raise ValueError(
+                    f"Requested advance to commit {self.args.advance_to} not found"
+                )
+        else:
+            if not self.new_commits:
+                return None
+            else:
+                return next(reversed(self.new_commits))
+
+    def index_of_next_commit(self, needle_commit: str) -> int:
+        for i, (new_commit, desc) in enumerate(self.new_commits):
+            if new_commit == needle_commit:
+                return i
+        return -1
+
 
 def do_start(args):
     fetch(args)
@@ -48,7 +77,7 @@ def do_start(args):
         print(f"Up to date! Not starting.")
         return
 
-    next_commit, next_desc = next(reversed(state.new_commits))
+    next_commit, next_desc = state.find_next_commit()
     print(f"==> Starting new integrate")
     # Create branch.
     branch_name = args.branch_name
@@ -71,6 +100,38 @@ def do_start(args):
     )
     print("Pushing...")
     iree_utils.git_push_branch("origin", branch_name, force=args.reuse_branch)
+
+
+def do_next(args):
+    fetch(args)
+    state = CurrentState(args)
+    if state.current_iree_branch == "main":
+        raise RuntimeError("Cannot run auto_integrate next from main branch!")
+
+    # TODO: Check if a merge from main is needed and do it.
+    if not state.is_clean:
+        raise RuntimeError("Current branch state is unclean. Not implemented yet.")
+    if not state.new_commits:
+        print(f"Up to date! Not starting.")
+        return
+
+    next_commit, next_desc = state.find_next_commit()
+    index_commit = state.index_of_next_commit(next_commit)
+    print(
+        f"==> Advancing to next LLVM commit ({index_commit} "
+        f"of {len(state.new_commits)}):"
+    )
+    print(f"  {next_commit}: {next_desc}")
+    iree_utils.git_reset(next_commit, repo_dir=LLVM_REPO_DIR)
+    iree_utils.git_create_commit(
+        message=(
+            f"Advance LLVM to {next_commit}: {next_desc} "
+            f"({index_commit} of {len(state.new_commits)})"
+        ),
+        add_all=True,
+    )
+    print("Pushing...")
+    iree_utils.git_exec(["push"])
 
 
 def do_status(args):
@@ -110,7 +171,9 @@ def setup_remotes(args):
 
 
 def main(args):
-    if args.sub_command == "start":
+    if args.sub_command == "next":
+        do_next(args)
+    elif args.sub_command == "start":
         do_start(args)
     elif args.sub_command == "status":
         do_status(args)
@@ -123,10 +186,18 @@ def parse_arguments(argv):
     subparsers = parser.add_subparsers(
         help="sub-command help", required=True, dest="sub_command"
     )
+    next_parser = subparsers.add_parser("next")
+    next_parser.add_argument(
+        "advance_to", default=None, help="Advance to the given LLVM commit"
+    )
     start_parser = subparsers.add_parser("start")
     start_parser.add_argument(
         "--branch-name", help="Integrate branch to create", default=None
     )
+    start_parser.add_argument(
+        "advance_to", default=None, help="Advance to the given LLVM commit"
+    )
+    start_parser = subparsers.add_parser("start")
     start_parser.add_argument(
         "--reuse-branch",
         help="Allow re-use of an existing branch",

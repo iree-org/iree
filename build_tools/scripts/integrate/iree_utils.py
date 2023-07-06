@@ -227,6 +227,15 @@ def git_ls_remote_branches(repository_url, *, filter=None, repo_dir=None):
     return [extract_branch(l) for l in lines]
 
 
+def git_current_branch(*, repo_dir=None):
+    return git_exec(
+        ["rev-parse", "--abbrev-ref", "HEAD"],
+        repo_dir=repo_dir,
+        quiet=True,
+        capture_output=True,
+    ).strip()
+
+
 def git_exec(args, *, repo_dir=None, quiet=False, capture_output=False):
     full_args = ["git"] + args
     full_args_quoted = [shlex.quote(a) for a in full_args]
