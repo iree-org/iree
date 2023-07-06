@@ -138,6 +138,13 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
       createFoldAffineMinInDistributedLoopsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+
+  // We need this pass to run before any non-dristribution loop is introduced so
+  // that some redundant `tensor.empty` ops are eliminated.
+  // TODO(dcaballe): This functionality should be implemented as part of
+  // ConvertDPS?
+  pm.nest<ModuleOp>().addPass(createEliminateEmptyTensorsPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFuseTensorPadWithConsumerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -146,10 +153,6 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
       IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
-
-  // We need this pass to run before any non-dristribution loop is introduced so
-  // that some redundant `tensor.empty` ops are eliminated.
-  pm.nest<ModuleOp>().addPass(createEliminateEmptyTensorsPass());
 }
 
 //===---------------------------------------------------------------------===//
