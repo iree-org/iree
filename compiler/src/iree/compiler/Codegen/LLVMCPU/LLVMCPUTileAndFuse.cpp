@@ -113,6 +113,7 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   }
   yieldedValuesToOrigValues.append(rootOp->result_begin(),
                                    rootOp->result_end());
+  llvm::DenseMap<Value, Value> mapper;
 
   // WAR for `if` ops generating `scf.if` operations.
   if (auto rootPadOp = dyn_cast<tensor::PadOp>(rootOp)) {
@@ -122,6 +123,12 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
         rewriter, rootPadOp, cast<tensor::PadOp>(tilingResult->tiledOps[0]));
     if (!failed(replacementTiledOp)) {
       tilingResult->tiledOps[0] = replacementTiledOp.value();
+    }
+  } else {
+    for (auto [init, iterArg] : llvm::zip_equal(
+             cast<DestinationStyleOpInterface>(rootOp).getDpsInitOperands(),
+             tilingResult->loops.back().getRegionIterArgs())) {
+      mapper[init->get()] = iterArg;
     }
   }
   tiledOps.append(tilingResult->tiledOps);
@@ -145,6 +152,11 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     // Traverse the slices in BFS fashion.
     tensor::ExtractSliceOp candidateSliceOp = candidates.front();
     candidates.pop_front();
+    if (mapper.contains(candidateSliceOp.getSource())) {
+      rewriter.startRootUpdate(candidateSliceOp);
+      candidateSliceOp->setOperand(0, mapper[candidateSliceOp.getSource()]);
+      rewriter.finalizeRootUpdate(candidateSliceOp);
+    }
 
     // Materialize the slice of the producer in place.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
