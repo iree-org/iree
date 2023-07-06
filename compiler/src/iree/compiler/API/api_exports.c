@@ -311,7 +311,6 @@ extern void mlirF16TypeGet();
 extern void mlirF32TypeGet();
 extern void mlirF64TypeGet();
 extern void mlirFlatSymbolRefAttrGet();
-extern void mlirFlatSymbolRefAttrGetTypeID();
 extern void mlirFlatSymbolRefAttrGetValue();
 extern void mlirFloat16TypeGetTypeID();
 extern void mlirFloat32TypeGetTypeID();
@@ -945,7 +944,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirF32TypeGet;
   x += (uintptr_t)&mlirF64TypeGet;
   x += (uintptr_t)&mlirFlatSymbolRefAttrGet;
-  x += (uintptr_t)&mlirFlatSymbolRefAttrGetTypeID;
   x += (uintptr_t)&mlirFlatSymbolRefAttrGetValue;
   x += (uintptr_t)&mlirFloat16TypeGetTypeID;
   x += (uintptr_t)&mlirFloat32TypeGetTypeID;

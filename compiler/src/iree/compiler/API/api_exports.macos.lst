@@ -302,7 +302,6 @@ _mlirF16TypeGet
 _mlirF32TypeGet
 _mlirF64TypeGet
 _mlirFlatSymbolRefAttrGet
-_mlirFlatSymbolRefAttrGetTypeID
 _mlirFlatSymbolRefAttrGetValue
 _mlirFloat16TypeGetTypeID
 _mlirFloat32TypeGetTypeID
