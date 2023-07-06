@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_INPUT_OPS_TD
 
 include "iree-dialects/Dialect/Input/InputDialect.td"
+include "iree-dialects/Dialect/Input/InputInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -548,6 +549,11 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
     AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
     AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREEInput_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+    ]>,
   ]> {
   let summary = [{updates a tensor with the contents of another tensor}];
   let description = [{
@@ -569,7 +575,7 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    type($result) (`{` $target_dims^ `}`)?
+    custom<ShapedTiedResult>(type($result), $target_dims)
     attr-dict-with-keyword
   }];
 
@@ -726,6 +732,37 @@ def IREEInput_AlignOp : IREEInput_PureOp<"align", [
        $_builder.createOrFold<arith::ConstantIndexOp>($_state.location, alignment));
     }]>,
   ];
+}
+
+//===----------------------------------------------------------------------===//
+// Compiler hints
+//===----------------------------------------------------------------------===//
+
+def IREEInput_OptimizationBarrierOp : IREEInput_Op<"optimization_barrier", [
+  SameOperandsAndResultType,
+]> {
+  let summary = "Prevents compiler optimizations across a value.";
+  let description = [{
+    Wraps any operands in an unoptimizable identity to prevent its results from
+    being folded. It will be dropped during the final step in compilation and
+    has no effect at runtime.
+  }];
+  let arguments = (ins Variadic<AnyType>:$operands);
+  let results = (outs Variadic<AnyType>:$results);
+
+  let assemblyFormat = [{
+    attr-dict
+    ($operands^ `:` type($operands))?
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+
+  let hasVerifier = 1;
 }
 
 #endif // IREE_DIALECTS_DIALECT_INPUT_OPS_TD

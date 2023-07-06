@@ -245,7 +245,7 @@ func.func @tensor_slice(%arg0 : tensor<?xf32>, %arg1 : index, %arg2 : index, %ar
 // CHECK-LABEL: func.func @tensor_update
 // CHECK: flow.tensor.update %arg3, %arg0[%arg1] : tensor<?xf32>{%arg2} -> %arg0 as tensor<?xf32>{%arg4}
 func.func @tensor_update(%arg0 : tensor<?xf32>, %arg1 : index, %arg2 : index, %arg3 : tensor<?xf32>, %arg4 : index) -> tensor<?xf32> {
-  %0 = iree_input.tensor.update %arg3, %arg0[%arg1] : tensor<?xf32>{%arg2} -> tensor<?xf32>{%arg4}
+  %0 = iree_input.tensor.update %arg3, %arg0[%arg1] : tensor<?xf32>{%arg2} -> %arg0 as tensor<?xf32>{%arg4}
   return %0 : tensor<?xf32>
 }
 
@@ -328,4 +328,12 @@ builtin.module @global_store_indirect {
     iree_input.global.store.indirect %arg0, %0 : tensor<4xf32> -> !iree_input.ptr<tensor<4xf32>>
     return
   }
+}
+
+// -----
+// CHECK-LABEL: func.func @optimization_barrier
+// CHECK: util.optimization_barrier %arg0 : tensor<f32>
+func.func @optimization_barrier(%arg0 : tensor<f32>) -> tensor<f32> {
+  %0 = iree_input.optimization_barrier %arg0 : tensor<f32>
+  return %0 : tensor<f32>
 }

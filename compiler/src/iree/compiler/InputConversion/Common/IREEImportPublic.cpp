@@ -365,6 +365,8 @@ void IREEImportPublicPass::runOnOperation() {
   ONE_TO_ONE(IREE::Input::GlobalStoreOp, IREE::Util::GlobalStoreOp);
   ONE_TO_ONE(IREE::Input::GlobalStoreIndirectOp,
              IREE::Util::GlobalStoreIndirectOp);
+  ONE_TO_ONE(IREE::Input::OptimizationBarrierOp,
+             IREE::Util::OptimizationBarrierOp);
 
   if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
     signalPassFailure();
