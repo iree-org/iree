@@ -86,6 +86,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common:TransformDialectInterpreterPass",
         "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/TransformStrategies/GPU",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
