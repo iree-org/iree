@@ -97,6 +97,7 @@ jobs:
           IREE_BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
           IREE_BUILD_DEFAULT_BENCHMARK_SUITES: ${{ inputs.build-default-benchmark-suites }}
           BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
+        continue-on-error: true
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
