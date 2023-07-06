@@ -46,8 +46,9 @@ from typing import Iterable, List, Mapping, Sequence, Tuple
 import yaml
 
 
+# We don't get StrEnum till Python 3.11
 @enum.unique
-class Trailer(enum.StrEnum):
+class Trailer(str, enum.Enum):
     SKIP_CI = "skip-ci"
     SKIP_JOBS = "ci-skip"
     EXTRA_JOBS = "ci-extra"
