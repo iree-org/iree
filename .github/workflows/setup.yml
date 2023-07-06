@@ -111,9 +111,12 @@ jobs:
 
           ./build_tools/github_actions/configure_ci.py
 
-      - name: "Show benchmark presets"
+      - name: "Show enabled options"
         env:
           BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets }}
+          ENABLED_JOBS: ${{ join(fromJson(steps.configure.outputs.enabled-jobs)) }}
         run: |
+          echo ":green_circle: Enabled jobs: \`${ENABLED_JOBS}\`" \
+              >> "${GITHUB_STEP_SUMMARY}"
           echo ":stopwatch: Enabled benchmarks: \`${BENCHMARK_PRESETS}\`" \
             >> "${GITHUB_STEP_SUMMARY}"
