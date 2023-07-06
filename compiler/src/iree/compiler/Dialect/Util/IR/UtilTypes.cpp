@@ -9,8 +9,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -21,9 +21,7 @@
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/Interfaces/CastInterfaces.h"
 #include "mlir/Parser/Parser.h"
 
 namespace mlir {
@@ -36,21 +34,20 @@ namespace Util {
 //===----------------------------------------------------------------------===//
 
 bool BufferType::isAccessStorageCompatible(Type accessType) const {
-  return llvm::isa<IREE::Util::BufferType>(accessType);
+  return llvm::isa<BufferType>(accessType);
 }
 
 Value BufferType::inferSizeFromValue(Location loc, Value value,
                                      OpBuilder &builder) const {
-  return builder.createOrFold<IREE::Util::BufferSizeOp>(
-      loc, builder.getIndexType(), value);
+  return builder.createOrFold<BufferSizeOp>(loc, builder.getIndexType(), value);
 }
 
 Value BufferType::createSubrangeOp(Location loc, Value resource,
                                    Value resourceSize, Value subrangeOffset,
                                    Value subrangeLength,
                                    OpBuilder &builder) const {
-  return builder.create<IREE::Util::BufferSubspanOp>(
-      loc, resource, resourceSize, subrangeOffset, subrangeLength);
+  return builder.create<BufferSubspanOp>(loc, resource, resourceSize,
+                                         subrangeOffset, subrangeLength);
 }
 
 //===----------------------------------------------------------------------===//
@@ -60,7 +57,7 @@ Value BufferType::createSubrangeOp(Location loc, Value resource,
 static LogicalResult parseListElementType(AsmParser &parser,
                                           Type &elementType) {
   if (succeeded(parser.parseOptionalQuestion())) {
-    elementType = IREE::Util::VariantType::get(parser.getContext());
+    elementType = VariantType::get(parser.getContext());
     return success();
   }
   Type type;
@@ -72,7 +69,7 @@ static LogicalResult parseListElementType(AsmParser &parser,
 }
 
 static void printListElementType(AsmPrinter &printer, Type elementType) {
-  if (llvm::isa<IREE::Util::VariantType>(elementType)) {
+  if (llvm::isa<VariantType>(elementType)) {
     printer << "?";
   } else {
     printer << elementType;
@@ -86,11 +83,9 @@ bool ListType::isCompatible(Type type) { return true; }
 bool ListType::canImplicitlyCast(Type from, Type to) {
   if (llvm::isa<VariantType>(from) || llvm::isa<VariantType>(to)) {
     return true;
-  } else if (llvm::isa<ObjectType>(from) &&
-             IREE::Util::ObjectType::isCompatible(to)) {
+  } else if (llvm::isa<ObjectType>(from) && ObjectType::isCompatible(to)) {
     return true;
-  } else if (IREE::Util::ObjectType::isCompatible(from) &&
-             llvm::isa<ObjectType>(to)) {
+  } else if (ObjectType::isCompatible(from) && llvm::isa<ObjectType>(to)) {
     return true;
   } else if (llvm::isa<TensorType>(from) && llvm::isa<TensorType>(to)) {
     return true;
@@ -242,8 +237,7 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
   }
 
-  if (auto knownType =
-          llvm::dyn_cast<IREE::Util::GlobalTypeInterface>(globalType)) {
+  if (auto knownType = llvm::dyn_cast<GlobalTypeInterface>(globalType)) {
     return knownType.isAccessStorageCompatible(accessType);
   }
 
@@ -251,7 +245,7 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
   return globalType == accessType;
 }
 
-LogicalResult detail::verifyGlobalOp(IREE::Util::GlobalOpInterface globalOp) {
+LogicalResult detail::verifyGlobalOp(GlobalOpInterface globalOp) {
   auto initialValue = globalOp.getGlobalInitialValue();
   if (auto typedInitialValue =
           llvm::dyn_cast_if_present<TypedAttr>(initialValue)) {
@@ -271,9 +265,8 @@ LogicalResult detail::verifyGlobalOp(IREE::Util::GlobalOpInterface globalOp) {
 LogicalResult
 detail::verifyGlobalAddressOp(GlobalAddressOpInterface addressOp,
                               SymbolTableCollection &symbolTable) {
-  if (!isa_and_nonnull<IREE::Util::GlobalOpInterface>(
-          symbolTable.lookupNearestSymbolFrom(addressOp.getOperation(),
-                                              addressOp.getGlobalAttr()))) {
+  if (!isa_and_nonnull<GlobalOpInterface>(symbolTable.lookupNearestSymbolFrom(
+          addressOp.getOperation(), addressOp.getGlobalAttr()))) {
     return addressOp->emitOpError(
         "attribute 'global' failed to satisfy constraint: flat symbol "
         "reference attribute referencing to a 'IREE::Util::GlobalOpInterface' "
@@ -322,7 +315,7 @@ LogicalResult detail::verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
   }
   if (!globalOp.isGlobalMutable()) {
     // Allow stores to immutable globals in initializers.
-    if (!storeOp->getParentOfType<IREE::Util::InitializerOpInterface>()) {
+    if (!storeOp->getParentOfType<InitializerOpInterface>()) {
       return storeOp->emitOpError()
              << "global " << globalOp.getGlobalName()
              << " is not mutable and cannot be stored to";
@@ -331,10 +324,10 @@ LogicalResult detail::verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
   return success();
 }
 
-IREE::Util::GlobalOpInterface
-lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
-               SymbolTableCollection &symbolTable) {
-  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
+GlobalOpInterface lookupGlobalOp(Operation *accessorOp,
+                                 SymbolRefAttr globalRefAttr,
+                                 SymbolTableCollection &symbolTable) {
+  return symbolTable.lookupNearestSymbolFrom<GlobalOpInterface>(
       accessorOp->getParentOp(), globalRefAttr);
 }
 
@@ -344,14 +337,14 @@ lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
 
 std::optional<unsigned>
 detail::getTiedResultOperandIndex(Operation *op, unsigned resultIndex) {
-  auto storageAttr = op->getAttrOfType<ArrayAttr>(
-      IREE::Util::TiedOpInterface::getStorageAttrName());
+  auto storageAttr =
+      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
   if (!storageAttr)
     return std::nullopt;
   auto valueAttrs = storageAttr.getValue();
   if (valueAttrs.empty())
     return std::nullopt;
-  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+  if (auto tiedOp = dyn_cast<TiedOpInterface>(op)) {
     auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
     if (resultIndex < indexAndLength.first)
       return std::nullopt;
@@ -360,9 +353,9 @@ detail::getTiedResultOperandIndex(Operation *op, unsigned resultIndex) {
       return std::nullopt;
   }
   int64_t value = llvm::cast<IntegerAttr>(valueAttrs[resultIndex]).getInt();
-  if (value == IREE::Util::TiedOpInterface::kUntiedIndex)
+  if (value == TiedOpInterface::kUntiedIndex)
     return std::nullopt;
-  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+  if (auto tiedOp = dyn_cast<TiedOpInterface>(op)) {
     unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
     return tiedOperandsOffset + static_cast<unsigned>(value);
   } else {
@@ -432,25 +425,18 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
 
 // static
 bool TiedOpInterface::hasAnyTiedUses(Value value) {
-  for (auto &use : value.getUses()) {
-    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
-    if (!tiedOp)
-      continue;
-    if (tiedOp.isOperandTied(use.getOperandNumber()))
-      return true;
-  }
-  return false;
+  return llvm::any_of(value.getUses(), [](auto &use) {
+    if (auto tiedOp = dyn_cast<TiedOpInterface>(use.getOwner())) {
+      return tiedOp.isOperandTied(use.getOperandNumber());
+    }
+    return false;
+  });
 }
 
 bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
-  auto tiedOp = dyn_cast<TiedOpInterface>(op);
-  if (!tiedOp)
-    return false;
-  auto tiedIndices = tiedOp.getTiedResultOperandIndices();
-  for (unsigned i = 0; i < tiedIndices.size(); ++i) {
-    if (tiedIndices[i] == operandIndex) {
-      return true;
-    }
+  if (auto tiedOp = dyn_cast<TiedOpInterface>(op)) {
+    auto tiedIndices = tiedOp.getTiedResultOperandIndices();
+    return llvm::find(tiedIndices, operandIndex) != tiedIndices.end();
   }
   return false;
 }
@@ -548,11 +534,10 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
     auto *definingOp = value.getDefiningOp();
     if (!definingOp)
       continue;
-    if (auto sizeAwareOp =
-            llvm::dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp)) {
+    if (auto sizeAwareOp = llvm::dyn_cast<SizeAwareOpInterface>(definingOp)) {
       return sizeAwareOp.getResultSizeFromValue(value);
     }
-    if (auto tiedOp = llvm::dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+    if (auto tiedOp = llvm::dyn_cast<TiedOpInterface>(definingOp)) {
       auto tiedOperand = tiedOp.getTiedResultOperand(value);
       if (tiedOperand)
         worklist.push_back(tiedOperand);
@@ -564,8 +549,8 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
   while (!worklist.empty()) {
     auto value = worklist.pop_back_val();
     for (auto &use : value.getUses()) {
-      if (auto sizeAwareOp = llvm::dyn_cast<IREE::Util::SizeAwareOpInterface>(
-              use.getOwner())) {
+      if (auto sizeAwareOp =
+              llvm::dyn_cast<SizeAwareOpInterface>(use.getOwner())) {
         auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
         if (sizeValue) {
           if (isValueUsableForOp(sizeValue, block, insertionPoint)) {
@@ -573,8 +558,7 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
           }
         }
       }
-      if (auto tiedOp =
-              llvm::dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+      if (auto tiedOp = llvm::dyn_cast<TiedOpInterface>(use.getOwner())) {
         worklist.append(tiedOp.getOperandTiedResults(use.getOperandNumber()));
       }
     }
@@ -586,8 +570,8 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
 // static
 Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
                                              OpBuilder &builder) {
-  auto sizeAwareType = llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
-      resourceValue.getType());
+  auto sizeAwareType =
+      llvm::dyn_cast<SizeAwareTypeInterface>(resourceValue.getType());
   if (!sizeAwareType) {
     return {}; // Not a sized type.
   }
@@ -601,12 +585,10 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
   // TODO(benvanik): make this cleaner.
   auto *definingOp = resourceValue.getDefiningOp();
   if (auto sizeAwareOp =
-          llvm::dyn_cast_or_null<IREE::Util::SizeAwareOpInterface>(
-              definingOp)) {
+          llvm::dyn_cast_or_null<SizeAwareOpInterface>(definingOp)) {
     return sizeAwareOp.getResultSizeFromValue(resourceValue);
-  } else if (auto inferSizeType =
-                 llvm::dyn_cast<IREE::Util::InferTypeSizeInterface>(
-                     resourceValue.getType())) {
+  } else if (auto inferSizeType = llvm::dyn_cast<InferTypeSizeInterface>(
+                 resourceValue.getType())) {
     return inferSizeType.inferSizeFromValue(loc, resourceValue, builder);
   }
   return {};
@@ -704,16 +686,16 @@ SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
   // Try the fast-path of scanning for the dynamic dims that exist in the IR
   // already. For shape-aware ops this is free as the dynamic dim SSA values are
   // always available.
-  auto foundDynamicDims = IREE::Util::findDynamicDims(
-      value, builder.getBlock(), builder.getInsertionPoint());
+  auto foundDynamicDims =
+      findDynamicDims(value, builder.getBlock(), builder.getInsertionPoint());
   if (foundDynamicDims.has_value()) {
     return llvm::to_vector(foundDynamicDims.value());
   }
 
   // Slower path that materializes the entire shape for a result. Some
   // implementations may only support this (vs the fast find above).
-  if (auto shapeAwareOp = dyn_cast_or_null<IREE::Util::ShapeAwareOpInterface>(
-          value.getDefiningOp())) {
+  if (auto shapeAwareOp =
+          dyn_cast_or_null<ShapeAwareOpInterface>(value.getDefiningOp())) {
     return shapeAwareOp.buildResultValueShape(value, builder);
   }
 

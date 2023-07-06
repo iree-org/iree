@@ -42,7 +42,7 @@ std::optional<unsigned> getTiedResultOperandIndex(Operation *op,
     if (resultIndex >= indexAndLength.second)
       return std::nullopt;
   }
-  int64_t value = llvm::cast<IntegerAttr>(valueAttrs[resultIndex]).getInt();
+  int64_t value = cast<IntegerAttr>(valueAttrs[resultIndex]).getInt();
   if (value == TiedOpInterface::kUntiedIndex)
     return std::nullopt;
   if (auto tiedOp = dyn_cast<TiedOpInterface>(op)) {
@@ -67,7 +67,7 @@ SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) {
   unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
   indices.resize(resultRange.second);
   for (unsigned i = 0; i < valueAttrs.size(); ++i) {
-    int64_t index = llvm::cast<IntegerAttr>(valueAttrs[i]).getInt();
+    int64_t index = cast<IntegerAttr>(valueAttrs[i]).getInt();
     indices[i] = index != TiedOpInterface::kUntiedIndex
                      ? tiedOperandsOffset + index
                      : TiedOpInterface::kUntiedIndex;
@@ -101,14 +101,9 @@ void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
 }
 
 bool isOperandTied(Operation *op, unsigned operandIndex) {
-  auto tiedOp = dyn_cast<TiedOpInterface>(op);
-  if (!tiedOp)
-    return false;
-  auto tiedIndices = tiedOp.getTiedResultOperandIndices();
-  for (unsigned i = 0; i < tiedIndices.size(); ++i) {
-    if (tiedIndices[i] == operandIndex) {
-      return true;
-    }
+  if (auto tiedOp = dyn_cast<TiedOpInterface>(op)) {
+    auto tiedIndices = tiedOp.getTiedResultOperandIndices();
+    return llvm::find(tiedIndices, operandIndex) != tiedIndices.end();
   }
   return false;
 }
@@ -154,14 +149,11 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
 }
 
 bool TiedOpInterface::hasAnyTiedUses(Value value) {
-  for (auto &use : value.getUses()) {
-    auto tiedOp = dyn_cast<TiedOpInterface>(use.getOwner());
-    if (!tiedOp)
-      continue;
-    if (tiedOp.isOperandTied(use.getOperandNumber()))
-      return true;
-  }
-  return false;
+  return llvm::any_of(value.getUses(), [](auto &use) {
+    if (auto tiedOp = dyn_cast<TiedOpInterface>(use.getOwner()))
+      return tiedOp.isOperandTied(use.getOperandNumber());
+    return false;
+  });
 }
 
 //===----------------------------------------------------------------------===//
