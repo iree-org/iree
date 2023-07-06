@@ -4691,7 +4691,7 @@ searching.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.update` $update `,` $target `[` $start_indices `]` `:`
               type($update) (`{` $update_dims^ `}`)? `-&gt;`
-              custom&lt;ShapedTiedResult&gt;(type($result), $target_dims, $tied_operands)
+              custom&lt;ShapedTiedResult&gt;(type($result), $target_dims)
               attr-dict-with-keyword
 </code></pre></div>
 <p>Updates the target tensor with the contents of the update tensor at the
@@ -4699,23 +4699,6 @@ given offset indices.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th align="center">Attribute</th>
-<th align="center">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center"><code>tied_operands</code></td>
-<td align="center">::mlir::ArrayAttr</td>
-<td>64-bit integer array attribute</td>
-</tr>
-</tbody>
-</table>
 <h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
