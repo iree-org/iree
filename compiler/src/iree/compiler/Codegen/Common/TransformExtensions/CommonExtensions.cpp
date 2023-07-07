@@ -353,6 +353,9 @@ transform_dialect::ApplyLoopIndependentCodeMotionOp::applyToOne(
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
     funcOp->walk([](LoopLikeOpInterface loopLike) {
+      // Do not hoist from scf.forall ops. These capture isolated computations
+      // that will be mapped to a certain level in the GPU hierarchy (e.g.,
+      // GPU blocks), so hoisting is not desired.
       if (!isa<scf::ForallOp>(loopLike.getOperation()))
         moveLoopInvariantCode(loopLike);
     });
