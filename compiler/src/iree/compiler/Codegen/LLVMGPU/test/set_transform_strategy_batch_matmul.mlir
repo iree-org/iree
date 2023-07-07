@@ -95,7 +95,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   %[[TILED_LINALG:.+]], %[[LOOPS:.+]] = transform.structured.tile %tiled_op
 // DEFAULT:   [0, 0, 0, 16]
 // OPTIONS:   [0, 0, 0, 8]
-// CHECK:   %[[PADDED:.+]] = transform.structured.pad %tiled_linalg_op 
+// CHECK:   %[[PADDED:.+]], %{{.*}} = transform.structured.pad %tiled_linalg_op 
 // CHECK:     pack_paddings = [1, 1, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
 // CHECK:     padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK:   %[[V3:.+]] = get_producer_of_operand %[[PADDED]][2]
@@ -200,7 +200,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 // CHECK:   transform.iree.apply_buffer_optimizations
-// CHECK:   %30 = transform.iree.eliminate_gpu_barriers
+// CHECK:   transform.iree.eliminate_gpu_barriers
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse

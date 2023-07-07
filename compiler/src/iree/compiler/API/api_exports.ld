@@ -304,7 +304,6 @@ VER_0 {
     mlirF32TypeGet;
     mlirF64TypeGet;
     mlirFlatSymbolRefAttrGet;
-    mlirFlatSymbolRefAttrGetTypeID;
     mlirFlatSymbolRefAttrGetValue;
     mlirFloat16TypeGetTypeID;
     mlirFloat32TypeGetTypeID;
