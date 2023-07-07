@@ -552,33 +552,40 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
   }
 
   // The tail registers in each bank is reserved for swapping, when required.
-  int scratchI32Reg = maxI32RegisterOrdinal_;
-  int scratchRefReg = maxRefRegisterOrdinal_;
+  int localScratchI32RegCount = 0;
+  int localScratchRefRegCount = 0;
   for (auto feedbackEdge : feedbackArcSet.feedbackEdges) {
     Register scratchReg;
     if (feedbackEdge.first.isRef()) {
-      scratchReg =
-          Register::getWithSameType(feedbackEdge.first, ++scratchRefReg);
+      localScratchRefRegCount += 1;
+      scratchReg = Register::getWithSameType(
+          feedbackEdge.first, maxRefRegisterOrdinal_ + localScratchRefRegCount);
     } else {
-      scratchReg =
-          Register::getWithSameType(feedbackEdge.first, ++scratchI32Reg);
+      localScratchI32RegCount += 1;
+      scratchReg = Register::getWithSameType(
+          feedbackEdge.first, maxI32RegisterOrdinal_ + localScratchI32RegCount);
+      // Integer types that use more than one register slot will be emitted
+      // as remapping per 4-byte word, so we have to account for the extra
+      // temporaries. See BytecodeEncoder:encodeBranch().
+      assert(scratchReg.byteWidth() >= 4 && "expected >= i32");
+      localScratchI32RegCount += scratchReg.byteWidth() / 4 - 1;
     }
     feedbackArcSet.acyclicEdges.insert(feedbackArcSet.acyclicEdges.begin(),
                                        {feedbackEdge.first, scratchReg});
     feedbackArcSet.acyclicEdges.push_back({scratchReg, feedbackEdge.second});
   }
-  if (scratchI32Reg != maxI32RegisterOrdinal_) {
-    scratchI32RegisterCount_ = std::max(scratchI32RegisterCount_,
-                                        scratchI32Reg - maxI32RegisterOrdinal_);
+  if (localScratchI32RegCount > 0) {
+    scratchI32RegisterCount_ =
+        std::max(scratchI32RegisterCount_, localScratchI32RegCount);
     assert(getMaxI32RegisterOrdinal() <= Register::kInt32RegisterCount &&
            "spilling i32 regs");
     if (getMaxI32RegisterOrdinal() > Register::kInt32RegisterCount) {
       op->emitOpError() << "spilling entire i32 register address space";
     }
   }
-  if (scratchRefReg != maxRefRegisterOrdinal_) {
-    scratchRefRegisterCount_ = std::max(scratchRefRegisterCount_,
-                                        scratchRefReg - maxRefRegisterOrdinal_);
+  if (localScratchRefRegCount > 0) {
+    scratchRefRegisterCount_ =
+        std::max(scratchRefRegisterCount_, localScratchRefRegCount);
     assert(getMaxRefRegisterOrdinal() <= Register::kRefRegisterCount &&
            "spilling ref regs");
     if (getMaxRefRegisterOrdinal() > Register::kRefRegisterCount) {
