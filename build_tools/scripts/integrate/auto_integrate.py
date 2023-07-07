@@ -81,10 +81,10 @@ class CurrentState:
             repo_dir=LLVM_REPO_DIR,
         )
 
-    def find_next_commit(self) -> Optional[Tuple[str, str]]:
+    def find_next_commit(self) -> Tuple[str, str]:
         """Finds the next LLVM commit to advance to.
 
-        Returns (commit, desc) or None if no eligible commit.
+        Returns (commit, desc).
         """
         if self.args.advance_to:
             for commit, desc in self.new_commits:
@@ -96,7 +96,7 @@ class CurrentState:
                 )
         else:
             if not self.new_commits:
-                return None
+                return ValueError(f"No new commits")
             else:
                 return next(reversed(self.new_commits))
 
