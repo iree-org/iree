@@ -9,6 +9,13 @@ on:
   # See the workflow's `SHARK -> generate_report` log output for exact results URL.
   # pull_request:
 
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit).
+  group: ${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   setup:
     runs-on: ubuntu-20.04
