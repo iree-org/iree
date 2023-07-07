@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/VMAnalysis.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
+#include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -19,14 +20,14 @@ namespace IREE {
 namespace VM {
 
 class EmitCTypeConverter : public mlir::TypeConverter {
- public:
+public:
   EmitCTypeConverter();
-  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(
-      mlir::func::FuncOp &funcOp) {
+  FailureOr<std::reference_wrapper<VMAnalysis>>
+  lookupAnalysis(mlir::func::FuncOp &funcOp) {
     return lookupAnalysis(funcOp.getOperation());
   }
-  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(
-      IREE::VM::FuncOp &funcOp) {
+  FailureOr<std::reference_wrapper<VMAnalysis>>
+  lookupAnalysis(IREE::VM::FuncOp &funcOp) {
     return lookupAnalysis(funcOp.getOperation());
   }
   std::optional<Value> materializeRef(Value ref);
@@ -37,16 +38,30 @@ class EmitCTypeConverter : public mlir::TypeConverter {
   Type convertTypeAsPointer(Type type);
   emitc::OpaqueType convertTypeAsCType(Type type);
 
+  void cacheTypeTable(IREE::VM::ModuleOp module) {
+    typeTable = buildTypeTable(module);
+  }
+  void mapType(Type type, size_t index) { typeOrdinalMap[type] = index; }
+  std::optional<size_t> lookupType(Type type) {
+    auto ptr = typeOrdinalMap.find(type);
+    if (ptr == typeOrdinalMap.end()) {
+      return std::nullopt;
+    }
+    return ptr->second;
+  }
+
   SetVector<Operation *> sourceMaterializations;
   VMAnalysisCache analysisCache;
+  std::vector<TypeDef> typeTable;
 
- private:
+private:
+  llvm::DenseMap<Type, int> typeOrdinalMap;
   FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(Operation *op);
 };
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_

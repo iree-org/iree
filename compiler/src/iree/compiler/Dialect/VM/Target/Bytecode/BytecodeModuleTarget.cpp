@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
+#include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/schemas/bytecode_module_def_builder.h"
@@ -61,11 +62,6 @@ static constexpr int kDefaultRodataAlignment = 16;
 // data at the risk of tripping the 31-bit FlatBuffer offset values.
 static constexpr int kMaxEmbeddedDataSize = 4 * 1024;
 
-struct TypeDef {
-  Type type;
-  std::string full_name;
-};
-
 // A rodata reference.
 // The archive file is empty if the data is to be embedded in the FlatBuffer.
 struct RodataRef {
@@ -79,7 +75,7 @@ struct RodataRef {
   std::optional<ArchiveWriter::File> archiveFile;
 };
 
-}  // namespace
+} // namespace
 
 // Gets a file extension based on the given |mimeType| that can be used to help
 // applications guess the file type of embedded data.
@@ -100,9 +96,9 @@ static StringRef mimeTypeToFileExtension(StringRef mimeType) {
 // Serializes a constant attribute to the FlatBuffer as a binary blob.
 // Returns the size in bytes of the serialized value and the FlatBuffers offset
 // to the uint8 vec containing the data.
-static flatbuffers_uint8_vec_ref_t serializeEmbeddedData(
-    Location loc, Attribute valueAttr, uint64_t alignment, uint64_t totalSize,
-    FlatbufferBuilder &fbb) {
+static flatbuffers_uint8_vec_ref_t
+serializeEmbeddedData(Location loc, Attribute valueAttr, uint64_t alignment,
+                      uint64_t totalSize, FlatbufferBuilder &fbb) {
   flatcc_builder_start_vector(fbb, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
 
   if (totalSize > SIZE_MAX) {
@@ -111,7 +107,7 @@ static flatbuffers_uint8_vec_ref_t serializeEmbeddedData(
     return {};
   }
 
-  auto value = valueAttr.dyn_cast<IREE::Util::SerializableAttrInterface>();
+  auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(valueAttr);
   assert(value && "expected a serializable rodata value");
 
   // Reserve memory in the FlatBuffer for the data.
@@ -131,57 +127,12 @@ static flatbuffers_uint8_vec_ref_t serializeEmbeddedData(
   return flatbuffers_uint8_vec_end(fbb);
 }
 
-// Finds all types in the module and builds a type table mapping the index in
-// the vector to the type represented by the type ordinal.
-static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
-  llvm::DenseMap<Type, std::string> typeMap;
-  std::function<void(Type)> tryInsertType;
-  tryInsertType = [&](Type type) {
-    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-      type = refPtrType.getObjectType();
-    }
-    if (typeMap.count(type)) return;
-    std::string str;
-    llvm::raw_string_ostream sstream(str);
-    type.print(sstream);
-    sstream.flush();
-    typeMap.try_emplace(type, str);
-    if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
-      assert(listType.getElementType());
-      tryInsertType(listType.getElementType());
-    }
-  };
-  for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
-    funcOp.walk([&](Operation *op) {
-      for (auto type : op->getOperandTypes()) tryInsertType(type);
-      for (auto type : op->getResultTypes()) tryInsertType(type);
-    });
-  }
-
-  std::vector<TypeDef> table;
-  table.reserve(typeMap.size());
-  for (const auto &typeString : typeMap) {
-    table.push_back(TypeDef{typeString.first, typeString.second});
-  }
-  llvm::stable_sort(
-      table, +[](const TypeDef &lhs, const TypeDef &rhs) {
-        // Always sort builtins above custom types.
-        if (lhs.full_name[0] != '!' && rhs.full_name[0] == '!') {
-          return true;
-        } else if (lhs.full_name[0] == '!' && rhs.full_name[0] != '!') {
-          return false;
-        }
-        return lhs.full_name.compare(rhs.full_name) < 0;
-      });
-  return table;
-}
-
 // Canonicalizes the module to its final form prior to emission.
 // This verifies that we only have ops we can serialize and performs any of the
 // required transformations (such as debug op stripping).
-static LogicalResult canonicalizeModule(
-    IREE::VM::BytecodeTargetOptions bytecodeOptions,
-    IREE::VM::ModuleOp moduleOp) {
+static LogicalResult
+canonicalizeModule(IREE::VM::BytecodeTargetOptions bytecodeOptions,
+                   IREE::VM::ModuleOp moduleOp) {
   RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
@@ -266,32 +217,37 @@ static iree_vm_FunctionSignatureDef_ref_t createFunctionSignatureDef(
 }
 
 // Returns a serialized function signature.
-static iree_vm_FunctionSignatureDef_ref_t makeImportFunctionSignatureDef(
-    IREE::VM::ImportOp importOp, llvm::DenseMap<Type, int> &typeTable,
-    FlatbufferBuilder &fbb) {
+static iree_vm_FunctionSignatureDef_ref_t
+makeImportFunctionSignatureDef(IREE::VM::ImportOp importOp,
+                               llvm::DenseMap<Type, int> &typeTable,
+                               FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeImportCallingConventionString(importOp);
-  if (!cconv.has_value()) return {};
+  if (!cconv.has_value())
+    return {};
   return createFunctionSignatureDef(importOp.getFunctionType(), typeTable,
                                     cconv.value(), /*attrsRef=*/0, fbb);
 }
 
 // Returns a serialized function signature.
-static iree_vm_FunctionSignatureDef_ref_t makeFunctionSignatureDef(
-    IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    FlatbufferBuilder &fbb) {
+static iree_vm_FunctionSignatureDef_ref_t
+makeFunctionSignatureDef(IREE::VM::FuncOp funcOp,
+                         llvm::DenseMap<Type, int> &typeTable,
+                         FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.has_value()) return {};
+  if (!cconv.has_value())
+    return {};
 
   // Reflection attributes.
   iree_vm_AttrDef_vec_ref_t attrsRef = 0;
   if (auto attrs = funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
-    SmallVector<iree_vm_AttrDef_ref_t, 4> attrRefs;
+    SmallVector<iree_vm_AttrDef_ref_t> attrRefs;
     for (auto attr : attrs) {
       auto key = attr.getName().strref();
-      auto value = attr.getValue().dyn_cast<StringAttr>();
-      if (!value || key.empty()) continue;
+      auto value = llvm::dyn_cast<StringAttr>(attr.getValue());
+      if (!value || key.empty())
+        continue;
       // NOTE: if we actually want to keep these we should dedupe them (as the
       // keys and likely several of the values are shared across all functions).
       auto valueRef = fbb.createString(value.getValue());
@@ -307,12 +263,14 @@ static iree_vm_FunctionSignatureDef_ref_t makeFunctionSignatureDef(
 }
 
 // Returns a serialized function signature.
-static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
-    IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    FlatbufferBuilder &fbb) {
+static iree_vm_FunctionSignatureDef_ref_t
+makeInternalFunctionSignatureDef(IREE::VM::FuncOp funcOp,
+                                 llvm::DenseMap<Type, int> &typeTable,
+                                 FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.has_value()) return {};
+  if (!cconv.has_value())
+    return {};
   return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
                                     cconv.value(), /*attrsRef=*/0, fbb);
 }
@@ -341,11 +299,12 @@ static iree_vm_FeatureBits_enum_t findRequiredFeatures(Operation *rootOp) {
 // has been packed into the top-level table. This results in a messier function
 // here during serialization but a much more trivial (and cache-friendly)
 // representation at runtime.
-static LogicalResult buildFlatBufferModule(
-    IREE::VM::TargetOptions vmOptions,
-    IREE::VM::BytecodeTargetOptions bytecodeOptions,
-    IREE::VM::ModuleOp moduleOp, MutableArrayRef<RodataRef> rodataRefs,
-    FlatbufferBuilder &fbb) {
+static LogicalResult
+buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
+                      IREE::VM::BytecodeTargetOptions bytecodeOptions,
+                      IREE::VM::ModuleOp moduleOp,
+                      MutableArrayRef<RodataRef> rodataRefs,
+                      FlatbufferBuilder &fbb) {
   // Start the buffer so that we can begin recording data prior to the root
   // table (which we do at the very end). This does not change the layout of the
   // file and is only used to prime the flatcc builder.
@@ -460,7 +419,8 @@ static LogicalResult buildFlatBufferModule(
       flatbuffers_uint8_vec_ref_t embeddedRef = serializeEmbeddedData(
           rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.getValue(),
           rodataRef.alignment, rodataRef.totalSize, fbb);
-      if (!embeddedRef) return failure();
+      if (!embeddedRef)
+        return failure();
       iree_vm_RodataSegmentDef_start(fbb);
       iree_vm_RodataSegmentDef_embedded_data_add(fbb, embeddedRef);
       rodataSegmentRefs.push_back(iree_vm_RodataSegmentDef_end(fbb));
@@ -472,12 +432,12 @@ static LogicalResult buildFlatBufferModule(
   SmallVector<iree_vm_RwdataSegmentDef_ref_t, 8> rwdataSegmentRefs;
 
   auto signatureRefs =
-      llvm::to_vector<8>(llvm::map_range(internalFuncOps, [&](auto funcOp) {
+      llvm::map_to_vector<8>(internalFuncOps, [&](auto funcOp) {
         return makeFunctionSignatureDef(funcOp, typeOrdinalMap, fbb);
-      }));
+      });
 
   auto exportFuncRefs =
-      llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
+      llvm::map_to_vector<8>(exportFuncOps, [&](auto exportOp) {
         auto localNameRef = fbb.createString(exportOp.getExportName());
         auto funcOp =
             symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getFunctionRef());
@@ -486,10 +446,10 @@ static LogicalResult buildFlatBufferModule(
         iree_vm_ExportFunctionDef_internal_ordinal_add(
             fbb, funcOp.getOrdinal()->getLimitedValue());
         return iree_vm_ExportFunctionDef_end(fbb);
-      }));
+      });
 
   auto importFuncRefs =
-      llvm::to_vector<8>(llvm::map_range(importFuncOps, [&](auto importOp) {
+      llvm::map_to_vector<8>(importFuncOps, [&](auto importOp) {
         auto fullNameRef = fbb.createString(importOp.getName());
         auto signatureRef =
             makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
@@ -501,11 +461,11 @@ static LogicalResult buildFlatBufferModule(
         iree_vm_ImportFunctionDef_signature_add(fbb, signatureRef);
         iree_vm_ImportFunctionDef_flags_add(fbb, flags);
         return iree_vm_ImportFunctionDef_end(fbb);
-      }));
+      });
 
   auto dependencies = moduleOp.getDependencies();
-  auto dependencyRefs = llvm::to_vector<8>(
-      llvm::map_range(llvm::reverse(dependencies), [&](const auto &dependency) {
+  auto dependencyRefs = llvm::map_to_vector<8>(
+      llvm::reverse(dependencies), [&](const auto &dependency) {
         auto nameRef = fbb.createString(dependency.name);
         iree_vm_ModuleDependencyFlagBits_enum_t flags = 0;
         if (dependency.isOptional) {
@@ -521,15 +481,14 @@ static LogicalResult buildFlatBufferModule(
             fbb, dependency.minimumVersion);
         iree_vm_ModuleDependencyDef_flags_add(fbb, flags);
         return iree_vm_ModuleDependencyDef_end(fbb);
-      }));
+      });
 
-  auto typeRefs =
-      llvm::to_vector<8>(llvm::map_range(typeTable, [&](auto typeDef) {
-        auto fullNameRef = fbb.createString(typeDef.full_name);
-        iree_vm_TypeDef_start(fbb);
-        iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
-        return iree_vm_TypeDef_end(fbb);
-      }));
+  auto typeRefs = llvm::map_to_vector<8>(typeTable, [&](auto typeDef) {
+    auto fullNameRef = fbb.createString(typeDef.full_name);
+    iree_vm_TypeDef_start(fbb);
+    iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
+    return iree_vm_TypeDef_end(fbb);
+  });
 
   // NOTE: we keep the vectors clustered here so that we can hopefully keep the
   // pages mapped at runtime; vector dereferences in FlatBuffers require
@@ -568,8 +527,10 @@ static LogicalResult buildFlatBufferModule(
   // so that we can multi-version. For now the moduleRequirements will be the OR
   // of all functions.
   iree_vm_FeatureBits_enum_t allowedFeatures = 0;
-  if (vmOptions.f32Extension) allowedFeatures |= iree_vm_FeatureBits_EXT_F32;
-  if (vmOptions.f64Extension) allowedFeatures |= iree_vm_FeatureBits_EXT_F64;
+  if (vmOptions.f32Extension)
+    allowedFeatures |= iree_vm_FeatureBits_EXT_F32;
+  if (vmOptions.f64Extension)
+    allowedFeatures |= iree_vm_FeatureBits_EXT_F64;
   if ((moduleRequirements & allowedFeatures) != moduleRequirements) {
     return moduleOp.emitError()
            << "module uses features not allowed by flags (requires "
@@ -600,10 +561,11 @@ static LogicalResult buildFlatBufferModule(
   return success();
 }
 
-LogicalResult translateModuleToBytecode(
-    IREE::VM::ModuleOp moduleOp, IREE::VM::TargetOptions vmOptions,
-    IREE::VM::BytecodeTargetOptions bytecodeOptions,
-    llvm::raw_ostream &output) {
+LogicalResult
+translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
+                          IREE::VM::TargetOptions vmOptions,
+                          IREE::VM::BytecodeTargetOptions bytecodeOptions,
+                          llvm::raw_ostream &output) {
   moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
 
   if (failed(canonicalizeModule(bytecodeOptions, moduleOp))) {
@@ -677,8 +639,8 @@ LogicalResult translateModuleToBytecode(
   SmallVector<RodataRef> rodataRefs;
   rodataRefs.resize(rodataOps.size());
   for (auto &rodataOp : rodataOps) {
-    auto rodataValue =
-        rodataOp.getValue().dyn_cast<IREE::Util::SerializableAttrInterface>();
+    auto rodataValue = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
+        rodataOp.getValue());
     assert(rodataValue && "expected a serializable rodata value");
 
     // Split large rodata out of the FlatBuffer to avoid going over 2GB.
@@ -726,10 +688,11 @@ LogicalResult translateModuleToBytecode(
   return success();
 }
 
-LogicalResult translateModuleToBytecode(
-    mlir::ModuleOp outerModuleOp, IREE::VM::TargetOptions vmOptions,
-    IREE::VM::BytecodeTargetOptions bytecodeOptions,
-    llvm::raw_ostream &output) {
+LogicalResult
+translateModuleToBytecode(mlir::ModuleOp outerModuleOp,
+                          IREE::VM::TargetOptions vmOptions,
+                          IREE::VM::BytecodeTargetOptions bytecodeOptions,
+                          llvm::raw_ostream &output) {
   auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
   if (moduleOps.empty()) {
     return outerModuleOp.emitError()
@@ -781,7 +744,7 @@ void BytecodeTargetOptions::bindOptions(OptionsBinder &binder) {
           "(only applies to binary targets)"));
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

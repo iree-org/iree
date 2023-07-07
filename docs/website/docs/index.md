@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 # IREE
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment[^1]) is
@@ -60,43 +65,41 @@ to low-level parallel pipelined hardware/API like
 dense computation on the hardware in the form of hardware/API-specific binaries
 like [SPIR-V](https://www.khronos.org/spir/).
 
-![IREE Architecture](assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
-![IREE Architecture](assets/images/iree_architecture.svg#gh-light-mode-only)
+![IREE Architecture](./assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
+![IREE Architecture](./assets/images/iree_architecture.svg#gh-light-mode-only)
 
 ## Workflow overview
 
-Specific examples outlining IREE's workflow can be found in the
-[User Getting Started Guide](./getting-started/index.md). Using IREE involves
-the following general steps:
+Using IREE involves the following general steps:
 
 1. **Import your model**
 
     Develop your program using one of the
-    [supported frameworks](./getting-started/#supported-frameworks), then run
-    your model using one of IREE's import tools.
+    [supported frameworks](./guides/ml-frameworks/index.md), then import into
+    IREE
 
-2. **Select your [deployment configuration](./deployment-configurations/)**
+2. **Select your [deployment configuration](./guides/deployment-configurations/index.md)**
 
-    Identify your target platform, accelerator(s), and other constraints.
+    Identify your target platform, accelerator(s), and other constraints
 
 3. **Compile your model**
 
-    Compile through IREE, picking compilation targets based on your
-    deployment configuration.
+    Compile through IREE, picking settings based on your deployment
+    configuration
 
 4. **Run your model**
 
-    Use IREE's runtime components to execute your compiled model.
+    Use IREE's runtime components to execute your compiled model
 
 ### Importing models from ML frameworks
 
 IREE supports importing models from a growing list of ML frameworks and model
 formats:
 
-* [TensorFlow](getting-started/tensorflow.md)
-* [TensorFlow Lite](getting-started/tflite.md)
-* [JAX](getting-started/jax.md)
-* [PyTorch](getting-started/pytorch.md)
+* [TensorFlow](./guides/ml-frameworks/tensorflow.md) and
+  [TensorFlow Lite](./guides/ml-frameworks/tflite.md)
+* [JAX](./guides/ml-frameworks/jax.md)
+* [PyTorch](./guides/ml-frameworks/pytorch.md)
 
 ### Selecting deployment configurations
 
@@ -121,19 +124,19 @@ operators used by high level frameworks down into optimized native code and
 associated scheduling logic.
 
 For example, compiling for
-[GPU execution](deployment-configurations/gpu-vulkan.md) using Vulkan generates
+[GPU execution](./guides/deployment-configurations/gpu-vulkan.md) using Vulkan generates
 SPIR-V kernels and Vulkan API calls. For
-[CPU execution](deployment-configurations/cpu.md), native code with
+[CPU execution](./guides/deployment-configurations/cpu.md), native code with
 static or dynamic linkage and the associated function calls are generated.
 
 ### Running models
 
 IREE offers a low level C API, as well as several specialized sets of
-[bindings](./bindings) for running IREE models using other languages:
+[bindings](./reference/bindings/index.md) for running IREE models using other languages:
 
-* [C API](bindings/c-api.md)
-* [Python](bindings/python.md)
-* [TensorFlow Lite](bindings/tensorflow-lite.md)
+* [C API](./reference/bindings/c-api.md)
+* [Python](./reference/bindings/python.md)
+* [TensorFlow Lite](./reference/bindings/tensorflow-lite.md)
 
 ## Communication channels
 

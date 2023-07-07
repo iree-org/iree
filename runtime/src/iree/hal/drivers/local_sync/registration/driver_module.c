@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/drivers/local_sync/sync_driver.h"
 #include "iree/hal/local/loaders/registration/init.h"
+#include "iree/hal/local/plugins/registration/init.h"
 
 static iree_status_t iree_hal_local_sync_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
@@ -38,11 +39,17 @@ static iree_status_t iree_hal_local_sync_driver_factory_try_create(
   iree_hal_sync_device_params_t default_params;
   iree_hal_sync_device_params_initialize(&default_params);
 
+  iree_hal_executable_plugin_manager_t* plugin_manager = NULL;
+  iree_status_t status = iree_hal_executable_plugin_manager_create_from_flags(
+      host_allocator, &plugin_manager);
+
   iree_hal_executable_loader_t* loaders[8] = {NULL};
   iree_host_size_t loader_count = 0;
-  iree_status_t status = iree_hal_create_all_available_executable_loaders(
-      iree_hal_executable_import_provider_default(), IREE_ARRAYSIZE(loaders),
-      &loader_count, loaders, host_allocator);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_create_all_available_executable_loaders(
+        plugin_manager, IREE_ARRAYSIZE(loaders), &loader_count, loaders,
+        host_allocator);
+  }
 
   iree_hal_allocator_t* device_allocator = NULL;
   if (iree_status_is_ok(status)) {
@@ -61,6 +68,7 @@ static iree_status_t iree_hal_local_sync_driver_factory_try_create(
   for (iree_host_size_t i = 0; i < loader_count; ++i) {
     iree_hal_executable_loader_release(loaders[i]);
   }
+  iree_hal_executable_plugin_manager_release(plugin_manager);
   return status;
 }
 

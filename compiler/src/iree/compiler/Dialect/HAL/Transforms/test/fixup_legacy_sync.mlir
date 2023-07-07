@@ -43,6 +43,28 @@ func.func @legacy_mode_not_required(%arg0: !hal.device) {
 
 // -----
 
+// Tests that any device requiring legacy_sync will trigger the pass.
+
+module attributes {hal.device.targets = [
+  #hal.device.target<"vmvx", {}>,
+  #hal.device.target<"vulkan", {legacy_sync}>
+]} {
+// CHECK-LABEL: @mixed_legacy_mode_required
+func.func @mixed_legacy_mode_required(%device: !hal.device, %wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
+  %affinity = arith.constant 0 : i64
+  // CHECK: hal.fence.await
+  // CHECK: hal.device.queue.execute
+  // CHECK: hal.fence.await
+  hal.device.queue.execute<%device : !hal.device>
+      affinity(%affinity)
+      wait(%wait) signal(%signal)
+      commands([%cmd])
+  return
+}
+}  // module
+
+// -----
+
 // Tests that queued operations get the appropriate waits before/after.
 
 module attributes {hal.device.targets = [#hal.device.target<"vulkan", {legacy_sync}>]} {

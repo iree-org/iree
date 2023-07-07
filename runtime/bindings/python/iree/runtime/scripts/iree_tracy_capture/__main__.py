@@ -10,12 +10,11 @@ import sys
 
 
 def main(args=None):
-  if args is None:
-    args = sys.argv[1:]
-  exe = os.path.join(os.path.dirname(__file__), "..", "..",
-                     "iree-tracy-capture")
-  return subprocess.call(args=[exe] + args)
+    if args is None:
+        args = sys.argv[1:]
+    exe = os.path.join(os.path.dirname(__file__), "..", "..", "iree-tracy-capture")
+    return subprocess.call(args=[exe] + args)
 
 
 if __name__ == "__main__":
-  sys.exit(main())
+    sys.exit(main())

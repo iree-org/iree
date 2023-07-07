@@ -139,7 +139,7 @@ struct FloatRangeState : public DFX::AbstractState {
     assumed += rhsAssumed;
   }
 
- private:
+private:
   FloatRangeStats assumed = FloatRangeStats::getInvalid();
   FloatRangeStats known = FloatRangeStats::getWidest();
 };
@@ -147,7 +147,7 @@ struct FloatRangeState : public DFX::AbstractState {
 // Attribute known floating point range and flags to an IR Value.
 class FloatRangeValueElement
     : public DFX::StateWrapper<FloatRangeState, DFX::ValueElement> {
- public:
+public:
   using BaseType = DFX::StateWrapper<FloatRangeState, DFX::ValueElement>;
   using BaseType::BaseType;
 
@@ -167,12 +167,12 @@ class FloatRangeValueElement
   }
   const std::string getAsStr(AsmState &asmState) const override;
 
- private:
+private:
   void initializeValue(Value value, DFX::Solver &solver) override;
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override;
 };
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

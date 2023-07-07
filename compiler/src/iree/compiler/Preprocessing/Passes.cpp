@@ -54,7 +54,7 @@ void extendWithTextPipeline(OpPassManager &passManager,
   });
 }
 
-}  // namespace
+} // namespace
 
 void buildPreprocessingPassPipeline(
     OpPassManager &passManager,
@@ -73,6 +73,6 @@ void buildPreprocessingPassPipeline(
 
 void registerPreprocessingPasses() { registerCommonPreprocessingPasses(); }
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

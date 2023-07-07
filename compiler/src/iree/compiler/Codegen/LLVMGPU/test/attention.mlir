@@ -4,7 +4,7 @@
 // RUN: FileCheck --check-prefix=CHECK %s
 
 hal.executable @_attention_dispatch_0 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
     hal.executable.export public @_attention_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -30,52 +30,69 @@ hal.executable @_attention_dispatch_0 {
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%variant_op: !pdl.operation):
+  ^bb0(%variant_op: !transform.any_op):
 
     // Get attention op
     // ==========================================
-    %attention = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    %attention = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
     // Tile and distribute to workgroups
     // ==========================================
     %forall_grid, %tiled_attention =
     transform.structured.tile_to_forall_op %attention tile_sizes [1, 128]
       ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Tile and decompose attention
     // ==========================================
-    %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %outer_loop, %max_fill, %sum_fill, %inner_loop, %fill_op, %first_matmul, %reduce_max, %partial_softmax, %reduce_sum, %update,
     %softmax, %scale_acc, %second_matmul = tile_and_decompose_attention %attention2 :
-       (!pdl.operation) -> (!pdl.operation, !pdl.operation,!pdl.operation,  !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+       (!transform.any_op) -> (!transform.any_op, !transform.any_op,!transform.any_op,  !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
 
     // Vectorize function
     // ==========================================
-    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
-    %func_3 = transform.structured.vectorize %func
+    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+      transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+      transform.apply_patterns.vector.cast_away_vector_leading_one_dim
+    } : !transform.any_op
+    %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
 
     // Bufferization
     // ==========================================
-    transform.iree.apply_patterns %func_3
-      { fold_reassociative_reshapes, canonicalization, tiling_canonicalization, cse } : (!pdl.operation) -> ()
-    transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
-    transform.iree.apply_patterns %func_3 { erase_unnecessary_tensor_operands } : (!pdl.operation) -> ()
-    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!pdl.operation) -> (!pdl.operation)
-    %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-    transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
+    transform.apply_patterns to %func_3 {
+      transform.apply_patterns.iree.fold_fill_into_pad
+      transform.apply_patterns.linalg.tiling_canonicalization
+      transform.apply_patterns.scf.for_loop_canonicalization
+    } : !transform.any_op
+    transform.apply_patterns to %func_3 {
+      transform.apply_patterns.tensor.reassociative_reshape_folding
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
+    transform.iree.apply_cse %func_3 : !transform.any_op
+    transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
+    transform.apply_patterns to %func_3 {
+      transform.apply_patterns.linalg.erase_unnecessary_inputs
+    } : !transform.any_op
+    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)
+    %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!transform.any_op) -> ()
 
     // Step 6. Post-bufferization vector distribution
     // ===========================================================================
-    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-    transform.iree.forall_to_workgroup %func_7 : (!pdl.operation) -> ()
-    transform.iree.map_nested_forall_to_gpu_threads %func_7 workgroup_dims = [128, 1, 1] : (!pdl.operation) -> ()
+    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
+    transform.iree.map_nested_forall_to_gpu_threads %func_7 workgroup_dims = [128, 1, 1] : (!transform.any_op) -> ()
 
     %func_8 = transform.structured.hoist_redundant_vector_transfers %memref_func
-    : (!pdl.operation) -> !pdl.operation
-    transform.iree.apply_patterns %func_8 { canonicalization } : (!pdl.operation) -> ()
-    transform.iree.apply_patterns %func_8 { cse } : (!pdl.operation) -> ()
-    transform.iree.apply_buffer_optimizations %func_8 : (!pdl.operation) -> ()
+    : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func_8 {
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
+    transform.iree.apply_cse %func_8 : !transform.any_op
+    transform.iree.apply_buffer_optimizations %func_8 : (!transform.any_op) -> ()
 }
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 128)>
@@ -108,13 +125,13 @@ transform.sequence failures(propagate) {
 // CHECK-DAG:      %[[D4:.+]] = affine.apply #[[MAP]]()[%[[WORKGROUP_ID_Y]]]
 // CHECK:        %[[SUBVIEW:.+]] = memref.subview %[[D3]][%[[WORKGROUP_ID_X]], %[[D4]], 0] [1, 128, 64] [1, 1, 1]
 // CHECK-SAME:     : memref<192x1024x64xf32> to memref<1x128x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:        %[[D7:.+]] = vector.transfer_read %[[D0]][%[[WORKGROUP_ID_X]], %[[D4]], %[[C0]]], %[[CST_2]]
+// CHECK-SAME:     {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
 // CHECK:        %[[D5:.+]] = vector.transfer_read %[[SUBVIEW]][%[[C0]], %[[C0]], %[[C0]]], %[[CST_2]] {in_bounds
 // CHECK-SAME:     = [true, true]} : memref<1x128x64xf32, strided<[65536, 64, 1], offset: ?>>, vector<128x64xf32>
 // CHECK:        %[[D6:.+]]:3 = scf.for %[[ARG0:.+]] = %[[C0]] to %[[C1024]] step %[[C128]]
 // CHECK-SAME:     iter_args(%[[ARG1:.+]] = %[[CST]], %[[ARG2:.+]] = %[[CST_0]], %[[ARG3:.+]] = %[[D5]]) -> (vector<128xf32>,
 // CHECK-SAME:     vector<128xf32>, vector<128x64xf32>) {
-// CHECK:          %[[D7:.+]] = vector.transfer_read %[[D0]][%[[WORKGROUP_ID_X]], %[[D4]], %[[C0]]], %[[CST_2]]
-// CHECK-SAME:       {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
 // CHECK:          %[[D8:.+]] = vector.transfer_read %[[D1]][%[[WORKGROUP_ID_X]], %[[ARG0]], %[[C0]]], %[[CST_2]]
 // CHECK-SAME:       {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
 // CHECK:          %[[D9:.+]] = vector.contract {indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iterator_types
@@ -134,18 +151,17 @@ transform.sequence failures(propagate) {
 // CHECK:          %[[D19:.+]] = vector.broadcast %[[D18]] : vector<128xf32> to vector<128x128xf32>
 // CHECK:          %[[D20:.+]] = vector.transpose %[[D19]], [1, 0] : vector<128x128xf32> to vector<128x128xf32>
 // CHECK:          %[[D21:.+]] = arith.divf %[[D14]], %[[D20]] : vector<128x128xf32>
-// CHECK:          %[[D22:.+]] = vector.broadcast %[[D17]] : vector<128xf32> to vector<64x128xf32>
-// CHECK:          %[[D23:.+]] = vector.broadcast %[[D18]] : vector<128xf32> to vector<64x128xf32>
-// CHECK:          %[[D24:.+]] = arith.divf %[[D22]], %[[D23]] : vector<64x128xf32>
-// CHECK:          %[[D25:.+]] = vector.transpose %[[D24]], [1, 0] : vector<64x128xf32> to vector<128x64xf32>
-// CHECK:          %[[D26:.+]] = arith.mulf %[[D25]], %[[ARG3]] : vector<128x64xf32>
-// CHECK:          %[[D27:.+]] = vector.transfer_read %[[D2]][%[[WORKGROUP_ID_X]], %[[ARG0]], %[[C0]]], %[[CST_2]]
+// CHECK:          %[[D22:.+]] = arith.divf %[[D17]], %[[D18]] : vector<128xf32>
+// CHECK:          %[[D23:.+]] = vector.broadcast %[[D22]] : vector<128xf32> to vector<64x128xf32>
+// CHECK:          %[[D24:.+]] = vector.transpose %[[D23]], [1, 0] : vector<64x128xf32> to vector<128x64xf32>
+// CHECK:          %[[D25:.+]] = arith.mulf %[[D24]], %[[ARG3]] : vector<128x64xf32>
+// CHECK:          %[[D26:.+]] = vector.transfer_read %[[D2]][%[[WORKGROUP_ID_X]], %[[ARG0]], %[[C0]]], %[[CST_2]]
 // CHECK-SAME:       {in_bounds = [true, true]} : memref<192x1024x64xf32>, vector<128x64xf32>
-// CHECK:          %[[D28:.+]] = vector.contract {indexing_maps = [#[[MAP1]], #[[MAP4]], #[[MAP3]]],
+// CHECK:          %[[D27:.+]] = vector.contract {indexing_maps = [#[[MAP1]], #[[MAP4]], #[[MAP3]]],
 // CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>}
-// CHECK-SAME:       %[[D21]], %[[D27]], %[[D26]] : vector<128x128xf32>, vector<128x64xf32> into
+// CHECK-SAME:       %[[D21]], %[[D26]], %[[D25]] : vector<128x128xf32>, vector<128x64xf32> into
 // CHECK-SAME:       vector<128x64xf32>
-// CHECK:          scf.yield %[[D10]], %[[D18]], %[[D28]] : vector<128xf32>, vector<128xf32>, vector<128x64xf32>
+// CHECK:          scf.yield %[[D10]], %[[D18]], %[[D27]] : vector<128xf32>, vector<128xf32>, vector<128x64xf32>
 // CHECK:        }
 // CHECK:        vector.transfer_write %[[D6]]#[[D2:.+]], %[[SUBVIEW]][%[[C0]], %[[C0]], %[[C0]]] {in_bounds =
 // CHECK-SAME:     [true, true]} : vector<128x64xf32>, memref<1x128x64xf32, strided<[65536, 64, 1], offset: ?>>

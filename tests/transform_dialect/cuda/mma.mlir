@@ -28,16 +28,20 @@ func.func @wmma(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x16xf
 }
 
 transform.sequence failures(propagate) {
-^bb1(%module: !pdl.operation):
+^bb1(%module: !transform.any_op):
   %func = transform.structured.match ops{["func.func"]} in %module
-    : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma } : (!pdl.operation) -> ()
-  transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!pdl.operation) -> ()
+    : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func {
+    transform.apply_patterns.iree.unroll_vectors_gpu_wmma_sync
+  } : !transform.any_op
+  transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!transform.any_op) -> ()
 
   // Apply canonicalization post-hoc to trigger DCE and pass the test 
   // (i.e. all vector.contract are dead).
   // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
-  transform.iree.apply_patterns %func { canonicalization } : (!pdl.operation) -> ()
+  transform.apply_patterns to %func {
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
 }
 
 // -----
@@ -60,7 +64,7 @@ func.func @mma_sync(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x
   %vc = vector.transfer_read %c[%c0, %c0], %cst: memref<16x16xf32>, vector<16x16xf32>
 
   // CHECK-NOT: vector.contract
-  //     CHECK: nvgpu.mma.sync
+  //     CHECK: nvgpu.mma.sync{{.*}} tf32Enabled}
   %vres = vector.contract #matmat_trait %va, %vb, %vc
     : vector<16x16xf32>, vector<16x16xf32> into vector<16x16xf32>
   vector.transfer_write %vres, %c[%c0, %c0]: vector<16x16xf32>, memref<16x16xf32>
@@ -68,14 +72,19 @@ func.func @mma_sync(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x
 }
 
 transform.sequence failures(propagate) {
-^bb1(%module: !pdl.operation):
+^bb1(%module: !transform.any_op):
   %func = transform.structured.match ops{["func.func"]} in %module
-    : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %func { unroll_vectors_gpu_mma_sync } : (!pdl.operation) -> ()
-  transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync } : (!pdl.operation) -> ()
+    : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %func {
+    transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
+  } : !transform.any_op
+  transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync } : (!transform.any_op) -> ()
 
   // Apply canonicalization post-hoc to trigger DCE and pass the test 
   // (i.e. all vector.contract are dead).
   // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
-  transform.iree.apply_patterns %func { canonicalization } : (!pdl.operation) -> ()
+  transform.apply_patterns to %func {
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
 }
+

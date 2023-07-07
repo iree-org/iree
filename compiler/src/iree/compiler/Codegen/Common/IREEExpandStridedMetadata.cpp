@@ -6,10 +6,10 @@
 
 #define DEBUG_TYPE "iree-codegen-expand-strided-metadata"
 
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -26,7 +26,7 @@ struct DescriptorInfo {
   SmallVector<OpFoldResult> sizes;
   SmallVector<OpFoldResult> strides;
 };
-}  // namespace
+} // namespace
 
 /// Returns an AffineMap for an add or a mul.
 static AffineMap getAddMap(MLIRContext *context) {
@@ -42,8 +42,9 @@ static AffineMap getMulMap(MLIRContext *context) {
 
 /// Returns the strides based on the sizes assuming that the `memref`
 /// has default layout, i.e. it is not a result of a subview.
-static SmallVector<OpFoldResult> getStridesFromSizes(
-    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> sizes) {
+static SmallVector<OpFoldResult>
+getStridesFromSizes(RewriterBase &rewriter, Location loc,
+                    ArrayRef<OpFoldResult> sizes) {
   if (sizes.size() == 0) {
     return {};
   }
@@ -54,8 +55,8 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
   }
   AffineMap mulMap = getMulMap(rewriter.getContext());
   for (int i = sizes.size() - 2; i >= 0; --i) {
-    strides[i] = makeComposedFoldedAffineApply(rewriter, loc, mulMap,
-                                               {strides[i + 1], sizes[i + 1]});
+    strides[i] = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulMap, {strides[i + 1], sizes[i + 1]});
   }
   return strides;
 }
@@ -63,7 +64,7 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
 static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
     IREE::HAL::InterfaceBindingSubspanOp binding, RewriterBase &rewriter,
     Location loc) {
-  auto memRefType = binding.getResult().getType().template cast<MemRefType>();
+  auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
   int rank = memRefType.getRank();
   DescriptorInfo resultDescriptor;
 
@@ -91,8 +92,9 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
 /// Replaces the offsets, sizes and strides based on values provided
 /// by `DescriptorInfo` object.
 template <typename OpTy>
-static void replaceOffsetSizesAndStridesWith(
-    RewriterBase &rewriter, OpTy op, const DescriptorInfo &resultDescriptor) {
+static void
+replaceOffsetSizesAndStridesWith(RewriterBase &rewriter, OpTy op,
+                                 const DescriptorInfo &resultDescriptor) {
   int rank = resultDescriptor.sizes.size();
   assert(rank == resultDescriptor.strides.size() &&
          "expected number of sizes and strides to match");
@@ -129,9 +131,11 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     auto binding =
         op.getSource()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!binding) return failure();
-    auto memRefType = binding.getResult().getType().template cast<MemRefType>();
-    if (memRefType.getRank() < 1) return failure();
+    if (!binding)
+      return failure();
+    auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
+    if (memRefType.getRank() < 1)
+      return failure();
 
     auto loc = op.getLoc();
     OpBuilder::InsertionGuard g(rewriter);
@@ -168,11 +172,11 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     AffineMap mulMap = getMulMap(rewriter.getContext());
     OpFoldResult linearizedMemrefSize = rewriter.getIndexAttr(1);
     for (auto size : resultDescriptor->sizes) {
-      linearizedMemrefSize = makeComposedFoldedAffineApply(
+      linearizedMemrefSize = affine::makeComposedFoldedAffineApply(
           rewriter, loc, mulMap, {linearizedMemrefSize, size});
     }
     AffineMap addMap = getAddMap(rewriter.getContext());
-    linearizedMemrefSize = makeComposedFoldedAffineApply(
+    linearizedMemrefSize = affine::makeComposedFoldedAffineApply(
         rewriter, loc, addMap,
         {linearizedMemrefSize, resultDescriptor->offset});
 
@@ -193,7 +197,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
 
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() + 2);
-    auto baseBufferType = op.getBaseBuffer().getType().cast<MemRefType>();
+    auto baseBufferType = llvm::cast<MemRefType>(op.getBaseBuffer().getType());
     if (newBufferType == baseBufferType) {
       results.push_back(linearInterfaceBinding);
     } else {
@@ -219,13 +223,13 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
 struct IREEExpandStridedMetadataPass
     : public IREEExpandStridedMetadataBase<IREEExpandStridedMetadataPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, arith::ArithDialect,
+    registry.insert<affine::AffineDialect, arith::ArithDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void IREEExpandStridedMetadataPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -261,5 +265,5 @@ std::unique_ptr<Pass> createIREEExpandStridedMetadataPass() {
   return std::make_unique<IREEExpandStridedMetadataPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

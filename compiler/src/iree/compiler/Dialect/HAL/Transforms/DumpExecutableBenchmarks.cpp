@@ -49,7 +49,7 @@ struct DispatchParams {
   // Analyzed minimum binding sizes.
   SmallVector<Binding> bindings;
   // Push constant operands that are known constant. May be null if dynamic.
-  SmallVector<Attribute> uniformOperands;
+  SmallVector<TypedAttr> uniformOperands;
 };
 
 using DispatchParamsMap =
@@ -66,8 +66,8 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       // TODO(benvanik): typed accessors for bindings.
-      auto bindingAttrs = dispatchOp->getAttr("hal.interface.bindings")
-                              .dyn_cast_or_null<ArrayAttr>();
+      auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
+          dispatchOp->getAttr("hal.interface.bindings"));
       assert(bindingAttrs &&
              "interface materialization must annotate dispatch sites");
 
@@ -97,9 +97,9 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
                             resourceLengthInt.getSExtValue()});
       }
 
-      SmallVector<Attribute> uniformOperands;
+      SmallVector<TypedAttr> uniformOperands;
       for (auto operand : dispatchOp.getUniformOperands()) {
-        Attribute uniformOperand;
+        TypedAttr uniformOperand;
         if (!matchPattern(operand, m_Constant(&uniformOperand))) {
           // Non-constant uniform operand; skip the dispatch.
           // TODO(benvanik): extract information from the executable annotations
@@ -136,9 +136,10 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
 
 // Appends a global hal.buffer initialized to the size required for all
 // of the bindings in |dispatchParams| (plus alignment).
-static IREE::Util::GlobalOp appendGlobalBuffer(
-    Location loc, StringRef baseName, const DispatchParams &dispatchParams,
-    OpBuilder &moduleBuilder) {
+static IREE::Util::GlobalOp
+appendGlobalBuffer(Location loc, StringRef baseName,
+                   const DispatchParams &dispatchParams,
+                   OpBuilder &moduleBuilder) {
   // Create a global to hold the HAL buffer.
   auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
       loc, (baseName + "_buffer").str(),
@@ -254,7 +255,7 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
 
   // Push constant values.
   if (int64_t pushConstantCount = layoutAttr.getPushConstants()) {
-    int pushConstantBase = 0;  // always 0 today
+    int pushConstantBase = 0; // always 0 today
     SmallVector<Value> pushConstants;
     pushConstants.reserve(pushConstantCount);
     for (int64_t i = 0; i < pushConstantCount; ++i) {
@@ -279,7 +280,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   };
   int64_t bufferOffset = 0;
   for (auto binding : dispatchParams.bindings) {
-    if (currentSet != -1 && currentSet != binding.set) flushSet();
+    if (currentSet != -1 && currentSet != binding.set)
+      flushSet();
     currentSet = binding.set;
     IREE::HAL::DescriptorSetBindingValue bindingValue;
     bindingValue.ordinal =
@@ -291,7 +293,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
     bufferOffset =
         IREE::Util::align(bufferOffset + binding.size, kBufferAlignment);
   }
-  if (currentSet != -1) flushSet();
+  if (currentSet != -1)
+    flushSet();
 
   // @executable::@variant::@export
   auto exportRefAttr =
@@ -302,9 +305,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
                          });
 
   // Compute the workgroup parameters.
-  auto workload = llvm::to_vector(
-      llvm::map_range(dispatchParams.workload,
-                      [&](unsigned dim) { return indexSet.get(dim); }));
+  auto workload = llvm::map_to_vector(
+      dispatchParams.workload, [&](unsigned dim) { return indexSet.get(dim); });
   auto workgroupCountOp =
       funcBuilder.create<IREE::HAL::ExecutableCalculateWorkgroupsOp>(
           loc, funcBuilder.getIndexType(), funcBuilder.getIndexType(),
@@ -361,10 +363,10 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
 
 // Builds a module exporting one function for each dispatch configuration
 // targeting |sourceExecutableOp|.
-static mlir::OwningOpRef<mlir::ModuleOp> buildBenchmarkModule(
-    IREE::HAL::ExecutableOp sourceExecutableOp,
-    IREE::HAL::ExecutableVariantOp sourceVariantOp,
-    const DispatchParamsMap &dispatchParamsMap) {
+static mlir::OwningOpRef<mlir::ModuleOp>
+buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
+                     IREE::HAL::ExecutableVariantOp sourceVariantOp,
+                     const DispatchParamsMap &dispatchParamsMap) {
   // Empty module with default name.
   // We could use the original module name here to make tracking nicer.
   mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
@@ -407,7 +409,8 @@ static mlir::OwningOpRef<mlir::ModuleOp> buildBenchmarkModule(
   }
 
   // Skip the file when we could not generate any benchmarks.
-  if (!hasAnyBenchmarks) return {};
+  if (!hasAnyBenchmarks)
+    return {};
 
   // Run CSE and the canonicalizer to pretty up the output.
   PassManager passManager(moduleOp->getContext());
@@ -424,15 +427,15 @@ static mlir::OwningOpRef<mlir::ModuleOp> buildBenchmarkModule(
 static void dumpModuleToStream(mlir::ModuleOp moduleOp, StringRef fileName,
                                llvm::raw_ostream &os) {
   OpPrintingFlags flags;
-  flags.useLocalScope();  // could use global scope, but IR gets messy fast
+  flags.useLocalScope(); // could use global scope, but IR gets messy fast
   moduleOp.print(os, flags);
-  os << "\n";  // newline at end of file
+  os << "\n"; // newline at end of file
 }
 
 class DumpExecutableBenchmarksPass
     : public PassWrapper<DumpExecutableBenchmarksPass,
                          OperationPass<ModuleOp>> {
- public:
+public:
   DumpExecutableBenchmarksPass() = default;
   DumpExecutableBenchmarksPass(const DumpExecutableBenchmarksPass &pass) {}
   DumpExecutableBenchmarksPass(StringRef path) { this->path = path.str(); }
@@ -460,7 +463,8 @@ class DumpExecutableBenchmarksPass
     // filtering out dispatches that have dynamic parameters we don't
     // currently support.
     auto dispatchParamsMap = gatherDispatchParams(moduleOp);
-    if (dispatchParamsMap.empty()) return;
+    if (dispatchParamsMap.empty())
+      return;
 
     // Help people out and mkdir if needed.
     if (!path.empty() && path != "-") {
@@ -473,9 +477,10 @@ class DumpExecutableBenchmarksPass
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
         auto benchmarkModuleOp =
             buildBenchmarkModule(executableOp, variantOp, dispatchParamsMap);
-        if (!benchmarkModuleOp) continue;
+        if (!benchmarkModuleOp)
+          continue;
         auto fileName = (moduleName + "_" + executableOp.getName() + "_" +
-                         variantOp.getName() + ".mlir")
+                         variantOp.getName() + "_benchmark.mlir")
                             .str();
         if (path.empty() || path == "-") {
           dumpModuleToStream(*benchmarkModuleOp, fileName, llvm::outs());
@@ -496,14 +501,14 @@ class DumpExecutableBenchmarksPass
     }
   }
 
- private:
+private:
   Option<std::string> path{
       *this, "path",
       llvm::cl::desc("Path to write hal.executable benchmarks into.")};
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createDumpExecutableBenchmarksPass(
-    StringRef path) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createDumpExecutableBenchmarksPass(StringRef path) {
   return std::make_unique<DumpExecutableBenchmarksPass>(path);
 }
 
@@ -511,7 +516,7 @@ static PassRegistration<DumpExecutableBenchmarksPass> pass([] {
   return std::make_unique<DumpExecutableBenchmarksPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

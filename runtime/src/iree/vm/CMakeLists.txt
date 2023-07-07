@@ -30,7 +30,6 @@ iree_cc_library(
   DEPS
     ::vm
     iree::base
-    iree::base::core_headers
     iree::base::internal::span
   PUBLIC
 )
@@ -66,9 +65,8 @@ iree_cc_library(
     "stack.c"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal
-    iree::base::tracing
+    iree::base::internal::synchronization
   PUBLIC
 )
 

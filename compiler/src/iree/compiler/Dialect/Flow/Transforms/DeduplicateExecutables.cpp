@@ -27,7 +27,8 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   auto lhsIt = lhs.begin();
   auto rhsIt = rhs.begin();
   while (lhsIt != lhs.end() && rhsIt != rhs.end()) {
-    if (!pred(*lhsIt++, *rhsIt++)) return false;
+    if (!pred(*lhsIt++, *rhsIt++))
+      return false;
   }
   if ((lhsIt == lhs.end()) != (rhsIt == rhs.end())) {
     // Block count mismatch. We do this here so that we avoid the O(n) scan
@@ -79,13 +80,14 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
             }
             for (auto [lhsArg, rhsArg] : llvm::zip_equal(
                      lhsBlock.getArguments(), rhsBlock.getArguments())) {
-              if (lhsArg.getType() != rhsArg.getType()) return false;
+              if (lhsArg.getType() != rhsArg.getType())
+                return false;
               mapping.map(lhsArg, rhsArg);
             }
             mapping.map(&lhsBlock, &rhsBlock);
             return true;
           })) {
-    return false;  // block mismatch
+    return false; // block mismatch
   }
 
   // Walk the blocks again now that we have a populated mapping.
@@ -101,11 +103,13 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
     llvm::ReversePostOrderTraversal<Block *> traversal(&b);
     rhsBlocks.insert(traversal.begin(), traversal.end());
   }
-  if (lhsBlocks.size() != rhsBlocks.size()) return false;
+  if (lhsBlocks.size() != rhsBlocks.size())
+    return false;
   for (auto [lhsBlock, rhsBlock] : llvm::zip_equal(lhsBlocks, rhsBlocks)) {
     auto &lhsOperations = lhsBlock->getOperations();
     auto &rhsOperations = rhsBlock->getOperations();
-    if (lhsOperations.size() != rhsOperations.size()) return false;
+    if (lhsOperations.size() != rhsOperations.size())
+      return false;
     for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsOperations, rhsOperations)) {
       if (!isStructurallyEquivalentTo(lhsOp, rhsOp, mapping)) {
         return false;
@@ -120,11 +124,16 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
 static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
                                        IRMapping &parentMapping) {
   // Check operation metadata for early-exit opportunities.
-  if (lhs.getName() != rhs.getName()) return false;
-  if (lhs.getNumOperands() != rhs.getNumOperands()) return false;
-  if (lhs.getNumResults() != rhs.getNumResults()) return false;
-  if (lhs.getNumRegions() != rhs.getNumRegions()) return false;
-  if (lhs.getNumSuccessors() != rhs.getNumSuccessors()) return false;
+  if (lhs.getName() != rhs.getName())
+    return false;
+  if (lhs.getNumOperands() != rhs.getNumOperands())
+    return false;
+  if (lhs.getNumResults() != rhs.getNumResults())
+    return false;
+  if (lhs.getNumRegions() != rhs.getNumRegions())
+    return false;
+  if (lhs.getNumSuccessors() != rhs.getNumSuccessors())
+    return false;
 
   // TODO(#3996): symbol mapping; for now allow them to differ unconditionally.
   if (!compare_ranges(
@@ -143,7 +152,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // in the mapping already from the parent region to do the lhs->rhs mapping.
   for (auto [lhsSuccessor, rhsSuccessor] :
        llvm::zip_equal(lhs.getSuccessors(), rhs.getSuccessors())) {
-    if (rhsSuccessor != parentMapping.lookup(lhsSuccessor)) return false;
+    if (rhsSuccessor != parentMapping.lookup(lhsSuccessor))
+      return false;
   }
 
   // Ensure result types match first and add to the block and value mapping.
@@ -152,7 +162,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // exit prior to the full traversal.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getResults(), rhs.getResults())) {
-    if (lhsValue.getType() != rhsValue.getType()) return false;
+    if (lhsValue.getType() != rhsValue.getType())
+      return false;
     parentMapping.map(lhsValue, rhsValue);
   }
 
@@ -160,8 +171,10 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // these values they should already be defined in the mapping.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getOperands(), rhs.getOperands())) {
-    if (lhsValue.getType() != rhsValue.getType()) return false;
-    if (rhsValue != parentMapping.lookup(lhsValue)) return false;
+    if (lhsValue.getType() != rhsValue.getType())
+      return false;
+    if (rhsValue != parentMapping.lookup(lhsValue))
+      return false;
   }
 
   // Recurse into regions.
@@ -191,63 +204,82 @@ void replaceEntryPointUses(
     funcLikeOp->walk([&](DispatchOp dispatchOp) {
       auto it = replacements.find(dispatchOp.getEntryPoint());
       if (it != replacements.end()) {
-        dispatchOp.setEntryPointAttr(it->second.cast<SymbolRefAttr>());
+        dispatchOp.setEntryPointAttr(llvm::cast<SymbolRefAttr>(it->second));
       }
     });
   }
 }
 
-}  // namespace
+} // namespace
 
 class DeduplicateExecutablesPass
     : public DeduplicateExecutablesBase<DeduplicateExecutablesPass> {
- public:
+public:
   explicit DeduplicateExecutablesPass() {}
   DeduplicateExecutablesPass(const DeduplicateExecutablesPass &pass) {}
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
-    auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
+    // Bucket based on the hash of the names of at most the first 5 ops.
+    // 5 was randomly chosen to be small enough to not increase overhead much,
+    // but giving at least enough of a sample that there is some bucketing. This
+    // was not empiraclly deetermined.
+    llvm::MapVector<uint32_t, SmallVector<ExecutableOp, 3>> executableOpsMap;
+    totalExecutables = 0;
+    for (auto op : moduleOp.getOps<ExecutableOp>()) {
+      int count = 0;
+      llvm::hash_code hash(1);
+      op.walk([&](Operation *it) {
+        hash = llvm::hash_combine(hash, it->getName());
+        return (++count >= 5) ? WalkResult::interrupt() : WalkResult::advance();
+      });
+      executableOpsMap[hash_value(hash)].push_back(op);
+      ++totalExecutables;
+    }
+
+    auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
     SmallVector<ExecutableOp, 3> duplicateExecutableOps;
     DenseMap<Attribute, SymbolRefAttr> entryPointRefReplacements;
 
     // For each executable, find the first executable which it is equivalent to.
-    for (int i = executableOps.size() - 1; i >= 0; --i) {
-      auto duplicateExecutableOp = executableOps[i];
+    for (auto &[key, executableOps] : executableOpsMap) {
+      (void)key;
+      for (int i = executableOps.size() - 1; i >= 0; --i) {
+        auto duplicateExecutableOp = executableOps[i];
 
-      for (int j = 0; j < i; ++j) {
-        auto referenceExecutableOp = executableOps[j];
-        if (!isStructurallyEquivalentTo(duplicateExecutableOp.getBody(),
-                                        referenceExecutableOp.getBody())) {
-          continue;
+        for (int j = 0; j < i; ++j) {
+          auto referenceExecutableOp = executableOps[j];
+          if (!isStructurallyEquivalentTo(duplicateExecutableOp.getBody(),
+                                          referenceExecutableOp.getBody())) {
+            continue;
+          }
+
+          // Found an equivalent executable! Record it and move on to the next.
+          duplicateExecutableOps.push_back(duplicateExecutableOp);
+
+          // Record entry point reference replacements.
+          for (auto [oldExportOp, newExportOp] :
+               llvm::zip_equal(duplicateExecutableOp.getBlock()
+                                   .getOps<ExecutableExportOp>(),
+                               referenceExecutableOp.getBlock()
+                                   .getOps<ExecutableExportOp>())) {
+            auto oldSymbolRefAttr = SymbolRefAttr::get(
+                builder.getContext(), duplicateExecutableOp.getName(),
+                {SymbolRefAttr::get(builder.getContext(),
+                                    oldExportOp.getSymName())});
+            auto newSymbolRefAttr = SymbolRefAttr::get(
+                builder.getContext(), referenceExecutableOp.getName(),
+                {SymbolRefAttr::get(builder.getContext(),
+                                    newExportOp.getSymName())});
+            entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
+          }
+
+          break;
         }
-
-        // Found an equivalent executable! Record it and move on to the next.
-        duplicateExecutableOps.push_back(duplicateExecutableOp);
-
-        // Record entry point reference replacements.
-        for (auto [oldExportOp, newExportOp] : llvm::zip_equal(
-                 duplicateExecutableOp.getBlock().getOps<ExecutableExportOp>(),
-                 referenceExecutableOp.getBlock()
-                     .getOps<ExecutableExportOp>())) {
-          auto oldSymbolRefAttr = SymbolRefAttr::get(
-              builder.getContext(), duplicateExecutableOp.getName(),
-              {SymbolRefAttr::get(builder.getContext(),
-                                  oldExportOp.getSymName())});
-          auto newSymbolRefAttr = SymbolRefAttr::get(
-              builder.getContext(), referenceExecutableOp.getName(),
-              {SymbolRefAttr::get(builder.getContext(),
-                                  newExportOp.getSymName())});
-          entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
-        }
-
-        break;
       }
     }
 
-    totalExecutables = executableOps.size();
     executablesDeduplicated = duplicateExecutableOps.size();
     remainingExecutables = totalExecutables - executablesDeduplicated;
 
@@ -264,7 +296,7 @@ class DeduplicateExecutablesPass
     }
   }
 
- private:
+private:
   Statistic totalExecutables{
       this, "total executable(s)",
       "Number of flow.executable ops before deduplication"};
@@ -281,7 +313,7 @@ createDeduplicateExecutablesPass() {
   return std::make_unique<DeduplicateExecutablesPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

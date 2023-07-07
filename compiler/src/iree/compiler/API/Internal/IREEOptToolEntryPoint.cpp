@@ -8,6 +8,7 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_passes.h"
@@ -29,9 +30,12 @@
 using namespace llvm;
 using namespace mlir;
 
+using mlir::iree_compiler::IREE::HAL::TargetBackendList;
+using mlir::iree_compiler::IREE::HAL::TargetBackendRegistry;
+
 #if defined(_MSC_VER)
 #define fileno _fileno
-#endif  // _MSC_VER
+#endif // _MSC_VER
 
 static LogicalResult ireeOptMainFromCL(int argc, char **argv,
                                        llvm::StringRef toolName,
@@ -45,7 +49,22 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
 
   InitLLVM y(argc, argv);
 
-  // Register any command line options.
+  // We support a limited form of the PluginManager, allowing it to perform
+  // global initialization and dialect registration.
+  mlir::iree_compiler::PluginManager pluginManager;
+  if (!pluginManager.loadAvailablePlugins()) {
+    llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
+    return failure();
+  }
+  // Initialization that applies to all global plugins must be done prior
+  // to CL parsing.
+  pluginManager.globalInitialize();
+  pluginManager.registerPasses();
+  pluginManager.registerGlobalDialects(registry);
+  pluginManager.initializeCLI();
+
+  // Register command line options. All passes must be registered at this point
+  // to expose them through the tool.
   MlirOptMainConfig::registerCLOptions(registry);
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
@@ -63,20 +82,6 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
                     [&](auto name) { os << name; });
   }
 
-  // We support a limited form of the PluginManager, allowing it to perform
-  // global initialization and dialect registration.
-  mlir::iree_compiler::PluginManager pluginManager;
-  if (!pluginManager.loadAvailablePlugins()) {
-    llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
-    return failure();
-  }
-  // Initialization that applies to all global plugins must be done prior
-  // to CL parsing.
-  pluginManager.globalInitialize();
-  pluginManager.registerPasses();
-  pluginManager.registerGlobalDialects(registry);
-  pluginManager.initializeCLI();
-
   // Parse pass names in main to ensure static initialization completed.
   cl::ParseCommandLineOptions(argc, argv, helpHeader);
   MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
@@ -86,8 +91,18 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   auto localBinder = mlir::iree_compiler::OptionsBinder::local();
   mlir::iree_compiler::PluginManagerSession pluginSession(
       pluginManager, localBinder, pluginManagerOptions);
-  if (failed(pluginSession.initializePlugins())) return failure();
+  if (failed(pluginSession.initializePlugins()))
+    return failure();
   pluginSession.registerDialects(registry);
+
+  // In the normal compiler flow, activated plugins maintain a scoped registry
+  // of target backends. However, no such layering exists for the opt tool.
+  // Since it tests passes that are default initialized, we just configure the
+  // global registry that such constructors depend on.
+  TargetBackendList pluginBackendList;
+  pluginSession.populateHALTargetBackends(pluginBackendList);
+  const_cast<TargetBackendRegistry &>(TargetBackendRegistry::getGlobal())
+      .mergeFrom(pluginBackendList);
 
   // When reading from stdin and the input is a tty, it is often a user mistake
   // and the process "appears to be stuck". Print a message to let the user know

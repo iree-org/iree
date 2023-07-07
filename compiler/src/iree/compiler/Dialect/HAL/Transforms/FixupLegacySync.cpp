@@ -63,7 +63,7 @@ static void insertWaitIfNeeded(Operation *asyncOp,
   // Returns an operation waiting on |fence| that is guaranteed to have
   // executed prior to asyncOp. Returns null if no waits found.
   auto beginIt = std::prev(asyncOp->getBlock()->begin());
-  auto endIt = std::prev(asyncOp->getBlock()->end());  // ignore terminator
+  auto endIt = std::prev(asyncOp->getBlock()->end()); // ignore terminator
   auto findPrecedingAwait = [&](Value fence) -> Operation * {
     auto it = std::prev(Block::iterator(asyncOp));
     for (; it != beginIt; --it) {
@@ -76,7 +76,7 @@ static void insertWaitIfNeeded(Operation *asyncOp,
           continue;
         }
       } else if (!isSafeToReorder(*it)) {
-        break;  // hit a point we can't scan past
+        break; // hit a point we can't scan past
       }
     }
     return nullptr;
@@ -96,7 +96,7 @@ static void insertWaitIfNeeded(Operation *asyncOp,
           continue;
         }
       } else if (!isSafeToReorder(*it)) {
-        break;  // hit a point we can't scan past
+        break; // hit a point we can't scan past
       }
     }
     return nullptr;
@@ -105,7 +105,8 @@ static void insertWaitIfNeeded(Operation *asyncOp,
   OpBuilder builder(asyncOp);
   Value timeoutMillis;
   auto makeInfiniteTimeout = [&]() {
-    if (timeoutMillis) return timeoutMillis;
+    if (timeoutMillis)
+      return timeoutMillis;
     timeoutMillis = builder.create<arith::ConstantIntOp>(loc, -1, 32);
     return timeoutMillis;
   };
@@ -153,15 +154,10 @@ struct FixupLegacySyncPass
 
     // See if any devices are marked as requiring the legacy_sync behavior.
     // If any single device does we must uniformly apply the fixups.
-    bool anyRequireFixup = false;
-    auto deviceTargetAttrs = IREE::HAL::DeviceTargetAttr::lookup(moduleOp);
-    for (auto deviceTargetAttr : deviceTargetAttrs) {
-      if (deviceTargetAttr.hasConfigurationAttr("legacy_sync")) {
-        anyRequireFixup = true;
-        break;
-      }
+    if (!IREE::HAL::DeviceTargetAttr::lookupConfigAttrAny(moduleOp,
+                                                          "legacy_sync")) {
+      return;
     }
-    if (!anyRequireFixup) return;
 
     // This could use an interface but it'd be better to remove the need for
     // this pass instead.
@@ -194,7 +190,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFixupLegacySyncPass() {
 
 static PassRegistration<FixupLegacySyncPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

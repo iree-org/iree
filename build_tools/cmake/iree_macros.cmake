@@ -52,33 +52,33 @@ endif()
 string(TOLOWER "${_IREE_UNNORMALIZED_ARCH}" _IREE_UNNORMALIZED_ARCH_LOWERCASE)
 
 # Normalize _IREE_UNNORMALIZED_ARCH into IREE_ARCH.
-if (EMSCRIPTEN)
+if(EMSCRIPTEN)
   # TODO: figure what to do about the wasm target, which masquerades as x86.
   # This is the one case where the IREE_ARCH CMake variable is currently
   # inconsistent with the IREE_ARCH C preprocessor token.
-  set (IREE_ARCH "")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "aarch64") OR
+  set(IREE_ARCH "")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "aarch64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64e") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64ec"))
-  set (IREE_ARCH "arm_64")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm") OR
+  set(IREE_ARCH "arm_64")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^armv[5-8]"))
-  set (IREE_ARCH "arm_32")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86_64") OR
+  set(IREE_ARCH "arm_32")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86_64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "amd64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x64"))
-  set (IREE_ARCH "x86_64")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^i[3-7]86$") OR
+  set(IREE_ARCH "x86_64")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^i[3-7]86$") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "win32"))
-  set (IREE_ARCH "x86_32")
-elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv64")
-  set (IREE_ARCH "riscv_64")
-elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv32")
-  set (IREE_ARCH "riscv_32")
-elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
-  set (IREE_ARCH "")
+  set(IREE_ARCH "x86_32")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv64")
+  set(IREE_ARCH "riscv_64")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv32")
+  set(IREE_ARCH "riscv_32")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
+  set(IREE_ARCH "")
   message(WARNING "Performance advisory: architecture-specific code paths "
     "disabled because no target architecture was specified or we didn't know "
     "which CMake variable to read. Some relevant CMake variables:\n"
@@ -88,9 +88,76 @@ elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
     "CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}\n"
     )
 else()
-  set (IREE_ARCH "")
+  set(IREE_ARCH "")
   message(SEND_ERROR "Unrecognized target architecture ${_IREE_UNNORMALIZED_ARCH_LOWERCASE}")
 endif()
+
+# iree_arch_to_llvm_arch()
+#
+# Helper mapping an architecture in IREE's naming scheme (as in IREE_ARCH)
+# to an architecture in LLVM's naming scheme (as in LLVM target triples).
+function(iree_arch_to_llvm_arch DST_LLVM_ARCH_VARIABLE SRC_ARCH)
+  if("${SRC_ARCH}" STREQUAL "arm_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "aarch64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "arm_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "arm" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "x86_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "x86_64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "x86_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "i386" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "riscv_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "riscv_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv32" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "wasm_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "wasm64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "wasm_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "wasm32" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "What is the LLVM name of the architecture that we call ${SRC_ARCH} ?")
+    set(${DST_LLVM_ARCH_VARIABLE} "unknown" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# iree_arch_to_llvm_target()
+#
+# Helper mapping an architecture in IREE's naming scheme (as in IREE_ARCH)
+# to a LLVM CPU target (as in LLVM_TARGETS_TO_BUILD, the CMake variable).
+function(iree_arch_to_llvm_target DST_LLVM_TARGET_VARIABLE SRC_ARCH)
+  if("${SRC_ARCH}" STREQUAL "arm_64")
+    set(${DST_LLVM_TARGET_VARIABLE} "AArch64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "arm_32")
+    set(${DST_LLVM_TARGET_VARIABLE} "ARM" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^x86_")
+    set(${DST_LLVM_TARGET_VARIABLE} "X86" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^riscv_")
+    set(${DST_LLVM_TARGET_VARIABLE} "RISCV" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^wasm_")
+    set(${DST_LLVM_TARGET_VARIABLE} "WebAssembly" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "What is the LLVM target handling of the architecture that we call ${SRC_ARCH} ?")
+    set(${DST_LLVM_TARGET_VARIABLE} "" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# iree_compiler_targeting_iree_arch
+#
+# Helper returning true if we are building the IREE compiler with the llvm-cpu
+# backend enabled and with the LLVM target supporting the CPU architecture
+# give in IREE's naming scheme (as in IREE_ARCH).
+function(iree_compiler_targeting_iree_arch DST_VAR SRC_ARCH)
+  if (NOT IREE_BUILD_COMPILER OR NOT IREE_TARGET_BACKEND_LLVM_CPU)
+    set(${DST_VAR} OFF PARENT_SCOPE)
+    return()
+  endif()
+  
+  iree_arch_to_llvm_target(_LLVM_TARGET "${SRC_ARCH}")
+  if (_LLVM_TARGET IN_LIST LLVM_TARGETS_TO_BUILD)
+    set(${DST_VAR} ON PARENT_SCOPE)
+  else()
+    set(${DST_VAR} OFF PARENT_SCOPE)
+  endif()
+endfunction()
 
 #-------------------------------------------------------------------------------
 # General utilities
@@ -141,7 +208,7 @@ function(iree_package_ns PACKAGE_NS)
       set(_PACKAGE "")
     endif()
     if(IREE_PACKAGE_ROOT_PREFIX)
-      if ("${_PACKAGE}" STREQUAL "")
+      if("${_PACKAGE}" STREQUAL "")
         set(_PACKAGE "${IREE_PACKAGE_ROOT_PREFIX}")
       else()
         set(_PACKAGE "${IREE_PACKAGE_ROOT_PREFIX}/${_PACKAGE}")
@@ -237,7 +304,7 @@ function(iree_select_compiler_opts OPTS)
     _IREE_SELECTS
     ""
     ""
-    "ALL;CLANG;CLANG_GTE_10;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
+    "ALL;CLANG;CLANG_GTE_10;CLANG_GTE_12;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
   )
   # OPTS is a variable containing the *name* of the variable being populated, so
   # we need to dereference it twice.
@@ -254,6 +321,9 @@ function(iree_select_compiler_opts OPTS)
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG})
       if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
         list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_10})
+      endif()
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
+        list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_12})
       endif()
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG_OR_GCC})
     endif()
@@ -312,6 +382,17 @@ function(iree_add_data_dependencies)
       add_dependencies(${_RULE_NAME} ${_DATA_TARGET})
     endif()
   endforeach()
+endfunction()
+
+#-------------------------------------------------------------------------------
+# iree_make_empty_file
+#-------------------------------------------------------------------------------
+
+# Creates an empty file by copying an in-tree empty file. Unlike `file(WRITE)`
+# or `file(TOUCH)`, this does not update the timestamp every time CMake is run,
+# avoiding unnecessary rebuilds when the empty file is used as a rule input.
+function(iree_make_empty_file _FILENAME)
+  configure_file("${PROJECT_SOURCE_DIR}/build_tools/cmake/empty_file" "${_FILENAME}" COPYONLY)
 endfunction()
 
 #-------------------------------------------------------------------------------

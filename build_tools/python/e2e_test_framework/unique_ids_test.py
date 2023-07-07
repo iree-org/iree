@@ -11,42 +11,42 @@ import unique_ids
 
 
 class UniqueIdsTest(unittest.TestCase):
+    def test_hash_composite_id(self):
+        output = unique_ids.hash_composite_id(["abc", "123"])
 
-  def test_hash_composite_id(self):
-    output = unique_ids.hash_composite_id(["abc", "123"])
+        self.assertEquals(
+            output, hashlib.sha256(f"0-abc:1-123".encode("utf-8")).hexdigest()
+        )
 
-    self.assertEquals(
-        output,
-        hashlib.sha256(f"0-abc:1-123".encode("utf-8")).hexdigest())
+    def test_hash_composite_id_diff_keys(self):
+        ids = [
+            unique_ids.hash_composite_id([]),
+            unique_ids.hash_composite_id(["abc", "123"]),
+            unique_ids.hash_composite_id(["123", "abc"]),
+            unique_ids.hash_composite_id(["123", unique_ids.TRANSPARENT_ID]),
+            unique_ids.hash_composite_id(["123", "abc", "xyz"]),
+            unique_ids.hash_composite_id(["123", unique_ids.TRANSPARENT_ID, "xyz"]),
+        ]
 
-  def test_hash_composite_id_diff_keys(self):
-    ids = [
-        unique_ids.hash_composite_id([]),
-        unique_ids.hash_composite_id(["abc", "123"]),
-        unique_ids.hash_composite_id(["123", "abc"]),
-        unique_ids.hash_composite_id(["123", unique_ids.TRANSPARENT_ID]),
-        unique_ids.hash_composite_id(["123", "abc", "xyz"]),
-        unique_ids.hash_composite_id(["123", unique_ids.TRANSPARENT_ID, "xyz"])
-    ]
+        # Check if they are all distinct.
+        self.assertCountEqual(set(ids), ids)
 
-    # Check if they are all distinct.
-    self.assertCountEqual(set(ids), ids)
+    def test_hash_composite_id_unchanged_with_transparent_id(self):
+        existing_id = unique_ids.hash_composite_id(["abc"])
+        new_id_a = unique_ids.hash_composite_id(["abc", unique_ids.TRANSPARENT_ID])
+        new_id_b = unique_ids.hash_composite_id(
+            ["abc", unique_ids.TRANSPARENT_ID, unique_ids.TRANSPARENT_ID]
+        )
 
-  def test_hash_composite_id_unchanged_with_transparent_id(self):
-    existing_id = unique_ids.hash_composite_id(["abc"])
-    new_id_a = unique_ids.hash_composite_id(["abc", unique_ids.TRANSPARENT_ID])
-    new_id_b = unique_ids.hash_composite_id(
-        ["abc", unique_ids.TRANSPARENT_ID, unique_ids.TRANSPARENT_ID])
+        self.assertEquals(existing_id, new_id_a)
+        self.assertEquals(existing_id, new_id_b)
 
-    self.assertEquals(existing_id, new_id_a)
-    self.assertEquals(existing_id, new_id_b)
+    def test_hash_composite_id_with_transparent_ids_in_diff_pos(self):
+        id_a = unique_ids.hash_composite_id([unique_ids.TRANSPARENT_ID, "abc"])
+        id_b = unique_ids.hash_composite_id(["abc", unique_ids.TRANSPARENT_ID])
 
-  def test_hash_composite_id_with_transparent_ids_in_diff_pos(self):
-    id_a = unique_ids.hash_composite_id([unique_ids.TRANSPARENT_ID, "abc"])
-    id_b = unique_ids.hash_composite_id(["abc", unique_ids.TRANSPARENT_ID])
-
-    self.assertNotEquals(id_a, id_b)
+        self.assertNotEquals(id_a, id_b)
 
 
 if __name__ == "__main__":
-  unittest.main()
+    unittest.main()

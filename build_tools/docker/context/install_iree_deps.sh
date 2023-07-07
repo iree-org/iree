@@ -13,10 +13,6 @@ declare -a PACKAGES=(
     "clang-${LLVM_VERSION}"
     "lld-${LLVM_VERSION}"
     # IREE transitive dependencies
-    # Next time someone's updating these, try dropping sdl2. It shouldn't be
-    # necessary anymore, but you need to make sure that we get `vulkaninfo` from
-    # another source (this is currently installing it implicitly).
-    libsdl2-dev
     libssl-dev
     # A much better CMake builder
     ninja-build
@@ -25,19 +21,12 @@ declare -a PACKAGES=(
     # Optional for tools like llvm-symbolizer, which we could build from
     # source but would rather just have available ahead of time
     llvm-dev
+    # Tracy build and run dependencies
+    pkg-config
+    libcapstone-dev
+    libtbb-dev
+    libzstd-dev
 )
-
-# The libzstd on Ubuntu 18.04 doesn't work with the IREE integrated LLVM.
-# TODO(#11782): Remove once we bump the minimum supported OS version.
-if [[ "$(lsb_release -ds)" != "Ubuntu 18.04"* ]]; then
-    PACKAGES+=(
-        # Tracy build and run dependencies
-        pkg-config
-        libcapstone-dev
-        libtbb-dev
-        libzstd-dev
-    )
-fi
 
 apt-get update
 apt-get install -y "${PACKAGES[@]}"

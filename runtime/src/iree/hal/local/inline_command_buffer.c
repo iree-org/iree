@@ -14,7 +14,6 @@
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_pipeline_layout.h"
@@ -192,17 +191,8 @@ static void iree_hal_inline_command_buffer_destroy(
 
 bool iree_hal_inline_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_inline_command_buffer_vtable);
-}
-
-static void* iree_hal_inline_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_inline_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_inline_command_buffer_vtable);
 }
 
 //===----------------------------------------------------------------------===//
@@ -386,7 +376,8 @@ static iree_status_t iree_hal_inline_command_buffer_push_constants(
   if (IREE_UNLIKELY(offset + values_length >=
                     sizeof(command_buffer->state.push_constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "push constant range %zu (length=%zu) out of range",
+                            "push constant range %" PRIhsz " (length=%" PRIhsz
+                            ") out of range",
                             offset, values_length);
   }
 
@@ -603,7 +594,6 @@ static iree_status_t iree_hal_inline_command_buffer_execute_commands(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_inline_command_buffer_vtable = {
         .destroy = iree_hal_inline_command_buffer_destroy,
-        .dyn_cast = iree_hal_inline_command_buffer_dyn_cast,
         .begin = iree_hal_inline_command_buffer_begin,
         .end = iree_hal_inline_command_buffer_end,
         .begin_debug_group = iree_hal_inline_command_buffer_begin_debug_group,

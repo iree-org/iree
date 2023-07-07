@@ -4,19 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/query_tile_sizes.h"
-
-#if defined(IREE_UK_ARCH_ARM_64)
-#include "iree/builtins/ukernel/arch/arm_64/query_tile_sizes_arm_64.h"
-#elif defined(IREE_UK_ARCH_X86_64)
-#include "iree/builtins/ukernel/arch/x86_64/query_tile_sizes_x86_64.h"
-#endif
+#include "iree/builtins/ukernel/query_tile_sizes_internal.h"
 
 static bool iree_uk_query_tile_sizes_operation_is_matmul(
     iree_uk_uint32_t flags) {
   iree_uk_uint32_t op = iree_uk_query_tile_sizes_operation(flags);
   return op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32 ||
-         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F16 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32 ||
+         op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
 }
 
 static void iree_uk_query_tile_sizes_2d_validate(
@@ -42,17 +40,6 @@ static iree_uk_matmul_tile_sizes_t iree_uk_query_matmul_tile_sizes_generic(
   return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 4, .N = 8};
 }
 
-static bool iree_uk_query_matmul_tile_sizes_arch(
-    const iree_uk_query_tile_sizes_2d_params_t* params,
-    iree_uk_matmul_tile_sizes_t* out_matmul_tile_sizes) {
-#if defined(IREE_UK_ARCH_ARM_64)
-  return iree_uk_query_matmul_tile_sizes_arm_64(params, out_matmul_tile_sizes);
-#elif defined(IREE_UK_ARCH_X86_64)
-  return iree_uk_query_matmul_tile_sizes_x86_64(params, out_matmul_tile_sizes);
-#endif
-  return false;
-}
-
 static void iree_uk_query_tile_sizes_2d_matmul(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_query_tile_sizes_2d_out_params_t* out_params) {
@@ -76,7 +63,7 @@ static void iree_uk_query_tile_sizes_2d_matmul(
   }
 }
 
-IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
+IREE_UK_EXPORT int iree_uk_query_tile_sizes_2d(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_query_tile_sizes_2d_out_params_t* out_params) {
   iree_uk_query_tile_sizes_2d_validate(params);
@@ -87,4 +74,5 @@ IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
     // Can't happen, validated earlier.
     IREE_UK_ASSUME_UNREACHABLE;
   }
+  return 0;
 }

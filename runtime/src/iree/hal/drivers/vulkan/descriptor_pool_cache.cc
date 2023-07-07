@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <ostream>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
 namespace iree {
@@ -31,7 +30,7 @@ DescriptorSetGroup::~DescriptorSetGroup() {
 }
 
 iree_status_t DescriptorSetGroup::Reset() {
-  IREE_TRACE_SCOPE0("DescriptorSetGroup::Reset");
+  IREE_TRACE_SCOPE_NAMED("DescriptorSetGroup::Reset");
 
   if (descriptor_pool_cache_ != nullptr) {
     IREE_RETURN_IF_ERROR(
@@ -48,7 +47,7 @@ DescriptorPoolCache::DescriptorPoolCache(VkDeviceHandle* logical_device)
 iree_status_t DescriptorPoolCache::AcquireDescriptorPool(
     VkDescriptorType descriptor_type, int max_descriptor_count,
     DescriptorPool* out_descriptor_pool) {
-  IREE_TRACE_SCOPE0("DescriptorPoolCache::AcquireDescriptorPool");
+  IREE_TRACE_SCOPE_NAMED("DescriptorPoolCache::AcquireDescriptorPool");
 
   // TODO(benvanik): lookup in cache.
 
@@ -78,7 +77,7 @@ iree_status_t DescriptorPoolCache::AcquireDescriptorPool(
 
 iree_status_t DescriptorPoolCache::ReleaseDescriptorPools(
     const std::vector<DescriptorPool>& descriptor_pools) {
-  IREE_TRACE_SCOPE0("DescriptorPoolCache::ReleaseDescriptorPools");
+  IREE_TRACE_SCOPE_NAMED("DescriptorPoolCache::ReleaseDescriptorPools");
 
   for (const auto& descriptor_pool : descriptor_pools) {
     // Always reset immediately. We could do this on allocation instead however

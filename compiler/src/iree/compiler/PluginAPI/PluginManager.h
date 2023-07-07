@@ -23,7 +23,7 @@ class PluginManagerSession;
 
 // Command line options for the plugin manager.
 class PluginManagerOptions {
- public:
+public:
   // Plugins to be activated in a session.
   llvm::SmallVector<std::string> plugins;
 
@@ -47,7 +47,7 @@ class PluginManagerOptions {
 // Most of the work of a plugin is done at session initialization time when
 // an MLIRContext is available.
 class PluginManager : public PluginRegistrar {
- public:
+public:
   PluginManager();
 
   // Initializes the plugin manager. Since this may do shared library opening
@@ -71,13 +71,16 @@ class PluginManager : public PluginRegistrar {
   // available plugins.
   void registerGlobalDialects(DialectRegistry &registry);
 
- private:
+  // Gets a list of all loaded plugin names.
+  llvm::SmallVector<std::string> getLoadedPlugins();
+
+private:
   friend class PluginManagerSession;
 };
 
 // Holds activated plugins for an |iree_compiler_session_t|.
 class PluginManagerSession : public PipelineExtensions {
- public:
+public:
   PluginManagerSession(PluginManager &pluginManager, OptionsBinder &binder,
                        PluginManagerOptions &options);
 
@@ -91,22 +94,38 @@ class PluginManagerSession : public PipelineExtensions {
   LogicalResult activatePlugins(MLIRContext *context);
 
   // Forward pipeline extensions.
+  void extendInputConversionPreprocessingPassPipeline(
+      OpPassManager &passManager,
+      InputDialectOptions::Type inputType) override {
+    for (auto *s : initializedSessions) {
+      s->extendInputConversionPreprocessingPassPipeline(passManager, inputType);
+    }
+  }
+
+  // Forward pipeline extensions.
   void extendPreprocessingPassPipeline(OpPassManager &passManager) override {
     for (auto *s : initializedSessions) {
       s->extendPreprocessingPassPipeline(passManager);
     }
   }
 
- private:
+  // Populates the given list of HAL target backends for all initialized
+  // plugins.
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);
+
+private:
   PluginManagerOptions &options;
   // At construction, uninitialized plugin sessions are created for all
   // registered plugins so that CLI options can be set properly.
   llvm::StringMap<std::unique_ptr<AbstractPluginSession>> allPluginSessions;
 
+  // All sessions that have opted to be default activated.
+  llvm::StringMap<AbstractPluginSession *> defaultActivatedSessions;
+
   // Initialized list of plugins.
   llvm::SmallVector<AbstractPluginSession *> initializedSessions;
 };
 
-}  // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler
 
-#endif  // IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_
+#endif // IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_

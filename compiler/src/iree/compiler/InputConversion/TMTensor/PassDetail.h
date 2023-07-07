@@ -17,8 +17,8 @@ namespace TMTensor {
 #define GEN_PASS_CLASSES
 #include "iree/compiler/InputConversion/TMTensor/Passes.h.inc"
 
-}  // namespace TMTensor
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace TMTensor
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_TMTENSOR_PASSDETAIL_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_TMTENSOR_PASSDETAIL_H_

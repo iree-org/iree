@@ -64,6 +64,9 @@ int iree_elf_call_i_p(const void* symbol_ptr, void* a0);
 // Host -> ELF: int(*)(void*, void*, void*)
 int iree_elf_call_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2);
 
+// Host -> ELF: void*(*)(void*, void*, void*)
+void* iree_elf_call_p_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2);
+
 // ELF -> Host: int(*)(void*, void*, void*)
 int iree_elf_thunk_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2);
 

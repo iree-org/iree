@@ -21,10 +21,11 @@ iree_cc_library(
     "WebGPUTarget.cpp"
   DEPS
     LLVMSupport
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRSPIRVDialect
     MLIRSPIRVSerialization
+    MLIRSPIRVTransforms
     SPIRV-Tools
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::SPIRV

@@ -15,7 +15,7 @@ namespace iree_compiler {
 /// Register all codegen related interfaces.
 void registerCodegenInterfaces(DialectRegistry &registry);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_INTERFACES_INTERFACES_H_
+#endif // IREE_COMPILER_CODEGEN_INTERFACES_INTERFACES_H_

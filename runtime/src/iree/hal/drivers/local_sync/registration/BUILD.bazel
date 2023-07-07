@@ -24,5 +24,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
         "//runtime/src/iree/hal/local/loaders/registration",
+        "//runtime/src/iree/hal/local/plugins/registration",
     ],
 )

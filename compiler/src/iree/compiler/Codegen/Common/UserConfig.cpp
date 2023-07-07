@@ -10,9 +10,9 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Propagate the configuration annotated in the incoming IR.
-LogicalResult setUserConfig(
-    func::FuncOp entryPointFn, Operation *computeOp,
-    IREE::Codegen::CompilationInfoAttr compilationInfo) {
+LogicalResult
+setUserConfig(func::FuncOp entryPointFn, Operation *computeOp,
+              IREE::Codegen::CompilationInfoAttr compilationInfo) {
   if (auto translationInfo = getTranslationInfo(entryPointFn)) {
     return computeOp->emitOpError(
         "multiple ops within dispatch trying to set the translation "
@@ -20,7 +20,8 @@ LogicalResult setUserConfig(
   }
 
   auto info = compilationInfo.getTranslationInfo();
-  if (failed(setTranslationInfo(entryPointFn, info))) return failure();
+  if (failed(setTranslationInfo(entryPointFn, info)))
+    return failure();
 
   SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
   std::optional<int64_t> subgroupSize = compilationInfo.getSubgroupSize();
@@ -33,5 +34,5 @@ LogicalResult setUserConfig(
   return success();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

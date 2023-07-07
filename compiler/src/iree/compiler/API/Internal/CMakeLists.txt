@@ -21,9 +21,11 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRBuiltinToLLVMIRTranslation
+    MLIRCAPIIR
     MLIRIR
     MLIRParser
     MLIRSupport
+    iree::compiler::API::MLIRInteropHeaders
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C
@@ -77,32 +79,11 @@ iree_cc_library(
     MLIROptLib
     MLIRPass
     MLIRSupport
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
     iree::compiler::bindings::c::headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    MLIRInterop
-  SRCS
-    "MLIRInterop.cpp"
-  DEPS
-    MLIRBuiltinToLLVMIRTranslation
-    MLIRCAPIIR
-    MLIRIR
-    iree::compiler::API::MLIRInteropHeaders
-    iree::compiler::ConstEval
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Target::init_targets
-    iree::compiler::Pipelines
-    iree::compiler::Tools::init_llvmir_translations
-    iree::compiler::Tools::init_passes_and_dialects
-    iree::compiler::Tools::init_targets
-    iree::compiler::Utils
   PUBLIC
 )
 
@@ -111,7 +92,8 @@ iree_cc_library(
 set(_lld_copts)
 set(_lld_deps)
 
-if(IREE_LLD_TARGET)
+# TODO(#14086): implement linking in the installed-LLVM case.
+if(IREE_BUILD_BUNDLED_LLVM)
   # Use generator expressions to conditionally include LLD targets, providing
   # a compiler definition if not available.
   macro(_add_dependent_lld_target target not_definition)

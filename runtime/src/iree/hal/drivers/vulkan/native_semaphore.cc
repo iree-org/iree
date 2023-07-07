@@ -9,7 +9,6 @@
 #include <cstddef>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbol_tables.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
@@ -308,6 +307,16 @@ static iree_status_t iree_hal_vulkan_native_semaphore_wait(
   };
   return iree_hal_vulkan_native_semaphore_multi_wait(
       semaphore->logical_device, &semaphore_list, timeout, 0);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_semaphore_handle(
+    iree_hal_semaphore_t* base_semaphore, VkSemaphore* out_handle) {
+  IREE_ASSERT_ARGUMENT(base_semaphore);
+  IREE_ASSERT_ARGUMENT(out_handle);
+  iree_hal_vulkan_native_semaphore_t* semaphore =
+      iree_hal_vulkan_native_semaphore_cast(base_semaphore);
+  *out_handle = semaphore->handle;
+  return iree_ok_status();
 }
 
 namespace {

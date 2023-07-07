@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -34,7 +35,8 @@ namespace {
 static int64_t costOfDomain(ArrayRef<int64_t> domain) {
   int64_t product = 1;
   for (int64_t size : domain) {
-    if (size == mlir::ShapedType::kDynamic) return INT64_MAX;
+    if (size == mlir::ShapedType::kDynamic)
+      return INT64_MAX;
     product *= size;
   }
   return product;
@@ -55,8 +57,9 @@ static TensorType getMainTensorForLinalgExtOp(Operation *op) {
   auto operandTypes = llvm::to_vector(op->getOperandTypes());
   auto resultTypes = llvm::to_vector(op->getResultTypes());
   for (Type t : llvm::concat<Type>(operandTypes, resultTypes)) {
-    auto tensorType = t.dyn_cast<TensorType>();
-    if (!tensorType) continue;
+    auto tensorType = llvm::dyn_cast<TensorType>(t);
+    if (!tensorType)
+      continue;
     if (!main) {
       main = tensorType;
     } else if (costOfDomain(tensorType.getShape()) >
@@ -119,7 +122,7 @@ static std::string operandTypeToString(Value operandValue) {
 static std::string getLinalgDataTypes(linalg::LinalgOp op) {
   std::string firstToken = "";
   bool allTokensSame = true;
-  SmallVector<std::string, 4> datatypeTokens;
+  SmallVector<std::string> datatypeTokens;
 
   for (Value operandValue : op->getOperands()) {
     datatypeTokens.push_back(operandTypeToString(operandValue));
@@ -147,13 +150,15 @@ static std::string getLinalgDataTypes(linalg::LinalgOp op) {
 static std::string getOpNameWithoutDialectName(Operation *op) {
   auto opName =
       op->getName().getStringRef().drop_until([](char c) { return c == '.'; });
-  if (opName.starts_with(".")) opName = opName.drop_front();
+  if (opName.starts_with("."))
+    opName = opName.drop_front();
   return opName.str();
 }
 
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   auto opName = op->getName().getStringRef();
-  if (!opName.consume_front("linalg.")) return "";
+  if (!opName.consume_front("linalg."))
+    return "";
   std::string opLoopRanges = loopRangesToString(op.getStaticLoopRanges());
   std::string opTypes = opLoopRanges.empty() ? "" : getLinalgDataTypes(op);
   return opName.str() + (opLoopRanges.empty() ? "" : "_" + opLoopRanges) +
@@ -162,7 +167,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
 
 static std::string summarizeLinalgExtOp(Operation *op) {
   auto opName = op->getName().getStringRef();
-  if (!opName.consume_front("iree_linalg_ext.")) return "";
+  if (!opName.consume_front("iree_linalg_ext."))
+    return "";
   std::string suffix = "";
   if (TensorType mainTensor = getMainTensorForLinalgExtOp(op)) {
     llvm::raw_string_ostream sstream(suffix);
@@ -177,8 +183,8 @@ static std::string summarizeLinalgExtOp(Operation *op) {
 
 // Summarizes the contents of a dispatch into a short string.
 // This uses heuristics to aid developer debugging.
-static std::string summarizeDispatchWorkgroupsOp(
-    DispatchWorkgroupsOp regionOp) {
+static std::string
+summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
   // The goal here is to build a relatively concise description that gives
   // enough information to developers to see roughly what sort of computation a
   // dispatch region performs. Multiple approaches are valid here, depending on
@@ -199,7 +205,8 @@ static std::string summarizeDispatchWorkgroupsOp(
     TypeSwitch<Operation *>(op)
         .Case<linalg::LinalgOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);
-          if (estimatedCost < bestEstimatedCost) return;
+          if (estimatedCost < bestEstimatedCost)
+            return;
           bestEstimatedCost = estimatedCost;
           bestOp = op;
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
@@ -210,7 +217,8 @@ static std::string summarizeDispatchWorkgroupsOp(
               // SetEncoding/UnsetEncoding is the bestOp only if there are no
               // other operations.
               int64_t estimatedCost = kMinEstimatedCost + 1;
-              if (estimatedCost < bestEstimatedCost) return;
+              if (estimatedCost < bestEstimatedCost)
+                return;
               bestEstimatedCost = estimatedCost;
               bestOp = op;
               LLVM_DEBUG(llvm::dbgs()
@@ -219,7 +227,8 @@ static std::string summarizeDispatchWorkgroupsOp(
             })
         .Case<IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgExtOpCost(op);
-          if (estimatedCost < bestEstimatedCost) return;
+          if (estimatedCost < bestEstimatedCost)
+            return;
           bestEstimatedCost = estimatedCost;
           bestOp = op;
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
@@ -229,7 +238,8 @@ static std::string summarizeDispatchWorkgroupsOp(
           // No cost estimation implemented, skip.
         });
   });
-  if (!bestOp) return "";
+  if (!bestOp)
+    return "";
 
   std::string bestSummary = "";
   TypeSwitch<Operation *>(bestOp)
@@ -245,7 +255,11 @@ static std::string summarizeDispatchWorkgroupsOp(
       })
       .Case<IREE::LinalgExt::UnsetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
-        auto encoding = stringifyEnum(op.getSourceTensorEncoding());
+        auto encoding = stringifyEnum(
+            op.getSourceType()
+                .getEncoding()
+                .template cast<IREE::LinalgExt::TensorEncodingAttr>()
+                .getValue());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
         bestSummary =
             opName + "_" + encoding.str() + "_" + loopRangesToString(shape);
@@ -256,6 +270,9 @@ static std::string summarizeDispatchWorkgroupsOp(
         // No summarization implemented, default to the op's name.
         bestSummary = op->getName().getStringRef().str();
       });
+
+  // Sanitize the string so that it contains only C literal-compatible chars.
+  bestSummary = sanitizeSymbolName(bestSummary);
 
   LLVM_DEBUG(llvm::dbgs() << "// best op summary: '" << bestSummary << "'\n");
   return bestSummary;
@@ -322,9 +339,8 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
 }
 
 // Converts a dispatch region body to a free-floating function.
-static mlir::func::FuncOp createWorkgroupFunc(Location loc,
-                                              StringRef functionName,
-                                              Region &region) {
+static mlir::func::FuncOp
+createWorkgroupFunc(Location loc, StringRef functionName, Region &region) {
   // Build function type matching the region signature.
   auto functionType = FunctionType::get(
       region.getContext(), region.getArgumentTypes(), /*results=*/{});
@@ -340,7 +356,7 @@ static mlir::func::FuncOp createWorkgroupFunc(Location loc,
     if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
       OpBuilder builder(returnOp);
       builder.create<mlir::func::ReturnOp>(
-          returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
+          returnOp.getLoc(), llvm::to_vector(returnOp.getOperands()));
       returnOp.erase();
     }
   }
@@ -350,9 +366,10 @@ static mlir::func::FuncOp createWorkgroupFunc(Location loc,
 
 // Outlines a dispatch region into a flow.executable and replaces the region op
 // with a dispatch to that outlined executable.
-static LogicalResult outlineDispatchWorkgroupsOp(
-    std::string executableOpName, std::string exportOpName,
-    DispatchWorkgroupsOp regionOp) {
+static LogicalResult
+outlineDispatchWorkgroupsOp(std::string executableOpName,
+                            std::string exportOpName,
+                            DispatchWorkgroupsOp regionOp) {
   // Convert the region to a free-floating function.
   auto workgroupFuncOp = createWorkgroupFunc(regionOp.getLoc(), exportOpName,
                                              regionOp.getWorkgroupBody());
@@ -373,23 +390,22 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   auto exportOp = builder.create<ExecutableExportOp>(
       regionOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp));
-  if (!regionOp.getWorkgroupCount().empty())
-    exportOp.getWorkgroupCount().takeBody(regionOp.getWorkgroupCount());
 
   // Move over the workgroup count region, if present.
   if (!regionOp.getWorkgroupCount().empty()) {
     exportOp.getWorkgroupCount().takeBody(regionOp.getWorkgroupCount());
   }
+  exportOp->setDialectAttrs(regionOp->getDialectAttrs());
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
   return convertToDispatchOp(regionOp, executableOp, exportOp);
 }
 
-}  // namespace
+} // namespace
 
 class OutlineDispatchRegionsPass
     : public OutlineDispatchRegionsBase<OutlineDispatchRegionsPass> {
- public:
+public:
   OutlineDispatchRegionsPass() = default;
 
   void runOnOperation() override {
@@ -444,7 +460,7 @@ createOutlineDispatchRegionsPass() {
   return std::make_unique<OutlineDispatchRegionsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

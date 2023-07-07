@@ -19,9 +19,10 @@ namespace {
 struct ConvertExecutableCalculateWorkgroupsOp
     : public OpConversionPattern<IREE::HAL::ExecutableCalculateWorkgroupsOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::ExecutableCalculateWorkgroupsOp calculateOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::ExecutableCalculateWorkgroupsOp calculateOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto exportOp =
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
             calculateOp, calculateOp.getEntryPoint());
@@ -37,7 +38,7 @@ struct ConvertExecutableCalculateWorkgroupsOp
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateHALToHALPatterns(MLIRContext *context,
                               ConversionTarget &conversionTarget,
@@ -48,5 +49,5 @@ void populateHALToHALPatterns(MLIRContext *context,
                                                           context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -1,0 +1,129 @@
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-clone-producers-into-dispatch-regions))" %s | FileCheck %s
+
+func.func @complex_element_type(%input: tensor<4xi32>, %table: tensor<8x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+  %c4095 = arith.constant 4095 : i32
+  %const = arith.constant dense<[
+    [(0x7FC00000,0.000000e+00), (0x7FC00000,1.000000e+00)], [(0x7FC00000,2.000000e+00), (0x7FC00000,3.000000e+00)],
+    [(0x7FC00000,4.000000e+00), (0x7FC00000,5.000000e+00)], [(0x7FC00000,6.000000e+00), (0x7FC00000,7.000000e+00)]
+  ]> : tensor<4x2xcomplex<f32>>
+  %empty = tensor.empty() : tensor<4x2xcomplex<f32>>
+  %0 = flow.dispatch.region -> (tensor<4x2xcomplex<f32>>) {
+    %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%input, %const : tensor<4xi32>, tensor<4x2xcomplex<f32>>) outs(%empty : tensor<4x2xcomplex<f32>>) {
+    ^bb0(%in0: i32, %in1: complex<f32>, %out: complex<f32>):
+      %i1 = linalg.index 1 : index
+      %i0 = arith.index_cast %in0 : i32 to index
+      %extract = tensor.extract %table[%i0, %i1] : tensor<8x2xcomplex<f32>>
+      %cmp = arith.cmpi sle, %in0, %c4095 : i32
+      %select = arith.select %cmp, %extract, %in1 : complex<f32>
+      linalg.yield %select : complex<f32>
+    } -> tensor<4x2xcomplex<f32>>
+    flow.return %generic : tensor<4x2xcomplex<f32>>
+  }
+  return %0 : tensor<4x2xcomplex<f32>>
+}
+
+// CHECK-LABEL: func.func @complex_element_type
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[EMPTY:.+]] = tensor.empty() : tensor<4x2xcomplex<f32>>
+//       CHECK:     %[[CST:.+]] = arith.constant dense<{{.+}}> : tensor<4x2xcomplex<f32>>
+//       CHECK:     linalg.generic
+//  CHECK-SAME:       ins(%{{.+}}, %[[CST]] : tensor<4xi32>, tensor<4x2xcomplex<f32>>)
+//  CHECK-SAME:       outs(%[[EMPTY]] : tensor<4x2xcomplex<f32>>)
+//       CHECK:   flow.return
+
+// -----
+
+func.func @complex_constant_clone(%input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+  %cst = complex.constant [1.000000e+00 : f32, 2.000000e+00 : f32] : complex<f32>
+  %empty = tensor.empty() : tensor<4x2xcomplex<f32>>
+  %0 = linalg.fill ins(%cst : complex<f32>) outs(%empty : tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>>
+  %1 = flow.dispatch.region -> (tensor<4x2xcomplex<f32>>) {
+    %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%input : tensor<4x2xcomplex<f32>>) outs(%0 : tensor<4x2xcomplex<f32>>) {
+    ^bb0(%in: complex<f32>, %out: complex<f32>):
+      %2 = complex.mul %in, %out : complex<f32>
+      linalg.yield %2 : complex<f32>
+    } -> tensor<4x2xcomplex<f32>>
+    flow.return %generic : tensor<4x2xcomplex<f32>>
+  }
+  return %1 : tensor<4x2xcomplex<f32>>
+}
+
+// CHECK-LABEL: @complex_constant_clone
+// CHECK: flow.dispatch.region
+// CHECK: tensor.empty
+// CHECK: complex.constant
+// CHECK: linalg.fill
+// CHECK: linalg.generic
+// CHECK: complex.mul
+// CHECK: linalg.yield
+// CHECK: flow.return
+
+// -----
+
+func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+  %cst = complex.create %real, %imag : complex<f32>
+  %empty = tensor.empty() : tensor<4x2xcomplex<f32>>
+  %0 = linalg.fill ins(%cst : complex<f32>) outs(%empty : tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>>
+  %1 = flow.dispatch.region -> (tensor<4x2xcomplex<f32>>) {
+    %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%input : tensor<4x2xcomplex<f32>>) outs(%0 : tensor<4x2xcomplex<f32>>) {
+    ^bb0(%in: complex<f32>, %out: complex<f32>):
+      %2 = complex.mul %in, %out : complex<f32>
+      linalg.yield %2 : complex<f32>
+    } -> tensor<4x2xcomplex<f32>>
+    flow.return %generic : tensor<4x2xcomplex<f32>>
+  }
+  return %0 : tensor<4x2xcomplex<f32>>
+}
+
+// CHECK-LABEL: @complex_create
+// CHECK: flow.dispatch.region
+// CHECK: tensor.empty
+// CHECK: complex.create
+// CHECK: linalg.fill
+// CHECK: linalg.generic
+// CHECK: complex.mul
+// CHECK: linalg.yield
+// CHECK: flow.return
+
+// ----
+
+#map = affine_map<() -> ()>
+func.func @use_in_dispatch_count(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view {
+  %c1 = arith.constant 1 : index
+  %c2_i32 = arith.constant 2 : i32
+  %c0 = arith.constant 0 : index
+  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<1xi32>
+  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<1xi32>
+  %2 = tensor.empty() : tensor<i32>
+  %extracted = tensor.extract %0[%c1] : tensor<1xi32>
+  %4 = flow.dispatch.region -> (tensor<i32>) {
+    %6 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%2 : tensor<i32>) {
+    ^bb0(%out: i32):
+      %7 = arith.addi %extracted, %c2_i32 : i32
+      linalg.yield %7 : i32
+    } -> tensor<i32>
+    flow.return %6 : tensor<i32>
+  } count() -> (index, index, index) {
+    flow.return %c1, %c1, %c1 : index, index, index
+  }
+  %5 = hal.tensor.export %4 "output 0" : tensor<i32> -> !hal.buffer_view
+  return %5 : !hal.buffer_view
+}
+
+
+// CHECK-LABEL: @use_in_dispatch_count
+// CHECK: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: flow.dispatch.region
+// CHECK: %[[C1_2:.+]] = arith.constant 1 : index
+// CHECK: linalg.generic
+// CHECK: count()
+// CHECK: flow.return %[[C1]], %[[C1]], %[[C1]]

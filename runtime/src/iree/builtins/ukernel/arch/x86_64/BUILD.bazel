@@ -1,0 +1,124 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library", "iree_link_bitcode")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# UKernel bitcode files
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+iree_compiler_targeting_iree_arch(_IREE_UKERNEL_BITCODE_BUILD_X86_64 "x86_64")
+if(_IREE_UKERNEL_BITCODE_BUILD_X86_64)
+""",
+    inline = True,
+)
+
+# All headers transitively included by code in this directory. Bazel-only.
+UKERNEL_X86_64_INTERNAL_HEADERS = [
+    "common_x86_64.h",
+    "//runtime/src/iree/builtins/ukernel:internal_headers_filegroup",
+    "//runtime/src/iree/schemas:cpu_data_headers_filegroup",
+]
+
+UKERNEL_X86_64_BASE_SRCS = [
+    "mmt4d_x86_64.c",
+    "pack_x86_64.c",
+    "query_tile_sizes_x86_64.c",
+    "unpack_x86_64.c",
+]
+
+iree_bitcode_library(
+    name = "ukernel_bitcode_x86_64_base",
+    srcs = UKERNEL_X86_64_BASE_SRCS,
+    arch = "x86_64",
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
+)
+
+UKERNEL_X86_64_AVX2_FMA_SRCS = [
+    "mmt4d_x86_64_avx2_fma.c",
+    "pack_x86_64_avx2_fma.c",
+    "unpack_x86_64_avx2_fma.c",
+]
+
+UKERNEL_X86_64_AVX2_FMA_COPTS = [
+    "-mavx",
+    "-mavx2",
+    "-mfma",
+]
+
+iree_bitcode_library(
+    name = "ukernel_bitcode_x86_64_avx2_fma",
+    srcs = UKERNEL_X86_64_AVX2_FMA_SRCS,
+    arch = "x86_64",
+    copts = UKERNEL_X86_64_AVX2_FMA_COPTS,
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
+)
+
+UKERNEL_X86_64_AVX512_BASE_SRCS = [
+    "mmt4d_x86_64_avx512_base.c",
+    "pack_x86_64_avx512_base.c",
+    "unpack_x86_64_avx512_base.c",
+]
+
+UKERNEL_X86_64_AVX512_BASE_COPTS = UKERNEL_X86_64_AVX2_FMA_COPTS + [
+    "-mavx512f",
+    "-mavx512vl",
+    "-mavx512cd",
+    "-mavx512bw",
+    "-mavx512dq",
+]
+
+iree_bitcode_library(
+    name = "ukernel_bitcode_x86_64_avx512_base",
+    srcs = UKERNEL_X86_64_AVX512_BASE_SRCS,
+    arch = "x86_64",
+    copts = UKERNEL_X86_64_AVX512_BASE_COPTS,
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
+)
+
+UKERNEL_X86_64_AVX512_VNNI_SRCS = [
+    "mmt4d_x86_64_avx512_vnni.c",
+]
+
+UKERNEL_X86_64_AVX512_VNNI_COPTS = UKERNEL_X86_64_AVX512_BASE_COPTS + [
+    "-mavx512vnni",
+]
+
+iree_bitcode_library(
+    name = "ukernel_bitcode_x86_64_avx512_vnni",
+    srcs = UKERNEL_X86_64_AVX512_VNNI_SRCS,
+    arch = "x86_64",
+    copts = UKERNEL_X86_64_AVX512_VNNI_COPTS,
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
+)
+
+iree_link_bitcode(
+    name = "ukernel_bitcode_x86_64",
+    bitcode_files = [
+        "ukernel_bitcode_x86_64_base.bc",
+        "ukernel_bitcode_x86_64_avx2_fma.bc",
+        "ukernel_bitcode_x86_64_avx512_base.bc",
+        "ukernel_bitcode_x86_64_avx512_vnni.bc",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64.bc")
+endif()  # _IREE_UKERNEL_BITCODE_BUILD_X86_64
+""",
+    inline = True,
+)

@@ -8,14 +8,14 @@
 # The NVidia drivers need to *exactly* match between the host machine and the
 # docker image.
 
-FROM gcr.io/iree-oss/frontends@sha256:f7c5a863e3478a66aff8f3f527b5587666d3e84fe974e3f179a84eee11d79fd2
+FROM gcr.io/iree-oss/frontends@sha256:0073a0ed0b8f9e1978181471155888be33e8d232b223ba317b76301b38c2d51c
 
 # We use .deb files that we host because we have to pin the version exactly to
 # match the host machine and packages routinely dissapear from the Ubuntu
 # apt repositories.
-ARG NVIDIA_GL_DEB="libnvidia-gl-460_460.39-0ubuntu0.18.04.1_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-460_460.39-0ubuntu0.18.04.1_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-460_460.39-0ubuntu0.18.04.1_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-530_530.41.03-0ubuntu0.20.04.2_all.deb"
 
 WORKDIR /install-nvidia
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMMON_DEB}" \

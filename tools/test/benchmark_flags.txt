@@ -2,7 +2,7 @@
 // HELP: --module
 // HELP: --benchmark_list_tests
 
-// RUN: ( iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --benchmark_list_tests --device=local-task --benchmark_list_tests ) | FileCheck --check-prefix=LIST-BENCHMARKS %s
+// RUN: ( iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --benchmark_list_tests --device=local-task --module=- --benchmark_list_tests ) | FileCheck --check-prefix=LIST-BENCHMARKS %s
 module {
   // LIST-BENCHMARKS: BM_foo1
   func.func @foo1() -> tensor<4xf32> {

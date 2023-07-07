@@ -144,8 +144,6 @@ std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass();
 // TODO(benvanik): outline streams (ala dispatch regions).
 // TODO(benvanik): deduplicate outlined streams.
 
-std::unique_ptr<OperationPass<ModuleOp>> createMemoizeChannelsPass();
-
 //===----------------------------------------------------------------------===//
 // Dispatch optimization
 //===----------------------------------------------------------------------===//
@@ -165,6 +163,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpStatisticsPass(
     DumpOutputFormat outputFormat = DumpOutputFormat::Pretty,
     std::string outputFile = "");
 
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createVerifyAsyncAccessRangesPass();
+
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyInputPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createVerifyLoweringToTensorsPass();
@@ -178,9 +179,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyLoweringToCmdPass();
 
 void registerStreamPasses();
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_

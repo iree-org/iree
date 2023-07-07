@@ -6,7 +6,6 @@
 
 #include "iree/hal/local/local_executable.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/local/executable_environment.h"
 
 void iree_hal_local_executable_initialize(

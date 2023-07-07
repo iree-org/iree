@@ -41,9 +41,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass();
 
 inline void registerPasses() { createWrapEntryPointsPass(); }
 
-}  // namespace TFLite
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace TFLite
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_BINDINGS_TFLITE_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_BINDINGS_TFLITE_TRANSFORMS_PASSES_H_

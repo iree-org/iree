@@ -31,6 +31,8 @@ iree_status_t iree_custom_string_create(iree_string_view_t value,
                                         iree_custom_string_t** out_string);
 
 // Registers types provided by the custom module.
+// Not required to be called unless trying to create types from the module
+// before creating the module (rare).
 iree_status_t iree_custom_module_basic_register_types(
     iree_vm_instance_t* instance);
 

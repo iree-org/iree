@@ -12,7 +12,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -22,8 +21,8 @@
 #include "mlir/Support/LLVM.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
-#include "iree/compiler/Dialect/VMVX/IR/VMVXEnums.h.inc"  // IWYU pragma: export
-#include "iree/compiler/Dialect/VMVX/IR/VMVXOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/VMVX/IR/VMVXEnums.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/VMVX/IR/VMVXOpInterfaces.h.inc" // IWYU pragma: export
 // clang-format on
 
-#endif  // IREE_COMPILER_DIALECT_VMVX_IR_VMVXTYPES_H_
+#endif // IREE_COMPILER_DIALECT_VMVX_IR_VMVXTYPES_H_

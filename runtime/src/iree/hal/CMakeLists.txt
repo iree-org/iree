@@ -29,6 +29,8 @@ iree_cc_library(
     "buffer_view_util.h"
     "channel.c"
     "channel.h"
+    "channel_provider.c"
+    "channel_provider.h"
     "command_buffer.c"
     "command_buffer.h"
     "command_buffer_validation.c"
@@ -57,11 +59,9 @@ iree_cc_library(
     "string_util.h"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::path
     iree::base::internal::synchronization
-    iree::base::tracing
   PUBLIC
 )
 

@@ -472,51 +472,6 @@ func.func @unused_ins_operand() {
 
 // -----
 
-func.func @fill_matmul_exp() {
-  %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %c33 = arith.constant 33 : index
-  %c49 = arith.constant 49 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<33x16xf32>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x49xf32>>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<33x49xf32>>
-  %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %workgroup_count_x = hal.interface.workgroup.count[0] : index
-  %workgroup_id_y = hal.interface.workgroup.id[1] : index
-  %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %3 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_y]
-  %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_y]
-  scf.for %arg0 = %3 to %c33 step %4 {
-    %5 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
-    %6 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
-    scf.for %arg1 = %5 to %c49 step %6 {
-      %7 = affine.min affine_map<(d0) -> (16, -d0 + 33)>(%arg0)
-      %8 = affine.min affine_map<(d0) -> (16, -d0 + 49)>(%arg1)
-      %9 = tensor.empty(%7, %8) : tensor<?x?xf32>
-      %10 = affine.min affine_map<(d0) -> (-d0 + 33, 16)>(%arg0)
-      %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%10, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<33x16xf32>> -> tensor<?x16xf32>
-      %12 = affine.min affine_map<(d0) -> (-d0 + 49, 16)>(%arg1)
-      %13 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [16, %12], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16x49xf32>> -> tensor<16x?xf32>
-      %14 = tensor.empty(%10, %12) : tensor<?x?xf32>
-      %15 = linalg.fill ins(%cst : f32) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
-      %16 = linalg.matmul ins(%11, %13 : tensor<?x16xf32>, tensor<16x?xf32>) outs(%15 : tensor<?x?xf32>) -> tensor<?x?xf32>
-      %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%16 : tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) {
-      ^bb0(%arg2: f32, %arg3: f32):
-        %18 = math.exp %arg2 : f32
-        linalg.yield %18 : f32
-      } -> tensor<?x?xf32>
-      flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%7, %8], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<33x49xf32>>
-    }
-  }
-  return
-}
-// CHECK-LABEL: func.func @fill_matmul_exp()
-//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
-//       CHECK:   linalg.generic
-//  CHECK-SAME:       outs(%[[MATMUL]]
-
-// -----
-
 func.func @cumsum__2x2x2x2x2x2x2() {
   %cst = arith.constant dense<0.000000e+00> : tensor<2x2x2x2x2x2x2xf32>
   %c0 = arith.constant 0 : index
@@ -796,15 +751,11 @@ func.func @non_perfect_tiling_unpack() {
   %c512 = arith.constant 512 : index
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
-  %0:2 = vmvx.query_tile_sizes sizes(%c16, %c16) flags(1245184) -> index, index
+  %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>> -> index, index
   %1 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#0]
   %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
   %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c512) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1}
   %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1xi32>>
-  %5:2 = vmvx.query_tile_sizes sizes(%c16, %c16) flags(1245184) -> index, index
-  %6 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%5#0]
-  %7 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%5#1]
-  %8:2 = vmvx.query_tile_sizes sizes(%c16, %c16) flags(1245184) -> index, index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -815,13 +766,13 @@ func.func @non_perfect_tiling_unpack() {
     %11 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
     %12 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
     scf.for %arg1 = %11 to %c1 step %12 {
-      %13 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%arg0)[%8#0]
-      %14 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%arg1)[%8#1]
-      %15 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg0)[%8#0]
-      %16 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg1)[%8#1]
-      %17 = flow.dispatch.tensor.load %3, offsets = [%15, %16, 0, 0], sizes = [%c1, %c1, %8#0, %8#1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%6, %7, %5#0, %5#1} -> tensor<?x?x?x?xi32>
-      %18 = tensor.empty(%8#0, %8#1) : tensor<?x?xi32>
-      %19 = tensor.unpack %17 inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %18 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
+      %13 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%arg0)[%0#0]
+      %14 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%arg1)[%0#1]
+      %15 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg0)[%0#0]
+      %16 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg1)[%0#1]
+      %17 = flow.dispatch.tensor.load %3, offsets = [%15, %16, 0, 0], sizes = [%c1, %c1, %0#0, %0#1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1} -> tensor<?x?x?x?xi32>
+      %18 = tensor.empty(%0#0, %0#1) : tensor<?x?xi32>
+      %19 = tensor.unpack %17 inner_dims_pos = [0, 1] inner_tiles = [%0#0, %0#1] into %18 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
       %extracted_slice = tensor.extract_slice %19[%13, %14] [1, 1] [1, 1] : tensor<?x?xi32> to tensor<1x1xi32>
       %cast = tensor.cast %extracted_slice : tensor<1x1xi32> to tensor<?x?xi32>
       flow.dispatch.tensor.store %cast, %4, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<1x1xi32>>

@@ -22,6 +22,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::local_sync::sync_driver
     iree::hal::local::loaders::registration
+    iree::hal::local::plugins::registration
   DEFINES
     "IREE_HAVE_HAL_LOCAL_SYNC_DRIVER_MODULE=1"
   PUBLIC

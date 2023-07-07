@@ -28,6 +28,17 @@ on:
       build-dir-gcs-artifact:
         required: true
         type: string
+      benchmark-presets:
+        description: |
+          A comma-separated string of benchmark presets to build.
+        required: true
+        type: string
+      build-default-benchmark-suites:
+        description: |
+          Build default benchmark suites for sanity check and e2e model testing
+          if set to 1.
+        default: 1
+        type: number
     outputs:
       e2e-test-artifacts-dir:
         description: |
@@ -83,11 +94,15 @@ jobs:
       - name: "Building e2e test artifacts"
         id: build
         env:
+          IREE_BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
+          IREE_BUILD_DEFAULT_BENCHMARK_SUITES: ${{ inputs.build-default-benchmark-suites }}
           BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-            gcr.io/iree-oss/frontends@sha256:f7c5a863e3478a66aff8f3f527b5587666d3e84fe974e3f179a84eee11d79fd2 \
+            --env "IREE_BENCHMARK_PRESETS=${IREE_BENCHMARK_PRESETS}" \
+            --env "IREE_BUILD_DEFAULT_BENCHMARK_SUITES=${IREE_BUILD_DEFAULT_BENCHMARK_SUITES}" \
+            gcr.io/iree-oss/frontends@sha256:0073a0ed0b8f9e1978181471155888be33e8d232b223ba317b76301b38c2d51c \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
@@ -100,13 +115,17 @@ jobs:
           E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
           E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/e2e-test-artifacts/ninja_log
         run: |
-          # Uploads all IREE artifacts and MLIR files (including the imported
-          # MLIR files and MLIR source models).
+          # TODO(#13677): MLIRs of the versioned MLIR source models are fetched
+          # from GCS and they won't change. We can upload links instead of files
+          # to save space.
+          # Uploads all artifacts except for the `*.tflite`, which are the
+          # source models we imported into MLIR.
           # Not archiving the directory to allow fetching each file as needed
-          # separately.
-          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
-            -name "iree_*" -o -name "model_*.mlir" | \
-            gcloud storage cp --read-paths-from-stdin -r \
+          # separately. `find` depth is limited at 1 to exclude the directory
+          # itself and list all files and subdirectories at the first level. Let
+          # gcloud cli handle the recursive file traversal.
+          find "${E2E_TEST_ARTIFACTS_DIR}" -mindepth 1 -maxdepth 1 ! -name "*.tflite" \
+            | gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
               "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"

@@ -17,7 +17,7 @@ namespace iree_compiler {
 #define GEN_PASS_CLASSES
 #include "iree/compiler/InputConversion/Common/Passes.h.inc"
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSDETAIL_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSDETAIL_H_

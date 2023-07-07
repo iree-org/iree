@@ -61,7 +61,7 @@ EmitCTypeConverter::EmitCTypeConverter() {
 Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) {
   Type convertedType = convertType(type);
 
-  if (auto ptrType = convertedType.dyn_cast<emitc::PointerType>()) {
+  if (auto ptrType = llvm::dyn_cast<emitc::PointerType>(convertedType)) {
     return ptrType.getPointee();
   }
 
@@ -75,40 +75,40 @@ Type EmitCTypeConverter::convertTypeAsPointer(Type type) {
 emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) {
   Type convertedType = convertTypeAsNonPointer(type);
 
-  if (auto oType = convertedType.dyn_cast<emitc::OpaqueType>()) {
+  if (auto oType = llvm::dyn_cast<emitc::OpaqueType>(convertedType)) {
     return oType;
   }
 
-  if (auto iType = type.dyn_cast<IntegerType>()) {
+  if (auto iType = llvm::dyn_cast<IntegerType>(type)) {
     std::string typeLiteral;
     switch (iType.getWidth()) {
-      case 32: {
-        typeLiteral = "int32_t";
-        break;
-      }
-      case 64: {
-        typeLiteral = "int64_t";
-        break;
-      }
-      default:
-        return {};
+    case 32: {
+      typeLiteral = "int32_t";
+      break;
+    }
+    case 64: {
+      typeLiteral = "int64_t";
+      break;
+    }
+    default:
+      return {};
     }
     return emitc::OpaqueType::get(type.getContext(), typeLiteral);
   }
 
-  if (auto fType = type.dyn_cast<FloatType>()) {
+  if (auto fType = llvm::dyn_cast<FloatType>(type)) {
     std::string typeLiteral;
     switch (fType.getWidth()) {
-      case 32: {
-        typeLiteral = "float";
-        break;
-      }
-      case 64: {
-        typeLiteral = "double";
-        break;
-      }
-      default:
-        return {};
+    case 32: {
+      typeLiteral = "float";
+      break;
+    }
+    case 64: {
+      typeLiteral = "double";
+      break;
+    }
+    default:
+      return {};
     }
     return emitc::OpaqueType::get(type.getContext(), typeLiteral);
   }
@@ -135,7 +135,7 @@ std::optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   if (auto definingOp = ref.getDefiningOp()) {
     funcOp = definingOp->getParentOfType<mlir::func::FuncOp>();
   } else {
-    Operation *op = ref.cast<BlockArgument>().getOwner()->getParentOp();
+    Operation *op = llvm::cast<BlockArgument>(ref).getOwner()->getParentOp();
     funcOp = cast<mlir::func::FuncOp>(op);
   }
 
@@ -166,7 +166,7 @@ std::optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   return applyOp.getResult();
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

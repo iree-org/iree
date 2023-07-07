@@ -87,9 +87,10 @@ class VmVariantList : public ApiRefCounted<VmVariantList, iree_vm_list_t> {
  public:
   static VmVariantList Create(iree_host_size_t capacity) {
     iree_vm_list_t* list;
-    CheckApiStatus(iree_vm_list_create(/*element_type=*/nullptr, capacity,
-                                       iree_allocator_system(), &list),
-                   "Error allocating variant list");
+    CheckApiStatus(
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), capacity,
+                            iree_allocator_system(), &list),
+        "Error allocating variant list");
     return VmVariantList::StealFromRawPtr(list);
   }
 
@@ -128,8 +129,17 @@ class VmInstance : public ApiRefCounted<VmInstance, iree_vm_instance_t> {
 
 class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
  public:
-  static VmModule FromFlatbufferBlob(VmInstance* instance,
-                                     py::object flatbuffer_blob_object);
+  static VmModule ResolveModuleDependency(VmInstance* instance,
+                                          const std::string& name,
+                                          uint32_t minimum_version);
+
+  static VmModule WrapBuffer(VmInstance* instance, py::object buffer_obj,
+                             py::object destroy_callback, bool close_buffer);
+  static VmModule MMap(VmInstance* instance, std::string filepath,
+                       py::object destroy_callback);
+  static VmModule CopyBuffer(VmInstance* instance, py::object buffer_obj);
+  static VmModule FromBuffer(VmInstance* instance, py::object buffer_obj,
+                             bool warn_if_copy);
 
   std::optional<iree_vm_function_t> LookupFunction(
       const std::string& name, iree_vm_function_linkage_t linkage);
@@ -143,6 +153,11 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
 
  private:
   // If the module was created from a FlatBuffer blob, we stash it here.
+  // Note that this buffer will typically be captured here at the Python
+  // instance level and within the deallocator of the native vm module.
+  // Since this child field is destroyed first (before the base class wrapped
+  // vm module), we ensure that there are no dangling references when
+  // that deallocator is called.
   py::object stashed_flatbuffer_blob = py::none();
 };
 
@@ -156,7 +171,7 @@ class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {
   // static, disallowing further module registration (and may be more
   // efficient).
   static VmContext Create(VmInstance* instance,
-                          std::optional<std::vector<VmModule*>> modules);
+                          std::optional<std::vector<VmModule*>>& modules);
 
   // Registers additional modules. Only valid for non static contexts (i.e.
   // those created without modules.
@@ -182,8 +197,8 @@ class VmRef {
   //----------------------------------------------------------------------------
   // Binds the reference protocol to a VmRefObject bound class.
   // This defines three attributes:
-  //   __iree_vm_type_id__()
-  //        Gets the type id from the object.
+  //   __iree_vm_type__()
+  //        Gets the type from the object.
   //   [readonly property] __iree_vm_ref__ :
   //        Gets a VmRef from the object.
   //   __iree_vm_cast__(ref) :
@@ -200,29 +215,29 @@ class VmRef {
   // reference object. It takes some of the C helper functions that are defined
   // for each type and is generic.
   //----------------------------------------------------------------------------
-  static const char* const kTypeIdAttr;
+  static const char* const kTypeAttr;
   static const char* const kRefAttr;
   static const char* const kCastAttr;
 
-  template <typename PyClass, typename TypeIdFunctor, typename RetainRefFunctor,
+  template <typename PyClass, typename TypeFunctor, typename RetainRefFunctor,
             typename DerefFunctor, typename IsaFunctor>
-  static void BindRefProtocol(PyClass& cls, TypeIdFunctor type_id,
+  static void BindRefProtocol(PyClass& cls, TypeFunctor type,
                               RetainRefFunctor retain_ref, DerefFunctor deref,
                               IsaFunctor isa) {
-    using WrapperType = typename PyClass::type;
+    using WrapperType = typename PyClass::Type;
     using RawPtrType = typename WrapperType::RawPtrType;
     auto ref_lambda = [=](WrapperType& self) {
       return VmRef::Steal(retain_ref(self.raw_ptr()));
     };
-    cls.def_static(VmRef::kTypeIdAttr, [=]() { return type_id(); });
-    cls.def_property_readonly(VmRef::kRefAttr, ref_lambda);
-    cls.def_property_readonly("ref", ref_lambda);
+    cls.def_static(VmRef::kTypeAttr, [=]() { return type(); });
+    cls.def_prop_ro(VmRef::kRefAttr, ref_lambda);
+    cls.def_prop_ro("ref", ref_lambda);
     cls.def_static(VmRef::kCastAttr, [=](VmRef& ref) -> py::object {
       if (!isa(ref.ref())) {
         return py::none();
       }
       return py::cast(WrapperType::BorrowFromRawPtr(deref(ref.ref())),
-                      py::return_value_policy::move);
+                      py::rv_policy::move);
     });
     cls.def("__eq__", [](WrapperType& self, WrapperType& other) {
       return self.raw_ptr() == other.raw_ptr();
@@ -260,7 +275,7 @@ class VmRef {
   iree_vm_ref_t ref_;
 };
 
-void SetupVmBindings(pybind11::module m);
+void SetupVmBindings(nanobind::module_ m);
 
 }  // namespace python
 }  // namespace iree

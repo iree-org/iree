@@ -22,8 +22,8 @@ iree_status_t iree_hal_modules_buffer_assert(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(buffer_ref, &buffer));
   iree_vm_buffer_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(message_ref, &message));
-  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
-      iree_vm_buffer_as_string(message);
+  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  (void)message_str;
 
   // Ensure we have enough bytes in the buffer for the encoding we have.
   // Note that having more bytes is fine:
@@ -145,8 +145,8 @@ iree_status_t iree_hal_modules_buffer_view_assert(
       iree_hal_buffer_view_check_deref(buffer_view_ref, &buffer_view));
   iree_vm_buffer_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(message_ref, &message));
-  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
-      iree_vm_buffer_as_string(message);
+  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  (void)message_str;
 
   // Check encoding first; getting the encoding wrong is worse than the shape.
   // If the actual encoding is opaque we allow it to pass through - this lets
@@ -271,8 +271,8 @@ iree_status_t iree_hal_modules_buffer_view_trace(
 
     // Query total length (excluding NUL terminator).
     iree_host_size_t result_length = 0;
-    iree_status_t status = iree_hal_buffer_view_format(buffer_view, SIZE_MAX, 0,
-                                                       NULL, &result_length);
+    iree_status_t status = iree_hal_buffer_view_format(
+        buffer_view, IREE_HOST_SIZE_MAX, 0, NULL, &result_length);
     if (!iree_status_is_out_of_range(status)) {
       return status;
     }
@@ -282,8 +282,9 @@ iree_status_t iree_hal_modules_buffer_view_trace(
     char* result_str = NULL;
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, result_length,
                                                (void**)&result_str));
-    status = iree_hal_buffer_view_format(buffer_view, SIZE_MAX, result_length,
-                                         result_str, &result_length);
+    status =
+        iree_hal_buffer_view_format(buffer_view, IREE_HOST_SIZE_MAX,
+                                    result_length, result_str, &result_length);
     if (iree_status_is_ok(status)) {
       fprintf(stderr, "%.*s\n", (int)result_length, result_str);
     }

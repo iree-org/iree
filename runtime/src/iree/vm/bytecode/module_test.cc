@@ -110,14 +110,15 @@ using testing::Eq;
 class VMBytecodeModuleTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     const auto* module_file_toc = iree_vm_bytecode_module_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         instance_,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
-            module_file_toc->size},
+            static_cast<iree_host_size_t>(module_file_toc->size)},
         iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
@@ -136,7 +137,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
       const char* function_name, std::vector<iree_vm_value_t> inputs) {
     ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(
-        iree_vm_list_create(/*element_type=*/nullptr, inputs.size(),
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), inputs.size(),
                             iree_allocator_system(), &input_list));
     IREE_RETURN_IF_ERROR(iree_vm_list_resize(input_list.get(), inputs.size()));
     for (iree_host_size_t i = 0; i < inputs.size(); ++i) {
@@ -145,8 +146,9 @@ class VMBytecodeModuleTest : public ::testing::Test {
     }
 
     ref<iree_vm_list_t> output_list;
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(
-        /*element_type=*/nullptr, 8, iree_allocator_system(), &output_list));
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             8, iree_allocator_system(),
+                                             &output_list));
 
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
@@ -170,7 +172,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
       const char* function_name, std::vector<iree_vm_ref_t> inputs) {
     ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(
-        iree_vm_list_create(/*element_type=*/nullptr, inputs.size(),
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), inputs.size(),
                             iree_allocator_system(), &input_list));
     IREE_RETURN_IF_ERROR(iree_vm_list_resize(input_list.get(), inputs.size()));
     for (iree_host_size_t i = 0; i < inputs.size(); ++i) {
@@ -179,8 +181,9 @@ class VMBytecodeModuleTest : public ::testing::Test {
     }
 
     ref<iree_vm_list_t> output_list;
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(
-        /*element_type=*/nullptr, 8, iree_allocator_system(), &output_list));
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             8, iree_allocator_system(),
+                                             &output_list));
 
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(

@@ -25,18 +25,6 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
-// Returns the number of elements in an array as a compile-time constant, which
-// can be used in defining new arrays. Fails at compile-time if |arr| is not a
-// static array (such as if used on a pointer type). Similar to `countof()`.
-//
-// Example:
-//  uint8_t kConstantArray[512];
-//  assert(IREE_ARRAYSIZE(kConstantArray) == 512);
-#define IREE_ARRAYSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
-
-#define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
-#define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
-
 #if IREE_STATISTICS_ENABLE
 // Evalutes the expression code only if statistics are enabled.
 //
@@ -147,7 +135,7 @@ typedef enum iree_allocator_command_e {
   // iree_allocator_ctl_fn_t:
   //   params: iree_allocator_alloc_params_t
   //   inout_ptr: set to allocated pointer
-  IREE_ALLOCATOR_COMMAND_CALLOC,
+  IREE_ALLOCATOR_COMMAND_CALLOC = 1,
 
   // Tries to resize an allocation provided via |inout_ptr|, if possible.
   // If the existing allocation is not reused then it is freed as if a call to
@@ -158,14 +146,14 @@ typedef enum iree_allocator_command_e {
   // iree_allocator_ctl_fn_t:
   //   params: iree_allocator_alloc_params_t
   //   inout_ptr: pointer of existing allocation; updated to realloced pointer
-  IREE_ALLOCATOR_COMMAND_REALLOC,
+  IREE_ALLOCATOR_COMMAND_REALLOC = 2,
 
   // Frees the memory pointed to by |inout_ptr|.
   //
   // iree_allocator_ctl_fn_t:
   //   params: unused
   //   inout_ptr: pointer to free
-  IREE_ALLOCATOR_COMMAND_FREE,
+  IREE_ALLOCATOR_COMMAND_FREE = 3,
 
   // TODO(benvanik): add optional IREE_ALLOCATOR_COMMAND_BIND like mbind:
   // https://man7.org/linux/man-pages/man2/mbind.2.html

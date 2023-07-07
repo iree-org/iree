@@ -36,9 +36,9 @@ struct TargetOptions {
   using FromFlags = OptionsFromFlags<TargetOptions>;
 };
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_TARGETOPTIONS_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_TARGETOPTIONS_H_

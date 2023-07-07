@@ -7,9 +7,11 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALG_TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 #define IREE_DIALECTS_DIALECT_LINALG_TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 
+#include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/Dialect/Transform/IR/TransformTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OpDefinition.h"
 
@@ -35,7 +37,7 @@ template <int N, typename... MatchingArgs>
 auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
                                    StringRef callbackName,
                                    MatchingArgs... args) {
-  SmallVector<Type> matchedTypes(N, pdl::OperationType::get(b.getContext()));
+  SmallVector<Type> matchedTypes(N, transform::AnyOpType::get(b.getContext()));
   auto matchOp = b.create<transform_ext::MatchCallbackOp>(
       matchedTypes, callbackName, std::forward<decltype(args)>(args)...);
   assert(matchOp->getNumResults() == N && "Unexpected number of results");
@@ -45,71 +47,35 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
   return std::tuple_cat(a);
 }
 
-class TrackingListener : public RewriterBase::Listener,
-                         public transform::TransformState::Extension {
+/// A tracking listener for tensor IR that checks for payload replacement
+/// errors.
+class ErrorCheckingTrackingListener : public transform::TrackingListener {
 public:
-  explicit TrackingListener(transform::TransformState &state)
-      : transform::TransformState::Extension(state) {}
+  using transform::TrackingListener::TrackingListener;
 
-  ~TrackingListener() override {
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    assert(errorStateChecked && "must check listener error state");
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
+  ~ErrorCheckingTrackingListener() override {
+    assert(status.succeeded() && "must check listener error state");
   }
 
-  DiagnosedSilenceableFailure check(Location loc) {
-    if (failed(checkErrorState()))
-      return emitDefiniteFailure(loc, "listener failed");
-    return DiagnosedSilenceableFailure::success();
+  /// Return "true" if this tracking listener had a failure.
+  bool failed() const { return !status.succeeded(); }
+
+  /// Check and return the current error state of this listener. In case of a
+  /// failure state, only the most recent error is returned. Afterwards, resets
+  /// the error state.
+  DiagnosedSilenceableFailure checkAndResetError() {
+    DiagnosedSilenceableFailure result(std::move(status));
+    status = DiagnosedSilenceableFailure::success();
+    return result;
   }
-
-  DiagnosedSilenceableFailure check(Location loc,
-                                    DiagnosedSilenceableFailure &&diag) {
-    if (failed(checkErrorState())) {
-      auto definite = emitDefiniteFailure(loc, "listener failed");
-      if (diag.isSilenceableFailure()) {
-        definite.attachNote()
-            << "was propagating silenceable error:" << diag.getMessage();
-        (void)diag.silence();
-      }
-      return definite;
-    }
-    return std::move(diag);
-  }
-
-  void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
-
-  void notifyOperationRemoved(Operation *op) override;
-
-  LogicalResult checkErrorState() const {
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    errorStateChecked = true;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
-    return failure(hadErrors);
-  }
-
-  /// Remove the mappings between the given operation and any handle that may be
-  /// associated with it in the transform op.
-  void removeMappings(Operation *op);
 
 private:
-  InFlightDiagnostic emitError(Operation *op, const llvm::Twine &message = {}) {
-    mayFail(failure());
-    return op->emitError(message);
-  }
+  void notifyPayloadReplacementNotFound(Operation *op,
+                                        ValueRange values) override;
 
-  void mayFail(LogicalResult result) {
-    hadErrors |= result.failed();
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    errorStateChecked = false;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
-  }
-
-  bool hadErrors = false;
-
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-  mutable bool errorStateChecked = false;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
+  /// The error state of this listener. "Success" indicates that no error
+  /// happened so far. Otherwise, the status contains the most recent error.
+  DiagnosedSilenceableFailure status = DiagnosedSilenceableFailure::success();
 };
 
 } // namespace mlir

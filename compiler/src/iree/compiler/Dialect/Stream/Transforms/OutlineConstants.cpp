@@ -27,7 +27,7 @@ namespace Stream {
 
 // Returns true if |value| is worth outlining (large, etc).
 static bool isOutlinableValue(Attribute value) {
-  if (auto elementsAttr = value.dyn_cast<DenseElementsAttr>()) {
+  if (auto elementsAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
     // Don't outline splats - we want those fused.
     return !elementsAttr.isSplat();
   }
@@ -45,7 +45,8 @@ static SmallVector<ConstantDef> findConstantsInModule(mlir::ModuleOp moduleOp) {
   SmallVector<ConstantDef> results;
   for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
     auto *region = callableOp.getCallableRegion();
-    if (!region) continue;
+    if (!region)
+      continue;
     for (auto &block : *region) {
       for (auto &op : block.getOperations()) {
         if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
@@ -53,7 +54,7 @@ static SmallVector<ConstantDef> findConstantsInModule(mlir::ModuleOp moduleOp) {
             results.push_back(ConstantDef{
                 constantOp,
                 constantOp.getType(),
-                constantOp.getValue().cast<ElementsAttr>(),
+                llvm::cast<ElementsAttr>(constantOp.getValue()),
             });
           }
         }
@@ -64,7 +65,7 @@ static SmallVector<ConstantDef> findConstantsInModule(mlir::ModuleOp moduleOp) {
 }
 
 class OutlineConstantsPass : public OutlineConstantsBase<OutlineConstantsPass> {
- public:
+public:
   OutlineConstantsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -75,7 +76,8 @@ class OutlineConstantsPass : public OutlineConstantsBase<OutlineConstantsPass> {
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
 
     SymbolTable moduleSymbols(moduleOp);
     std::string baseName = "_constant";
@@ -89,7 +91,7 @@ class OutlineConstantsPass : public OutlineConstantsBase<OutlineConstantsPass> {
       auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           def.op->getLoc(), baseName, /*isMutable=*/false, def.type, def.value);
       globalOp.setPrivate();
-      moduleSymbols.insert(globalOp);  // uniques name
+      moduleSymbols.insert(globalOp); // uniques name
       replacements.emplace_back(def.op, globalOp);
 
       // Prevent the variable from being re-inlined if the canonicalizer runs.
@@ -127,7 +129,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass() {
   return std::make_unique<OutlineConstantsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

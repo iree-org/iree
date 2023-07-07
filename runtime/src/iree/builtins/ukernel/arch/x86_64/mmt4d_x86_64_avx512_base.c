@@ -4,10 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <immintrin.h>
-
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
-#include "iree/builtins/ukernel/mmt4d.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
@@ -21,11 +19,11 @@ void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
   // prefetch-ahead offset of 128*sizeof(float) in the loop was empirically
   // determined. Similar prefetches did not produce any benefit in other
   // kernels, even though they are very similar to this one.
-  _mm_prefetch(lhs_ptr, _MM_HINT_T0);
-  _mm_prefetch(rhs_ptr, _MM_HINT_T0);
+  _mm_prefetch((const char*)lhs_ptr, _MM_HINT_T0);
+  _mm_prefetch((const char*)rhs_ptr, _MM_HINT_T0);
   __m512 acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;
   __m512 acc8, acc9, acc10, acc11, acc12, acc13, acc14, acc15;
-  if (flags & IREE_UK_FLAG_ACCUMULATE) {
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     acc0 = _mm512_loadu_ps(out_ptr + 0 * 16);
     acc1 = _mm512_loadu_ps(out_ptr + 1 * 16);
     acc2 = _mm512_loadu_ps(out_ptr + 2 * 16);
@@ -62,7 +60,7 @@ void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
   }
   for (iree_uk_int32_t k = 0; k < K; ++k) {
     __m512 rhs = _mm512_loadu_ps(rhs_ptr);
-    _mm_prefetch(rhs_ptr + 128, _MM_HINT_T0);
+    _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
     acc0 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[0]), rhs, acc0);
     acc1 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[1]), rhs, acc1);
@@ -80,7 +78,7 @@ void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
     acc13 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[13]), rhs, acc13);
     acc14 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[14]), rhs, acc14);
     acc15 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[15]), rhs, acc15);
-    _mm_prefetch(lhs_ptr + 128, _MM_HINT_T0);
+    _mm_prefetch((const char*)(lhs_ptr + 128), _MM_HINT_T0);
     lhs_ptr += 16;
   }
   _mm512_storeu_ps(out_ptr + 0 * 16, acc0);
@@ -126,7 +124,7 @@ void iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_base(
   __m512i acc_3_89AB_7_CDEF_B_0123_F_4567;
   __m512i acc_3_CDEF_7_89AB_B_4567_F_0123;
 
-  if (flags & IREE_UK_FLAG_ACCUMULATE) {
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     acc_0_0123_4_4567_8_89AB_C_CDEF = iree_uk_avx512_loadu_4x128_from_16x16xi32(
         out_ptr, 0, 0, 4, 4, 8, 8, 12, 12);
     acc_0_4567_4_0123_8_CDEF_C_89AB = iree_uk_avx512_loadu_4x128_from_16x16xi32(

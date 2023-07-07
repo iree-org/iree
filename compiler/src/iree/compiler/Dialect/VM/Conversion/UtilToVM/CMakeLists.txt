@@ -17,6 +17,7 @@ iree_cc_library(
     "ConvertUtilToVM.h"
   SRCS
     "ConvertAlignmentOps.cpp"
+    "ConvertAssignmentOps.cpp"
     "ConvertBufferOps.cpp"
     "ConvertGlobalOps.cpp"
     "ConvertListOps.cpp"

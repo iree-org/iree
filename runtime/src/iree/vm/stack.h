@@ -10,11 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "iree/base/alignment.h"
 #include "iree/base/api.h"
-#include "iree/base/attributes.h"
-#include "iree/base/string_builder.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 

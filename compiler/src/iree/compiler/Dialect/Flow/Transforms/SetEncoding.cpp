@@ -38,7 +38,7 @@ using IREE::LinalgExt::TensorEncoding;
 // Returns the element type of `t` if it is a `ShapedType`, else return
 // `t` itself.
 static Type getElementTypeOrType(Type t) {
-  if (auto shapedType = t.dyn_cast<ShapedType>()) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(t)) {
     return shapedType.getElementType();
   }
   return t;
@@ -47,26 +47,28 @@ static Type getElementTypeOrType(Type t) {
 /// Returns a constant 0 of type `elementType`.
 static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
                                 Type elementType) {
-  Attribute zeroVal =
-      TypeSwitch<Type, Attribute>(elementType)
+  TypedAttr zeroVal =
+      TypeSwitch<Type, TypedAttr>(elementType)
           .Case<FloatType>([&](FloatType floatType) -> Attribute {
-            return builder.getFloatAttr(floatType, 0);
+            return cast<TypedAttr>(builder.getFloatAttr(floatType, 0));
           })
           .Case<IntegerType>([&](IntegerType intType) -> Attribute {
-            return builder.getIntegerAttr(intType, 0);
+            return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
           })
           .Default([](Type type) { return nullptr; });
-  if (!zeroVal) return failure();
-  return builder.create<arith::ConstantOp>(loc, zeroVal, elementType)
+  if (!zeroVal)
+    return failure();
+  return builder.create<arith::ConstantOp>(loc, elementType, zeroVal)
       .getResult();
 }
 
 /// Pads `value` to `padding` if needed. If no padding is specified,
 /// return `value` itself.
-static FailureOr<Value> padIfNeeded(
-    OpBuilder &builder, Location loc, Value value,
-    std::optional<int64_t> padding = std::nullopt) {
-  if (!padding) return value;
+static FailureOr<Value>
+padIfNeeded(OpBuilder &builder, Location loc, Value value,
+            std::optional<int64_t> padding = std::nullopt) {
+  if (!padding)
+    return value;
 
   OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());
   FailureOr<SmallVector<OpFoldResult>> shape =
@@ -86,7 +88,7 @@ static FailureOr<Value> padIfNeeded(
   AffineExpr highPadExpr =
       shapeExpr.ceilDiv(paddingExpr) * paddingExpr - shapeExpr;
   for (auto shape : llvm::enumerate(shape.value())) {
-    highPad[shape.index()] = makeComposedFoldedAffineApply(
+    highPad[shape.index()] = affine::makeComposedFoldedAffineApply(
         builder, loc, highPadExpr, {paddingOfr, shape.value()});
   }
 
@@ -114,16 +116,17 @@ namespace {
 struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
   SetMatmulEncoding(MLIRContext *context, int64_t padding,
                     PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
-        padding(padding) {}
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit), padding(padding) {
+  }
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics()) return failure();
+    if (!matmulOp.hasTensorSemantics())
+      return failure();
     auto inputs = matmulOp.getDpsInputOperands();
     auto outputs = matmulOp.getDpsInitOperands();
     auto hasEncoding = [](OpOperand *operand) -> bool {
-      auto type = operand->get().getType().dyn_cast<RankedTensorType>();
+      auto type = llvm::dyn_cast<RankedTensorType>(operand->get().getType());
       return type && type.getEncoding();
     };
     if (llvm::any_of(inputs, hasEncoding) ||
@@ -136,7 +139,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     Value origOut = outputs[0]->get();
 
     auto getElemType = [](Value v) -> Type {
-      if (auto tensorType = v.getType().dyn_cast<RankedTensorType>()) {
+      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType())) {
         return tensorType.getElementType();
       }
       return {};
@@ -157,6 +160,26 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       lhsEncoding = TensorEncoding::MATMUL_F32F32F32_LHS;
       rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS;
       outEncoding = TensorEncoding::MATMUL_F32F32F32_RESULT;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF32()) {
+      lhsEncoding = TensorEncoding::MATMUL_F16F16F32_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_F16F16F32_RHS;
+      outEncoding = TensorEncoding::MATMUL_F16F16F32_RESULT;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF16()) {
+      lhsEncoding = TensorEncoding::MATMUL_F16F16F16_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_F16F16F16_RHS;
+      outEncoding = TensorEncoding::MATMUL_F16F16F16_RESULT;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isF32()) {
+      lhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_RHS;
+      outEncoding = TensorEncoding::MATMUL_BF16BF16F32_RESULT;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isBF16()) {
+      lhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RHS;
+      outEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RESULT;
     } else if (lhsElemType.isSignlessInteger(8) &&
                rhsElemType.isSignlessInteger(8) &&
                outElemType.isSignlessInteger(32)) {
@@ -206,7 +229,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     // If the output was padded, extract the actual output.
     if (paddedOut.value() != origOut) {
       auto replacementRank =
-          replacement.getType().cast<RankedTensorType>().getRank();
+          llvm::cast<RankedTensorType>(replacement.getType()).getRank();
       // Offsets are all 0.
       OpFoldResult zero = rewriter.getIndexAttr(0);
       SmallVector<OpFoldResult> offsets(replacementRank, zero);
@@ -229,7 +252,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     return success();
   }
 
- private:
+private:
   int64_t padding;
 };
 
@@ -242,13 +265,14 @@ struct FoldFillWithSetEncoding
   LogicalResult matchAndRewrite(IREE::LinalgExt::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto fillOp = encodingOp.getSource().getDefiningOp<linalg::FillOp>();
-    if (!fillOp) return failure();
+    if (!fillOp)
+      return failure();
 
     // Create a new fill op, with outs being defined by a new `tensor.empty` op.
     RankedTensorType encodingType = encodingOp.getResultType();
     Location loc = fillOp.getLoc();
     SmallVector<OpFoldResult> dimValues =
-        tensor::createDimValues(rewriter, loc, fillOp.getOutputs()[0]);
+        tensor::getMixedSizes(rewriter, loc, fillOp.getOutputs()[0]);
     auto newEmptyOp = rewriter.create<tensor::EmptyOp>(
         loc, dimValues, encodingType.getElementType(),
         encodingType.getEncoding());
@@ -265,7 +289,7 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -274,7 +298,7 @@ void SetEncodingPass::runOnOperation() {
     patterns.insert<SetMatmulEncoding>(context, defaultPadding);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -286,7 +310,7 @@ std::unique_ptr<Pass> createSetEncodingPass() {
   return std::make_unique<SetEncodingPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

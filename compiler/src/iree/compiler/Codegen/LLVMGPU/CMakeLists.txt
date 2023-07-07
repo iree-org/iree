@@ -10,34 +10,61 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "PassDetail.h"
+    "Passes.h"
+    "Passes.h.inc"
+  DEPS
+    ::PassesIncGen
+    MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRNVGPUDialect
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     LLVMGPU
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
-    "TilingUtils.h"
-    "TransposeUtils.h"
+    "Passes.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
-    "LLVMGPUCheckIRBeforeLLVMConversion.cpp"
-    "LLVMGPUDistribute.cpp"
+    "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
-    "LLVMGPUTensorAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
-    "LLVMGPUTileTensor.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"
     "Verifiers.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
@@ -57,7 +84,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
     MLIRGPUTransformOps
@@ -88,22 +115,26 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::GPU::CommonGPUPasses
+    iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::LLVMGPU::Utils
-    iree::compiler::Codegen::PassHeaders
-    iree::compiler::Codegen::TransformDialectStrategies::GPU::TransformDialectStrategies
+    iree::compiler::Codegen::TransformStrategies::GPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
   PUBLIC
 )
 

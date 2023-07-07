@@ -12,7 +12,6 @@
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_driver_registry_t
@@ -148,7 +147,6 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
 
   if (iree_status_is_ok(status)) {
     // Compact list. Note that registration order is preserved.
-    // C4090 bug in MSVC: https://tinyurl.com/y46hlogx
     memmove((void*)&registry->factories[index], &registry->factories[index + 1],
             registry->factory_count - index - 1);
     registry->factories[--registry->factory_count] = NULL;

@@ -33,6 +33,37 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_regression_llvm-cpu
+  SRCS
+    "associative_reordering.mlir"
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "i1_inlined_constant.mlir"
+    "layernorm.mlir"
+    "linalg_ops.mlir"
+    "lowering_config.mlir"
+    "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir"
+    "reduction_broadcast_elementwise.mlir"
+    "scalar_computation.mlir"
+    "softmax.mlir"
+    "strided_slice.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-type=stablehlo"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_regression_tosa_llvm-cpu
   SRCS
     "linalg_quantized_matmul_vs_linalg_matmul.mlir"
@@ -60,6 +91,7 @@ iree_check_single_backend_test_suite(
     "layernorm.mlir"
     "linalg_ops.mlir"
     "reduction_broadcast_elementwise.mlir"
+    "scalar_computation.mlir"
     "softmax.mlir"
     "strided_slice.mlir"
     "transpose.mlir"
@@ -68,7 +100,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -86,6 +118,7 @@ iree_check_single_backend_test_suite(
     "i1_inlined_constant.mlir"
     "linalg_ops.mlir"
     "reduction_broadcast_elementwise.mlir"
+    "scalar_computation.mlir"
     "softmax.mlir"
     "strided_slice.mlir"
     "transpose.mlir"
@@ -94,7 +127,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -114,6 +147,7 @@ iree_check_single_backend_test_suite(
     "layernorm.mlir"
     "linalg_ops.mlir"
     "reduction_broadcast_elementwise.mlir"
+    "scalar_computation.mlir"
     "softmax.mlir"
     "strided_slice.mlir"
     "transpose.mlir"
@@ -122,7 +156,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
   LABELS
     "noasan"
     "nomsan"

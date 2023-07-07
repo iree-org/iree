@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Implements logic for lowering StableHLO/CHLO pointwise ops to Linalg dialect.
+// Implements logic for lowering StableHLO pointwise ops to Linalg dialect.
 // These patterns are separated out to their own file to save on the compilation
 // times, given that we instantiate a large number of class templates here.
 
@@ -19,8 +19,6 @@
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
-namespace stablehlo = mlir::stablehlo;
-
 int64_t getRank(Value v) { return cast<ShapedType>(v.getType()).getRank(); }
 
 int64_t getMaxRank(ValueRange operands) {
@@ -56,13 +54,14 @@ struct PointwiseConversionInfo {
 
 /// Checks the preconditions for conversion of pointwise HLO ops to linalg.
 /// Returns the max operand rank and the result type on success.
-FailureOr<PointwiseConversionInfo> checkOperandsAndResults(
-    Operation* op, ValueRange operands, TypeConverter& typeConverter,
-    ConversionPatternRewriter& rewriter) {
+FailureOr<PointwiseConversionInfo>
+checkOperandsAndResults(Operation *op, ValueRange operands,
+                        TypeConverter &typeConverter,
+                        ConversionPatternRewriter &rewriter) {
   int64_t maxRank = getMaxRank(operands);
 
   // Apply only if all operands are scalar or have the same rank. Some ops,
-  // like `mhlo.select`, support implicit broadcasting of scalars.
+  // like `stablehlo.select`, support implicit broadcasting of scalars.
   if (!llvm::all_of(operands, [&](Value v) {
         int64_t r = getRank(v);
         return r == 0 || r == maxRank;
@@ -85,7 +84,8 @@ FailureOr<PointwiseConversionInfo> checkOperandsAndResults(
 
   // All-scalar pointwise ops inside of linalg ops are processes by
   // ScalarHloToArithmeticPattern.
-  if (maxRank == 0 && isInBodyOfLinalgOps(op)) return failure();
+  if (maxRank == 0 && isInBodyOfLinalgOps(op))
+    return failure();
 
   return PointwiseConversionInfo{maxRank, resultTy};
 }
@@ -97,9 +97,9 @@ struct PointwiseToLinalgMapConverter final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   using OpAdaptor = typename OpTy::Adaptor;
 
-  LogicalResult matchAndRewrite(
-      OpTy op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto conversionInfo = checkOperandsAndResults(
         op, adaptor.getOperands(), *this->typeConverter, rewriter);
     if (failed(conversionInfo)) {
@@ -122,7 +122,7 @@ struct PointwiseToLinalgMapConverter final : OpConversionPattern<OpTy> {
       if (getRank(input) == maxRank) {
         mappedInputs.push_back(coerceTensorShape(
             rewriter, loc, cast<TypedValue<ShapedType>>(input),
-            emptyTensor.getType()));
+            cast<ShapedType>(emptyTensor.getType())));
         scalarInputs.push_back(nullptr);
       } else {
         scalarInputs.push_back(rewriter.create<tensor::ExtractOp>(loc, input));
@@ -131,8 +131,8 @@ struct PointwiseToLinalgMapConverter final : OpConversionPattern<OpTy> {
 
     auto mapOp = rewriter.create<linalg::MapOp>(
         loc, mappedInputs, emptyTensor,
-        [&](OpBuilder& b, Location loc, ValueRange args) {
-          Value innerResult = stablehlo::StableHloOpToStdScalarOp::mapOp(
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value innerResult = mlir::stablehlo::StableHloOpToStdScalarOp::mapOp(
               op, getElementTypeOrSelf(emptyTensor),
               interleaveScalarAndBlockArgs(scalarInputs, args), &b);
 
@@ -152,9 +152,9 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   using OpAdaptor = typename OpTy::Adaptor;
 
-  LogicalResult matchAndRewrite(
-      OpTy op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+  LogicalResult
+  matchAndRewrite(OpTy op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto conversionInfo = checkOperandsAndResults(
         op, adaptor.getOperands(), *this->typeConverter, rewriter);
     if (failed(conversionInfo)) {
@@ -173,8 +173,9 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
     // Create indexing maps.
     AffineMap scalarMap = AffineMap::get(maxRank, 0, rewriter.getContext());
     AffineMap idMap = rewriter.getMultiDimIdentityMap(maxRank);
-    SmallVector<AffineMap, 4> maps;
-    for (Value v : inputs) maps.push_back(isScalar(v) ? scalarMap : idMap);
+    SmallVector<AffineMap> maps;
+    for (Value v : inputs)
+      maps.push_back(isScalar(v) ? scalarMap : idMap);
     maps.push_back(idMap);
 
     // Build `linalg.generic` op.
@@ -182,7 +183,7 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
     auto linalgOp = rewriter.create<linalg::GenericOp>(
         loc, resultTy ? resultTy : TypeRange{}, inputs, output, maps,
         getNParallelLoopsAttrs(maxRank),
-        [&](OpBuilder& nestedBuilder, Location /*nested_loc*/,
+        [&](OpBuilder &nestedBuilder, Location /*nested_loc*/,
             ValueRange args) {
           Type innerResultTy = getElementTypeOrSelf(output);
           auto argvec = llvm::to_vector<2>(args.take_front(inputs.size()));
@@ -197,117 +198,119 @@ struct PointwiseToLinalgConverter final : OpConversionPattern<OpTy> {
           }
         },
         linalg::getPrunedAttributeList(op));
-    if (failed) return failure();
+    if (failed)
+      return failure();
 
     rewriter.replaceOp(op, linalgOp->getResults());
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 namespace detail {
 void populatePointwiseStableHloToLinalgConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns, bool enablePrimitiveOps) {
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns, bool enablePrimitiveOps) {
   if (enablePrimitiveOps) {
-    patterns
-        ->add<PointwiseToLinalgMapConverter<stablehlo::AbsOp>,
-              PointwiseToLinalgMapConverter<stablehlo::AddOp>,
-              PointwiseToLinalgMapConverter<stablehlo::AndOp>,
-              PointwiseToLinalgMapConverter<stablehlo::Atan2Op>,
-              PointwiseToLinalgMapConverter<stablehlo::BitcastConvertOp>,
-              PointwiseToLinalgMapConverter<stablehlo::CbrtOp>,
-              PointwiseToLinalgMapConverter<stablehlo::CeilOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ClampOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ClzOp>,
-              PointwiseToLinalgMapConverter<stablehlo::CompareOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ComplexOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ConvertOp>,
-              PointwiseToLinalgMapConverter<stablehlo::CosineOp>,
-              PointwiseToLinalgMapConverter<stablehlo::DivOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ExpOp>,
-              PointwiseToLinalgMapConverter<stablehlo::Expm1Op>,
-              PointwiseToLinalgMapConverter<stablehlo::FloorOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ImagOp>,
-              PointwiseToLinalgMapConverter<stablehlo::IsFiniteOp>,
-              PointwiseToLinalgMapConverter<stablehlo::Log1pOp>,
-              PointwiseToLinalgMapConverter<stablehlo::LogOp>,
-              PointwiseToLinalgMapConverter<stablehlo::LogisticOp>,
-              PointwiseToLinalgMapConverter<stablehlo::MaxOp>,
-              PointwiseToLinalgMapConverter<stablehlo::MinOp>,
-              PointwiseToLinalgMapConverter<stablehlo::MulOp>,
-              PointwiseToLinalgMapConverter<stablehlo::NegOp>,
-              PointwiseToLinalgMapConverter<stablehlo::NotOp>,
-              PointwiseToLinalgMapConverter<stablehlo::OrOp>,
-              PointwiseToLinalgMapConverter<stablehlo::PopulationCountOp>,
-              PointwiseToLinalgMapConverter<stablehlo::PowOp>,
-              PointwiseToLinalgMapConverter<stablehlo::RealOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ReducePrecisionOp>,
-              PointwiseToLinalgMapConverter<stablehlo::RemOp>,
-              PointwiseToLinalgMapConverter<stablehlo::RoundNearestEvenOp>,
-              PointwiseToLinalgMapConverter<stablehlo::RoundOp>,
-              PointwiseToLinalgMapConverter<stablehlo::RsqrtOp>,
-              PointwiseToLinalgMapConverter<stablehlo::SelectOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ShiftLeftOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ShiftRightArithmeticOp>,
-              PointwiseToLinalgMapConverter<stablehlo::ShiftRightLogicalOp>,
-              PointwiseToLinalgMapConverter<stablehlo::SignOp>,
-              PointwiseToLinalgMapConverter<stablehlo::SineOp>,
-              PointwiseToLinalgMapConverter<stablehlo::SqrtOp>,
-              PointwiseToLinalgMapConverter<stablehlo::SubtractOp>,
-              PointwiseToLinalgMapConverter<stablehlo::TanhOp>,
-              PointwiseToLinalgMapConverter<stablehlo::XorOp>>(typeConverter,
+    patterns->add<
+        PointwiseToLinalgMapConverter<mlir::stablehlo::AbsOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::AddOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::AndOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::Atan2Op>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::BitcastConvertOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::CbrtOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::CeilOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ClampOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ClzOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::CompareOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ComplexOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ConvertOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::CosineOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::DivOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ExpOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::Expm1Op>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::FloorOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ImagOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::IsFiniteOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::Log1pOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::LogOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::LogisticOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::MaxOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::MinOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::MulOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::NegOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::NotOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::OrOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::PopulationCountOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::PowOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::RealOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ReducePrecisionOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::RemOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::RoundNearestEvenOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::RoundOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::RsqrtOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::SelectOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ShiftLeftOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ShiftRightArithmeticOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::ShiftRightLogicalOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::SignOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::SineOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::SqrtOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::SubtractOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::TanhOp>,
+        PointwiseToLinalgMapConverter<mlir::stablehlo::XorOp>>(typeConverter,
                                                                context);
     return;
   }
 
-  patterns->add<PointwiseToLinalgConverter<stablehlo::AbsOp>,
-                PointwiseToLinalgConverter<stablehlo::AddOp>,
-                PointwiseToLinalgConverter<stablehlo::AndOp>,
-                PointwiseToLinalgConverter<stablehlo::Atan2Op>,
-                PointwiseToLinalgConverter<stablehlo::BitcastConvertOp>,
-                PointwiseToLinalgConverter<stablehlo::CbrtOp>,
-                PointwiseToLinalgConverter<stablehlo::CeilOp>,
-                PointwiseToLinalgConverter<stablehlo::ClampOp>,
-                PointwiseToLinalgConverter<stablehlo::ClzOp>,
-                PointwiseToLinalgConverter<stablehlo::CompareOp>,
-                PointwiseToLinalgConverter<stablehlo::ComplexOp>,
-                PointwiseToLinalgConverter<stablehlo::ConvertOp>,
-                PointwiseToLinalgConverter<stablehlo::CosineOp>,
-                PointwiseToLinalgConverter<stablehlo::DivOp>,
-                PointwiseToLinalgConverter<stablehlo::ExpOp>,
-                PointwiseToLinalgConverter<stablehlo::Expm1Op>,
-                PointwiseToLinalgConverter<stablehlo::FloorOp>,
-                PointwiseToLinalgConverter<stablehlo::ImagOp>,
-                PointwiseToLinalgConverter<stablehlo::IsFiniteOp>,
-                PointwiseToLinalgConverter<stablehlo::Log1pOp>,
-                PointwiseToLinalgConverter<stablehlo::LogOp>,
-                PointwiseToLinalgConverter<stablehlo::LogisticOp>,
-                PointwiseToLinalgConverter<stablehlo::MaxOp>,
-                PointwiseToLinalgConverter<stablehlo::MinOp>,
-                PointwiseToLinalgConverter<stablehlo::MulOp>,
-                PointwiseToLinalgConverter<stablehlo::NegOp>,
-                PointwiseToLinalgConverter<stablehlo::NotOp>,
-                PointwiseToLinalgConverter<stablehlo::OrOp>,
-                PointwiseToLinalgConverter<stablehlo::PopulationCountOp>,
-                PointwiseToLinalgConverter<stablehlo::PowOp>,
-                PointwiseToLinalgConverter<stablehlo::RealOp>,
-                PointwiseToLinalgConverter<stablehlo::ReducePrecisionOp>,
-                PointwiseToLinalgConverter<stablehlo::RemOp>,
-                PointwiseToLinalgConverter<stablehlo::RoundNearestEvenOp>,
-                PointwiseToLinalgConverter<stablehlo::RoundOp>,
-                PointwiseToLinalgConverter<stablehlo::RsqrtOp>,
-                PointwiseToLinalgConverter<stablehlo::SelectOp>,
-                PointwiseToLinalgConverter<stablehlo::ShiftLeftOp>,
-                PointwiseToLinalgConverter<stablehlo::ShiftRightArithmeticOp>,
-                PointwiseToLinalgConverter<stablehlo::ShiftRightLogicalOp>,
-                PointwiseToLinalgConverter<stablehlo::SignOp>,
-                PointwiseToLinalgConverter<stablehlo::SineOp>,
-                PointwiseToLinalgConverter<stablehlo::SqrtOp>,
-                PointwiseToLinalgConverter<stablehlo::SubtractOp>,
-                PointwiseToLinalgConverter<stablehlo::TanhOp>,
-                PointwiseToLinalgConverter<stablehlo::XorOp>>(typeConverter,
-                                                              context);
+  patterns
+      ->add<PointwiseToLinalgConverter<mlir::stablehlo::AbsOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::AddOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::AndOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::Atan2Op>,
+            PointwiseToLinalgConverter<mlir::stablehlo::BitcastConvertOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::CbrtOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::CeilOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ClampOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ClzOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::CompareOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ComplexOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ConvertOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::CosineOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::DivOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ExpOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::Expm1Op>,
+            PointwiseToLinalgConverter<mlir::stablehlo::FloorOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ImagOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::IsFiniteOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::Log1pOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::LogOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::LogisticOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::MaxOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::MinOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::MulOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::NegOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::NotOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::OrOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::PopulationCountOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::PowOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::RealOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ReducePrecisionOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::RemOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::RoundNearestEvenOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::RoundOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::RsqrtOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::SelectOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ShiftLeftOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ShiftRightArithmeticOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::ShiftRightLogicalOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::SignOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::SineOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::SqrtOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::SubtractOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::TanhOp>,
+            PointwiseToLinalgConverter<mlir::stablehlo::XorOp>>(typeConverter,
+                                                                context);
 }
-}  // namespace detail
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace detail
+} // namespace mlir::iree_compiler::stablehlo

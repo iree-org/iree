@@ -359,3 +359,109 @@ func.func @named_op(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?xi8>) -> tensor<?x
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[FILL]] :
 //      CHECK:   return %[[GEMM]]
+
+// -----
+
+func.func @scatter() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<8xi8>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<8x1xi32>>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<3xi8>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<8xi8>> -> tensor<8xi8>
+  %4 = arith.trunci %3 : tensor<8xi8> to tensor<8xi1>
+  %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x1xi32>> -> tensor<8x1xi32>
+  %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [3], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<3xi8>> -> tensor<3xi8>
+  %7 = arith.trunci %6 : tensor<3xi8> to tensor<3xi1>
+  %8 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false) ins(%4, %5 : tensor<8xi1>, tensor<8x1xi32>) outs(%7 : tensor<3xi1>) {
+  ^bb0(%arg0: i1, %arg1: i1):
+    %10 = arith.minui %arg1, %arg0 : i1
+    iree_linalg_ext.yield %10 : i1
+  } -> tensor<3xi1>
+  %9 = arith.extui %8 : tensor<3xi1> to tensor<3xi8>
+  flow.dispatch.tensor.store %9, %2, offsets = [0], sizes = [3], strides = [1] : tensor<3xi8> -> !flow.dispatch.tensor<readwrite:tensor<3xi8>>
+  return
+}
+
+// CHECK-LABEL: func.func @scatter()
+//   CHECK-DAG:   %[[UPDATES:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[INDICES:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
+//   CHECK-DAG:   %[[UPDATES_TENSOR:.+]] = flow.dispatch.tensor.load %[[UPDATES]]
+//   CHECK-DAG:   %[[INDICES_TENSOR:.+]] = flow.dispatch.tensor.load %[[INDICES]]
+//   CHECK-DAG:   %[[OUT_TENSOR:.+]] = flow.dispatch.tensor.load %[[OUT]]
+//       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false)
+//  CHECK-SAME:       ins(%[[UPDATES_TENSOR]], %[[INDICES_TENSOR]] : tensor<8xi8>, tensor<8x1xi32>)
+//  CHECK-SAME:       outs(%[[OUT_TENSOR]] : tensor<3xi8>)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, %[[ARG1:[a-zA-Z0-9]+]]: i8)
+//   CHECK-DAG:       %[[TRUNC0:.+]] = arith.trunci %[[ARG0]] : i8 to i1
+//   CHECK-DAG:       %[[TRUNC1:.+]] = arith.trunci %[[ARG1]] : i8 to i1
+//   CHECK-DAG:       %[[MIN:.+]] = arith.minui %[[TRUNC1]], %[[TRUNC0]] : i1
+//   CHECK-DAG:       %[[EXTUI:.+]] = arith.extui %[[MIN]] : i1 to i8
+//       CHECK:       iree_linalg_ext.yield %[[EXTUI]]
+//       CHECK:   flow.dispatch.tensor.store %[[SCATTER]], %[[OUT]]
+
+// -----
+
+func.func @sort() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1xi8>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xi32>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readonly:tensor<1xi8>> -> tensor<1xi8>
+  %3 = arith.trunci %2 : tensor<1xi8> to tensor<1xi1>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<1xi32>> -> tensor<1xi32>
+  %5:2 = iree_linalg_ext.sort dimension(0) outs(%3, %4 : tensor<1xi1>, tensor<1xi32>) {
+  ^bb0(%arg0: i1, %arg1: i1, %arg2: i32, %arg3: i32):
+    %6 = arith.cmpi ult, %arg0, %arg1 : i1
+    iree_linalg_ext.yield %6 : i1
+  } -> tensor<1xi1>, tensor<1xi32>
+  flow.dispatch.tensor.store %5#1, %1, offsets = [0], sizes = [1], strides = [1] : tensor<1xi32> -> !flow.dispatch.tensor<readwrite:tensor<1xi32>>
+  return
+}
+
+// CHECK-LABEL: func.func @sort()
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[A:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[B:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:   %[[A_TENSOR:.+]] = flow.dispatch.tensor.load %[[A]]
+//   CHECK-DAG:   %[[B_TENSOR:.+]] = flow.dispatch.tensor.load %[[B]]
+//       CHECK:   %[[SORT:.+]]:2 = iree_linalg_ext.sort dimension(0)
+//  CHECK-SAME:       outs(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi8>, tensor<1xi32>)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, %[[ARG1:[a-zA-Z0-9]+]]: i8, %[[ARG2:[a-zA-Z0-9]+]]: i32, %[[ARG3:[a-zA-Z0-9]+]]: i32)
+//   CHECK-DAG:       %[[TRUNC_A_1:.+]] = arith.trunci %[[ARG0]] : i8 to i1
+//   CHECK-DAG:       %[[TRUNC_A_2:.+]] = arith.trunci %[[ARG1]] : i8 to i1
+//   CHECK-DAG:       %[[CMPI:.+]] = arith.cmpi ult, %[[TRUNC_A_1]], %[[TRUNC_A_2]] : i1
+//       CHECK:       iree_linalg_ext.yield %[[CMPI]]
+//       CHECK:   flow.dispatch.tensor.store %[[SORT]]#1, %[[B]]
+
+
+// -----
+
+func.func @sort_secondary() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1xi32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xi8>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readonly:tensor<1xi32>> -> tensor<1xi32>
+  %3 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<1xi8>> -> tensor<1xi8>
+  %4 = arith.trunci %3 : tensor<1xi8> to tensor<1xi1>
+  %5:2 = iree_linalg_ext.sort dimension(0) outs(%2, %4 : tensor<1xi32>, tensor<1xi1>) {
+  ^bb0(%arg0: i32, %arg1: i32, %arg2: i1, %arg3: i1):
+    %6 = arith.cmpi ult, %arg0, %arg1 : i32
+    iree_linalg_ext.yield %6 : i1
+  } -> tensor<1xi32>, tensor<1xi1>
+  %7 = arith.extui %5#1 : tensor<1xi1> to tensor<1xi8>
+  flow.dispatch.tensor.store %7, %1, offsets = [0], sizes = [1], strides = [1] : tensor<1xi8> -> !flow.dispatch.tensor<readwrite:tensor<1xi8>>
+  return
+}
+
+// CHECK-LABEL: func.func @sort_secondary()
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[A:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[B:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:   %[[A_TENSOR:.+]] = flow.dispatch.tensor.load %[[A]]
+//   CHECK-DAG:   %[[B_TENSOR:.+]] = flow.dispatch.tensor.load %[[B]]
+//       CHECK:   %[[SORT:.+]]:2 = iree_linalg_ext.sort dimension(0)
+//  CHECK-SAME:       outs(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi32>, tensor<1xi8>) 
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i32, %[[ARG1:[a-zA-Z0-9]+]]: i32, %[[ARG2:[a-zA-Z0-9]+]]: i8, %[[ARG3:[a-zA-Z0-9]+]]: i8)
+//   CHECK-DAG:       %[[CMPI:.+]] = arith.cmpi ult, %[[ARG0]], %[[ARG1]] : i32
+//       CHECK:       iree_linalg_ext.yield %[[CMPI]]
+//       CHECK:   flow.dispatch.tensor.store %[[SORT]]#1, %[[B]]

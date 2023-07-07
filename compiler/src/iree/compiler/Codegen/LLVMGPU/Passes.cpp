@@ -4,13 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
@@ -33,9 +36,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<unsigned> logSwizzleTile(
-    "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
-    llvm::cl::init(0));
+static llvm::cl::opt<unsigned>
+    logSwizzleTile("iree-codegen-log-swizzle-tile",
+                   llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
 
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
@@ -58,13 +61,14 @@ static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   bool needsBarrier = false;
-  if (hasSharedMemoryAddressSpace(from.getType().cast<MemRefType>())) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType()))) {
     needsBarrier = true;
   }
-  if (hasSharedMemoryAddressSpace(to.getType().cast<MemRefType>())) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
+  if (needsBarrier)
+    builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
@@ -77,12 +81,8 @@ static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  // TODO(#12933): Because of regressions in CUDA backend, there is an
-  // option to keep a legacy mode of not representing the offset in the
-  // type. Remove once the bug is fixed.
-  addIREEComprehensiveBufferizePasses(
-      passManager, allocationFn, deallocationFn, memcpyFn,
-      /*embedSubspanOffsetIntoMemRefType=*/false);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
@@ -91,8 +91,9 @@ static void addBufferizePasses(OpPassManager &passManager) {
       createEraseHALDescriptorTypeFromMemRefPass());
 }
 
-static void tileAndDistributeToWorkgroup(
-    OpPassManager &pm, bool useWARForCooperativeMatrixCodegen = false) {
+static void
+tileAndDistributeToWorkgroup(OpPassManager &pm,
+                             bool useWARForCooperativeMatrixCodegen = false) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass(
       /*maxWorkgroupParallelDims=*/1,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
@@ -130,7 +131,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -141,7 +142,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUDistribute());
 
   // Post bufferization optimizations.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -152,6 +153,8 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
@@ -164,8 +167,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTensorAlloc());
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorAlloc());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
 
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
@@ -176,7 +179,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   addBufferizePasses(nestedModulePM);
 
   // distribute foreach threads
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUDistribute());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -203,7 +206,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // store to load forwarding. This relies on shacky alias analysis and we need
   // to move this to tensor level once we have better abstractions.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createHoistRedundantVectorTransfersPass());
 
   // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -242,6 +245,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -303,6 +308,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -344,8 +351,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+      createGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
 
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
@@ -353,12 +360,14 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
 
   // distribute foreach threads
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUDistribute());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -394,10 +403,11 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   addBufferizePasses(nestedModulePM);
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -422,17 +432,17 @@ void addGPUPackUnPackPasses(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createDecomposePackUnPackOpsPass());
+      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createHoistRedundantVectorTransfersPass());
 
   addBufferizePasses(nestedModulePM);
 
   // distribute foreach threads
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUDistribute());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSplitFullPartialTransferPass("linalg-copy"));
@@ -447,6 +457,13 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+}
+
+void addGPUDefaultPassPipeline(OpPassManager &pm) {
+  tileAndBufferize(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 }
@@ -477,6 +494,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addPass(createLowerUKernelOpsToCallsPass());
+
   // LinalgExt -> SCF
   pm.addNestedPass<func::FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
 
@@ -505,7 +524,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // THIS NEEDS TO RUN BEFORE SCF ->CF OFF
 
   // Run checks on shared memory usage.
-  pm.addPass(createLLVMGPUCheckIRBeforeLLVMConversionPass());
+  // TODO: query this from the target.
+  auto getSharedMemoryLimit = [](func::FuncOp) { return 163 * 1024; };
+  auto getIndexBitwidth = [](func::FuncOp) { return 64; };
+  pm.addPass(
+      createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 
   // SCF -> STD
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
@@ -515,16 +538,24 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // Handle complex operation conversion.
   pm.addPass(createConvertComplexToStandardPass());
 
+  // Convert BF16 operations to occur as F32.
+  pm.addPass(createConvertBf16ArithToF32Pass());
+  pm.addPass(createConvertBf16ToUInt16BuffersPass());
+
+  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
+
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
-  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createLowerAffinePass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
+  // Cast address spaces of all function arguments to generic
+  if (!useROCM)
+    pm.addPass(createLLVMGPUCastAddressSpaceFunction());
   if (useROCM) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());
@@ -554,17 +585,7 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
-  pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
-  // TODO(#12933): Because of regressions in CUDA backend, there is an
-  // option to keep a legacy mode of not representing the offset in the
-  // type. Remove once the bug is fixed.
-  pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass(
-      /*embedSubspanOffsetIntoMemRefType=*/false));
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createDecomposeSoftmaxPass());
-  // Temporary solution to avoid large allocations due to softmax lowering.
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createRematerializeParallelOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
@@ -587,5 +608,33 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+//===---------------------------------------------------------------------===//
+// Register LLVMGPU Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+} // namespace
+
+void registerCodegenLLVMGPUPasses() {
+  // Generated.
+  registerPasses();
+
+  static PassPipelineRegistration<> LinalgNVVMPipeline(
+      "iree-codegen-linalg-to-nvvm-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to NVVM",
+      [](OpPassManager &passManager) {
+        buildLLVMGPUTransformPassPipeline(passManager, false);
+      });
+
+  static PassPipelineRegistration<> LinalgROCDLPipeline(
+      "iree-codegen-linalg-to-rocdl-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to ROCDL",
+      [](OpPassManager &passManager) {
+        buildLLVMGPUTransformPassPipeline(passManager, true);
+      });
+}
+
+} // namespace iree_compiler
+} // namespace mlir

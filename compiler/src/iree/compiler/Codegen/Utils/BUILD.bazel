@@ -17,15 +17,17 @@ package(
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
-        "EncodingInfo.cpp",
+        "EncodingUtils.cpp",
         "GPUUtils.cpp",
+        "LinalgOpInfo.cpp",
         "LinkingUtils.cpp",
         "MarkerUtils.cpp",
         "Utils.cpp",
     ],
     hdrs = [
-        "EncodingInfo.h",
+        "EncodingUtils.h",
         "GPUUtils.h",
+        "LinalgOpInfo.h",
         "LinkingUtils.h",
         "MarkerUtils.h",
         "Utils.h",
@@ -33,6 +35,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Codegen/Interfaces:PartitionableLoopsInterface",
         "//compiler/src/iree/compiler/Codegen/Interfaces:ProcessorOpInterfaces",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",

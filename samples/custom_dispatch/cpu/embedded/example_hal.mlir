@@ -2,6 +2,7 @@
 // RUN:     --iree-hal-executable-object-search-path=$IREE_BINARY_DIR | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
+// RUN:     --module=- \
 // RUN:     --function=mixed_invocation \
 // RUN:     --input=8xf32=2 \
 // RUN:     --input=8xf32=4 | \

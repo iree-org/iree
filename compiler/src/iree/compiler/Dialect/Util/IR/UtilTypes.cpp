@@ -36,7 +36,7 @@ namespace Util {
 //===----------------------------------------------------------------------===//
 
 bool BufferType::isAccessStorageCompatible(Type accessType) const {
-  return accessType.isa<IREE::Util::BufferType>();
+  return llvm::isa<IREE::Util::BufferType>(accessType);
 }
 
 Value BufferType::inferSizeFromValue(Location loc, Value value,
@@ -72,7 +72,7 @@ static LogicalResult parseListElementType(AsmParser &parser,
 }
 
 static void printListElementType(AsmPrinter &printer, Type elementType) {
-  if (elementType.isa<IREE::Util::VariantType>()) {
+  if (llvm::isa<IREE::Util::VariantType>(elementType)) {
     printer << "?";
   } else {
     printer << elementType;
@@ -84,9 +84,15 @@ bool ListType::isCompatible(Type type) { return true; }
 
 // static
 bool ListType::canImplicitlyCast(Type from, Type to) {
-  if (from.isa<VariantType>() || to.isa<VariantType>()) {
+  if (llvm::isa<VariantType>(from) || llvm::isa<VariantType>(to)) {
     return true;
-  } else if (from.isa<TensorType>() && to.isa<TensorType>()) {
+  } else if (llvm::isa<ObjectType>(from) &&
+             IREE::Util::ObjectType::isCompatible(to)) {
+    return true;
+  } else if (IREE::Util::ObjectType::isCompatible(from) &&
+             llvm::isa<ObjectType>(to)) {
+    return true;
+  } else if (llvm::isa<TensorType>(from) && llvm::isa<TensorType>(to)) {
     return true;
   }
   return from == to;
@@ -118,14 +124,31 @@ LogicalResult PtrType::verify(function_ref<InFlightDiagnostic()> emitError,
 }
 
 //===----------------------------------------------------------------------===//
+// !util.object
+//===----------------------------------------------------------------------===//
+
+// static
+bool ObjectType::isCompatible(Type type) {
+  if (llvm::isa<ObjectType>(type)) {
+    // Already an object.
+    return true;
+  } else if (type.isIntOrIndexOrFloat() || llvm::isa<ComplexType>(type)) {
+    // Ignore known primitive types.
+    return false;
+  }
+  // Assume all other types (user types, buffers, etc) can be objects.
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 // Op utilities common in util patterns and folders
 //===----------------------------------------------------------------------===//
 
 // Walks up the ancestors of |sourceBlock| until |targetBlock| is reached.
 // Returns an insertion point in the |targetBlock|.
-static std::pair<Block *, Block::iterator> findCommonBlockInsertionPoint(
-    Block *targetBlock, Block *sourceBlock,
-    Block::iterator sourceInsertionPoint) {
+static std::pair<Block *, Block::iterator>
+findCommonBlockInsertionPoint(Block *targetBlock, Block *sourceBlock,
+                              Block::iterator sourceInsertionPoint) {
   auto *ancestorOp = targetBlock->findAncestorOpInBlock(*sourceInsertionPoint);
   if (ancestorOp) {
     return std::make_pair(ancestorOp->getBlock(), Block::iterator(ancestorOp));
@@ -146,8 +169,10 @@ bool isValueUsableForOp(Value value, Block *block,
   }
   if (definingBlock == block) {
     // Defined in the same block; ensure block order.
-    if (value.isa<BlockArgument>()) return true;
-    if (insertionPoint == block->end()) return true;
+    if (llvm::isa<BlockArgument>(value))
+      return true;
+    if (insertionPoint == block->end())
+      return true;
     if (value.getDefiningOp()->isBeforeInBlock(&*insertionPoint)) {
       return true;
     }
@@ -170,16 +195,36 @@ bool isValueUsableForOp(Value value, Operation *op) {
 
 bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
   auto *producerOp = value.getDefiningOp();
-  if (!producerOp) return true;  // block arg, ok to use
+  if (!producerOp) {
+    return true; // block arg, ok to use
+  }
+
+  // Producers and consumers in the same block are easy to check.
   if (producerOp->getBlock() == consumerOp->getBlock()) {
-    if (producerOp->isBeforeInBlock(consumerOp)) return true;
+    if (producerOp->isBeforeInBlock(consumerOp)) {
+      // Producer comes before the consumer in the same block and already
+      // satisfies the request based on SSA dominance.
+      return true;
+    }
     for (auto operand : producerOp->getOperands()) {
-      if (!isValueUsableForOp(operand, consumerOp)) return false;
+      if (!isValueUsableForOp(operand, consumerOp)) {
+        return false;
+      }
     }
     producerOp->moveBefore(consumerOp);
     return true;
   }
-  // Could extend this - really need a shared helper function.
+
+  // If the value is directly usable from another block (dominates, etc) then
+  // the condition is already satisfied. We don't move ops that don't satisfy
+  // this yet.
+  if (isValueUsableForOp(value, consumerOp)) {
+    return true;
+  }
+
+  // Could support more cases of satisfaction checks or movement. Ops that exist
+  // in ancestors (like those implicitly captured by nested scf.if/scf.for ops)
+  // are good candidates to check for.
   return false;
 }
 
@@ -193,11 +238,12 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
 static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
   // If one is a shaped type, then they both must be and have compatible
   // shapes.
-  if (globalType.isa<ShapedType>() && accessType.isa<ShapedType>()) {
+  if (llvm::isa<ShapedType>(globalType) && llvm::isa<ShapedType>(accessType)) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
   }
 
-  if (auto knownType = globalType.dyn_cast<IREE::Util::GlobalTypeInterface>()) {
+  if (auto knownType =
+          llvm::dyn_cast<IREE::Util::GlobalTypeInterface>(globalType)) {
     return knownType.isAccessStorageCompatible(accessType);
   }
 
@@ -207,7 +253,8 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 
 LogicalResult detail::verifyGlobalOp(IREE::Util::GlobalOpInterface globalOp) {
   auto initialValue = globalOp.getGlobalInitialValue();
-  if (auto typedInitialValue = initialValue.dyn_cast_or_null<TypedAttr>()) {
+  if (auto typedInitialValue =
+          llvm::dyn_cast_if_present<TypedAttr>(initialValue)) {
     // Ensure the value is something we can convert to a const.
     if (!isGlobalTypeCompatible(globalOp.getGlobalType(),
                                 typedInitialValue.getType())) {
@@ -221,8 +268,9 @@ LogicalResult detail::verifyGlobalOp(IREE::Util::GlobalOpInterface globalOp) {
   return success();
 }
 
-LogicalResult detail::verifyGlobalAddressOp(
-    GlobalAddressOpInterface addressOp, SymbolTableCollection &symbolTable) {
+LogicalResult
+detail::verifyGlobalAddressOp(GlobalAddressOpInterface addressOp,
+                              SymbolTableCollection &symbolTable) {
   if (!isa_and_nonnull<IREE::Util::GlobalOpInterface>(
           symbolTable.lookupNearestSymbolFrom(addressOp.getOperation(),
                                               addressOp.getGlobalAttr()))) {
@@ -283,9 +331,9 @@ LogicalResult detail::verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
   return success();
 }
 
-IREE::Util::GlobalOpInterface lookupGlobalOp(
-    Operation *accessorOp, SymbolRefAttr globalRefAttr,
-    SymbolTableCollection &symbolTable) {
+IREE::Util::GlobalOpInterface
+lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
+               SymbolTableCollection &symbolTable) {
   return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
       accessorOp->getParentOp(), globalRefAttr);
 }
@@ -294,21 +342,26 @@ IREE::Util::GlobalOpInterface lookupGlobalOp(
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
-std::optional<unsigned> detail::getTiedResultOperandIndex(
-    Operation *op, unsigned resultIndex) {
+std::optional<unsigned>
+detail::getTiedResultOperandIndex(Operation *op, unsigned resultIndex) {
   auto storageAttr = op->getAttrOfType<ArrayAttr>(
       IREE::Util::TiedOpInterface::getStorageAttrName());
-  if (!storageAttr) return std::nullopt;
+  if (!storageAttr)
+    return std::nullopt;
   auto valueAttrs = storageAttr.getValue();
-  if (valueAttrs.empty()) return std::nullopt;
+  if (valueAttrs.empty())
+    return std::nullopt;
   if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
     auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
-    if (resultIndex < indexAndLength.first) return std::nullopt;
+    if (resultIndex < indexAndLength.first)
+      return std::nullopt;
     resultIndex -= indexAndLength.first;
-    if (resultIndex >= indexAndLength.second) return std::nullopt;
+    if (resultIndex >= indexAndLength.second)
+      return std::nullopt;
   }
-  int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
-  if (value == IREE::Util::TiedOpInterface::kUntiedIndex) return std::nullopt;
+  int64_t value = llvm::cast<IntegerAttr>(valueAttrs[resultIndex]).getInt();
+  if (value == IREE::Util::TiedOpInterface::kUntiedIndex)
+    return std::nullopt;
   if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
     unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
     return tiedOperandsOffset + static_cast<unsigned>(value);
@@ -332,7 +385,8 @@ void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
     // returned by `getTiedOperandsIndexAndLength`.
     unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
     for (auto &index : indices) {
-      if (index != TiedOpInterface::kUntiedIndex) index -= tiedOperandsOffset;
+      if (index != TiedOpInterface::kUntiedIndex)
+        index -= tiedOperandsOffset;
     }
   }
 
@@ -341,19 +395,21 @@ void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
               Builder(op).getIndexArrayAttr(indices));
 }
 
-SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {
-  SmallVector<int64_t, 4> indices;
+SmallVector<int64_t> detail::getTiedResultOperandIndices(Operation *op) {
+  SmallVector<int64_t> indices;
   auto storageAttr =
       op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
-  if (!storageAttr) return indices;
+  if (!storageAttr)
+    return indices;
   auto valueAttrs = storageAttr.getValue();
-  if (valueAttrs.empty()) return indices;
+  if (valueAttrs.empty())
+    return indices;
   auto tiedOp = cast<TiedOpInterface>(op);
   auto resultRange = tiedOp.getTiedResultsIndexAndLength();
   unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
   indices.resize(resultRange.second);
   for (unsigned i = 0; i < valueAttrs.size(); ++i) {
-    int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
+    int64_t index = llvm::cast<IntegerAttr>(valueAttrs[i]).getInt();
     indices[i] = index != TiedOpInterface::kUntiedIndex
                      ? tiedOperandsOffset + index
                      : TiedOpInterface::kUntiedIndex;
@@ -367,7 +423,8 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   while (auto definingOp =
              dyn_cast_or_null<TiedOpInterface>(baseValue.getDefiningOp())) {
     auto tiedValue = definingOp.getTiedResultOperand(baseValue);
-    if (!tiedValue) break;
+    if (!tiedValue)
+      break;
     baseValue = tiedValue;
   }
   return baseValue;
@@ -377,15 +434,18 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
 bool TiedOpInterface::hasAnyTiedUses(Value value) {
   for (auto &use : value.getUses()) {
     auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
-    if (!tiedOp) continue;
-    if (tiedOp.isOperandTied(use.getOperandNumber())) return true;
+    if (!tiedOp)
+      continue;
+    if (tiedOp.isOperandTied(use.getOperandNumber()))
+      return true;
   }
   return false;
 }
 
 bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
   auto tiedOp = dyn_cast<TiedOpInterface>(op);
-  if (!tiedOp) return false;
+  if (!tiedOp)
+    return false;
   auto tiedIndices = tiedOp.getTiedResultOperandIndices();
   for (unsigned i = 0; i < tiedIndices.size(); ++i) {
     if (tiedIndices[i] == operandIndex) {
@@ -398,7 +458,8 @@ bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
 SmallVector<Value> detail::getOperandTiedResults(Operation *op,
                                                  unsigned operandIndex) {
   auto tiedOp = dyn_cast<TiedOpInterface>(op);
-  if (!tiedOp) return {};
+  if (!tiedOp)
+    return {};
   auto resultRange = tiedOp.getTiedResultsIndexAndLength();
   SmallVector<Value> results;
   auto tiedIndices = tiedOp.getTiedResultOperandIndices();
@@ -412,7 +473,8 @@ SmallVector<Value> detail::getOperandTiedResults(Operation *op,
 
 LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
   auto tiedOperandIndices = tiedOp.getTiedResultOperandIndices();
-  if (tiedOperandIndices.empty()) return success();
+  if (tiedOperandIndices.empty())
+    return success();
   auto resultRange = tiedOp.getTiedResultsIndexAndLength();
   if (tiedOperandIndices.size() != resultRange.second) {
     return tiedOp.emitError("op results/tied operand indices mismatch");
@@ -423,8 +485,8 @@ LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
 void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices,
-    SmallVector<int64_t, 4> &tiedOperandIndices) {
-  SmallVector<int64_t, 4> oldTiedOperandIndices = tiedOperandIndices;
+    SmallVector<int64_t> &tiedOperandIndices) {
+  SmallVector<int64_t> oldTiedOperandIndices = tiedOperandIndices;
   tiedOperandIndices.clear();
 
   // To adjust operand indices we need to know the how many operands to offset
@@ -444,7 +506,7 @@ void excludeTiedOperandAndResultIndices(
   for (auto it : llvm::enumerate(oldTiedOperandIndices)) {
     unsigned resultIndex = it.index();
     if (llvm::is_contained(excludedResultIndices, resultIndex)) {
-      continue;  // result removed
+      continue; // result removed
     }
 
     int64_t tiedOperandIndex = it.value();
@@ -459,7 +521,8 @@ void excludeTiedOperandAndResultIndices(
       // Count up the number of removed operands prior to this one.
       unsigned offset = 0;
       for (unsigned i = 0; i < tiedOperandIndex; ++i) {
-        if (i < excludedOperands.size() && excludedOperands[i]) ++offset;
+        if (i < excludedOperands.size() && excludedOperands[i])
+          ++offset;
       }
 
       tiedOperandIndex -= offset;
@@ -483,14 +546,16 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
   while (!worklist.empty()) {
     auto value = worklist.pop_back_val();
     auto *definingOp = value.getDefiningOp();
-    if (!definingOp) continue;
+    if (!definingOp)
+      continue;
     if (auto sizeAwareOp =
             llvm::dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp)) {
       return sizeAwareOp.getResultSizeFromValue(value);
     }
     if (auto tiedOp = llvm::dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
       auto tiedOperand = tiedOp.getTiedResultOperand(value);
-      if (tiedOperand) worklist.push_back(tiedOperand);
+      if (tiedOperand)
+        worklist.push_back(tiedOperand);
     }
   }
 
@@ -521,16 +586,16 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
 // static
 Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
                                              OpBuilder &builder) {
-  auto sizeAwareType =
-      resourceValue.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>();
+  auto sizeAwareType = llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
+      resourceValue.getType());
   if (!sizeAwareType) {
-    return {};  // Not a sized type.
+    return {}; // Not a sized type.
   }
   if (!builder.getInsertionPoint().getNodePtr()->isKnownSentinel()) {
     auto sizeValue = sizeAwareType.findSizeValue(
         resourceValue, builder.getBlock(), builder.getInsertionPoint());
     if (sizeValue) {
-      return sizeValue;  // Found in IR.
+      return sizeValue; // Found in IR.
     }
   }
   // TODO(benvanik): make this cleaner.
@@ -540,8 +605,8 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
               definingOp)) {
     return sizeAwareOp.getResultSizeFromValue(resourceValue);
   } else if (auto inferSizeType =
-                 resourceValue.getType()
-                     .dyn_cast<IREE::Util::InferTypeSizeInterface>()) {
+                 llvm::dyn_cast<IREE::Util::InferTypeSizeInterface>(
+                     resourceValue.getType())) {
     return inferSizeType.inferSizeFromValue(loc, resourceValue, builder);
   }
   return {};
@@ -559,12 +624,14 @@ std::optional<ValueRange> findDynamicDims(Value shapedValue) {
   while (!worklist.empty()) {
     auto workValue = worklist.pop_back_val();
     auto workOp = workValue.getDefiningOp();
-    if (!workOp) continue;
+    if (!workOp)
+      continue;
     if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(workOp)) {
       return shapeAwareOp.getResultDynamicDimsFromValue(workValue);
     } else if (auto tiedOp = dyn_cast<TiedOpInterface>(workOp)) {
       auto tiedValue = tiedOp.getTiedResultOperand(workValue);
-      if (tiedValue) worklist.push_back(tiedValue);
+      if (tiedValue)
+        worklist.push_back(tiedValue);
     }
   }
   return std::nullopt;
@@ -575,7 +642,8 @@ std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
   auto upwardRange = findDynamicDims(shapedValue);
-  if (upwardRange.has_value()) return upwardRange.value();
+  if (upwardRange.has_value())
+    return upwardRange.value();
 
   // Look down the use-def chain: not safe at some point because we'll move past
   // where {|block|, |insertionPoint|} is dominated. This is often fine for a
@@ -599,16 +667,18 @@ std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
                                    ValueRange dynamicDims) {
   auto value = values[idx];
-  auto shapedType = value.getType().dyn_cast<ShapedType>();
-  if (!shapedType) return ValueRange{};
+  auto shapedType = llvm::dyn_cast<ShapedType>(value.getType());
+  if (!shapedType)
+    return ValueRange{};
 
   // Bail immediately if the shape is static.
-  if (shapedType.hasStaticShape()) return ValueRange{};
+  if (shapedType.hasStaticShape())
+    return ValueRange{};
 
   // Find where the dynamic dims start in the flattened list.
   unsigned offset = 0;
   for (unsigned i = 0; i < idx; ++i) {
-    if (auto type = values[i].getType().dyn_cast<ShapedType>()) {
+    if (auto type = llvm::dyn_cast<ShapedType>(values[i].getType())) {
       offset += type.getNumDynamicDims();
     }
   }
@@ -619,7 +689,7 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
 
 SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
                                             OpBuilder &builder) {
-  auto valueType = value.getType().dyn_cast<ShapedType>();
+  auto valueType = llvm::dyn_cast<ShapedType>(value.getType());
   if (!valueType) {
     mlir::emitError(loc) << "cannot construct shape for non shaped value: "
                          << value.getType();
@@ -637,7 +707,7 @@ SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
   auto foundDynamicDims = IREE::Util::findDynamicDims(
       value, builder.getBlock(), builder.getInsertionPoint());
   if (foundDynamicDims.has_value()) {
-    return llvm::to_vector<4>(foundDynamicDims.value());
+    return llvm::to_vector(foundDynamicDims.value());
   }
 
   // Slower path that materializes the entire shape for a result. Some
@@ -684,7 +754,7 @@ static SmallVector<Value> buildShape(Location loc, ShapedType type,
 SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
                                      unsigned operandIdx, OpBuilder &builder) {
   auto operand = op->getOperand(operandIdx);
-  auto type = operand.getType().cast<ShapedType>();
+  auto type = llvm::cast<ShapedType>(operand.getType());
   auto dynamicDims = op.getOperandDynamicDims(operandIdx);
   return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
@@ -692,15 +762,15 @@ SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
 SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
                                     unsigned resultIdx, OpBuilder &builder) {
   auto result = op->getResult(resultIdx);
-  auto type = result.getType().cast<ShapedType>();
+  auto type = llvm::cast<ShapedType>(result.getType());
   auto dynamicDims = op.getResultDynamicDims(resultIdx);
   return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
@@ -708,7 +778,7 @@ SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_TYPEDEF_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -723,11 +793,11 @@ namespace Util {
 void UtilDialect::registerTypes() {
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.cpp.inc" // IWYU pragma: keep
       >();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

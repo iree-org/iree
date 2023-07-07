@@ -18,7 +18,6 @@
 #if IREE_FLAGS_ENABLE_CLI == 1
 
 #include "iree/base/internal/debugging.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Flag manipulation utilities
@@ -440,7 +439,7 @@ void iree_flags_parse_checked(iree_flags_parse_mode_t mode, int* argc,
                               char*** argv) {
   IREE_TRACE_ZONE_BEGIN(z0);
   for (int i = 0; i < *argc; ++i) {
-    IREE_TRACE_ZONE_APPEND_TEXT_CSTRING(z0, (*argv)[i]);
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, (*argv)[i]);
   }
   iree_status_t status = iree_flags_parse(mode, argc, argv);
   IREE_TRACE_ZONE_END(z0);

@@ -19,7 +19,7 @@ iree_cc_library(
 iree_c_embed_data(
   NAME
     dynamic_library_test_library
-  GENERATED_SRCS
+  SRCS
     "$<TARGET_FILE:iree::base::testing::dynamic_library_test_library.so>"
   C_FILE_OUTPUT
     "dynamic_library_test_library_embed.c"

@@ -78,13 +78,13 @@ jobs:
       - name: "Building mmperf for CPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cpu" "${IREE_SHA}"
       - name: "Running mmperf on CPU"
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |
@@ -113,7 +113,7 @@ jobs:
       - name: "Building mmperf for CUDA"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cuda" "${IREE_SHA}"
       - name: "Removing unused files"
         run: |
@@ -144,7 +144,7 @@ jobs:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
+      - machine-type=a2-highgpu-1g
       - os-family=Linux
     env:
       RESULTS_DIR: mmperf-results-cuda
@@ -165,7 +165,7 @@ jobs:
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
           --gpus all \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |

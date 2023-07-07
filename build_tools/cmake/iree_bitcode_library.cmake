@@ -12,35 +12,18 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: Name of target (see Note).
-# SRCS: Source files to pass to clang.
-# HDRS: Additional headers included by the source files.
+# SRCS: Source files. Headers go here as well, as in iree_cc_library. There is
+#       no concept of public headers (HDRS) here.
 # COPTS: additional flags to pass to clang.
-# DEFINES: Preprocessor definitions to pass to clang.
-# DATA: Additional data required during compilation.
 # OUT: Output file name (defaults to NAME.bc).
-# PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
-#     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
-#     will be in ${PACKAGE}/internal.
-# TESTONLY: When added, this target will only be built if IREE_BUILD_TESTS=ON.
 function(iree_bitcode_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY"
-    "NAME;OUT"
-    "SRCS;HDRS;COPTS;DEFINES;DATA"
+    ""
+    "NAME;OUT;ARCH"
+    "SRCS;COPTS"
     ${ARGN}
   )
-
-  set(_CLANG_TOOL "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
-  set(_LINK_TOOL "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
-
-  # These are copied as part of the clang build; we could allow the user to
-  # override this but it should be harmless.
-  set(_BUILTIN_HEADERS_PATH "${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/${CLANG_VERSION_MAJOR}/include/")
-
-  if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
-    return()
-  endif()
 
   if(DEFINED _RULE_OUT)
     set(_OUT "${_RULE_OUT}")
@@ -48,31 +31,63 @@ function(iree_bitcode_library)
     set(_OUT "${_RULE_NAME}.bc")
   endif()
 
-  set(_ARGS "-isystem ${_BUILTIN_HEADERS_PATH}")
-  list(APPEND _ARGS "${_RULE_COPTS}")
-  foreach(_DEFINE ${_RULE_DEFINES})
-    list(APPEND _ARGS "-D${_DEFINE}")
-  endforeach()
+  iree_arch_to_llvm_arch(_LLVM_ARCH "${_RULE_ARCH}")
+
+  set(_COPTS
+    # Target architecture.
+    "-target" "${_LLVM_ARCH}"
+
+    # C17 with no system deps.
+    "-std=c17"
+    "-nostdinc"
+    "-ffreestanding"
+
+    # Optimized and unstamped.
+    "-O3"
+    "-DNDEBUG"
+    "-fno-ident"
+    "-fdiscard-value-names"
+
+    # Set the size of wchar_t to 4 bytes (instead of 2 bytes).
+    # This must match what the runtime is built with.
+    "-fno-short-wchar"
+
+    # Enable inline asm.
+    "-fasm"
+
+    # Object file only in bitcode format:
+    "-c"
+    "-emit-llvm"
+
+    # Force the library into standalone mode (not depending on build-directory
+    # configuration).
+    "-DIREE_DEVICE_STANDALONE=1"
+  )
+
+  list(APPEND _COPTS "-isystem" "${IREE_CLANG_BUILTIN_HEADERS_PATH}")
+  list(APPEND _COPTS "-I" "${IREE_SOURCE_DIR}/runtime/src")
+  list(APPEND _COPTS "-I" "${IREE_BINARY_DIR}/runtime/src")
+  list(APPEND _COPTS "${_RULE_COPTS}")
 
   set(_BITCODE_FILES)
-  foreach(_BITCODE_SRC ${_RULE_SRCS})
-    get_filename_component(_BITCODE_SRC_PATH "${_BITCODE_SRC}" REALPATH)
-    set(_BITCODE_FILE "${_RULE_NAME}_${_BITCODE_SRC}.bc")
+  foreach(_SRC ${_RULE_SRCS})
+    get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
+    set(_BITCODE_FILE "${_RULE_NAME}_${_SRC}.bc")
     list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
     add_custom_command(
       OUTPUT
-        ${_BITCODE_FILE}
+        "${_BITCODE_FILE}"
       COMMAND
-        ${_CLANG_TOOL}
-        ${_ARGS}
+        "${IREE_CLANG_BINARY}"
+        ${_COPTS}
         "${_BITCODE_SRC_PATH}"
         "-o"
         "${_BITCODE_FILE}"
       DEPENDS
-        ${_CLANG_TOOL}
-        ${_BITCODE_SRC}
+        "${IREE_CLANG_BINARY}"
+        "${_SRC}"
       COMMENT
-        "Compiling ${_BITCODE_SRC} to ${_BITCODE_FILE}"
+        "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM
     )
   endforeach()
@@ -81,13 +96,151 @@ function(iree_bitcode_library)
     OUTPUT
       ${_OUT}
     COMMAND
-      ${_LINK_TOOL}
+      ${IREE_LLVM_LINK_BINARY}
       ${_BITCODE_FILES}
       "-o"
       "${_OUT}"
     DEPENDS
-      ${_LINK_TOOL}
-      ${_RULE_SRCS}
+      ${IREE_LLVM_LINK_BINARY}
+      ${_BITCODE_FILES}
+    COMMENT
+      "Linking bitcode to ${_OUT}"
+    VERBATIM
+  )
+
+  # Only add iree_${NAME} as custom target doesn't support aliasing to
+  # iree::${NAME}.
+  iree_package_name(_PACKAGE_NAME)
+  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
+    DEPENDS "${_OUT}"
+  )
+endfunction()
+
+function(iree_cuda_bitcode_library)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;OUT;CUDA_ARCH"
+    "SRCS;COPTS"
+    ${ARGN}
+  )
+
+  if(DEFINED _RULE_OUT)
+    set(_OUT "${_RULE_OUT}")
+  else()
+    set(_OUT "${_RULE_NAME}.bc")
+  endif()
+
+  set(_CUDA_ARCH "${_RULE_CUDA_ARCH}")
+
+  set(_COPTS
+    "-x" "cuda"
+
+    # Target architecture.
+    "--cuda-gpu-arch=${_CUDA_ARCH}"
+
+    "--cuda-path=${CUDAToolkit_ROOT}"
+
+    # Suppress warnings about missing path to cuda lib,
+    # and benign warning about CUDA version.
+    "-Wno-unknown-cuda-version"
+    "-nocudalib"
+    "--cuda-device-only"
+
+    # https://github.com/llvm/llvm-project/issues/54609
+    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+
+    # Optimized and unstamped.
+    "-O3"
+
+    # Object file only in bitcode format:
+    "-c"
+    "-emit-llvm"
+  )
+
+  set(_BITCODE_FILES)
+  foreach(_SRC ${_RULE_SRCS})
+    get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
+    set(_BITCODE_FILE "${_RULE_NAME}_${_SRC}.bc")
+    list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
+    add_custom_command(
+      OUTPUT
+        "${_BITCODE_FILE}"
+      COMMAND
+        "${IREE_CLANG_BINARY}"
+        ${_COPTS}
+        "${_BITCODE_SRC_PATH}"
+        "-o"
+        "${_BITCODE_FILE}"
+      DEPENDS
+        "${IREE_CLANG_BINARY}"
+        "${_SRC}"
+      COMMENT
+        "Compiling ${_SRC} to ${_BITCODE_FILE}"
+      VERBATIM
+    )
+  endforeach()
+
+  add_custom_command(
+    OUTPUT
+      ${_OUT}
+    COMMAND
+      ${IREE_LLVM_LINK_BINARY}
+      ${_BITCODE_FILES}
+      "-o"
+      "${_OUT}"
+    DEPENDS
+      ${IREE_LLVM_LINK_BINARY}
+      ${_BITCODE_FILES}
+    COMMENT
+      "Linking bitcode to ${_OUT}"
+    VERBATIM
+  )
+
+  # Only add iree_${NAME} as custom target doesn't support aliasing to
+  # iree::${NAME}.
+  iree_package_name(_PACKAGE_NAME)
+  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
+    DEPENDS "${_OUT}"
+  )
+endfunction()
+
+
+# iree_link_bitcode()
+#
+# Builds an LLVM bitcode library from an input file via clang
+#
+# Parameters:
+# NAME: Name of target (see Note).
+# SRCS: Source files to pass to clang.
+# OUT: Output file name (defaults to NAME.bc).
+function(iree_link_bitcode)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;OUT"
+    "SRCS"
+    ${ARGN}
+  )
+
+  if(DEFINED _RULE_OUT)
+    set(_OUT "${_RULE_OUT}")
+  else()
+    set(_OUT "${_RULE_NAME}.bc")
+  endif()
+
+  set(_BITCODE_FILES "${_RULE_SRCS}")
+
+  add_custom_command(
+    OUTPUT
+      ${_OUT}
+    COMMAND
+      ${IREE_LLVM_LINK_BINARY}
+      ${_BITCODE_FILES}
+      "-o"
+      "${_OUT}"
+    DEPENDS
+      ${IREE_LLVM_LINK_BINARY}
       ${_BITCODE_FILES}
     COMMENT
       "Linking bitcode to ${_OUT}"

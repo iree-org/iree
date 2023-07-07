@@ -13,6 +13,19 @@ include "iree-dialects/Dialect/Input/InputBase.td"
 // Types
 //===----------------------------------------------------------------------===//
 
+def IREEInput_BufferType : IREEInput_Type<"Buffer"> {
+  let mnemonic = "buffer";
+
+  let summary = "Buffer is an untyped bag of bits with no shape or dtype";
+
+  let description = [{
+    Buffers represent an untyped bag of bits that can be reinterpreted depending
+    on a use case using `buffer_view` operation. Buffers can be used for packing
+    multiple tensors into the same underlying storage. It is left to higher
+    level code to decide how exactly tensors layed out in the buffer.
+  }];
+}
+
 def IREEInput_BufferViewType : IREEInput_Type<"BufferView"> {
   let mnemonic = "buffer_view";
 

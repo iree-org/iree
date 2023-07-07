@@ -38,11 +38,12 @@ static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
          << std::string(77, '=') << "\n";
 }
 
-static LogicalResult printFunctionDeclaration(
-    mlir::func::FuncOp funcOp, llvm::raw_ostream &output,
-    mlir::emitc::CppEmitter &emitter) {
+static LogicalResult
+printFunctionDeclaration(mlir::func::FuncOp funcOp, llvm::raw_ostream &output,
+                         mlir::emitc::CppEmitter &emitter) {
   Operation *op = funcOp.getOperation();
-  if (op->hasAttr("emitc.static")) output << "static ";
+  if (op->hasAttr("emitc.static"))
+    output << "static ";
 
   if (failed(emitter.emitTypes(funcOp.getLoc(),
                                funcOp.getFunctionType().getResults())))
@@ -53,9 +54,11 @@ static LogicalResult printFunctionDeclaration(
 
   bool error = false;
   llvm::interleaveComma(funcOp.getArguments(), output, [&](BlockArgument arg) {
-    if (failed(emitter.emitType(funcOp.getLoc(), arg.getType()))) error = true;
+    if (failed(emitter.emitType(funcOp.getLoc(), arg.getType())))
+      error = true;
   });
-  if (error) return failure();
+  if (error)
+    return failure();
   output << ");\n";
 
   return success();
@@ -67,8 +70,8 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
   std::string moduleName = moduleOp.getName().str();
 
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-    auto value =
-        rodataOp.getValue().dyn_cast<IREE::Util::SerializableAttrInterface>();
+    auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
+        rodataOp.getValue());
     assert(value && "expected a serializable rodata value");
     SmallVector<char> byteBuffer;
     if (failed(value.serializeToVector(llvm::support::endianness::little,
@@ -81,7 +84,8 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
         rodataOp.getAlignment()
             ? static_cast<size_t>(rodataOp.getAlignment().value())
             : 0;
-    if (alignment == 0) alignment = kDefaultRodataAlignment;
+    if (alignment == 0)
+      alignment = kDefaultRodataAlignment;
 
     std::string bufferName =
         moduleOp.getName().str() + "_" + rodataOp.getName().str();
@@ -104,16 +108,21 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
-  output << "struct " << moduleName << "_t {\n";
-  output << "iree_allocator_t allocator;\n";
-  output << "};\n";
-
-  output << "struct " << moduleName << "_state_t {\n";
-
   // Returns |count| or 1 if |count| == 0.
   // Some compilers (MSVC) don't support zero-length struct fields on the
   // interior of structs (just VLA at the tail).
   auto countOrEmpty = [](uint32_t count) { return count ? count : 1; };
+
+  const int64_t numTypes =
+      llvm::cast<IntegerAttr>(moduleOp.getOperation()->getAttr("vm.num_types"))
+          .getInt();
+
+  output << "struct " << moduleName << "_t {\n";
+  output << "iree_allocator_t allocator;\n";
+  output << "iree_vm_ref_type_t types[" << countOrEmpty(numTypes) << "];\n";
+  output << "};\n";
+
+  output << "struct " << moduleName << "_state_t {\n";
 
   auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
   output << "iree_allocator_t allocator;\n";
@@ -172,7 +181,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "\n";
 
   // imports
-  SmallVector<IREE::VM::ImportOp, 4> importOps(
+  SmallVector<IREE::VM::ImportOp> importOps(
       moduleOp.getOps<IREE::VM::ImportOp>());
   std::string importName = moduleName + "_imports_";
   output << "static const iree_vm_native_import_descriptor_t " << importName
@@ -197,14 +206,15 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "\n";
 
   // exports
-  SmallVector<func::FuncOp, 4> exportedFunctions;
+  SmallVector<func::FuncOp> exportedFunctions;
   for (auto func : moduleOp.getOps<func::FuncOp>()) {
     if (func.getOperation()->hasAttr("vm.export_name")) {
       exportedFunctions.push_back(func);
     }
   }
   auto extractExportName = [](func::FuncOp funcOp) {
-    return funcOp.getOperation()->getAttr("vm.export_name").cast<StringAttr>();
+    return llvm::cast<StringAttr>(
+        funcOp.getOperation()->getAttr("vm.export_name"));
   };
   std::string exportName = moduleName + "_exports_";
   output << "static const iree_vm_native_export_descriptor_t " << exportName
@@ -219,9 +229,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     });
     for (auto funcOp : exportedFunctions) {
       StringAttr exportName = extractExportName(funcOp);
-      StringAttr callingConvention = funcOp.getOperation()
-                                         ->getAttr("vm.calling_convention")
-                                         .cast<StringAttr>();
+      StringAttr callingConvention = llvm::cast<StringAttr>(
+          funcOp.getOperation()->getAttr("vm.calling_convention"));
       if (!callingConvention) {
         return funcOp.emitError("Couldn't find calling convention attribute");
       }
@@ -292,8 +301,9 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 }
 
 /// Adapted from BytecodeModuleTarget and extended by C specific passes
-static LogicalResult canonicalizeModule(
-    IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
+static LogicalResult
+canonicalizeModule(IREE::VM::ModuleOp moduleOp,
+                   IREE::VM::CTargetOptions targetOptions) {
   RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
@@ -411,7 +421,8 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   mlir::emitc::CppEmitter emitter(output, /*declareVariablesAtTop=*/true);
   for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
-    if (!op->hasAttr("vm.module.constructor")) continue;
+    if (!op->hasAttr("vm.module.constructor"))
+      continue;
     if (failed(printFunctionDeclaration(funcOp, output, emitter)))
       return failure();
   }
@@ -452,7 +463,8 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 
   for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
-    if (op->hasAttr("vm.module.constructor")) continue;
+    if (op->hasAttr("vm.module.constructor"))
+      continue;
     if (failed(printFunctionDeclaration(funcOp, output, emitter)))
       return failure();
   }
@@ -464,9 +476,12 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     // TODO(simon-camp): Clean up. We generate calls to a macro that defines a
     // struct. As we declare all variables at the start of the function, the
     // macro call cannot be inlined into the function.
-    if (!isa<mlir::func::FuncOp, emitc::CallOp>(op)) continue;
-    if (op.hasAttr("vm.emit_at_end")) continue;
-    if (op.hasAttr("emitc.static")) output << "static ";
+    if (!isa<mlir::func::FuncOp, emitc::CallOp>(op))
+      continue;
+    if (op.hasAttr("vm.emit_at_end"))
+      continue;
+    if (op.hasAttr("emitc.static"))
+      output << "static ";
     if (failed(emitter.emitOperation(op,
                                      /*trailingSemicolon=*/false)))
       return failure();
@@ -482,8 +497,10 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   // Emit code for functions marked with `vm.emit_at_end`.
   for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
-    if (!op->hasAttr("vm.emit_at_end")) continue;
-    if (op->hasAttr("emitc.static")) output << "static ";
+    if (!op->hasAttr("vm.emit_at_end"))
+      continue;
+    if (op->hasAttr("emitc.static"))
+      output << "static ";
     if (failed(emitter.emitOperation(*funcOp.getOperation(),
                                      /*trailingSemicolon=*/false)))
       return failure();
@@ -504,7 +521,7 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
   return translateModuleToC(*moduleOps.begin(), targetOptions, output);
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

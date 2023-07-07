@@ -23,7 +23,7 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
                                   RewritePatternSet &patterns,
                                   Type convertedBufferType = {});
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_CONVERSION_MEMREFTOUTIL_PATTERN_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_CONVERSION_MEMREFTOUTIL_PATTERN_H_

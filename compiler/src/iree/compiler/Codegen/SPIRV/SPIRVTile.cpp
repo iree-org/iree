@@ -12,9 +12,10 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -45,8 +46,9 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 /// Collects computation ops which we will use as anchor to tile and fuse.
-static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps) {
+static FailureOr<IREE::Codegen::LoweringConfigAttr>
+collectComputeOps(func::FuncOp funcOp,
+                  SmallVectorImpl<Operation *> &computeOps) {
   // If there are `scf.if` ops which have linalg ops, we have both a fast and
   // slow paths for padding handling. Then we need to scan both regions to
   // discover such computation ops so that we can tile and fuse both regions.
@@ -65,7 +67,8 @@ static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
   if (ifOps.empty()) {
     computeOps = getComputeOps(funcOp);
     for (Operation *op : computeOps) {
-      if (auto config = getLoweringConfig(op)) configs.push_back(config);
+      if (auto config = getLoweringConfig(op))
+        configs.push_back(config);
     }
     if (computeOps.size() > 1) {
       // Only keep the last compute ops.
@@ -79,7 +82,8 @@ static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
 
     ifOps.front()->walk([&configs](Operation *op) {
       if (isa<linalg::LinalgOp, TilingInterface>(op)) {
-        if (auto config = getLoweringConfig(op)) configs.push_back(config);
+        if (auto config = getLoweringConfig(op))
+          configs.push_back(config);
       }
     });
 
@@ -151,7 +155,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns,
     auto range = llvm::map_range(tileSizes, [&](int64_t size) -> Value {
       return builder.create<arith::ConstantIndexOp>(op->getLoc(), size);
     });
-    return llvm::to_vector<4>(range);
+    return llvm::to_vector(range);
   };
 
   auto tilingOptions = linalg::LinalgTilingOptions()
@@ -296,7 +300,7 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
 namespace {
 
 class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
- public:
+public:
   SPIRVTilePass() = default;
   SPIRVTilePass(const SPIRVTilePass &pass) = default;
 
@@ -308,7 +312,8 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     SmallVector<Operation *> computeOps;
     FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfig =
         collectComputeOps(funcOp, computeOps);
-    if (failed(loweringConfig)) return signalPassFailure();
+    if (failed(loweringConfig))
+      return signalPassFailure();
     assert(computeOps.size() <= 2);
 
     // Now tile the last computation op to invocations and fuse all operand
@@ -345,7 +350,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
     concretizePadShape(funcOp);
 
-    {  // Downsize n-D (n > 1) convolutions to 1-D.
+    { // Downsize n-D (n > 1) convolutions to 1-D.
       RewritePatternSet patterns(context);
       linalg::populateDecomposeConvolutionPatterns(patterns);
       // Downsizing creates consecutive extract/insert slice ops. Merge them.
@@ -366,11 +371,11 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass() {
   return std::make_unique<SPIRVTilePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

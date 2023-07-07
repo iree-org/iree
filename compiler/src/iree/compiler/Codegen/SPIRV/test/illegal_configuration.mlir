@@ -26,7 +26,7 @@ hal.executable private @matmul_tensors {
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
-        // expected-error @+1 {{expected 3 levels of tiling sizes, got 0}}
+        // expected-error @+1 {{expected 1 levels of tiling sizes, got 0}}
         linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return
@@ -112,48 +112,6 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 256], [8, 8], [0, 0, 32]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize pipeline_depth = 2>,
-    workgroup_size = [32, 8, 1]>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
-]>
-hal.executable private @matmul_tensors {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, Float16], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
-        max_compute_shared_memory_size = 32768,
-        max_compute_workgroup_invocations = 1024,
-        max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>>
-    }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
-    builtin.module {
-      func.func @illegal() {
-        %c0 = arith.constant 0 : index
-        %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x320xf16>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<320x1280xf16>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x1280xf16>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 320], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x320xf16>> -> tensor<64x320xf16>
-        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [320, 1280], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<320x1280xf16>> -> tensor<320x1280xf16>
-        %5 = tensor.empty() : tensor<64x1280xf16>
-        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x1280xf16>) -> tensor<64x1280xf16>
-        // expected-error @+1 {{expected shared memory usage <= 32768, got 51200}}
-        %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<64x320xf16>, tensor<320x1280xf16>) outs(%6 : tensor<64x1280xf16>) -> tensor<64x1280xf16>
-        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 1280], strides = [1, 1] : tensor<64x1280xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x1280xf16>>
-        return
-      }
-    }
-  }
-}
-
-// -----
-
-#compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[32, 64], [4, 2], [0, 0, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [32, 8, 1]>
@@ -228,43 +186,6 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [32, 8, 1]>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
-]>
-hal.executable private @matmul_tensors {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
-        max_compute_shared_memory_size = 32768,
-        max_compute_workgroup_invocations = 512,
-        max_compute_workgroup_size = [512, 512, 512],
-        subgroup_size = 16>>
-    }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
-    builtin.module {
-      func.func @illegal() {
-        %c0 = arith.constant 0 : index
-        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
-        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
-        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
-        // expected-error @+1 {{expected workgroup tile sizes to be the product of thread tile sizes and workgroup sizes}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
-          outs(%result: memref<64x128xf32>)
-        return
-      }
-    }
-  }
-}
-
-// -----
-
-#compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[32, 60], [4, 4], [0, 0, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [15, 8, 1]>
@@ -302,7 +223,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
+    lowering_config  = <tile_sizes = [[32, 64, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -339,7 +260,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
+    lowering_config  = <tile_sizes = [[32, 64, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

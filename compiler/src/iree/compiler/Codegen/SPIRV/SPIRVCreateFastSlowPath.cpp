@@ -13,8 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -54,21 +54,25 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
 
   // Find the anchor tensor.pad op, from which we get the conditions for
   // switching between the fast and slow path.
-  auto padOps = llvm::to_vector<4>(body->getOps<tensor::PadOp>());
-  if (llvm::size(padOps) != 1) return;
+  auto padOps = llvm::to_vector(body->getOps<tensor::PadOp>());
+  if (llvm::size(padOps) != 1)
+    return;
   tensor::PadOp padOp = *padOps.begin();
 
   // If all padding sizes are zero, we don't need to do anything.
   SmallVector<OpFoldResult> lowPads = padOp.getMixedLowPad();
   SmallVector<OpFoldResult> highPads = padOp.getMixedHighPad();
-  if (llvm::all_of(lowPads, isZero) && llvm::all_of(highPads, isZero)) return;
+  if (llvm::all_of(lowPads, isZero) && llvm::all_of(highPads, isZero))
+    return;
 
   IRRewriter rewriter(funcOp.getContext());
   rewriter.setInsertionPoint(body->getTerminator());
   SmallVector<Operation *, 16> allOps;
-  for (Operation &op : body->without_terminator()) allOps.push_back(&op);
+  for (Operation &op : body->without_terminator())
+    allOps.push_back(&op);
 
-  auto isDefinedInRegion = [](Operation *op) { return true; };
+  BackwardSliceOptions options;
+  options.filter = [](Operation *op) { return true; };
   SetVector<Operation *> padSizeOps;
 
   // Build the condition for the scf.if op: all pad sizes are zero.
@@ -77,7 +81,7 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
   SmallVector<Value> eqZeroCmpVals;
   for (OpFoldResult pad : llvm::concat<OpFoldResult>(lowPads, highPads)) {
     if (auto padValue = pad.dyn_cast<Value>()) {
-      getBackwardSlice(padValue, &padSizeOps, isDefinedInRegion);
+      getBackwardSlice(padValue, &padSizeOps, options);
       padSizeOps.insert(padValue.getDefiningOp());
     }
     if (!isZero(pad)) {
@@ -92,7 +96,8 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
 
   SmallVector<Operation *> cloneOps;
   for (Operation *op : allOps) {
-    if (!padSizeOps.contains(op)) cloneOps.push_back(op);
+    if (!padSizeOps.contains(op))
+      cloneOps.push_back(op);
   }
 
   // Build the scf.if op itself. Clone all ops other than those used for
@@ -112,13 +117,15 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
   };
   auto elseBuilder = [&](OpBuilder &builder, Location loc) {
     IRMapping bvm;
-    for (Operation *op : cloneOps) builder.clone(*op, bvm);
+    for (Operation *op : cloneOps)
+      builder.clone(*op, bvm);
     builder.create<scf::YieldOp>(loc);
   };
   rewriter.create<scf::IfOp>(padOp.getLoc(), ifCond, thenBuilder, elseBuilder);
 
   // All of these ops have been cloned to both regions. Erease them now.
-  for (Operation *op : llvm::reverse(cloneOps)) rewriter.eraseOp(op);
+  for (Operation *op : llvm::reverse(cloneOps))
+    rewriter.eraseOp(op);
 }
 
 namespace {
@@ -146,12 +153,12 @@ struct SPIRVCreateFastSlowPathPass final
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVCreateFastSlowPathPass() {
   return std::make_unique<SPIRVCreateFastSlowPathPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

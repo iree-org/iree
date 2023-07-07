@@ -16,7 +16,7 @@ namespace iree_compiler {
 // need.
 void registerHALTargetBackends();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_TARGETS_H_
+#endif // IREE_COMPILER_TOOLS_INIT_TARGETS_H_

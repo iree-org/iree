@@ -20,9 +20,9 @@ static constexpr int32_t kWarpSize = 32;
 // GPU processor IDs and sizes
 //===----------------------------------------------------------------------===//
 
-llvm::SmallVector<linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
-    OpBuilder &builder, Location loc, unsigned numDims,
-    llvm::ArrayRef<int64_t> workgroupSize);
+llvm::SmallVector<linalg::ProcInfo, 2>
+getGPUThreadIdsAndCounts(OpBuilder &builder, Location loc, unsigned numDims,
+                         llvm::ArrayRef<int64_t> workgroupSize);
 
 /// Computes subgroup ID and returns in (X, Y, Z) order.
 ///
@@ -31,9 +31,9 @@ llvm::SmallVector<linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
 /// warp is full and we pick a workgroup size so that `workgroupSize.x %
 /// warpSize == 0`. This is why we can have warpId = { threadId.x / warpSize,
 /// threadId.y, threadId.z }.
-llvm::SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    OpBuilder &builder, Location loc, unsigned warpSize, unsigned numDims,
-    llvm::ArrayRef<int64_t> numSubgroups);
+llvm::SmallVector<linalg::ProcInfo, 2>
+getSubgroupIdsAndCounts(OpBuilder &builder, Location loc, unsigned warpSize,
+                        unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups);
 
 /// Returns the workgroup size associated to the funcOp entry point.
 std::array<int64_t, 3> getWorkgroupSize(func::FuncOp funcOp);
@@ -50,8 +50,8 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
 
 /// Pick an unrolling order that will allow tensorcore operation to reuse LHS
 /// register. This is needed to get good performance on sm_80 target.
-std::optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
-    vector::ContractionOp contract);
+std::optional<SmallVector<int64_t>>
+gpuMmaUnrollOrder(vector::ContractionOp contract);
 
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
@@ -101,7 +101,15 @@ Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
 Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
                      VectorType targetVecType);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+//===----------------------------------------------------------------------===//
+// GPU CodeGen op filter
+//===----------------------------------------------------------------------===//
 
-#endif  // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
+/// Returns true if the index map represents a transpose that benefits from
+/// using shared memory when CodeGen towards the GPU.
+bool sharedMemTransposeFilter(AffineMap indexMap);
+
+} // namespace iree_compiler
+} // namespace mlir
+
+#endif // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_

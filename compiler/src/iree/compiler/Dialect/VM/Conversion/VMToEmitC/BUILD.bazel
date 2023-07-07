@@ -41,6 +41,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/Analysis",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Utils:CallingConvention",
+        "//compiler/src/iree/compiler/Dialect/VM/Utils:TypeTable",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ControlFlowDialect",

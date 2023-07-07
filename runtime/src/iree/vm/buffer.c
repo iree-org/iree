@@ -9,7 +9,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/vm/instance.h"
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_buffer, iree_vm_buffer_t);
@@ -25,11 +24,12 @@ static iree_status_t iree_vm_buffer_map(const iree_vm_buffer_t* buffer,
   length &= ~(alignment - 1);
   const iree_host_size_t end = offset + length;
   if (IREE_UNLIKELY(end > buffer->data.data_length)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "out-of-bounds access detected (offset=%zu, "
-                            "length=%zu, alignment=%zu, buffer length=%zu)",
-                            offset, length, alignment,
-                            buffer->data.data_length);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "out-of-bounds access detected (offset=%" PRIhsz
+        ", "
+        "length=%" PRIhsz ", alignment=%" PRIhsz ", buffer length=%" PRIhsz ")",
+        offset, length, alignment, buffer->data.data_length);
   }
   *out_data = buffer->data.data + offset;
   *out_data_length = length;
@@ -123,11 +123,11 @@ static void iree_vm_buffer_destroy(void* ptr) {
 }
 
 IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer) {
-  iree_vm_ref_object_retain(buffer, &iree_vm_buffer_descriptor);
+  iree_vm_ref_object_retain(buffer, iree_vm_buffer_type());
 }
 
 IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer) {
-  iree_vm_ref_object_release(buffer, &iree_vm_buffer_descriptor);
+  iree_vm_ref_object_release(buffer, iree_vm_buffer_type());
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
@@ -315,13 +315,22 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
 }
 
 iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
-  if (iree_vm_buffer_descriptor.type != IREE_VM_REF_TYPE_NULL) {
-    // Already registered.
-    return iree_ok_status();
-  }
-  iree_vm_buffer_descriptor.destroy = iree_vm_buffer_destroy;
-  iree_vm_buffer_descriptor.offsetof_counter =
-      offsetof(iree_vm_buffer_t, ref_object.counter);
-  iree_vm_buffer_descriptor.type_name = iree_make_cstring_view("vm.buffer");
-  return iree_vm_ref_register_type(&iree_vm_buffer_descriptor);
+  static const iree_vm_ref_type_descriptor_t descriptor = {
+      .destroy = iree_vm_buffer_destroy,
+      .type_name = IREE_SVL("vm.buffer"),
+      .offsetof_counter = offsetof(iree_vm_buffer_t, ref_object.counter) /
+                          IREE_VM_REF_COUNTER_ALIGNMENT,
+  };
+  return iree_vm_instance_register_type(instance, &descriptor,
+                                        &iree_vm_buffer_registration);
+}
+
+iree_status_t iree_vm_buffer_resolve_types(iree_vm_instance_t* instance) {
+  iree_vm_buffer_registration =
+      iree_vm_instance_lookup_type(instance, IREE_SV("vm.buffer"));
+  return iree_vm_buffer_registration
+             ? iree_ok_status()
+             : iree_make_status(
+                   IREE_STATUS_INTERNAL,
+                   "VM type `vm.buffer` not registered with the instance");
 }

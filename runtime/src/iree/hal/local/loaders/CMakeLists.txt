@@ -21,12 +21,12 @@ iree_cc_library(
     "embedded_elf_loader.c"
   DEPS
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
     iree::hal
     iree::hal::local::elf::elf_module
     iree::hal::local::executable_library
+    iree::hal::local::executable_library_util
     iree::hal::local::executable_loader
+    iree::hal::local::executable_plugin_manager
   DEFINES
     "IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF=1"
   PUBLIC
@@ -43,10 +43,10 @@ iree_cc_library(
     "static_library_loader.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
+    iree::hal::local::executable_library_util
     iree::hal::local::executable_loader
   DEFINES
     "IREE_HAVE_HAL_EXECUTABLE_LOADER_STATIC_LIBRARY=1"
@@ -64,12 +64,12 @@ iree_cc_library(
     "system_library_loader.c"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree::hal
     iree::hal::local::executable_library
+    iree::hal::local::executable_library_util
     iree::hal::local::executable_loader
+    iree::hal::local::executable_plugin_manager
   DEFINES
     "IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY=1"
   PUBLIC
@@ -88,9 +88,7 @@ iree_cc_library(
     "vmvx_module_loader.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
-    iree::hal::local::executable_library
     iree::hal::local::executable_loader
     iree::modules::vmvx
     iree::vm

@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/HAL/Analysis/BindingLayout.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -44,9 +45,11 @@ static void setApplicableObjects(Operation *sourceOp,
                                  IREE::HAL::ExecutableVariantOp targetOp) {
   auto objectsAttr = sourceOp->getAttrOfType<IREE::HAL::ExecutableObjectsAttr>(
       "hal.executable.objects");
-  if (!objectsAttr) return;
+  if (!objectsAttr)
+    return;
   auto objects = objectsAttr.getApplicableObjects(targetOp.getTarget());
-  if (!objects) return;
+  if (!objects)
+    return;
   targetOp.setObjectsAttr(*objects);
 }
 
@@ -104,7 +107,8 @@ static LogicalResult materializeExecutableFromSourceOp(
     // Clone any target-specific object files specified.
     if (auto objectsAttr = sourceOp.getObjectsAttr()) {
       auto objects = objectsAttr.getApplicableObjects(targetAttr);
-      if (objects) targetVariantOp.setObjectsAttr(*objects);
+      if (objects)
+        targetVariantOp.setObjectsAttr(*objects);
     }
 
     // Clone inner module contents.
@@ -150,7 +154,7 @@ static LogicalResult materializeExecutablesFromSourceOps(
 static LogicalResult verifyEntryPointTypes(mlir::func::FuncOp entryFuncOp) {
   for (auto inputType :
        llvm::enumerate(entryFuncOp.getFunctionType().getInputs())) {
-    if (inputType.value().isa<IREE::Stream::BindingType>() ||
+    if (llvm::isa<IREE::Stream::BindingType>(inputType.value()) ||
         inputType.value().isInteger(32)) {
       // OK - directly translates to a HAL interface binding.
     } else {
@@ -164,8 +168,9 @@ static LogicalResult verifyEntryPointTypes(mlir::func::FuncOp entryFuncOp) {
 }
 
 // Creates an pipeline layout attr from the analysis results.
-static IREE::HAL::PipelineLayoutAttr makePipelineLayoutAttr(
-    const PipelineLayout &pipelineLayout, OpBuilder &builder) {
+static IREE::HAL::PipelineLayoutAttr
+makePipelineLayoutAttr(const PipelineLayout &pipelineLayout,
+                       OpBuilder &builder) {
   SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs;
   for (const auto &setLayout : pipelineLayout.setLayouts) {
     SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
@@ -198,11 +203,12 @@ static void convertOperandUsage(mlir::func::FuncOp sourceFuncOp,
 }
 
 // Converts the usage of the given !stream.binding |arg| to interface methods.
-static void convertBindingUsage(
-    mlir::func::FuncOp sourceFuncOp, BlockArgument arg,
-    IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
-    IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
-  if (arg.use_empty()) return;  // no-op
+static void
+convertBindingUsage(mlir::func::FuncOp sourceFuncOp, BlockArgument arg,
+                    IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
+                    IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
+  if (arg.use_empty())
+    return; // no-op
   for (auto &use : llvm::make_early_inc_range(arg.getUses())) {
     auto oldOp = dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner());
     assert(oldOp && "bindings are only usable by stream.binding.subspan");
@@ -221,9 +227,10 @@ static void convertBindingUsage(
 
 // Clones |sourceFuncOp| and updates its signature to match the |interfaceOp|
 // and use the HAL interface access primitives.
-static mlir::func::FuncOp cloneFuncWithInterface(
-    mlir::func::FuncOp sourceFuncOp, const PipelineLayout &pipelineLayout,
-    IREE::HAL::PipelineLayoutAttr layoutAttr) {
+static mlir::func::FuncOp
+cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
+                       const PipelineLayout &pipelineLayout,
+                       IREE::HAL::PipelineLayoutAttr layoutAttr) {
   // Clone so that we can do a bunch of unsafe in-place updates.
   auto clonedFuncOp = sourceFuncOp.clone();
 
@@ -238,13 +245,14 @@ static mlir::func::FuncOp cloneFuncWithInterface(
   // for use by the binding accessors.
   unsigned operandIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!arg.getType().isa<IREE::Stream::BindingType>()) {
+    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
       convertOperandUsage(sourceFuncOp, arg, operandIdx++, entryBuilder);
     }
   }
   unsigned resourceIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!arg.getType().isa<IREE::Stream::BindingType>()) continue;
+    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType()))
+      continue;
     auto setBinding = pipelineLayout.resourceMap[resourceIdx++];
     auto setLayoutAttr = layoutAttr.getSetLayouts()[setBinding.first];
     auto bindingAttr = setLayoutAttr.getBindings()[setBinding.second];
@@ -259,14 +267,14 @@ static mlir::func::FuncOp cloneFuncWithInterface(
 
 // Updates the target entry point symbols of |dispatchOp| to the expanded set of
 // variant exports in |entryPointExpansions|.
-static void updateDispatchTargets(
-    IREE::Stream::CmdDispatchOp dispatchOp,
-    const EntryPointExpansions &entryPointExpansions) {
+static void
+updateDispatchTargets(IREE::Stream::CmdDispatchOp dispatchOp,
+                      const EntryPointExpansions &entryPointExpansions) {
   SmallVector<Attribute> newAttrs;
   for (auto oldAttr : dispatchOp.getEntryPointRefs()) {
     auto it = entryPointExpansions.find(oldAttr);
     if (it == entryPointExpansions.end()) {
-      newAttrs.push_back(oldAttr);  // preserve existing
+      newAttrs.push_back(oldAttr); // preserve existing
       continue;
     }
     for (auto newAttr : it->second) {
@@ -293,11 +301,11 @@ static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
 // Adds the entry point ops with assigned ordinals for each entry function.
 // The entry points will all use the provided |interfaceOp| and be exported with
 // hal.executable.export ops.
-static LogicalResult declareEntryPointOps(
-    IREE::Stream::ExecutableOp sourceExecutableOp,
-    IREE::HAL::ExecutableOp targetExecutableOp,
-    const BindingLayoutAnalysis &layoutAnalysis,
-    EntryPointExpansions &entryPointExpansions) {
+static LogicalResult
+declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
+                     IREE::HAL::ExecutableOp targetExecutableOp,
+                     const BindingLayoutAnalysis &layoutAnalysis,
+                     EntryPointExpansions &entryPointExpansions) {
   auto sourceModuleOp = sourceExecutableOp.getInnerModule();
   auto variantOps =
       targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>();
@@ -311,7 +319,8 @@ static LogicalResult declareEntryPointOps(
                            .getOps<IREE::Stream::ExecutableExportOp>()) {
     auto sourceFuncOp = sourceModuleOp.lookupSymbol<mlir::func::FuncOp>(
         exportOp.getFunctionRef());
-    if (failed(verifyEntryPointTypes(sourceFuncOp))) return failure();
+    if (failed(verifyEntryPointTypes(sourceFuncOp)))
+      return failure();
 
     // Create the interface for this entry point based on the analysis of its
     // usage within the program.
@@ -331,10 +340,26 @@ static LogicalResult declareEntryPointOps(
     for (auto variantOp : variantOps) {
       // Declare the entry point on the target.
       OpBuilder targetBuilder(variantOp.getInnerModule());
+      // Check if workgroup size is set externally.
+      ArrayAttr workgroupSize;
+      for (auto attr : exportOp->getAttrs()) {
+        if (attr.getValue().isa<IREE::Codegen::ExportConfigAttr>()) {
+          workgroupSize = attr.getValue()
+                              .cast<IREE::Codegen::ExportConfigAttr>()
+                              .getWorkgroupSize();
+          if (workgroupSize.size() < 3) {
+            SmallVector<Attribute> workgroupSizeVals =
+                llvm::to_vector(workgroupSize);
+            workgroupSizeVals.resize(3, targetBuilder.getIndexAttr(1));
+            workgroupSize = targetBuilder.getArrayAttr(workgroupSizeVals);
+          }
+          break;
+        }
+      }
       auto newExportOp = targetBuilder.create<IREE::HAL::ExecutableExportOp>(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.getFunctionRef()),
-          targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
+          targetBuilder.getIndexAttr(ordinal), layoutAttr, workgroupSize,
           /*subgroup_size=*/IntegerAttr{},
           /*workgroup_local_memory=*/IntegerAttr{});
 
@@ -384,7 +409,8 @@ static LogicalResult declareEntryPointOps(
   // Drop the temporary target functions. We could avoid an additional clone if
   // we only had one variant but this is relatively small in cost (once per
   // variant).
-  for (auto it : targetFuncOps) it.second->erase();
+  for (auto it : targetFuncOps)
+    it.second->erase();
   targetFuncOps.clear();
 
   return success();
@@ -430,17 +456,18 @@ struct InlineConstantWorkgroupSizePattern
     assert(exportOp &&
            "must have an entry point corresponding to the parent func");
     auto workgroupSizeAttr = exportOp.getWorkgroupSizeAttr();
-    if (!workgroupSizeAttr) return failure();
+    if (!workgroupSizeAttr)
+      return failure();
 
     uint64_t dimIdx = sizeOp.getDimension().getZExtValue();
     auto dimAttr = workgroupSizeAttr[dimIdx];
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(sizeOp, dimAttr,
-                                                   rewriter.getIndexType());
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        sizeOp, rewriter.getIndexType(), cast<TypedAttr>(dimAttr));
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
   RewritePatternSet patterns(executableOp.getContext());
@@ -462,7 +489,7 @@ static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
 
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
- public:
+public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MaterializeInterfacesPass)
 
   MaterializeInterfacesPass() = default;
@@ -501,7 +528,8 @@ class MaterializeInterfacesPass
         getOperation().getOps<IREE::Stream::ExecutableOp>());
     for (auto sourceOp : sourceOps) {
       auto exportOps = sourceOp.getOps<IREE::Stream::ExecutableExportOp>();
-      if (exportOps.empty()) continue;
+      if (exportOps.empty())
+        continue;
 
       // Gather a list of all #hal.executable.targets that we should produce
       // variants for.
@@ -602,7 +630,7 @@ class MaterializeInterfacesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass() {
   return std::make_unique<MaterializeInterfacesPass>();
@@ -612,7 +640,7 @@ static PassRegistration<MaterializeInterfacesPass> pass([] {
   return std::make_unique<MaterializeInterfacesPass>();
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

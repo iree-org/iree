@@ -17,7 +17,7 @@ endif()
 iree_c_embed_data(
   NAME
     all_bytecode_modules_c
-  GENERATED_SRCS
+  SRCS
     "arithmetic_ops.vmfb"
     "arithmetic_ops_f32.vmfb"
     "arithmetic_ops_i64.vmfb"
@@ -293,7 +293,7 @@ iree_bytecode_module(
 iree_c_embed_data(
   NAME
     async_bytecode_modules_c
-  GENERATED_SRCS
+  SRCS
     "async_ops.vmfb"
   C_FILE_OUTPUT
     "async_bytecode_modules.c"

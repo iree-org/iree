@@ -16,9 +16,9 @@ namespace iree_compiler {
 template <typename T>
 struct GenericConvertTypesPattern : public OpConversionPattern<T> {
   using OpConversionPattern<T>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      T op, typename T::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(T op, typename T::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     SmallVector<Type> resultTypes;
     for (auto oldType : op.getOperation()->getResultTypes()) {
       SmallVector<Type> newTypes;
@@ -67,7 +67,7 @@ void populateGenericStructuralConversionPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
     TypeConverter &typeConverter, RewritePatternSet &patterns);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_CONVERSION_CONVERSIONPATTERNS_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_CONVERSION_CONVERSIONPATTERNS_H_

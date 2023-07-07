@@ -37,31 +37,31 @@ typedef struct iree_vm_variant_t {
 // Returns an empty variant.
 static inline iree_vm_variant_t iree_vm_variant_empty(void) {
   iree_vm_variant_t result;
-  result.type = iree_vm_type_def_make_variant_type();
+  result.type = iree_vm_make_undefined_type_def();
   result.ref = iree_vm_ref_null();
   return result;
 }
 
 // Returns true if |variant| is empty (no value/NULL ref).
 static inline bool iree_vm_variant_is_empty(iree_vm_variant_t variant) {
-  return iree_vm_type_def_is_variant(&variant.type);
+  return iree_vm_type_def_is_variant(variant.type);
 }
 
 // Returns true if |variant| represents a primitive value.
 static inline bool iree_vm_variant_is_value(iree_vm_variant_t variant) {
-  return iree_vm_type_def_is_value(&variant.type);
+  return iree_vm_type_def_is_value(variant.type);
 }
 
 // Returns true if |variant| represents a non-NULL ref type.
 static inline bool iree_vm_variant_is_ref(iree_vm_variant_t variant) {
-  return iree_vm_type_def_is_ref(&variant.type);
+  return iree_vm_type_def_is_ref(variant.type);
 }
 
 // Makes a variant containing the given primitive |value|.
 static inline iree_vm_variant_t iree_vm_make_variant_value(
     iree_vm_value_t value) {
   iree_vm_variant_t result = iree_vm_variant_empty();
-  result.type.value_type = value.type;
+  result.type.value_type_bits = value.type;
   memcpy(result.value_storage, value.value_storage,
          sizeof(result.value_storage));
   return result;
@@ -71,7 +71,7 @@ static inline iree_vm_variant_t iree_vm_make_variant_value(
 static inline iree_vm_variant_t iree_vm_make_variant_ref_assign(
     iree_vm_ref_t ref) {
   iree_vm_variant_t result = iree_vm_variant_empty();
-  result.type.ref_type = ref.type;
+  result.type.ref_type_bits = ref.type >> IREE_VM_REF_TYPE_TAG_BITS;
   result.ref = ref;
   return result;
 }
@@ -81,7 +81,7 @@ static inline iree_vm_variant_t iree_vm_make_variant_ref_assign(
 // iree_vm_value_make_none.
 static inline iree_vm_value_t iree_vm_variant_value(iree_vm_variant_t variant) {
   iree_vm_value_t value;
-  value.type = variant.type.value_type;
+  value.type = (iree_vm_value_type_t)variant.type.value_type_bits;
   memcpy(value.value_storage, variant.value_storage,
          sizeof(value.value_storage));
   return value;

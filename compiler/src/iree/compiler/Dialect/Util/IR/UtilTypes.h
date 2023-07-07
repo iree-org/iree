@@ -116,11 +116,11 @@ LogicalResult verifyGlobalLoadOp(GlobalLoadOpInterface loadOp,
 LogicalResult verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
                                   SymbolTableCollection &symbolTable);
 
-}  // namespace detail
+} // namespace detail
 
-IREE::Util::GlobalOpInterface lookupGlobalOp(
-    Operation *accessorOp, SymbolRefAttr globalRefAttr,
-    SymbolTableCollection &symbolTable);
+IREE::Util::GlobalOpInterface
+lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
+               SymbolTableCollection &symbolTable);
 
 //===----------------------------------------------------------------------===//
 // Tied operand interface utilities
@@ -132,19 +132,19 @@ std::optional<unsigned> getTiedResultOperandIndex(Operation *op,
                                                   unsigned resultIndex);
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
                                std::optional<unsigned> operandIndex);
-SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
+SmallVector<int64_t> getTiedResultOperandIndices(Operation *op);
 bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
 SmallVector<Value> getOperandTiedResults(Operation *op, unsigned operandIndex);
 LogicalResult verifyTiedOp(TiedOpInterface tiedOp);
 
-}  // namespace detail
+} // namespace detail
 
 // Resets or removes the indices in |tiedOperandIndices| based on the given
 // exclusion lists.
 void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices,
-    SmallVector<int64_t, 4> &tiedOperandIndices);
+    SmallVector<int64_t> &tiedOperandIndices);
 
 //===----------------------------------------------------------------------===//
 // Shape-aware interface utilities
@@ -217,23 +217,32 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+// Returns the bit-width of the scalar type. If the type is complex, it returns
+// the type of individual elements * 2 (1 for real and 1 for complex).
+static int64_t getTypeBitWidth(Type type) {
+  if (auto complexType = type.dyn_cast<ComplexType>()) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
 
-#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc"  // IWYU pragma: export
-#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc"  // IWYU pragma: export
-#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.h.inc"  // IWYU pragma: export
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
+
+#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.h.inc" // IWYU pragma: export
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilAttrs.h.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilAttrs.h.inc" // IWYU pragma: keep
 // clang-format on
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_TYPEDEF_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h.inc" // IWYU pragma: keep
 // clang-format on
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_

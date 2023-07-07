@@ -20,14 +20,15 @@ namespace iree_compiler {
 // A conversion target for the HAL dialect that ensures that tensor types are
 // fully removed. Conversions targeting the HAL dialect should always use this.
 class HALConversionTarget : public ConversionTarget {
- public:
+public:
   HALConversionTarget(MLIRContext *context, TypeConverter &typeConverter);
 
   // Attempts to rewrite an op that may use tensor values into an op using HAL
   // buffers. See HALOpConversion for more information.
-  static LogicalResult applyDefaultBufferRewrite(
-      Operation *srcOp, ValueRange operands, StringRef dstOpName,
-      TypeConverter &typeConverter, ConversionPatternRewriter &rewriter);
+  static LogicalResult
+  applyDefaultBufferRewrite(Operation *srcOp, ValueRange operands,
+                            StringRef dstOpName, TypeConverter &typeConverter,
+                            ConversionPatternRewriter &rewriter);
 };
 
 // HAL tensor-to-buffer conversion utility.
@@ -48,23 +49,23 @@ class HALConversionTarget : public ConversionTarget {
 //   my.buffer_op(%arg0_view : !hal.buffer_view)
 template <typename SRC, typename DST>
 class HALOpConversion : public OpConversionPattern<SRC> {
- public:
+public:
   HALOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern<SRC>(context), typeConverter(typeConverter) {}
 
-  LogicalResult matchAndRewrite(
-      SRC srcOp, typename SRC::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(SRC srcOp, typename SRC::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     return HALConversionTarget::applyDefaultBufferRewrite(
         srcOp, adaptor.getOperands(), DST::getOperationName(), typeConverter,
         rewriter);
   }
 
- protected:
+protected:
   TypeConverter &typeConverter;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONTARGET_H_
+#endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONTARGET_H_

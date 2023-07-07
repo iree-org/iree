@@ -10,7 +10,6 @@
 #include <stdlib.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "third_party/nccl/nccl.h"
@@ -53,10 +52,15 @@ typedef struct iree_hal_cuda_nccl_channel_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context_wrapper;
 
+  // Parent channel this was split from, if any.
+  // This is only used to keep the parent channel live for as long as there are
+  // any split channels live (including transitive splits).
+  iree_hal_channel_t* parent_channel;
+
   // Hash of the unique ID used to create the communicator.
   // This is consistent with the hashes NCCL itself uses for logging but is not
   // guaranteed to be unique - only use for informational purposes.
-  uint64_t id_hash;
+  IREE_TRACE(uint64_t id_hash;)
 
   // This participant's rank in the communicator.
   // Equivalent to ncclCommUserRank.
@@ -86,10 +90,10 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
   *out_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, id_hash);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, rank);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
+  IREE_TRACE(const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id));
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, id_hash);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, rank);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
 
   ncclComm_t comm = NULL;
   ncclConfig_t config = NCCL_CONFIG_INITIALIZER;
@@ -107,7 +111,7 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
     iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
                                  &channel->resource);
     channel->context_wrapper = context_wrapper;
-    channel->id_hash = id_hash;
+    IREE_TRACE(channel->id_hash = id_hash);
     channel->rank = rank;
     channel->count = count;
     channel->comm = comm;
@@ -124,9 +128,9 @@ static void iree_hal_cuda_nccl_channel_destroy(
       iree_hal_cuda_nccl_channel_cast(base_channel);
   iree_allocator_t host_allocator = channel->context_wrapper->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->id_hash);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->rank);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, channel->id_hash);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, channel->rank);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, channel->count);
 
   // TODO(#9580): support async tear down
   // We could be smarter about starting finalization of all channels async and
@@ -142,13 +146,69 @@ static void iree_hal_cuda_nccl_channel_destroy(
   //  syms->ncclCommDestroy(channel->comm)
   NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
                     ncclCommFinalize(channel->comm));
+
   NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
                     ncclCommDestroy(channel->comm));
+
+  iree_hal_channel_release(channel->parent_channel);
   iree_allocator_free(host_allocator, channel);
+
   IREE_TRACE_ZONE_END(z0);
 }
 
-void iree_hal_cuda_nccl_channel_query_rank_and_count(
+static iree_status_t iree_hal_cuda_nccl_channel_split(
+    iree_hal_channel_t* base_channel, int32_t color, int32_t key,
+    iree_hal_channel_flags_t flags, iree_hal_channel_t** out_split_channel) {
+  iree_hal_cuda_nccl_channel_t* channel =
+      iree_hal_cuda_nccl_channel_cast(base_channel);
+  iree_hal_cuda_dynamic_symbols_t* syms = channel->context_wrapper->syms;
+
+  // TODO: see if we need to set the sharing config - we may always want to.
+  ncclConfig_t config = NCCL_CONFIG_INITIALIZER;
+  config.blocking = 1;  // FIXME: use async to check a timeout
+
+  // Split the communicator.
+  ncclComm_t split_comm = NULL;
+  NCCL_RETURN_IF_ERROR(
+      syms, ncclCommSplit(channel->comm, color, key, &split_comm, &config),
+      "ncclCommSplit");
+
+  // Query the local rank/count from the split communicator.
+  int split_rank = 0;
+  int split_count = 0;
+  iree_status_t status = NCCL_RESULT_TO_STATUS(
+      syms, ncclCommUserRank(split_comm, &split_rank), "ncclCommUserRank");
+  if (iree_status_is_ok(status)) {
+    status = NCCL_RESULT_TO_STATUS(
+        syms, ncclCommCount(split_comm, &split_count), "ncclCommCount");
+  }
+
+  // Wrap the split communicator in a new channel.
+  iree_hal_cuda_nccl_channel_t* split_channel = NULL;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_allocator_malloc(channel->context_wrapper->host_allocator,
+                              sizeof(*split_channel), (void**)&split_channel);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
+                                 &split_channel->resource);
+    split_channel->context_wrapper = channel->context_wrapper;
+    split_channel->parent_channel = base_channel;
+    iree_hal_channel_retain(base_channel);
+    split_channel->rank = split_rank;
+    split_channel->count = split_count;
+    split_channel->comm = split_comm;
+    *out_split_channel = (iree_hal_channel_t*)split_channel;
+  }
+
+  if (!iree_status_is_ok(status)) {
+    NCCL_IGNORE_ERROR(syms, ncclCommDestroy(split_comm));
+  }
+  return status;
+}
+
+static void iree_hal_cuda_nccl_channel_query_rank_and_count(
     const iree_hal_channel_t* base_channel, int32_t* out_rank,
     int32_t* out_count) {
   IREE_ASSERT_ARGUMENT(base_channel);
@@ -294,6 +354,34 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
           "ncclAllReduce");
       break;
     }
+    case IREE_HAL_COLLECTIVE_KIND_ALL_TO_ALL: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      iree_device_size_t send_count = entry->element_count / channel->count;
+      iree_device_size_t element_size_bytes =
+          iree_hal_collective_element_byte_count(entry->op.element_type);
+      iree_device_size_t rank_offset = send_count * element_size_bytes;
+      // These calls are already grouped by iree_hal_cuda_nccl_submit_batch.
+      for (iree_host_size_t r = 0; r < channel->count; ++r) {
+        NCCL_RETURN_IF_ERROR(syms,
+                             ncclSend((const void*)(sendbuff + r * rank_offset),
+                                      send_count, datatype, r, comm, stream),
+                             "ncclSend");
+        NCCL_RETURN_IF_ERROR(syms,
+                             ncclRecv((void*)(recvbuff + r * rank_offset),
+                                      send_count, datatype, r, comm, stream),
+                             "ncclRecv");
+      }
+      break;
+    }
     case IREE_HAL_COLLECTIVE_KIND_BROADCAST: {
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
@@ -379,6 +467,44 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
                            "ncclRecv");
       break;
     }
+    case IREE_HAL_COLLECTIVE_KIND_SEND_RECV: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      int16_t sendid;
+      int16_t recvid;
+      memcpy(&sendid, &entry->param, 2);
+      memcpy(&recvid, (char*)&entry->param + 2, 2);
+      if (sendid != -1) {
+        NCCL_RETURN_IF_ERROR(
+            syms,
+            ncclSend((const void*)sendbuff, entry->element_count, datatype,
+                     sendid, comm, stream),
+            "ncclSend");
+      }
+      if (recvid != -1) {
+        NCCL_RETURN_IF_ERROR(syms,
+                             ncclRecv((void*)recvbuff, entry->element_count,
+                                      datatype, recvid, comm, stream),
+                             "ncclRecv");
+      } else {
+        // Zero out recvbuff if this rank is not receiving any data.
+        iree_device_size_t num_bytes =
+            entry->element_count *
+            iree_hal_collective_element_byte_count(entry->op.element_type);
+        CUDA_RETURN_IF_ERROR(syms,
+                             cuMemsetD8Async(recvbuff, 0, num_bytes, stream),
+                             "cuMemsetD8Async");
+      }
+      break;
+    }
   }  // switch
   return iree_ok_status();
 }
@@ -391,22 +517,22 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
   IREE_ASSERT_ARGUMENT(batch);
   IREE_ASSERT_ARGUMENT(stream);
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   // Begin one zone for each entry in the batch. Each entry will show stacked on
   // top of each other and unfortunately use independent CUDA events. We could
   // optimize this by changing the tracing context to expose an API with event
   // reservation and then zone commit using an existing event.
-  IREE_TRACE({
-    iree_bitfield_string_temp_t string_temp;
-    for (iree_host_size_t i = 0; i < batch->count; ++i) {
-      iree_hal_collective_batch_entry_t* entry = &batch->entries[i];
-      iree_string_view_t collective_str =
-          iree_hal_collective_op_format(&entry->op, &string_temp);
-      IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
-          tracing_context, stream, __FILE__, strlen(__FILE__),
-          (uint32_t)__LINE__, __FUNCTION__, strlen(__FUNCTION__),
-          collective_str.data, collective_str.size);
-    }
-  });
+  iree_bitfield_string_temp_t string_temp;
+  for (iree_host_size_t i = 0; i < batch->count; ++i) {
+    iree_hal_collective_batch_entry_t* entry = &batch->entries[i];
+    iree_string_view_t collective_str =
+        iree_hal_collective_op_format(&entry->op, &string_temp);
+    IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+        tracing_context, stream, __FILE__, strlen(__FILE__), (uint32_t)__LINE__,
+        __FUNCTION__, strlen(__FUNCTION__), collective_str.data,
+        collective_str.size);
+  }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   // Issue all collective operations in the batch as part of a group.
   // NCCL may be able to fuse or reduce overheads by issuing like this.
@@ -417,18 +543,19 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
   }
   NCCL_RETURN_IF_ERROR(context->syms, ncclGroupEnd(), "ncclGroupEnd");
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   // End all zones we began above - note that these are just simply nested so
   // order doesn't matter so long as we end the right number of zones.
-  IREE_TRACE({
-    for (iree_host_size_t i = 0; i < batch->count; ++i) {
-      IREE_CUDA_TRACE_ZONE_END(tracing_context, stream);
-    }
-  });
+  for (iree_host_size_t i = 0; i < batch->count; ++i) {
+    IREE_CUDA_TRACE_ZONE_END(tracing_context, stream);
+  }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   return iree_ok_status();
 }
 
 static const iree_hal_channel_vtable_t iree_hal_cuda_nccl_channel_vtable = {
     .destroy = iree_hal_cuda_nccl_channel_destroy,
+    .split = iree_hal_cuda_nccl_channel_split,
     .query_rank_and_count = iree_hal_cuda_nccl_channel_query_rank_and_count,
 };

@@ -7,7 +7,6 @@
 #include "iree/hal/local/executable_environment.h"
 
 #include "iree/base/internal/cpu.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_environment_*_t

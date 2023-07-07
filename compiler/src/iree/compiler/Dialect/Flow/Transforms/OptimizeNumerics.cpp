@@ -23,12 +23,13 @@ namespace {
 
 int getNextPotBitWidth(int bitWidth, int minBitWidth = 8) {
   for (int i = minBitWidth;; i *= 2) {
-    if (i >= bitWidth) return i;
+    if (i >= bitWidth)
+      return i;
   }
 }
 
 Type withNewElementType(Type origType, Type elementType) {
-  if (auto st = origType.dyn_cast<ShapedType>()) {
+  if (auto st = llvm::dyn_cast<ShapedType>(origType)) {
     return st.clone(elementType);
   } else {
     return elementType;
@@ -47,14 +48,15 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
   Type origElementType = getElementTypeOrSelf(origValue.getType());
   Type toElementType = getElementTypeOrSelf(toType);
 
-  if (origElementType.isa<FloatType>() && toElementType.isa<IntegerType>()) {
+  if (llvm::isa<FloatType>(origElementType) &&
+      llvm::isa<IntegerType>(toElementType)) {
     if (isSigned) {
       return builder.create<arith::FPToSIOp>(loc, toType, origValue);
     } else {
       return builder.create<arith::FPToUIOp>(loc, toType, origValue);
     }
-  } else if (origElementType.isa<IntegerType>() &&
-             toElementType.isa<FloatType>()) {
+  } else if (llvm::isa<IntegerType>(origElementType) &&
+             llvm::isa<FloatType>(toElementType)) {
     if (isSigned) {
       return builder.create<arith::SIToFPOp>(loc, toType, origValue);
     } else {
@@ -85,13 +87,19 @@ struct NarrowParams {
     return {};
   }
 
-  bool isFromFloat() { return getElementTypeOrSelf(fromType).isa<FloatType>(); }
+  bool isFromFloat() {
+    return llvm::isa<FloatType>(getElementTypeOrSelf(fromType));
+  }
 
-  bool isToInteger() { return toElementType.isa<IntegerType>(); }
+  bool isToInteger() { return llvm::isa<IntegerType>(toElementType); }
 
-  bool isToSigned() { return toElementType.cast<IntegerType>().isSigned(); }
+  bool isToSigned() {
+    return llvm::cast<IntegerType>(toElementType).isSigned();
+  }
 
-  int getToBitWidth() { return toElementType.cast<IntegerType>().getWidth(); }
+  int getToBitWidth() {
+    return llvm::cast<IntegerType>(toElementType).getWidth();
+  }
 
   Value producer;
   Type fromType;
@@ -108,7 +116,8 @@ struct TensorEmptyCast
   LogicalResult matchAndRewrite(IREE::Util::NumericCastOpInterface castOp,
                                 PatternRewriter &rewriter) const override {
     auto emptyOp = castOp.getInput().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyOp) return failure();
+    if (!emptyOp)
+      return failure();
     Type resultType = castOp.getCasted().getType();
 
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(castOp, resultType,
@@ -126,7 +135,8 @@ struct LinalgFillCast
                                 PatternRewriter &rewriter) const override {
     auto loc = castOp.getLoc();
     auto fillOp = castOp.getInput().getDefiningOp<linalg::FillOp>();
-    if (!fillOp) return failure();
+    if (!fillOp)
+      return failure();
     Type toElementType = getElementTypeOrSelf(castOp.getCastedType());
 
     Value fillInput = fillOp.value();
@@ -273,13 +283,13 @@ class OptimizeNumericsPass : public OptimizeNumericsBase<OptimizeNumericsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createOptimizeNumericsPass() {
   return std::make_unique<OptimizeNumericsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

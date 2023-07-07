@@ -71,7 +71,7 @@ static bool canUsersHandleSubviews(Operation *op) {
 static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
   Operation *definingOp = v.getDefiningOp();
   if (!definingOp) {
-    auto arg = v.cast<BlockArgument>();
+    auto arg = llvm::cast<BlockArgument>(v);
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           Value initOperand = forOp.getOpOperandForRegionIterArg(arg).get();
@@ -89,15 +89,17 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
 /// here).
 static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
                                        BufferizationPlan &plan) {
-  if (!constantOp.getResult().getType().isa<ShapedType>()) return success();
+  if (!llvm::isa<ShapedType>(constantOp.getResult().getType()))
+    return success();
   plan.insert(constantOp.getResult());
   return success();
 }
 
 /// Adds the result of the `flow.dispatch.tensor.load` op to the same
 /// equivalence class as the source.
-static LogicalResult analyseInterfaceLoadTensorOp(
-    IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
+static LogicalResult
+analyseInterfaceLoadTensorOp(IREE::Flow::DispatchTensorLoadOp loadOp,
+                             BufferizationPlan &plan) {
   plan.unionSets(loadOp.getResult(), loadOp.getSource());
   return success();
 }
@@ -111,10 +113,12 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
   SmallVector<Value> mappedTensors = plan.getTensorsMappedToSameSet(value);
   for (auto v : mappedTensors) {
     auto definingOp = v.getDefiningOp<OpType>();
-    if (!definingOp) continue;
+    if (!definingOp)
+      continue;
     assert((!equivalentOp || equivalentOp == definingOp) &&
            "found two interface binding ops marked as equivalent");
-    if (!equivalentOp) equivalentOp = definingOp;
+    if (!equivalentOp)
+      equivalentOp = definingOp;
   }
   return equivalentOp;
 }
@@ -154,8 +158,9 @@ static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
 ///   assumed that the equivalence classes contain only 1 such instruction.
 /// This method asserts that the `target` equivalence class already contains a
 /// `hal.interface.binding.subspan` op.'
-static bool canSetStoreValueAndTargetAsEquivalent(
-    IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
+static bool
+canSetStoreValueAndTargetAsEquivalent(IREE::Flow::DispatchTensorStoreOp storeOp,
+                                      BufferizationPlan &plan) {
   if (!canSetsBeMerged(storeOp.getValue(), storeOp.getTarget(), plan)) {
     return false;
   }
@@ -170,15 +175,16 @@ static bool canSetStoreValueAndTargetAsEquivalent(
   }
   // If the binding and offsets are the same, make sure that the
   // !flow.dispatch.tensor is read-write.
-  auto sourceType = valueInterfaceBinding.getType()
-                        .dyn_cast<IREE::Flow::DispatchTensorType>();
+  auto sourceType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+      valueInterfaceBinding.getType());
   return sourceType &&
          sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
 }
 
 /// Tries to add the `value` and `target` to the same equivalence class.
-static LogicalResult analyseInterfaceStoreTensorOp(
-    IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
+static LogicalResult
+analyseInterfaceStoreTensorOp(IREE::Flow::DispatchTensorStoreOp storeOp,
+                              BufferizationPlan &plan) {
   // The value and target can be union-ed if the set the value is part of does
   // not contain any hal.interface.binding.subspan from a different binding.
   Value value = storeOp.getValue();
@@ -198,8 +204,9 @@ static LogicalResult analyseInterfaceStoreTensorOp(
   return success();
 }
 
-static LogicalResult analyseInterfaceBindingSubspanOp(
-    IREE::HAL::InterfaceBindingSubspanOp subspanOp, BufferizationPlan &plan) {
+static LogicalResult
+analyseInterfaceBindingSubspanOp(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                                 BufferizationPlan &plan) {
   plan.insert(subspanOp.getResult());
   return success();
 }
@@ -213,8 +220,9 @@ static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
 
 /// For every result of the LinalgOp, gets the operands (`ins` or `outs`) whose
 /// buffer can be reused for the result.
-static SmallVector<Value> getTiedOperandsForDPSOps(
-    DestinationStyleOpInterface dpsOp, const BufferizationPlan &plan) {
+static SmallVector<Value>
+getTiedOperandsForDPSOps(DestinationStyleOpInterface dpsOp,
+                         const BufferizationPlan &plan) {
   SmallVector<Value> tiedOperands(dpsOp.getOperation()->getNumResults());
   auto outputOperands = dpsOp.getDpsInitOperands();
   for (auto [index, outTensor] : llvm::enumerate(outputOperands)) {
@@ -232,10 +240,12 @@ static SmallVector<Value> getTiedOperandsForDPSOps(
 /// same equivalence class.
 static LogicalResult analyseDPSOps(DestinationStyleOpInterface dpsOp,
                                    BufferizationPlan &plan) {
-  if (!dpsOp.hasTensorSemantics()) return success();
+  if (!dpsOp.hasTensorSemantics())
+    return success();
   auto results = dpsOp->getResults();
   auto tiedOperands = getTiedOperandsForDPSOps(dpsOp, plan);
-  if (tiedOperands.empty()) return failure();
+  if (tiedOperands.empty())
+    return failure();
   for (auto [index, resultTensor, tiedOperand] : llvm::zip_equal(
            llvm::seq<int64_t>(0, results.size()), results, tiedOperands)) {
     if (tiedOperand) {
@@ -306,11 +316,13 @@ static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
 }
 
 static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
-  if (!ifOp.getNumResults()) return success();
+  if (!ifOp.getNumResults())
+    return success();
   for (auto [result, thenOperand, elseOperand] :
        llvm::zip_equal(ifOp.getResults(), ifOp.thenYield().getOperands(),
                        ifOp.elseYield().getOperands())) {
-    if (!result.getType().isa<RankedTensorType>()) continue;
+    if (!llvm::isa<RankedTensorType>(result.getType()))
+      continue;
     // All results and yields of the if-then-else are tied together.
     plan.unionSets(result, thenOperand);
     plan.unionSets(result, elseOperand);
@@ -320,9 +332,10 @@ static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
 
 static LogicalResult analyseScfForOp(scf::ForOp forOp,
                                      BufferizationPlan &plan) {
-  if (forOp.getResults().empty()) return success();
+  if (forOp.getResults().empty())
+    return success();
   if (!llvm::all_of(forOp->getResultTypes(), [](Type resultType) {
-        return resultType.isa<RankedTensorType>();
+        return llvm::isa<RankedTensorType>(resultType);
       })) {
     return success();
   }
@@ -384,7 +397,8 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   for (OpOperand &use : source.getUses()) {
     auto user = use.getOwner();
     // Process only update ops uses here.
-    if (!isUpdateOp(user)) continue;
+    if (!isUpdateOp(user))
+      continue;
     // If this is not the first use in a tensor::InsertSliceOp abort.
     if (updateOp) {
       return;
@@ -409,7 +423,8 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   Block *updateOpBlock = updateOp->getBlock();
   for (OpOperand &use : source.getUses()) {
     Operation *user = use.getOwner();
-    if (user == updateOp) continue;
+    if (user == updateOp)
+      continue;
     if (isReadOp(user)) {
       Value source = getSource(user);
       assert(source && "unable to find source from read op");
@@ -462,11 +477,14 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
       continue;
     }
     for (OpOperand *input : linalgOp.getDpsInputOperands()) {
-      auto tensorType = input->get().getType().dyn_cast<RankedTensorType>();
-      if (!tensorType) continue;
+      auto tensorType =
+          llvm::dyn_cast<RankedTensorType>(input->get().getType());
+      if (!tensorType)
+        continue;
       Type inputElementType = tensorType.getElementType();
       Type resultElementType =
-          result->get().getType().cast<RankedTensorType>().getElementType();
+          llvm::cast<RankedTensorType>(result->get().getType())
+              .getElementType();
       if (input->get().hasOneUse() && (inputElementType == resultElementType) &&
           linalgOp.getMatchingIndexingMap(input) ==
               linalgOp.getMatchingIndexingMap(result) &&
@@ -504,7 +522,8 @@ void BufferizationPlan::dump() {
   unsigned numSets = 0;
   for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
        ++it) {
-    if (!it->isLeader()) continue;
+    if (!it->isLeader())
+      continue;
     llvm::dbgs() << "\tSet " << numSets;
     if (storeLeaders.count(
             getLeaderValue(getValue(*mappedTensors.member_begin(it))))) {
@@ -576,22 +595,24 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
                                             insertOp.getDest(),
                                             insertOp.getResult(), plan);
         })
-        .Case<vector::TransferReadOp>([&](vector::TransferReadOp
-                                              transferReadOp) {
-          if (transferReadOp.getSource().getType().isa<RankedTensorType>()) {
-            plan.insert(transferReadOp.getSource());
-          }
-          return success();
-        })
-        .Case<vector::TransferWriteOp>([&](vector::TransferWriteOp
-                                               transferWriteOp) {
-          if (!transferWriteOp.getSource().getType().isa<RankedTensorType>()) {
-            return success();
-          }
-          return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
-                                            transferWriteOp.getSource(),
-                                            transferWriteOp.getResult(), plan);
-        })
+        .Case<vector::TransferReadOp>(
+            [&](vector::TransferReadOp transferReadOp) {
+              if (llvm::isa<RankedTensorType>(
+                      transferReadOp.getSource().getType())) {
+                plan.insert(transferReadOp.getSource());
+              }
+              return success();
+            })
+        .Case<vector::TransferWriteOp>(
+            [&](vector::TransferWriteOp transferWriteOp) {
+              if (!llvm::isa<RankedTensorType>(
+                      transferWriteOp.getSource().getType())) {
+                return success();
+              }
+              return analyseDestructiveUpdateOp(
+                  transferWriteOp, nullptr, transferWriteOp.getSource(),
+                  transferWriteOp.getResult(), plan);
+            })
         .Case<scf::IfOp>(
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
@@ -603,10 +624,11 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         .Default([&](Operation *op) -> LogicalResult {
           if (llvm::any_of(op->getOperands(),
                            [](Value v) {
-                             return v.getType().isa<RankedTensorType>();
+                             return llvm::isa<RankedTensorType>(v.getType());
                            }) ||
-              llvm::any_of(op->getResultTypes(),
-                           [](Type t) { return t.isa<RankedTensorType>(); })) {
+              llvm::any_of(op->getResultTypes(), [](Type t) {
+                return llvm::isa<RankedTensorType>(t);
+              })) {
             return op->emitOpError("unhandled tensor operation");
           }
           return success();
@@ -626,7 +648,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
       return;
     }
     if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {
-      if (vectorWriteOp.getSource().getType().isa<RankedTensorType>()) {
+      if (llvm::isa<RankedTensorType>(vectorWriteOp.getSource().getType())) {
         hasDestructiveUpdatePattern(vectorWriteOp.getSource(), plan);
       }
     }
@@ -652,5 +674,5 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
   return success();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

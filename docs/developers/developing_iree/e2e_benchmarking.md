@@ -2,19 +2,13 @@
 
 <!-- TODO(meadowlark): Update this doc once the API is stable and change default to cmake. -->
 
-> Note:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;The TensorFlow integrations are currently being
-  refactored. The `bazel` build is deprecated. Refer to
-  https://openxla.github.io/iree/get-started/getting-started-python for a general
-  overview of how to build and execute the e2e tests.
-
 We use our end-to-end TensorFlow integration tests to test compilation and
 numerical accuracy, and to generate compilation and benchmarking artifacts.
 This allows us to validate that our benchmarks are behaving as we expect them
 to, and to run them using valid inputs for each model.
 
 This guide assumes that you can run the tensorflow integration tests. See
-[this doc](https://openxla.github.io/iree/building-from-source/python-bindings-and-importers/)
+[this doc](https://openxla.github.io/iree/building-from-source/getting-started/#python-bindings)
 for more information. That doc also covers writing new tests, which you'll need
 to do if you'd like to benchmark a new TensorFlow model.
 

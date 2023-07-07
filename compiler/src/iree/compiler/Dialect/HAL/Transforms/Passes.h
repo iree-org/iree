@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -45,14 +46,16 @@ enum class PipelinePhase {
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(
-    OpPassManager &passManager, const TargetOptions &targetOptions,
+    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    const TargetOptions &targetOptions,
     PipelinePhase compileTo = PipelinePhase::End);
 
 // Adds a set of passes to the given pass manager that run the head of the HAL
 // pipeline to assign devices, materialize interfaces, and translate
 // executables. The host portion of the program is annotated but not modified.
-void buildHALConfigurationPassPipeline(OpPassManager &passManager,
-                                       const TargetOptions &targetOptions);
+void buildHALConfigurationPassPipeline(
+    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    const TargetOptions &targetOptions);
 
 void registerHALTransformPassPipeline();
 void registerHALConfigurationPassPipeline();
@@ -72,11 +75,12 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToHALPass();
 // #hal.device.target and #hal.executable.target attribute placement and
 // definition will be checked as well along with other structural requirements.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createVerifyTargetEnvironmentPass();
+createVerifyTargetEnvironmentPass(const TargetBackendRegistry &targetRegistry);
 
 // Assigns the HAL devices the module will target to the given list of targets.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createAssignTargetDevicesPass(
-    ArrayRef<std::string> targets);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createAssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
+                              ArrayRef<std::string> targets);
 
 // Applies fixups to the program for when using legacy HAL devices that only
 // support synchronous execution. Once all devices support async this will be
@@ -100,8 +104,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createMaterializeInterfacesPass();
 
 // Dumps individual hal.executable source listings to |path|.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpExecutableSourcesPass(
-    StringRef path);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createDumpExecutableSourcesPass(StringRef path);
 
 // Dumps standalone hal.executable benchmarks to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -110,12 +114,12 @@ createDumpExecutableBenchmarksPass(StringRef path);
 // Substitutes hal.executable ops by parsing |substitutions| in
 // `executable_name=file.xxx` strings. File paths may be absolute or relative to
 // the paths specified on `--iree-hal-executable-object-search-path=`.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
-    ArrayRef<std::string> substitutions = {});
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSubstituteExecutablesPass(ArrayRef<std::string> substitutions = {});
 // Substitutes hal.executable ops with files in the given |searchPath| matching
 // the symbol name.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
-    std::string searchPath);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSubstituteExecutablesPass(std::string searchPath);
 
 // Preprocess each executable with either a pass pipeline or external tool.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
@@ -129,21 +133,24 @@ createPreprocessExecutablesWithToolPass(std::string command);
 
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createTranslateExecutablesPass();
+createTranslateExecutablesPass(const TargetBackendRegistry &targetRegistry);
 
 // Translates hal.executable.variant ops for the specified |target| backend.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTranslateTargetExecutableVariantsPass(StringRef target);
+createTranslateTargetExecutableVariantsPass(
+    const TargetBackendRegistry &targetRegistry, StringRef target);
 
 // Calls into each target backend to have it link multiple hal.executables
 // together (if that makes sense). For example, the LLVM AOT backend may combine
 // all executable targets for the same architecture into a single executable and
 // link it as a shared library.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createLinkExecutablesPass(const TargetBackendRegistry &targetRegistry);
 
 // Links executables for the specified |target| backend.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkTargetExecutablesPass(
-    StringRef target);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createLinkTargetExecutablesPass(const TargetBackendRegistry &targetRegistry,
+                                StringRef target);
 
 // Resolves hal.executable.export references to ordinals.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -151,15 +158,17 @@ createResolveExportOrdinalsPass();
 
 // Converts hal.executable.variants to one or more hal.executable.binary ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(int debugLevel = 2,
+createSerializeExecutablesPass(const TargetBackendRegistry &targetRegistry,
+                               int debugLevel = 2,
                                std::string dumpIntermediatesPath = "",
                                std::string dumpBinariesPath = "");
 
 // Serializes executables for the specified |target| backend.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeTargetExecutablesPass(StringRef target, int debugLevel = 2,
-                                     std::string dumpIntermediatesPath = "",
-                                     std::string dumpBinariesPath = "");
+createSerializeTargetExecutablesPass(
+    const TargetBackendRegistry &targetRegistry, StringRef target,
+    int debugLevel = 2, std::string dumpIntermediatesPath = "",
+    std::string dumpBinariesPath = "");
 
 //===----------------------------------------------------------------------===//
 // Resource initialization, caching, and optimization
@@ -180,8 +189,8 @@ std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass();
 
 // Repeats dispatches `iree-hal-repeat-dispatch-num` times, which is 1 by
 // default.
-std::unique_ptr<OperationPass<func::FuncOp>> createBenchmarkBatchDispatchesPass(
-    unsigned repeatCount);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createBenchmarkBatchDispatchesPass(unsigned repeatCount);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -191,32 +200,33 @@ inline void registerHALPasses() {
   registerHALTransformPassPipeline();
   registerHALConfigurationPassPipeline();
   auto targetOptions = TargetOptions::FromFlags::get();
-  createAssignTargetDevicesPass({});
+  createAssignTargetDevicesPass(TargetBackendRegistry::getGlobal(), {});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createConvertToHALPass();
   createDumpExecutableSourcesPass("");
   createElideRedundantCommandsPass();
   createInlineDeviceSwitchesPass();
   createFixupLegacySyncPass();
-  createLinkExecutablesPass();
-  createLinkTargetExecutablesPass("");
+  createLinkExecutablesPass(TargetBackendRegistry::getGlobal());
+  createLinkTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");
   createMaterializeDispatchInstrumentationPass(0);
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
   createPreprocessExecutablesPass("");
   createResolveExportOrdinalsPass();
-  createSerializeExecutablesPass();
-  createSerializeTargetExecutablesPass("");
+  createSerializeExecutablesPass(TargetBackendRegistry::getGlobal());
+  createSerializeTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");
   createSubstituteExecutablesPass();
-  createTranslateExecutablesPass();
-  createTranslateTargetExecutableVariantsPass("");
-  createVerifyTargetEnvironmentPass();
+  createTranslateExecutablesPass(TargetBackendRegistry::getGlobal());
+  createTranslateTargetExecutableVariantsPass(
+      TargetBackendRegistry::getGlobal(), "");
+  createVerifyTargetEnvironmentPass(TargetBackendRegistry::getGlobal());
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_

@@ -84,3 +84,23 @@ stream.executable private @convert_load_i33 {
     }
   }
 }
+
+// -----
+
+// CHECK-LABEL: @convert_store_i33
+
+stream.executable private @convert_store_i33 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !stream.binding) {
+      // CHECK: %[[CST:.+]] = arith.constant dense<[0, 7, 2, 5]> : tensor<4xi64>
+      %c0 = arith.constant 0 : index
+      // CHECK: %[[BINDING:.+]] = stream.binding.subspan {{.+}} -> !flow.dispatch.tensor<writeonly:tensor<4xi64>>
+      %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<4xi33>>
+      %cst = arith.constant dense<[0, 7, 2, 5]> : tensor<4xi33>
+      // CHECK: flow.dispatch.tensor.store %[[CST]], %[[BINDING]], {{.+}} : tensor<4xi64> -> !flow.dispatch.tensor<writeonly:tensor<4xi64>>
+      flow.dispatch.tensor.store %cst, %binding, offsets = [0], sizes = [4], strides = [1] : tensor<4xi33> -> !flow.dispatch.tensor<writeonly:tensor<4xi33>>
+      return
+    }
+  }
+}

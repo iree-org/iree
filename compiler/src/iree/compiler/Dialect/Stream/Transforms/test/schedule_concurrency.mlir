@@ -109,12 +109,12 @@ func.func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg
 // region.
 
 // CHECK-LABEL: @groupCollectiveOps
-// CHECK-SAME: (%[[SEND0:.+]]: !stream.resource<external>, %[[SEND0_SIZE:[a-z0-9]+]]: index,
+// CHECK-SAME: (%[[CHANNEL:.+]]: !stream.channel,
+// CHECK-SAME:  %[[SEND0:.+]]: !stream.resource<external>, %[[SEND0_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[SEND1:.+]]: !stream.resource<transient>, %[[SEND1_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
-func.func @groupCollectiveOps(%send0: !stream.resource<external>, %send0_size: index, %send1: !stream.resource<transient>, %send1_size: index, %recv_size: index, %count: index) {
+func.func @groupCollectiveOps(%channel: !stream.channel, %send0: !stream.resource<external>, %send0_size: index, %send1: !stream.resource<transient>, %send1_size: index, %recv_size: index, %count: index) {
   %c0 = arith.constant 0 : index
-  %channel = stream.channel.default : !stream.channel
   // CHECK: stream.async.execute
   %result:2, %result_timepoint = stream.async.execute
       // CHECK-SAME: with(%[[SEND0]] as %[[SEND0_CAPTURE:.+]]: !stream.resource<external>{%[[SEND0_SIZE]]},

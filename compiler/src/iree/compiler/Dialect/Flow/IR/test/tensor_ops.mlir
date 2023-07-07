@@ -23,6 +23,13 @@ func.func @tensorReshapeDynamic(%arg0 : tensor<?x4xf32>) -> tensor<?x2xf32> {
   return %0 : tensor<?x2xf32>
 }
 
+// CHECK-LABEL: @tensorReshapeComplex
+func.func @tensorReshapeComplex(%arg0 : tensor<4x4xcomplex<f32>>) -> tensor<16xcomplex<f32>> {
+  // CHECK-NEXT: flow.tensor.reshape %arg0 : tensor<4x4xcomplex<f32>> -> tensor<16xcomplex<f32>>
+  %0 = flow.tensor.reshape %arg0 : tensor<4x4xcomplex<f32>> -> tensor<16xcomplex<f32>>
+  return %0 : tensor<16xcomplex<f32>>
+}
+
 // -----
 
 // CHECK-LABEL: @tensorLoad
@@ -69,6 +76,15 @@ func.func @tensorStoreDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2 : in
   // CHECK: %0 = flow.tensor.store %arg3, %arg0[%arg1, %arg2] : tensor<?x4xf32>{%c4}
   %0 = flow.tensor.store %arg3, %arg0[%arg1, %arg2] : tensor<?x4xf32>{%c4}
   return %0 : tensor<?x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorAlloca
+func.func @tensorAlloca(%arg0: index) -> tensor<?x0x1xf32> {
+  // CHECK-NEXT: = flow.tensor.alloca : tensor<?x0x1xf32>{%arg0}
+  %0 = flow.tensor.alloca : tensor<?x0x1xf32>{%arg0}
+  return %0 : tensor<?x0x1xf32>
 }
 
 // -----

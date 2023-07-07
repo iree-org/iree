@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterPassBase.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -18,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
@@ -30,14 +30,14 @@ namespace Flow {
 /// Interpreter pass that applies transform dialect ops for dispatch region
 /// formation. This needs to be its own pass because the registration mechanism
 /// and ops available are different than for other interpreters.
-struct DispatchWithTransformDialect
-    : public transform::iree_dialects::TransformInterpreterPassBase<
+class DispatchWithTransformDialect
+    : public mlir::transform::TransformInterpreterPassBase<
           DispatchWithTransformDialect, DispatchWithTransformDialectBase> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Flow::FlowDialect,
-                    AffineDialect,
+                    affine::AffineDialect,
                     arith::ArithDialect,
                     linalg::LinalgDialect,
                     pdl::PDLDialect,
@@ -49,6 +49,7 @@ struct DispatchWithTransformDialect
     // clang-format on
   }
 
+public:
   DispatchWithTransformDialect(StringRef transformFileName,
                                StringRef debugPayloadRootTag = StringRef(),
                                StringRef debugTransformRootTag = StringRef()) {
@@ -63,7 +64,7 @@ struct DispatchWithTransformDialect
     this->debugTransformRootTag = pass.debugTransformRootTag;
   }
 
- private:
+private:
   Statistic numDispatches{this, "number of dispatches",
                           "Number of Flow dispatches created"};
 };
@@ -76,7 +77,7 @@ createDispatchWithTransformDialect(StringRef transformFileName,
       transformFileName, debugPayloadRootTag, debugTransformRootTag);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

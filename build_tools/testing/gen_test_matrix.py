@@ -86,11 +86,11 @@ import os
 import shutil
 
 try:
-  import yaml
+    import yaml
 except ModuleNotFoundError as e:
-  raise RuntimeError(
-      f"PyYAML is not installed. Typically: 'python -m pip install PyYAML"
-  ) from e
+    raise RuntimeError(
+        f"PyYAML is not installed. Typically: 'python -m pip install PyYAML"
+    ) from e
 
 ################################################################################
 # Base classes and types
@@ -98,74 +98,75 @@ except ModuleNotFoundError as e:
 
 
 class Environment:
-  """Runtime environment for processing a directory."""
+    """Runtime environment for processing a directory."""
 
-  def __init__(self, args, root_dir: str, output_dir: str):
-    self.args = args
-    self.root_dir = root_dir
-    self.output_dir = output_dir
-    # Set of directories containing purely generated files.
-    self.gen_dirs = set()  # type: Set[str]
-    # Set of (gen_dir, file_name) for all files in a given directory that have
-    # been generated.
-    self.gen_files = set()  # type: Set[Tuple[str, str]]
+    def __init__(self, args, root_dir: str, output_dir: str):
+        self.args = args
+        self.root_dir = root_dir
+        self.output_dir = output_dir
+        # Set of directories containing purely generated files.
+        self.gen_dirs = set()  # type: Set[str]
+        # Set of (gen_dir, file_name) for all files in a given directory that have
+        # been generated.
+        self.gen_files = set()  # type: Set[Tuple[str, str]]
 
-  def remember_gen_file(self, gen_file_path: str):
-    gen_dir = os.path.dirname(gen_file_path)
-    gen_file = os.path.basename(gen_file_path)
-    self.gen_dirs.add(gen_dir)
-    self.gen_files.add((gen_dir, gen_file))
+    def remember_gen_file(self, gen_file_path: str):
+        gen_dir = os.path.dirname(gen_file_path)
+        gen_file = os.path.basename(gen_file_path)
+        self.gen_dirs.add(gen_dir)
+        self.gen_files.add((gen_dir, gen_file))
 
-  def prune_gen_files(self):
-    found_gen_files = set()
-    for gen_dir in self.gen_dirs:
-      dir_listing = os.listdir(gen_dir)
-      for fname in dir_listing:
-        found_gen_files.add((gen_dir, fname))
-    obsolete_gen_files = found_gen_files - self.gen_files
-    if obsolete_gen_files:
-      for gen_dir, fname in obsolete_gen_files:
-        obsolete_path = os.path.join(gen_dir, fname)
-        log(f"Removing obsolete file {obsolete_path}")
-        if os.path.isdir(obsolete_path):
-          shutil.rmtree(obsolete_path)
-        else:
-          os.remove(obsolete_path)
+    def prune_gen_files(self):
+        found_gen_files = set()
+        for gen_dir in self.gen_dirs:
+            dir_listing = os.listdir(gen_dir)
+            for fname in dir_listing:
+                found_gen_files.add((gen_dir, fname))
+        obsolete_gen_files = found_gen_files - self.gen_files
+        if obsolete_gen_files:
+            for gen_dir, fname in obsolete_gen_files:
+                obsolete_path = os.path.join(gen_dir, fname)
+                log(f"Removing obsolete file {obsolete_path}")
+                if os.path.isdir(obsolete_path):
+                    shutil.rmtree(obsolete_path)
+                else:
+                    os.remove(obsolete_path)
 
 
 class Runner:
-  """Base class for a runner."""
-  RUNNER_IDENT = None
+    """Base class for a runner."""
 
-  def __init__(self, env: Environment, test_id: str):
-    self.env = env
-    self.test_id = test_id
-    self.gen_dir = os.path.join(self.env.output_dir, "generated")
-    self.xfail = False
+    RUNNER_IDENT = None
 
-  @property
-  def runner_ident(self) -> str:
-    assert self.RUNNER_IDENT, "Must define RUNNER_IDENT"
-    return self.RUNNER_IDENT
+    def __init__(self, env: Environment, test_id: str):
+        self.env = env
+        self.test_id = test_id
+        self.gen_dir = os.path.join(self.env.output_dir, "generated")
+        self.xfail = False
 
-  def create_gen_file(self, file_name: str, mode: str = "wt"):
-    os.makedirs(self.gen_dir, exist_ok=True)
-    full_path = os.path.join(self.gen_dir, file_name)
-    handle = open(full_path, mode)
-    self.env.remember_gen_file(full_path)
-    return handle
+    @property
+    def runner_ident(self) -> str:
+        assert self.RUNNER_IDENT, "Must define RUNNER_IDENT"
+        return self.RUNNER_IDENT
 
-  def link_file(self, from_path: str, to_path: str):
-    if from_path == to_path:
-      return
-    from_path = os.path.realpath(from_path)
-    os.makedirs(os.path.dirname(to_path), exist_ok=True)
-    if os.path.exists(to_path):
-      os.remove(to_path)
-    os.symlink(from_path, to_path)
+    def create_gen_file(self, file_name: str, mode: str = "wt"):
+        os.makedirs(self.gen_dir, exist_ok=True)
+        full_path = os.path.join(self.gen_dir, file_name)
+        handle = open(full_path, mode)
+        self.env.remember_gen_file(full_path)
+        return handle
 
-  def generate(self):
-    raise NotImplementedError(f"Generate not implemented for {self.__class__}")
+    def link_file(self, from_path: str, to_path: str):
+        if from_path == to_path:
+            return
+        from_path = os.path.realpath(from_path)
+        os.makedirs(os.path.dirname(to_path), exist_ok=True)
+        if os.path.exists(to_path):
+            os.remove(to_path)
+        os.symlink(from_path, to_path)
+
+    def generate(self):
+        raise NotImplementedError(f"Generate not implemented for {self.__class__}")
 
 
 ################################################################################
@@ -174,105 +175,103 @@ class Runner:
 
 
 def parse_arguments():
-  parser = argparse.ArgumentParser(description="Test matrix generator")
-  parser.add_argument("--dir",
-                      required=True,
-                      type=str,
-                      help="Directory to process")
-  parser.add_argument("--output_dir",
-                      required=True,
-                      type=str,
-                      help="Output directory")
-  args = parser.parse_args()
-  return args
+    parser = argparse.ArgumentParser(description="Test matrix generator")
+    parser.add_argument("--dir", required=True, type=str, help="Directory to process")
+    parser.add_argument(
+        "--output_dir", required=True, type=str, help="Output directory"
+    )
+    args = parser.parse_args()
+    return args
 
 
 def main(args):
-  env = Environment(args, args.dir, args.output_dir)
-  process_directory(env)
+    env = Environment(args, args.dir, args.output_dir)
+    process_directory(env)
 
 
 def process_directory(env: Environment):
-  dir = os.path.realpath(env.root_dir)
-  try:
-    config_sections = read_directory_config(dir)
-  except Exception as e:
-    raise RuntimeError(f"Could not read configuration from {dir}") from e
-  for section in config_sections:
-    require_mapping(section)
-    for config_key, config_value in section.items():
-      if config_key == "lists":
-        # Ignore: a place to stash anchors and references.
-        pass
-      elif config_key == "test_groups":
-        require_list(config_value)
-        for test_group in config_value:
-          require_mapping(test_group)
-          process_test_group(env, test_group)
-      else:
-        raise ValueError(f"Unexpected top-level section {config_key}")
+    dir = os.path.realpath(env.root_dir)
+    try:
+        config_sections = read_directory_config(dir)
+    except Exception as e:
+        raise RuntimeError(f"Could not read configuration from {dir}") from e
+    for section in config_sections:
+        require_mapping(section)
+        for config_key, config_value in section.items():
+            if config_key == "lists":
+                # Ignore: a place to stash anchors and references.
+                pass
+            elif config_key == "test_groups":
+                require_list(config_value)
+                for test_group in config_value:
+                    require_mapping(test_group)
+                    process_test_group(env, test_group)
+            else:
+                raise ValueError(f"Unexpected top-level section {config_key}")
 
-  env.prune_gen_files()
+    env.prune_gen_files()
 
 
 def process_test_group(env: Environment, test_group):
-  group_id = get_mapping_key(test_group, "id", require_str)
-  matrix = generate_matrix(
-      get_mapping_key(test_group, "matrix", require_mapping))
-  matrix_id_map = {group_id.format(**m): m for m in matrix}
-  for runner_map in get_mapping_key(test_group, "runner", require_list):
-    for matrix_id, matrix_map in matrix_id_map.items():
-      runner = create_runner(env, matrix_id, runner_map, matrix_map)
-      runner.xfail = (evaluate_xfail(test_group, matrix_map) and
-                      not evaluate_xpass(test_group, matrix_map))
-      runner.generate()
+    group_id = get_mapping_key(test_group, "id", require_str)
+    matrix = generate_matrix(get_mapping_key(test_group, "matrix", require_mapping))
+    matrix_id_map = {group_id.format(**m): m for m in matrix}
+    for runner_map in get_mapping_key(test_group, "runner", require_list):
+        for matrix_id, matrix_map in matrix_id_map.items():
+            runner = create_runner(env, matrix_id, runner_map, matrix_map)
+            runner.xfail = evaluate_xfail(
+                test_group, matrix_map
+            ) and not evaluate_xpass(test_group, matrix_map)
+            runner.generate()
 
 
 def evaluate_xfail(test_group, matrix_map) -> bool:
-  try:
-    xfail_list = flatten_lists(require_list(test_group["xfail"]))
-  except KeyError:
+    try:
+        xfail_list = flatten_lists(require_list(test_group["xfail"]))
+    except KeyError:
+        return False
+    for xfail_group in xfail_list:
+        if evaluate_matrix_map_predicate(matrix_map, xfail_group):
+            return True
     return False
-  for xfail_group in xfail_list:
-    if evaluate_matrix_map_predicate(matrix_map, xfail_group):
-      return True
-  return False
 
 
 def evaluate_xpass(test_group, matrix_map) -> bool:
-  try:
-    xpass_list = flatten_lists(require_list(test_group["xpass"]))
-  except KeyError:
+    try:
+        xpass_list = flatten_lists(require_list(test_group["xpass"]))
+    except KeyError:
+        return False
+    for xpass_group in xpass_list:
+        if evaluate_matrix_map_predicate(matrix_map, xpass_group):
+            return True
     return False
-  for xpass_group in xpass_list:
-    if evaluate_matrix_map_predicate(matrix_map, xpass_group):
-      return True
-  return False
 
 
 def evaluate_matrix_map_predicate(matrix_map, predicate_group) -> bool:
-  # Each key is something like 'matrix.<key>' which are and'ed
-  # together. Each value is either a literal or a list that is
-  # or'd together.
-  for pred_key, pred_value in predicate_group.items():
-    match_value = None
-    if pred_key.startswith("matrix."):
-      try:
-        match_value = matrix_map[pred_key[len("matrix."):]]
-      except KeyError:
-        raise ValueError(
-            f"Could not match matrix predicate to matrix value: {pred_key}")
-    else:
-      raise ValueError(
-          f"Expected a matrix predicate (i.e. matrix.) but got {pred_key}")
-    # Match list (OR) or literal (==)
-    if isinstance(pred_value, list):
-      if match_value not in flatten_lists(pred_value):
-        return False
-    else:
-      if pred_value != match_value:
-        return False
-  return True
+    # Each key is something like 'matrix.<key>' which are and'ed
+    # together. Each value is either a literal or a list that is
+    # or'd together.
+    for pred_key, pred_value in predicate_group.items():
+        match_value = None
+        if pred_key.startswith("matrix."):
+            try:
+                match_value = matrix_map[pred_key[len("matrix.") :]]
+            except KeyError:
+                raise ValueError(
+                    f"Could not match matrix predicate to matrix value: {pred_key}"
+                )
+        else:
+            raise ValueError(
+                f"Expected a matrix predicate (i.e. matrix.) but got {pred_key}"
+            )
+        # Match list (OR) or literal (==)
+        if isinstance(pred_value, list):
+            if match_value not in flatten_lists(pred_value):
+                return False
+        else:
+            if pred_value != match_value:
+                return False
+    return True
 
 
 ################################################################################
@@ -281,84 +280,84 @@ def evaluate_matrix_map_predicate(matrix_map, predicate_group) -> bool:
 
 
 def generate_matrix(matrix_map):
-  # List of (key, [value, value, ...])
-  matrix_entries = [(k, flatten_lists(v)) for k, v in matrix_map.items()]
-  # Permute.
-  permuted = []
+    # List of (key, [value, value, ...])
+    matrix_entries = [(k, flatten_lists(v)) for k, v in matrix_map.items()]
+    # Permute.
+    permuted = []
 
-  def accumulate(prior: dict, i: int):
-    if i == len(matrix_entries):
-      permuted.append(prior)
-      return
-    next_key, next_values = matrix_entries[i]
-    for next_value in next_values:
-      current = dict(prior)
-      current[next_key] = next_value
-      accumulate(current, i + 1)
+    def accumulate(prior: dict, i: int):
+        if i == len(matrix_entries):
+            permuted.append(prior)
+            return
+        next_key, next_values = matrix_entries[i]
+        for next_value in next_values:
+            current = dict(prior)
+            current[next_key] = next_value
+            accumulate(current, i + 1)
 
-  accumulate({}, 0)
-  return permuted
+    accumulate({}, 0)
+    return permuted
 
 
 def read_directory_config(dir: str) -> list:
-  sections = []
-  matrix_path = os.path.join(dir, "test_matrix.yaml")
-  with open(matrix_path, "r") as stream:
-    for section in yaml.safe_load_all(stream):
-      sections.append(section)
-  return sections
+    sections = []
+    matrix_path = os.path.join(dir, "test_matrix.yaml")
+    with open(matrix_path, "r") as stream:
+        for section in yaml.safe_load_all(stream):
+            sections.append(section)
+    return sections
 
 
 INDENT = 0
 
 
 def log(msg: str):
-  print("  " * INDENT + msg)
+    print("  " * INDENT + msg)
 
 
 @contextmanager
 def indent():
-  global INDENT
-  INDENT += 1
-  yield
-  INDENT -= 1
+    global INDENT
+    INDENT += 1
+    yield
+    INDENT -= 1
 
 
 def flatten_lists(l):
-  results = list()
-  for item in l:
-    if isinstance(item, list):
-      results.extend(flatten_lists(item))
-    else:
-      results.append(item)
-  return results
+    results = list()
+    for item in l:
+        if isinstance(item, list):
+            results.extend(flatten_lists(item))
+        else:
+            results.append(item)
+    return results
 
 
 def require_mapping(v):
-  if isinstance(v, dict):
-    return v
-  raise ValueError(f"Expected a YAML mapping for {v}")
+    if isinstance(v, dict):
+        return v
+    raise ValueError(f"Expected a YAML mapping for {v}")
 
 
 def require_list(v):
-  if isinstance(v, list):
-    return v
-  raise ValueError(f"Expected YAML list for {v}")
+    if isinstance(v, list):
+        return v
+    raise ValueError(f"Expected YAML list for {v}")
 
 
 def require_str(v):
-  if isinstance(v, str):
-    return v
-  raise ValueError(f"Expected str for {v}")
+    if isinstance(v, str):
+        return v
+    raise ValueError(f"Expected str for {v}")
 
 
 def get_mapping_key(mapping, key: str, checker=None):
-  if key not in mapping:
-    raise ValueError(f"Expected key '{key}' in {mapping}")
-  value = mapping[key]
-  if checker:
-    checker(value)
-  return value
+    if key not in mapping:
+        raise ValueError(f"Expected key '{key}' in {mapping}")
+    value = mapping[key]
+    if checker:
+        checker(value)
+    return value
 
 
 ################################################################################
@@ -417,42 +416,45 @@ if FAILED:
 
 
 class TfHostRunner(Runner):
-  """Runner for tf e2e host tests."""
-  RUNNER_IDENT = "tfhost"
+    """Runner for tf e2e host tests."""
 
-  def __init__(self, env: Environment, test_id: str, runner_map: dict,
-               matrix_map: dict):
-    super().__init__(env=env, test_id=test_id)
-    self.main_file = get_mapping_key(runner_map, "main", require_str)
-    raw_arg_list = get_mapping_key(runner_map, "args", require_list)
-    self.args = [
-        require_str(raw_arg).format(**matrix_map) for raw_arg in raw_arg_list
-    ]
+    RUNNER_IDENT = "tfhost"
 
-  def generate(self):
-    # Generate the runner script.
-    file_name = (
-        f"{'XFAIL_' if self.xfail else ''}{self.test_id}_{self.runner_ident}.py"
-    )
-    with self.create_gen_file(file_name) as f:
-      parts = [
-          "import os",
-          "import sys",
-          "REQUIRE_IMPORTS = ['iree.tf.support.tf_utils', 'iree.tf.support.tf_test_utils']",
-          f"ARGS = {repr(self.args)}",
-          f"MAIN = os.path.join(os.path.dirname(__file__), '..', {repr(self.main_file)})",
-          f"XFAIL = {self.xfail}",
-          PYRUNNER_STUB,
-      ]
-      f.write("\n".join(parts))
+    def __init__(
+        self, env: Environment, test_id: str, runner_map: dict, matrix_map: dict
+    ):
+        super().__init__(env=env, test_id=test_id)
+        self.main_file = get_mapping_key(runner_map, "main", require_str)
+        raw_arg_list = get_mapping_key(runner_map, "args", require_list)
+        self.args = [
+            require_str(raw_arg).format(**matrix_map) for raw_arg in raw_arg_list
+        ]
 
-    # Copy/link the main file.
-    main_file_src_path = os.path.join(self.env.root_dir, self.main_file)
-    main_file_dst_path = os.path.join(self.env.output_dir, self.main_file)
-    if not os.path.exists(main_file_src_path):
-      raise RuntimeError(
-          f"Referenced main file '{main_file_src_path}' does not exist")
-    self.link_file(main_file_src_path, main_file_dst_path)
+    def generate(self):
+        # Generate the runner script.
+        file_name = (
+            f"{'XFAIL_' if self.xfail else ''}{self.test_id}_{self.runner_ident}.py"
+        )
+        with self.create_gen_file(file_name) as f:
+            parts = [
+                "import os",
+                "import sys",
+                "REQUIRE_IMPORTS = ['iree.tf.support.tf_utils', 'iree.tf.support.tf_test_utils']",
+                f"ARGS = {repr(self.args)}",
+                f"MAIN = os.path.join(os.path.dirname(__file__), '..', {repr(self.main_file)})",
+                f"XFAIL = {self.xfail}",
+                PYRUNNER_STUB,
+            ]
+            f.write("\n".join(parts))
+
+        # Copy/link the main file.
+        main_file_src_path = os.path.join(self.env.root_dir, self.main_file)
+        main_file_dst_path = os.path.join(self.env.output_dir, self.main_file)
+        if not os.path.exists(main_file_src_path):
+            raise RuntimeError(
+                f"Referenced main file '{main_file_src_path}' does not exist"
+            )
+        self.link_file(main_file_src_path, main_file_dst_path)
 
 
 RUNNER_CLASSES = {
@@ -460,18 +462,16 @@ RUNNER_CLASSES = {
 }
 
 
-def create_runner(env: Environment, test_id: str, runner_map: dict,
-                  matrix_map: dict):
-  runner_type = get_mapping_key(runner_map, "type", require_str)
-  try:
-    runner_class = RUNNER_CLASSES[runner_type]
-  except KeyError:
-    raise ValueError(f"Unknown runner type '{runner_type}'")
-  return runner_class(env=env,
-                      test_id=test_id,
-                      runner_map=runner_map,
-                      matrix_map=matrix_map)
+def create_runner(env: Environment, test_id: str, runner_map: dict, matrix_map: dict):
+    runner_type = get_mapping_key(runner_map, "type", require_str)
+    try:
+        runner_class = RUNNER_CLASSES[runner_type]
+    except KeyError:
+        raise ValueError(f"Unknown runner type '{runner_type}'")
+    return runner_class(
+        env=env, test_id=test_id, runner_map=runner_map, matrix_map=matrix_map
+    )
 
 
 if __name__ == "__main__":
-  main(parse_arguments())
+    main(parse_arguments())

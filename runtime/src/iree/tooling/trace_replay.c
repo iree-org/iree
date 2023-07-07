@@ -15,7 +15,6 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/numpy_io.h"
@@ -48,15 +47,16 @@ iree_status_t iree_trace_replay_initialize(
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->inputs);
+    status = iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                                 host_allocator, &out_replay->inputs);
   }
   if (iree_status_is_ok(status)) {
-    status =
-        iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->outputs);
+    status = iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                                 host_allocator, &out_replay->outputs);
   }
   if (iree_status_is_ok(status)) {
-    status =
-        iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->blackboard);
+    status = iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                                 host_allocator, &out_replay->blackboard);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -437,14 +437,14 @@ static void iree_trace_replay_get_min_max_for_element_type(
 static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
     iree_hal_element_type_t element_type, iree_byte_span_t span,
     uint32_t seed) {
+  int32_t min = 0;
+  int32_t max = 0;
+  iree_trace_replay_get_min_max_for_element_type(element_type, &min, &max);
+  uint32_t range = (max - min + 1);
   iree_host_size_t element_byte_count =
       iree_hal_element_dense_byte_count(element_type);
   uint8_t* data_end = span.data + span.data_length;
   uint32_t state = seed;
-  uint32_t range;
-  int32_t min, max;
-  iree_trace_replay_get_min_max_for_element_type(element_type, &min, &max);
-  range = (max - min + 1);
   for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
     // Generate "uniform" integer-valued numbers in the range [min, max].
     int32_t value =
@@ -689,7 +689,7 @@ static iree_status_t iree_trace_replay_parse_vm_list(
       document, value_node, IREE_SV("items"), &items_node));
 
   iree_vm_list_t* list = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/NULL,
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                            /*initial_capacity=*/8,
                                            replay->host_allocator, &list));
 
@@ -756,7 +756,7 @@ static iree_status_t iree_trace_replay_parse_hal_shape(
     }
     if (shape_rank >= shape_capacity) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "(%zu): shape rank overflow (>%zu)",
+                              "(%zu): shape rank overflow (>%" PRIhsz ")",
                               shape_node->start_mark.line, shape_capacity);
     }
     shape[shape_rank++] = (iree_hal_dim_t)dim;
@@ -1170,6 +1170,7 @@ static iree_status_t iree_trace_replay_parse_item(
 static iree_status_t iree_trace_replay_parse_item_sequence(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* sequence_node, iree_vm_list_t* target_list) {
+  if (!sequence_node) return iree_ok_status();
   for (yaml_node_item_t* item = sequence_node->data.sequence.items.start;
        item != sequence_node->data.sequence.items.top; ++item) {
     yaml_node_t* item_node = yaml_document_get_node(document, *item);
@@ -1209,6 +1210,7 @@ static iree_status_t iree_trace_replay_parse_result_item(
 static iree_status_t iree_trace_replay_parse_result_item_sequence(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* sequence_node, iree_vm_list_t* source_list) {
+  if (!sequence_node) return iree_ok_status();
   iree_host_size_t i = 0;
   for (yaml_node_item_t* item = sequence_node->data.sequence.items.start;
        item != sequence_node->data.sequence.items.top; ++item, ++i) {
@@ -1252,8 +1254,9 @@ iree_status_t iree_trace_replay_event_call_prepare(
                                      &args_node));
   iree_vm_list_t* input_list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                              replay->host_allocator, &input_list));
+      z0, iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                              /*initial_capacity=*/8, replay->host_allocator,
+                              &input_list));
   iree_status_t status = iree_trace_replay_parse_item_sequence(
       replay, document, args_node, input_list);
   if (iree_status_is_ok(status)) {
@@ -1299,9 +1302,9 @@ iree_status_t iree_trace_replay_event_call(
                                                &function, &input_list));
 
   iree_vm_list_t* output_list = NULL;
-  iree_status_t status =
-      iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                          replay->host_allocator, &output_list);
+  iree_status_t status = iree_vm_list_create(
+      iree_vm_make_undefined_type_def(), /*initial_capacity=*/8,
+      replay->host_allocator, &output_list);
 
   if (iree_status_is_ok(status) && hooks && hooks->before) {
     status = hooks->before(hooks->user_data, replay, document, event_node,
@@ -1373,8 +1376,8 @@ static iree_status_t iree_trace_replay_event_blackboard_assign(
 
   iree_vm_list_t* list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(/*element_type=*/NULL, 8u, replay->host_allocator,
-                              &list));
+      z0, iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                              replay->host_allocator, &list));
 
   iree_status_t status =
       iree_trace_replay_parse_item_sequence(replay, document, from_node, list);

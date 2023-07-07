@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/modules/hal/types.h"
 
 //===----------------------------------------------------------------------===//
@@ -26,13 +25,14 @@ static iree_status_t iree_tooling_write_iovec(iree_vm_ref_t iovec, FILE* file) {
   bool write_ok = false;
   if (iree_vm_buffer_isa(iovec)) {
     iree_vm_buffer_t* buffer = iree_vm_buffer_deref(iovec);
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)iree_vm_buffer_length(buffer));
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0,
+                                     (int64_t)iree_vm_buffer_length(buffer));
     write_ok =
         fwrite(iree_vm_buffer_data(buffer), 1, iree_vm_buffer_length(buffer),
                file) == iree_vm_buffer_length(buffer);
   } else if (iree_hal_buffer_view_isa(iovec)) {
     iree_hal_buffer_view_t* buffer_view = iree_hal_buffer_view_deref(iovec);
-    IREE_TRACE_ZONE_APPEND_VALUE(
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(
         z0, (int64_t)iree_hal_buffer_view_byte_length(buffer_view));
     iree_hal_buffer_mapping_t mapping;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -73,11 +73,12 @@ iree_status_t iree_tooling_process_instrument_data(
   // list and use that across all of them.
   iree_vm_list_t* iovec_list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(NULL, 8, host_allocator, &iovec_list));
+      z0, iree_vm_list_create(iree_vm_make_undefined_type_def(), 8,
+                              host_allocator, &iovec_list));
 
   iree_vm_list_t* input_list = NULL;
-  iree_status_t status =
-      iree_vm_list_create(NULL, 8, host_allocator, &input_list);
+  iree_status_t status = iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             8, host_allocator, &input_list);
   if (iree_status_is_ok(status)) {
     iree_vm_ref_t iovec_list_ref = iree_vm_list_retain_ref(iovec_list);
     status = iree_vm_list_push_ref_move(input_list, &iovec_list_ref);

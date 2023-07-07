@@ -1,5 +1,8 @@
 // RUN: iree-opt %s --iree-stablehlo-to-linalg --split-input-file \
-// RUN:   --canonicalize | FileCheck --enable-var-scope=false %s
+// RUN:   --canonicalize | FileCheck %s
+
+// Note: We need the canonicalization pass to deduplicate constants. This test
+// does not rely on it to simplify arithmetic, etc.
 
 func.func @dot_general(%arg0: tensor<?x?x?xf32>,
                   %arg1: tensor<?x?x?xf32>) -> tensor<?x?x?xf32> {
@@ -105,8 +108,9 @@ func.func @dot_general_multiple_batch_dimensions(%arg0: tensor<3x4x2x4xi32>,
 // CHECK: #[[MAP0:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4, d2)>
 // CHECK: #[[MAP1:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 // CHECK: #[[MAP2:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
-// CHECK-LABEL: func @dot_general_multiple_batch_dimensions(
-// CHECK: linalg.generic
+// CHECK:      func @dot_general_multiple_batch_dimensions
+// CHECK-SAME:   (%[[ARG0:.+]]: tensor<3x4x2x4xi32>, %[[ARG1:.+]]: tensor<3x4x3x2xi32>)
+// CHECK:        linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
 // CHECK-SAME: ins(%[[ARG0]], %[[ARG1]] : tensor<3x4x2x4xi32>, tensor<3x4x3x2xi32>)
@@ -121,8 +125,8 @@ func.func @dot_matmul(%arg0: tensor<2x3xf32>,
            : (tensor<2x3xf32>, tensor<3x?xf32>) -> tensor<2x?xf32>
   func.return %0 : tensor<2x?xf32>
 }
-// CHECK-LABEL: func @dot_matmul(
-// CHECK-SAME: %[[ARG0:.*]]: tensor<2x3xf32>, %[[ARG1:.*]]: tensor<3x?xf32>)
+// CHECK-LABEL: func @dot_matmul
+// CHECK-SAME:    (%[[ARG0:.*]]: tensor<2x3xf32>, %[[ARG1:.*]]: tensor<3x?xf32>)
 // CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[D1:.*]] = tensor.dim %[[ARG1]], %[[C1]]
 // CHECK: %[[INIT:.*]] = tensor.empty(%[[D1]])
@@ -236,7 +240,7 @@ func.func @dot_vecmat(%arg0: tensor<3xf32>,
 // CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[D1:.*]] = tensor.dim %[[ARG1]], %[[C1]]
 // CHECK: %[[INIT:.*]] = tensor.empty(%[[D1]])
-// CHECK: linalg.fill ins(%{{.*}}{{.*}}outs(%[[INIT]]
+// CHECK: %[[FILL:.*]] = linalg.fill ins(%{{.*}}{{.*}}outs(%[[INIT]]
 // CHECK: linalg.vecmat
 // CHECK-SAME: ins(%[[ARG0]], %[[ARG1]] : tensor<3xf32>, tensor<3x?xf32>)
 // CHECK-SAME: outs(%[[FILL]] : tensor<?xf32>)

@@ -26,12 +26,20 @@ class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
 // Generic resource ops
 //===----------------------------------------------------------------------===//
 
-def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
+def OpGroupResourceOps : OpDocGroup {
+  let summary = "Resource ops";
+  let description = "Generic resource ops.";
+}
+
+let opDocGroup = OpGroupResourceOps in {
+
+def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
   ]>,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a persistent value with undefined contents}];
@@ -79,13 +87,14 @@ def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
+def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
   ]>,
   Stream_TimelineOp,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a transient value with undefined contents}];
@@ -600,9 +609,18 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
   let hasFolder = 1;
 }
 
+} // OpGroupResourceOps
+
 //===----------------------------------------------------------------------===//
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
+
+def OpGroupPseudoOps : OpDocGroup {
+  let summary = "Pseudo Ops";
+  let description = "Pseudo ops for conversion support.";
+}
+
+let opDocGroup = OpGroupPseudoOps in {
 
 def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
   Stream_AffinityOp,
@@ -710,9 +728,18 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
   let hasFolder = 1;
 }
 
+} // OpGroupPseudoOps
+
 //===----------------------------------------------------------------------===//
 // High-level tensor ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupTensorOps : OpDocGroup {
+  let summary = "Tensor ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTensorOps in {
 
 def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
   Stream_AffinityOp,
@@ -747,7 +774,10 @@ def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
 
 def Stream_TensorEmptyOp : Stream_PureOp<"tensor.empty", [
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "isMetadata",
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -836,7 +866,9 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
 
 def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -1229,109 +1261,20 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
-//===----------------------------------------------------------------------===//
-// Builtins
-//===----------------------------------------------------------------------===//
-// Builtins are added by frontends or during tensor encoding to handle ops or
-// data types not supported by the lower-level stream ops (stream.async.* and
-// stream.cmd.*).
-
-def Stream_BuiltinSplatI64Op : Stream_Op<"builtin.splat.i64", [
-  Stream_AffinityOp,
-  Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
-    "mergeBuiltinModule",
-    "convertBuiltinOp",
-  ]>,
-  Util_SizeAwareOp,
-]> {
-  let summary = [{splats a value into a resource}];
-  let description = [{
-    Generated builtin for emulating 64-bit splats.
-    As with stream.async.splat it returns a new resource with the given
-    value splatted out to fill the entire contents.
-  }];
-
-  let arguments = (ins
-    I64:$value,
-    Stream_Size:$result_size,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_AnyStreamResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $value `:` type($value) `->` type($result) `` `{` $result_size `}`
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getResultSize(); }
-  }];
-
-  let hasVerifier = 1;
-}
-
-def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
-  AllTypesMatch<["target", "result"]>,
-  Stream_AffinityOp,
-  Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
-    "mergeBuiltinModule",
-    "convertBuiltinOp",
-  ]>,
-  Util_SizeAwareOp,
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-    "getTiedResult",
-    "getTiedResultOperandIndex",
-    "getTiedResultOperandIndices",
-  ]>,
-]> {
-  let summary = [{fills a subview of a stream resource with a value}];
-  let description = [{
-    Generated builtin for emulating 64-bit fills.
-    As with stream.async.fill it splats a value into a subview of the given
-    stream resource and returns the resource with the update applied.
-  }];
-
-  let arguments = (ins
-    Stream_AnyStreamResource:$target,
-    Stream_Size:$target_size,
-    Stream_Offset:$target_offset,
-    Stream_Offset:$target_end,
-    Stream_Size:$target_length,
-    I64:$value,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_AnyStreamResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $value `,`
-    $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
-    type($value) `->`
-    custom<ShapedTiedResult>(type($target), $target_size)
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return getTargetSize(); }
-    Value getResultSize(unsigned idx) { return getTargetSize(); }
-  }];
-
-  let hasVerifier = 1;
-}
+} // OpGroupTensorOps
 
 //===----------------------------------------------------------------------===//
 // Resource transfer ops
 //===----------------------------------------------------------------------===//
 
-def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
+def OpGroupResourceTransferOps : OpDocGroup {
+  let summary = "Resource transfer ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupResourceTransferOps in {
+
+def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
@@ -1342,6 +1285,7 @@ def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
     "preferCloneToConsumers",
   ]>,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a transient value with undefined contents}];
@@ -1777,7 +1721,7 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
     `` $op `` `[` $element_count `]`
     (`on` `(` $affinity^ `)`)?
     `channel` `(` $channel `)`
-    custom<CollectiveParam>(ref($op), $param)
+    custom<CollectiveParam>(ref($op), $param) ``
     $source `[` $source_offset `to` $source_end `for` $source_length `]` `,`
     $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
     type($source) `` `{` $source_size `}` `->`
@@ -2000,9 +1944,18 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupResourceTransferOps
+
 //===----------------------------------------------------------------------===//
 // Async control flow ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupAsyncControlFlowOps : OpDocGroup {
+  let summary = "Async control flow ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupAsyncControlFlowOps in {
 
 // TODO(benvanik): stream.async.if
 // TODO(benvanik): stream.async.select
@@ -2154,6 +2107,11 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
     }
 
     Value getOperandSize(unsigned idx) {
@@ -2372,9 +2330,18 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupAsyncControlFlowOps
+
 //===----------------------------------------------------------------------===//
 // Explicit command ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupExplicitCommandOps : OpDocGroup {
+  let summary = "Explicit command ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExplicitCommandOps in {
 
 def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
   Stream_CmdPhaseOp,
@@ -2508,7 +2475,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
     Stream_Size:$target_size,
     Stream_Offset:$target_offset,
     Stream_Size:$target_length,
-    Stream_FillPatternType:$value
+    Stream_NativeFillPatternType:$value
   );
   let results = (outs);
 
@@ -2816,6 +2783,11 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
     }
 
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
@@ -3031,9 +3003,18 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupExplicitCommandOps
+
 //===----------------------------------------------------------------------===//
 // Synchronization ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupSynchronizationOps : OpDocGroup {
+  let summary = "Synchronization ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupSynchronizationOps in {
 
 def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   ConstantLike,
@@ -3147,6 +3128,8 @@ def Stream_TimepointChainExternalOp :
     `(` $external_values `:` type($external_values) `)`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
@@ -3305,37 +3288,20 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   let hasFolder = 1;
 }
 
+} // OpGroupSynchronizationOps
+
 //===----------------------------------------------------------------------===//
 // Channels
 //===----------------------------------------------------------------------===//
 
-def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Stream_AffinityOp,
-]> {
-  let summary = [{returns a default collective communication channel}];
-  let description = [{
-    Returns a channel initialized using the runtime environment for the
-    particular affinity.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$group,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_Channel:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    (`group` `(` $group^ `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
+def OpGroupChannelOps : OpDocGroup {
+  let summary = "Channel ops";
+  let description = "";
 }
 
-def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
+let opDocGroup = OpGroupChannelOps in {
+
+def Stream_ChannelCreateOp : Stream_PureOp<"channel.create", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Stream_AffinityOp,
@@ -3371,6 +3337,40 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
     `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{splits a collective communication channel}];
+  let description = [{
+    Partitions the group associated with the given channel into disjoint
+    subgroups for each unique value of color. Each new subgroup contains all
+    participants of the same color and within each subgroup the key argument
+    is used to define the rank order. When multiple participants in a group
+    use the same key the tie will be broken using their rank in the parent
+    group. A color of -1 indicates that the rank does not participate in any
+    subgroup and will return a null channel.
+  }];
+
+  let arguments = (ins
+    Stream_Channel:$channel,
+    Index:$color,
+    Index:$key
+  );
+  let results = (outs
+    Stream_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `,` $color `,` $key
+    `:` type($channel) `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
@@ -3393,6 +3393,8 @@ def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
      $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
 
 def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
@@ -3414,11 +3416,22 @@ def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
     $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
+
+} // OpGroupChannelOps
 
 //===----------------------------------------------------------------------===//
 // Executables
 //===----------------------------------------------------------------------===//
+
+def OpGroupExecutableOps : OpDocGroup {
+  let summary = "Executable ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExecutableOps in {
 
 def Stream_ExecutableOp : Stream_Op<"executable", [
   IsolatedFromAbove,
@@ -3545,9 +3558,18 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
   }];
 }
 
+} // OpGroupExecutableOps
+
 //===----------------------------------------------------------------------===//
 // Misc
 //===----------------------------------------------------------------------===//
+
+def OpGroupMiscellaneousOps : OpDocGroup {
+  let summary = "Miscellaneous ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupMiscellaneousOps in {
 
 def Stream_ReturnOp : Stream_Op<"return", [
   ParentOneOf<[
@@ -3627,5 +3649,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 }
+
+} // OpGroupMiscellaneousOps
 
 #endif  // IREE_DIALECT_STREAM_OPS

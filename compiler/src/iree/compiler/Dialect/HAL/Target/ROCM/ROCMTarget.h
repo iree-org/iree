@@ -25,9 +25,9 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 // Compiles ISAToHsaco Code
 std::string createHsaco(const std::string isa, StringRef name);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_ROCM_ROCMTARGET_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_ROCM_ROCMTARGET_H_

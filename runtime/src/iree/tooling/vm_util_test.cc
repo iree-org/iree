@@ -47,8 +47,8 @@ static Status PrintVariantList(iree_vm_list_t* variant_list,
 class VmUtilTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_ASSERT_OK(
-        iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_ASSERT_OK(iree_vm_instance_create(
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance_));
     IREE_ASSERT_OK(iree_hal_module_register_all_types(instance_));
     iree_status_t status = iree_hal_create_device(
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),

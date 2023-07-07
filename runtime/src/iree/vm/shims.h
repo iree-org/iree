@@ -12,8 +12,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/attributes.h"
-#include "iree/base/target_platform.h"
 #include "iree/vm/module.h"
 #include "iree/vm/native_module.h"
 #include "iree/vm/ref.h"

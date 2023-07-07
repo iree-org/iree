@@ -14,24 +14,29 @@ iree_cc_library(
   NAME
     IREECodegenDialect
   HDRS
+    "IREECodegenAttrs.h"
     "IREECodegenDialect.h"
-    "LoweringConfig.h"
+    "IREECodegenOps.h"
     "UKernelOps.h"
   TEXTUAL_HDRS
+    "IREECodegenAttrs.cpp.inc"
+    "IREECodegenAttrs.h.inc"
     "IREECodegenDialect.cpp.inc"
     "IREECodegenDialect.h.inc"
-    "LoweringConfig.cpp.inc"
-    "LoweringConfig.h.inc"
+    "IREECodegenOps.cpp.inc"
+    "IREECodegenOps.h.inc"
     "LoweringConfigEnums.cpp.inc"
     "LoweringConfigEnums.h.inc"
     "UKernelOps.cpp.inc"
     "UKernelOps.h.inc"
   SRCS
+    "IREECodegenAttrs.cpp"
     "IREECodegenDialect.cpp"
-    "LoweringConfig.cpp"
+    "IREECodegenOps.cpp"
     "UKernelOps.cpp"
   DEPS
     ::IREECodegenDialectGen
+    ::IREECodegenOpsGen
     ::LoweringConfigGen
     ::UKernelOpsGen
     LLVMSupport
@@ -54,7 +59,7 @@ iree_tablegen_library(
   NAME
     IREECodegenDialectGen
   TD_FILE
-    "IREECodegenAttributes.td"
+    "IREECodegenDialect.td"
   OUTS
     --gen-dialect-decls IREECodegenDialect.h.inc
     --gen-dialect-defs IREECodegenDialect.cpp.inc
@@ -62,12 +67,22 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
+    IREECodegenOpsGen
+  TD_FILE
+    "IREECodegenOps.td"
+  OUTS
+    --gen-op-decls IREECodegenOps.h.inc
+    --gen-op-defs IREECodegenOps.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
     LoweringConfigGen
   TD_FILE
-    "LoweringConfig.td"
+    "IREECodegenAttrs.td"
   OUTS
-    --gen-attrdef-decls LoweringConfig.h.inc
-    --gen-attrdef-defs LoweringConfig.cpp.inc
+    --gen-attrdef-decls IREECodegenAttrs.h.inc
+    --gen-attrdef-defs IREECodegenAttrs.cpp.inc
     --gen-enum-decls LoweringConfigEnums.h.inc
     --gen-enum-defs LoweringConfigEnums.cpp.inc
 )

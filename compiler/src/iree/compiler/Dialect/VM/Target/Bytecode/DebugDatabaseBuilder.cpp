@@ -37,7 +37,8 @@ struct LocationTable {
   // Inserts a string into the location table string subtable if needed.
   flatbuffers_string_ref_t insert(StringRef value) {
     auto it = strings.find(value);
-    if (it != strings.end()) return it->second;
+    if (it != strings.end())
+      return it->second;
     auto stringRef = fbb.createString(value);
     strings[value] = stringRef;
     return stringRef;
@@ -47,7 +48,8 @@ struct LocationTable {
   // Returns the ordinal of the location in the table.
   int32_t insert(Location baseLoc) {
     auto it = map.find(baseLoc);
-    if (it != map.end()) return it->second;
+    if (it != map.end())
+      return it->second;
     auto locationRef =
         llvm::TypeSwitch<Location, iree_vm_LocationTypeDef_union_ref_t>(baseLoc)
             .Case([&](CallSiteLoc loc) {
@@ -102,9 +104,10 @@ struct LocationTable {
   }
 };
 
-iree_vm_DebugDatabaseDef_ref_t DebugDatabaseBuilder::build(
-    FlatbufferBuilder &fbb) {
-  if (functionSourceMaps.empty()) return 0;
+iree_vm_DebugDatabaseDef_ref_t
+DebugDatabaseBuilder::build(FlatbufferBuilder &fbb) {
+  if (functionSourceMaps.empty())
+    return 0;
 
   LocationTable locationTable(fbb);
 
@@ -137,7 +140,7 @@ iree_vm_DebugDatabaseDef_ref_t DebugDatabaseBuilder::build(
   return iree_vm_DebugDatabaseDef_end(fbb);
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -18,8 +18,6 @@
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
-namespace stablehlo = mlir::stablehlo;
-
 enum class DotOperationType {
   kVectorDot = 0,
   kMatrixVector,
@@ -28,7 +26,7 @@ enum class DotOperationType {
   kUnsupported
 };
 
-DotOperationType getDotOperationType(stablehlo::DotOp dotOp) {
+DotOperationType getDotOperationType(mlir::stablehlo::DotOp dotOp) {
   ArrayRef<int64_t> lhsShape =
       cast<ShapedType>(dotOp.getLhs().getType()).getShape();
   ArrayRef<int64_t> rhsShape =
@@ -55,53 +53,54 @@ DotOperationType getDotOperationType(stablehlo::DotOp dotOp) {
   return DotOperationType::kUnsupported;
 }
 
-SmallVector<Value, 2> getDotOpEmptyTensorDynSizes(OpBuilder& b, Location loc,
+SmallVector<Value, 2> getDotOpEmptyTensorDynSizes(OpBuilder &b, Location loc,
                                                   Value lhs, Value rhs,
                                                   DotOperationType type) {
   SmallVector<Value, 2> dynShape;
   switch (type) {
-    case DotOperationType::kMatrixMatrix: {
-      if (lhs.getType().cast<ShapedType>().isDynamicDim(0))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
-      if (rhs.getType().cast<ShapedType>().isDynamicDim(1))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
-      break;
-    }
-    case DotOperationType::kMatrixVector: {
-      if (lhs.getType().cast<ShapedType>().isDynamicDim(0))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
-      break;
-    }
-    case DotOperationType::kVectorMatrix: {
-      if (rhs.getType().cast<ShapedType>().isDynamicDim(1))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
-      break;
-    }
-    case DotOperationType::kVectorDot:
-    case DotOperationType::kUnsupported:
-      break;
+  case DotOperationType::kMatrixMatrix: {
+    if (llvm::cast<ShapedType>(lhs.getType()).isDynamicDim(0))
+      dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
+    if (llvm::cast<ShapedType>(rhs.getType()).isDynamicDim(1))
+      dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
+    break;
+  }
+  case DotOperationType::kMatrixVector: {
+    if (llvm::cast<ShapedType>(lhs.getType()).isDynamicDim(0))
+      dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
+    break;
+  }
+  case DotOperationType::kVectorMatrix: {
+    if (llvm::cast<ShapedType>(rhs.getType()).isDynamicDim(1))
+      dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
+    break;
+  }
+  case DotOperationType::kVectorDot:
+  case DotOperationType::kUnsupported:
+    break;
   }
   return dynShape;
 }
 
 template <DotOperationType op_type, typename LinalgOp>
-struct DotOpConversion final : OpConversionPattern<stablehlo::DotOp> {
-  using OpConversionPattern<stablehlo::DotOp>::OpConversionPattern;
-  using OpAdaptor = stablehlo::DotOp::Adaptor;
+struct DotOpConversion final : OpConversionPattern<mlir::stablehlo::DotOp> {
+  using OpConversionPattern<mlir::stablehlo::DotOp>::OpConversionPattern;
+  using OpAdaptor = mlir::stablehlo::DotOp::Adaptor;
 
-  LogicalResult matchAndRewrite(
-      stablehlo::DotOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::DotOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) {
       return failure();
     }
-    if (getDotOperationType(op) != op_type) return failure();
+    if (getDotOperationType(op) != op_type)
+      return failure();
 
     Location loc = op.getLoc();
     // Convert unsigned to signed. This works because signed and unsigned
     // integer matmul is the same operation in two's complement.
     auto outputType =
-        cast<ShapedType>(typeConverter->convertType(op.getType()));
+        cast<ShapedType>(getTypeConverter()->convertType(op.getType()));
     SmallVector<Value, 2> dynShape = getDotOpEmptyTensorDynSizes(
         rewriter, loc, adaptor.getLhs(), adaptor.getRhs(), op_type);
     Value emptyTensor =
@@ -118,20 +117,21 @@ struct DotOpConversion final : OpConversionPattern<stablehlo::DotOp> {
 };
 
 struct DotGeneralBatchMatMulOpConversion final
-    : OpConversionPattern<stablehlo::DotGeneralOp> {
+    : OpConversionPattern<mlir::stablehlo::DotGeneralOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      stablehlo::DotGeneralOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::DotGeneralOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) {
       return failure();
     }
-    if (op.getType().cast<RankedTensorType>().getRank() != 3) {
+    if (llvm::cast<RankedTensorType>(op.getType()).getRank() != 3) {
       return rewriter.notifyMatchFailure(op, "expected a batch matmul");
     }
 
-    stablehlo::DotDimensionNumbersAttr dimNumbers = op.getDotDimensionNumbers();
+    mlir::stablehlo::DotDimensionNumbersAttr dimNumbers =
+        op.getDotDimensionNumbers();
     ArrayRef<int64_t> lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
     ArrayRef<int64_t> rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
     ArrayRef<int64_t> lhsContractingDims =
@@ -163,7 +163,7 @@ struct DotGeneralBatchMatMulOpConversion final
     Value emptyTensor =
         getEmptyTensorFor(rewriter, loc, outputType, op, adaptor.getOperands());
     Value zeroTensor = fillTensorWithZeros(rewriter, loc, emptyTensor);
-    Operation* linalgOp = rewriter.create<linalg::BatchMatmulOp>(
+    Operation *linalgOp = rewriter.create<linalg::BatchMatmulOp>(
         loc, /*resultTensorTypes=*/TypeRange{outputType},
         /*inputs=*/ValueRange{adaptor.getLhs(), adaptor.getRhs()},
         /*outputBuffers=*/ValueRange{zeroTensor},
@@ -175,17 +175,18 @@ struct DotGeneralBatchMatMulOpConversion final
 };
 
 struct DotGeneralOpConversion final
-    : OpConversionPattern<stablehlo::DotGeneralOp> {
+    : OpConversionPattern<mlir::stablehlo::DotGeneralOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      stablehlo::DotGeneralOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::DotGeneralOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) {
       return failure();
     }
 
     // Get various dimension iterator information
-    stablehlo::DotDimensionNumbersAttr dimNumbers = op.getDotDimensionNumbers();
+    mlir::stablehlo::DotDimensionNumbersAttr dimNumbers =
+        op.getDotDimensionNumbers();
     ArrayRef<int64_t> lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
     ArrayRef<int64_t> rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
     ArrayRef<int64_t> lhsContractingDims =
@@ -204,10 +205,12 @@ struct DotGeneralOpConversion final
     size_t targetRank = outputType.getRank();
     size_t totalLoopCount = numContracting + targetRank;
 
-    int64_t lhsRank = adaptor.getLhs().getType().cast<ShapedType>().getRank();
+    int64_t lhsRank =
+        llvm::cast<ShapedType>(adaptor.getLhs().getType()).getRank();
     size_t lhsExtraDims =
         lhsRank - lhsBatchingDims.size() - lhsContractingDims.size();
-    int64_t rhsRank = adaptor.getRhs().getType().cast<ShapedType>().getRank();
+    int64_t rhsRank =
+        llvm::cast<ShapedType>(adaptor.getRhs().getType()).getRank();
 
     Location loc = op.getLoc();
     Value emptyTensor =
@@ -218,10 +221,10 @@ struct DotGeneralOpConversion final
     auto getMap = [&](int64_t rank, ArrayRef<int64_t> batchingDims,
                       ArrayRef<int64_t> contractingDims, size_t extraDims) {
       llvm::SmallVector<AffineExpr> indices(rank);
-      for (const auto& i : llvm::enumerate(batchingDims)) {
+      for (const auto &i : llvm::enumerate(batchingDims)) {
         indices[i.value()] = rewriter.getAffineDimExpr(i.index());
       }
-      for (const auto& i : llvm::enumerate(contractingDims)) {
+      for (const auto &i : llvm::enumerate(contractingDims)) {
         indices[i.value()] = rewriter.getAffineDimExpr(i.index() + targetRank);
       }
       for (int i = 0; i < rank; ++i) {
@@ -239,7 +242,7 @@ struct DotGeneralOpConversion final
            rhsBatchingDims.size() + lhsExtraDims);
 
     {
-      SmallVector<AffineExpr, 4> dimExprs;
+      SmallVector<AffineExpr> dimExprs;
       dimExprs.reserve(targetRank);
       for (unsigned i = 0; i < targetRank; ++i)
         dimExprs.push_back(rewriter.getAffineDimExpr(i));
@@ -248,14 +251,14 @@ struct DotGeneralOpConversion final
                                             op.getContext()));
     }
 
-    Operation* linalgOp = rewriter.create<linalg::GenericOp>(
+    Operation *linalgOp = rewriter.create<linalg::GenericOp>(
         loc, /*resultTensorTypes=*/TypeRange{outputType},
         /*inputs=*/ValueRange{adaptor.getLhs(), adaptor.getRhs()},
         /*outputBuffers=*/ValueRange{zeroTensor}, indexingMaps,
         getParallelAndReductionIterators(
             /*nLoops=*/totalLoopCount,
             /*nReduction=*/numContracting),
-        [](OpBuilder& b, Location loc, ValueRange) {
+        [](OpBuilder &b, Location loc, ValueRange) {
           ImplicitLocOpBuilder builder(loc, b);
           linalg::MatmulOp::regionBuilder(builder, *b.getInsertionBlock(), {});
         },
@@ -266,12 +269,12 @@ struct DotGeneralOpConversion final
   }
 };
 
-}  // namespace
+} // namespace
 
 namespace detail {
 void populateStableHloDotProdToLinalgConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns) {
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns) {
   // Ensure specialized patterns are higher priority than their generic
   // versions.
   patterns
@@ -284,5 +287,5 @@ void populateStableHloDotProdToLinalgConversionPatterns(
   patterns->add<DotGeneralOpConversion>(typeConverter, context,
                                         PatternBenefit(1));
 }
-}  // namespace detail
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace detail
+} // namespace mlir::iree_compiler::stablehlo

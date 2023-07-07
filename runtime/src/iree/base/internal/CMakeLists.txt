@@ -60,10 +60,9 @@ iree_cc_library(
     "arena.c"
   DEPS
     ::atomic_slist
+    ::internal
     ::synchronization
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -102,7 +101,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::core_headers
-    iree::base::tracing
     iree::schemas::cpu_data
   PUBLIC
 )
@@ -121,8 +119,6 @@ iree_cc_library(
     ::path
     ::synchronization
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -135,8 +131,6 @@ iree_cc_library(
     "file_io.c"
   DEPS
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -166,8 +160,6 @@ iree_cc_library(
     ::file_io
     ::internal
     iree::base
-    iree::base::target_platform
-    iree::base::tracing
   PUBLIC
 )
 
@@ -302,7 +294,6 @@ iree_cc_library(
     ::internal
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -336,6 +327,7 @@ iree_cc_library(
     "wait_handle.h"
   SRCS
     "wait_handle.c"
+    "wait_handle_emscripten.c"
     "wait_handle_epoll.c"
     "wait_handle_impl.h"
     "wait_handle_inproc.c"
@@ -349,7 +341,6 @@ iree_cc_library(
     ::synchronization
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -381,7 +372,6 @@ iree_cc_library(
     ::wait_handle
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -402,7 +392,6 @@ iree_cc_library(
     ::synchronization
     iree::base
     iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -417,9 +406,17 @@ iree_cc_test(
     ::synchronization
     ::threading
     iree::base
-    iree::base::target_platform
     iree::testing::gtest
     iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(EMSCRIPTEN)
+  iree_link_js_library(
+    TARGET
+      ::wait_handle
+    SRCS
+      "wait_handle_emscripten.js"
+  )
+endif()

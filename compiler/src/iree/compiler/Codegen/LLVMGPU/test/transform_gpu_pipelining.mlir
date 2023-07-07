@@ -53,9 +53,9 @@ func.func @matmul_pipelining() {
 }
 }
 transform.sequence failures(propagate) {
-^bb1(%variant_op: !pdl.operation):
-  %for = transform.structured.match ops{["scf.for"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %1 = transform.cast %for : !pdl.operation to !transform.op<"scf.for">
+^bb1(%variant_op: !transform.any_op):
+  %for = transform.structured.match ops{["scf.for"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+  %1 = transform.cast %for : !transform.any_op to !transform.op<"scf.for">
   %2 = transform.iree.pipeline_shared_memory_copies %1 { depth = 4 } : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 }
 }

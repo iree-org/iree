@@ -49,9 +49,9 @@ struct ConstantSlice {
   // padding.
   uint64_t getStorageSize() const {
     if (auto serializableAttr =
-            value.dyn_cast<IREE::Util::SerializableAttrInterface>()) {
+            llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(value)) {
       return serializableAttr.getStorageSize();
-    } else if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
+    } else if (auto denseAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
       return denseAttr.getRawData().size();
     } else {
       assert(false && "invalid constant attr type");
@@ -126,11 +126,11 @@ static void packStorageResourceData(StorageResource &storageBuffer,
   // be useful if we wanted to map back a module size through data blobs.
   // With buffer <-> constant it's possible to build a tree map of
   // contributions in the source. TBD ;)
-  storageBuffer.loc =
-      FusedLoc::get(context, llvm::to_vector<8>(llvm::map_range(
-                                 storageBuffer.spans, [](PackedSpan &span) {
-                                   return span.slice.result.getLoc();
-                                 })));
+  storageBuffer.loc = FusedLoc::get(
+      context,
+      llvm::map_to_vector<8>(storageBuffer.spans, [](PackedSpan &span) {
+        return span.slice.result.getLoc();
+      }));
 
   // Construct a composite attribute that contains references to the original
   // uniqued storage values. This avoids needing to reallocate/unique/copy
@@ -142,7 +142,8 @@ static void packStorageResourceData(StorageResource &storageBuffer,
   SmallVector<Attribute> values;
   int64_t offset = 0;
   for (auto &constantSpan : storageBuffer.spans) {
-    if (constantSpan.length == 0) continue;
+    if (constantSpan.length == 0)
+      continue;
 
     int64_t start = constantSpan.offset;
     int64_t end = start + constantSpan.length;
@@ -185,9 +186,10 @@ static void packStorageResourceData(StorageResource &storageBuffer,
 // Assume that |slices| have been ordered by prior passes and that order may
 // have some performance-sensitivity (constants are grouped by
 // locality/lifetime/etc).
-static SmallVector<StorageResource, 8> computePackingMap(
-    ArrayRef<ConstantSlice> slices,
-    IREE::Stream::ResourceConfigAttr resourceConfig, MLIRContext *context) {
+static SmallVector<StorageResource, 8>
+computePackingMap(ArrayRef<ConstantSlice> slices,
+                  IREE::Stream::ResourceConfigAttr resourceConfig,
+                  MLIRContext *context) {
   // This is literally all my brain has brain for right now. The ideal here is
   // that we have a basic static (and ideally profile-guided) sorting pass
   // that keeps constant values that are accessed sorted together.
@@ -254,11 +256,12 @@ struct UploadResult {
 // issue an async copy from source to result. To avoid a bunch of overhead when
 // there are multiple storage buffers we invert the logic so that we put all the
 // async copies into a single region.
-static UploadResult buildStagingUpload(
-    Location loc, IREE::Stream::AffinityAttr affinityAttr,
-    IREE::Stream::ResourceType resourceType,
-    ArrayRef<StorageResource> storageResources, ArrayRef<Value> storageBuffers,
-    IndexSet &indexSet, OpBuilder &builder) {
+static UploadResult
+buildStagingUpload(Location loc, IREE::Stream::AffinityAttr affinityAttr,
+                   IREE::Stream::ResourceType resourceType,
+                   ArrayRef<StorageResource> storageResources,
+                   ArrayRef<Value> storageBuffers, IndexSet &indexSet,
+                   OpBuilder &builder) {
   UploadResult uploadResult;
   auto stagingType = builder.getType<IREE::Stream::ResourceType>(
       IREE::Stream::Lifetime::Staging);
@@ -321,7 +324,8 @@ static UploadResult buildStagingUpload(
   auto executeOp = builder.create<IREE::Stream::CmdExecuteOp>(
       loc, /*awaitTimepoint=*/Value{}, capturedResources,
       capturedResourceSizes);
-  if (affinityAttr) executeOp.setAffinityAttr(affinityAttr);
+  if (affinityAttr)
+    executeOp.setAffinityAttr(affinityAttr);
   uploadResult.timepoint = executeOp.getResultTimepoint();
 
   // Map captured resources into the execution region.
@@ -432,8 +436,10 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   for (auto [result, resultSize, value] :
        llvm::zip_equal(constantsOp.getResults(), constantsOp.getResultSizes(),
                        constantsOp.getValues())) {
-    auto resourceType = result.getType().cast<IREE::Stream::ResourceType>();
-    if (resourceType.getLifetime() != lifetime) continue;
+    auto resourceType =
+        llvm::cast<IREE::Stream::ResourceType>(result.getType());
+    if (resourceType.getLifetime() != lifetime)
+      continue;
     slices.push_back(ConstantSlice{
         result,
         resultSize,
@@ -445,7 +451,8 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   // will need and where each value will be placed.
   auto storageResources =
       computePackingMap(slices, resourceConfig, constantsOp.getContext());
-  if (storageResources.empty()) return nullptr;
+  if (storageResources.empty())
+    return nullptr;
 
   // Emit rodata storage for the constant values.
   // As our upload paths may vary this ensures that we are only emitting
@@ -463,7 +470,8 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   // fast-path where we directly map the constant memory. If producing
   // variables then we always need to stage and clone.
   auto anyResult = slices.front().result;
-  auto resourceType = anyResult.getType().cast<IREE::Stream::ResourceType>();
+  auto resourceType =
+      llvm::cast<IREE::Stream::ResourceType>(anyResult.getType());
   UploadResult uploadResult;
   if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
     uploadResult = buildTryMapConstantResources(
@@ -506,7 +514,7 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
 // never a case where this matters by construction; which is a feature :P
 
 class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
@@ -543,7 +551,8 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
                              resourceConfig, indexSet, builder)) {
         timepoints.push_back(timepoint);
       }
-      if (timepoints.empty()) return;
+      if (timepoints.empty())
+        return;
 
       // Join on storage timepoints for our transitive dependencies to await.
       // We could do this at a finer granularity if we were to split the
@@ -562,13 +571,13 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<CallableOpInterface>> createPackConstantsPass() {
   return std::make_unique<PackConstantsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

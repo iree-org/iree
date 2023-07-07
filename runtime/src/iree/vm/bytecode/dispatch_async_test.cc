@@ -30,12 +30,13 @@ class VMBytecodeDispatchAsyncTest : public ::testing::Test {
     IREE_TRACE_SCOPE();
     const iree_file_toc_t* file = async_bytecode_modules_c_create();
 
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         instance_,
         iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(file->data),
-                               file->size},
+                               static_cast<iree_host_size_t>(file->size)},
         iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};

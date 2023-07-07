@@ -79,6 +79,7 @@ inline static void enumerateIREEVMPipelinePhases(
 // If a |runTo| phase is specified the pipeline will stop and output the full
 // IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
@@ -94,7 +95,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
 // Registration hooks.
 void registerIREEVMTransformPassPipeline();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_PIPELINES_PIPELINES_H_
+#endif // IREE_COMPILER_PIPELINES_PIPELINES_H_

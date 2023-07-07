@@ -29,7 +29,7 @@ static const char *kConstantBlockSetterName = "__set_constants";
 
 class MaterializeConstantsPass
     : public MaterializeConstantsBase<MaterializeConstantsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     arith::ArithDialect, func::FuncDialect>();
@@ -51,7 +51,8 @@ class MaterializeConstantsPass
     });
 
     // No constants found; omit the constant block entirely.
-    if (allLoadOps.empty()) return;
+    if (allLoadOps.empty())
+      return;
 
     // Create global ops for each constant and replace the HAL ops so they load
     // from them. Each global will track what constant key it represents for
@@ -66,14 +67,14 @@ class MaterializeConstantsPass
     for (auto [keyAttr, loadOps] : allLoadOps) {
       auto globalLoc = FusedLoc::get(
           context,
-          llvm::to_vector<4>(llvm::map_range(
-              loadOps, [&](IREE::HAL::ExecutableConstantLoadOp loadOp) {
-                return loadOp.getLoc();
-              })));
+          llvm::map_to_vector(loadOps,
+                              [&](IREE::HAL::ExecutableConstantLoadOp loadOp) {
+                                return loadOp.getLoc();
+                              }));
       auto globalType = loadOps.front().getType();
-      auto globalName =
-          (kConstantBlockGlobalPrefix + keyAttr.cast<StringAttr>().getValue())
-              .str();
+      auto globalName = (kConstantBlockGlobalPrefix +
+                         llvm::cast<StringAttr>(keyAttr).getValue())
+                            .str();
 
       // Placeholder ordinal that'll be updated during linking.
       auto ordinalGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
@@ -135,7 +136,7 @@ createMaterializeConstantsPass() {
   return std::make_unique<MaterializeConstantsPass>();
 }
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

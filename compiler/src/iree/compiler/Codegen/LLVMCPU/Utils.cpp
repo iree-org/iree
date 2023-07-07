@@ -14,10 +14,11 @@
 namespace mlir {
 namespace iree_compiler {
 
-std::optional<StringRef> getCpuFeatures(
-    IREE::HAL::ExecutableTargetAttr targetAttr) {
+std::optional<StringRef>
+getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures) return std::nullopt;
+  if (!cpuFeatures)
+    return std::nullopt;
   return cpuFeatures->getValue();
 }
 
@@ -74,6 +75,10 @@ bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+avx2");
 }
 
+bool hasAVX512fFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+avx512f");
+}
+
 bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+v");
 }
@@ -94,5 +99,9 @@ bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+sme");
+}
+
+} // namespace iree_compiler
+} // namespace mlir

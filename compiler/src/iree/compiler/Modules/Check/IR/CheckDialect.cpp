@@ -22,7 +22,7 @@ namespace Check {
 
 namespace {
 class CheckToVmConversionInterface : public VMConversionDialectInterface {
- public:
+public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
   OwningOpRef<mlir::ModuleOp> parseVMImportModule() const override {
@@ -32,17 +32,18 @@ class CheckToVmConversionInterface : public VMConversionDialectInterface {
         getDialect()->getContext());
   }
 
-  void populateVMConversionPatterns(
-      SymbolTable &importSymbols, RewritePatternSet &patterns,
-      ConversionTarget &conversionTarget,
-      TypeConverter &typeConverter) const override {
+  void
+  populateVMConversionPatterns(SymbolTable &importSymbols,
+                               RewritePatternSet &patterns,
+                               ConversionTarget &conversionTarget,
+                               TypeConverter &typeConverter) const override {
     populateCheckToVMPatterns(getDialect()->getContext(), importSymbols,
                               patterns, typeConverter);
   }
 };
 
 class CheckToHalConversionInterface : public HALConversionDialectInterface {
- public:
+public:
   using HALConversionDialectInterface::HALConversionDialectInterface;
 
   void setupConversionTarget(ConversionTarget &target,
@@ -52,7 +53,7 @@ class CheckToHalConversionInterface : public HALConversionDialectInterface {
                                typeConverter);
   }
 };
-}  // namespace
+} // namespace
 
 CheckDialect::CheckDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<CheckDialect>()) {
@@ -64,7 +65,7 @@ CheckDialect::CheckDialect(MLIRContext *context)
       >();
 }
 
-}  // namespace Check
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Check
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

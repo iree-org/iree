@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "bitcast.mlir",
             "cast.mlir",
             "extract.mlir",
             "extract_slice.mlir",

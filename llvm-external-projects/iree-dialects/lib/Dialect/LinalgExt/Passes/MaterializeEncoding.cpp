@@ -28,10 +28,15 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 /// Extract encoding from the `tensorType` if specified.
 static std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
-  auto encodingAttr = tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
-  if (!encodingAttr)
+  auto encoding = tensorType.getEncoding();
+  if (!encoding) {
     return std::nullopt;
-  return encodingAttr.getEncoding().getValue();
+  }
+  auto tensorEncodingAttr = encoding.dyn_cast_or_null<TensorEncodingAttr>();
+  if (!tensorEncodingAttr) {
+    return std::nullopt;
+  }
+  return tensorEncodingAttr.getValue();
 }
 
 /// For a given tensor type with an encoding, return the materialized
@@ -147,20 +152,9 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   resultType.getElementType());
   std::optional<Value> paddingValue = getPaddingValue(source);
-  auto packOp = rewriter.create<tensor::PackOp>(
+  return rewriter.create<tensor::PackOp>(
       loc, source, emptyOp, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
-  // As we rewrite the SetEncoding and its old result tensor, which used to hold
-  // the TensorEncodingAttr, into a pack op with a new result tensor which does
-  // not have a TensorEncodingAttr, we lose the information that used to be
-  // stored in that attr. That shouldn't matter, as the purpose of that attr
-  // was to enable exactly this rewrite, but there is a catch: at the moment,
-  // in IREE's TileAndDistributeToWorkgroupsPass.cpp, we need the encoding value
-  // again. See the comment there. So we re-add the attribute on the pack op
-  // itself as a temporary work-around.
-  packOp->setAttr(StringAttr::get(rewriter.getContext(), "encoding"),
-                  EncodingAttr::get(rewriter.getContext(), *encoding));
-  return packOp;
 }
 
 /// Utility method to convert from `set_encoding` op to `pack` operation.
@@ -214,15 +208,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
       getEncoding(inputs[1]->get().getType().cast<RankedTensorType>());
   std::optional<TensorEncoding> resultEncoding =
       getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
-  if (!lhsEncoding ||
-      (lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS &&
-       lhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_LHS) ||
-      !rhsEncoding ||
-      (rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS &&
-       rhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RHS) ||
-      !resultEncoding ||
-      (resultEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RESULT &&
-       resultEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RESULT)) {
+  if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
   Operation *mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
@@ -465,7 +451,7 @@ void populateMaterializeEncodingPatterns(
                   SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToPackOpConversion>(
       patterns.getContext(), typeConverter, materializeEncodingValueFn);
-  ::mlir::memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  ::mlir::memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass() {

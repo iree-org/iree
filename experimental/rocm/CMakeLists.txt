@@ -4,6 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(IREE_PACKAGE_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/../..)
+# Canonicalize path.
+cmake_path(ABSOLUTE_PATH IREE_PACKAGE_ROOT_DIR
+  BASE_DIRECTORY ${IREE_PACKAGE_ROOT_DIR}
+  NORMALIZE
+  OUTPUT_VARIABLE IREE_PACKAGE_ROOT_DIR)
+set(IREE_PACKAGE_ROOT_PREFIX iree)
+
 iree_add_all_subdirs()
 
 if(NOT ROCM_HEADERS_API_ROOT)
@@ -52,12 +60,10 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
     iree::hal::utils::semaphore_base
@@ -83,9 +89,8 @@ iree_cc_library(
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   DEPS
-    iree::base::core_headers
+    iree::base
     iree::base::internal::dynamic_library
-    iree::base::tracing
   PUBLIC
 )
 

@@ -29,49 +29,25 @@ endif()
 iree_bitcode_library(
   NAME
     libdevice_wasm32_generic
+  ARCH
+    wasm_32
   SRCS
     "device_generic.c"
-  HDRS
-    "device.h"
-  COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-c"
-    "-emit-llvm"
-    "-DIREE_DEVICE_STANDALONE=1"
-    "--target=wasm32"
-  PUBLIC
 )
 
 iree_bitcode_library(
   NAME
     libdevice_wasm64_generic
+  ARCH
+    wasm_64
   SRCS
     "device_generic.c"
-  HDRS
-    "device.h"
-  COPTS
-    "-std=c17"
-    "-nostdinc"
-    "-ffreestanding"
-    "-O3"
-    "-fno-ident"
-    "-fdiscard-value-names"
-    "-c"
-    "-emit-llvm"
-    "-DIREE_DEVICE_STANDALONE=1"
-    "--target=wasm64"
-  PUBLIC
 )
 
 iree_c_embed_data(
   NAME
     libdevice_bitcode
-  GENERATED_SRCS
+  SRCS
     "libdevice_wasm32_generic.bc"
     "libdevice_wasm64_generic.bc"
   DEPS

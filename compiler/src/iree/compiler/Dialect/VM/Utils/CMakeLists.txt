@@ -25,4 +25,16 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    TypeTable
+  HDRS
+    "TypeTable.h"
+  SRCS
+    "TypeTable.cpp"
+  DEPS
+    iree::compiler::Dialect::VM::IR
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -18,7 +18,6 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/tracing.h"
 
 // Useful to see how pthreads is implemented on (old) darwin:
 // https://opensource.apple.com/source/Libc/Libc-825.40.1/pthreads/pthread.c.auto.html
@@ -203,7 +202,7 @@ iree_thread_override_t* iree_thread_priority_class_override_begin(
       pthread_override_qos_class_start_np(thread->handle, qos_class, 0);
 
   IREE_TRACE_ZONE_END(z0);
-  return (iree_thread_override_t*)override;
+  return (iree_thread_override_t*) override;
 }
 
 void iree_thread_override_end(iree_thread_override_t* override) {
@@ -213,7 +212,7 @@ void iree_thread_override_end(iree_thread_override_t* override) {
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  pthread_override_qos_class_end_np((pthread_override_t)override);
+  pthread_override_qos_class_end_np((pthread_override_t) override);
 
   IREE_TRACE_ZONE_END(z0);
 }

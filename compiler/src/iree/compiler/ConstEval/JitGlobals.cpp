@@ -28,10 +28,9 @@ namespace ConstEval {
 namespace {
 
 struct ProgramExtractor {
- public:
+public:
   ProgramExtractor(Operation *sourceModuleOp, Operation *targetModuleOp)
-      : sourceSymbolTable(sourceModuleOp),
-        targetSymbolTable(targetModuleOp),
+      : sourceSymbolTable(sourceModuleOp), targetSymbolTable(targetModuleOp),
         builder(OpBuilder::atBlockEnd(&targetModuleOp->getRegion(0).front())) {}
 
   // Creates an accessor function to load the given global value.
@@ -71,7 +70,8 @@ struct ProgramExtractor {
       iterWorklist.swap(symbolImportWorklist);
 
       for (StringAttr symbolRef : iterWorklist) {
-        if (targetSymbolTable.lookup(symbolRef)) continue;
+        if (targetSymbolTable.lookup(symbolRef))
+          continue;
 
         Operation *sourceOp = sourceSymbolTable.lookup(symbolRef);
         if (!sourceOp) {
@@ -109,7 +109,7 @@ struct ProgramExtractor {
     // TODO: Scan for functions, etc.
   }
 
- private:
+private:
   SymbolTable sourceSymbolTable;
   SymbolTable targetSymbolTable;
   OpBuilder builder;
@@ -137,7 +137,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     // Invoke IREE compilation flow.
     options->executableOptions.targets.push_back("vmvx");
     options->targetOptions.f32Extension = true;
-    options->targetOptions.f64Extension = false;  // not yet implemented
+    options->targetOptions.f64Extension = false; // not yet implemented
 
     // Disable constant evaluation for our Jit compilation pipeline.
     // It would make no sense to recursively do constant evaluation, and since
@@ -146,10 +146,13 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     options->highLevelOptimizationOptions.constEval = false;
 
     buildIREEVMTransformPassPipeline(
-        options->bindingOptions, options->inputOptions,
-        options->preprocessingOptions, options->highLevelOptimizationOptions,
-        options->schedulingOptions, options->executableOptions,
-        options->targetOptions, options->hooks, compilePipeline);
+        // TODO: If ever not using VMVX, plumb the real target registry
+        // through.
+        IREE::HAL::TargetBackendRegistry::getGlobal(), options->bindingOptions,
+        options->inputOptions, options->preprocessingOptions,
+        options->highLevelOptimizationOptions, options->schedulingOptions,
+        options->executableOptions, options->targetOptions, options->hooks,
+        compilePipeline);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -181,8 +184,10 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     SmallVector<std::pair<StringAttr, StringAttr>> uninitializedGlobals;
     for (Operation &childOp : *innerModule.getBody()) {
       auto globalOp = llvm::dyn_cast<IREE::Util::GlobalOp>(childOp);
-      if (!globalOp) continue;
-      if (globalOp.getInitialValueAttr()) continue;
+      if (!globalOp)
+        continue;
+      if (globalOp.getInitialValueAttr())
+        continue;
 
       // Only generate an accessor for types our runtime bridge knows how to
       // handle.
@@ -235,7 +240,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       }
 
       modified = true;
-      targetGlobal.setInitialValueAttr(value);
+      targetGlobal.setInitialValueAttr(cast<TypedAttr>(value));
     }
 
     // Delete any ops noted for pruning.
@@ -254,12 +259,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
   OpPassManager compilePipeline;
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createJitGlobalsPass() {
   return std::make_unique<JitGlobalsPass>();
 }
 
-}  // namespace ConstEval
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ConstEval
+} // namespace iree_compiler
+} // namespace mlir

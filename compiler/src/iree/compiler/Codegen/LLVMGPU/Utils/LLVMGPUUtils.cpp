@@ -7,25 +7,31 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Visitors.h"
 
 using namespace mlir;
 
 #define DEBUG_TYPE "llvm-gpu-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir {
 namespace iree_compiler {
 
-static bool isContiguousStore(Operation* write) {
+static bool isContiguousStore(Operation *write) {
   if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(write)) {
     if (!transferWrite.getPermutationMap().isMinorIdentity() ||
-        !transferWrite.isDimInBounds(0)) {
+        !transferWrite.isDimInBounds(0) || transferWrite.getMask()) {
+      LDBG("--not a contiguous store op: " << *write);
       return false;
     }
     return true;
@@ -33,13 +39,15 @@ static bool isContiguousStore(Operation* write) {
   if (isa<vector::StoreOp>(write)) {
     return true;
   }
+  LDBG("--not a store op: " << write->getName().getStringRef());
   return false;
 }
 
-static bool isContiguousRead(Operation* read) {
+static bool isContiguousRead(Operation *read) {
   if (auto transferRead = dyn_cast<vector::TransferReadOp>(read)) {
     if (!transferRead.isDimInBounds(0) ||
         !transferRead.getPermutationMap().isMinorIdentity()) {
+      LDBG("--not a contiguous load op: " << *read);
       return false;
     }
     return true;
@@ -47,10 +55,11 @@ static bool isContiguousRead(Operation* read) {
   if (isa<vector::LoadOp>(read)) {
     return true;
   }
+  LDBG("--not a load op: " << read->getName().getStringRef());
   return false;
 }
 
-static Value getMemrefOperand(Operation* op) {
+static Value getMemrefOperand(Operation *op) {
   if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(op)) {
     return transferWrite.getSource();
   }
@@ -66,7 +75,60 @@ static Value getMemrefOperand(Operation* op) {
   return Value();
 }
 
-static Value getValueStored(Operation* writeOp) {
+struct MaskResult {
+  vector::CreateMaskOp maskOp;
+  vector::ExtractOp maybeExtractOp;
+};
+static MaskResult getMask(Operation *op) {
+  auto transferRead = dyn_cast<vector::TransferReadOp>(op);
+  if (!transferRead || !transferRead.getMask())
+    return MaskResult{};
+  vector::ExtractOp maybeExtractOp =
+      transferRead.getMask().getDefiningOp<vector::ExtractOp>();
+  auto maskOp =
+      maybeExtractOp
+          ? maybeExtractOp.getVector().getDefiningOp<vector::CreateMaskOp>()
+          : transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
+  if (maybeExtractOp) {
+    if (maybeExtractOp.getPosition().size() + 1 !=
+        llvm::cast<VectorType>(maskOp->getResultTypes().front()).getRank()) {
+      LDBG("----mask through extract unexpected position size -> Skip: "
+           << maybeExtractOp);
+      return MaskResult{};
+    }
+    if (maybeExtractOp.getPosition().size() != 1) {
+      LDBG("----only mask through 2-D -> 1-D extract supported atm -> Skip: "
+           << maybeExtractOp);
+      return MaskResult{};
+    }
+    LDBG("----mask through extract: " << maybeExtractOp);
+  }
+  return MaskResult{maskOp, maybeExtractOp};
+}
+
+static Value getMaskValue(RewriterBase &rewriter, Operation *op) {
+  MaskResult maskResult = getMask(op);
+  if (!maskResult.maskOp)
+    return Value();
+  Value count = maskResult.maskOp->getOperands().back();
+  vector::ExtractOp maybeExtractOp = maskResult.maybeExtractOp;
+  if (maybeExtractOp) {
+    assert(maybeExtractOp.getPosition().size() == 1 && "expected single pos");
+    int64_t sliceNum =
+        llvm::cast<IntegerAttr>(maybeExtractOp.getPosition()[0]).getInt();
+    // TODO: to support >2-D mask + extract, and all the cmp.
+    Location loc = op->getLoc();
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value cmp = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt,
+        rewriter.create<arith::ConstantIndexOp>(loc, sliceNum),
+        maskResult.maskOp->getOperands().front());
+    count = rewriter.create<arith::SelectOp>(loc, cmp, count, zero);
+  }
+  return count;
+}
+
+static Value getValueStored(Operation *writeOp) {
   if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(writeOp)) {
     return transferWrite.getValue();
   }
@@ -76,7 +138,7 @@ static Value getValueStored(Operation* writeOp) {
   return Value();
 }
 
-static Operation::operand_range getIndices(Operation* op) {
+static Operation::operand_range getIndices(Operation *op) {
   if (auto vectorReadOp = dyn_cast<vector::LoadOp>(op))
     return vectorReadOp.getIndices();
   if (auto vectorStoreOp = dyn_cast<vector::StoreOp>(op))
@@ -88,56 +150,111 @@ static Operation::operand_range getIndices(Operation* op) {
   llvm_unreachable("unsupported op type");
 }
 
-void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
-                       bool useMMASync) {
-  LLVM_DEBUG(DBGS() << "Start asyncGroups: useMMASync=" << useMMASync << "\n");
-  llvm::SmallSetVector<Operation*, 16> copyToSharedMem;
-  // Look for all the copy that can be converted to async copy ops.
-  funcOp.walk([&](Operation* writeOp) {
-    if (!isContiguousStore(writeOp)) {
-      return WalkResult::advance();
+/// Return `true` if the conversion to async copy is legal.
+static bool resultsInSupportedAsyncCopy(MemRefType memrefType,
+                                        Operation::operand_range indices,
+                                        VectorType vecType) {
+  constexpr int64_t kSupportedCpAsyncAlignmentsInBytes[3] = {4, 8, 16};
+  // Condition 1: the vectory rank must be supported.
+  if (vecType.hasRank() != 1) {
+    LDBG("----> cp.async failed, not a 1-D vector: " << vecType);
+    return false;
+  }
+
+  // Condition 2: the copy size must be supported.
+  bool supportedCopySize = false;
+  int64_t numElements = vecType.getNumElements();
+  Type elementType = vecType.getElementType();
+  for (int64_t alignmentInBytes : kSupportedCpAsyncAlignmentsInBytes) {
+    if (alignmentInBytes * 8 ==
+        numElements * elementType.getIntOrFloatBitWidth()) {
+      supportedCopySize = true;
+      break;
     }
-    LLVM_DEBUG(DBGS() << "--candidate writeOp: " << writeOp << "\n");
+  }
+  if (!supportedCopySize) {
+    LDBG("----> cp.async alignment failed, "
+         << numElements << " elts * " << elementType.getIntOrFloatBitWidth()
+         << "b/elem = " << numElements * elementType.getIntOrFloatBitWidth()
+         << "b is not supported by cp.async");
+    return false;
+  }
+
+  // TODO: Condition 3: the alignments must be supported. For cp.async the
+  // NVIDIA doc (section 6.4.1) says: "The address must be naturally aligned to
+  // a multiple of the access size. If an address is not properly aligned, the
+  // resulting behavior is undefined.".
+  return true;
+}
+
+void createAsyncGroups(RewriterBase &rewriter, func::FuncOp funcOp,
+                       bool useMMASync) {
+  LDBG("Start asyncGroups: useMMASync=" << useMMASync);
+  llvm::SmallSetVector<Operation *, 16> copyToSharedMem;
+  // Look for all the copy that can be converted to async copy ops.
+  funcOp.walk([&](Operation *writeOp) {
+    if (!isContiguousStore(writeOp))
+      return WalkResult::advance();
+    LDBG("--candidate writeOp: " << *writeOp);
     Value vectorVal = getValueStored(writeOp);
-    if (vectorVal.getType().cast<VectorType>().getRank() != 1) {
-      LLVM_DEBUG(
-          DBGS()
-          << "----writeOp is not an inbounds 1-D minor identity -> Skip \n");
+    if (llvm::cast<VectorType>(vectorVal.getType()).getRank() != 1) {
+      LDBG("----writeOp is not an inbounds 1-D minor identity -> Skip");
       return WalkResult::advance();
     }
     Value memrefOperand = getMemrefOperand(writeOp);
     if (!hasSharedMemoryAddressSpace(
-            memrefOperand.getType().cast<MemRefType>())) {
-      LLVM_DEBUG(DBGS() << "----address space is not workgroup -> Skip \n");
+            llvm::cast<MemRefType>(memrefOperand.getType()))) {
+      LDBG("----address space is not workgroup -> Skip");
       return WalkResult::advance();
     }
-    Operation* readOp = vectorVal.getDefiningOp();
+    Operation *readOp = vectorVal.getDefiningOp();
     if (readOp == nullptr || !isContiguousRead(readOp)) {
-      LLVM_DEBUG(DBGS() << "----no readOp defining the writeOp -> Skip \n");
+      LDBG("----no contiguous readOp defining the writeOp -> Skip");
       return WalkResult::advance();
     }
 
-    VectorType vecType = vectorVal.getType().cast<VectorType>();
-    if (!((vecType.getElementType().isF32() && vecType.getNumElements() <= 4) ||
-          (vecType.getElementType().isF16() &&
-           vecType.getNumElements() <= 8))) {
-      LLVM_DEBUG(
-          DBGS() << "----readOp is not (<=4)xf32 or (<=8)xf16 -> Skip \n");
-      return WalkResult::advance();
+    LDBG("--candidate readOp: " << *readOp);
+    if (auto transferRead = dyn_cast<vector::TransferReadOp>(readOp)) {
+      if (transferRead.getMask()) {
+        auto paddingCst =
+            transferRead.getPadding().getDefiningOp<arith::ConstantFloatOp>();
+        if (!paddingCst || !paddingCst.value().isZero()) {
+          LDBG("----read padding value is not 0.f -> Skip");
+          return WalkResult::advance();
+        }
+        auto maskResult = getMask(transferRead);
+        if (!maskResult.maskOp) {
+          LDBG("----read mask is not a vector.create_mask op -> Skip: "
+               << transferRead.getMask());
+          return WalkResult::advance();
+        }
+      }
     }
 
-    LLVM_DEBUG(DBGS() << "--writeOp can be made async -> SUCCESS\n");
+    // Check whether both accesses are supported before we emit: this is
+    // necessary to ensure the correctness of DeviceAsyncCopyOp.
+    VectorType vecType = llvm::cast<VectorType>(vectorVal.getType());
+    Value storeBase = getMemrefOperand(writeOp);
+    Value loadBase = getMemrefOperand(readOp);
+    if (!resultsInSupportedAsyncCopy(cast<MemRefType>(loadBase.getType()),
+                                     getIndices(readOp), vecType) ||
+        !resultsInSupportedAsyncCopy(cast<MemRefType>(storeBase.getType()),
+                                     getIndices(writeOp), vecType))
+      return WalkResult::advance();
+
+    LDBG("--writeOp can be made async -> SUCCESS");
     copyToSharedMem.insert(writeOp);
     return WalkResult::advance();
   });
 
   while (!copyToSharedMem.empty()) {
-    SmallVector<Operation*> group;
-    Operation* writeOp = *copyToSharedMem.begin();
+    SmallVector<Operation *> group;
+    Operation *writeOp = *copyToSharedMem.begin();
+    LDBG("--START a group from: " << *writeOp);
     // Start a group with the first write.
     copyToSharedMem.remove(writeOp);
     group.push_back(writeOp);
-    Operation* nextNode = writeOp;
+    Operation *nextNode = writeOp;
     // Look in the next nodes for more copies to add to the same group.
     while ((nextNode = nextNode->getNextNode())) {
       // Ignore ops without side effects
@@ -147,10 +264,10 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
         continue;
       // ignore read from a different address space.
       if (isa<vector::TransferReadOp, vector::LoadOp>(nextNode)) {
-        Operation* readOp = nextNode;
+        Operation *readOp = nextNode;
         Value memrefOperand = getMemrefOperand(readOp);
         if (!hasSharedMemoryAddressSpace(
-                memrefOperand.getType().cast<MemRefType>())) {
+                llvm::cast<MemRefType>(memrefOperand.getType()))) {
           continue;
         }
       }
@@ -161,23 +278,25 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
         continue;
       }
       // If the op is something else stop the accumulating op in the group.
+      LDBG("----> STOP accumulating into group due to: " << *nextNode);
       break;
     }
     // emit the group.
     SmallVector<Value> tokens;
-    for (Operation* writeOp : group) {
+    for (Operation *writeOp : group) {
       rewriter.setInsertionPoint(writeOp);
       Value vectorVal = getValueStored(writeOp);
-      Operation* readOp = vectorVal.getDefiningOp();
+      auto vectorType = llvm::cast<VectorType>(vectorVal.getType());
+      int64_t numElements = vectorType.getNumElements();
+      Operation *readOp = vectorVal.getDefiningOp();
       Value storeBase = getMemrefOperand(writeOp);
       Value loadBase = getMemrefOperand(readOp);
+      Value mask = getMaskValue(rewriter, readOp);
       Value token = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
           writeOp->getLoc(),
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
-          rewriter.getIndexAttr(
-              vectorVal.getType().cast<VectorType>().getNumElements()),
-          Value(),
+          rewriter.getIndexAttr(numElements), mask,
           /*bypassL1=*/useMMASync ? rewriter.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
@@ -188,15 +307,16 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
     rewriter.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
                                               nullptr);
     // Clean up old stores.
-    for (Operation* writeOp : group) rewriter.eraseOp(writeOp);
+    for (Operation *writeOp : group)
+      rewriter.eraseOp(writeOp);
   }
 }
 
-void reorderTranspose(IRRewriter& rewriter, func::FuncOp funcOp) {
+void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp) {
   SmallVector<vector::TransposeOp> transposeOps;
-  funcOp.walk([&](Operation* op) {
+  funcOp.walk([&](Operation *op) {
     if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
-      Operation* definingOp = transposeOp.getVector().getDefiningOp();
+      Operation *definingOp = transposeOp.getVector().getDefiningOp();
       if (OpTrait::hasElementwiseMappableTraits(definingOp)) {
         transposeOps.push_back(transposeOp);
       }
@@ -206,7 +326,7 @@ void reorderTranspose(IRRewriter& rewriter, func::FuncOp funcOp) {
 
   for (auto transposeOp : transposeOps) {
     OpBuilder::InsertionGuard g(rewriter);
-    Operation* op = transposeOp.getVector().getDefiningOp();
+    Operation *op = transposeOp.getVector().getDefiningOp();
     rewriter.setInsertionPoint(op);
     SmallVector<int64_t> perm;
     transposeOp.getTransp(perm);
@@ -217,12 +337,12 @@ void reorderTranspose(IRRewriter& rewriter, func::FuncOp funcOp) {
       transposedOperands.push_back(transposed);
     }
     SmallVector<Type> resultTypes{transposedOperands.front().getType()};
-    Operation* newOp =
+    Operation *newOp =
         rewriter.create(op->getLoc(), op->getName().getIdentifier(),
                         transposedOperands, resultTypes, op->getAttrs());
     rewriter.replaceAllUsesWith(transposeOp.getResult(), newOp->getResult(0));
   }
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

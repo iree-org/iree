@@ -57,7 +57,6 @@ iree_cc_binary(
     benchmark
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::hal::types
     iree::tooling::context_util
@@ -77,7 +76,6 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::testing::benchmark
@@ -96,10 +94,8 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::modules::check
     iree::testing::gtest
@@ -145,7 +141,9 @@ iree_cc_binary(
     flatcc::runtime
     iree::base
     iree::base::internal::file_io
+    iree::base::internal::flags
     iree::base::internal::flatcc::debugging
+    iree::base::internal::flatcc::parsing
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm::bytecode::module
 )
@@ -153,7 +151,8 @@ iree_cc_binary(
 # Only enable fatelf tool when we're compiling it in.
 # Currently it requires that the host and target both support embedded ELFs as
 # the ELF implementation is only compiled when the target supports it.
-if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF OR
+   IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF)
 iree_cc_binary(
   NAME
     iree-fatelf
@@ -171,18 +170,13 @@ iree_cc_binary(
   NAME
     iree-run-module
   SRCS
-    "iree-run-module-main.cc"
+    "iree-run-module-main.c"
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
-    iree::modules::hal::types
-    iree::tooling::comparison
     iree::tooling::context_util
-    iree::tooling::device_util
-    iree::tooling::instrument_util
-    iree::tooling::vm_util
+    iree::tooling::run_module
     iree::vm
 )
 
@@ -195,7 +189,6 @@ iree_cc_binary(
     iree::base
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::tooling::device_util
@@ -216,7 +209,6 @@ iree_cc_binary(
     iree::base::internal::cpu
     iree::base::internal::flags
     iree::base::internal::path
-    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::tooling::device_util
@@ -237,21 +229,24 @@ if(IREE_BUILD_COMPILER)
     )
   endif()
 
+  # Tablegen binaries are special snowflakes among special snowflakes.
+  # They must be statically linked against internal LLVM libraries, and they
+  # therefore must not depend on anything outside of the upstream tablegen
+  # libraries. These targets are specially set up to link in the correct
+  # way. This is a necessary diversion from how Bazel deals with it (which
+  # must deep-link to everything to satisfy its checks).
   iree_cc_binary(
     NAME
       iree-tblgen
     SRCS
-      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+      "iree-tblgen.cpp"
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
       "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
       LLVMSupport
-      LLVMTableGen
-      MLIRSupport
-      MLIRTableGen
       MLIRTblgenLib
-      iree::compiler::Utils
     HOSTONLY
+    DISABLE_LLVM_LINK_LLVM_DYLIB
   )
 
   iree_cc_binary(
@@ -299,32 +294,19 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-run-mlir-main.cc"
     DEPS
-      LLVMSupport
-      MLIRIR
-      MLIRParser
-      MLIRPass
-      MLIRSupport
-      MLIRTargetLLVMIRExport
       iree::base
       iree::base::internal::flags
-      iree::base::tracing
-      iree::compiler::ConstEval
-      iree::compiler::Dialect::HAL::Target
-      iree::compiler::Dialect::VM::Target::Bytecode
-      iree::compiler::Dialect::VM::Target::init_targets
-      iree::compiler::Pipelines
-      iree::compiler::Tools::init_passes_and_dialects
-      iree::compiler::Tools::init_targets
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
       iree::hal
-      iree::modules::hal::types
       iree::tooling::context_util
       iree::tooling::device_util
-      iree::tooling::vm_util
+      iree::tooling::run_module
       iree::vm
-      iree::vm::bytecode::module
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
+    SETUP_INSTALL_RPATH
   )
 
   # Ensure FileCheck and associated binaries get built. Tests don't have

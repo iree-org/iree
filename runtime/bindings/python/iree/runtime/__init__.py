@@ -27,11 +27,11 @@ from ._binding import (
     MemoryType,
     PyModuleInterface,
     Shape,
+    create_hal_module,
 )
 
 # Vm imports
 from ._binding import (
-    create_hal_module,
     Linkage,
     VmBuffer,
     VmVariantList,

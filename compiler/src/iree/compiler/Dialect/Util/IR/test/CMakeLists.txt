@@ -16,6 +16,8 @@ iree_lit_test_suite(
   SRCS
     "alignment_folding.mlir"
     "alignment_ops.mlir"
+    "assignment_folding.mlir"
+    "assignment_ops.mlir"
     "attributes.mlir"
     "buffer_folding.mlir"
     "buffer_ops.mlir"

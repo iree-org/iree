@@ -9,7 +9,6 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
 #include "iree/hal/local/elf/arch.h"
 #include "iree/hal/local/elf/elf_types.h"
 
@@ -143,6 +142,12 @@ int iree_elf_call_i_p(const void* symbol_ptr, void* a0) {
 
 int iree_elf_call_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2) {
   typedef int (*ptr_t)(void*, void*, void*);
+  return ((ptr_t)symbol_ptr)(a0, a1, a2);
+}
+
+void* iree_elf_call_p_ppp(const void* symbol_ptr, void* a0, void* a1,
+                          void* a2) {
+  typedef void* (*ptr_t)(void*, void*, void*);
   return ((ptr_t)symbol_ptr)(a0, a1, a2);
 }
 

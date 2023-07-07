@@ -77,13 +77,13 @@ them.
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
-    [CPU configuration](https://openxla.github.io/iree/deployment-configurations/cpu/)
+    [CPU configuration](https://openxla.github.io/iree/guides/deployment-configurations/cpu/)
     has the best support for dynamic shapes:
 
     ```
     ../iree-build/tools/iree-compile \
         --iree-hal-target-backends=llvm-cpu \
-        --iree-input-type=mhlo \
+        --iree-input-type=stablehlo \
         dynamic_shapes.mlir -o dynamic_shapes_cpu.vmfb
     ```
 

@@ -15,17 +15,11 @@ import os
 import platform
 from setuptools import setup, find_namespace_packages
 
-README = r'''
+README = r"""
 TensorFlow TFLite Compiler Tools
-'''
+"""
 
 exe_suffix = ".exe" if platform.system() == "Windows" else ""
-import_tflite_path = os.path.join(os.path.dirname(__file__), "iree", "tools",
-                                  "tflite", f"iree-import-tflite{exe_suffix}")
-if not os.access(import_tflite_path, os.X_OK):
-  raise RuntimeError(
-      f"Tool not found ({import_tflite_path}). Be sure to build "
-      f"//iree_tf_compiler:iree-import-tflite and run ./symlink_binaries.sh")
 
 # Setup and get version information.
 THIS_DIR = os.path.realpath(os.path.dirname(__file__))
@@ -34,51 +28,18 @@ VERSION_INFO_FILE = os.path.join(IREESRC_DIR, "version_info.json")
 
 
 def load_version_info():
-  with open(VERSION_INFO_FILE, "rt") as f:
-    return json.load(f)
+    with open(VERSION_INFO_FILE, "rt") as f:
+        return json.load(f)
 
 
 try:
-  version_info = load_version_info()
+    version_info = load_version_info()
 except FileNotFoundError:
-  print("version_info.json not found. Using defaults")
-  version_info = {}
+    print("version_info.json not found. Using defaults")
+    version_info = {}
 
 PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
 PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
-
-# Force platform specific wheel.
-# https://stackoverflow.com/questions/45150304
-try:
-  from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
-
-  class bdist_wheel(_bdist_wheel):
-
-    def finalize_options(self):
-      _bdist_wheel.finalize_options(self)
-      self.root_is_pure = False
-
-    def get_tag(self):
-      python, abi, plat = _bdist_wheel.get_tag(self)
-      # We don't contain any python extensions so are version agnostic
-      # but still want to be platform specific.
-      python, abi = 'py3', 'none'
-      return python, abi, plat
-
-except ImportError:
-  bdist_wheel = None
-
-
-# Force installation into platlib.
-# Since this is a pure-python library with platform binaries, it is
-# mis-detected as "pure", which fails audit. Usually, the presence of an
-# extension triggers non-pure install. We force it here.
-class platlib_install(install):
-
-  def finalize_options(self):
-    install.finalize_options(self)
-    self.install_lib = self.install_platlib
-
 
 setup(
     name=f"iree-tools-tflite{PACKAGE_SUFFIX}",
@@ -99,16 +60,16 @@ setup(
         "Programming Language :: Python :: 3.10",
     ],
     python_requires=">=3.8",
-    packages=find_namespace_packages(include=[
-        "iree.tools.tflite",
-        "iree.tools.tflite.*",
-    ]),
+    packages=find_namespace_packages(
+        include=[
+            "iree.tools.tflite",
+            "iree.tools.tflite.*",
+        ]
+    ),
     package_data={
-        "iree.tools.tflite": [f"iree-import-tflite{exe_suffix}",],
-    },
-    cmdclass={
-        'bdist_wheel': bdist_wheel,
-        'install': platlib_install,
+        "iree.tools.tflite": [
+            f"iree-import-tflite{exe_suffix}",
+        ],
     },
     entry_points={
         "console_scripts": [

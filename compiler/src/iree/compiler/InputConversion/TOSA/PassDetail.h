@@ -21,7 +21,7 @@ namespace iree_compiler {
 #define GEN_PASS_CLASSES
 #include "iree/compiler/InputConversion/TOSA/Passes.h.inc"
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_TOSA_PASSDETAIL_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_TOSA_PASSDETAIL_H_

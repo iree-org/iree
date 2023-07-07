@@ -1,4 +1,4 @@
-// R-UN: iree-run-mlir --iree-hal-target-backends=llvm-cpu \
+// R-UN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu \
 /// Specify the dispatch region formation with the transform dialect.
 // R-UN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir \
 /// Specify the codegen strategy with the transform dialect.

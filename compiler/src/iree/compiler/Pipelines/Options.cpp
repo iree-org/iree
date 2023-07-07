@@ -40,14 +40,18 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Specifies the input program representation."),
       llvm::cl::values(
           clEnumValN(InputDialectOptions::Type::none, "none",
-                     "No input dialect transformation.")
+                     "No input dialect transformation."),
+          clEnumValN(InputDialectOptions::Type::auto_detect, "auto",
+                     "Analyze the input program to choose conversion.")
   // clang-format off
-#ifdef IREE_HAVE_MHLO_INPUT
-        , clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
-                     "Legalize from MHLO ops.")
-        , clEnumValN(InputDialectOptions::Type::xla, "xla",
-              "Legalize from MHLO ops (with XLA cleanup preprocessing).")
-#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_STABLEHLO_INPUT
+        , clEnumValN(InputDialectOptions::Type::stablehlo,
+            "stablehlo",
+            "Legalize from StableHLO ops.")
+        , clEnumValN(InputDialectOptions::Type::stablehlo_xla,
+            "stablehlo_xla",
+            "Legalize from StableHLO ops (with XLA cleanup preprocessing). ")
+#endif  // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
         , clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",
                      "Legalize from TMTensor ops.")
@@ -59,6 +63,23 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
           ),
       // clang-format on
       llvm::cl::cat(category));
+
+#ifdef IREE_HAVE_STABLEHLO_INPUT
+  binder.opt<bool>(
+      "iree-input-demote-i64-to-i32", demoteI64ToI32,
+      llvm::cl::desc("Converts all i64 ops and values into i32 counterparts."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-input-demote-f64-to-f32", demoteF64ToF32,
+      llvm::cl::desc("Converts all f64 ops and values into f32 counterparts."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-input-promote-bf16-to-f32", promoteBF16ToF32,
+      llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts."),
+      llvm::cl::cat(category));
+#endif // IREE_HAVE_STABLEHLO_INPUT
 }
 
 void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
@@ -144,5 +165,5 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

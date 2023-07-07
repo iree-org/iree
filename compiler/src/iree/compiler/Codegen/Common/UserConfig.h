@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -13,5 +13,5 @@ namespace iree_compiler {
 LogicalResult setUserConfig(func::FuncOp entryPointFn, Operation *computeOp,
                             IREE::Codegen::CompilationInfoAttr compilationInfo);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

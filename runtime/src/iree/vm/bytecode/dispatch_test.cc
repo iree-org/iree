@@ -37,7 +37,8 @@ std::vector<TestParams> GetModuleTestParams() {
   std::vector<TestParams> test_params;
 
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
 
   const struct iree_file_toc_t* module_file_toc =
       all_bytecode_modules_c_create();
@@ -48,7 +49,7 @@ std::vector<TestParams> GetModuleTestParams() {
         instance,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file.data),
-            module_file.size},
+            static_cast<iree_host_size_t>(module_file.size)},
         iree_allocator_null(), iree_allocator_system(), &module));
     iree_vm_module_signature_t signature = iree_vm_module_signature(module);
     test_params.reserve(test_params.size() + signature.export_function_count);
@@ -75,13 +76,14 @@ class VMBytecodeDispatchTest
   virtual void SetUp() {
     const auto& test_params = GetParam();
 
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         instance_,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(test_params.module_file.data),
-            test_params.module_file.size},
+            static_cast<iree_host_size_t>(test_params.module_file.size)},
         iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};

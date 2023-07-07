@@ -21,7 +21,6 @@ iree_cc_library(
     ::caching_allocator
     ::debug_allocator
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -35,7 +34,6 @@ iree_cc_library(
     "buffer_transfer.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -49,7 +47,6 @@ iree_cc_library(
     "debug_allocator.c"
   DEPS
     iree::base
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -65,7 +62,6 @@ iree_cc_library(
     ::resource_set
     iree::base
     iree::base::internal::arena
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -80,7 +76,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -96,7 +91,47 @@ iree_cc_library(
     ::resource_set
     iree::base
     iree::base::internal::arena
-    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    libmpi
+  HDRS
+    "libmpi.h"
+    "libmpi_dynamic_symbols.h"
+  SRCS
+    "libmpi.c"
+  DEPS
+    iree::base
+    iree::base::internal::dynamic_library
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    libmpi_test
+  SRCS
+    "libmpi_test.cc"
+  DEPS
+    ::libmpi
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    mpi_channel_provider
+  HDRS
+    "mpi_channel_provider.h"
+  SRCS
+    "mpi_channel_provider.c"
+  DEPS
+    ::libmpi
+    iree::base
     iree::hal
   PUBLIC
 )
@@ -110,8 +145,8 @@ iree_cc_library(
     "resource_set.c"
   DEPS
     iree::base
+    iree::base::internal
     iree::base::internal::arena
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -153,7 +188,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
   PUBLIC
 )

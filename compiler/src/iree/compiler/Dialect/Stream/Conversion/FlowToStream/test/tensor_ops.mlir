@@ -46,6 +46,18 @@ func.func @tensorReshapeWithMultipleUses(%input: tensor<5x24x48xf32>)
 
 // -----
 
+// CHECK-LABEL: @tensorAlloca
+//  CHECK-SAME: (%[[DIM0:.+]]: index)
+func.func @tensorAlloca(%dim0: index) -> tensor<?x0xf32> {
+  // CHECK: %[[ALLOCA_SIZE:.+]] = stream.tensor.sizeof tensor<?x0xf32>{%[[DIM0]]}
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca : !stream.resource<*>{%[[ALLOCA_SIZE]]}
+  %0 = flow.tensor.alloca : tensor<?x0xf32>{%dim0}
+  // CHECK: return %[[ALLOCA]]
+  return %0 : tensor<?x0xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorEmpty
 //  CHECK-SAME: (%[[DIM0:.+]]: index)
 func.func @tensorEmpty(%dim0: index) -> tensor<?x0xf32> {

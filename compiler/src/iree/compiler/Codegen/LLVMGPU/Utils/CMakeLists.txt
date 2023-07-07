@@ -21,8 +21,9 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineDialect
+    MLIRArithDialect
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRMathDialect
     MLIRMemRefDialect

@@ -22,7 +22,7 @@ namespace iree_compiler {
 /// Register external models for PartitionableLoopsInterface.
 void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_INTERFACES_PARTITIONABLE_LOOPS_INTERFACE_H_
+#endif // IREE_COMPILER_CODEGEN_INTERFACES_PARTITIONABLE_LOOPS_INTERFACE_H_

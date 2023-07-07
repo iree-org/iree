@@ -37,16 +37,14 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/src/iree/compiler/InputConversion/Common",
-        "//compiler/src/iree/compiler/InputConversion/MHLO",
         "//compiler/src/iree/compiler/InputConversion/StableHLO",
         "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:TosaDialect",
-        "@mlir-hlo//:mlir_hlo",
-        "@mlir-hlo//stablehlo:chlo_ops",
-        "@mlir-hlo//stablehlo:stablehlo_ops",
+        "@stablehlo//:chlo_ops",
+        "@stablehlo//:stablehlo_ops",
         "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )
@@ -112,6 +110,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:EmitCDialect",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FuncExtensions",
         "@llvm-project//mlir:FuncToSPIRV",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRV",
@@ -178,20 +177,14 @@ iree_compiler_cc_library(
         "IREE_HAVE_ROCM_TARGET",
         "IREE_HAVE_VMVX_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
-    ] + select({
-        ":cuda_enabled": ["IREE_HAVE_CUDA_TARGET"],
-        "//conditions:default": [],
-    }),
+    ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/ROCM",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VMVX",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    ] + select({
-        ":cuda_enabled": ["//compiler/src/iree/compiler/Dialect/HAL/Target/CUDA"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 iree_compiler_cc_library(

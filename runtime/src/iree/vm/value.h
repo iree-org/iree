@@ -38,6 +38,9 @@ typedef enum iree_vm_value_type_e {
   IREE_VM_VALUE_TYPE_MAX = IREE_VM_VALUE_TYPE_F64,
   IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,  // used for lookup
 } iree_vm_value_type_t;
+static_assert(
+    IREE_VM_VALUE_TYPE_MAX < (1 << IREE_VM_REF_TYPE_TAG_BITS),
+    "bitpacking in iree_vm_type_def_t requires this enum to be small");
 
 // Maximum size, in bytes, of any value type we can represent.
 #define IREE_VM_VALUE_STORAGE_SIZE 8

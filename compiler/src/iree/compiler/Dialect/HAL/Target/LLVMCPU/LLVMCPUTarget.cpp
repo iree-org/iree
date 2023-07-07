@@ -11,9 +11,11 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/UKernel.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LinkerTool.h"
@@ -38,6 +40,24 @@
 #include "mlir/Target/LLVMIR/Export.h"
 
 #define DEBUG_TYPE "iree-llvm-cpu-target"
+
+// TODO(ravishankarm): This is redundant w.r.t `iree-vmvx-enable-microkernels`
+// flag. Fold these into either a single flag, or not have the flag at all.
+static llvm::cl::opt<bool> clEnableCPUMicrokernels(
+    "iree-llvmcpu-enable-microkernels",
+    llvm::cl::desc(
+        "Enables microkernel lowering for llvmcpu backend (experimental)"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
+    "iree-llvmcpu-native-vector-width-in-bytes",
+    llvm::cl::desc("sets the native vector register width of the hardware. It "
+                   "overrides any inferred vector register width"),
+    llvm::cl::init(0));
+
+// Default native vector width when target or specific native vector width are
+// not provided.
+constexpr unsigned defaultNativeVectorWidth = 16;
 
 namespace mlir {
 namespace iree_compiler {
@@ -95,7 +115,7 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
 
   // Matches iree_hal_system_executable_footer_t.
   struct Footer {
-    uint8_t magic[8];  // IREEDBG\0
+    uint8_t magic[8]; // IREEDBG\0
     uint32_t version;
     uint32_t flags;
     uint64_t libraryOffset;
@@ -117,8 +137,26 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
   return success();
 }
 
+/// Helper method to check if the variant op has a `ukernel` attribute
+/// in its `hal.executable.target`. If so, load the ukernel library
+/// for that target and link.
+// Note: This is duplicate of a similar function in Codegen/. For
+// now duplicating this to avoid false linking issues. Eventually
+// presence of this attribute in the `hal.executable.target` should
+// drive everything.
+static bool hasMicrokernel(IREE::HAL::ExecutableVariantOp variantOp) {
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (!targetAttr)
+    return false;
+  auto config = targetAttr.getConfiguration();
+  if (!config)
+    return false;
+  auto attr = config.getAs<BoolAttr>("ukernels");
+  return attr && attr.getValue();
+}
+
 class LLVMCPUTargetBackend final : public TargetBackend {
- public:
+public:
   explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {
     initializeConfiguration(options_);
@@ -141,8 +179,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // clang-format on
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -169,9 +207,11 @@ class LLVMCPUTargetBackend final : public TargetBackend {
   LLVMTarget getVariantTarget(IREE::HAL::ExecutableVariantOp variantOp) {
     auto configAttr = variantOp.getTarget().getConfiguration();
     auto tryAttrLookup = [&](StringRef name, StringRef fallback) {
-      if (!configAttr) return fallback.str();
-      auto value = configAttr.get(name).dyn_cast_or_null<StringAttr>();
-      if (!value) return fallback.str();
+      if (!configAttr)
+        return fallback.str();
+      auto value = llvm::dyn_cast_if_present<StringAttr>(configAttr.get(name));
+      if (!value)
+        return fallback.str();
       return value.str();
     };
     LLVMTarget target;
@@ -255,22 +295,22 @@ class LLVMCPUTargetBackend final : public TargetBackend {
                                   LibraryBuilder::Version::LATEST);
 
     switch (options_.sanitizerKind) {
-      case SanitizerKind::kNone: {
-        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
-        break;
+    case SanitizerKind::kNone: {
+      libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
+      break;
+    }
+    case SanitizerKind::kAddress: {
+      libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::ADDRESS);
+      for (auto &function : llvmModule->getFunctionList()) {
+        function.addFnAttr(llvm::Attribute::SanitizeAddress);
       }
-      case SanitizerKind::kAddress: {
-        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::ADDRESS);
-        for (auto &function : llvmModule->getFunctionList()) {
-          function.addFnAttr(llvm::Attribute::SanitizeAddress);
-        }
-      } break;
-      case SanitizerKind::kThread: {
-        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::THREAD);
-        for (auto &function : llvmModule->getFunctionList()) {
-          function.addFnAttr(llvm::Attribute::SanitizeThread);
-        }
-      } break;
+    } break;
+    case SanitizerKind::kThread: {
+      libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::THREAD);
+      for (auto &function : llvmModule->getFunctionList()) {
+        function.addFnAttr(llvm::Attribute::SanitizeThread);
+      }
+    } break;
     }
 
     // Declare dynamically imported functions.
@@ -279,8 +319,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     if (auto importsAttr =
             variantOp->getAttrOfType<ArrayAttr>(importsAttrName)) {
       for (auto importAttr : importsAttr.getAsValueRange<ArrayAttr>()) {
-        auto nameAttr = importAttr[0].cast<StringAttr>();
-        auto weakAttr = importAttr[1].cast<BoolAttr>();
+        auto nameAttr = llvm::cast<StringAttr>(importAttr[0]);
+        auto weakAttr = llvm::cast<BoolAttr>(importAttr[1]);
         libraryBuilder.addImport(nameAttr.getValue(), weakAttr.getValue());
       }
       variantOp->removeAttr(importsAttrName);
@@ -312,10 +352,9 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       std::string sourceFile = "";
       int sourceLine = 0;
       if (options.debugLevel >= 1) {
-        // TODO(scotttodd): Copy findFirstFileLoc() from VulkanSPIRVTarget?
-        if (auto loc = exportOp.getLoc().dyn_cast<FileLineColLoc>()) {
-          sourceFile = loc.getFilename().str();
-          sourceLine = loc.getLine();
+        if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
+          sourceFile = loc->getFilename().str();
+          sourceLine = loc->getLine();
         }
       }
       libraryBuilder.addExport(
@@ -375,7 +414,15 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // This approximates LTO.
     llvm::Linker moduleLinker(*llvmModule);
 
-    // Link any user bitcode objects and specialize them for the current config.
+    // Link any bitcode files specified on the command line.
+    if (failed(linkCmdlineBitcodeFile(variantOp.getLoc(), moduleLinker,
+                                      llvm::Linker::OverrideFromSrc,
+                                      *targetMachine, context))) {
+      return failure();
+    }
+
+    // Link any bitcode objects specified in executable.object attributes and
+    // specialize them for the current config.
     if (failed(linkBitcodeObjects(variantOp.getLoc(), moduleLinker,
                                   llvm::Linker::LinkOnlyNeeded, *targetMachine,
                                   variantOp.getObjectsAttr(), context))) {
@@ -410,10 +457,64 @@ class LLVMCPUTargetBackend final : public TargetBackend {
              << targetTriple.str() << "'";
     }
 
+    // Link in ukernel bitcode.
+    if (hasMicrokernel(variantOp)) {
+      auto setAlwaysInline = [&](llvm::Module &module) {
+        for (auto &func : module.getFunctionList()) {
+          func.addFnAttr(llvm::Attribute::AlwaysInline);
+        }
+      };
+
+      llvm::Expected<std::unique_ptr<llvm::Module>> archBitcode =
+          loadUKernelArchBitcode(targetMachine.get(), context);
+      if (!archBitcode) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed to load architecture-specific ukernel bitcode: "
+               << llvm::toString(archBitcode.takeError());
+      }
+
+      // The archBitcode contains overrides for weak symbols that will come in
+      // the baseBitcode below. So we link it before baseBitcode, with
+      // OverrideFromSrc.
+      //
+      // archBitcode is optional, may be null if there is none for the target
+      // architecture.
+      if (archBitcode.get()) {
+        // Sequence that access before we std::move(archBitcode)!
+        StringRef archBitcodeName =
+            archBitcode ? archBitcode.get()->getName() : "";
+        if (failed(linkBitcodeModule(
+                variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
+                *targetMachine, archBitcodeName, std::move(archBitcode),
+                setAlwaysInline))) {
+          return mlir::emitError(variantOp.getLoc())
+                 << "failed linking in architecture-specific ukernel bitcode "
+                    "for target triple '"
+                 << targetTriple.str() << "'";
+        }
+      }
+
+      // The baseBitcode module contains weak symbols for fallbacks.
+      // So we link it after the archBitcode and with LinkOnlyNeeded.
+      llvm::Expected<std::unique_ptr<llvm::Module>> baseBitcode =
+          loadUKernelBaseBitcode(targetMachine.get(), context);
+      // Sequence that access before we std::move(baseBitcode)!
+      StringRef baseBitcodeName =
+          baseBitcode ? baseBitcode.get()->getName() : "";
+      if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
+                                   llvm::Linker::LinkOnlyNeeded, *targetMachine,
+                                   baseBitcodeName, std::move(baseBitcode),
+                                   setAlwaysInline))) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed linking in base ukernel bitcode";
+      }
+    }
+
     // Strip any compiler identifiers that may have snuck in. We let the linker
     // tag the module.
     auto *llvmIdent = llvmModule->getNamedMetadata("llvm.ident");
-    if (llvmIdent) llvmIdent->clearOperands();
+    if (llvmIdent)
+      llvmIdent->clearOperands();
 
     // Dump all linked bitcode prior to optimization.
     if (!options.dumpIntermediatesPath.empty()) {
@@ -488,7 +589,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
                                                    {".o", ".obj", ".a", ".lib"},
                                                    linkerObjectAttrs);
     for (auto [index, attr] : llvm::enumerate(linkerObjectAttrs)) {
-      auto objectAttr = attr.cast<IREE::HAL::ExecutableObjectAttr>();
+      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(attr);
       if (auto dataAttr = objectAttr.getData()) {
         objectFiles.push_back(Artifact::createTemporary(
             objectFiles.front().path + "_object_" + std::to_string(index),
@@ -599,25 +700,25 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       const char *mimeType = nullptr;
       const char *extension = "";
       switch (targetTriple.getObjectFormat()) {
-        case llvm::Triple::ObjectFormatType::COFF:
-          mimeType = "application/x-msdownload";
-          extension = ".dll";
-          break;
-        case llvm::Triple::ObjectFormatType::ELF:
-          mimeType = "application/x-elf";
-          extension = ".so";
-          break;
-        case llvm::Triple::ObjectFormatType::MachO:
-          mimeType = "application/x-dylib";
-          extension = ".dylib";
-          break;
-        case llvm::Triple::ObjectFormatType::Wasm:
-          mimeType = "application/wasm";
-          extension = ".wasm";
-          break;
-        default:
-          mimeType = "application/octet-stream";
-          break;
+      case llvm::Triple::ObjectFormatType::COFF:
+        mimeType = "application/x-msdownload";
+        extension = ".dll";
+        break;
+      case llvm::Triple::ObjectFormatType::ELF:
+        mimeType = "application/x-elf";
+        extension = ".so";
+        break;
+      case llvm::Triple::ObjectFormatType::MachO:
+        mimeType = "application/x-dylib";
+        extension = ".dylib";
+        break;
+      case llvm::Triple::ObjectFormatType::Wasm:
+        mimeType = "application/wasm";
+        extension = ".wasm";
+        break;
+      default:
+        mimeType = "application/octet-stream";
+        break;
       }
 
       // Load the linked system library and optionally tag on the debug
@@ -656,7 +757,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
@@ -664,8 +765,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context) const {
     std::string format;
     if (options_.linkStatic) {
       // Static libraries are just string references when serialized so we don't
@@ -681,52 +782,24 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         // System-specific shared library format.
         format += "system-";
         switch (targetTriple.getObjectFormat()) {
-          case llvm::Triple::ObjectFormatType::COFF:
-            format += "dll-";
-            break;
-          case llvm::Triple::ObjectFormatType::ELF:
-            format += "elf-";
-            break;
-          case llvm::Triple::ObjectFormatType::MachO:
-            format += "dylib-";
-            break;
-          case llvm::Triple::ObjectFormatType::Wasm:
-            format += "wasm-";
-            break;
-          default:
-            format += "unknown-";
-            break;
-        }
-      }
-      switch (targetTriple.getArch()) {
-        case llvm::Triple::ArchType::arm:
-          format += "arm_32";
+        case llvm::Triple::ObjectFormatType::COFF:
+          format += "dll-";
           break;
-        case llvm::Triple::ArchType::aarch64:
-          format += "arm_64";
+        case llvm::Triple::ObjectFormatType::ELF:
+          format += "elf-";
           break;
-        case llvm::Triple::ArchType::riscv32:
-          format += "riscv_32";
+        case llvm::Triple::ObjectFormatType::MachO:
+          format += "dylib-";
           break;
-        case llvm::Triple::ArchType::riscv64:
-          format += "riscv_64";
-          break;
-        case llvm::Triple::ArchType::wasm32:
-          format += "wasm_32";
-          break;
-        case llvm::Triple::ArchType::wasm64:
-          format += "wasm_64";
-          break;
-        case llvm::Triple::ArchType::x86:
-          format += "x86_32";
-          break;
-        case llvm::Triple::ArchType::x86_64:
-          format += "x86_64";
+        case llvm::Triple::ObjectFormatType::Wasm:
+          format += "wasm-";
           break;
         default:
-          format += "unknown";
+          format += "unknown-";
           break;
+        }
       }
+      format += getIreeArchNameForTargetTriple(targetTriple);
     }
 
     // Add some configurations to the `hal.executable.target` attribute.
@@ -750,6 +823,9 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     addConfig("native_vector_size",
               IntegerAttr::get(IndexType::get(context), config_.vectorSize));
 
+    // Check if microkernels are to be enabled.
+    addConfig("ukernels", BoolAttr::get(context, clEnableCPUMicrokernels));
+
     return IREE::HAL::ExecutableTargetAttr::get(
         context, StringAttr::get(context, "llvm-cpu"),
         StringAttr::get(context, format), DictionaryAttr::get(context, config));
@@ -772,17 +848,34 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     llvm::Function *dummyFunc = llvm::Function::Create(
         llvm::FunctionType::get(voidType, false),
         llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
+
+    // If target supports AVX-512, enforce 512-bit vector registers.
+    llvm::StringRef targetFeatures = targetMachine->getTargetFeatureString();
+    if (targetFeatures.contains("avx512")) {
+      dummyFunc->addFnAttr("prefer-vector-width", "512");
+    }
+
     llvm::TargetTransformInfo tti =
         targetMachine->getTargetTransformInfo(*dummyFunc);
-    config_.vectorSize = tti.getRegisterBitWidth(
-                             llvm::TargetTransformInfo::RGK_FixedWidthVector) /
-                         8;
+
+    // Set the native vector width. We prioritize user-specified widths over
+    // widths provided by TTI.
+    if (clNativeVectorWidthInBytes) {
+      config_.vectorSize = clNativeVectorWidthInBytes;
+    } else {
+      unsigned ttiVectorWidth =
+          tti.getRegisterBitWidth(
+              llvm::TargetTransformInfo::RGK_FixedWidthVector) /
+          8;
+      config_.vectorSize =
+          ttiVectorWidth > 1 ? ttiVectorWidth : defaultNativeVectorWidth;
+    }
+
     LLVM_DEBUG({
       llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
       llvm::dbgs() << "Target Triple : "
                    << targetMachine->getTargetTriple().normalize() << "\n";
-      llvm::dbgs() << "Target Feature string : "
-                   << targetMachine->getTargetFeatureString() << "\n";
+      llvm::dbgs() << "Target Feature string : " << targetFeatures << "\n";
       llvm::dbgs() << "Data Layout : " << config_.dataLayoutStr << "\n";
       llvm::dbgs() << "Vector Width : " << config_.vectorSize << "\n";
     });
@@ -810,11 +903,11 @@ void registerLLVMCPUTargetBackends(
 // require build support, which is a pain to manage across platforms.
 //
 // See comments below.
-#define LLVM_INITIALIZE_GENERIC(TargetName) \
-  LLVMInitialize##TargetName##Target();     \
-  LLVMInitialize##TargetName##TargetMC();   \
-  LLVMInitialize##TargetName##TargetInfo(); \
-  LLVMInitialize##TargetName##AsmPrinter(); \
+#define LLVM_INITIALIZE_GENERIC(TargetName)                                    \
+  LLVMInitialize##TargetName##Target();                                        \
+  LLVMInitialize##TargetName##TargetMC();                                      \
+  LLVMInitialize##TargetName##TargetInfo();                                    \
+  LLVMInitialize##TargetName##AsmPrinter();                                    \
   LLVMInitialize##TargetName##AsmParser();
 
 // CPU targets that we care about and have hard-linked against are here.
@@ -824,7 +917,7 @@ void registerLLVMCPUTargetBackends(
 #define LLVM_INITIALIZE_TARGET_ARM() LLVM_INITIALIZE_GENERIC(ARM)
 #define LLVM_INITIALIZE_TARGET_RISCV() LLVM_INITIALIZE_GENERIC(RISCV)
 #define LLVM_INITIALIZE_TARGET_X86() LLVM_INITIALIZE_GENERIC(X86)
-#define LLVM_INITIALIZE_TARGET_WebAssembly() \
+#define LLVM_INITIALIZE_TARGET_WebAssembly()                                   \
   LLVM_INITIALIZE_GENERIC(WebAssembly)
 
 // We must no-op the name of each target we don't care about. This is annoying,
@@ -857,7 +950,7 @@ void registerLLVMCPUTargetBackends(
   static TargetBackendRegistration registration("llvm-cpu", backendFactory);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

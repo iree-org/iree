@@ -5,8 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines PyTorch models."""
 
+import string
+
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
+import e2e_test_framework.models.utils as model_utils
 
 # Implementations of the models listed below can be found in
 # https://github.com/iree-org/iree-samples/tree/main/iree-torch/importer.
@@ -25,10 +28,10 @@ MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH = common_definitions.Model(
     name="ClipTextSeqLen64PT",
     tags=["fp32", "seqlen64"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_CLIP_TEXT_MODEL_SEQLEN64/linalg.mlir",
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_CLIP_TEXT_MODEL_SEQLEN64/linalg.mlir",
     entry_function="forward",
-    input_types=["1x77xi64", "1x77xi64"])
+    input_types=["1x77xi64", "1x77xi64"],
+)
 
 # `Unet2d` consists of `ResNet` encoder and decoder blocks with cross-attention layers.
 #
@@ -48,10 +51,10 @@ MODEL_UNET_2D_FP32_TORCH = common_definitions.Model(
     name="Unet2dPT",
     tags=["fp32"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_UNET_MODEL/linalg.mlir",
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_UNET_MODEL/linalg.mlir",
     entry_function="forward",
-    input_types=["1x4x64x64xf32", "1x77x768xf32"])
+    input_types=["1x4x64x64xf32", "1x77x768xf32"],
+)
 
 # Converted from https://pytorch.org/vision/stable/models/generated/torchvision.models.efficientnet_v2_s.html#torchvision.models.efficientnet_v2_s
 EFFICIENTNET_V2_S_FP32_TORCH = common_definitions.Model(
@@ -59,10 +62,21 @@ EFFICIENTNET_V2_S_FP32_TORCH = common_definitions.Model(
     name="EfficientNetV2SPT",
     tags=["fp32", "cnn", "depthwise-conv"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_V2_S/batch_1/linalg.mlir",
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_V2_S/batch_1/linalg.mlir",
     entry_function="forward",
-    input_types=["1x3x384x384xf32"])
+    input_types=["1x3x384x384xf32"],
+)
+
+# FP16
+EFFICIENTNET_V2_S_FP16_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_EFFICIENTNET_V2_S_FP16_TORCH,
+    name="EfficientNetV2Sfp16PT",
+    tags=["fp16", "cnn", "depthwise-conv"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684831160/EFFICIENTNET_V2_S_FP16/batch_1/linalg.mlir",
+    entry_function="forward",
+    input_types=["1x3x384x384xf16"],
+)
 
 # Converted from https://pytorch.org/vision/stable/models/generated/torchvision.models.efficientnet_b7.html#torchvision.models.efficientnet_b7
 EFFICIENTNET_B7_FP32_TORCH = common_definitions.Model(
@@ -70,159 +84,92 @@ EFFICIENTNET_B7_FP32_TORCH = common_definitions.Model(
     name="EfficientNetB7PT",
     tags=["fp32", "cnn", "depthwise-conv"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir",
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir",
     entry_function="forward",
-    input_types=["1x3x600x600xf32"])
+    input_types=["1x3x600x600xf32"],
+)
+
+ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
+NAME_FORMAT = string.Template("${name}Batch${batch_size}")
+BERT_LARGE_FP32_URL = string.Template(
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_${batch_size}/linalg.mlir"
+)
+BERT_LARGE_FP16_URL = string.Template(
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_${batch_size}/linalg.mlir"
+)
+RESNET50_FP32_URL = string.Template(
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_${batch_size}/linalg.mlir"
+)
+RESNET50_FP16_URL = string.Template(
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_${batch_size}/linalg.mlir"
+)
 
 # Converted from https://huggingface.co/docs/transformers/v4.27.2/en/model_doc/bert#transformers.BertModel
-BERT_LARGE_1X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_1X384_FP32_TORCH,
-    name="BertLargePTBatch1",
-    tags=["fp32", "transformer", "seqlen384", "batch-1"],
+BERT_LARGE_384_FP32_TORCH_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_BERT_LARGE_384_FP32_TORCH
+    ),
+    name_template=model_utils.partial_template_substitute(
+        NAME_FORMAT, name="BertLargePT"
+    ),
+    tags=["fp32", "transformer", "seqlen384"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_1/linalg.mlir",
+    source_url_template=BERT_LARGE_FP32_URL,
     entry_function="forward",
-    input_types=["1x384xi64", "1x384xi64"])
+    input_type_templates=[
+        string.Template("${batch_size}x384xi64"),
+        string.Template("${batch_size}x384xi64"),
+    ],
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
+)
 
-BERT_LARGE_16X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_16X384_FP32_TORCH,
-    name="BertLargePTBatch16",
-    tags=["fp32", "transformer", "seqlen384", "batch-16"],
+# FP16 Versions
+BERT_LARGE_384_FP16_TORCH_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_BERT_LARGE_384_FP16_TORCH
+    ),
+    name_template=model_utils.partial_template_substitute(
+        NAME_FORMAT, name="BertLargefp16PT"
+    ),
+    tags=["fp16", "transformer", "seqlen384"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_16/linalg.mlir",
+    source_url_template=BERT_LARGE_FP16_URL,
     entry_function="forward",
-    input_types=["16x384xi64", "16x384xi64"])
-
-BERT_LARGE_24X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_24X384_FP32_TORCH,
-    name="BertLargePTBatch24",
-    tags=["fp32", "transformer", "seqlen384", "batch-24"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_24/linalg.mlir",
-    entry_function="forward",
-    input_types=["24x384xi64", "24x384xi64"])
-
-BERT_LARGE_32X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_32X384_FP32_TORCH,
-    name="BertLargePTBatch32",
-    tags=["fp32", "transformer", "seqlen384", "batch-32"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_32/linalg.mlir",
-    entry_function="forward",
-    input_types=["32x384xi64", "32x384xi64"])
-
-BERT_LARGE_48X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_48X384_FP32_TORCH,
-    name="BertLargePTBatch48",
-    tags=["fp32", "transformer", "seqlen384", "batch-48"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_48/linalg.mlir",
-    entry_function="forward",
-    input_types=["48x384xi64", "48x384xi64"])
-
-BERT_LARGE_64X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_64X384_FP32_TORCH,
-    name="BertLargePTBatch64",
-    tags=["fp32", "transformer", "seqlen384", "batch-64"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_64/linalg.mlir",
-    entry_function="forward",
-    input_types=["64x384xi64", "64x384xi64"])
-
-BERT_LARGE_512X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_512X384_FP32_TORCH,
-    name="BertLargePTBatch512",
-    tags=["fp32", "transformer", "seqlen384", "batch-512"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_512/linalg.mlir",
-    entry_function="forward",
-    input_types=["512x384xi64", "512x384xi64"])
-
-BERT_LARGE_1024X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_1024X384_FP32_TORCH,
-    name="BertLargePTBatch1024",
-    tags=["fp32", "transformer", "seqlen384", "batch-1024"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_1024/linalg.mlir",
-    entry_function="forward",
-    input_types=["1024x384xi64", "1024x384xi64"])
-
-BERT_LARGE_1280X384_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_BERT_LARGE_1280X384_FP32_TORCH,
-    name="BertLargePTBatch1280",
-    tags=["fp32", "transformer", "seqlen384", "batch-1280"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_1280/linalg.mlir",
-    entry_function="forward",
-    input_types=["1280x384xi64", "1280x384xi64"])
+    input_type_templates=[
+        string.Template("${batch_size}x384xi64"),
+        string.Template("${batch_size}x384xi64"),
+    ],
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
+)
 
 # Converted from https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html
-RESNET50_1X3X224X224_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_1X3X224X224_FP32_TORCH,
-    name="Resnet50PTBatch1",
-    tags=["fp32", "cnn", "batch-1"],
+RESNET50_3X224X224_FP32_TORCH_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_RESNET50_3X224X224_FP32_TORCH
+    ),
+    name_template=model_utils.partial_template_substitute(
+        NAME_FORMAT, name="Resnet50PT"
+    ),
+    tags=["fp32", "cnn"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_1/linalg.mlir",
+    source_url_template=RESNET50_FP32_URL,
     entry_function="forward",
-    input_types=["1x3x224x224xf32"])
+    input_type_templates=[string.Template("${batch_size}x3x224x224xf32")],
+    batch_sizes=[1, 8, 64, 128, 256, 2048],
+)
 
-RESNET50_8X3X224X224_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_8X3X224X224_FP32_TORCH,
-    name="Resnet50PTBatch8",
-    tags=["fp32", "cnn", "batch-8"],
+# FP16 Versions
+RESNET50_3X224X224_FP16_TORCH_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_RESNET50_3X224X224_FP16_TORCH
+    ),
+    name_template=model_utils.partial_template_substitute(
+        NAME_FORMAT, name="Resnet50fp16PT"
+    ),
+    tags=["fp32", "cnn"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_8/linalg.mlir",
+    source_url_template=RESNET50_FP16_URL,
     entry_function="forward",
-    input_types=["8x3x224x224xf32"])
-
-RESNET50_64X3X224X224_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_64X3X224X224_FP32_TORCH,
-    name="Resnet50PTBatch64",
-    tags=["fp32", "cnn", "batch-64"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_64/linalg.mlir",
-    entry_function="forward",
-    input_types=["64x3x224x224xf32"])
-
-RESNET50_128X3X224X224_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_128X3X224X224_FP32_TORCH,
-    name="Resnet50PTBatch128",
-    tags=["fp32", "cnn", "batch-128"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_128/linalg.mlir",
-    entry_function="forward",
-    input_types=["128x3x224x224xf32"])
-
-RESNET50_256X3X224X224_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_256X3X224X224_FP32_TORCH,
-    name="Resnet50PTBatch256",
-    tags=["fp32", "cnn", "batch-256"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_256/linalg.mlir",
-    entry_function="forward",
-    input_types=["256x3x224x224xf32"])
-
-RESNET50_2048X3X224X224_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_2048X3X224X224_FP32_TORCH,
-    name="Resnet50PTBatch2048",
-    tags=["fp32", "cnn", "batch-2048"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_2048/linalg.mlir",
-    entry_function="forward",
-    input_types=["2048x3x224x224xf32"])
+    input_type_templates=[string.Template("${batch_size}x3x224x224xf16")],
+    batch_sizes=[1, 8, 64, 128, 256, 2048],
+)

@@ -22,27 +22,22 @@ namespace {
 // Converts linalg.conv_2d_input_nhwc_filter_nhwc op to linalg.matmul
 template <typename Conv2DOpType>
 class Convert1x1FilterConvToMatmul : public OpRewritePattern<Conv2DOpType> {
- public:
+public:
   using OpRewritePattern<Conv2DOpType>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(Conv2DOpType convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputShapeType = convOp.getDpsInputOperand(0)
-                              ->get()
-                              .getType()
-                              .template dyn_cast<RankedTensorType>();
-    auto filterShapeType = convOp.getDpsInputOperand(1)
-                               ->get()
-                               .getType()
-                               .template dyn_cast<RankedTensorType>();
-    auto outputShapeType = convOp.getDpsInitOperand(0)
-                               ->get()
-                               .getType()
-                               .template dyn_cast<RankedTensorType>();
+    auto inputShapeType = llvm::dyn_cast<RankedTensorType>(
+        convOp.getDpsInputOperand(0)->get().getType());
+    auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
+        convOp.getDpsInputOperand(1)->get().getType());
+    auto outputShapeType = llvm::dyn_cast<RankedTensorType>(
+        convOp.getDpsInitOperand(0)->get().getType());
 
     const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(convOp);
     const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(convOp);
-    if (!isNCHW & !isNHWC) return failure();
+    if (!isNCHW & !isNHWC)
+      return failure();
 
     if (!inputShapeType || !filterShapeType || !outputShapeType)
       return failure();
@@ -66,13 +61,15 @@ class Convert1x1FilterConvToMatmul : public OpRewritePattern<Conv2DOpType> {
 
     // We cannot merge the width and height if they are both dynamic as we
     // cannot expand them back to their dynamic values.
-    if (isInputHWDynamic) return failure();
+    if (isInputHWDynamic)
+      return failure();
 
     if (filterShape[khIndex] != 1 || filterShape[kwIndex] != 1)
       return failure();
 
     // TODO(ataei): Support conversion to linalg.batch_matmul.
-    if (inputShape[0] != 1) return failure();
+    if (inputShape[0] != 1)
+      return failure();
 
     if (!llvm::all_of(convOp.getStrides(), [](APInt element) {
           return element.getSExtValue() == 1;
@@ -89,8 +86,8 @@ class Convert1x1FilterConvToMatmul : public OpRewritePattern<Conv2DOpType> {
       return a * b;
     };
 
-    SmallVector<ReassociationIndices, 4> reassociationInputOutputIndices;
-    SmallVector<ReassociationIndices, 4> reassociationFilterIndices;
+    SmallVector<ReassociationIndices> reassociationInputOutputIndices;
+    SmallVector<ReassociationIndices> reassociationFilterIndices;
     SmallVector<int64_t> reshapedInputShape(2, 0);
     SmallVector<int64_t> reshapedFilterShape(2, 0);
     SmallVector<int64_t> reshapedOutputShape(2, 0);
@@ -181,13 +178,13 @@ struct Convert1X1FilterConv2DToMatmulPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass() {
   return std::make_unique<Convert1X1FilterConv2DToMatmulPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

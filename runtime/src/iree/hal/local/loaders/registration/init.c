@@ -24,7 +24,7 @@
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE
 
 IREE_API_EXPORT iree_status_t iree_hal_create_all_available_executable_loaders(
-    iree_hal_executable_import_provider_t import_provider,
+    iree_hal_executable_plugin_manager_t* plugin_manager,
     iree_host_size_t capacity, iree_host_size_t* out_count,
     iree_hal_executable_loader_t** loaders, iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(out_count);
@@ -53,14 +53,14 @@ IREE_API_EXPORT iree_status_t iree_hal_create_all_available_executable_loaders(
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
   if (iree_status_is_ok(status)) {
     status = iree_hal_system_library_loader_create(
-        import_provider, host_allocator, &loaders[count++]);
+        plugin_manager, host_allocator, &loaders[count++]);
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
   if (iree_status_is_ok(status)) {
-    status = iree_hal_embedded_elf_loader_create(
-        import_provider, host_allocator, &loaders[count++]);
+    status = iree_hal_embedded_elf_loader_create(plugin_manager, host_allocator,
+                                                 &loaders[count++]);
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF
 
@@ -84,20 +84,20 @@ IREE_API_EXPORT iree_status_t iree_hal_create_all_available_executable_loaders(
 
 IREE_API_EXPORT iree_status_t iree_hal_create_executable_loader_by_name(
     iree_string_view_t name,
-    iree_hal_executable_import_provider_t import_provider,
+    iree_hal_executable_plugin_manager_t* plugin_manager,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
   if (iree_string_view_starts_with(name, IREE_SV("embedded-elf"))) {
-    return iree_hal_embedded_elf_loader_create(import_provider, host_allocator,
+    return iree_hal_embedded_elf_loader_create(plugin_manager, host_allocator,
                                                out_executable_loader);
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
   if (iree_string_view_starts_with(name, IREE_SV("system-library"))) {
-    return iree_hal_system_library_loader_create(
-        import_provider, host_allocator, out_executable_loader);
+    return iree_hal_system_library_loader_create(plugin_manager, host_allocator,
+                                                 out_executable_loader);
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY
 

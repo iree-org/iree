@@ -48,7 +48,7 @@ ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
   return info;
 }
 
-}  // namespace
+} // namespace
 
 void registerConstExprDependentDialects(DialectRegistry &registry) {
   registry.insert<IREE::Util::UtilDialect>();
@@ -115,8 +115,8 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 
   // Never hoist sub-byte aligned values: in legal programs, these will be
   // cast or packed in some successor.
-  if (auto integerType = getElementTypeOrSelf(info->constValue.getType())
-                             .dyn_cast<IntegerType>()) {
+  if (auto integerType = llvm::dyn_cast<IntegerType>(
+          getElementTypeOrSelf(info->constValue.getType()))) {
     if (integerType.getWidth() % 8 != 0) {
       return false;
     }
@@ -158,7 +158,7 @@ bool isHoistableConstExprConsumingOperand(OpOperand *operand) {
   return true;
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

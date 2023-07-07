@@ -7,9 +7,11 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/VMVX/EncodingInfo.h"
+#include "iree/compiler/Codegen/VMVX/PassDetail.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
@@ -43,8 +45,8 @@ static MatmulTileParams chooseMatmulTileParams(MatmulType type,
   return chooseMatmulTileParamsGeneric();
 }
 
-static MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr) {
+static MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (hasMicrokernels(targetAttr)) {
     return chooseDynamicEncodingInfoVMVXMicrokernels;
   }
@@ -54,15 +56,15 @@ static MaterializeEncodingValueFn getMaterializeEncodingValueFn(
 struct VMVXMaterializeEncodingPass
     : public VMVXMaterializeEncodingBase<VMVXMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<arith::ArithDialect, AffineDialect, tensor::TensorDialect,
-                IREE::Flow::FlowDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                IREE::VMVX::VMVXDialect>();
+    registry.insert<
+        arith::ArithDialect, affine::AffineDialect, tensor::TensorDialect,
+        IREE::Flow::FlowDialect, IREE::LinalgExt::IREELinalgExtDialect,
+        IREE::VMVX::VMVXDialect, IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
 };
 
-}  // namespace
+} // namespace
 
 void VMVXMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -73,7 +75,8 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
       [targetAttr](
           RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
         std::optional<TensorEncoding> encoding = getEncoding(tensorType);
-        if (!encoding) return failure();
+        if (!encoding)
+          return failure();
 
         auto matmulType = getMatmulType(*encoding);
         auto matmulOperandRole = getMatmulOperandRole(*encoding);
@@ -104,7 +107,7 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
       operation.emitOpError("folding patterns failed");
       return signalPassFailure();
@@ -117,5 +120,5 @@ createVMVXMaterializeEncodingPass() {
   return std::make_unique<VMVXMaterializeEncodingPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

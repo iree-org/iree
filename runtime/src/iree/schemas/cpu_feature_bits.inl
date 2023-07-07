@@ -47,12 +47,34 @@
 // IREE_ARCH_ARM_64 / aarch64
 //===----------------------------------------------------------------------===//
 
-// TODO: add several common ARM ISA extensions and allocate some ranges of
-// bits for some families/eras. If we just start out with bits 0 and 1
-// allocated for dotprod and i8mm, we are quickly going to have a hard-to-read
-// enumeration here.
-IREE_CPU_FEATURE_BIT(ARM_64, 0, 0, DOTPROD, "dotprod")
-IREE_CPU_FEATURE_BIT(ARM_64, 0, 1, I8MM, "i8mm")
+// General features and high-level switches.
+// FP_ARMV8: whether FP and NEON are enabled. Armv8 spec says they must agree.
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 0, FP_ARMV8, "fp-armv8")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 1, LSE, "lse")  // Armv8.1 atomics
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 2, LSE128, "lse128")  // Armv8.1 atomics
+
+// SIMD features, not SVE-specific.
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 10, FULLFP16, "fullfp16")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 11, FP16FML, "fp16fml")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 12, DOTPROD, "dotprod")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 13, I8MM, "i8mm")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 14, BF16, "bf16")
+
+// SVE features.
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 20, SVE, "sve")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 21, SVE2, "sve2")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 22, SVE2P1, "sve2p1")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 23, SVE2_BITPERM, "sve2-bitperm")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 24, F32MM, "f32mm")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 25, F64MM, "f64mm")
+
+// SME features.
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 30, SME, "sme")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 31, SME2, "sme2")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 32, SME2P1, "sme2p1")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 33, SME_F16F16, "sme-f16f16")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 34, SME_F64F64, "sme-f64f64")
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 35, SME_I16I64, "sme-i16i64")
 
 //===----------------------------------------------------------------------===//
 // IREE_ARCH_X86_64 / x86-64

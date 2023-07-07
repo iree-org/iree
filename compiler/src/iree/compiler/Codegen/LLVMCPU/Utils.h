@@ -13,8 +13,8 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Returns the CPU target features associated with the `targetAttr`, if set.
-std::optional<StringRef> getCpuFeatures(
-    IREE::HAL::ExecutableTargetAttr targetAttr);
+std::optional<StringRef>
+getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Methods to get target information.
 bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
@@ -28,6 +28,9 @@ bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
 
 /// Returns true if the 'targetAttr' contains '+avx2' in its cpu features.
 bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+/// Returns true if the 'targetAttr' contains '+avx512f' in its cpu features.
+bool hasAVX512fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Returns true if the 'targetAttr' contains '+v' in its cpu features.
 bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
@@ -45,7 +48,10 @@ bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// features.
 bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+/// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
+bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_UTILS_H_
+} // namespace iree_compiler
+} // namespace mlir
+
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_UTILS_H_

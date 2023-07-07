@@ -6,7 +6,6 @@
 
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/cuda_event.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
@@ -123,17 +122,8 @@ static void iree_hal_cuda_stream_command_buffer_destroy(
 
 bool iree_hal_cuda_stream_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_cuda_stream_command_buffer_vtable);
-}
-
-static void* iree_hal_cuda_stream_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_cuda_stream_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_cuda_stream_command_buffer_vtable);
 }
 
 // Flushes any pending batched collective operations.
@@ -152,7 +142,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_flush_collectives(
   iree_status_t status = iree_hal_cuda_nccl_submit_batch(
       command_buffer->context, command_buffer->tracing_context,
       &command_buffer->collective_batch, command_buffer->stream);
-  iree_hal_collective_batch_reset(&command_buffer->collective_batch);
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -161,7 +151,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_stream_command_buffer_t* command_buffer =
       iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
-  iree_arena_reset(&command_buffer->arena);
+  (void)command_buffer;
 
   IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->stream,
@@ -179,6 +169,23 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_end(
 
   IREE_RETURN_IF_ERROR(
       iree_hal_cuda_stream_command_buffer_flush_collectives(command_buffer));
+
+  // Reset the arena as there should be nothing using it now that we've
+  // dispatched all our operations inline.
+  // NOTE: the resource set may contain resources we need to drop as we don't
+  //       need to keep them live any longer than it takes to schedule the
+  //       operations. In a real command buffer we would be this stream command
+  //       buffer is strictly used to perform inline execution/replay of
+  //       deferred command buffers that are retaining the resources already.
+  // NOTE: reseting the arena invalidates the collective batch.
+  iree_arena_reset(&command_buffer->arena);
+  iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
+  iree_hal_resource_set_free(command_buffer->resource_set);
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_allocate(
+      command_buffer->arena.block_pool, &command_buffer->resource_set));
+  iree_hal_collective_batch_initialize(&command_buffer->arena,
+                                       command_buffer->resource_set,
+                                       &command_buffer->collective_batch);
 
   IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context,
                            command_buffer->stream);
@@ -357,8 +364,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_update_buffer(
                     iree_hal_buffer_byte_offset(target_buffer) + target_offset;
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuMemcpyHtoDAsync_v2(dst, src, length, command_buffer->stream),
-      "cuMemcpyHtoDAsync_v2");
+      cuMemcpyHtoDAsync(dst, src, length, command_buffer->stream),
+      "cuMemcpyHtoDAsync");
 
   return iree_ok_status();
 }
@@ -492,9 +499,9 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
 
   IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->stream,
-      kernel_params.function_name.data, kernel_params.function_name.size,
-      /*line=*/0, /*func_name=*/NULL, 0, kernel_params.function_name.data,
-      kernel_params.function_name.size);
+      kernel_params.source_filename.data, kernel_params.source_filename.size,
+      kernel_params.source_line, /*func_name=*/NULL, 0,
+      kernel_params.function_name.data, kernel_params.function_name.size);
 
   // Patch the push constants in the kernel arguments.
   iree_host_size_t num_constants =
@@ -543,7 +550,6 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_execute_commands(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_stream_command_buffer_vtable = {
         .destroy = iree_hal_cuda_stream_command_buffer_destroy,
-        .dyn_cast = iree_hal_cuda_stream_command_buffer_dyn_cast,
         .begin = iree_hal_cuda_stream_command_buffer_begin,
         .end = iree_hal_cuda_stream_command_buffer_end,
         .begin_debug_group =

@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -24,7 +24,7 @@ struct HoistStaticallyBoundAllocationsPass
   void runOnOperation() override;
 };
 
-}  // namespace
+} // namespace
 
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
@@ -37,5 +37,5 @@ createHoistStaticallyBoundAllocationsPass() {
   return std::make_unique<HoistStaticallyBoundAllocationsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -11,7 +11,6 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
@@ -134,7 +133,7 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Drop any pending collective batches before we tear things down.
-  iree_hal_collective_batch_reset(&command_buffer->collective_batch);
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
 
   if (command_buffer->graph != NULL) {
     CUDA_IGNORE_ERROR(command_buffer->context->syms,
@@ -158,26 +157,16 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
 
 CUgraphExec iree_hal_cuda_graph_command_buffer_handle(
     iree_hal_command_buffer_t* base_command_buffer) {
+  if (!iree_hal_cuda_graph_command_buffer_isa(base_command_buffer)) return NULL;
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      (iree_hal_cuda_graph_command_buffer_t*)iree_hal_command_buffer_dyn_cast(
-          base_command_buffer, &iree_hal_cuda_graph_command_buffer_vtable);
-  IREE_ASSERT_TRUE(command_buffer);
+      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   return command_buffer->exec;
 }
 
 bool iree_hal_cuda_graph_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_cuda_graph_command_buffer_vtable);
-}
-
-static void* iree_hal_cuda_graph_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_cuda_graph_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_cuda_graph_command_buffer_vtable);
 }
 
 // Flushes any pending batched collective operations.
@@ -216,7 +205,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_flush_collectives(
       IREE_STATUS_UNIMPLEMENTED,
       "CUDA graph capture of collective operations not yet implemented");
 
-  iree_hal_collective_batch_reset(&command_buffer->collective_batch);
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -266,6 +255,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_end(
                       cuGraphDestroy(command_buffer->graph));
     command_buffer->graph = NULL;
   }
+
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
 
   return iree_ok_status();
 }
@@ -400,8 +391,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
   CUDA_MEMSET_NODE_PARAMS params = {
       .dst = target_device_buffer + target_offset,
       .elementSize = pattern_length,
-      // width in number of elements despite what driver documentation says.
-      .width = length / pattern_length,
+      .pitch = 0,                        // unused if height == 1
+      .width = length / pattern_length,  // element count
       .height = 1,
       .value = dword_pattern,
   };
@@ -683,7 +674,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_execute_commands(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable = {
         .destroy = iree_hal_cuda_graph_command_buffer_destroy,
-        .dyn_cast = iree_hal_cuda_graph_command_buffer_dyn_cast,
         .begin = iree_hal_cuda_graph_command_buffer_begin,
         .end = iree_hal_cuda_graph_command_buffer_end,
         .begin_debug_group =

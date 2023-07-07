@@ -29,10 +29,6 @@ if(IREE_TARGET_BACKEND_WEBGPU)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::WebGPU)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_WEBGPU_TARGET")
 endif()
-if(IREE_TARGET_BACKEND_CUDA)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::CUDA)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_CUDA_TARGET")
-endif()
 if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
@@ -46,12 +42,9 @@ endif()
 
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
-if(IREE_INPUT_MHLO)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
-  list(APPEND IREE_INPUT_DEPS tensorflow::external_mhlo_includes)
   list(APPEND IREE_INPUT_DEPS ChloOps)
-  list(APPEND IREE_INPUT_DEPS MhloDialect)
   list(APPEND IREE_INPUT_DEPS StablehloOps)
 endif()
 if(IREE_INPUT_TORCH)
@@ -137,7 +130,8 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
-    MLIRGPUOps
+    MLIRFuncInlinerExtension
+    MLIRGPUDialect
     MLIRGPUToSPIRV
     MLIRIR
     MLIRLLVMDialect

@@ -19,7 +19,6 @@ iree_lit_test_suite(
     "fragment_000.mlir"
     "fullyconnected.mlir"
     "mnist_fake_weights.mlir"
-    "resnet50_fake_weights.mlir"
     "unidirectional_lstm.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
@@ -30,60 +29,6 @@ iree_lit_test_suite(
     "driver=vulkan"
     "hostonly"
     "optonly"
-  TIMEOUT
-    900
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task
-  SRCS
-    "bert_encoder_unrolled_fake_weights.mlir"
-    "mobilenetv3_fake_weights.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=mhlo"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_vulkan-spirv_vulkan
-  SRCS
-    "bert_encoder_unrolled_fake_weights.mlir"
-    "mobilenetv3_fake_weights.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-input-type=mhlo"
-  TIMEOUT
-    900
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_cuda_cuda
-  SRCS
-    "bert_encoder_unrolled_fake_weights.mlir"
-    "mobilenetv3_fake_weights.mlir"
-  TARGET_BACKEND
-    "cuda"
-  DRIVER
-    "cuda"
-  COMPILER_FLAGS
-    "--iree-input-type=mhlo"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
-  TIMEOUT
-    900
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
@@ -100,7 +45,7 @@ iree_static_linker_test(
   FUNCTION_INPUTS
     "1x28x28x1xf32"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
 )
 
 iree_static_linker_test(
@@ -115,7 +60,7 @@ iree_static_linker_test(
   FUNCTION_INPUTS
     "1x28x28x1xf32"
   COMPILER_FLAGS
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-vm-target-index-bits=32"
   EMITC
 )

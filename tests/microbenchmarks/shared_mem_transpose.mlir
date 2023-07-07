@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --iree-hal-target-backends=cuda --iree-llvmcpu-link-embedded=true  %s
+// RUN: iree-run-mlir --Xcompiler,iree-hal-target-backends=cuda %s
 
 //===----------------------------------------------------------------------===//
 // Transpose ops.

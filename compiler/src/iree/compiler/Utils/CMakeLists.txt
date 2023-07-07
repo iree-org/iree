@@ -15,6 +15,7 @@ iree_cc_library(
     Utils
   HDRS
     "ConversionUtils.h"
+    "ElementPackingUtils.h"
     "FlatbufferUtils.h"
     "IndexSet.h"
     "ModuleUtils.h"
@@ -26,6 +27,7 @@ iree_cc_library(
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
+    "ElementPackingUtils.cpp"
     "FlatbufferUtils.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
@@ -43,10 +45,10 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::base
     iree::base::internal::flatcc::building
     iree::base::internal::flatcc::debugging
     iree::base::internal::flatcc::parsing
-    iree::base::tracing
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

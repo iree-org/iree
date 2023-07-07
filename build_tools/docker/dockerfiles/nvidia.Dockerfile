@@ -11,12 +11,12 @@
 # We use .deb files that we host because we have to pin the version and packages
 # routinely dissapear from the Ubuntu apt repositories. The versions need to be
 # compatible with the host driver (usually <= host driver version).
-ARG NVIDIA_GL_DEB="libnvidia-gl-460_460.39-0ubuntu0.18.04.1_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-460_460.39-0ubuntu0.18.04.1_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-460_460.39-0ubuntu0.18.04.1_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-530_530.41.03-0ubuntu0.20.04.2_all.deb"
 
 
-FROM gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb AS fetch-nvidia
+FROM gcr.io/iree-oss/base@sha256:d6c426d1fe55947a4afe7669abae6c7e6aa44fa94e84804bc5d7e7304dd183c9 AS fetch-nvidia
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -30,13 +30,12 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_D
 # Set up the image and working directory by inheriting the base CMake
 # configuration.
 # Note that we don't start from NVIDIA's docker base:
-# - nvidia/cuda (https://hub.docker.com/r/nvidia/cuda):
-#     it's.. for CUDA.
-# - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan):
-#      does not support Ubuntu 18.04.
-# This allows to share configuration with base CMake, but it also means we need
-# to MATCH the driver version between the host machine and the docker image.
-FROM gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb AS final
+# - nvidia/cuda (https://hub.docker.com/r/nvidia/cuda), or
+# - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan).
+# This allows to share configuration with base CMake and better control the
+# installed packages. But it does mean we need to carefully manage the MATCHING
+# of the driver version between the host machine and the docker image.
+FROM gcr.io/iree-oss/base@sha256:d6c426d1fe55947a4afe7669abae6c7e6aa44fa94e84804bc5d7e7304dd183c9 AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -51,9 +50,12 @@ RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
   "/tmp/${NVIDIA_GL_DEB}" \
   "/tmp/${NVIDIA_COMPUTE_DEB}"
 
-# install cuda sdk
-RUN wget https://developer.download.nvidia.com/compute/cuda/11.6.0/local_installers/cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb \
-  && dpkg --install cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb \
-  && apt-key add /var/cuda-repo-debian11-11-6-local/7fa2af80.pub \
+# Install the CUDA SDK
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb \
+  && dpkg --install cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb \
+  && cp /var/cuda-repo-ubuntu2004-12-1-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
-  && apt-get -y install cuda-toolkit-11-6
+  && apt-get -y install cuda-toolkit-12-1
+
+# Adding CUDA binaries to Path
+ENV PATH=${PATH}:/usr/local/cuda/bin/

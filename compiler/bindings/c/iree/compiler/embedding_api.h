@@ -17,6 +17,7 @@
 #ifndef IREE_COMPILER_EMBEDDING_API_H
 #define IREE_COMPILER_EMBEDDING_API_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -48,14 +49,21 @@ IREE_EMBED_EXPORTED void ireeCompilerErrorDestroy(iree_compiler_error_t *error);
 
 // Gets the message associated with the error as a C-string. The string will be
 // valid until the error is destroyed.
-IREE_EMBED_EXPORTED const char *ireeCompilerErrorGetMessage(
-    iree_compiler_error_t *error);
+IREE_EMBED_EXPORTED const char *
+ireeCompilerErrorGetMessage(iree_compiler_error_t *error);
 
 //===----------------------------------------------------------------------===//
 // Global initialization.
 //===----------------------------------------------------------------------===//
 
 // Gets the version of the API that this compiler exports.
+// The version is encoded with the lower 16 bits containing the minor version
+// and upper bits containing the major version.
+// The compiler API is versioned. Within a major version, symbols may be
+// added, but existing symbols must not be removed or changed to alter
+// previously exposed functionality. A major version bump implies an API
+// break and no forward or backward compatibility is assumed across major
+// versions.
 IREE_EMBED_EXPORTED int ireeCompilerGetAPIVersion();
 
 // The compiler must be globally initialized before further use.
@@ -68,6 +76,13 @@ IREE_EMBED_EXPORTED int ireeCompilerGetAPIVersion();
 // to initialize will fail/abort. If this is not desirable, some higher level
 // code must hold initialization open with its own call.
 IREE_EMBED_EXPORTED void ireeCompilerGlobalInitialize();
+
+// Gets the build revision of the IREE compiler. In official releases, this
+// will be a string with the build tag. In development builds, it may be an
+// empty string. The returned is valid for as long as the compiler is
+// initialized.
+// Available since: 1.1
+IREE_EMBED_EXPORTED const char *ireeCompilerGetRevision();
 
 // Processes an argc/argv from main() using platform specific dark magic,
 // possibly updating them in-place to cleaned up values. On most systems,
@@ -103,8 +118,16 @@ IREE_EMBED_EXPORTED void ireeCompilerSetupGlobalCL(int argc, const char **argv,
 IREE_EMBED_EXPORTED void ireeCompilerGlobalShutdown();
 
 // Invokes a callback with each registered HAL target backend.
+//
+// This is really only suitable for global CLI-like tools, as plugins may
+// register target backends and plugins are activated at the session level.
 IREE_EMBED_EXPORTED void ireeCompilerEnumerateRegisteredHALTargetBackends(
     void (*callback)(const char *backend, void *userData), void *userData);
+
+// Enumerates all plugins that are linked into the compiler.
+// Available since: 1.2
+IREE_EMBED_EXPORTED void ireeCompilerEnumeratePlugins(
+    void (*callback)(const char *pluginName, void *userData), void *userData);
 
 //===----------------------------------------------------------------------===//
 // Session management.
@@ -121,13 +144,14 @@ IREE_EMBED_EXPORTED void ireeCompilerEnumerateRegisteredHALTargetBackends(
 IREE_EMBED_EXPORTED iree_compiler_session_t *ireeCompilerSessionCreate();
 
 // Destroys a session.
-IREE_EMBED_EXPORTED void ireeCompilerSessionDestroy(
-    iree_compiler_session_t *session);
+IREE_EMBED_EXPORTED void
+ireeCompilerSessionDestroy(iree_compiler_session_t *session);
 
 // Sets session-local flags. These are a subset of flags supported by CLI
 // tools and are privately scoped.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSessionSetFlags(
-    iree_compiler_session_t *session, int argc, const char *const *argv);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerSessionSetFlags(iree_compiler_session_t *session, int argc,
+                            const char *const *argv);
 
 // Gets textual flags actually in effect from any source. Optionally, only
 // calls back for non-default valued flags.
@@ -148,8 +172,8 @@ enum iree_compiler_diagnostic_severity_t {
   IREE_COMPILER_DIAGNOSTIC_SEVERITY_REMARK = 3,
 };
 
-IREE_EMBED_EXPORTED iree_compiler_invocation_t *ireeCompilerInvocationCreate(
-    iree_compiler_session_t *session);
+IREE_EMBED_EXPORTED iree_compiler_invocation_t *
+ireeCompilerInvocationCreate(iree_compiler_session_t *session);
 
 // Enables a callback to receive diagnostics. This is targeted at API use of
 // the compiler, allowing fine grained collection of formatted diagnostic
@@ -174,12 +198,12 @@ IREE_EMBED_EXPORTED void ireeCompilerInvocationEnableCallbackDiagnostics(
 // Enables default, pretty-printed diagnostics to the console. This is usually
 // the right thing to do for command-line tools, but other mechanisms are
 // preferred for library use.
-IREE_EMBED_EXPORTED void ireeCompilerInvocationEnableConsoleDiagnostics(
-    iree_compiler_invocation_t *inv);
+IREE_EMBED_EXPORTED void
+ireeCompilerInvocationEnableConsoleDiagnostics(iree_compiler_invocation_t *inv);
 
 // Destroys a run.
-IREE_EMBED_EXPORTED void ireeCompilerInvocationDestroy(
-    iree_compiler_invocation_t *inv);
+IREE_EMBED_EXPORTED void
+ireeCompilerInvocationDestroy(iree_compiler_invocation_t *inv);
 
 // Sets a crash handler on the invocation. In the event of a crash, the callback
 // will be invoked to create an output which will receive the crash dump.
@@ -196,18 +220,20 @@ IREE_EMBED_EXPORTED void ireeCompilerInvocationSetCrashHandler(
 // Parses a source into this instance in preparation for performing a
 // compilation action.
 // Returns false and emits diagnostics on failure.
-IREE_EMBED_EXPORTED bool ireeCompilerInvocationParseSource(
-    iree_compiler_invocation_t *inv, iree_compiler_source_t *source);
+IREE_EMBED_EXPORTED bool
+ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
+                                  iree_compiler_source_t *source);
 
 // Sets a mnemonic phase name to run compilation to. Default is "end".
 // The meaning of this is pipeline specific. See IREEVMPipelinePhase
 // for the standard pipeline.
-IREE_EMBED_EXPORTED void ireeCompilerInvocationSetCompileToPhase(
-    iree_compiler_invocation_t *inv, const char *phase);
+IREE_EMBED_EXPORTED void
+ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *inv,
+                                        const char *phase);
 
 // Enables/disables verification of IR after each pass. Defaults to enabled.
-IREE_EMBED_EXPORTED void ireeCompilerInvocationSetVerifyIR(
-    iree_compiler_invocation_t *inv, bool enable);
+IREE_EMBED_EXPORTED void
+ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv, bool enable);
 
 // Runs a compilation pipeline.
 // Returns false and emits diagnostics on failure.
@@ -215,12 +241,14 @@ enum iree_compiler_pipeline_t {
   IREE_COMPILER_PIPELINE_STD = 0,
   IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1,
 };
-IREE_EMBED_EXPORTED bool ireeCompilerInvocationPipeline(
-    iree_compiler_invocation_t *inv, enum iree_compiler_pipeline_t pipeline);
+IREE_EMBED_EXPORTED bool
+ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,
+                               enum iree_compiler_pipeline_t pipeline);
 
 // Outputs the current compiler state as textual IR to the output.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerInvocationOutputIR(
-    iree_compiler_invocation_t *inv, iree_compiler_output_t *output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerInvocationOutputIR(iree_compiler_invocation_t *inv,
+                               iree_compiler_output_t *output);
 
 // Assuming that the compiler has produced VM IR, converts it to bytecode
 // and outputs it. This is a valid next step after running the
@@ -255,25 +283,27 @@ ireeCompilerInvocationOutputHALExecutable(iree_compiler_invocation_t *inv,
 //===----------------------------------------------------------------------===//
 
 // Destroy source instances.
-IREE_EMBED_EXPORTED void ireeCompilerSourceDestroy(
-    iree_compiler_source_t *source);
+IREE_EMBED_EXPORTED void
+ireeCompilerSourceDestroy(iree_compiler_source_t *source);
 
 // Opens the source from a file. This is used for normal text assembly file
 // sources.
 // Must be destroyed with ireeCompilerSourceDestroy().
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSourceOpenFile(
-    iree_compiler_session_t *session, const char *filePath,
-    iree_compiler_source_t **out_source);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerSourceOpenFile(iree_compiler_session_t *session,
+                           const char *filePath,
+                           iree_compiler_source_t **out_source);
 
 // Wraps an existing buffer in memory.
 // If |isNullTerminated| is true, then the null must be accounted for in the
 // length. This is required for text buffers and it is permitted for binary
 // buffers.
 // Must be destroyed with ireeCompilerSourceDestroy().
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
-    iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, bool isNullTerminated,
-    iree_compiler_source_t **out_source);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerSourceWrapBuffer(iree_compiler_session_t *session,
+                             const char *bufferName, const char *buffer,
+                             size_t length, bool isNullTerminated,
+                             iree_compiler_source_t **out_source);
 
 // Splits the current source buffer, invoking a callback for each "split"
 // within it. This is per the usual MLIR split rules (see
@@ -298,32 +328,34 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSourceSplit(
 //===----------------------------------------------------------------------===//
 
 // Destroy output instances.
-IREE_EMBED_EXPORTED void ireeCompilerOutputDestroy(
-    iree_compiler_output_t *output);
+IREE_EMBED_EXPORTED void
+ireeCompilerOutputDestroy(iree_compiler_output_t *output);
 
 // Opens a file for the output.
 // Must be destroyed via ireeCompilerOutputDestroy().
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    const char *filePath, iree_compiler_output_t **out_output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerOutputOpenFile(const char *filePath,
+                           iree_compiler_output_t **out_output);
 
 // Opens a file descriptor for output.
 // Must be destroyed via ireeCompilerOutputDestroy().
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFD(
-    int fd, iree_compiler_output_t **out_output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerOutputOpenFD(int fd, iree_compiler_output_t **out_output);
 
 // Opens an output to in-memory storage. Use the API
 // |ireeCompilerOutputMapMemory| to access the mapped contents once all
 // output has been written.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
-    iree_compiler_output_t **out_output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerOutputOpenMembuffer(iree_compiler_output_t **out_output);
 
 // Maps the contents of a compiler output opened via
 // |ireeCompilerOutputOpenMembuffer|. This may be something obtained via
 // mmap or a more ordinary temporary buffer. This may fail in platform
 // specific ways unless if the output was created via
 // |ireeCompilerOutputOpenMembuffer|.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputMapMemory(
-    iree_compiler_output_t *output, void **contents, uint64_t *size);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerOutputMapMemory(iree_compiler_output_t *output, void **contents,
+                            uint64_t *size);
 
 // For file or other persistent outputs, by default they will be deleted on
 // |ireeCompilerOutputDestroy| (or exit). It is necessary to call
@@ -332,11 +364,12 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputMapMemory(
 IREE_EMBED_EXPORTED void ireeCompilerOutputKeep(iree_compiler_output_t *output);
 
 // Writes arbitrary data to the output.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputWrite(
-    iree_compiler_output_t *output, const void *data, size_t length);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerOutputWrite(iree_compiler_output_t *output, const void *data,
+                        size_t length);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // IREE_COMPILER_EMBEDDING_API_H
+#endif // IREE_COMPILER_EMBEDDING_API_H
