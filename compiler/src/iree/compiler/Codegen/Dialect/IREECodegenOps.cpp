@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"

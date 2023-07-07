@@ -2670,22 +2670,13 @@ DEFINE_OP_GET_EFFECTS(AttentionOp)
 // iree_linalg_ext.set_encoding
 //===----------------------------------------------------------------------===//
 
-void SetEncodingOp::build(OpBuilder &builder, OperationState &state,
-                          Value source, TensorEncoding encoding) {
-  auto encodingAttr = TensorEncodingAttr::get(builder.getContext(), encoding);
-  auto sourceType = source.getType().cast<RankedTensorType>();
-  RankedTensorType encodingType = RankedTensorType::get(
-      sourceType.getShape(), sourceType.getElementType(), encodingAttr);
-  build(builder, state, encodingType, source);
-}
-
 LogicalResult SetEncodingOp::verify() {
   // Source and the result have the same rank.
   if (getSourceType().getEncoding()) {
     return emitOpError(
         "source of set_encoding op cannot have a tensor encoding");
   }
-  if (!getResultType().getEncoding().isa_and_nonnull<TensorEncodingAttr>()) {
+  if (!getResultType().getEncoding().isa_and_nonnull<EncodingAttr>()) {
     return emitOpError(
         "result of set_encoding op expected to have a valid tensor encoding");
   }
@@ -2710,20 +2701,12 @@ LogicalResult SetEncodingOp::reifyResultShapes(
 // iree_linalg_ext.unset_encoding
 //===----------------------------------------------------------------------===//
 
-void UnsetEncodingOp::build(OpBuilder &builder, OperationState &state,
-                            Value source) {
-  auto sourceType = source.getType().cast<RankedTensorType>();
-  auto resultType =
-      RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
-  return build(builder, state, resultType, source);
-}
-
 LogicalResult UnsetEncodingOp::verify() {
   if (getResultType().getEncoding()) {
     return emitOpError(
         "result of unset_encoding op cannot have a tensor encoding");
   }
-  if (!getSourceType().getEncoding().isa_and_nonnull<TensorEncodingAttr>()) {
+  if (!getSourceType().getEncoding().isa_and_nonnull<EncodingAttr>()) {
     return emitOpError(
         "source of unset_encoding op expected to have a valid tensor encoding");
   }

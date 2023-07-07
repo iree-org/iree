@@ -21,6 +21,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -29,7 +30,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-using IREE::LinalgExt::TensorEncoding;
+using IREE::LinalgExt::EncodingOpKind;
+using IREE::LinalgExt::EncodingRole;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -152,40 +154,26 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       return failure();
     }
 
-    TensorEncoding lhsEncoding;
-    TensorEncoding rhsEncoding;
-    TensorEncoding outEncoding;
+    EncodingOpKind opKind;
 
     if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
-      lhsEncoding = TensorEncoding::MATMUL_F32F32F32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS;
-      outEncoding = TensorEncoding::MATMUL_F32F32F32_RESULT;
+      opKind = EncodingOpKind::MATMUL_F32F32F32;
     } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
                outElemType.isF32()) {
-      lhsEncoding = TensorEncoding::MATMUL_F16F16F32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_F16F16F32_RHS;
-      outEncoding = TensorEncoding::MATMUL_F16F16F32_RESULT;
+      opKind = EncodingOpKind::MATMUL_F16F16F32;
     } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
                outElemType.isF16()) {
-      lhsEncoding = TensorEncoding::MATMUL_F16F16F16_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_F16F16F16_RHS;
-      outEncoding = TensorEncoding::MATMUL_F16F16F16_RESULT;
+      opKind = EncodingOpKind::MATMUL_F16F16F16;
     } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
                outElemType.isF32()) {
-      lhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_RHS;
-      outEncoding = TensorEncoding::MATMUL_BF16BF16F32_RESULT;
+      opKind = EncodingOpKind::MATMUL_BF16BF16F32;
     } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
                outElemType.isBF16()) {
-      lhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RHS;
-      outEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RESULT;
+      opKind = EncodingOpKind::MATMUL_BF16BF16BF16;
     } else if (lhsElemType.isSignlessInteger(8) &&
                rhsElemType.isSignlessInteger(8) &&
                outElemType.isSignlessInteger(32)) {
-      lhsEncoding = TensorEncoding::MATMUL_I8I8I32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_I8I8I32_RHS;
-      outEncoding = TensorEncoding::MATMUL_I8I8I32_RESULT;
+      opKind = EncodingOpKind::MATMUL_I8I8I32;
     } else {
       return rewriter.notifyMatchFailure(
           matmulOp,
@@ -212,18 +200,31 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       return rewriter.notifyMatchFailure(matmulOp, "failed to pad output");
     }
 
-    Value encodedLhs = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
-        loc, paddedLhs.value(), lhsEncoding);
-    Value encodedRhs = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
-        loc, paddedRhs.value(), rhsEncoding);
-    Value encodedOut = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
-        loc, paddedOut.value(), outEncoding);
+    auto createSetEncodingOp = [&](Value source, EncodingRole role) {
+      auto *context = rewriter.getContext();
+      auto opKindAttr = LinalgExt::EncodingOpKindAttr::get(context, opKind);
+      auto roleAttr = LinalgExt::EncodingRoleAttr::get(context, role);
+      auto encodingAttr =
+          LinalgExt::EncodingAttr::get(context, opKindAttr, roleAttr);
+      auto sourceType = source.getType().cast<RankedTensorType>();
+      auto resultType = RankedTensorType::get(
+          sourceType.getShape(), sourceType.getElementType(), encodingAttr);
+      return rewriter.create<IREE::LinalgExt::SetEncodingOp>(loc, resultType,
+                                                             source);
+    };
+
+    Value encodedLhs =
+        createSetEncodingOp(paddedLhs.value(), EncodingRole::LHS);
+    Value encodedRhs =
+        createSetEncodingOp(paddedRhs.value(), EncodingRole::RHS);
+    Value encodedOut =
+        createSetEncodingOp(paddedOut.value(), EncodingRole::RESULT);
 
     auto matmulTiled = rewriter.create<linalg::MatmulOp>(
         loc, encodedOut.getType(), ValueRange{encodedLhs, encodedRhs},
         encodedOut);
     auto unsetEncoding = rewriter.create<IREE::LinalgExt::UnsetEncodingOp>(
-        loc, matmulTiled.getResult(0));
+        loc, paddedOut->getType(), matmulTiled.getResult(0));
 
     Value replacement = unsetEncoding.getResult();
     // If the output was padded, extract the actual output.
