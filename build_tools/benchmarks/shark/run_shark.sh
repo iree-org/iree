@@ -72,7 +72,7 @@ declare -a args=(
   -k "${BENCHMARK_REGEX}"
 )
 
-setup_args=("NO_BREVITAS=1")
+setup_args+=( NO_BREVITAS=1 )
 if [[ ${DRIVER} == "cuda" ]]; then
   args+=(--forked)
   setup_args+=("BENCHMARK=1")
