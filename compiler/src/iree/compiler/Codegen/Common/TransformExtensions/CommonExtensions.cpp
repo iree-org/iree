@@ -352,8 +352,10 @@ transform_dialect::ApplyLoopIndependentCodeMotionOp::applyToOne(
     // This assumes LICM never removes operations so we don't need tracking.
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
-    funcOp->walk(
-        [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
+    funcOp->walk([](LoopLikeOpInterface loopLike) {
+      if (!isa<scf::ForallOp>(loopLike.getOperation()))
+        moveLoopInvariantCode(loopLike);
+    });
     // For now, put single loop promotion as part of licm. Underlying
     // implementations perform splice operations which shouldn't need
     // tracking.
