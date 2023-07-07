@@ -324,22 +324,19 @@ def parse_jobs_trailer(
     jobs = set(name.strip() for name in jobs_text.split(","))
     if ALL_KEY in jobs:
         if len(jobs) != 1:
-            print(
+            raise ValueError(
                 f"'{ALL_KEY}' must be alone in job specification"
                 f" trailer, but got '{key}: {jobs_text}'"
             )
-            sys.exit(1)
         print(f"Expanded trailer '{key}: {jobs_text}' to all jobs")
         return all_jobs
 
     jobs = set(jobs)
     unknown_jobs = jobs - all_jobs
     if unknown_jobs:
-        print(
-            f"Received unknown jobs '{','.join(unknown_jobs)}' in" f" trailer '{key}'",
-            file=sys.stderr,
+        raise ValueError(
+            f"Received unknown jobs '{','.join(unknown_jobs)}' in trailer '{key}'"
         )
-        sys.exit(1)
     return jobs
 
 
@@ -364,12 +361,10 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
             or Trailer.EXTRA_JOBS in trailers
             or Trailer.SKIP_JOBS in trailers
         ):
-            print(
+            raise ValueError(
                 f"Cannot specify both '{Trailer.SKIP_JOBS}' and any of"
-                f" '{Trailer.EXACTLY_JOBS}', '{Trailer.EXTRA_JOBS}', '{Trailer.SKIP_JOBS}'",
-                file=sys.stderr,
+                f" '{Trailer.EXACTLY_JOBS}', '{Trailer.EXTRA_JOBS}', '{Trailer.SKIP_JOBS}'"
             )
-            sys.exit(1)
         print(
             f"Skipping all jobs because PR description has"
             f" '{Trailer.SKIP_CI}' trailer."
@@ -378,12 +373,9 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
 
     if Trailer.EXACTLY_JOBS in trailers:
         if Trailer.EXTRA_JOBS in trailers or Trailer.SKIP_JOBS in trailers:
-            print(
+            raise ValueError(
                 f"Cannot mix trailer '{Trailer.EXACTLY_JOBS}' with"
-                f" '{Trailer.EXTRA_JOBS}' or '{Trailer.SKIP_JOBS}'",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+                f" '{Trailer.EXTRA_JOBS}' or '{Trailer.SKIP_JOBS}'")
 
         exactly_jobs = parse_jobs_trailer(trailers, Trailer.EXACTLY_JOBS, all_jobs)
         return exactly_jobs
@@ -393,11 +385,9 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
 
     ambiguous_jobs = skip_jobs & extra_jobs
     if ambiguous_jobs:
-        print(
+        raise ValueError(
             f"Jobs cannot be specified in both '{Trailer.SKIP_JOBS}' and"
-            f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
-        )
-        sys.exit(1)
+            f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}")
 
     default_jobs = all_jobs - POSTSUBMIT_ONLY_JOBS
 
@@ -497,11 +487,16 @@ def main():
         or LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", ""))
         or LLVM_INTEGRATE_LABEL in labels
     )
-    benchmark_presets = get_benchmark_presets(
-        trailers, labels, is_pr, is_llvm_integrate_pr
-    )
+    try:
+        benchmark_presets = get_benchmark_presets(
+            trailers, labels, is_pr, is_llvm_integrate_pr
+        )
+        enabled_jobs = sorted(get_enabled_jobs(is_pr, trailers))
+    except ValueError as e:
+        print(e)
+        sys.exit(1)
     output = {
-        "enabled-jobs": sorted(get_enabled_jobs(is_pr, trailers)),
+        "enabled-jobs": enabled_jobs,
         "is-pr": is_pr,
         "runner-env": get_runner_env(trailers),
         "runner-group": "presubmit" if is_pr else "postsubmit",

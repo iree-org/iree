@@ -15,7 +15,7 @@ SORTED_DEFAULT_BENCHMARK_PRESETS_STR = ",".join(
 )
 
 
-class GetBenchmarkPresetsTest(unittest.TestCase):
+class ConfigureCITest(unittest.TestCase):
     def test_get_benchmark_presets_no_preset(self):
         presets_str = configure_ci.get_benchmark_presets(
             trailers={},
@@ -104,6 +104,50 @@ class GetBenchmarkPresetsTest(unittest.TestCase):
             ),
         )
 
+    def test_parse_jobs_trailer(self):
+        trailers = {"key": "job1,job2"}
+        key = "key"
+        all_jobs = {"job1", "job2", "job3"}
+        jobs = configure_ci.parse_jobs_trailer(trailers, key, all_jobs)
+        self.assertCountEqual(jobs, {"job1", "job2"})
+
+    def test_parse_jobs_trailer_whitespace(self):
+        trailers = {"key": "  job1 ,  job2 "}
+        key = "key"
+        all_jobs = {"job1", "job2", "job3"}
+        jobs = configure_ci.parse_jobs_trailer(trailers, key, all_jobs)
+        self.assertCountEqual(jobs, {"job1", "job2"})
+
+    def test_parse_jobs_trailer_all_with_others(self):
+        bad_text = "job1, all"
+        trailers = {"key": bad_text}
+        key = "key"
+        all_jobs = {"job1", "job2", "job3"}
+        with self.assertRaises(ValueError) as cm:
+            configure_ci.parse_jobs_trailer(trailers, key, all_jobs)
+
+        msg = str(cm.exception)
+        self.assertIn(configure_ci.ALL_KEY, msg)
+        self.assertIn(bad_text, msg)
+
+    def test_parse_jobs_unknown_job(self):
+        unknown_job = "uknown_job"
+        trailers = {"key": f"job1, {unknown_job}"}
+        key = "key"
+        all_jobs = {"job1", "job2", "job3"}
+        with self.assertRaises(ValueError) as cm:
+            configure_ci.parse_jobs_trailer(trailers, key, all_jobs)
+
+        msg = str(cm.exception)
+        self.assertIn(unknown_job, msg)
+        self.assertIn("unknown", msg)
+
+    def test_get_enabled_jobs_skip(self):
+        trailers = {configure_ci.Trailer.SKIP_JOBS: "job1,job2"}
+        all_jobs = {"job1", "job2", "job3"}
+        is_pr = True
+        jobs = configure_ci.get_enabled_jobs(is_pr, trailers)
+        self.assertCountEqual(jobs, {"job3"})
 
 if __name__ == "__main__":
     unittest.main()
