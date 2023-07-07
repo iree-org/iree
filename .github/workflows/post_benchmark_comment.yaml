@@ -10,6 +10,7 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
+  pull_request:
 
 env:
   PR_CI_STAGE: ${{ github.event.workflow_run.event == 'pull_request' && 'presubmit' || 'postsubmit' }}
