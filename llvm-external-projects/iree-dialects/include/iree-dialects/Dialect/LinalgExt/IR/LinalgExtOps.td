@@ -59,6 +59,13 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 
+def OpGroupNonStructuredOps : OpDocGroup {
+  let summary = "Non-structured ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupNonStructuredOps in {
+
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -864,9 +871,19 @@ def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
   }];
 }
 
+} // OpGroupNonStructuredOps
+
+
 //===----------------------------------------------------------------------===//
 // Winograd ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupWinogradOps : OpDocGroup {
+  let summary = "Winograd ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupWinogradOps in {
 
 def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_transform",
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
@@ -1083,6 +1100,8 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     }
   }];
 }
+
+} // OpGroupWinogradOps
 
 //===----------------------------------------------------------------------===//
 // Softmax

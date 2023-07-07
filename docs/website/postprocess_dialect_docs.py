@@ -64,6 +64,8 @@ def main(args):
 
             print(line, end="")
 
+    # TODO(scotttodd): replace [TOC] with \n[TOC] as needed (transform ops)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Dialect doc postprocessor.")

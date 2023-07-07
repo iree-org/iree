@@ -18,9 +18,12 @@ include "mlir/IR/EnumAttr.td"
 def IREELinalgExt_Dialect : Dialect {
   let name = "iree_linalg_ext";
   let cppNamespace = "::mlir::iree_compiler::IREE::LinalgExt";
+  let summary = [{
+    IREE Linalg Extensions.
+  }];
   let description = [{
-    The `iree_linalg_ext` dialect is intended to experiment more support for
-    non-structured operations, ie, can not be represented in Linalg operations.
+    A dialect designed for experimenting with non-structured operations that
+    cannot be represented efficiently/directly by the Linalg dialect.
   }];
   let hasCanonicalizer = 1;
   let useDefaultAttributePrinterParser = 1;
