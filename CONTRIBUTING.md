@@ -65,11 +65,13 @@ later culprit-finding. It is assumed that the PR author will merge their change
 unless they ask someone else to merge it for them (e.g. because they don't have
 write access).
 
-## Details
+## Peculiarities
 
-For further details, see our
-[detailed contributing guide](/docs/developers/contributing.md), which is
-separate to avoid notifying everyone every time it changes.
+Our documentation on
+[repository management](https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/repository_management.md)
+has more information on some of the oddities in our repository setup and
+workflows. For the most part, these should be transparent to normal developer
+workflows.
 
 ## Community Guidelines
 
