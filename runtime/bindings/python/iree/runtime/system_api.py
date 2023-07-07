@@ -283,13 +283,9 @@ def load_vm_module(vm_module, config: Optional[Config] = None):
     return load_vm_modules(vm_module, config=config)[0]
 
 
-def load_vm_flatbuffer(
-    vm_flatbuffer: bytes, *, driver: Optional[str] = None, backend: Optional[str] = None
-) -> BoundModule:
-    """Loads a VM Flatbuffer into a callable module.
-
-    Either 'driver' or 'backend' must be specified.
-    """
+def _create_config(
+    *, driver: Optional[str] = None, backend: Optional[str] = None
+) -> Config:
     if driver is None and backend is None:
         raise ValueError(
             "Either 'driver' or 'backend' must be specified, but got "
@@ -302,20 +298,47 @@ def load_vm_flatbuffer(
     if backend is not None:
         driver = TARGET_BACKEND_TO_DRIVER[backend]
     config = Config(driver)
-    vm_module = _binding.VmModule.from_flatbuffer(config.vm_instance, vm_flatbuffer)
-    bound_module = load_vm_module(vm_module, config)
-    return bound_module
+    return config
 
 
-# TODO: There should be an API for mmap'ing the file which should be used
-# instead of reading into memory.
+def load_vm_flatbuffer(
+    vm_flatbuffer: bytes, *, driver: Optional[str] = None, backend: Optional[str] = None
+) -> BoundModule:
+    """Loads a VM Flatbuffer into a callable module.
+
+    Either 'driver' or 'backend' must be specified.
+
+    Note that this API makes a defensive copy to ensure proper alignment and is
+    therefore not suitable for large flatbuffers. See load_vm_flatbuffer_file()
+    or mmap APIs on VmModule.
+    """
+    config = _create_config(driver=driver, backend=backend)
+    vm_module = _binding.VmModule.copy_buffer(config.vm_instance, vm_flatbuffer)
+    return load_vm_module(vm_module, config)
+
+
 def load_vm_flatbuffer_file(
-    path: str, *, driver: Optional[str] = None, backend: Optional[str] = None
+    path: str,
+    *,
+    driver: Optional[str] = None,
+    backend: Optional[str] = None,
+    destroy_callback=None,
 ) -> BoundModule:
     """Loads a file containing a VM Flatbuffer into a callable module.
 
     Either 'driver' or 'backend' must be specified.
+
+    Note that this delegates to the lower level VmModule.mmap() API, which,
+    as the name implies, memory maps the file. This can be fiddly across
+    platforms and for maximum compatibility, ensure that the file is not
+    otherwise open for write or deleted while in use.
+
+    If provided, 'destroy_callback' will be passed to VmModule.mmap and will
+    be invoked when no further references to the mapping exist. This can be
+    used to clean up test state, etc (in a Windows compatible way).
     """
-    with open(path, "rb") as f:
-        vm_flatbuffer = f.read()
-    return load_vm_flatbuffer(vm_flatbuffer, driver=driver, backend=backend)
+    config = _create_config(driver=driver, backend=backend)
+    vm_module = _binding.VmModule.mmap(
+        config.vm_instance, str(path), destroy_callback=destroy_callback
+    )
+    return load_vm_module(vm_module, config)
