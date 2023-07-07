@@ -239,8 +239,8 @@ def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
 
     # PR information can be fetched from API for the latest updates. If
     # ORIGINAL_PR_TITLE is set, compare the current and original description and
-    # show a notice if they are different. This is mostly to inform users that the
-    # workflow might not parse the PR description they expect.
+    # show a notice if they are different. This is mostly to inform users that
+    # the workflow might not parse the PR description they expect.
     if original_title is not None:
         original_description = PR_DESCRIPTION_TEMPLATE.substitute(
             title=original_title, body=original_body
@@ -377,7 +377,8 @@ def get_enabled_jobs(
         ):
             raise ValueError(
                 f"Cannot specify both '{Trailer.SKIP_JOBS}' and any of"
-                f" '{Trailer.EXACTLY_JOBS}', '{Trailer.EXTRA_JOBS}', '{Trailer.SKIP_JOBS}'"
+                f" '{Trailer.EXACTLY_JOBS}', '{Trailer.EXTRA_JOBS}',"
+                f" '{Trailer.SKIP_JOBS}'"
             )
         print(
             f"Skipping all jobs because PR description has"
@@ -392,7 +393,11 @@ def get_enabled_jobs(
                 f" '{Trailer.EXTRA_JOBS}' or '{Trailer.SKIP_JOBS}'"
             )
 
-        exactly_jobs = parse_jobs_trailer(trailers, Trailer.EXACTLY_JOBS, all_jobs)
+        exactly_jobs = parse_jobs_trailer(
+            trailers,
+            Trailer.EXACTLY_JOBS,
+            all_jobs,
+        )
         return exactly_jobs
 
     skip_jobs = parse_jobs_trailer(trailers, Trailer.SKIP_JOBS, all_jobs)
@@ -439,8 +444,9 @@ def get_benchmark_presets(
     skip_llvm_integrate_benchmark = Trailer.SKIP_LLVM_INTEGRATE_BENCHMARK in trailers
     if skip_llvm_integrate_benchmark:
         print(
-            "Skipping default benchmarking on LLVM integration because PR "
-            f"description has '{Trailer.SKIP_LLVM_INTEGRATE_BENCHMARK}' trailer."
+            f"Skipping default benchmarking on LLVM integration because PR "
+            f"description has '{Trailer.SKIP_LLVM_INTEGRATE_BENCHMARK}'"
+            f" trailer."
         )
 
     if not is_pr:
