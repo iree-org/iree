@@ -837,8 +837,7 @@ let builders = [
       return getResult().getType().cast<RankedTensorType>();
     }
     TensorEncoding getResultTensorEncoding() {
-      return getResultType().getEncoding().cast<EncodingAttr>()
-          .getEncoding().getValue();
+      return getResultType().getEncoding().cast<TensorEncodingAttr>().getValue();
     }
   }];
 }
@@ -870,10 +869,6 @@ let builders = [
     }
     RankedTensorType getResultType() {
       return getResult().getType().cast<RankedTensorType>();
-    }
-    TensorEncoding getSourceTensorEncoding() {
-      return getSourceType().getEncoding().cast<EncodingAttr>()
-          .getEncoding().getValue();
     }
   }];
 }

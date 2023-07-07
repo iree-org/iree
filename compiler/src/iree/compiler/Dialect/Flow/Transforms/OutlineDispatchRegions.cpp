@@ -255,7 +255,11 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
       })
       .Case<IREE::LinalgExt::UnsetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
-        auto encoding = stringifyEnum(op.getSourceTensorEncoding());
+        auto encoding = stringifyEnum(
+            op.getSourceType()
+                .getEncoding()
+                .template cast<IREE::LinalgExt::TensorEncodingAttr>()
+                .getValue());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
         bestSummary =
             opName + "_" + encoding.str() + "_" + loopRangesToString(shape);

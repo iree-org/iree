@@ -5,13 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
+#include <optional>
 
 #include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-using IREE::LinalgExt::EncodingAttr;
 using IREE::LinalgExt::TensorEncoding;
 using IREE::LinalgExt::TensorEncodingAttr;
 
@@ -48,11 +48,15 @@ std::optional<MatmulType> getMatmulType(Type lhsElementType,
 }
 
 std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
-  auto encodingAttr =
-      llvm::dyn_cast_if_present<EncodingAttr>(tensorType.getEncoding());
-  if (!encodingAttr)
+  auto encoding = tensorType.getEncoding();
+  if (!encoding) {
     return std::nullopt;
-  return encodingAttr.getEncoding().getValue();
+  }
+  auto tensorEncodingAttr = encoding.dyn_cast_or_null<TensorEncodingAttr>();
+  if (!tensorEncodingAttr) {
+    return std::nullopt;
+  }
+  return tensorEncodingAttr.getValue();
 }
 
 #define IREE_GETMATMULTYPE_CASE(TYPE)                                          \

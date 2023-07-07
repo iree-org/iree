@@ -97,12 +97,7 @@ def TensorEncodingEnum
 }
 
 def TensorEncodingAttr :
-  EnumAttr<IREELinalgExt_Dialect, TensorEncodingEnum, ""> {
-  let assemblyFormat = "``$value";
-}
-
-def IREELinalgExt_EncodingAttr : IREELinalgExt_Attr<"Encoding"> {
-  let mnemonic = "encoding";
+  EnumAttr<IREELinalgExt_Dialect, TensorEncodingEnum, "encoding"> {
   let summary = [{tensor layout encoding}];
   let description = [{
     This attribute describes the change in the layout for
@@ -120,19 +115,9 @@ def IREELinalgExt_EncodingAttr : IREELinalgExt_Attr<"Encoding"> {
     made richer.
   }];
 
-  let parameters = (ins
-    AttrParameter<"IREE::LinalgExt::TensorEncodingAttr",
-        "Tensor encoding to use for a tensor">:$encoding
-  );
-
   let assemblyFormat = [{
-    `<` `` $encoding `>`
+    `<` `` $value `>`
   }];
-
-  let builders = [
-    AttrBuilder<(ins "TensorEncoding":$encoding)>
-  ];
 }
-
 
 #endif // IREE_DIALECT_LINALGEXT_BASE
