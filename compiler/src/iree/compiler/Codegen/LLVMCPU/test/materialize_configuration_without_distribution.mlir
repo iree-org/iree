@@ -13,7 +13,7 @@ hal.executable private @matmul_static  {
     "embedded-elf-x86_64", {
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 16 : index,
-      target_triple = "x86_64-unknown-unknown-eabi-elf"
+      target_triple = "x86_64-none-elf"
     }> {
     hal.executable.export public @matmul_static layout(#pipeline_layout)
     builtin.module {

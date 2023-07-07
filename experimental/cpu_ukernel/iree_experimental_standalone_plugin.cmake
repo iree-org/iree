@@ -81,7 +81,7 @@ function(iree_experimental_standalone_plugin_arch)
       COMMAND "${IREE_CLANG_BINARY}"
         # Flags copied from
         # compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/internal/EmbeddedLinkerTool.cpp
-        -target "${LLVM_ARCH}-unknown-unknown-eabi-elf"
+        -target "${LLVM_ARCH}-none-elf"
         -isystem "${IREE_CLANG_BUILTIN_HEADERS_PATH}"
         -std=c17
         -fasm  # Added for inline-asm support.
