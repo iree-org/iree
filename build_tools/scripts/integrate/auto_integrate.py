@@ -5,6 +5,45 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+"""Prototype of an LLVM auto-integrate script.
+
+WARNING: This script is a WIP that is being developed while stellaraccident@
+does LLVM integrates. If this warning is still present without activity after
+about Aug-2023, then consider it defunct.
+
+This script attempts to define a human-augmented workflow for staying up to
+date with LLVM. Roughly, it encourages the following flow:
+
+1. Integrator `start`'s a new integrate branch, which will reset llvm-project
+   to the next affecting change (currently defined as anything touching
+   MLIR but can be expanded).
+2. The integrator or automation periodically issues a `next` command, which
+   will advance LLVM to the next affecting commit (or an arbitrary future
+   commit).
+3. If the CI on the integrate branch signals a failure, then the integrator
+   should apply patches as appropriate to turn it green or manually decide
+   to advance anyway (i.e. around a breakage/revert).
+4. When convenient, land the integrate branch into main and start a new one.
+
+The integrate branch is expected to live and accumulate patches over several
+days and is pushed to main based on a human decision. Since it is just a branch,
+normal git commands can be used to navigate around trouble spots.
+
+Current verbs:
+
+* `start`: Starts a new integrate branch.
+* `next`: Advances the current branch to the next affecting LLVM commit.
+* `status`: Shows the status of the LLVM dependency, including
+  reverse-chronological commit summaries of the delta between where we are and
+  upstream main.
+
+Future enhancements:
+
+* Carried patches to LLVM.
+* On `next`, we should see if we need to merge from `main` and do so.
+* Consult special `llvm-patch/{commit}` branches for pre-integrate patches and
+  apply them when we have integrated the given patch.
+"""
 from typing import Optional, Tuple
 
 import argparse
@@ -197,7 +236,6 @@ def parse_arguments(argv):
     start_parser.add_argument(
         "advance_to", default=None, help="Advance to the given LLVM commit"
     )
-    start_parser = subparsers.add_parser("start")
     start_parser.add_argument(
         "--reuse-branch",
         help="Allow re-use of an existing branch",
