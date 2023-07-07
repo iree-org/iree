@@ -296,8 +296,17 @@ def get_modified_paths(base_ref: str) -> Iterable[str]:
     ).stdout.splitlines()
 
 
-def modifies_included_path(base_ref: str) -> bool:
-    return any(not skip_path(p) for p in get_modified_paths(base_ref))
+def modifies_included_path() -> bool:
+    base_ref = os.environ["BASE_REF"]
+    try:
+        return any(not skip_path(p) for p in get_modified_paths(base_ref))
+    except TimeoutError as e:
+        print(
+            "Computing modified files timed out. Not using PR diff to determine"
+            " jobs to run.",
+            file=sys.stderr,
+        )
+        return True
 
 
 def get_runner_env(trailers: Mapping[str, str]) -> str:
@@ -309,9 +318,7 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
         )
         runner_env = RUNNER_ENV_DEFAULT
     else:
-        print(
-            f"Using runner environment '{runner_env}' from PR description" f" trailers"
-        )
+        print(f"Using runner environment '{runner_env}' from PR description trailers")
     return runner_env
 
 
@@ -340,18 +347,25 @@ def parse_jobs_trailer(
     return jobs
 
 
-def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
+def parse_jobs_from_workflow_file() -> Set[str]:
     with open(CI_WORKFLOW_FILE) as f:
         workflow = yaml.load(f.read(), Loader=yaml.SafeLoader)
     all_jobs = set(workflow["jobs"].keys())
     all_jobs -= CONTROL_JOBS
 
     if ALL_KEY in all_jobs:
-        print(f"Workflow has job with reserved name '{ALL_KEY}'")
+        raise ValueError(f"Workflow has job with reserved name '{ALL_KEY}'")
+    return all_jobs
 
+
+def get_enabled_jobs(
+    is_pr: bool, modifies: bool, trailers: Mapping[str, str], all_jobs: Set[str]
+) -> Set[str]:
     if not is_pr:
         print(
-            "Running all jobs because run was not triggered by a" " pull request event."
+            "Running all jobs because run was not triggered by a pull request"
+            " event.",
+            file=sys.stderr,
         )
         return all_jobs
 
@@ -375,7 +389,8 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
         if Trailer.EXTRA_JOBS in trailers or Trailer.SKIP_JOBS in trailers:
             raise ValueError(
                 f"Cannot mix trailer '{Trailer.EXACTLY_JOBS}' with"
-                f" '{Trailer.EXTRA_JOBS}' or '{Trailer.SKIP_JOBS}'")
+                f" '{Trailer.EXTRA_JOBS}' or '{Trailer.SKIP_JOBS}'"
+            )
 
         exactly_jobs = parse_jobs_trailer(trailers, Trailer.EXACTLY_JOBS, all_jobs)
         return exactly_jobs
@@ -387,18 +402,10 @@ def get_enabled_jobs(is_pr: bool, trailers: Mapping[str, str]) -> Set[str]:
     if ambiguous_jobs:
         raise ValueError(
             f"Jobs cannot be specified in both '{Trailer.SKIP_JOBS}' and"
-            f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}")
+            f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
+        )
 
     default_jobs = all_jobs - POSTSUBMIT_ONLY_JOBS
-
-    base_ref = os.environ["BASE_REF"]
-    try:
-        modifies = modifies_included_path(base_ref)
-    except TimeoutError as e:
-        print(
-            "Computing modified files timed out. Not using PR diff to"
-            " determine jobs to run."
-        )
 
     if not modifies:
         print(
@@ -487,16 +494,19 @@ def main():
         or LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", ""))
         or LLVM_INTEGRATE_LABEL in labels
     )
+
+    modifies = modifies_included_path()
     try:
         benchmark_presets = get_benchmark_presets(
             trailers, labels, is_pr, is_llvm_integrate_pr
         )
-        enabled_jobs = sorted(get_enabled_jobs(is_pr, trailers))
+        all_jobs = parse_jobs_from_workflow_file()
+        enabled_jobs = get_enabled_jobs(modifies, is_pr, trailers, all_jobs)
     except ValueError as e:
         print(e)
         sys.exit(1)
     output = {
-        "enabled-jobs": enabled_jobs,
+        "enabled-jobs": sorted(enabled_jobs),
         "is-pr": is_pr,
         "runner-env": get_runner_env(trailers),
         "runner-group": "presubmit" if is_pr else "postsubmit",
