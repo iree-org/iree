@@ -96,7 +96,7 @@ class CurrentState:
                 )
         else:
             if not self.new_commits:
-                return ValueError(f"No new commits")
+                raise ValueError(f"No new commits")
             else:
                 return next(reversed(self.new_commits))
 
