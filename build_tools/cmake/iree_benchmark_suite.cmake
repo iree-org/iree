@@ -48,6 +48,7 @@ function(iree_import_tflite_model)
       DEPENDS
         "${_RULE_SOURCE}"
       COMMENT "Importing TFLite model ${_MODEL_BASENAME}"
+      VERBATIM
     )
     add_custom_target("${_RULE_TARGET_NAME}"
       DEPENDS
@@ -102,6 +103,7 @@ function(iree_import_tf_model)
       DEPENDS
         "${_RULE_SOURCE}"
       COMMENT "Importing TF model ${_MODEL_BASENAME}"
+      VERBATIM
     )
     add_custom_target("${_RULE_TARGET_NAME}"
       DEPENDS

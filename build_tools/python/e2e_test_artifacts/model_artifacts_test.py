@@ -7,7 +7,7 @@
 import pathlib
 import unittest
 
-from e2e_test_artifacts import model_artifacts
+from e2e_test_artifacts import model_artifacts, utils
 from e2e_test_framework.definitions import common_definitions
 
 
@@ -26,10 +26,12 @@ class ModelArtifactsTest(unittest.TestCase):
 
         path = model_artifacts.get_model_path(model=tflite_model, root_path=root_path)
 
+        filename = utils.get_safe_name(
+            f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tflite_model.name}.tflite"
+        )
         self.assertEqual(
             path,
-            root_path
-            / f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tflite_model.id}_{tflite_model.name}.tflite",
+            root_path / filename,
         )
 
     def test_get_model_path_with_tf_model(self):
@@ -38,7 +40,7 @@ class ModelArtifactsTest(unittest.TestCase):
             name="tf_m",
             tags=[],
             source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
-            source_url="https://example.com/xyz_mlir",
+            source_url="https://example.com/xyz_stablehlo.mlir",
             entry_function="predict",
             input_types=["2xf32"],
         )
@@ -46,10 +48,12 @@ class ModelArtifactsTest(unittest.TestCase):
 
         path = model_artifacts.get_model_path(model=tf_model, root_path=root_path)
 
+        filename = utils.get_safe_name(
+            f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tf_model.name}.mlir"
+        )
         self.assertEqual(
             path,
-            root_path
-            / f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tf_model.id}_{tf_model.name}",
+            root_path / filename,
         )
 
 
