@@ -507,13 +507,13 @@ def main():
             trailers, labels, is_pr, is_llvm_integrate_pr
         )
         all_jobs = parse_jobs_from_workflow_file()
-        enabled_jobs = get_enabled_jobs(modifies, is_pr, trailers, all_jobs)
+        enabled_jobs = get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
     except ValueError as e:
         print(e)
         sys.exit(1)
     output = {
         "enabled-jobs": sorted(enabled_jobs),
-        "is-pr": is_pr,
+        "is-pr": json.dumps(is_pr),
         "runner-env": get_runner_env(trailers),
         "runner-group": "presubmit" if is_pr else "postsubmit",
         "write-caches": "0" if is_pr else "1",
