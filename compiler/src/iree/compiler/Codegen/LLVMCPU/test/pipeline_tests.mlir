@@ -13,7 +13,7 @@
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout5 = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -174,7 +174,7 @@ hal.executable private @preset_pad_config_dynamic_matmul  {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 64 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout5 = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -236,7 +236,7 @@ hal.executable private @pad_partially_unaligned_matmul {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 6, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -289,7 +289,7 @@ hal.executable private @batch_matmul_dynamic {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -334,7 +334,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
       cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 16 : index,
-      target_triple = "x86_64-unknown-unknown-eabi-elf"
+      target_triple = "x86_64-none-elf"
     }> {
     hal.executable.export public @vectorize_fill_conv2d_generic ordinal(0) layout(
       #hal.pipeline.layout<push_constants = 0, sets = [
@@ -399,7 +399,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
 // -----
 
 hal.executable private @multi_result {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @multi_result ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -447,7 +447,7 @@ hal.executable private @multi_result {
 // -----
 
 hal.executable private @quant_matmul_fusion {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @quant_matmul_fusion ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer, ReadOnly>, <4, storage_buffer, ReadOnly>, <5, storage_buffer, ReadOnly>, <6, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -525,7 +525,7 @@ hal.executable private @mmt4d_ukernel {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64",
       {cpu = "generic", cpu_features = "",
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-       native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf",
+       native_vector_size = 16 : index, target_triple = "x86_64-none-elf",
        ukernels = true}> {
     hal.executable.export public @ukernel_dispatch ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index):
@@ -562,7 +562,7 @@ hal.executable private @ukernel_pass_through {
     "llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf",
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf",
       ukernels = false}> {
     hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<
       push_constants = 2, sets = [
@@ -637,7 +637,7 @@ hal.executable private @ukernel_pass_through {
   cpu_features = "+sve,+sme",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"
+  target_triple = "aarch64-none-elf"
 }>
 
 hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
@@ -731,7 +731,7 @@ hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
   cpu_features = "+sme",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"
+  target_triple = "aarch64-none-elf"
 }>
 
 hal.executable private @aarch64_ssve_sve_disabled {

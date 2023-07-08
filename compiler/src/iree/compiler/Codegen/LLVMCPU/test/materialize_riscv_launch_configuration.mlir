@@ -14,7 +14,7 @@ hal.executable private @matmul_riscv  {
       cpu_features = "+m,+f",
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 16 : index,
-      target_triple = "riscv32-unknown-unknown-eabi-elf"
+      target_triple = "riscv32-none-elf"
     }> {
     hal.executable.export public @matmul_riscv layout(#pipeline_layout)
     builtin.module {
@@ -62,7 +62,7 @@ hal.executable private @thin_depthwise_conv_static {
       cpu_features = "+m,+f",
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 16 : index,
-      target_triple = "riscv32-unknown-unknown-eabi-elf"
+      target_triple = "riscv32-none-elf"
     }> {
     hal.executable.export public @thin_depthwise_conv_static layout(#pipeline_layout)
     builtin.module {

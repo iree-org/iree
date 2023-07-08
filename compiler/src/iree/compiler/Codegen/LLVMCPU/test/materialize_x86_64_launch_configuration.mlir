@@ -726,7 +726,7 @@ hal.executable private @conv_static {
 
 // -----
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -861,7 +861,7 @@ hal.executable private @thin_depthwise_conv_static {
 // -----
 
 hal.executable private @pooling_nchw_max {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "cascadelake", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vnni,+adx,+clflushopt,+clwb,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+pku,+prfchw,+rdrnd,+rdseed,+sahf,+x87,+xsave,+xsavec,+xsaveopt,+xsaves", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 32 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = false}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "cascadelake", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vnni,+adx,+clflushopt,+clwb,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+pku,+prfchw,+rdrnd,+rdseed,+sahf,+x87,+xsave,+xsavec,+xsaveopt,+xsaves", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 32 : index, target_triple = "x86_64-none-elf", ukernels = false}> {
     hal.executable.export public @pooling_nchw_max ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -951,7 +951,7 @@ hal.executable private @matmul_static  {
     "llvm-cpu",
     "embedded-elf-x86_64", {
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      target_triple = "x86_64-unknown-unknown-eabi-elf",
+      target_triple = "x86_64-none-elf",
       native_vector_size = 16 : index
     }> {
     hal.executable.export public @matmul_static layout(#pipeline_layout)
@@ -996,7 +996,7 @@ hal.executable private @matmul_static  {
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
   "llvm-cpu", "embedded-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-    target_triple = "x86_64-unknown-unknown-eabi-elf",
+    target_triple = "x86_64-none-elf",
     native_vector_size = 16 : index
   }
 >
@@ -1056,7 +1056,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
     "llvm-cpu",
     "embedded-elf-x86_64", {
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      target_triple = "x86_64-unknown-unknown-eabi-elf",
+      target_triple = "x86_64-none-elf",
       native_vector_size = 16 : index
     }> {
     hal.executable.export public @matmul_i8_i8_i32_static layout(#pipeline_layout)
@@ -1098,7 +1098,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
   "llvm-cpu", "embedded-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-    target_triple = "x86_64-unknown-unknown-eabi-elf",
+    target_triple = "x86_64-none-elf",
     native_vector_size = 16 : index
   }
 >
@@ -1151,7 +1151,7 @@ hal.executable private @gemm_unit_N {
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
   "llvm-cpu", "embedded-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-    target_triple = "x86_64-unknown-unknown-eabi-elf",
+    target_triple = "x86_64-none-elf",
     native_vector_size = 16 : index
   }
 >
@@ -1198,7 +1198,7 @@ hal.executable private @gemm_unit_M_unit_N {
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
   "llvm-cpu", "embedded-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-    target_triple = "x86_64-unknown-unknown-eabi-elf",
+    target_triple = "x86_64-none-elf",
     native_vector_size = 16 : index
   }
 >
@@ -1431,7 +1431,7 @@ hal.executable private @scalar {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 64 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 
@@ -1468,7 +1468,7 @@ hal.executable private @transpose_8x8 {
 hal.executable private @multi_root {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
       cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @multi_root ordinal(0)
         layout(#hal.pipeline.layout<
             push_constants = 0,
@@ -1544,7 +1544,7 @@ hal.executable private @pack  {
     cpu_features = "+avx512f",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 64 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }> {
   hal.executable.export public @pack layout(#pipeline_layout)
     builtin.module {
@@ -1583,7 +1583,7 @@ hal.executable private @unpack_generic_pack  {
     cpu_features = "+avx512f",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }> {
   hal.executable.export public @unpack_generic_pack layout(#pipeline_layout)
     builtin.module {
@@ -1623,7 +1623,7 @@ hal.executable private @unpack_generic_pack  {
 // -----
 
 hal.executable private @elem_pack {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @elem_pack ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %c1 = arith.constant 1 : index
@@ -1668,7 +1668,7 @@ hal.executable private @elem_pack {
   ]>
 ]>
 hal.executable private @transpose_pack  {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+avx2", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = false}> {
+  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+avx2", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf", ukernels = false}> {
     hal.executable.export @transpose_pack layout(#pipeline_layout)
     builtin.module {
       func.func @transpose_pack() {
@@ -1708,7 +1708,7 @@ hal.executable private @transpose_pack  {
   ]>
 ]>
 hal.executable private @reduction_broadcast_pack  {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+avx2", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = false}> {
+  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+avx2", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf", ukernels = false}> {
     hal.executable.export @reduction_broadcast_pack layout(#pipeline_layout)
     builtin.module {
       func.func @reduction_broadcast_pack() {
@@ -1765,7 +1765,7 @@ hal.executable private @reduction_broadcast_pack  {
 // -----
 
 hal.executable private @unpack_elem {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @unpack_elem ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -1803,7 +1803,7 @@ hal.executable private @unpack_elem {
 // -----
 
 hal.executable private @quant_model {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @quant_model ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer, ReadOnly>, <4, storage_buffer, ReadOnly>, <5, storage_buffer, ReadOnly>, <6, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
