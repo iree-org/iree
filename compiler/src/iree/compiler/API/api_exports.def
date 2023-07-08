@@ -321,6 +321,7 @@ EXPORTS
   mlirFloatAttrDoubleGetChecked
   mlirFloatAttrGetTypeID
   mlirFloatAttrGetValueDouble
+  mlirFloatTF32TypeGetTypeID
   mlirFunctionTypeGet
   mlirFunctionTypeGetInput
   mlirFunctionTypeGetNumInputs
@@ -543,6 +544,7 @@ EXPORTS
   mlirSymbolTableLookup
   mlirSymbolTableReplaceAllSymbolUses
   mlirSymbolTableWalkSymbolTables
+  mlirTF32TypeGet
   mlirTransformAnyOpTypeGet
   mlirTransformOperationTypeGet
   mlirTransformOperationTypeGetOperationName
@@ -589,6 +591,7 @@ EXPORTS
   mlirTypeIsAPDLValueType
   mlirTypeIsARankedTensor
   mlirTypeIsAShaped
+  mlirTypeIsATF32
   mlirTypeIsATensor
   mlirTypeIsATransformAnyOpType
   mlirTypeIsATransformOperationType
