@@ -34,34 +34,26 @@ void BindingOptions::bindOptions(OptionsBinder &binder) {
 void InputDialectOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling the input transformations to apply.");
-
-  binder.opt<InputDialectOptions::Type>(
-      "iree-input-type", type,
-      llvm::cl::desc("Specifies the input program representation."),
-      llvm::cl::values(
-          clEnumValN(InputDialectOptions::Type::none, "none",
-                     "No input dialect transformation."),
-          clEnumValN(InputDialectOptions::Type::auto_detect, "auto",
-                     "Analyze the input program to choose conversion.")
-  // clang-format off
+  binder.opt<std::string>(
+      "iree-input-type", inputTypeMnemonic,
+      llvm::cl::desc(
+          // clang-format off
+          "Specifies the input program representation:\n"
+          "  =none          - No input dialect transformation.\n"
+          "  =auto          - Analyze the input program to choose conversion.\n"
 #ifdef IREE_HAVE_STABLEHLO_INPUT
-        , clEnumValN(InputDialectOptions::Type::stablehlo,
-            "stablehlo",
-            "Legalize from StableHLO ops.")
-        , clEnumValN(InputDialectOptions::Type::stablehlo_xla,
-            "stablehlo_xla",
-            "Legalize from StableHLO ops (with XLA cleanup preprocessing). ")
-#endif  // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-        , clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",
-                     "Legalize from TMTensor ops.")
-#endif  // IREE_HAVE_TORCH_INPUT
+          "  =stablehlo     - Legalize from StableHLO ops.\n"
+          "  =stablehlo_xla - Legalize from StableHLO ops (with XLA cleanup preprocessing).\n"
+#endif // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
-        , clEnumValN(InputDialectOptions::Type::tosa, "tosa",
-                     "Legalize from TOSA ops.")
+          "  =tosa          - Legalize from TOSA ops.\n"
 #endif  // IREE_HAVE_TOSA_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
+          "  =torch         - Legalize from TMTensor ops.\n"
+#endif  // IREE_HAVE_TORCH_INPUT
+          "  =*             - An extensible input type defined in a plugin."
+          // clang-format on
           ),
-      // clang-format on
       llvm::cl::cat(category));
 
 #ifdef IREE_HAVE_STABLEHLO_INPUT
@@ -80,6 +72,30 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts."),
       llvm::cl::cat(category));
 #endif // IREE_HAVE_STABLEHLO_INPUT
+}
+
+InputDialectOptions::Type InputDialectOptions::parseInputTypeMnemonic() {
+  if (inputTypeMnemonic == "none") {
+    return Type::none;
+  } else if (inputTypeMnemonic == "auto") {
+    return Type::auto_detect;
+#ifdef IREE_HAVE_STABLEHLO_INPUT
+  } else if (inputTypeMnemonic == "stablehlo") {
+    return Type::stablehlo;
+  } else if (inputTypeMnemonic == "stablehlo_xla") {
+    return Type::stablehlo_xla;
+#endif
+#ifdef IREE_HAVE_TOSA_INPUT
+  } else if (inputTypeMnemonic == "tosa") {
+    return Type::tosa;
+#endif
+#ifdef IREE_HAVE_TORCH_INPUT
+  } else if (inputTypeMnemonic == "tm_tensor") {
+    return Type::tm_tensor;
+#endif
+  } else {
+    return Type::plugin;
+  }
 }
 
 void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
