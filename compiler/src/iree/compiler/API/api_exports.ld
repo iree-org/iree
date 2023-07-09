@@ -14,7 +14,8 @@ VER_0 {
     ireeCompilerInvocationDestroy;
     ireeCompilerInvocationEnableCallbackDiagnostics;
     ireeCompilerInvocationEnableConsoleDiagnostics;
-    ireeCompilerInvocationImportModule;
+    ireeCompilerInvocationImportBorrowModule;
+    ireeCompilerInvocationImportStealModule;
     ireeCompilerInvocationOutputHALExecutable;
     ireeCompilerInvocationOutputIR;
     ireeCompilerInvocationOutputVMBytecode;
@@ -34,11 +35,12 @@ VER_0 {
     ireeCompilerRegisterDialects;
     ireeCompilerRunLldMain;
     ireeCompilerRunMain;
+    ireeCompilerSessionBorrowContext;
     ireeCompilerSessionCreate;
     ireeCompilerSessionDestroy;
-    ireeCompilerSessionGetContext;
     ireeCompilerSessionGetFlags;
     ireeCompilerSessionSetFlags;
+    ireeCompilerSessionStealContext;
     ireeCompilerSetupGlobalCL;
     ireeCompilerSourceDestroy;
     ireeCompilerSourceOpenFile;
