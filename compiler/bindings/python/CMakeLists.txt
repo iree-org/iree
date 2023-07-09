@@ -58,6 +58,7 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
     tflite.py
     xla.py
   SOURCES_GLOB
+    api/*.py
     tools/*.py
 )
 
