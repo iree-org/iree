@@ -154,14 +154,12 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
 }
 
 bool TiedOpInterface::hasAnyTiedUses(Value value) {
-  for (auto &use : value.getUses()) {
-    auto tiedOp = dyn_cast<TiedOpInterface>(use.getOwner());
-    if (!tiedOp)
-      continue;
-    if (tiedOp.isOperandTied(use.getOperandNumber()))
-      return true;
-  }
-  return false;
+  return llvm::any_of(value.getUses(), [](auto &use) {
+    if (auto tiedOp = dyn_cast<TiedOpInterface>(use.getOwner())) {
+      return tiedOp.isOperandTied(use.getOperandNumber());
+    }
+    return false;
+  });
 }
 
 //===----------------------------------------------------------------------===//
