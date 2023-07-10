@@ -61,6 +61,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://openxla.github.io/iree/guides/developer-tips/</loc>
+         <lastmod>2023-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/</loc>
          <lastmod>2023-07-10</lastmod>
          <changefreq>daily</changefreq>
