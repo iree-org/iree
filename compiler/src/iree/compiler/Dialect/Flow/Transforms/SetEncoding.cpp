@@ -30,8 +30,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-using IREE::LinalgExt::EncodingOpKind;
 using IREE::LinalgExt::EncodingRole;
+using IREE::LinalgExt::EncodingUser;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -154,26 +154,26 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       return failure();
     }
 
-    EncodingOpKind opKind;
+    EncodingUser user;
 
     if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
-      opKind = EncodingOpKind::MATMUL_F32F32F32;
+      user = EncodingUser::MATMUL_F32F32F32;
     } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
                outElemType.isF32()) {
-      opKind = EncodingOpKind::MATMUL_F16F16F32;
+      user = EncodingUser::MATMUL_F16F16F32;
     } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
                outElemType.isF16()) {
-      opKind = EncodingOpKind::MATMUL_F16F16F16;
+      user = EncodingUser::MATMUL_F16F16F16;
     } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
                outElemType.isF32()) {
-      opKind = EncodingOpKind::MATMUL_BF16BF16F32;
+      user = EncodingUser::MATMUL_BF16BF16F32;
     } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
                outElemType.isBF16()) {
-      opKind = EncodingOpKind::MATMUL_BF16BF16BF16;
+      user = EncodingUser::MATMUL_BF16BF16BF16;
     } else if (lhsElemType.isSignlessInteger(8) &&
                rhsElemType.isSignlessInteger(8) &&
                outElemType.isSignlessInteger(32)) {
-      opKind = EncodingOpKind::MATMUL_I8I8I32;
+      user = EncodingUser::MATMUL_I8I8I32;
     } else {
       return rewriter.notifyMatchFailure(
           matmulOp,
@@ -202,10 +202,10 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
 
     auto createSetEncodingOp = [&](Value source, EncodingRole role) {
       auto *context = rewriter.getContext();
-      auto opKindAttr = LinalgExt::EncodingOpKindAttr::get(context, opKind);
+      auto userAttr = LinalgExt::EncodingUserAttr::get(context, user);
       auto roleAttr = LinalgExt::EncodingRoleAttr::get(context, role);
       auto encodingAttr =
-          LinalgExt::EncodingAttr::get(context, opKindAttr, roleAttr);
+          LinalgExt::EncodingAttr::get(context, userAttr, roleAttr);
       auto sourceType = source.getType().cast<RankedTensorType>();
       auto resultType = RankedTensorType::get(
           sourceType.getShape(), sourceType.getElementType(), encodingAttr);

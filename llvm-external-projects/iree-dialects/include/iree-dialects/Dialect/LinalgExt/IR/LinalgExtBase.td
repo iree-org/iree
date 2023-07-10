@@ -60,7 +60,7 @@ def MATMUL_F16F16F16 : I32EnumAttrCase<"MATMUL_F16F16F16", 3>;
 def MATMUL_BF16BF16F32 : I32EnumAttrCase<"MATMUL_BF16BF16F32", 4>;
 def MATMUL_BF16BF16BF16 : I32EnumAttrCase<"MATMUL_BF16BF16BF16", 5>;
 
-def EncodingOpKind : IREELinalgExt_I32EnumAttr<"EncodingOpKind",
+def EncodingUser : IREELinalgExt_I32EnumAttr<"EncodingUser",
     "Describes the operation that a tensor is an operand or a result of.", [
       MATMUL_F32F32F32,
       MATMUL_I8I8I32,
@@ -70,8 +70,8 @@ def EncodingOpKind : IREELinalgExt_I32EnumAttr<"EncodingOpKind",
       MATMUL_BF16BF16BF16,
     ]>;
 
-def EncodingOpKindAttr :
-  IREELinalgExt_EnumAttr<EncodingOpKind, "op_kind">;
+def EncodingUserAttr :
+  IREELinalgExt_EnumAttr<EncodingUser, "user">;
 
 def LHS : I32EnumAttrCase<"LHS", 0>;
 def RHS : I32EnumAttrCase<"RHS", 1>;
@@ -103,12 +103,12 @@ def EncodingAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `op_kind` `=` $opKind
+    `<` `user` `=` $user
       `,` `role` `=` $role `>`
   }];
 
   let parameters = (ins
-    AttrParameter<"EncodingOpKindAttr", "kind of operation using this tensor">:$opKind,
+    AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
     AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role
   );
 

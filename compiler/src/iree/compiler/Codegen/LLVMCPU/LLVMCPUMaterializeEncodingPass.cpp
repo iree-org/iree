@@ -30,21 +30,20 @@ namespace {
 static MatmulTileParams chooseMatmulTileParamsGeneric() { return {8, 4, 8}; }
 
 static MatmulTileParams
-chooseMatmulTileParamsAArch64(EncodingOpKind opKind,
-                              ExecutableTargetAttr target) {
-  switch (opKind) {
-  case EncodingOpKind::MATMUL_F32F32F32:
-  case EncodingOpKind::MATMUL_F16F16F32:
-  case EncodingOpKind::MATMUL_F16F16F16:
-  case EncodingOpKind::MATMUL_BF16BF16F32:
-  case EncodingOpKind::MATMUL_BF16BF16BF16:
+chooseMatmulTileParamsAArch64(EncodingUser user, ExecutableTargetAttr target) {
+  switch (user) {
+  case EncodingUser::MATMUL_F32F32F32:
+  case EncodingUser::MATMUL_F16F16F32:
+  case EncodingUser::MATMUL_F16F16F16:
+  case EncodingUser::MATMUL_BF16BF16F32:
+  case EncodingUser::MATMUL_BF16BF16BF16:
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     return {8, 1, 8};
-  case EncodingOpKind::MATMUL_I8I8I32:
+  case EncodingUser::MATMUL_I8I8I32:
     if (hasFeature(target, "+i8mm")) {
       // Aim to use SMMLA.
       return {8, 8, 8};
@@ -61,14 +60,13 @@ chooseMatmulTileParamsAArch64(EncodingOpKind opKind,
 }
 
 static MatmulTileParams
-chooseMatmulTileParamsX86_64(EncodingOpKind opKind,
-                             ExecutableTargetAttr target) {
-  switch (opKind) {
-  case EncodingOpKind::MATMUL_F32F32F32:
-  case EncodingOpKind::MATMUL_F16F16F32:
-  case EncodingOpKind::MATMUL_F16F16F16:
-  case EncodingOpKind::MATMUL_BF16BF16F32:
-  case EncodingOpKind::MATMUL_BF16BF16BF16:
+chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
+  switch (user) {
+  case EncodingUser::MATMUL_F32F32F32:
+  case EncodingUser::MATMUL_F16F16F32:
+  case EncodingUser::MATMUL_F16F16F16:
+  case EncodingUser::MATMUL_BF16BF16F32:
+  case EncodingUser::MATMUL_BF16BF16BF16:
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -86,7 +84,7 @@ chooseMatmulTileParamsX86_64(EncodingOpKind opKind,
     }
     // SSE fallback.
     return {8, 1, 4};
-  case EncodingOpKind::MATMUL_I8I8I32:
+  case EncodingUser::MATMUL_I8I8I32:
     if (hasFeature(target, "+avx512vnni")) {
       // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
       // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
@@ -109,13 +107,13 @@ chooseMatmulTileParamsX86_64(EncodingOpKind opKind,
   }
 }
 
-static MatmulTileParams chooseMatmulTileParams(EncodingOpKind opKind,
+static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
                                                ExecutableTargetAttr target) {
   if (isAArch64(target)) {
-    return chooseMatmulTileParamsAArch64(opKind, target);
+    return chooseMatmulTileParamsAArch64(user, target);
   }
   if (isX86_64(target)) {
-    return chooseMatmulTileParamsX86_64(opKind, target);
+    return chooseMatmulTileParamsX86_64(user, target);
   }
   return chooseMatmulTileParamsGeneric();
 }
@@ -145,10 +143,9 @@ void LLVMCPUMaterializeEncodingPass::runOnOperation() {
             tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
         if (!encoding)
           return failure();
-        auto opKind = encoding.getOpKind().getValue();
+        auto user = encoding.getUser().getValue();
         auto role = encoding.getRole().getValue();
-        MatmulTileParams tileParams =
-            chooseMatmulTileParams(opKind, targetAttr);
+        MatmulTileParams tileParams = chooseMatmulTileParams(user, targetAttr);
         auto encodingInfo = chooseEncodingInfoForMatmul(role, tileParams);
         adjustTileSizesToNarrowStaticShape(encodingInfo, tensorType.getShape());
         return encodingInfo;

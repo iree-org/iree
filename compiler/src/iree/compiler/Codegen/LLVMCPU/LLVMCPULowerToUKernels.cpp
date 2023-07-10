@@ -355,19 +355,19 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op) {
       genericMicroKernelOp.getOperation());
 }
 
-static uint32_t flagForOpKind(IREE::LinalgExt::EncodingOpKind opKind) {
-  switch (opKind) {
-  case IREE::LinalgExt::EncodingOpKind::MATMUL_F32F32F32:
+static uint32_t flagForUser(IREE::LinalgExt::EncodingUser user) {
+  switch (user) {
+  case IREE::LinalgExt::EncodingUser::MATMUL_F32F32F32:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
-  case IREE::LinalgExt::EncodingOpKind::MATMUL_I8I8I32:
+  case IREE::LinalgExt::EncodingUser::MATMUL_I8I8I32:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
-  case IREE::LinalgExt::EncodingOpKind::MATMUL_F16F16F32:
+  case IREE::LinalgExt::EncodingUser::MATMUL_F16F16F32:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32;
-  case IREE::LinalgExt::EncodingOpKind::MATMUL_F16F16F16:
+  case IREE::LinalgExt::EncodingUser::MATMUL_F16F16F16:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F16;
-  case IREE::LinalgExt::EncodingOpKind::MATMUL_BF16BF16F32:
+  case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16F32:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32;
-  case IREE::LinalgExt::EncodingOpKind::MATMUL_BF16BF16BF16:
+  case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16BF16:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
   }
 }
@@ -406,7 +406,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
   }
   inputValues.push_back(rewriter.create<arith::ConstantIntOp>(
       loc,
-      flagForOpKind(encoding.getOpKind().getValue()) |
+      flagForUser(encoding.getUser().getValue()) |
           flagForRole(encoding.getRole().getValue()),
       32));
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);

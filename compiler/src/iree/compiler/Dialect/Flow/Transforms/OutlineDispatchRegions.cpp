@@ -250,10 +250,10 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
         auto encoding = op.getResultType()
                             .getEncoding()
                             .template cast<IREE::LinalgExt::EncodingAttr>();
-        auto opKind = stringifyEnum(encoding.getOpKind().getValue());
+        auto user = stringifyEnum(encoding.getUser().getValue());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getSourceType().getShape();
-        bestSummary = opName + "_" + opKind.str() + "_" + role.str() + "_" +
+        bestSummary = opName + "_" + user.str() + "_" + role.str() + "_" +
                       loopRangesToString(shape);
         ;
       })
@@ -262,10 +262,10 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
         auto encoding = op.getSourceType()
                             .getEncoding()
                             .template cast<IREE::LinalgExt::EncodingAttr>();
-        auto opKind = stringifyEnum(encoding.getOpKind().getValue());
+        auto user = stringifyEnum(encoding.getUser().getValue());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
-        bestSummary = opName + "_" + opKind.str() + "_" + role.str() + "_" +
+        bestSummary = opName + "_" + user.str() + "_" + role.str() + "_" +
                       loopRangesToString(shape);
       })
       .Case<IREE::LinalgExt::LinalgExtOp>(
