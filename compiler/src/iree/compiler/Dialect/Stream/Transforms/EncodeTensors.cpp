@@ -528,7 +528,9 @@ struct EncodeTensorLoadOp
     auto sourceDims = op.getSourceEncodingDims();
     auto loadType = op.getResult().getType();
     if (auto complexTy = dyn_cast<ComplexType>(loadType)) {
-      loadType = IntegerType::get(loadType.getContext(), complexTy.getElementType().getIntOrFloatBitWidth() * 2);
+      loadType = IntegerType::get(
+          loadType.getContext(),
+          complexTy.getElementType().getIntOrFloatBitWidth() * 2);
     }
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
@@ -547,7 +549,8 @@ struct EncodeTensorLoadOp
         sourceOffset);
 
     if (loadType != op.getType()) {
-      load = rewriter.create<complex::BitcastOp>(op.getLoc(), op.getType(), load);
+      load =
+          rewriter.create<complex::BitcastOp>(op.getLoc(), op.getType(), load);
     }
 
     rewriter.replaceOp(op, load);
