@@ -113,8 +113,9 @@ func.func @denseTensorSplatI64(%arg0: i64, %arg1: index, %arg2: index) -> !strea
 func.func @denseTensorSplatConstantComplexF32(%arg0: !stream.resource<*>) -> (!stream.resource<*>) {
   %cst = complex.constant [3.000000e+00 : f32, 1.000000e+01 : f32] : complex<f32>
   %0 = stream.tensor.sizeof tensor<6xcomplex<f32>> : index
-  // CHECK: %[[I64NUMBER:.+]] = arith.constant 4629700418029486080
-  // CHECK: %[[SPLAT_RES:.+]] = stream.async.splat %[[I64NUMBER]]
+  // CHECK: %[[I64NUMBER:.+]] = complex.constant [3.000000e+00 : f32, 1.000000e+01 : f32] : complex<f32>
+  // CHECK: %[[BITCAST:.+]] = complex.bitcast %[[I64NUMBER]] : complex<f32> to i64 
+  // CHECK: %[[SPLAT_RES:.+]] = stream.async.splat %[[BITCAST]]
   %1 = stream.tensor.splat %cst : complex<f32> -> tensor<6xcomplex<f32>> in !stream.resource<*>{%0}
   // CHECK: return %[[SPLAT_RES]]
   return %1 : !stream.resource<*>
@@ -125,15 +126,8 @@ func.func @denseTensorSplatConstantComplexF32(%arg0: !stream.resource<*>) -> (!s
 // CHECK-LABEL: @denseTensorSplatDynamicComplexF32
 func.func @denseTensorSplatDynamicComplexF32(%arg0: !stream.resource<*>, %arg1: complex<f32>) -> (!stream.resource<*>) {
   %0 = stream.tensor.sizeof tensor<6xcomplex<f32>> : index
-  // CHECK-DAG: %[[REAL_F32:.+]] = complex.re %arg1 : complex<f32>
-  // CHECK-DAG: %[[REAL_I32:.+]] = arith.bitcast %[[REAL_F32]] : f32 to i32
-  // CHECK-DAG: %[[IMAG_F32:.+]] = complex.im %arg1 : complex<f32>
-  // CHECK-DAG: %[[IMAG_I32:.+]] = arith.bitcast %[[IMAG_F32]] : f32 to i32
-  // CHECK-DAG: %[[REAL_I64:.+]] = arith.extui %[[REAL_I32]] : i32 to i64
-  // CHECK-DAG: %[[IMAG_I64:.+]] = arith.extui %[[IMAG_I32]] : i32 to i64
-  // CHECK-DAG: %[[UPPER:.+]] = arith.shli %[[REAL_I64]], %c32
-  // CHECK-DAG: %[[VALUE:.+]] = arith.ori %[[UPPER]], %[[IMAG_I64]]
-  // CHECK: %[[SPLAT_RES:.+]] = stream.async.splat %[[VALUE]]
+  // CHECK: %[[BITCAST:.+]] = complex.bitcast %arg1 : complex<f32> to i64 
+  // CHECK: %[[SPLAT_RES:.+]] = stream.async.splat %[[BITCAST]]
   %1 = stream.tensor.splat %arg1 : complex<f32> -> tensor<6xcomplex<f32>> in !stream.resource<*>{%0}
   // CHECK: return %[[SPLAT_RES]]
   return %1 : !stream.resource<*>
@@ -271,4 +265,3 @@ func.func @denseTensorStoreRank0(%arg0: !stream.resource<staging>, %arg1: index,
   // CHECK: return %[[RET]]
   return %0 : !stream.resource<staging>
 }
-
