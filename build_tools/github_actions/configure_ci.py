@@ -359,11 +359,11 @@ def parse_jobs_from_workflow_file() -> Set[str]:
 
 
 def get_enabled_jobs(
+    trailers: Mapping[str, str],
+    all_jobs: Set[str],
     *,
     is_pr: bool,
     modifies: bool,
-    trailers: Mapping[str, str],
-    all_jobs: Set[str],
 ) -> Set[str]:
     if not is_pr:
         print(
@@ -512,7 +512,10 @@ def main():
         )
         all_jobs = parse_jobs_from_workflow_file()
         enabled_jobs = get_enabled_jobs(
-            modifies=modifies, is_pr=is_pr, trailers=trailers, all_jobs=all_jobs
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
         )
     except ValueError as e:
         print(e)

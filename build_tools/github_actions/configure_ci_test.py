@@ -147,7 +147,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = {"job1", "job2", "job3"}
         is_pr = True
         modifies = True
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, all_jobs)
 
     def test_get_enabled_jobs_postsubmit(self):
@@ -157,7 +162,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = False
         modifies = True
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, all_jobs)
 
     def test_get_enabled_jobs_no_postsubmit(self):
@@ -167,7 +177,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
         modifies = True
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, default_jobs)
 
     def test_get_enabled_jobs_no_modifies(self):
@@ -177,7 +192,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
         modifies = False
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, {})
 
     def test_get_enabled_jobs_skip(self):
@@ -187,7 +207,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
         modifies = True
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, {"job3"})
 
     def test_get_enabled_jobs_skip_all(self):
@@ -197,7 +222,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
         modifies = True
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, {})
 
     def test_get_enabled_jobs_extra(self):
@@ -207,7 +237,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
         modifies = True
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, all_jobs)
 
     def test_get_enabled_jobs_exactly(self):
@@ -217,7 +252,12 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
         modifies = True
-        jobs = configure_ci.get_enabled_jobs(is_pr, modifies, trailers, all_jobs)
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modifies=modifies,
+            is_pr=is_pr,
+        )
         self.assertCountEqual(jobs, {postsubmit_job})
 
 
