@@ -14,22 +14,22 @@
 
 set -euo pipefail
 
-VERSION="${VERSION:-7138511883-62g-testing}"
-REGION="${REGION:-us-west1}"
-ZONES="${ZONES:-us-west1-a,us-west1-b,us-west1-c}"
+VERSION="${VERSION:-46d94c383f-nn2}"
+REGION="${REGION:-us-central1}"
+ZONES="${ZONES:-us-central1-b,us-central1-c,us-central1-f}"
 AUTOSCALING="${AUTOSCALING:-1}"
 GROUP="${GROUP:-presubmit}"
-TYPE="${TYPE:-cpu}"
+TYPE="${TYPE:-a100}"
 MIG_NAME_PREFIX="${MIG_NAME_PREFIX:-gh-runner}"
 TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-gh-runner}"
 DRY_RUN="${DRY_RUN:-0}"
 
 # For GPU groups, these should both be set to the target group size, as
 # autoscaling currently does not work for these.
-MIN_SIZE="${MIN_SIZE:-3}"
-MAX_SIZE="${MAX_SIZE:-3}"
+MIN_SIZE="${MIN_SIZE:-1}"
+MAX_SIZE="${MAX_SIZE:-1}"
 # Whether this is a testing MIG (i.e. not prod)
-TESTING="${TESTING:-1}"
+TESTING="${TESTING:-0}"
 
 if (( TESTING==0 )) && [[ "${VERSION}" == *testing* ]]; then
   echo "Creating testing mig because VERSION='${VERSION}' contains 'testing'" >&2
