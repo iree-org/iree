@@ -82,8 +82,10 @@ static void iree_hal_webgpu_buffer_destroy(iree_hal_buffer_t* base_buffer) {
 }
 
 WGPUBuffer iree_hal_webgpu_buffer_handle(const iree_hal_buffer_t* base_buffer) {
+  iree_hal_buffer_t* allocated_buffer =
+      iree_hal_buffer_allocated_buffer(base_buffer);
   iree_hal_webgpu_buffer_t* buffer =
-      iree_hal_webgpu_buffer_cast((iree_hal_buffer_t*)base_buffer);
+      iree_hal_webgpu_buffer_cast((iree_hal_buffer_t*)allocated_buffer);
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->handle;
 }
