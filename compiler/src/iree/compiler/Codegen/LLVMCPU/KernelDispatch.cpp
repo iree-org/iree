@@ -70,9 +70,10 @@ static llvm::cl::list<int>
                      llvm::cl::desc("linalg.mmt4d vector tile size"),
                      llvm::cl::ZeroOrMore);
 
-static llvm::cl::opt<int> defaultDistTileSize(
-    "iree-codegen-llvm-distribution-size",
-    llvm::cl::desc("default distribution tile size"), llvm::cl::init(64));
+static llvm::cl::opt<int>
+    defaultDistTileSize("iree-codegen-llvm-distribution-size",
+                        llvm::cl::desc("default distribution tile size"),
+                        llvm::cl::init(64));
 
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
@@ -1152,7 +1153,8 @@ getDefaultDistributionTileSizes(TilingInterface op) {
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto dim : llvm::seq<int64_t>(0, distTileSizes.size())) {
-    if (!partitionedLoopsSet.count(dim)) distTileSizes[dim] = 0;
+    if (!partitionedLoopsSet.count(dim))
+      distTileSizes[dim] = 0;
   }
 
   return distTileSizes;
