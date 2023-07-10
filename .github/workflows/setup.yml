@@ -110,6 +110,7 @@ jobs:
           git log --oneline --graph --max-count=3
 
           ./build_tools/github_actions/configure_ci.py
+          cat "${GITHUB_OUTPUT}"
 
       - name: "Show enabled options"
         env:
