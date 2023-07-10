@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
-#include "iree/builtins/ukernel/mmt4d_internal.h"
+#include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_internal.h"
 
 void iree_uk_mmt4d_tile_i8i8i32_8x8x4_arm_64_dotprod(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
