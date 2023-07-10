@@ -113,8 +113,8 @@ jobs:
 
       - name: "Show enabled options"
         env:
-          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets }}
-          ENABLED_JOBS: ${{ join(fromJson(steps.configure.outputs.enabled-jobs)) }}
+          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets || 'None' }}
+          ENABLED_JOBS: ${{ join(fromJson(steps.configure.outputs.enabled-jobs)) || 'None' }}
         run: |
           echo ":green_circle: Enabled jobs: \`${ENABLED_JOBS}\`" \
               >> "${GITHUB_STEP_SUMMARY}"
