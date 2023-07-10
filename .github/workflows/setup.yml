@@ -81,10 +81,7 @@ jobs:
           PR_NUMBER: ${{ github.event.number }}
           PR_JSON: pull_request.json
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TEST: ${{ github.workflow }}
         run: |
-          echo "${TEST}"
-          jq '.' "${GITHUB_EVENT_PATH}"
           gh api "/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "${PR_JSON}"
           # It requires delimiter to pass multiline strings through
           # GITHUB_OUTPUT. Since these are already escaped JSON strings, pass
