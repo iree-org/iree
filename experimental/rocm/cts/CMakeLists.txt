@@ -24,4 +24,6 @@ iree_hal_cts_test_suite(
     # Semaphores are not implemented in the ROCm backend yet.
     "semaphore_submission"
     "semaphore"
+  LABELS
+    driver=rocm
 )

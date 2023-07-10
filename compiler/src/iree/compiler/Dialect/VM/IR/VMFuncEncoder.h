@@ -17,7 +17,7 @@ namespace iree_compiler {
 // This base manages source map construction and vm.func walking while
 // subclasses provide actual emission.
 class VMFuncEncoder {
- public:
+public:
   virtual ~VMFuncEncoder() = default;
 
   // Begins encoding the contents of a block.
@@ -74,7 +74,7 @@ class VMFuncEncoder {
   virtual LogicalResult encodeResults(Operation::result_range values) = 0;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_IR_VMFUNCENCODER_H_
+#endif // IREE_COMPILER_DIALECT_VM_IR_VMFUNCENCODER_H_

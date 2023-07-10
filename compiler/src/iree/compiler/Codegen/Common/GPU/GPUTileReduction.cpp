@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -40,7 +40,8 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   rewriter.setInsertionPoint(op);
   FailureOr<scf::SCFReductionTilingResult> results = scf::tileReductionUsingScf(
       rewriter, cast<PartialReductionOpInterface>(op.getOperation()), sizes);
-  if (failed(results)) return failure();
+  if (failed(results))
+    return failure();
   return success();
 }
 
@@ -48,12 +49,14 @@ static LogicalResult tileFusedOps(linalg::GenericOp op) {
   IRRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
   SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
-  if (tileSizes.empty()) return success();
+  if (tileSizes.empty())
+    return success();
   linalg::LinalgTilingOptions tileOption;
   tileOption.setTileSizes(tileSizes);
   FailureOr<linalg::TiledLinalgOp> tiledOps =
       linalg::tileLinalgOp(rewriter, op, tileOption);
-  if (failed(tiledOps)) return failure();
+  if (failed(tiledOps))
+    return failure();
   rewriter.replaceOp(op, tiledOps->tensorResults);
   return success();
 }
@@ -81,11 +84,11 @@ struct GPUTileReductionPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass() {
   return std::make_unique<GPUTileReductionPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

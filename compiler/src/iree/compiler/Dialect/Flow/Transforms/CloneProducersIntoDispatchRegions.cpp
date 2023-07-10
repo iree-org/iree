@@ -27,7 +27,7 @@ struct CloneProducersIntoDispatchRegionPass
           CloneProducersIntoDispatchRegionPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void CloneProducersIntoDispatchRegionPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
@@ -44,7 +44,7 @@ createCloneProducersIntoDispatchRegionsPass() {
   return std::make_unique<CloneProducersIntoDispatchRegionPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

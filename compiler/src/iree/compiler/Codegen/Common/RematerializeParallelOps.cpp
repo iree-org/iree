@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -18,15 +18,34 @@ namespace iree_compiler {
 
 namespace {
 
+static bool isScalarOrTensorOfSizeOne(Type t) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(t)) {
+    return tensorType.hasStaticShape() && tensorType.getNumElements() == 1;
+  }
+  return t.isIntOrIndexOrFloat();
+}
+
 /// Merge elementwise operations into their consumers.
 struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
+    // Avoid doing this for scalar operations. This is a temporary solution
+    // to address #14258. Ideally we should apply this pass more prescriptively
+    // instead of default always.
+    auto isScalarValue = [](Value v) {
+      return isScalarOrTensorOfSizeOne(v.getType());
+    };
+    if (llvm::all_of(genericOp.getOperands(), isScalarValue) &&
+        llvm::all_of(genericOp.getResults(), isScalarValue)) {
+      return failure();
+    }
+
     // Find the first operand that is defined by another generic op on tensors.
-    for (OpOperand& opOperand : genericOp->getOpOperands()) {
-      if (!linalg::areElementwiseOpsFusable(&opOperand)) continue;
+    for (OpOperand &opOperand : genericOp->getOpOperands()) {
+      if (!linalg::areElementwiseOpsFusable(&opOperand))
+        continue;
 
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
@@ -59,12 +78,12 @@ struct RematerializeParallelOpsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRematerializeParallelOpsPass() {
   return std::make_unique<RematerializeParallelOpsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

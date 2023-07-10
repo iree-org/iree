@@ -16,29 +16,29 @@ namespace IREE {
 namespace Util {
 
 class UtilDialect : public Dialect {
- public:
-  explicit UtilDialect(MLIRContext* context);
+public:
+  explicit UtilDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "util"; }
 
-  Attribute parseAttribute(DialectAsmParser& parser, Type type) const override;
-  void printAttribute(Attribute attr, DialectAsmPrinter& p) const override;
+  Attribute parseAttribute(DialectAsmParser &parser, Type type) const override;
+  void printAttribute(Attribute attr, DialectAsmPrinter &p) const override;
 
-  Type parseType(DialectAsmParser& parser) const override;
-  void printType(Type type, DialectAsmPrinter& os) const override;
+  Type parseType(DialectAsmParser &parser) const override;
+  void printType(Type type, DialectAsmPrinter &os) const override;
 
-  Operation* materializeConstant(OpBuilder& builder, Attribute value, Type type,
+  Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
 
-  void getCanonicalizationPatterns(RewritePatternSet& results) const override;
+  void getCanonicalizationPatterns(RewritePatternSet &results) const override;
 
- private:
+private:
   void registerAttributes();
   void registerTypes();
 };
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILDIALECT_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILDIALECT_H_

@@ -197,6 +197,8 @@ int main(int argc, char** argv) {
   // in a power-of-two assumption
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 3, 5, "");
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 3, 4, "");
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F16F16, 6, 7, "");
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_BF16BF16, 9, 2, "");
 
 #if defined(IREE_ARCH_ARM_64)
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, "");

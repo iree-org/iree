@@ -15,7 +15,8 @@ include "mlir/IR/OpBase.td"
 def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{Fuses the producers for the operands to fuse.}];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
@@ -33,7 +34,8 @@ def RewriteForallToAsyncOp :
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
 
   let description = [{
     Rewrite a bufferized scf.forall op to the async dialect.
@@ -58,6 +60,7 @@ def RewriteForallToAsyncOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::scf::ForallOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -69,7 +72,8 @@ def RewriteForallToScfForOp :
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
 
   let description = [{
     Rewrite a bufferized scf.forall to a sequential scf.for.
@@ -94,6 +98,7 @@ def RewriteForallToScfForOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::scf::ForallOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -104,7 +109,8 @@ def TileAndDecomposeAttentionOp : Op<Transform_Dialect, "tile_and_decompose_atte
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface,
-     TransformEachOpTrait]> {
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Target iree_linalg_ext.attention ops and tile and decompose them.
     This transform consumes the target handle and produces a result handle.
@@ -128,6 +134,7 @@ def TileAndDecomposeAttentionOp : Op<Transform_Dialect, "tile_and_decompose_atte
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::iree_compiler::IREE::LinalgExt::AttentionOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);

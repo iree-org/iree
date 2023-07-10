@@ -135,11 +135,11 @@ struct GatherToTorchIndexSelect final
   }
 };
 
-}  // namespace
+} // namespace
 
 void populatePreprocessingGatherToTorchIndexSelectPatterns(
     mlir::MLIRContext *context, RewritePatternSet *patterns) {
   patterns->add<GatherIsTorchIndexSelectPattern>(context);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

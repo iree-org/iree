@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -24,7 +24,8 @@ struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
     Operation *linalgCopy =
         createLinalgCopyOp(rewriter, copyOp.getLoc(), copyOp.getSource(),
                            copyOp.getTarget(), copyOp->getAttrs());
-    if (!linalgCopy) return failure();
+    if (!linalgCopy)
+      return failure();
     rewriter.replaceOp(copyOp, linalgCopy->getResults());
     return success();
   }
@@ -47,11 +48,11 @@ struct MemrefCopyToLinalgPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass() {
   return std::make_unique<MemrefCopyToLinalgPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

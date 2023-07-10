@@ -51,7 +51,8 @@ struct LinalgTensorReshapeToFlowTensorReshape
     SmallVector<Value> outputDynamicShapes;
     for (auto shape : llvm::zip_equal(reshapeOp.getResultType().getShape(),
                                       outputShape[0])) {
-      if (std::get<0>(shape) != ShapedType::kDynamic) continue;
+      if (std::get<0>(shape) != ShapedType::kDynamic)
+        continue;
       outputDynamicShapes.push_back(std::get<1>(shape));
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
@@ -139,7 +140,7 @@ struct ConvertLinalgTensorOpsPass
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::func::FuncOp>>
 createConvertLinalgTensorOpsPass(bool runBeforeDispatchRegionFormation) {
@@ -147,7 +148,7 @@ createConvertLinalgTensorOpsPass(bool runBeforeDispatchRegionFormation) {
       runBeforeDispatchRegionFormation);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

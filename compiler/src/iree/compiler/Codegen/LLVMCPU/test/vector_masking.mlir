@@ -145,7 +145,7 @@ hal.executable private @preset_config_generic_add  {
   hal.executable.variant @embedded_elf_rv32, target = <"llvm-cpu", "embedded-elf-riscv_32", {
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 32 : index,
-      target_triple = "riscv32-unknown-unknown-eabi-elf"
+      target_triple = "riscv32-none-elf"
     }> {
     hal.executable.export @mask_dynamic_generic_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
@@ -215,7 +215,7 @@ hal.executable private @preset_config_generic_add  {
   hal.executable.variant @embedded_elf_rv32, target = <"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
-    target_triple = "aarch64-unknown-unknown-eabi-elf"
+    target_triple = "aarch64-none-elf"
   }> {
     hal.executable.export @mask_dynamic_generic_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
@@ -281,7 +281,7 @@ hal.executable private @preset_config_generic_add  {
     cpu_features = "+sve",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
-    target_triple = "aarch64-unknown-unknown-eabi-elf"
+    target_triple = "aarch64-none-elf"
   }> {
     hal.executable.export @mask_dynamic_generic_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):

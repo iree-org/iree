@@ -15,7 +15,7 @@ namespace {
 
 class AllocatorAllocateInitializedOpConversion
     : public OpConversionPattern<IREE::HAL::AllocatorAllocateInitializedOp> {
- public:
+public:
   AllocatorAllocateInitializedOpConversion(TypeConverter &typeConverter,
                                            MLIRContext *context,
                                            SymbolTable &importSymbols)
@@ -25,9 +25,10 @@ class AllocatorAllocateInitializedOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::AllocatorAllocateInitializedOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::AllocatorAllocateInitializedOp op,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, importOp.getName(),
         ArrayRef<Type>{
@@ -49,13 +50,13 @@ class AllocatorAllocateInitializedOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
 class AllocatorTryMapOpConversion
     : public OpConversionPattern<IREE::HAL::AllocatorTryMapOp> {
- public:
+public:
   AllocatorTryMapOpConversion(TypeConverter &typeConverter,
                               MLIRContext *context, SymbolTable &importSymbols)
       : OpConversionPattern(typeConverter, context) {
@@ -64,9 +65,9 @@ class AllocatorTryMapOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::AllocatorTryMapOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::AllocatorTryMapOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto callOp = rewriter.create<IREE::VM::CallOp>(
         op.getLoc(), importOp.getName(),
         ArrayRef<Type>{
@@ -93,11 +94,11 @@ class AllocatorTryMapOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-}  // namespace
+} // namespace
 
 void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                       SymbolTable &importSymbols,
@@ -111,5 +112,5 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                                importSymbols);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

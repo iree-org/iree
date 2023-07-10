@@ -113,7 +113,8 @@ static bool usesDynamicTensors(Operation *op) {
 // Expands tensors in the given |types| list to (tensor, dynamic dims...).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
-  if (types.empty()) return {};
+  if (types.empty())
+    return {};
   auto indexType = IndexType::get(types.front().getContext());
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
@@ -191,19 +192,22 @@ static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
 // given |region|. All branches, ops, and nested regions will be processed.
 static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, TensorDimMap tensorDimMap) {
-  if (region.empty()) return;
+  if (region.empty())
+    return;
 
   // Update all block arguments.
   auto indexType = IndexType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
-    if (!llvm::any_of(block.getArgumentTypes(), isDynamicTensor)) continue;
+    if (!llvm::any_of(block.getArgumentTypes(), isDynamicTensor))
+      continue;
 
     // Insert and build a list of expanded (tensor, dynamic dims...) tuples.
     SmallVector<ExpandedValue> expansions;
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto arg = block.getArgument(i);
       auto tensorType = llvm::dyn_cast<RankedTensorType>(arg.getType());
-      if (!tensorType || tensorType.hasStaticShape()) continue;
+      if (!tensorType || tensorType.hasStaticShape())
+        continue;
       ExpandedValue expandedValue;
       expandedValue.tensor = arg;
       for (unsigned j = 0; j < tensorType.getNumDynamicDims(); ++j) {
@@ -255,7 +259,8 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
 static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
                                ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                                TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op)) return;
+  if (!usesDynamicTensors(op))
+    return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto indexType = builder.getIndexType();
@@ -290,7 +295,8 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet,
                                 TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op)) return;
+  if (!usesDynamicTensors(op))
+    return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto expandedValue = consumeExpandedValue(op.getLoc(), op.getValue(),
@@ -344,7 +350,8 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
 //  %2 = flow.tensor.tie_shape %r : tensor<?xf32>{%rd}
 static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
                          TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op)) return;
+  if (!usesDynamicTensors(op))
+    return;
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
@@ -392,7 +399,8 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
 //  return %0, %d
 static void expandReturnOp(mlir::func::ReturnOp op, IndexSet &indexSet,
                            TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op)) return;
+  if (!usesDynamicTensors(op))
+    return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), tensorDimMap,
                                  indexSet, builder);
@@ -422,7 +430,8 @@ static void expandBranchOp(mlir::cf::BranchOp op, IndexSet &indexSet,
 
 static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
                                TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op)) return;
+  if (!usesDynamicTensors(op))
+    return;
   OpBuilder builder(op);
   builder.create<mlir::cf::CondBranchOp>(
       op.getLoc(), op.getCondition(), op.getTrueDest(),
@@ -446,7 +455,8 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
 //   %4 = flow.tensor.tie_shape %2 : tensor<?xf32>{%3}
 static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
                            TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op)) return;
+  if (!usesDynamicTensors(op))
+    return;
   OpBuilder builder(op);
 
   auto trueValue = consumeExpandedValue(op.getLoc(), op.getTrueValue(),
@@ -512,7 +522,7 @@ static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
 // elision/deduplication/etc left until cleanup.
 class ExpandTensorShapesPass
     : public ExpandTensorShapesBase<ExpandTensorShapesPass> {
- public:
+public:
   ExpandTensorShapesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -546,13 +556,13 @@ class ExpandTensorShapesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass() {
   return std::make_unique<ExpandTensorShapesPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

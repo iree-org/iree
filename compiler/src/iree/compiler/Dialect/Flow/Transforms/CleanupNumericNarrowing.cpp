@@ -25,13 +25,13 @@ class CleanupNumericNarrowingPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createCleanupNumericNarrowingPass() {
   return std::make_unique<CleanupNumericNarrowingPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

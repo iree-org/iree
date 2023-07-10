@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "experimental/metal/metal_kernel_library.h"
+#include "experimental/metal/kernel_library.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 

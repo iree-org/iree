@@ -44,8 +44,8 @@ void registerVMTransformPassPipeline();
 //===----------------------------------------------------------------------===//
 
 // Converts from various dialects (standard, HAL, etc) to the VM dialect.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
-    TargetOptions targetOptions);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createConversionPass(TargetOptions targetOptions);
 
 //===----------------------------------------------------------------------===//
 // Module layout
@@ -118,9 +118,9 @@ inline void registerVMTestPasses() {
   createConvertStandardToVMTestPass();
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_VM_TRANSFORMS_PASSES_H_

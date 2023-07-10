@@ -17,15 +17,15 @@ namespace HAL {
 namespace Inline {
 
 class HALInlineDialect : public Dialect {
- public:
+public:
   explicit HALInlineDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "hal_inline"; }
 };
 
-}  // namespace Inline
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Inline
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_HAL_INLINE_IR_HALINLINEDIALECT_H_
+#endif // IREE_COMPILER_MODULES_HAL_INLINE_IR_HALINLINEDIALECT_H_

@@ -670,6 +670,80 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
   (intrinsics)
 #endif  // not defined(IREE_UK_ENABLE_INLINE_ASM)
 
+//===----------------------------------------------------------------------===//
+// 16-bit <-> 32-bit floating point conversions.
+// Adapted from runtime/src/iree/base/internal/math.h.
+//===----------------------------------------------------------------------===//
+
+// Converts a 16-bit floating-point value to a 32-bit C `float`.
+//
+// NOTE: this implementation does not handle all corner cases around NaN and
+// such; we can improve this implementation over time if it is used for such
+// cases.
+static inline float iree_uk_f16_to_f32(const iree_uk_uint16_t f16_value) {
+  const iree_uk_uint32_t sign =
+      ((iree_uk_uint32_t)((f16_value & 0x8000u) >> 15)) << 31;
+  iree_uk_uint32_t exp = ((f16_value & 0x7C00u) >> 10);
+  iree_uk_uint32_t mantissa = 0;
+  if (exp == 0x1Fu) {
+    // NaN or Inf case.
+    exp = 0xFFu << 23;
+    // For NaN mantissa should not be 0.
+    if ((f16_value & 0x3FFu) != 0) mantissa = 1;
+
+  } else if (exp > 0) {
+    exp = (exp + 127 - 15) << 23;
+    mantissa = ((iree_uk_uint32_t)(f16_value & 0x3FFu)) << (23 - 10);
+  }
+  const iree_uk_uint32_t u32_value = sign | exp | mantissa;
+  float f32_value;
+  iree_uk_memcpy(&f32_value, &u32_value, sizeof f32_value);
+  return f32_value;
+}
+
+// Converts a 32-bit C `float` value to a 16-bit floating-point value.
+//
+// NOTE: this implementation does not handle corner cases around NaN and such;
+// we can improve this implementation over time if it is used for such cases.
+static inline iree_uk_uint16_t iree_uk_f32_to_f16(const float f32_value) {
+  iree_uk_uint32_t u32_value;
+  iree_uk_memcpy(&u32_value, &f32_value, sizeof u32_value);
+  const iree_uk_uint32_t sign = ((u32_value & 0x80000000u) >> 31) << 15;
+  iree_uk_uint32_t mantissa = (u32_value & 0x007FFFFFu) >> (23 - 10);
+  iree_uk_int32_t exp = ((u32_value & 0x7F800000u) >> 23) - 127 + 15;
+  if (exp > 31) {
+    exp = 31 << 10;
+    // zero out the mantissa for infinity.
+    mantissa = 0;
+    // If this is a NaN value set the mantissa to a non zero value.
+    if (((u32_value & 0x7F800000u) >> 23) == 0xFF) {
+      if (((u32_value & 0x007FFFFFu) != 0)) {
+        mantissa = 1;
+      }
+    }
+  } else if (exp < 0) {
+    exp = 0;
+  } else {
+    exp = exp << 10;
+  }
+  return (iree_uk_uint16_t)(sign | exp | mantissa);
+}
+
+// Converts a bfloat16 value to a 32-bit C `float`.
+static inline float iree_uk_bf16_to_f32(const iree_uk_uint16_t bf16_value) {
+  iree_uk_uint32_t u32_value = ((iree_uk_uint32_t)bf16_value) << 16;
+  float f32_value;
+  iree_uk_memcpy(&f32_value, &u32_value, sizeof f32_value);
+  return f32_value;
+}
+
+// Converts a 32-bit C `float` value to a bfloat16 value.
+static inline iree_uk_uint16_t iree_uk_f32_to_bf16(const float f32_value) {
+  iree_uk_uint32_t u32_value;
+  iree_uk_memcpy(&u32_value, &f32_value, sizeof u32_value);
+  return u32_value >> 16;
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

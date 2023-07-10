@@ -136,7 +136,7 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
 
 class InlineDeviceSwitchesPass
     : public PassWrapper<InlineDeviceSwitchesPass, OperationPass<void>> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
@@ -169,7 +169,7 @@ std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass() {
 
 static PassRegistration<InlineDeviceSwitchesPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

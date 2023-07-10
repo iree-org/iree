@@ -130,13 +130,13 @@ class InferNumericNarrowingPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createInferNumericNarrowingPass() {
   return std::make_unique<InferNumericNarrowingPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -59,7 +59,8 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
                                          /*numHandles=*/N);
   assert(matchOp->getNumResults() == N && "Unexpected number of results");
   std::array<Value, N> a;
-  for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
+  for (int64_t i = 0; i < N; ++i)
+    a[i] = matchOp->getResult(i);
   return std::tuple_cat(a);
 }
 
@@ -75,16 +76,18 @@ int64_t mlir::iree_compiler::nextMultipleOf(int64_t val, int64_t multiple) {
   return ((val + multiple - 1) / multiple) * multiple;
 }
 
-FailureOr<int64_t> mlir::iree_compiler::maxDivisorOfValueBelowLimit(
-    int64_t value, int64_t limit) {
+FailureOr<int64_t>
+mlir::iree_compiler::maxDivisorOfValueBelowLimit(int64_t value, int64_t limit) {
   // Conservatively return failure when `limit` is greater than 1024 to avoid
   // prohibitively long compile time overheads.
   // TODO: approximate with a faster implementation based on a few desirable
   // primes.
-  if (limit > 1024) return failure();
+  if (limit > 1024)
+    return failure();
   // If either value or limit is <= 0, the loop is skipped and we fail.
   for (int64_t i = std::min(value, limit); i > 1; --i)
-    if (value % i == 0) return i;
+    if (value % i == 0)
+      return i;
   return failure();
 }
 
@@ -108,7 +111,6 @@ void mlir::iree_compiler::createTransformRegion(
   (void)sequence;
   LDBG("transformation script:\n");
   LDBG("verification: " << sequence.verify().succeeded() << "\n");
-  LLVM_DEBUG(sequence.print(DBGS()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -118,8 +120,10 @@ void mlir::iree_compiler::createTransformRegion(
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
 void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
                                      ValueRange handles) {
-  if (handles.empty()) b.create<PrintOp>();
-  for (auto h : handles) b.create<PrintOp>(h);
+  if (handles.empty())
+    b.create<PrintOp>();
+  for (auto h : handles)
+    b.create<PrintOp>(h);
 }
 
 /// Create an ApplyPatternsOp that performs a set of key canonicalizations and
@@ -128,19 +132,19 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
 ///   tiling-related canonicalization patterns, canonicalization, licm and cse
 ///   (in this order).
 void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-    ImplicitLocOpBuilder &b, Value variantH,
+    ImplicitLocOpBuilder &b, Value funcH,
     ApplyPatternsOpBodyBuilderFn populatePatternsFn) {
-  b.create<transform::ApplyPatternsOp>(
-      variantH, [&](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyTilingCanonicalizationPatternsOp>(loc);
-        b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
-        b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
-        b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
-        if (populatePatternsFn) populatePatternsFn(b, loc);
-      });
-  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(variantH);
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyTilingCanonicalizationPatternsOp>(loc);
+    b.create<IREE::transform_dialect::ApplyFoldFillIntoPadPatternsOp>(loc);
+    b.create<transform::ApplyForLoopCanonicalizationPatternsOp>(loc);
+    b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+    if (populatePatternsFn)
+      populatePatternsFn(b, loc);
+  });
+  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
   b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
-      variantH);
+      funcH);
 }
 
 /// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
@@ -151,8 +155,9 @@ void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
 /// This is used as a normalization operation that replaces conditionals, either
 /// in C++ or in transform IR.
 /// This can be thought of as a control-flow -> data-dependent conversion.
-std::pair<Value, Value> mlir::iree_compiler::buildSelectFirstNonEmpty(
-    ImplicitLocOpBuilder &b, Value handle1, Value handle2) {
+std::pair<Value, Value>
+mlir::iree_compiler::buildSelectFirstNonEmpty(ImplicitLocOpBuilder &b,
+                                              Value handle1, Value handle2) {
   auto anyOpType = transform::AnyOpType::get(b.getContext());
   auto selector = b.create<TakeFirstOp>(anyOpType, anyOpType,
                                         ArrayRef<Value>{handle1, handle2});
@@ -161,7 +166,7 @@ std::pair<Value, Value> mlir::iree_compiler::buildSelectFirstNonEmpty(
 
 mlir::iree_compiler::TileToScfForAndFuseResult
 mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
-                                           Value isolatedParentOpH, Value rootH,
+                                           Value variantH, Value rootH,
                                            ValueRange opsHToFuse,
                                            ArrayRef<OpFoldResult> tileSizes,
                                            bool canonicalize) {
@@ -177,8 +182,9 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
   // matmuls.
   // TODO: Make padding less brittle so that this toggle is unnecessary.
   if (canonicalize) {
-    mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-        b, isolatedParentOpH);
+    Value funcH = b.create<transform::MatchOp>(
+        variantH, func::FuncOp::getOperationName());
+    mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   }
   return result;
 }
@@ -205,9 +211,8 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
 // TODO: apply forwarding pattern.
 template <typename TileOrNumThreadSpec>
 static iree_compiler::TileToForallAndFuseAndDistributeResult
-buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
-                                  Value isolatedParentOpH, Value rootH,
-                                  ValueRange opsHToFuse,
+buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b, Value variantH,
+                                  Value rootH, ValueRange opsHToFuse,
                                   ArrayRef<OpFoldResult> tileSizesOrNumThreads,
                                   ArrayAttr threadDimMapping) {
   iree_compiler::TileToForallAndFuseAndDistributeResult result;
@@ -218,8 +223,9 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   result.tiledOpH = tileToForeachOp.getTiledOp();
 
   // Perform a pass of canonicalization + enabling after tiling.
-  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, isolatedParentOpH);
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
 
   // Batch fusion if requested.
   if (opsHToFuse.size() > 1) {
@@ -239,11 +245,10 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
 // sigh.
 iree_compiler::TileToForallAndFuseAndDistributeResult
 mlir::iree_compiler::buildTileFuseDistToForallWithTileSizes(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
-    ArrayAttr threadDimMapping) {
+    ImplicitLocOpBuilder &b, Value variantH, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
   return buildTileAndFuseAndDistributeImpl<transform::TileSizesSpec>(
-      b, isolatedParentOpH, rootH, opsHToFuse, tileSizes, threadDimMapping);
+      b, variantH, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
 
 /// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
@@ -251,11 +256,10 @@ mlir::iree_compiler::buildTileFuseDistToForallWithTileSizes(
 // sigh.
 iree_compiler::TileToForallAndFuseAndDistributeResult
 mlir::iree_compiler::buildTileFuseDistToForallWithNumThreads(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
-    ArrayAttr threadDimMapping) {
+    ImplicitLocOpBuilder &b, Value variantH, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping) {
   return buildTileAndFuseAndDistributeImpl<transform::NumThreadsSpec>(
-      b, isolatedParentOpH, rootH, opsHToFuse, numThreads, threadDimMapping);
+      b, variantH, rootH, opsHToFuse, numThreads, threadDimMapping);
 }
 
 /// Build the transform IR to pad an op `opH`.
@@ -268,10 +272,17 @@ Value mlir::iree_compiler::buildPad(
   SmallVector<Attribute> transposeAttrs;
   for (auto &transp : transposePaddings)
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
-  return b.create<transform::PadOp>(
-      opH.getType(), opH, b.getArrayAttr(paddingValues),
-      b.getI64ArrayAttr(paddingDimensions), b.getI64ArrayAttr(padToMultipleOf),
-      b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs));
+  SmallVector<Type> resultTypes;
+  resultTypes.push_back(opH.getType());
+  resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
+  return b
+      .create<transform::PadOp>(resultTypes, opH, b.getArrayAttr(paddingValues),
+                                b.getI64ArrayAttr(paddingDimensions),
+                                b.getI64ArrayAttr(padToMultipleOf),
+                                b.getI64ArrayAttr(packingDimensions),
+                                b.getArrayAttr(transposeAttrs),
+                                /*copyBack=*/b.getBoolAttr(false))
+      ->getResult(0);
 }
 
 /// Apply patterns and vectorize.
@@ -287,42 +298,37 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
   return funcH;
 }
 
-Value mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
-    ImplicitLocOpBuilder &b, Value containingOpH, bool cleanup) {
+void mlir::iree_compiler::buildLowerMaskedTransfersAndCleanup(
+    ImplicitLocOpBuilder &b, Value funcH, bool cleanup) {
   // TODO: avoid functional style transform so we can apply to the variant.
-  b.create<transform::ApplyPatternsOp>(
-      containingOpH, [](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(loc);
-      });
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerMaskedTransfersPatternsOp>(loc);
+  });
   if (cleanup) {
-    b.create<transform::ApplyPatternsOp>(
-        containingOpH, [](OpBuilder &b, Location loc) {
-          b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
-          b.create<transform::ApplyFoldUnitExtentDimsViaSlicesPatternsOp>(loc);
-          b.create<IREE::transform_dialect::
-                       ApplyFoldReshapeIntoTensorHalInterfacePatternsOp>(loc);
-        });
+    b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+      b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
+      b.create<transform::ApplyFoldUnitExtentDimsViaSlicesPatternsOp>(loc);
+      b.create<IREE::transform_dialect::
+                   ApplyFoldReshapeIntoTensorHalInterfacePatternsOp>(loc);
+    });
   }
-  return containingOpH;
 }
 
 Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
-    ImplicitLocOpBuilder &b, Value containingOpH, bool cleanup) {
-  b.create<transform::ApplyPatternsOp>(
-      containingOpH, [](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyLowerMasksPatternsOp>(loc);
-      });
-  b.create<transform::ApplyPatternsOp>(
-      containingOpH, [](OpBuilder &b, Location loc) {
-        b.create<transform::ApplyMaterializeMasksPatternsOp>(loc);
-      });
+    ImplicitLocOpBuilder &b, Value funcH, bool cleanup) {
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyLowerMasksPatternsOp>(loc);
+  });
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyMaterializeMasksPatternsOp>(loc);
+  });
   if (cleanup) {
     iree_compiler::buildCanonicalizationAndEnablingTransforms(
-        b, containingOpH, [](OpBuilder &b, Location loc) {
+        b, funcH, [](OpBuilder &b, Location loc) {
           b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
         });
   }
-  return containingOpH;
+  return funcH;
 }
 
 /// Hoist redundant subet ops.
@@ -335,8 +341,10 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
                                           Value variantH, bool targetGpu) {
   // Perform a pass of canonicalization + enabling before bufferization to avoid
   // spurious allocations.
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
   buildCanonicalizationAndEnablingTransforms(
-      b, variantH, [](OpBuilder &b, Location loc) {
+      b, funcH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyReassociativeReshapeFoldingPatternsOp>(loc);
         b.create<transform::ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
       });
@@ -368,16 +376,16 @@ struct ReductionSplitResult {
   /// was not re-matched.
   Value trailingEltwiseH;
 };
-}  // namespace
+} // namespace
 
 /// Builds transform IR requesting to bubble up the "expand_shape" operation
 /// produced as parent of reduction splitting if necessary for fusion of the
 /// leading elementwise operation.
 // TODO: consider passing a problem-specific struct to control information.
-static ReductionSplitResult createBubbleExpand(
-    ImplicitLocOpBuilder &b, Value variantH,
-    SplitReductionOp splitReductionTransformOp, bool hasLeadingEltwise,
-    bool hasTrailingEltwise) {
+static ReductionSplitResult
+createBubbleExpand(ImplicitLocOpBuilder &b, Value variantH,
+                   SplitReductionOp splitReductionTransformOp,
+                   bool hasLeadingEltwise, bool hasTrailingEltwise) {
   ReductionSplitResult result;
   if (!hasLeadingEltwise) {
     result.splitFillH = splitReductionTransformOp.getFillOp();
@@ -457,7 +465,7 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
   TileToForallAndFuseAndDistributeResult tileResult =
       buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/fusionTargetH,
           /*opsToFuseH=*/fusionGroupH,
           /*tileSizes=*/
@@ -475,7 +483,9 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
           .getFusedOp();
 
   // Perform a pass of canonicalization + enabling after fusion.
-  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(b, variantH);
+  Value funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
 
   // Step 3. Normalize to reorder results irrespective of emptiness.
   auto [blockReductionH, maybeBlockTrailingH] = buildSelectFirstNonEmpty(

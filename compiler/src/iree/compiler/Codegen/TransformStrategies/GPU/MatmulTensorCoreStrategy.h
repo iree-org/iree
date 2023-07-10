@@ -11,6 +11,8 @@
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/AbstractGemmLikeStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/CopyMapping.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
@@ -26,14 +28,12 @@ namespace gpu {
 struct GPUModel;
 
 class MatmulStrategy : public AbstractGemmLikeStrategy {
- public:
+public:
   MatmulStrategy(MLIRContext *context,
-                 const transform_ext::MatchedMatmulCaptures &captures)
-      : AbstractGemmLikeStrategy(),
-        ctx(context),
-        captures(captures),
-        cliOptionsSpecified(false) {
-    initDefaultValues();
+                 const transform_ext::MatchedMatmulCaptures &captures,
+                 const GPUModel &gpuModel)
+      : AbstractGemmLikeStrategy(gpuModel), ctx(context), captures(captures) {
+    initDefaultValues(gpuModel);
   }
 
   MatmulStrategy(const MatmulStrategy &) = default;
@@ -43,16 +43,11 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   MLIRContext *ctx;
   transform_ext::MatchedMatmulCaptures captures;
 
-  /// Encodes whether the user has specified any CLI options. When true, the
-  /// strategy should just run what was specified and is not allowed to
-  /// override the user's choices.
-  bool cliOptionsSpecified;
-
   /// Initialize values from the CLI. Set cliOptionsSpecified to true if the
   /// default CLI values have been overriden.
-  void initDefaultValues();
+  void initDefaultValues(const GPUModel &gpuModel) override;
 
-  LogicalResult verify() const;
+  LogicalResult validate(const GPUModel &gpuModel) const override;
 
   int64_t m() const override {
     assert(captures.matmulOpSizes.size() == 3 && "need 3 sizes");
@@ -76,35 +71,37 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
     return blockTileSizes[1];
   }
 
-  int64_t numWarpsM() const override {
+  int64_t numWarpsX() const override {
     assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
     return numWarps[0];
   }
-  int64_t numWarpsN() const override {
+  int64_t numWarpsY() const override {
     assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
     return numWarps[1];
   }
 
-  using AbstractGemmLikeStrategy::MappingInfo;
+  Type getLhsElementalType() const override { return captures.lhsElementType; }
+  Type getRhsElementalType() const override { return captures.rhsElementType; }
+  Type getResElementalType() const override {
+    return captures.outputElementType;
+  }
 
   MappingInfo getBlockMapping() const override {
     return MappingInfo{/*numThreads=*/{},
                        /*tileSizes=*/{blockTileM(), blockTileN()},
-                       /*threadMapping=*/{blockY(ctx), blockX(ctx)}};
+                       /*threadMapping=*/{blockY(ctx), blockX(ctx)},
+                       /*vectorSize=*/std::nullopt};
   }
 
   // LHS copy is of size mxk.
   MappingInfo lhsCopyMapping() const override {
-    int64_t numThreadsK = mlir::ceilDiv(reductionTileSize, lhsCopyVectorSize());
-    int64_t numThreadsM =
-        std::min(blockTileM(), mlir::ceilDiv(totalNumThreads(), numThreadsK));
-    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsK},
-                       /*tileSizes=*/
-                       {mlir::ceilDiv(blockTileM(), numThreadsM),
-                        mlir::ceilDiv(reductionTileSize, numThreadsK)},
-                       /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/k(),
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), reductionTileSize},
+        /*favorPredication=*/false,
+        /*elementalBitWidth=*/lhsElementalBitWidth());
   }
-
   LogicalResult validateLhsCopyMapping() const override {
     MappingInfo mapping = lhsCopyMapping();
     // It is fine to use fewer threads to copy the LHS.
@@ -119,16 +116,13 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
-    int64_t numThreadsN = mlir::ceilDiv(blockTileN(), rhsCopyVectorSize());
-    int64_t numThreadsK = std::min(
-        reductionTileSize, mlir::ceilDiv(totalNumThreads(), numThreadsN));
-    return MappingInfo{/*numThreads=*/{numThreadsK, numThreadsN},
-                       /*tileSizes=*/
-                       {mlir::ceilDiv(reductionTileSize, numThreadsK),
-                        mlir::ceilDiv(blockTileN(), numThreadsN)},
-                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/n(),
+        /*copySizes=*/ArrayRef<int64_t>{reductionTileSize, blockTileN()},
+        /*favorPredication=*/false,
+        /*elementalBitWidth=*/rhsElementalBitWidth());
   }
-
   LogicalResult validateRhsCopyMapping() const override {
     MappingInfo mapping = rhsCopyMapping();
     // It is fine to use fewer threads to copy the RHS.
@@ -143,16 +137,12 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
-    int64_t numThreadsN = mlir::ceilDiv(blockTileN(), resCopyVectorSize());
-    int64_t numThreadsM =
-        std::min(blockTileM(), mlir::ceilDiv(totalNumThreads(), numThreadsN));
-    return MappingInfo{/*numThreads=*/{numThreadsM, numThreadsN},
-                       /*tileSizes=*/
-                       {std::max(static_cast<int64_t>(1),
-                                 mlir::ceilDiv(blockTileM(), numThreadsM)),
-                        std::max(static_cast<int64_t>(1),
-                                 mlir::ceilDiv(blockTileN(), numThreadsN))},
-                       /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(),
+        /*alignment=*/n(),
+        /*copySizes=*/ArrayRef<int64_t>{blockTileM(), blockTileN()},
+        /*favorPredication=*/false,
+        /*elementalBitWidth=*/resElementalBitWidth());
   }
 
   LogicalResult validateResCopyMapping() const override {
@@ -169,106 +159,150 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
 
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {
-    // Warps along M and N need to properly be ordered along the X and Y
-    // dimensions respectively, otherwise we would improperly generate
-    // predicated code.
-    return MappingInfo{/*numThreads=*/{numWarpsM(), numWarpsN()},
+    if (useFma) {
+      // When using FMA we don't need to map to warps, instead just match what
+      // the copy does.
+      return CopyMapping::getMappingInfo(ctx, totalNumThreads(),
+                                         /*alignment=*/n(),
+                                         {blockTileM(), blockTileN()});
+    }
+    return MappingInfo{/*numThreads=*/{numWarpsY(), numWarpsX()},
                        /*tileSizes=*/{},
-                       /*threadMapping=*/{warpX(ctx), warpY(ctx)}};
+                       /*threadMapping=*/{warpY(ctx), warpX(ctx)},
+                       /*vectorSize=*/std::nullopt};
   }
 
-  LogicalResult validate() const override {
-    if (totalNumThreads() != totalNumWarps() * kCudaWarpSize) {
-      llvm::errs() << "Number of threads specified by warps must match total "
-                      "number of threads\n";
-      return failure();
-    }
-    if (m() < blockTileM()) {
-      llvm::errs() << "m(" << m() << ") < blockTileM(" << blockTileM() << ") ";
-      llvm::errs() << "this is at risk of not vectorizing and is NYI";
-      return failure();
-    }
-    if (n() < blockTileN()) {
-      llvm::errs() << "n(" << n() << ") < blockTileN(" << blockTileN() << ") ";
-      llvm::errs() << "this is at risk of not vectorizing and is NYI";
-      return failure();
-    }
-    if (k() < reductionTileSize) {
-      llvm::errs() << "k(" << k() << ") < reductionTileSize("
-                   << reductionTileSize << ") ";
-      llvm::errs() << "this is at risk of not vectorizing and is NYI";
-      return failure();
+  void print(llvm::raw_ostream &os) const override;
+  LLVM_DUMP_METHOD void dump() const override;
+};
+
+/// An extension of the matmul strategy to batched matrix multiplications.
+class BatchMatmulStrategy : public MatmulStrategy {
+public:
+  /// Construct the default strategy, pulling options from the command-line
+  /// arguments if provided and using the defaults otherwise.
+  BatchMatmulStrategy(MLIRContext *context, const GPUModel &gpuModel,
+                      const transform_ext::MatchedMatmulCaptures &captures)
+      : MatmulStrategy(context, captures, gpuModel) {
+    initDefaultValues(gpuModel);
+  }
+
+  /// Initialize the default values of the strategy.
+  void initDefaultValues(const GPUModel &gpuModel) override {
+    // First, initialize as if this was a simple matmul.
+    MatmulStrategy::initDefaultValues(gpuModel);
+
+    // Make sure we pad along all dimensions.
+    paddingDimensions = {0, 1, 2, 3};
+    packingDimensions = {1, 1, 1, 1};
+  }
+
+  /// Check that the strategy is valid for the captures and the model.
+  LogicalResult validate(const GPUModel &gpuModel) const override;
+
+  /// Named accessors to shapes.
+  int64_t batch() const { return captures.matmulOpSizes[0]; }
+  int64_t m() const override { return captures.matmulOpSizes[1]; }
+  int64_t n() const override { return captures.matmulOpSizes[2]; }
+  int64_t k() const override { return captures.matmulOpSizes[3]; }
+
+  /// Named accessors to block tile sizes associated with shapes.
+  int64_t blockTileBatch() const { return blockTileSizes[0]; }
+  int64_t blockTileM() const override { return blockTileSizes[1]; }
+  int64_t blockTileN() const override { return blockTileSizes[2]; }
+
+  /// Number of threads to use.
+  int64_t numThreadsX() const { return numThreads[0]; }
+  int64_t numThreadsY() const { return numThreads[1]; }
+  int64_t numThreadsZ() const { return numThreads[2]; }
+
+  /// Number of warps to use.
+  int64_t numWarpsX() const override { return numWarps[0]; }
+  int64_t numWarpsY() const override { return numWarps[1]; }
+  int64_t numWarpsZ() const { return numWarps[2]; }
+
+  MappingInfo getBlockMapping() const override {
+    return MappingInfo{
+        /*numThreads=*/
+        {},
+        /*tileSizes=*/{blockTileBatch(), blockTileM(), blockTileN()},
+        /*threadMapping=*/{blockZ(ctx), blockY(ctx), blockX(ctx)},
+        /*vectorSize=*/std::nullopt};
+  }
+
+  // LHS copy is batch x M x K.
+  MappingInfo lhsCopyMapping() const override {
+    // TODO: generalize to transpositions, here and below.
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(), k(),
+        {blockTileBatch(), blockTileM(), reductionTileSize},
+        /*favorPredication=*/false,
+        captures.lhsElementType.getIntOrFloatBitWidth());
+  }
+
+  // RHS copy is batch x K x N.
+  MappingInfo rhsCopyMapping() const override {
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(), n(),
+        {blockTileBatch(), reductionTileSize, blockTileN()},
+        /*favorPredication=*/false,
+        captures.rhsElementType.getIntOrFloatBitWidth());
+  }
+
+  // RES copy is batch x M x N.
+  MappingInfo resCopyMapping() const override {
+    return CopyMapping::getMappingInfo(
+        ctx, totalNumThreads(), n(),
+        {blockTileBatch(), blockTileM(), blockTileN()},
+        /*favorPredication=*/false,
+        captures.outputElementType.getIntOrFloatBitWidth());
+  }
+
+  /// Validates the mapping for one of the lhs, rhs or res copies.
+  LogicalResult validateCopyMapping(const MappingInfo &mapping,
+                                    StringRef name) const {
+    int64_t threadsUsed =
+        std::accumulate(mapping.numThreads.begin(), mapping.numThreads.end(), 1,
+                        std::multiplies<int64_t>());
+    if (totalNumThreads() < threadsUsed) {
+      InFlightDiagnostic diag = emitError(UnknownLoc::get(ctx))
+                                << "too many threads used for transferring "
+                                << name;
+
+      std::string str;
+      llvm::raw_string_ostream os(str);
+      llvm::interleave(mapping.numThreads, os, " * ");
+      os << " >= " << totalNumThreads();
+      diag.attachNote() << os.str();
+      return diag;
     }
 
-    if (failed(validateLhsCopyMapping())) {
-      llvm::errs() << "invalid lhs copy mapping";
-      return failure();
-    }
-    if (failed(validateRhsCopyMapping())) {
-      llvm::errs() << "invalid rhs copy mapping";
-      return failure();
-    }
-    if (failed(validateResCopyMapping())) {
-      llvm::errs() << "invalid res copy mapping";
-      return failure();
-    }
-
-    if (pipelineDepth > 1 && reductionTileSize * pipelineDepth > k()) {
-      llvm::errs() << "pipeline depth too large for reduction tile size";
-      return failure();
-    }
-    if (useMmaSync) {
-      if (blockTileM() < kMinMmaSyncMinM) {
-        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinM
-                     << " block tile size in M";
-        return failure();
-      }
-      if (blockTileN() < kMinMmaSyncMinN) {
-        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinN
-                     << " block tile size in N";
-        return failure();
-      }
-      if (reductionTileSize < kMinMmaSyncMinK) {
-        llvm::errs() << "mma.sync requires at least " << kMinMmaSyncMinK
-                     << " block tile size in K";
-        return failure();
-      }
-      if (pipelineDepth > 1 && pipelineDepth < kMinMmaSyncPipelineDepth) {
-        llvm::errs() << "mma.sync pipelining requires at least "
-                     << kMinMmaSyncPipelineDepth << " stages";
-        return failure();
-      }
-      if (pipelineDepth > 1 && reductionTileSize * kMinMmaSyncGroups > k()) {
-        llvm::errs() << "mma.sync pipelining requires at least "
-                     << kMinMmaSyncGroups << " k groups";
-        return failure();
-      }
-    } else {
-      if (blockTileM() < kMinWmmaMinM) {
-        llvm::errs() << "wmma requires at least " << kMinWmmaMinM
-                     << " block tile size in M";
-        return failure();
-      }
-      if (blockTileN() < kMinWmmaMinN) {
-        llvm::errs() << "wmma requires at least " << kMinWmmaMinN
-                     << " block tile size in N";
-        return failure();
-      }
-      if (reductionTileSize < kMinWmmaMinK) {
-        llvm::errs() << "wmma requires at least " << kMinWmmaMinK
-                     << " block tile size in K";
-        return failure();
-      }
-    }
     return success();
   }
 
-  void print(llvm::raw_ostream &os) const;
-  LLVM_DUMP_METHOD void dump() const;
+  /// Check that the mapping computed for a copy is valid.
+  LogicalResult validateLhsCopyMapping() const override {
+    return validateCopyMapping(lhsCopyMapping(), "lhs");
+  }
+  LogicalResult validateRhsCopyMapping() const override {
+    return validateCopyMapping(rhsCopyMapping(), "rhs");
+  }
+  LogicalResult validateResCopyMapping() const override {
+    return validateCopyMapping(resCopyMapping(), "result");
+  }
+
+  // Compute is of the size batch x M x N.
+  MappingInfo computeMapping() const override {
+    assert(useFma && "only fma is currently supported");
+    return MappingInfo{{numThreadsZ(), numThreadsY(), numThreadsX()},
+                       {},
+                       {threadZ(ctx), threadY(ctx), threadX(ctx)},
+                       std::nullopt};
+  }
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_TENSOR_CORE_MATMUL_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_TENSOR_CORE_MATMUL_STRATEGY_H_

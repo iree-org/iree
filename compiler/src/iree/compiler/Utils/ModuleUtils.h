@@ -41,7 +41,7 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
                                     Operation *targetOp,
                                     OpBuilder &targetBuilder);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_MODULEUTILS_H_
+#endif // IREE_COMPILER_UTILS_MODULEUTILS_H_

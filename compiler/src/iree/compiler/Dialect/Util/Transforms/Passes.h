@@ -19,8 +19,8 @@ namespace Util {
 std::unique_ptr<OperationPass<void>> createApplyPatternsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
-std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
-    OpPassManager pipeline);
+std::unique_ptr<OperationPass<void>>
+createFixedPointIteratorPass(OpPassManager pipeline);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
@@ -44,9 +44,9 @@ std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 // Register all Passes
 void registerTransformPasses();
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_

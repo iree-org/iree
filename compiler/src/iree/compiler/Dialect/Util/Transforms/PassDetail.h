@@ -17,11 +17,11 @@ namespace IREE {
 namespace Util {
 
 #define GEN_PASS_CLASSES
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc" // IWYU pragma: keep
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_TRANSFORMS_PASS_DETAIL_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_TRANSFORMS_PASS_DETAIL_H_

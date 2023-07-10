@@ -5,11 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "iree/compiler/Codegen/SPIRV/SPIRVPasses.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
@@ -39,7 +39,7 @@ namespace {
 /// - then convert to SPIRV dialect.
 class SPIRVLowerExecutableTargetPass
     : public SPIRVLowerExecutableTargetBase<SPIRVLowerExecutableTargetPass> {
- public:
+public:
   SPIRVLowerExecutableTargetPass() = default;
   SPIRVLowerExecutableTargetPass(const SPIRVLowerExecutableTargetPass &pass) {}
 
@@ -55,7 +55,7 @@ class SPIRVLowerExecutableTargetPass
 
   void runOnOperation() override;
 
- private:
+private:
   Option<bool> testLoweringConfiguration{
       *this, "test-lowering-configuration",
       llvm::cl::desc("Flag used for lit-testing the configuration set for root "
@@ -63,25 +63,28 @@ class SPIRVLowerExecutableTargetPass
                      "to true for lit tests; not for general usage"),
       llvm::cl::init(false)};
 };
-}  // namespace
+} // namespace
 
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
 template <typename F>
-static LogicalResult verifyLoweringConfiguration(
-    ModuleOp module, IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize, F verificationFn) {
+static LogicalResult
+verifyLoweringConfiguration(ModuleOp module,
+                            IREE::Codegen::TranslationInfoAttr translationInfo,
+                            ArrayRef<int64_t> workgroupSize, F verificationFn) {
   auto walkResult = module.walk([&](Operation *op) -> WalkResult {
     IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig) return WalkResult::advance();
+    if (!loweringConfig)
+      return WalkResult::advance();
     return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
   });
   return failure(walkResult.wasInterrupted());
 }
 
-static LogicalResult verifyEntryPoint(
-    ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
-    IREE::HAL::ExecutableExportOp exportOp) {
+static LogicalResult
+verifyEntryPoint(ModuleOp moduleOp,
+                 IREE::Codegen::TranslationInfoAttr translationInfo,
+                 IREE::HAL::ExecutableExportOp exportOp) {
   if (translationInfo.getDispatchLoweringPassPipeline() ==
       CodeGenPipeline::TransformDialectCodegen) {
     // Transform dialect encodes configuration into the schedule directly.
@@ -102,20 +105,20 @@ static LogicalResult verifyEntryPoint(
   }
 
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case CodeGenPipeline::SPIRVBaseVectorize:
-      return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                         workgroupSizes,
-                                         verifySPIRVBaseVectorizePassPipeline);
-    case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
-      return verifyLoweringConfiguration(
-          moduleOp, translationInfo, workgroupSizes,
-          verifySPIRVMatmulPromoteVectorizePassPipeline);
-    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
-      return verifyLoweringConfiguration(
-          moduleOp, translationInfo, workgroupSizes,
-          verifySPIRVCooperativeMatrixVectorizePassPipeline);
-    default:
-      break;
+  case CodeGenPipeline::SPIRVBaseVectorize:
+    return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                       workgroupSizes,
+                                       verifySPIRVBaseVectorizePassPipeline);
+  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
+    return verifyLoweringConfiguration(
+        moduleOp, translationInfo, workgroupSizes,
+        verifySPIRVMatmulPromoteVectorizePassPipeline);
+  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
+    return verifyLoweringConfiguration(
+        moduleOp, translationInfo, workgroupSizes,
+        verifySPIRVCooperativeMatrixVectorizePassPipeline);
+  default:
+    break;
   }
   return success();
 }
@@ -163,34 +166,34 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-      case CodeGenPipeline::SPIRVBaseDistribute:
-        addSPIRVBaseDistributePassPipeline(pipeline);
-        break;
-      case CodeGenPipeline::SPIRVBaseVectorize:
-        addSPIRVBaseVectorizePassPipeline(pipeline);
-        break;
-      case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
-        addSPIRVCooperativeMatrixVectorizePassPipeline(
-            pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-            translationInfo.value().getSoftwarePipelineStoreStage());
-        break;
-      case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
-        addSPIRVMatmulPromoteVectorizePassPipeline(
-            pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-            translationInfo.value().getSoftwarePipelineStoreStage());
-        break;
-      case CodeGenPipeline::SPIRVSubgroupReduce:
-        addSPIRVSubgroupReducePassPipeline(pipeline);
-        break;
-      case CodeGenPipeline::SPIRVWinogradVectorize:
-        addSPIRVWinogradVectorizePassPipeline(pipeline);
-        break;
-      case CodeGenPipeline::TransformDialectCodegen:
-        addSPIRVTransformDialectPassPipeline(pipeline);
-        break;
-      default:
-        variantOp.emitOpError("Unsupported pipeline on GPU target.");
-        return signalPassFailure();
+    case CodeGenPipeline::SPIRVBaseDistribute:
+      addSPIRVBaseDistributePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVBaseVectorize:
+      addSPIRVBaseVectorizePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
+      addSPIRVCooperativeMatrixVectorizePassPipeline(
+          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+          translationInfo.value().getSoftwarePipelineStoreStage());
+      break;
+    case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
+      addSPIRVMatmulPromoteVectorizePassPipeline(
+          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+          translationInfo.value().getSoftwarePipelineStoreStage());
+      break;
+    case CodeGenPipeline::SPIRVSubgroupReduce:
+      addSPIRVSubgroupReducePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVWinogradVectorize:
+      addSPIRVWinogradVectorizePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::TransformDialectCodegen:
+      addSPIRVTransformDialectPassPipeline(pipeline);
+      break;
+    default:
+      variantOp.emitOpError("Unsupported pipeline on GPU target.");
+      return signalPassFailure();
     }
   }
 
@@ -210,5 +213,5 @@ createSPIRVLowerExecutableTargetPass() {
   return std::make_unique<SPIRVLowerExecutableTargetPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

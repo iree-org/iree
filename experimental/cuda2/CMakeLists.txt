@@ -30,6 +30,8 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
+    "nop_semaphore.c"
+    "nop_semaphore.h"
     "nccl_channel.c"
     "nccl_channel.h"
     "pipeline_layout.c"
@@ -44,6 +46,7 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )

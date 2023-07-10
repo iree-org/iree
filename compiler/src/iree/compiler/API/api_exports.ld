@@ -304,7 +304,6 @@ VER_0 {
     mlirF32TypeGet;
     mlirF64TypeGet;
     mlirFlatSymbolRefAttrGet;
-    mlirFlatSymbolRefAttrGetTypeID;
     mlirFlatSymbolRefAttrGetValue;
     mlirFloat16TypeGetTypeID;
     mlirFloat32TypeGetTypeID;
@@ -323,6 +322,7 @@ VER_0 {
     mlirFloatAttrDoubleGetChecked;
     mlirFloatAttrGetTypeID;
     mlirFloatAttrGetValueDouble;
+    mlirFloatTF32TypeGetTypeID;
     mlirFunctionTypeGet;
     mlirFunctionTypeGetInput;
     mlirFunctionTypeGetNumInputs;
@@ -545,6 +545,7 @@ VER_0 {
     mlirSymbolTableLookup;
     mlirSymbolTableReplaceAllSymbolUses;
     mlirSymbolTableWalkSymbolTables;
+    mlirTF32TypeGet;
     mlirTransformAnyOpTypeGet;
     mlirTransformOperationTypeGet;
     mlirTransformOperationTypeGetOperationName;
@@ -591,6 +592,7 @@ VER_0 {
     mlirTypeIsAPDLValueType;
     mlirTypeIsARankedTensor;
     mlirTypeIsAShaped;
+    mlirTypeIsATF32;
     mlirTypeIsATensor;
     mlirTypeIsATransformAnyOpType;
     mlirTypeIsATransformOperationType;

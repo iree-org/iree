@@ -300,7 +300,7 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       ireeCallFunction(loadedProgram, functionName, inputs)
           .then((resultObject) => {
             functionOutputsElement.value =
-                resultObject['outputs'].replace(";", "\n");
+                resultObject['outputs'].replaceAll(";", "\n");
 
             const endJsTime = performance.now();
             const totalJsTime = endJsTime - startJsTime;

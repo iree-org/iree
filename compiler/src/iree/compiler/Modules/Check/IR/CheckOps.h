@@ -11,6 +11,6 @@
 #include "mlir/IR/OpDefinition.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Modules/Check/IR/CheckOps.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Modules/Check/IR/CheckOps.h.inc" // IWYU pragma: export
 
-#endif  // IREE_COMPILER_MODULES_CHECK_IR_CHECK_OPS_H_
+#endif // IREE_COMPILER_MODULES_CHECK_IR_CHECK_OPS_H_

@@ -46,7 +46,8 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
       illegalOps.insert(op);
     }
   });
-  if (illegalOps.empty()) return success();
+  if (illegalOps.empty())
+    return success();
   emitLegalizationErrors(op->getLoc(), illegalOps);
   return failure();
 }
@@ -60,12 +61,14 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
 
   // Return the same attribute if it doesn't have a type.
   auto typedOldAttr = llvm::dyn_cast<TypedAttr>(oldAttr);
-  if (!typedOldAttr) return oldAttr;
+  if (!typedOldAttr)
+    return oldAttr;
 
   // Convert the attribute type - if it's the same then it's already legal.
   auto oldType = typedOldAttr.getType();
   auto newType = typeConverter.convertType(oldType);
-  if (oldType == newType) return typedOldAttr;
+  if (oldType == newType)
+    return typedOldAttr;
 
   if (auto intAttr = llvm::dyn_cast<IntegerAttr>(typedOldAttr)) {
     APInt value = intAttr.getValue();
@@ -123,5 +126,5 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
   return oldAttr;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

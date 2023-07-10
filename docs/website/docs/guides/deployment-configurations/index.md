@@ -48,6 +48,7 @@ When compiling programs, a list of target backends must be specified via
         $ iree-compile --iree-hal-list-target-backends
 
         Registered target backends:
+            cuda
             llvm-cpu
             metal
             metal-spirv

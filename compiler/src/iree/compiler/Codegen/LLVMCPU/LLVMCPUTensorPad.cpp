@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -21,10 +21,10 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 class LLVMCPUTensorPadPass : public LLVMCPUTensorPadBase<LLVMCPUTensorPadPass> {
- private:
+private:
   LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims;
 
- public:
+public:
   explicit LLVMCPUTensorPadPass(LLVMCPUTensorPadOption option)
       : option(option) {}
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -41,16 +41,16 @@ void LLVMCPUTensorPadPass::runOnOperation() {
   bool nofold;
   utils::IteratorType targetIterType;
   switch (option) {
-    case LLVMCPUTensorPadOption::ParallelDims:
-      LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
-      targetIterType = utils::IteratorType::parallel;
-      nofold = false;
-      break;
-    case LLVMCPUTensorPadOption::ReductionDims:
-      LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
-      targetIterType = utils::IteratorType::reduction;
-      nofold = true;
-      break;
+  case LLVMCPUTensorPadOption::ParallelDims:
+    LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
+    targetIterType = utils::IteratorType::parallel;
+    nofold = false;
+    break;
+  case LLVMCPUTensorPadOption::ReductionDims:
+    LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
+    targetIterType = utils::IteratorType::reduction;
+    nofold = true;
+    break;
   };
   SmallVector<linalg::LinalgOp> candidates;
   funcOp.walk([&](linalg::LinalgOp op) { candidates.push_back(op); });
@@ -114,11 +114,11 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     }
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
-    LLVMCPUTensorPadOption option) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption option) {
   return std::make_unique<LLVMCPUTensorPadPass>(option);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

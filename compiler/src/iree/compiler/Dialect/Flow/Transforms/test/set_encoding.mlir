@@ -74,7 +74,6 @@ func.func @matmul_padding(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf3
 //      PADDING:   %[[RESULT:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
 //      PADDING:   return %[[RESULT]]
 
-
 // -----
 
 func.func @matmul_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
@@ -116,6 +115,126 @@ func.func @matmul_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 // CHECK-SAME:       outs(%[[OUTS]] :
 //      CHECK:   %[[RESULT_PADDED:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
 //      CHECK:   %[[RESULT:.+]] = tensor.extract_slice %[[RESULT_PADDED]][0, 0] [%[[OUTS_D0]], %[[OUTS_D1]]] [1, 1]
+//      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @matmul_i8i8i32(%arg0 : tensor<128x256xi8>, %arg1 : tensor<256x512xi8>,
+    %arg2 : tensor<128x512xi32>) -> tensor<128x512xi32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x256xi8>, tensor<256x512xi8>)
+      outs(%arg2 : tensor<128x512xi32>) -> tensor<128x512xi32>
+  return %0 : tensor<128x512xi32>
+}
+//      CHECK: func @matmul_i8i8i32(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<128x256xi8>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<256x512xi8>
+// CHECK-SAME:     %[[ARG2:.+]]: tensor<128x512xi32>
+//      CHECK:   %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG0]]
+// CHECK-SAME:       tensor<128x256xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>
+//      CHECK:   %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[ARG1]]
+// CHECK-SAME:       tensor<256x512xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>
+//      CHECK:   %[[OUTS:.+]] = iree_linalg_ext.set_encoding %[[ARG2]]
+// CHECK-SAME:       tensor<128x512xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
+//      CHECK:   %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
+//      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @matmul_f16f16f32(%arg0 : tensor<128x256xf16>, %arg1 : tensor<256x512xf16>,
+    %arg2 : tensor<128x512xf32>) -> tensor<128x512xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x256xf16>, tensor<256x512xf16>)
+      outs(%arg2 : tensor<128x512xf32>) -> tensor<128x512xf32>
+  return %0 : tensor<128x512xf32>
+}
+//      CHECK: func @matmul_f16f16f32(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<128x256xf16>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<256x512xf16>
+// CHECK-SAME:     %[[ARG2:.+]]: tensor<128x512xf32>
+//      CHECK:   %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG0]]
+// CHECK-SAME:       tensor<128x256xf16, #iree_linalg_ext.encoding<MATMUL_F16F16F32_LHS>>
+//      CHECK:   %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[ARG1]]
+// CHECK-SAME:       tensor<256x512xf16, #iree_linalg_ext.encoding<MATMUL_F16F16F32_RHS>>
+//      CHECK:   %[[OUTS:.+]] = iree_linalg_ext.set_encoding %[[ARG2]]
+// CHECK-SAME:       tensor<128x512xf32, #iree_linalg_ext.encoding<MATMUL_F16F16F32_RESULT>>
+//      CHECK:   %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
+//      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @matmul_f16f16f16(%arg0 : tensor<128x256xf16>, %arg1 : tensor<256x512xf16>,
+    %arg2 : tensor<128x512xf16>) -> tensor<128x512xf16> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x256xf16>, tensor<256x512xf16>)
+      outs(%arg2 : tensor<128x512xf16>) -> tensor<128x512xf16>
+  return %0 : tensor<128x512xf16>
+}
+//      CHECK: func @matmul_f16f16f16(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<128x256xf16>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<256x512xf16>
+// CHECK-SAME:     %[[ARG2:.+]]: tensor<128x512xf16>
+//      CHECK:   %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG0]]
+// CHECK-SAME:       tensor<128x256xf16, #iree_linalg_ext.encoding<MATMUL_F16F16F16_LHS>>
+//      CHECK:   %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[ARG1]]
+// CHECK-SAME:       tensor<256x512xf16, #iree_linalg_ext.encoding<MATMUL_F16F16F16_RHS>>
+//      CHECK:   %[[OUTS:.+]] = iree_linalg_ext.set_encoding %[[ARG2]]
+// CHECK-SAME:       tensor<128x512xf16, #iree_linalg_ext.encoding<MATMUL_F16F16F16_RESULT>>
+//      CHECK:   %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
+//      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @matmul_bf16bf16f32(%arg0 : tensor<128x256xbf16>, %arg1 : tensor<256x512xbf16>,
+    %arg2 : tensor<128x512xf32>) -> tensor<128x512xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x256xbf16>, tensor<256x512xbf16>)
+      outs(%arg2 : tensor<128x512xf32>) -> tensor<128x512xf32>
+  return %0 : tensor<128x512xf32>
+}
+//      CHECK: func @matmul_bf16bf16f32(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<128x256xbf16>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<256x512xbf16>
+// CHECK-SAME:     %[[ARG2:.+]]: tensor<128x512xf32>
+//      CHECK:   %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG0]]
+// CHECK-SAME:       tensor<128x256xbf16, #iree_linalg_ext.encoding<MATMUL_BF16BF16F32_LHS>>
+//      CHECK:   %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[ARG1]]
+// CHECK-SAME:       tensor<256x512xbf16, #iree_linalg_ext.encoding<MATMUL_BF16BF16F32_RHS>>
+//      CHECK:   %[[OUTS:.+]] = iree_linalg_ext.set_encoding %[[ARG2]]
+// CHECK-SAME:       tensor<128x512xf32, #iree_linalg_ext.encoding<MATMUL_BF16BF16F32_RESULT>>
+//      CHECK:   %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
+//      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @matmul_bf16bf16bf16(%arg0 : tensor<128x256xbf16>, %arg1 : tensor<256x512xbf16>,
+    %arg2 : tensor<128x512xbf16>) -> tensor<128x512xbf16> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x256xbf16>, tensor<256x512xbf16>)
+      outs(%arg2 : tensor<128x512xbf16>) -> tensor<128x512xbf16>
+  return %0 : tensor<128x512xbf16>
+}
+//      CHECK: func @matmul_bf16bf16bf16(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<128x256xbf16>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<256x512xbf16>
+// CHECK-SAME:     %[[ARG2:.+]]: tensor<128x512xbf16>
+//      CHECK:   %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG0]]
+// CHECK-SAME:       tensor<128x256xbf16, #iree_linalg_ext.encoding<MATMUL_BF16BF16BF16_LHS>>
+//      CHECK:   %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[ARG1]]
+// CHECK-SAME:       tensor<256x512xbf16, #iree_linalg_ext.encoding<MATMUL_BF16BF16BF16_RHS>>
+//      CHECK:   %[[OUTS:.+]] = iree_linalg_ext.set_encoding %[[ARG2]]
+// CHECK-SAME:       tensor<128x512xbf16, #iree_linalg_ext.encoding<MATMUL_BF16BF16BF16_RESULT>>
+//      CHECK:   %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
 //      CHECK:   return %[[RESULT]]
 
 // -----

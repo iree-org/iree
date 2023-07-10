@@ -54,7 +54,7 @@ void PartitionSet::dump(AsmState &asmState) {
 #else
 void Partition::dump(AsmState &asmState) {}
 void PartitionSet::dump(AsmState &asmState) {}
-#endif  // !NDEBUG
+#endif // !NDEBUG
 
 LogicalResult Partition::verify(Location loc) {
   // Ensure all ops are compatible with the partition affinity.
@@ -102,7 +102,8 @@ LogicalResult Partition::verify(Location loc) {
 LogicalResult PartitionSet::verify(Location loc) {
   // Verify each partition is consistent.
   for (auto &partition : partitions) {
-    if (failed(partition.verify(loc))) return failure();
+    if (failed(partition.verify(loc)))
+      return failure();
   }
 
   // Ensure a correct topological order of partitions. This only checks the
@@ -127,7 +128,8 @@ LogicalResult PartitionSet::verify(Location loc) {
 }
 
 void PartitionSet::topologicalSort() {
-  if (partitions.empty()) return;
+  if (partitions.empty())
+    return;
 
   SetVector<Partition *> unsortedSet;
   DenseMap<Value, SmallVector<Partition *>> consumers;
@@ -156,7 +158,8 @@ void PartitionSet::topologicalSort() {
       }
     }
   };
-  for (auto *partition : unsortedSet) postorderWalk(partition);
+  for (auto *partition : unsortedSet)
+    postorderWalk(partition);
 
   SmallVector<Partition> sortedSet;
   sortedSet.reserve(partitions.size());
@@ -172,13 +175,14 @@ PartitionSet partitionStreamableOps(IREE::Stream::PartitioningConfigAttr config,
   return partitionStreamableOpsReference(config, block);
 }
 
-PartitionSet partitionRegionConcurrency(
-    IREE::Stream::PartitioningConfigAttr config, Block *block) {
+PartitionSet
+partitionRegionConcurrency(IREE::Stream::PartitioningConfigAttr config,
+                           Block *block) {
   // Only one algorithm today.
   return partitionRegionConcurrencyReference(config, block);
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

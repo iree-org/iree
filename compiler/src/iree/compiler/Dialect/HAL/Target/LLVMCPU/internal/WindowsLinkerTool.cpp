@@ -19,26 +19,28 @@ namespace HAL {
 
 // Windows linker (MSVC link.exe-like); for DLL files.
 class WindowsLinkerTool : public LinkerTool {
- public:
+public:
   using LinkerTool::LinkerTool;
 
   std::string getSystemToolPath() const override {
     // First check for setting the linker explicitly.
     auto toolPath = LinkerTool::getSystemToolPath();
-    if (!toolPath.empty()) return toolPath;
+    if (!toolPath.empty())
+      return toolPath;
 
     // No explicit linker specified, search the executable directory (i.e. our
     // own build or install directories) for common tools.
     toolPath = findToolFromExecutableDir({"lld-link"});
-    if (!toolPath.empty()) return toolPath;
+    if (!toolPath.empty())
+      return toolPath;
 
     llvm::errs() << "No Windows linker tool specified or discovered\n";
     return "";
   }
 
-  LogicalResult configureModule(
-      llvm::Module *llvmModule,
-      ArrayRef<llvm::Function *> exportedFuncs) override {
+  LogicalResult
+  configureModule(llvm::Module *llvmModule,
+                  ArrayRef<llvm::Function *> exportedFuncs) override {
     auto &ctx = llvmModule->getContext();
 
     // Create a _DllMainCRTStartup replacement that does not initialize the CRT.
@@ -90,8 +92,9 @@ class WindowsLinkerTool : public LinkerTool {
     return success();
   }
 
-  std::optional<Artifacts> linkDynamicLibrary(
-      StringRef libraryName, ArrayRef<Artifact> objectFiles) override {
+  std::optional<Artifacts>
+  linkDynamicLibrary(StringRef libraryName,
+                     ArrayRef<Artifact> objectFiles) override {
     Artifacts artifacts;
 
     // Create the shared object name; if we only have a single input object we
@@ -232,9 +235,9 @@ class WindowsLinkerTool : public LinkerTool {
     // matrix (dynamic/static and debug/release).
     int libIndex = 0;
     if (targetOptions.optimizerOptLevel.getSpeedupLevel() == 0) {
-      libIndex += 0;  // debug
+      libIndex += 0; // debug
     } else {
-      libIndex += 2;  // release
+      libIndex += 2; // release
     }
     libIndex += targetOptions.linkStatic ? 1 : 0;
 
@@ -272,7 +275,8 @@ class WindowsLinkerTool : public LinkerTool {
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) return std::nullopt;
+    if (failed(runLinkCommand(commandLine)))
+      return std::nullopt;
 
     // PDB file gets generated wtih the same path + .pdb.
     artifacts.debugFile =
@@ -289,12 +293,13 @@ class WindowsLinkerTool : public LinkerTool {
   }
 };
 
-std::unique_ptr<LinkerTool> createWindowsLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+std::unique_ptr<LinkerTool>
+createWindowsLinkerTool(const llvm::Triple &targetTriple,
+                        LLVMTargetOptions &targetOptions) {
   return std::make_unique<WindowsLinkerTool>(targetTriple, targetOptions);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

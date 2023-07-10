@@ -11,7 +11,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -33,7 +33,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/IndexingUtils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -98,7 +97,8 @@ static void eraseDeadAllocAndStores(RewriterBase &rewriter,
       opToErase.push_back(op.getOperation());
     }
   });
-  for (Operation *op : opToErase) rewriter.eraseOp(op);
+  for (Operation *op : opToErase)
+    rewriter.eraseOp(op);
 }
 
 //===---------------------------------------------------------------------===//
@@ -107,15 +107,13 @@ static void eraseDeadAllocAndStores(RewriterBase &rewriter,
 
 DiagnosedSilenceableFailure
 transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   vector::transferOpflowOpt(rewriter, target);
   eraseDeadAllocAndStores(rewriter, target);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
@@ -134,7 +132,8 @@ void transform_dialect::ApplyBufferOptimizationsOp::build(
 //===---------------------------------------------------------------------===//
 
 static void addOperands(Operation *op, SetVector<Value> &operandSet) {
-  if (!op) return;
+  if (!op)
+    return;
   TypeSwitch<Operation *, void>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
         SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
@@ -148,10 +147,12 @@ static void addOperands(Operation *op, SetVector<Value> &operandSet) {
 template <int limit = 3>
 static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
   Operation *producer = fusedOperand->get().getDefiningOp();
-  if (!producer) return false;
+  if (!producer)
+    return false;
   Operation *consumer = fusedOperand->getOwner();
   SetVector<Value> fusedOpOperands;
-  if (producer->getNumResults() != 1) return false;
+  if (producer->getNumResults() != 1)
+    return false;
   addOperands(consumer, fusedOpOperands);
   fusedOpOperands.remove(producer->getResult(0));
   addOperands(producer, fusedOpOperands);
@@ -204,15 +205,15 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
 
     Location loc = padOp.getLoc();
     auto emptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, resultType,
-        linalg::createDynamicDimensions(rewriter, loc, padOp.getResult()));
+        loc, tensor::getMixedSizes(rewriter, loc, padOp),
+        resultType.getElementType());
     rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
                                                 emptyOp.getResult());
 
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
@@ -232,7 +233,8 @@ void transform_dialect::ApplyUnrollVectorsGpuMmaSyncPatternsOp::
     populatePatterns(RewritePatternSet &patterns) {
   auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract) return std::nullopt;
+    if (!contract)
+      return std::nullopt;
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
   };
   vector::populateVectorUnrollPatterns(
@@ -245,8 +247,8 @@ void transform_dialect::ApplyUnrollVectorsGpuMmaSyncPatternsOp::
 // ApplyUnrollVectorsGpuWmmaSyncPatternsOp
 //===---------------------------------------------------------------------===//
 
-static std::optional<SmallVector<int64_t>> getGPUTensorCoreNativeWmmaVectorSize(
-    Operation *op) {
+static std::optional<SmallVector<int64_t>>
+getGPUTensorCoreNativeWmmaVectorSize(Operation *op) {
   return getWmmaNativeVectorSize(op);
 }
 
@@ -254,7 +256,8 @@ void transform_dialect::ApplyUnrollVectorsGpuWmmaSyncPatternsOp::
     populatePatterns(RewritePatternSet &patterns) {
   auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract) return std::nullopt;
+    if (!contract)
+      return std::nullopt;
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
   };
   vector::populateVectorUnrollPatterns(
@@ -301,7 +304,8 @@ void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
 
 DiagnosedSilenceableFailure
 transform_dialect::ApplyCommonSubexpressionEliminationOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   ErrorCheckingTrackingListener listener(state, *this);
   Operation *lastOpVisited = nullptr;
@@ -312,15 +316,18 @@ transform_dialect::ApplyCommonSubexpressionEliminationOp::applyToOne(
       if (failed(eliminateCommonSubexpressions(op, /*domInfo=*/nullptr,
                                                &listener)))
         return WalkResult::interrupt();
-      if (listener.failed()) return WalkResult::interrupt();
+      if (listener.failed())
+        return WalkResult::interrupt();
       return WalkResult::skip();
     }
     return WalkResult::advance();
   });
 
-  if (!status.wasInterrupted()) return DiagnosedSilenceableFailure::success();
+  if (!status.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
 
-  if (listener.failed()) return listener.checkAndResetError();
+  if (listener.failed())
+    return listener.checkAndResetError();
 
   return mlir::emitDefiniteFailure(lastOpVisited, "CSE failed");
 }
@@ -337,24 +344,31 @@ void transform_dialect::ApplyCommonSubexpressionEliminationOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::ApplyLoopIndependentCodeMotionOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   ErrorCheckingTrackingListener listener(state, *this);
   target->walk([&](func::FuncOp funcOp) {
     // This assumes LICM never removes operations so we don't need tracking.
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
-    funcOp->walk(
-        [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
+    funcOp->walk([](LoopLikeOpInterface loopLike) {
+      // Do not hoist from scf.forall ops. These capture isolated computations
+      // that will be mapped to a certain level in the GPU hierarchy (e.g.,
+      // GPU blocks), so hoisting is not desired.
+      if (!isa<scf::ForallOp>(loopLike.getOperation()))
+        moveLoopInvariantCode(loopLike);
+    });
     // For now, put single loop promotion as part of licm. Underlying
     // implementations perform splice operations which shouldn't need
     // tracking.
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
-    funcOp->walk([](Operation *op) {
+    funcOp->walk([&](Operation *op) {
       (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<affine::AffineForOp, scf::ForOp>(
-              [](auto loop) { return promoteIfSingleIteration(loop); })
+          .Case<affine::AffineForOp, scf::ForOp>([&](auto loop) {
+            return loop.promoteIfSingleIteration(rewriter);
+          })
           .Default([](Operation *) { return success(); });
     });
   });
@@ -373,14 +387,12 @@ void transform_dialect::ApplyLoopIndependentCodeMotionOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
       rewriter, target);
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::HoistStaticAllocOp::getEffects(
@@ -395,9 +407,9 @@ void transform_dialect::HoistStaticAllocOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::ShareForallOperandsOp::applyToOne(
-    scf::ForallOp forallOp, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, scf::ForallOp forallOp,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(getContext());
   SmallVector<int64_t> shareOperands(getShareOperands());
   // Empty case: consider all operands need to be shared.
   if (shareOperands.empty()) {
@@ -419,7 +431,8 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
     tensor::ExtractSliceOp extractSliceOp;
     for (Operation *user : toShare.getUsers()) {
       extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
-      if (extractSliceOp) break;
+      if (extractSliceOp)
+        break;
     }
     if (!extractSliceOp) {
       /*return mlir::emitSilenceableFailure(
@@ -434,8 +447,10 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
     // (i.e., same source/target, offsets, sizes and strides).
     auto isMatchingParallelInsertSlice = [&](Operation &op) {
       auto insertSlice = dyn_cast<tensor::ParallelInsertSliceOp>(&op);
-      if (!insertSlice) return false;
-      if (insertSlice.getDest() != bbArg) return false;
+      if (!insertSlice)
+        return false;
+      if (insertSlice.getDest() != bbArg)
+        return false;
       return llvm::equal(insertSlice.getMixedOffsets(),
                          extractSliceOp.getMixedOffsets()) &&
              llvm::equal(insertSlice.getMixedSizes(),
@@ -563,7 +578,8 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     return mlir::emitDefiniteFailure(
@@ -575,7 +591,8 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
 
   IREE::HAL::ExecutableExportOp exportOp;
   state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.getSymName() == target.getName()) exportOp = op;
+    if (op.getSymName() == target.getName())
+      exportOp = op;
   });
   if (!exportOp) {
     return mlir::emitSilenceableFailure(
@@ -586,7 +603,8 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
   auto walkResult = target->walk([&](scf::ForallOp forallOp) {
     if (forallOp->getParentOfType<scf::ForallOp>())
       return WalkResult::advance();
-    if (topLevelForallOp) return WalkResult::interrupt();
+    if (topLevelForallOp)
+      return WalkResult::interrupt();
     topLevelForallOp = forallOp;
     return WalkResult::advance();
   });
@@ -596,14 +614,11 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
         target, "could not find a unique topLevel scf.forall");
   }
 
-  IRRewriter rewriter(topLevelForallOp->getContext());
   rewriter.setInsertionPoint(topLevelForallOp);
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp, exportOp)))
     return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
 
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::ForallToWorkgroupOp::getEffects(
@@ -622,10 +637,11 @@ void transform_dialect::IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
   transform::modifiesPayload(effects);
 }
 
-DiagnosedSilenceableFailure transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::applyToOne(
-        Operation *target, transform::ApplyToEachResultList &results,
-        transform::TransformState &state) {
+DiagnosedSilenceableFailure
+transform_dialect::IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
+    applyToOne(transform::TransformRewriter &rewriter, Operation *target,
+               transform::ApplyToEachResultList &results,
+               transform::TransformState &state) {
   auto forAllOp = dyn_cast<scf::ForallOp>(target);
   if (!forAllOp) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
@@ -635,7 +651,6 @@ DiagnosedSilenceableFailure transform_dialect::
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "Expect the for op to be normalized");
   }
-  IRRewriter rewriter(target->getContext());
   auto workgroupCount =
       getMixedValues(forAllOp.getStaticUpperBound(),
                      forAllOp.getDynamicUpperBound(), rewriter);
@@ -780,14 +795,16 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
       hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
+  if (needsBarrier)
+    builder.create<gpu::BarrierOp>(loc);
   // TODO: ideally we should use linalg.copy which was recently reintroduced
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
-  if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
+  if (needsBarrier)
+    builder.create<gpu::BarrierOp>(loc);
   return success();
 }
 
@@ -834,18 +851,18 @@ struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
+    transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
   auto payload = state.getPayloadOps(getTarget());
   if (!llvm::hasSingleElement(payload) ||
       !isa<ModuleOp, HAL::ExecutableOp, HAL::ExecutableVariantOp>(
           *payload.begin())) {
     return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "requires exactly a single HAL::ExecutableOp or "
-        "HAL::ExecutableVariantOp target op.");
+        state.getTopLevel(), "requires exactly a single HAL::ExecutableOp or "
+                             "HAL::ExecutableVariantOp target op.");
   }
 
   //===-------------------------------------------------------------------===//
@@ -878,7 +895,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     // overloads only accepts ops that are isolated from above.
     SmallVector<Operation *> ops;
     state.getTopLevel()->walk([&](Operation *nestedOp) {
-      if (state.getTopLevel() != nestedOp) ops.push_back(nestedOp);
+      if (state.getTopLevel() != nestedOp)
+        ops.push_back(nestedOp);
     });
     LogicalResult result =
         applyOpPatternsAndFold(ops, std::move(patterns), config);
@@ -886,7 +904,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
       return mlir::emitDefiniteFailure(state.getTopLevel(),
                                        "greedy pattern application failed");
     }
-    if (listener.failed()) return listener.checkAndResetError();
+    if (listener.failed())
+      return listener.checkAndResetError();
   }
 
   //   2. Run one-shot-bufferize, without the pass baggage.
@@ -933,17 +952,14 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
 DiagnosedSilenceableFailure
 transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
-    ::mlir::Operation *target,
+    transform::TransformRewriter &rewriter, ::mlir::Operation *target,
     ::mlir::transform::ApplyToEachResultList &results,
     ::mlir::transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state, *this);
-  rewriter.setListener(&listener);
   if (failed(
           eliminateEmptyTensors(rewriter, target, getBufferizationOptions())))
     return emitDefaultDefiniteFailure(target)
            << "failed to eliminate tensor.empty ops";
-  return listener.checkAndResetError();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
@@ -958,7 +974,7 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
-    ::mlir::Operation *target,
+    transform::TransformRewriter &rewriter, ::mlir::Operation *target,
     ::mlir::transform::ApplyToEachResultList &results,
     ::mlir::transform::TransformState &state) {
   if (!isa<func::FuncOp>(target)) {

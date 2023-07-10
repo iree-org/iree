@@ -41,9 +41,9 @@ struct CmdDispatchOpPattern
     : public OpConversionPattern<IREE::Stream::CmdDispatchOp> {
   CmdDispatchOpPattern(TypeConverter &typeConverter, MLIRContext *context)
       : OpConversionPattern(typeConverter, context, PatternBenefit(10000)) {}
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = dispatchOp.getLoc();
 
     // TODO(benvanik): support a lightweight switch builder for picking variants
@@ -143,7 +143,7 @@ struct CmdDispatchOpPattern
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateStreamToHALLoaderPatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
@@ -157,5 +157,5 @@ void populateStreamToHALLoaderPatterns(MLIRContext *context,
   patterns.insert<CmdDispatchOpPattern>(typeConverter, context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

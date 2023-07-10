@@ -43,13 +43,14 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
       : OpRewritePattern<Op>(context, /*benefit=*/1000) {}
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.use_empty()) return failure();
+    if (!op.use_empty())
+      return failure();
     rewriter.eraseOp(op);
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // hal.tensor.import/export
@@ -87,16 +88,18 @@ struct DeduplicateTensorBarrierSources
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorBarrierOp op,
                                 PatternRewriter &rewriter) const override {
-    DenseMap<Value, unsigned> uniqueSources;  // source -> unique index
+    DenseMap<Value, unsigned> uniqueSources; // source -> unique index
     SmallVector<Value> orderedSources;
-    SmallVector<unsigned> resultMapping;  // old -> new result index
+    SmallVector<unsigned> resultMapping; // old -> new result index
     for (auto source : op.getSources()) {
       auto it =
           uniqueSources.insert(std::make_pair(source, orderedSources.size()));
-      if (it.second) orderedSources.push_back(source);
+      if (it.second)
+        orderedSources.push_back(source);
       resultMapping.push_back(it.first->second);
     }
-    if (orderedSources.size() == op.getSources().size()) return failure();
+    if (orderedSources.size() == op.getSources().size())
+      return failure();
     auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
                                                   op.getSignalFence());
     SmallVector<Value> newResults;
@@ -109,7 +112,7 @@ struct DeduplicateTensorBarrierSources
   }
 };
 
-}  // namespace
+} // namespace
 
 void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
@@ -142,7 +145,8 @@ struct FoldBufferViewCreateSubspan
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate) return failure();
+    if (!needsUpdate)
+      return failure();
     rewriter.updateRootInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
@@ -151,7 +155,7 @@ struct FoldBufferViewCreateSubspan
   }
 };
 
-}  // namespace
+} // namespace
 
 void BufferViewCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
@@ -161,22 +165,23 @@ void BufferViewCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
-/// the same scope and we know the origin buffer.
+/// the same scope at zero offset and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
   using OpRewritePattern<BufferViewBufferOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
-            op.getBufferView().getDefiningOp())) {
-      rewriter.replaceOp(op, createOp.getSourceBuffer());
-      return success();
-    }
-    return failure();
+    auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
+        op.getBufferView().getDefiningOp());
+    if (!createOp || !matchPattern(createOp.getSourceOffset(), m_Zero()))
+      return failure();
+
+    rewriter.replaceOp(op, createOp.getSourceBuffer());
+    return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void BufferViewBufferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
@@ -224,7 +229,7 @@ struct SkipCommandBufferDeviceOp
   }
 };
 
-}  // namespace
+} // namespace
 
 void CommandBufferDeviceOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -254,7 +259,8 @@ struct FoldCommandBufferFillBufferSubspans
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate) return failure();
+    if (!needsUpdate)
+      return failure();
     rewriter.updateRootInPlace(op, [&]() {
       op.getTargetBufferMutable().assign(newTargetBuffer);
       op.getTargetOffsetMutable().assign(newTargetOffset);
@@ -263,7 +269,7 @@ struct FoldCommandBufferFillBufferSubspans
   }
 };
 
-}  // namespace
+} // namespace
 
 void CommandBufferFillBufferOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -303,7 +309,8 @@ struct FoldCommandBufferCopyBufferSubspans
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate) return failure();
+    if (!needsUpdate)
+      return failure();
     rewriter.updateRootInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
@@ -314,7 +321,7 @@ struct FoldCommandBufferCopyBufferSubspans
   }
 };
 
-}  // namespace
+} // namespace
 
 void CommandBufferCopyBufferOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -338,7 +345,8 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
     auto bindingOffsets = llvm::to_vector(op.getBindingOffsets());
     for (size_t i = 0; i < bindingBuffers.size(); ++i) {
       auto *definingOp = bindingBuffers[i].getDefiningOp();
-      if (!definingOp) continue;
+      if (!definingOp)
+        continue;
       if (auto subspanOp = dyn_cast<BufferSubspanOp>(definingOp)) {
         needsUpdate = true;
         bindingBuffers[i] = subspanOp.getSourceBuffer();
@@ -347,7 +355,8 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
       }
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate) return failure();
+    if (!needsUpdate)
+      return failure();
     rewriter.updateRootInPlace(op, [&]() {
       auto mutableBindingBuffers = op.getBindingBuffersMutable();
       mutableBindingBuffers.clear();
@@ -360,7 +369,7 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
   }
 };
 
-}  // namespace
+} // namespace
 
 void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -392,15 +401,18 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 // same basic block. We need an abstract interpreter to do much more as we'd
 // need to track conditionals/branching logic.
 static bool isOpAlwaysExecutedWith(Operation *before, Operation *after) {
-  if (before == after) return true;
-  if (before->getBlock() != after->getBlock()) return false;
+  if (before == after)
+    return true;
+  if (before->getBlock() != after->getBlock())
+    return false;
   return before->isBeforeInBlock(after);
 }
 
 // Returns true if |op| was hoisted before |insertBefore| without breaking
 // SSA invariants. Returns false if no IR modifications were made.
 static bool tryHoistOpBeforeUser(Operation *op, Operation *insertBefore) {
-  if (op == insertBefore) return false;
+  if (op == insertBefore)
+    return false;
 
   // Currently conservative - should be doing a domination check.
   if (op->getBlock() != insertBefore->getBlock()) {
@@ -437,7 +449,8 @@ struct ImmediatelyResolveDeviceQueueBarrier
   LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
                                 PatternRewriter &rewriter) const override {
     // Only looking for ops performing basic barriers.
-    if (!barrierOp.isBarrier()) return failure();
+    if (!barrierOp.isBarrier())
+      return failure();
 
     // Check for whether we know the wait fence is immediately resolved in the
     // local scope. A more involved data flow analysis would let us handle more
@@ -469,7 +482,8 @@ struct HoistDeviceQueueBarrierChain
   LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
                                 PatternRewriter &rewriter) const override {
     // Only looking for ops performing basic barriers.
-    if (!barrierOp.isBarrier()) return failure();
+    if (!barrierOp.isBarrier())
+      return failure();
 
     // See if we can observe the original fence creation in the local scope.
     auto waitFence = barrierOp.getWaitFence();
@@ -529,7 +543,8 @@ struct ElideDeviceQueueBarrierOp
   LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
                                 PatternRewriter &rewriter) const override {
     // Only looking for ops performing basic barriers.
-    if (!barrierOp.isBarrier()) return failure();
+    if (!barrierOp.isBarrier())
+      return failure();
 
     // We're looking at the wait fence on the barrier back up to the signal
     // operation on that fence.
@@ -624,7 +639,7 @@ struct ElideDeviceQueueBarrierOp
   }
 };
 
-}  // namespace
+} // namespace
 
 void DeviceQueueExecuteOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -661,9 +676,11 @@ static void rewriteToOneReturn(int numResults, Region &region,
   // Get all of the return ops - if there's only one then the requirement is
   // already satisfied and we can exit early.
   auto returnOps = llvm::to_vector(region.getOps<IREE::HAL::ReturnOp>());
-  if (returnOps.size() <= 1) return;  // no-op
+  if (returnOps.size() <= 1)
+    return; // no-op
   SmallVector<Location> returnLocs;
-  for (auto returnOp : returnOps) returnLocs.push_back(returnOp.getLoc());
+  for (auto returnOp : returnOps)
+    returnLocs.push_back(returnOp.getLoc());
 
   // Create the new exit block with arguments matching 1:1 with results.
   auto anyReturnOp = returnOps.front();
@@ -708,7 +725,8 @@ struct MergeExecutableConstantBlocks
     SmallVector<Location> resultLocs;
     for (auto blockOp : blockOps) {
       blockLocs.push_back(blockOp.getLoc());
-      if (blockOp.getNumArguments() > 0) anyRequireDevice = true;
+      if (blockOp.getNumArguments() > 0)
+        anyRequireDevice = true;
       llvm::append_range(resultTypes, blockOp.getResultTypes());
       llvm::append_range(resultKeys, blockOp.getKeys().getValue());
       llvm::append_range(
@@ -797,7 +815,7 @@ struct MergeExecutableConstantBlocks
   }
 };
 
-}  // namespace
+} // namespace
 
 void ExecutableVariantOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -812,7 +830,8 @@ static void filterReturnOperands(ExecutableConstantBlockOp blockOp,
        llvm::make_early_inc_range(blockOp.getOps<IREE::HAL::ReturnOp>())) {
     SmallVector<Value> operands;
     for (auto [i, operand] : llvm::enumerate(returnOp.getOperands())) {
-      if (preservedIndices.test(i)) operands.push_back(operand);
+      if (preservedIndices.test(i))
+        operands.push_back(operand);
     }
     returnOp.getOperandsMutable().assign(operands);
   }
@@ -824,9 +843,11 @@ struct DropUnusedExecutableConstantBlockDeviceArg
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ExecutableConstantBlockOp blockOp,
                                 PatternRewriter &rewriter) const override {
-    if (blockOp.getNumArguments() == 0) return failure();
+    if (blockOp.getNumArguments() == 0)
+      return failure();
     auto deviceArg = blockOp.getArgument(0);
-    if (!deviceArg.use_empty()) return failure();
+    if (!deviceArg.use_empty())
+      return failure();
     rewriter.updateRootInPlace(blockOp, [&]() {
       blockOp.eraseArgument(0);
       blockOp.setFunctionTypeAttr(TypeAttr::get(
@@ -876,7 +897,7 @@ struct DeduplicateExecutableConstantBlockKeys
   }
 };
 
-}  // namespace
+} // namespace
 
 void ExecutableConstantBlockOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -898,7 +919,8 @@ void FenceCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult FenceJoinOp::fold(FoldAdaptor operands) {
-  if (getFences().size() == 1) return getFences().front();
+  if (getFences().size() == 1)
+    return getFences().front();
   return {};
 }
 
@@ -909,7 +931,8 @@ struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getNumOperands() != 0) return failure();
+    if (op.getNumOperands() != 0)
+      return failure();
     rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op,
                                                     op.getResult().getType());
     return success();
@@ -918,8 +941,8 @@ struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
 
 // Produces a deduplicated and null-elided operand list.
 // Returns std::nullopt if nothing changed.
-static std::optional<std::vector<Value>> deduplicateFenceOperands(
-    ValueRange operands) {
+static std::optional<std::vector<Value>>
+deduplicateFenceOperands(ValueRange operands) {
   SetVector<Value> newOperands;
   for (auto operand : operands) {
     if (isa_and_nonnull<IREE::Util::NullOp>(operand.getDefiningOp())) {
@@ -930,7 +953,8 @@ static std::optional<std::vector<Value>> deduplicateFenceOperands(
     newOperands.insert(operand);
   }
 
-  if (newOperands.size() == operands.size()) return std::nullopt;
+  if (newOperands.size() == operands.size())
+    return std::nullopt;
   return newOperands.takeVector();
 }
 
@@ -940,14 +964,15 @@ struct DeduplicateFenceJoinFences : public OpRewritePattern<FenceJoinOp> {
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
     auto newOperands = deduplicateFenceOperands(op.getFences());
-    if (!newOperands) return failure();
+    if (!newOperands)
+      return failure();
     rewriter.replaceOpWithNewOp<FenceJoinOp>(op, op.getResult().getType(),
                                              newOperands.value());
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void FenceJoinOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
@@ -980,7 +1005,8 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
     auto fence = signalOp.getFence();
     auto createOp =
         dyn_cast_or_null<IREE::HAL::FenceCreateOp>(fence.getDefiningOp());
-    if (!createOp) return failure();
+    if (!createOp)
+      return failure();
 
     // TODO(benvanik): broader analysis - likely in a dedicated fence elision
     // pass so we can do IPO. For now block-only.
@@ -1012,7 +1038,7 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void FenceSignalOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
@@ -1030,7 +1056,8 @@ struct ElideEmptyFenceAwait : public OpRewritePattern<FenceAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getFences().empty()) return failure();
+    if (!op.getFences().empty())
+      return failure();
     rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, /*ok=*/0, 32);
     return success();
   }
@@ -1042,7 +1069,8 @@ struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     auto newOperands = deduplicateFenceOperands(op.getFences());
-    if (newOperands == std::nullopt) return failure();
+    if (newOperands == std::nullopt)
+      return failure();
     rewriter.replaceOpWithNewOp<FenceAwaitOp>(op, op.getStatus().getType(),
                                               op.getTimeoutMillis(),
                                               newOperands.value());
@@ -1050,7 +1078,7 @@ struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void FenceAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
@@ -1058,7 +1086,7 @@ void FenceAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<DeduplicateFenceAwaitFences>(context);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

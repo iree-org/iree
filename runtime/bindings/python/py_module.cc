@@ -7,6 +7,7 @@
 #include "./py_module.h"
 
 #include <string_view>
+#include <unordered_map>
 
 #include "./vm.h"
 
@@ -370,7 +371,7 @@ class PyModuleInterface {
           // count.
           VmRef py_ref;
           iree_vm_ref_retain(&ref, &py_ref.ref());
-          arguments.append(py::cast(py_ref, py::return_value_policy::move));
+          arguments.append(py::cast(py_ref, py::rv_policy::move));
           packed_arguments += sizeof(iree_vm_ref_t);
           break;
         }
@@ -471,13 +472,13 @@ class PyModuleInterface {
   py::object retained_self_ref_;
 };
 
-void SetupPyModuleBindings(py::module& m) {
+void SetupPyModuleBindings(py::module_& m) {
   py::class_<PyModuleInterface>(m, "PyModuleInterface")
       .def(py::init<std::string, py::object>(), py::arg("module_name"),
            py::arg("ctor"))
       .def("__str__", &PyModuleInterface::ToString)
-      .def_property_readonly("initialized", &PyModuleInterface::initialized)
-      .def_property_readonly("destroyed", &PyModuleInterface::destroyed)
+      .def_prop_ro("initialized", &PyModuleInterface::initialized)
+      .def_prop_ro("destroyed", &PyModuleInterface::destroyed)
       .def("create", &PyModuleInterface::Create)
       .def("export", &PyModuleInterface::ExportFunction, py::arg("name"),
            py::arg("cconv"), py::arg("callable"));

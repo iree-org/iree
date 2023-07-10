@@ -22,6 +22,13 @@ class HALLoader_PureOp<string mnemonic, list<Trait> traits = []> :
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
+def OpGroupExecutableOps : OpDocGroup {
+  let summary = "Executable ops";
+  let description = "Ops for `!hal.executable` / `iree_hal_executable_t`.";
+}
+
+let opDocGroup = OpGroupExecutableOps in {
+
 def HALLoader_ExecutableQuerySupportOp :
     HALLoader_PureOp<"executable.query_support", [
       DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -184,5 +191,7 @@ def HALLoader_ExecutableDispatchOp :
   let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
+
+} // OpGroupExecutableOps
 
 #endif  // IREE_DIALECT_MODULES_HAL_LOADER_OPS

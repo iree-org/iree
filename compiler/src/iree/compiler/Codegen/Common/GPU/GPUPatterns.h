@@ -27,7 +27,7 @@ void populateCombineVectorTransferReadBroadcastPatterns(
 void populateContractPromotionPatterns(RewritePatternSet &patterns,
                                        ArrayRef<int64_t> operandsToPromote);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_GPUPATTERNS_H_
+#endif // IREE_COMPILER_CODEGEN_COMMON_GPUPATTERNS_H_

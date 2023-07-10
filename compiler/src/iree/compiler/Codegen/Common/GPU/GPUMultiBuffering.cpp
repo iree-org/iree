@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/CommonGPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -20,7 +20,7 @@ struct GPUMultiBufferingPass
     : public GPUMultiBufferingBase<GPUMultiBufferingPass> {
   GPUMultiBufferingPass(unsigned numBuffers) : numBuffers(numBuffers) {}
 
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect>();
   }
 
@@ -50,9 +50,10 @@ struct GPUMultiBufferingPass
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
       // Skip allocations not used in a loop.
-      for (Operation* user : allocOp->getUsers()) {
+      for (Operation *user : allocOp->getUsers()) {
         auto loop = user->getParentOfType<scf::ForOp>();
-        if (!loop) return WalkResult::advance();
+        if (!loop)
+          return WalkResult::advance();
       }
       allocs.push_back(allocOp);
       return WalkResult::advance();
@@ -68,15 +69,15 @@ struct GPUMultiBufferingPass
     }
   }
 
- private:
+private:
   unsigned numBuffers;
 };
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUMultiBuffering(
-    unsigned numBuffers) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createGPUMultiBuffering(unsigned numBuffers) {
   return std::make_unique<GPUMultiBufferingPass>(numBuffers);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

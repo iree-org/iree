@@ -14,6 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/base/internal/math.h"
 #include "iree/schemas/cpu_data.h"
 
 // Implementation of iree_uk_assert_fail failure is deferred to users code, i.e.
@@ -95,6 +96,12 @@ void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
     switch (type) {
       case IREE_UK_TYPE_FLOAT_32:
         ((float*)buffer)[i] = random_val;
+        break;
+      case IREE_UK_TYPE_FLOAT_16:
+        ((uint16_t*)buffer)[i] = iree_math_f32_to_f16((float)random_val);
+        break;
+      case IREE_UK_TYPE_BFLOAT_16:
+        ((uint16_t*)buffer)[i] = iree_math_f32_to_bf16((float)random_val);
         break;
       case IREE_UK_TYPE_INT_32:
         ((int32_t*)buffer)[i] = random_val;

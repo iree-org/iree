@@ -4,6 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// cuGetErrorName, cuGetErrorString should be loaded first in case there are
+// errors loading the other symbols.
+IREE_CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
+IREE_CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
 IREE_CU_PFN_DECL(cuDriverGetVersion, int*)
 IREE_CU_PFN_DECL(cuCtxCreate, CUcontext*, unsigned int, CUdevice)
 IREE_CU_PFN_DECL(cuCtxDestroy, CUcontext)
@@ -23,8 +27,7 @@ IREE_CU_PFN_DECL(cuEventElapsedTime, float*, CUevent, CUevent)
 IREE_CU_PFN_DECL(cuEventQuery, CUevent)
 IREE_CU_PFN_DECL(cuEventRecord, CUevent, CUstream)
 IREE_CU_PFN_DECL(cuEventSynchronize, CUevent)
-IREE_CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
-IREE_CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
+IREE_CU_PFN_DECL(cuGetProcAddress, const char*, void**, int, cuuint64_t)
 IREE_CU_PFN_DECL(cuGraphAddMemcpyNode, CUgraphNode*, CUgraph,
                  const CUgraphNode*, size_t, const CUDA_MEMCPY3D*, CUcontext)
 IREE_CU_PFN_DECL(cuGraphAddMemsetNode, CUgraphNode*, CUgraph,
@@ -76,8 +79,7 @@ IREE_CU_PFN_DECL(cuMemsetD16Async, unsigned long long, unsigned short, size_t,
 IREE_CU_PFN_DECL(cuMemsetD8Async, unsigned long long, unsigned char, size_t,
                  CUstream)
 IREE_CU_PFN_DECL(cuMemcpyAsync, CUdeviceptr, CUdeviceptr, size_t, CUstream)
-IREE_CU_PFN_DECL(cuMemcpyHtoDAsync_v2, CUdeviceptr, const void*, size_t,
-                 CUstream)
+IREE_CU_PFN_DECL(cuMemcpyHtoDAsync, CUdeviceptr, const void*, size_t, CUstream)
 IREE_CU_PFN_DECL(cuFuncSetAttribute, CUfunction, CUfunction_attribute, int)
 IREE_CU_PFN_DECL(cuLaunchKernel, CUfunction, unsigned int, unsigned int,
                  unsigned int, unsigned int, unsigned int, unsigned int,

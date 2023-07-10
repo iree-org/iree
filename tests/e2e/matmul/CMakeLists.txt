@@ -407,7 +407,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -431,7 +431,31 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f16_gpu_large_unaligned
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--shapes=gpu_large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -456,7 +480,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -481,7 +505,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(
@@ -506,7 +530,7 @@ iree_generated_trace_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-nvidia"
+    "requires-gpu-sm80"
 )
 
 iree_generated_trace_runner_test(

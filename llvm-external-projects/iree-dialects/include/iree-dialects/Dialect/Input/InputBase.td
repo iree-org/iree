@@ -9,6 +9,7 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def IREEInput_Dialect : Dialect {
@@ -28,6 +29,7 @@ def IREEInput_Dialect : Dialect {
   }];
   let cppNamespace = "::mlir::iree_compiler::IREE::Input";
   let useDefaultTypePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
 }
 
 class IREEInput_Op<string mnemonic, list<Trait> traits = []> :
@@ -88,11 +90,6 @@ def IREEInput_ElementTypeParameter : TypeParameter<
 def IREEInput_PtrTargetTypeParameter : TypeParameter<
     "::mlir::Type", "A type suitable as a target type of a pointer">;
 
-def IREEInput_Dim : TypeAlias<Index>;
-def IREEInput_Dims : Variadic<IREEInput_Dim>;
-def IREEInput_Shape : Variadic<IREEInput_Dim>;
-def IREEInput_ShapeDynamicDims : Variadic<IREEInput_Dim>;
-
 def IREEInput_GlobalRefAttr : IREEInput_AliasedSymbolRefAttr;
 def IREEInput_AnyGlobalPtr : IREEInput_AnyPtrOf<[IREEInput_Tensor, IREEInput_PrimitiveType]>;
 
@@ -111,6 +108,211 @@ def IREEInput_IndexAttr : IREEInput_IndexAttrBase<"size_t">;
 def IREEInput_TiedOpStorageAttr :
     TypedArrayAttrBase<IREEInput_IndexAttr, "64-bit integer array attribute"> {
   let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
+}
+
+//===----------------------------------------------------------------------===//
+// Type aliases for working with shapes
+//===----------------------------------------------------------------------===//
+
+def IREEInput_Dim : TypeAlias<Index>;
+def IREEInput_Dims : Variadic<IREEInput_Dim>;
+def IREEInput_Shape : Variadic<IREEInput_Dim>;
+def IREEInput_ShapeDynamicDims : Variadic<IREEInput_Dim>;
+
+//===----------------------------------------------------------------------===//
+// Type aliases for working with Buffers and BufferViews
+//===----------------------------------------------------------------------===//
+
+def IREEInput_DeviceSize : TypeAlias<Index>;
+def IREEInput_ElementType : TypeAlias<I32>;
+def IREEInput_EncodingType : TypeAlias<I32>;
+
+//===----------------------------------------------------------------------===//
+// Following attributes are mirrored from the IREEs HAL dialect to allow higher
+// level clients of IREE to construct IREE input with pre-compiled executables,
+// e.g. in NVIDIA GPU case it allows the higher level client to embed PTX or
+// CUBIN as an executable, export device functions, and rely on IREEs runtime
+// to dispatch them. It is possible to constuct an input IR with an arbitrary
+// mix of pre-compiled kernels (executables) and "compute IR" (e.g. stablehlo)
+// that will be compiled to executables using builtin IREE compilation pipeline.
+//
+// See corresponding HAL dialect attributes for the documentation.
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Device and executable target specification
+//===----------------------------------------------------------------------===//
+
+def IREEInput_DeviceTargetAttr : AttrDef<IREEInput_Dialect, "DeviceTarget"> {
+  let mnemonic = "device.target";
+  let summary = [{generic device target specification}];
+
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$deviceID,
+    AttrParameter<"DictionaryAttr", "">:$configuration
+  );
+
+  let builders = [
+    AttrBuilder<(ins "StringRef":$deviceID)>,
+  ];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+def IREEInput_ExecutableTargetAttr :
+    AttrDef<IREEInput_Dialect, "ExecutableTarget"> {
+  let mnemonic = "executable.target";
+  let summary = [{generic executable target specification}];
+
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$backend,
+    AttrParameter<"StringAttr", "">:$format,
+    AttrParameter<"DictionaryAttr", "">:$configuration
+  );
+
+  let builders = [
+    AttrBuilder<(ins "StringRef":$backend, "StringRef":$format)>,
+  ];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Executable object(s)
+//===----------------------------------------------------------------------===//
+
+def IREEInput_WorkgroupSizeAttr : TypedArrayAttrBase<
+    IREEInput_IndexAttrBase<"size_t">,
+    "index array attribute"> {
+  let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
+}
+
+def IREEInput_SubgroupSizeAttr : IREEInput_IndexAttrBase<"size_t">;
+
+def IREEInput_ExecutableObjectAttr :
+    AttrDef<IREEInput_Dialect, "ExecutableObject"> {
+  let mnemonic = "executable.object";
+  let summary = [{executable object reference}];
+
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$path,
+    OptionalParameter<"DenseIntElementsAttr", "">:$data
+  );
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+def IREEInput_ExecutableObjectArrayAttr :
+    TypedArrayAttrBase<IREEInput_ExecutableObjectAttr,
+                       "IREEInput executable object references">;
+
+def IREEInput_ExecutableObjectsAttr :
+    AttrDef<IREEInput_Dialect, "ExecutableObjects"> {
+  let mnemonic = "executable.objects";
+  let summary = [{target-specific object file references}];
+
+  let parameters = (ins
+    AttrParameter<"ArrayAttr", "">:$targets,
+    AttrParameter<"ArrayAttr", "">:$targetObjects
+  );
+
+  let genVerifyDecl = 1;
+  let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Executable Pipeline Layout (aka IREEs executable ABI)
+//===----------------------------------------------------------------------===//
+
+def IREEInput_OrdinalAttr : IREEInput_IndexAttrBase<"size_t">;
+
+class IREEInput_I32Enum<string name, string description,
+                        list<I32EnumAttrCase> cases>
+    : I32EnumAttr<name, description, cases> {
+  let genSpecializedAttr = 0;
+  let cppNamespace = "::mlir::iree_compiler::IREE::Input";
+}
+
+class IREEInput_I32EnumAttr<string name, string description, string mnemonic,
+                            list<I32EnumAttrCase> cases>
+    : EnumAttr<IREEInput_Dialect,
+               IREEInput_I32Enum<name, description, cases>, mnemonic> {
+  let assemblyFormat = "`<` $value `>`";
+}
+
+def IREEInput_DescriptorType_UniformBuffer :
+    I32EnumAttrCase<"UniformBuffer", 6, "uniform_buffer">;
+def IREEInput_DescriptorType_StorageBuffer :
+    I32EnumAttrCase<"StorageBuffer", 7, "storage_buffer">;
+def IREEInput_DescriptorTypeAttr :
+    IREEInput_I32EnumAttr<"DescriptorType", "valid DescriptorType",
+                                            "descriptor_type", [
+      IREEInput_DescriptorType_UniformBuffer,
+      IREEInput_DescriptorType_StorageBuffer,
+    ]>;
+
+def IREEInput_DescriptorFlags_None :
+    I32BitEnumAttrCase<"None", 0x0000>;
+def IREEInput_DescriptorFlags_ReadOnly :
+    I32BitEnumAttrCase<"ReadOnly", 0x0001>;
+def IREEInput_DescriptorFlagsAttr :
+    I32BitEnumAttr<"DescriptorFlags", "valid Descriptor flags", [
+      IREEInput_DescriptorFlags_None,
+      IREEInput_DescriptorFlags_ReadOnly,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Input";
+}
+
+def IREEInput_DescriptorSetBindingAttr :
+    AttrDef<IREEInput_Dialect, "DescriptorSetBinding", []> {
+  let mnemonic = "descriptor_set.binding";
+  let summary = [{descriptor set binding specification}];
+
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$ordinal,
+    AttrParameter<"DescriptorType", "">:$type,
+    OptionalParameter<"std::optional<DescriptorFlags>">:$flags
+  );
+
+  let assemblyFormat = [{
+    `<` $ordinal `,` $type (`,` $flags^)? `>`
+  }];
+}
+
+def IREEInput_DescriptorSetLayoutAttr :
+    AttrDef<IREEInput_Dialect, "DescriptorSetLayout", []> {
+  let mnemonic = "descriptor_set.layout";
+  let summary = [{descriptor set layout specification}];
+
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$ordinal,
+    ArrayRefParameter<"DescriptorSetBindingAttr", "">:$bindings
+  );
+
+  let assemblyFormat = [{
+    `<`
+    $ordinal `,`
+    `bindings` `=` `[` $bindings `]`
+    `>`
+  }];
+}
+
+def IREEInput_PipelineLayoutAttr :
+    AttrDef<IREEInput_Dialect, "PipelineLayout", []> {
+  let mnemonic = "pipeline.layout";
+  let summary = [{executable entry point layout specification}];
+
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$pushConstants,
+    ArrayRefParameter<"DescriptorSetLayoutAttr", "">:$setLayouts
+  );
+
+  let assemblyFormat = [{
+    `<`
+    `push_constants` `=` $pushConstants `,`
+    `sets` `=` `[` $setLayouts `]`
+    `>`
+  }];
 }
 
 #endif // IREE_DIALECTS_DIALECT_INPUT_BASE_TD

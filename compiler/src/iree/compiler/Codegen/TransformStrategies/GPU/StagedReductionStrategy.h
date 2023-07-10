@@ -9,13 +9,11 @@
 
 #include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace gpu {
-
-struct GPUModel;
-struct ReductionConfig;
 
 /// Encode a 3-staged strategy for a 1-d reduction mapped to a block.
 ///
@@ -32,7 +30,7 @@ struct ReductionConfig;
 /// Stage 2: the second stage of the reduction is the first stage of the warp
 /// shuffle step. It is normalized to reduce from a "k-warps" abstraction,
 /// across all warps in parallel, to a k-element result. Only the first thread
-/// within each warp (e.g. threadIdx % kCudaWarpSize == 0) commits to memory.
+/// within each warp (e.g. threadIdx % subgroupSize == 0) commits to memory.
 ///
 /// Stage 1: the first stage of the reduction is normalized to run on "k-warps"
 /// of maximal vector size for both the hardware and the problem sizes.
@@ -50,11 +48,11 @@ struct ReductionConfig;
 //
 // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue. This is
 // best done if we can encode the future stride to ensure the 4 is aligned.
-class StagedReductionStrategy : public AbstractReductionStrategy {
- public:
+class StagedReductionStrategy : public AbstractReductionStrategy, GPUStrategy {
+public:
   StagedReductionStrategy(
       const transform_ext::MatchedReductionCaptures &captures,
-      const ReductionConfig &reductionConfig);
+      const ReductionConfig &reductionConfig, const GPUModel &targetGpu);
 
   StagedReductionStrategy(const StagedReductionStrategy &) = default;
   StagedReductionStrategy &operator=(const StagedReductionStrategy &) = default;
@@ -65,7 +63,15 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
 
   int64_t getVectorSize() const { return vectorSize; }
 
- private:
+  int64_t getNumWarps() const {
+    assert(numThreadsXInBlock % subgroupSize == 0 &&
+           "staged reduction strategy requires full warps");
+    return numThreadsXInBlock / subgroupSize;
+  }
+
+  int64_t getTotalNumThreads() const { return numThreadsXInBlock; }
+
+private:
   /// Compute the staged strategy based on the reductionDimensionSize, the
   /// `maxNumThreadsToUse` and the `vectorSize`.
   /// The latter 2 numbers control the tradeoff between parallelism and shared
@@ -83,8 +89,8 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
   int64_t numThreadsXInBlock;
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_

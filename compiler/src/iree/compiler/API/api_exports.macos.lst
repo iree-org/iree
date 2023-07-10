@@ -302,7 +302,6 @@ _mlirF16TypeGet
 _mlirF32TypeGet
 _mlirF64TypeGet
 _mlirFlatSymbolRefAttrGet
-_mlirFlatSymbolRefAttrGetTypeID
 _mlirFlatSymbolRefAttrGetValue
 _mlirFloat16TypeGetTypeID
 _mlirFloat32TypeGetTypeID
@@ -321,6 +320,7 @@ _mlirFloatAttrDoubleGet
 _mlirFloatAttrDoubleGetChecked
 _mlirFloatAttrGetTypeID
 _mlirFloatAttrGetValueDouble
+_mlirFloatTF32TypeGetTypeID
 _mlirFunctionTypeGet
 _mlirFunctionTypeGetInput
 _mlirFunctionTypeGetNumInputs
@@ -543,6 +543,7 @@ _mlirSymbolTableInsert
 _mlirSymbolTableLookup
 _mlirSymbolTableReplaceAllSymbolUses
 _mlirSymbolTableWalkSymbolTables
+_mlirTF32TypeGet
 _mlirTransformAnyOpTypeGet
 _mlirTransformOperationTypeGet
 _mlirTransformOperationTypeGetOperationName
@@ -589,6 +590,7 @@ _mlirTypeIsAPDLTypeType
 _mlirTypeIsAPDLValueType
 _mlirTypeIsARankedTensor
 _mlirTypeIsAShaped
+_mlirTypeIsATF32
 _mlirTypeIsATensor
 _mlirTypeIsATransformAnyOpType
 _mlirTypeIsATransformOperationType

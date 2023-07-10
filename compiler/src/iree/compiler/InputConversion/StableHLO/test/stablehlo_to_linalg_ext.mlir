@@ -542,6 +542,32 @@ func.func @chlo_top_k_int(%arg : tensor<16x16xi32>) -> (tensor<16x8xi32>, tensor
 
 // -----
 
+// CHECK:       func.func @chlo_top_k_uint
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+func.func @chlo_top_k_uint(%arg: tensor<2000xui32>) -> (tensor<3xui32>, tensor<3xi32>) {
+  %values, %indices = chlo.top_k(%arg, k = 3) : tensor<2000xui32> -> (tensor<3xui32>, tensor<3xi32>)
+  return %values, %indices : tensor<3xui32>, tensor<3xi32>
+}
+
+// CHECK:        %[[CONVERTED:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<2000xui32> to tensor<2000xi32>
+// CHECK:        %[[D2:.+]] = tensor.empty() : tensor<3xi32>
+// CHECK:        %[[D3:.+]] = tensor.empty() : tensor<3xi32>
+// CHECK-DAG:    %[[CNEG:.+]] = arith.constant -2147483648 : i32
+// CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
+// CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : i32) outs(%[[D2]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D3]]
+// CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
+// CHECK-SAME:     dimension(0)
+// CHECK-SAME:     ins(%[[CONVERTED]]
+// CHECK-SAME:     outs(%[[D4]], %[[D5]]
+// CHECK:        ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
+// CHECK:        %[[D7:.+]] = arith.cmpi sge, %[[ARG1]], %[[ARG2]] : i32
+// CHECK:        iree_linalg_ext.yield %[[D7]] : i1
+// CHECK:        %[[CONVERTED_OUT:.+]] = builtin.unrealized_conversion_cast %[[D6]]#0 : tensor<3xi32> to tensor<3xui32>
+// CHECK:        return %[[CONVERTED_OUT]], %[[D6]]#1
+
+// -----
+
 // CHECK:       func.func @chlo_top_k_float
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
 func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tensor<16x8xi32>) {

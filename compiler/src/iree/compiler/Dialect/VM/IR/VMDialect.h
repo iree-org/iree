@@ -24,10 +24,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.h.inc" // IWYU pragma: export
 
 class VMDialect : public Dialect {
- public:
+public:
   explicit VMDialect(MLIRContext *context);
   ~VMDialect() override;
   static StringRef getDialectNamespace() { return "vm"; }
@@ -51,7 +51,7 @@ class VMDialect : public Dialect {
   void *getRegisteredInterfaceForOp(mlir::TypeID interface,
                                     mlir::OperationName opName) override;
 
- private:
+private:
   /// Register the attributes of this dialect.
   void registerAttributes();
   /// Register the types of this dialect.
@@ -61,9 +61,9 @@ class VMDialect : public Dialect {
   VMOpAsmInterface *fallbackOpAsmInterface;
 };
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
+#endif // IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_

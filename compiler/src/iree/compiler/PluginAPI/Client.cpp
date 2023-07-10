@@ -44,4 +44,4 @@ void PluginRegistrar::registerPlugin(
   }
 }
 
-}  // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler

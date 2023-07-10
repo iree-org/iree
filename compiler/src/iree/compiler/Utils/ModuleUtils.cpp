@@ -26,18 +26,22 @@ std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
     // Recurse through fused locations.
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
-      if (childResult) return childResult;
+      if (childResult)
+        return childResult;
     }
   } else if (auto loc = llvm::dyn_cast<CallSiteLoc>(baseLoc)) {
     // First check caller...
     auto callerResult = findFirstFileLoc(loc.getCaller());
-    if (callerResult) return callerResult;
+    if (callerResult)
+      return callerResult;
     // Then check callee...
     auto calleeResult = findFirstFileLoc(loc.getCallee());
-    if (calleeResult) return calleeResult;
+    if (calleeResult)
+      return calleeResult;
   } else if (auto loc = llvm::dyn_cast<NameLoc>(baseLoc)) {
     auto childResult = findFirstFileLoc(loc.getChildLoc());
-    if (childResult) return childResult;
+    if (childResult)
+      return childResult;
   } else if (auto loc = llvm::dyn_cast<OpaqueLoc>(baseLoc)) {
     // TODO(scotttodd): Use loc.fallbackLocation()?
   } else if (auto loc = llvm::dyn_cast<UnknownLoc>(baseLoc)) {
@@ -49,7 +53,8 @@ std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
 
 std::string guessModuleName(mlir::ModuleOp moduleOp, StringRef defaultName) {
   std::string moduleName = moduleOp.getName().value_or("").str();
-  if (!moduleName.empty()) return moduleName;
+  if (!moduleName.empty())
+    return moduleName;
   auto loc = findFirstFileLoc(moduleOp.getLoc());
   if (loc.has_value()) {
     return sanitizeSymbolName(
@@ -100,7 +105,8 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
 
   // Resolve conflicts and move the op.
   for (auto &sourceOp : sourceOps) {
-    if (sourceOp->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (sourceOp->hasTrait<OpTrait::IsTerminator>())
+      continue;
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(sourceOp)) {
       auto symbolName = symbolOp.getName();
 
@@ -165,5 +171,5 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
   return mergeModuleInto(*sourceModuleRef, targetOp, targetBuilder);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -20,7 +20,8 @@ def ApplyBufferOptimizationsOp :
   Op<Transform_Dialect, "iree.apply_buffer_optimizations",
     [TransformEachOpTrait,
      TransformOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This applies memory optimization on memref. In particular it does store to
     load forwarding, dead store elimination and dead alloc elimination.
@@ -45,6 +46,7 @@ def ApplyBufferOptimizationsOp :
   ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -53,7 +55,8 @@ def ApplyBufferOptimizationsOp :
 
 def ApplyBubbleCollapsePatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.bubble_collapse",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to fold an expanding tensor.expand_shape operation with
     its producer generic operation by collapsing the dimensions of the generic
@@ -66,7 +69,8 @@ def ApplyBubbleCollapsePatternsOp : Op<Transform_Dialect,
 
 def ApplyBubbleExpandPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.bubble_expand",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to fold an expanding (collapsing) tensor_reshape
     operation with its producer (consumer) generic operation by expanding
@@ -79,7 +83,8 @@ def ApplyBubbleExpandPatternsOp : Op<Transform_Dialect,
 
 def ApplyBubblePackUnpackPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.bubble_pack_unpack",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to bubble up or down data layout ops across other
     operations.
@@ -91,7 +96,8 @@ def ApplyBubblePackUnpackPatternsOp : Op<Transform_Dialect,
 
 def ApplyFoldFillIntoPadPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.fold_fill_into_pad",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populates a pattern that folds
     "tensor.pad(cst, tensor.extract*(linalg.fill(cst)))" into
@@ -105,7 +111,8 @@ def ApplyFoldFillIntoPadPatternsOp : Op<Transform_Dialect,
 
 def ApplyFoldReshapeIntoTensorHalInterfacePatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.fold_reshape_into_tensor_hal_interface",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns that fold tensor.expand_shape/tensor.collapse_shape into
     the source hal.interface.binding.subspan op.
@@ -117,7 +124,8 @@ def ApplyFoldReshapeIntoTensorHalInterfacePatternsOp : Op<Transform_Dialect,
 
 def ApplyIreeLinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.linalg_elementwise_greedy_fusion",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to fuse `linalg.generic` -> `linalg.generic` operations
     when both operations are fusable elementwise operations.
@@ -132,7 +140,8 @@ def ApplyIreeLinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
 
 def ApplyPrepareVectorToMMAPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.prepare_vector_to_mma",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns that transform vector ops into a canonical form to
     convert to MMA matrix operations. If `useNvGpu` is true, then the patterns
@@ -147,7 +156,8 @@ def ApplyPrepareVectorToMMAPatternsOp : Op<Transform_Dialect,
 
 def ApplyUnrollVectorsGpuMmaSyncPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.unroll_vectors_gpu_mma_sync",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns that unroll vectors. TODO: better documentation.
   }];
@@ -158,7 +168,8 @@ def ApplyUnrollVectorsGpuMmaSyncPatternsOp : Op<Transform_Dialect,
 
 def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.unroll_vectors_gpu_wmma_sync",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns that unroll vectors. TODO: better documentation.
   }];
@@ -170,7 +181,8 @@ def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
 def ApplyCommonSubexpressionEliminationOp : Op<Transform_Dialect, "iree.apply_cse",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Apply common subexpression elimination. This transform is applied to all
     ops within the target that are isolated from above.
@@ -187,6 +199,7 @@ def ApplyCommonSubexpressionEliminationOp : Op<Transform_Dialect, "iree.apply_cs
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -196,7 +209,8 @@ def ApplyCommonSubexpressionEliminationOp : Op<Transform_Dialect, "iree.apply_cs
 def ApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Apply loop-independent code motion and single iteration loop promotion.
     This transform is applied to all FuncOps within the target.
@@ -213,6 +227,7 @@ def ApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -222,7 +237,8 @@ def ApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
 def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let summary = "Hoist static allocations";
   let description = [{
     Find static allocations and hoist them to the top level.
@@ -241,6 +257,7 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::func::FuncOp funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -250,7 +267,8 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Target the whole hal.executable_variant op and call upstream comprehensive
     bufferize with extra IREE hooks.
@@ -296,7 +314,8 @@ def IREEEliminateEmptyTensorsOp : Op<
     Transform_Dialect, "iree.eliminate_empty_tensors",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This is a pre-processing pass for iree.bufferize. It tries to remove
     tensor.empty ops by replacing them with suitable destination tensors,
@@ -317,6 +336,7 @@ def IREEEliminateEmptyTensorsOp : Op<
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -327,7 +347,8 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
     "iree.erase_hal_descriptor_type_from_memref",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Erase #hal.descriptor_type from MemRef memory space to ignore all IREE
     memory space planning. This is meant to ease transitioning given that
@@ -352,6 +373,7 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -362,7 +384,8 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Target the whole hal.executable_variant op and rewrite the unique topLevel
     scf.forall to distributed workgroup_id and workgroup_count.
@@ -407,6 +430,7 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::func::FuncOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -418,7 +442,8 @@ def ShareForallOperandsOp : Op<
       FunctionalStyleTransformOpTrait,
       MemoryEffectsOpInterface,
       TransformEachOpTrait,
-      TransformOpInterface]> {
+      TransformOpInterface,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Target a single scf.forall op and shares all uses of the specified
     `share_operands` operand indices.
@@ -478,6 +503,7 @@ def ShareForallOperandsOp : Op<
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::scf::ForallOp forallOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -488,7 +514,8 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
     Op<Transform_Dialect, "iree.populate_workgroup_count_region_using_num_threads_slice",
       [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
        TransformEachOpTrait,
-       TransformOpInterface]> {
+       TransformOpInterface,
+       ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate the workgroup_count region on the `hal.executable.export` op.
 
@@ -509,6 +536,7 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::transform::TransformRewriter &rewriter,
       ::mlir::Operation *target,
       ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);

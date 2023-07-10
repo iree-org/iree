@@ -28,6 +28,7 @@ BACKEND_TESTS = [
     "i1_inlined_constant.mlir",
     "linalg_ops.mlir",
     "reduction_broadcast_elementwise.mlir",
+    "scalar_computation.mlir",
     "softmax.mlir",
     "strided_slice.mlir",
     "transpose.mlir",

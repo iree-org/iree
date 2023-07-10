@@ -7,9 +7,9 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -51,11 +51,13 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
                                          bool useMmaSyncShape) {
   auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract) return std::nullopt;
+    if (!contract)
+      return std::nullopt;
     return gpuMmaUnrollOrder(contract);
   };
   auto getNativeShape = [useMmaSyncShape](Operation *op) {
-    if (useMmaSyncShape) return getMmaNativeVectorSize(op);
+    if (useMmaSyncShape)
+      return getMmaNativeVectorSize(op);
     return getWmmaNativeVectorSize(op);
   };
   vector::populateVectorUnrollPatterns(
@@ -156,15 +158,15 @@ struct LLVMGPUTensorCoreVectorizationPass
     }
   }
 
- private:
+private:
   GPUTensorCoreType tensorCoreType;
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType) {
   return std::make_unique<LLVMGPUTensorCoreVectorizationPass>(tensorCoreType);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

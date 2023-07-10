@@ -35,7 +35,7 @@ using mlir::iree_compiler::IREE::HAL::TargetBackendRegistry;
 
 #if defined(_MSC_VER)
 #define fileno _fileno
-#endif  // _MSC_VER
+#endif // _MSC_VER
 
 static LogicalResult ireeOptMainFromCL(int argc, char **argv,
                                        llvm::StringRef toolName,
@@ -91,7 +91,8 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   auto localBinder = mlir::iree_compiler::OptionsBinder::local();
   mlir::iree_compiler::PluginManagerSession pluginSession(
       pluginManager, localBinder, pluginManagerOptions);
-  if (failed(pluginSession.initializePlugins())) return failure();
+  if (failed(pluginSession.initializePlugins()))
+    return failure();
   pluginSession.registerDialects(registry);
 
   // In the normal compiler flow, activated plugins maintain a scoped registry

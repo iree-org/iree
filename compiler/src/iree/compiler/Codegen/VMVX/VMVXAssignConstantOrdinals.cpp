@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/VMVX/VMVXPasses.h"
+#include "iree/compiler/Codegen/VMVX/PassDetail.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -22,11 +22,13 @@ struct VMVXAssignConstantOrdinalsPass
 
     // Ignore non-VMVX variants.
     // TODO(benvanik): a way to nest this in the pipeline via dynamic passes.
-    if (variantOp.getTarget().getBackend().getValue() != "vmvx") return;
+    if (variantOp.getTarget().getBackend().getValue() != "vmvx")
+      return;
 
     // Get a constant key -> ordinal mapping.
     auto keyOrdinals = variantOp.gatherConstantOrdinals();
-    if (keyOrdinals.empty()) return;
+    if (keyOrdinals.empty())
+      return;
 
     // Update placeholders to hold the concrete ordinal values.
     // Eventually the VM global folding passes will inline them.
@@ -36,7 +38,8 @@ struct VMVXAssignConstantOrdinalsPass
                moduleOp.getOps<IREE::VM::GlobalI32Op>())) {
         auto keyAttr = globalOp->getAttr(
             IREE::HAL::ExecutableConstantBlockOp::getKeyAttrName());
-        if (!keyAttr) continue;
+        if (!keyAttr)
+          continue;
         auto it = keyOrdinals.find(keyAttr);
         if (it == keyOrdinals.end()) {
           globalOp.emitOpError()
@@ -53,12 +56,12 @@ struct VMVXAssignConstantOrdinalsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createVMVXAssignConstantOrdinalsPass() {
   return std::make_unique<VMVXAssignConstantOrdinalsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

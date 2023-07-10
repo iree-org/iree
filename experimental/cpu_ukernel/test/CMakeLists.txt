@@ -20,20 +20,3 @@ iree_check_single_backend_test_suite(
   LABELS
     "hostonly"
 )
-
-iree_check_single_backend_test_suite(
-  NAME
-    builtin_ukernel_standalone_plugin_test
-  SRCS
-    "mmt4d.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-sync"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-enable-microkernels"
-  RUNNER_ARGS
-    "--executable_plugin=${PROJECT_BINARY_DIR}/experimental/cpu_ukernel/builtin_ukernel_standalone_plugin.sos"
-  LABELS
-    "hostonly"
-)

@@ -616,10 +616,23 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # "Bootstrapping" by first looking for the optional Development component
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
-  find_package(Python3 COMPONENTS Interpreter Development)
-  find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+  # If building Python packages, we have a hard requirement on 3.8+.
+  find_package(Python3 3.8 COMPONENTS Interpreter Development NumPy)
+  find_package(Python3 3.8 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  # Some parts of the build use FindPython instead of FindPython3. Why? No
+  # one knows, but they are different. So make sure to bootstrap this one too.
+  # Not doing this here risks them diverging, which on multi-Python systems,
+  # can be troublesome. Note that nanobind requires FindPython.
+  set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
+  find_package(Python 3.8 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
+  find_package(Python COMPONENTS Interpreter REQUIRED)
+endif()
+
+if(NOT "${Python_EXECUTABLE}" STREQUAL "${Python3_EXECUTABLE}")
+  message(WARNING "FindPython and FindPython3 found different executables. You may need to pin -DPython_EXECUTABLE and -DPython3_EXECUTABLE (${Python_EXECUTABLE} vs ${Python3_EXECUTABLE})")
 endif()
 
 # Extended Python environment checks.
@@ -670,40 +683,6 @@ endif()
 # We define these here because various things in the build tree adds
 # dependencies to them.
 #-------------------------------------------------------------------------------
-
-if(IREE_BUILD_E2E_TEST_ARTIFACTS)
-  # iree-benchmark-import-models imports benchmark models from their source
-  # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
-  add_custom_target(iree-benchmark-import-models)
-  # Build for large benchmark suites.
-  add_custom_target(iree-benchmark-import-models-large)
-
-  # iree-benchmark-suites* fully prepares benchmark models for benchmarking:
-  #   * importing from source formats to IREE-compatible .mlir files
-  #   * compiling from .mlir files to benchmark-ready .vmfb files
-  # Build default benchmark suites.
-  add_custom_target(iree-benchmark-suites)
-  # Build large benchmark suites.
-  add_custom_target(iree-benchmark-suites-large)
-
-  # iree-e2e-compile-stats-suites* compiles the benchmark models with specific
-  # flags to collect the compilation statistics.
-  # Build for default benchmark suites.
-  add_custom_target(iree-e2e-compile-stats-suites)
-  # Build for large benchmark suites.
-  add_custom_target(iree-e2e-compile-stats-suites-large)
-
-  # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
-  # and model tests.
-  add_custom_target(iree-e2e-test-artifacts)
-  add_dependencies(iree-e2e-test-artifacts
-    iree-benchmark-import-models
-    iree-benchmark-suites
-    iree-benchmark-suites-large
-    iree-e2e-compile-stats-suites
-    iree-e2e-compile-stats-suites-large
-  )
-endif()
 
 if(IREE_BUILD_MICROBENCHMARKS)
   # Add top-level custom targets to drive generating microbenchmark suites.
@@ -879,11 +858,14 @@ if(IREE_BUILD_TESTS)
 endif()
 
 if(IREE_BUILD_PYTHON_BINDINGS)
-  if(NOT TARGET pybind11::module)
-    message(STATUS "Using bundled pybind11")
-    add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-  else()
-    message(STATUS "Not including bundled pybind11 (already configured)")
+  # The compiler uses pybind11
+  if(IREE_BUILD_COMPILER)
+    if(NOT TARGET pybind11::module)
+      message(STATUS "Using bundled pybind11")
+      add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+    else()
+      message(STATUS "Not including bundled pybind11 (already configured)")
+    endif()
   endif()
 endif()
 

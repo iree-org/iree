@@ -55,9 +55,9 @@ std::unique_ptr<OperationPass<>> createResolveBufferDescriptorsPass();
 
 void registerVMVXPasses();
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VMVX_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_VMVX_TRANSFORMS_PASSES_H_

@@ -55,5 +55,5 @@ std::string sanitizeFileName(StringRef name) {
   return result;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -36,60 +36,63 @@ from options import parse_profiler_arguments
 ###############################################################################
 
 if __name__ == "__main__":
-  ###############################################################################
-  # Parse command line arguments
-  ###############################################################################
-  parser = argparse.ArgumentParser(description="IREE Python profiler tool for "\
-           "verifcation and performance profiling tool for IREE-compiled "\
-           "MLIR operations.")
+    ###############################################################################
+    # Parse command line arguments
+    ###############################################################################
+    parser = argparse.ArgumentParser(
+        description="IREE Python profiler tool for "
+        "verifcation and performance profiling tool for IREE-compiled "
+        "MLIR operations."
+    )
 
-  args = parse_profiler_arguments(parser)
-  ###############################################################################
+    args = parse_profiler_arguments(parser)
+    ###############################################################################
 
-  # Create manifest object and load dispatches.
-  manifest = Manifest(args)
-  manifest.load()
+    # Create manifest object and load dispatches.
+    manifest = Manifest(args)
+    manifest.load()
 
-  # Performance report
-  perf_report = PerformanceReport(args)
+    # Performance report
+    perf_report = PerformanceReport(args)
 
-  # For all the operations in the manifest compile (if needed), verify, and profile.
-  for _, dispatch_collection_list in manifest.dispatch_collection_map.items():
-    for dispatch_collection in dispatch_collection_list:
+    # For all the operations in the manifest compile (if needed), verify, and profile.
+    for _, dispatch_collection_list in manifest.dispatch_collection_map.items():
+        for dispatch_collection in dispatch_collection_list:
+            operation = dispatch_collection.operation
+            # Select and create an instance of operation_launcher for the operation.
+            operation_launcher = IreeToolsLauncher(args, operation)
+            for configuration in dispatch_collection.configuration_list:
+                # Create a dispatch object.
+                dispatch = Dispatch(operation, configuration)
 
-      operation = dispatch_collection.operation
-      # Select and create an instance of operation_launcher for the operation.
-      operation_launcher = IreeToolsLauncher(args, operation)
-      for configuration in dispatch_collection.configuration_list:
+                # Skip the dispatch if filter returns false.
+                if not manifest.is_enabled(dispatch):
+                    continue
 
-        # Create a dispatch object.
-        dispatch = Dispatch(operation, configuration)
+                # If dry run is enabled, skip the dispatch.
+                if args.dry_run:
+                    print(f"[Dry run] : {dispatch.name()}")
+                    continue
 
-        # Skip the dispatch if filter returns false.
-        if not manifest.is_enabled(dispatch):
-          continue
+                # Initialize verification and profiling results.
+                verification_result = (
+                    "Not verified" if not args.verification_enabled else "Failed"
+                )
+                runtime = -1.0
 
-        # If dry run is enabled, skip the dispatch.
-        if args.dry_run:
-          print(f'[Dry run] : {dispatch.name()}')
-          continue
+                # Launch the operation dispatches for verification and profiling.
+                if args.verification_enabled:
+                    verification_result = operation_launcher.verify(configuration)
+                if args.profiling_enabled:
+                    runtime = operation_launcher.profile(configuration)
 
-        # Initialize verification and profiling results.
-        verification_result = 'Not verified' if not args.verification_enabled else 'Failed'
-        runtime = -1.0
+                # Create performance result.
+                result = PerformanceResult(
+                    operation, configuration, verification_result, runtime
+                )
 
-        # Launch the operation dispatches for verification and profiling.
-        if args.verification_enabled:
-          verification_result = operation_launcher.verify(configuration)
-        if args.profiling_enabled:
-          runtime = operation_launcher.profile(configuration)
+                # Print the performance result.
+                result.print()
 
-        # Create performance result.
-        result = PerformanceResult(operation, configuration,
-                                   verification_result, runtime)
-
-        # Print the performance result.
-        result.print()
-
-        # Append the performance result to the performance report.
-        perf_report.append_perf_result(result)
+                # Append the performance result to the performance report.
+                perf_report.append_perf_result(result)

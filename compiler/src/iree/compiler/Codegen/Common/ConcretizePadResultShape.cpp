@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -30,7 +30,8 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
                              Location loc) {
   IntegerAttr attr;
   if (Value val = attrOrValue.dyn_cast<Value>()) {
-    if (val.getType().isIndex()) return val;
+    if (val.getType().isIndex())
+      return val;
     matchPattern(val, m_Constant(&attr));
   } else {
     attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
@@ -49,7 +50,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {
     // If the result shape is already static, then nothing to do.
-    if (padOp.getResultType().hasStaticShape()) return failure();
+    if (padOp.getResultType().hasStaticShape())
+      return failure();
 
     int rank = padOp.getResultType().getRank();
     SmallVector<int64_t> staticShape;
@@ -57,7 +59,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
 
     auto sourceIfxOp = dyn_cast_or_null<OffsetSizeAndStrideOpInterface>(
         padOp.getSource().getDefiningOp());
-    if (!sourceIfxOp) return failure();
+    if (!sourceIfxOp)
+      return failure();
 
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> source = sourceIfxOp.getMixedSizes();
@@ -107,7 +110,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         affine::canonicalizeMapAndOperands(&map, &valueSizes);
         cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
       }
-      if (!cstExpr) return failure();
+      if (!cstExpr)
+        return failure();
 
       staticShape.push_back(cstExpr.getValue());
     }
@@ -124,7 +128,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
 
 class ConcretizePadResultShapePass final
     : public ConcretizePadResultShapeBase<ConcretizePadResultShapePass> {
- public:
+public:
   ConcretizePadResultShapePass() = default;
   ConcretizePadResultShapePass(const ConcretizePadResultShapePass &pass) =
       default;
@@ -150,7 +154,7 @@ class ConcretizePadResultShapePass final
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass() {
@@ -178,5 +182,5 @@ void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
   patterns.add<ConcretizePadResultShape>(context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

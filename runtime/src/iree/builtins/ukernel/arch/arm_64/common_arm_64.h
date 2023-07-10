@@ -10,24 +10,6 @@
 #include <arm_neon.h>
 
 #include "iree/builtins/ukernel/common.h"
-#include "iree/schemas/cpu_data.h"
-
-#if IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(7, 0) || \
-    IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(8, 0)
-#define IREE_UK_BUILD_ARM_64_DOTPROD
-static inline bool iree_uk_cpu_supports_dotprod(
-    const iree_uk_uint64_t* cpu_data) {
-  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_DOTPROD);
-}
-#endif
-
-#if IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(10, 0) || \
-    IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(10, 0)
-#define IREE_UK_BUILD_ARM_64_I8MM
-static inline bool iree_uk_cpu_supports_i8mm(const iree_uk_uint64_t* cpu_data) {
-  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_I8MM);
-}
-#endif
 
 static inline int8x16x2_t iree_uk_neon_load_8x4xi8_strided(
     const iree_uk_int8_t* src, iree_uk_index_t stride) {

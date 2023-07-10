@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_KERNELDISPATCH_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_KERNELDISPATCH_H_
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -15,7 +15,7 @@ namespace iree_compiler {
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_KERNELDISPATCH_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_KERNELDISPATCH_H_

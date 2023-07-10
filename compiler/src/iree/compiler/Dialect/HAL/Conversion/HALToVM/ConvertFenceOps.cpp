@@ -29,5 +29,5 @@ void populateHALFenceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.fence.await");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

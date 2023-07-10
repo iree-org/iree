@@ -84,8 +84,8 @@ std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
 // Pass to convert a tensor.pad operation into a linalg.fill +
 // tensor.insert_slice.
-std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
-    bool skipSingleLinalgOpUses = false);
+std::unique_ptr<Pass>
+createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses = false);
 
 // Create a pass to detach elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
@@ -127,6 +127,10 @@ std::unique_ptr<Pass> createSetEncodingPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createStripSignednessPass();
 
+// Removes tensors that have 0-extents.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createRemoveZeroExtentTensorsPass();
+
 // Verifies that the input to the Flow transformation pipeline is legal.
 // This includes checking for operations from dialects that are expected
 // to be legalized before this pass.
@@ -152,6 +156,10 @@ struct FormDispatchRegionsOptions {
 };
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(FormDispatchRegionsOptions options = {});
+
+// Pass to create `flow.dispatch.region`s for scalar computations.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFormScalarDispatchesPass();
 
 // Pass to collapse dimensions of Linalg Ops on tensor ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -245,8 +253,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantVariablesPass();
 
 /// Creates a pass to dump a graph for dispatches
-std::unique_ptr<Pass> createDumpDispatchGraphPass(
-    raw_ostream &os = llvm::errs());
+std::unique_ptr<Pass>
+createDumpDispatchGraphPass(raw_ostream &os = llvm::errs());
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -254,9 +262,9 @@ std::unique_ptr<Pass> createDumpDispatchGraphPass(
 
 void registerFlowPasses();
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_

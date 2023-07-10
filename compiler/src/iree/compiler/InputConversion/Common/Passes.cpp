@@ -16,8 +16,8 @@ namespace iree_compiler {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/InputConversion/Common/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/InputConversion/Common/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createIREEImportPublicPass());
@@ -37,5 +37,5 @@ void registerCommonInputConversionPasses() {
       });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

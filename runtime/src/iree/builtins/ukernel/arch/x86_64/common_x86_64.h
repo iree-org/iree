@@ -10,47 +10,6 @@
 #include <immintrin.h>
 
 #include "iree/builtins/ukernel/common.h"
-#include "iree/schemas/cpu_data.h"
-
-// We default to requiring Clang>=8 and GCC>=9 because that's what Ruy used to
-// do; in my memory it's not just about what's officially supported but also
-// about skipping over quirky support in earlier releases.
-#if IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(8, 0) || \
-    IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(9, 0) ||   \
-    IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(1910)  // MSVC 2017
-#define IREE_UK_BUILD_X86_64_AVX2_FMA
-static inline bool iree_uk_cpu_supports_avx2_fma(
-    const iree_uk_uint64_t* cpu_data) {
-  return iree_uk_all_bits_set(
-      cpu_data[0], IREE_CPU_DATA0_X86_64_AVX2 | IREE_CPU_DATA0_X86_64_FMA);
-}
-#endif
-
-#if IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(8, 0) || \
-    IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(9, 0) ||   \
-    IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(1920)  // MSVC 2019
-#define IREE_UK_BUILD_X86_64_AVX512_BASE
-static inline bool iree_uk_cpu_supports_avx512_base(
-    const iree_uk_uint64_t* cpu_data) {
-  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_X86_64_AVX512F |
-                                               IREE_CPU_DATA0_X86_64_AVX512BW |
-                                               IREE_CPU_DATA0_X86_64_AVX512DQ |
-                                               IREE_CPU_DATA0_X86_64_AVX512VL |
-                                               IREE_CPU_DATA0_X86_64_AVX512CD);
-}
-#endif
-
-// GCC 9 introduced AVX512VNNI: https://gcc.gnu.org/gcc-9/changes.html
-#if IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(8, 0) || \
-    IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(9, 0) ||   \
-    IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(1930)  // MSVC 2022
-#define IREE_UK_BUILD_X86_64_AVX512_VNNI
-static inline bool iree_uk_cpu_supports_avx512_vnni(
-    const iree_uk_uint64_t* cpu_data) {
-  return iree_uk_cpu_supports_avx512_base(cpu_data) &&
-         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_X86_64_AVX512VNNI);
-}
-#endif
 
 #if defined(__AVX2__)
 

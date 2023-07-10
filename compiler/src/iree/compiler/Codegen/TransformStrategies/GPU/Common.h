@@ -18,6 +18,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
+struct GPUModel;
+
 //===----------------------------------------------------------------------===//
 // Base quantities generally useful for all GPU strategies.
 //===----------------------------------------------------------------------===//
@@ -52,8 +54,6 @@ inline Attribute linearIdZ(MLIRContext *ctx) {
 //===----------------------------------------------------------------------===//
 // General helpers.
 //===----------------------------------------------------------------------===//
-static constexpr int64_t kCudaWarpSize = 32;
-static constexpr int64_t kCudaMaxNumThreads = 1024;
 static constexpr int64_t kCudaMaxVectorLoadBitWidth = 128;
 
 /// Return max(1, (value * 32) / bitWidth).
@@ -81,7 +81,7 @@ Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
-                             Value funcH, int64_t warpSize = kCudaWarpSize);
+                             Value funcH, int64_t warpSize);
 
 /// Take care of the last common steps in a GPU strategy (i.e. vectorize,
 /// bufferize, maps to blocks and threads and distribute vectors).
@@ -89,9 +89,9 @@ Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
 /// the variant op.
 // TODO: abstract away AbstractReductionStrategy, this is supposed to be
 // retargetable.
-std::pair<Value, Value> buildCommonTrailingStrategy(
-    ImplicitLocOpBuilder &b, Value variantH,
-    ArrayRef<int64_t> numThreadsInBlock);
+std::pair<Value, Value>
+buildCommonTrailingStrategy(ImplicitLocOpBuilder &b, Value variantH,
+                            ArrayRef<int64_t> numThreadsInBlock);
 
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
@@ -112,7 +112,7 @@ std::pair<Value, Value> buildCommonTrailingStrategy(
 // in schedule complexity and can be handled with simple padding of the
 // underlying allocation.
 void build1DSplittingStrategyWithOptionalThreadMapping(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value opH, int64_t rank,
+    ImplicitLocOpBuilder &b, Value variantH, Value opH, int64_t rank,
     int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
     Attribute mappingAttr = Attribute(), int64_t maxVectorSize = 4);
 
@@ -149,9 +149,10 @@ std::tuple<Value, Value> buildDistributeOnePadOrCopyWithTileSizes(
 
 /// Distribute the explicit copies involved in a matmul operation
 /// `paddedMatmulOpH`.
-std::tuple<Value, Value, Value> buildDistributeMatmulCopies(
-    ImplicitLocOpBuilder &b, Value variantH, Value paddedMatmulOpH,
-    const AbstractGemmLikeStrategy &strategy);
+std::tuple<Value, Value, Value>
+buildDistributeMatmulCopies(ImplicitLocOpBuilder &b, Value variantH,
+                            Value paddedMatmulOpH,
+                            const AbstractGemmLikeStrategy &strategy);
 
 /// Specific pattern to perform masked vectorization of copies give as
 /// parameters, cleanup and vectorize the rest.
@@ -185,18 +186,8 @@ void buildPipelineSharedMemoryCopies(ImplicitLocOpBuilder &b, Value funcH,
 
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH);
 
-//===----------------------------------------------------------------------===//
-// Higher-level problem-specific strategy creation APIs, these should favor
-// user-friendliness.
-//===----------------------------------------------------------------------===//
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-/// Try to find an exisiting transform dialect strategy for a given entry point.
-LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,
-                                           Operation *op,
-                                           const GPUModel &gpuModel);
-
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
-
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_

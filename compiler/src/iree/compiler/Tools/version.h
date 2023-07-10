@@ -15,6 +15,6 @@ namespace mlir::iree_compiler {
 // defined.
 std::string getIreeRevision();
 
-}  // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler
 
-#endif  // IREE_COMPILER_TOOLS_VERSION_H
+#endif // IREE_COMPILER_TOOLS_VERSION_H

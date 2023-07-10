@@ -15,14 +15,14 @@ if(_IREE_UKERNEL_BITCODE_BUILD_X86_64)
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_base
+    ukernel_bitcode_x86_64_entry_points
   ARCH
-    x86_64
+    wasm_64
   SRCS
-    "mmt4d_x86_64.c"
-    "pack_x86_64.c"
-    "query_tile_sizes_x86_64.c"
-    "unpack_x86_64.c"
+    "mmt4d_x86_64_entry_point.c"
+    "pack_x86_64_entry_point.c"
+    "query_tile_sizes_x86_64_entry_point.c"
+    "unpack_x86_64_entry_point.c"
 )
 
 iree_bitcode_library(
@@ -86,12 +86,12 @@ iree_link_bitcode(
     "ukernel_bitcode_x86_64_avx2_fma.bc"
     "ukernel_bitcode_x86_64_avx512_base.bc"
     "ukernel_bitcode_x86_64_avx512_vnni.bc"
-    "ukernel_bitcode_x86_64_base.bc"
 
 )
 
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64.bc")
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64_entry_points.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_X86_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
@@ -151,6 +151,11 @@ set(IREE_UK_COPTS_X86_64_AVX512_VNNI
   "${IREE_UK_COPTS_X86_64_AVX512_VNNI_RELATIVE}"
 )
 
+check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX2_FMA}" IREE_UK_BUILD_X86_64_AVX2_FMA)
+check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BASE}" IREE_UK_BUILD_X86_64_AVX512_BASE)
+check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_VNNI}" IREE_UK_BUILD_X86_64_AVX512_VNNI)
+configure_file("config_x86_64.h.in" "config_x86_64.h")
+
 iree_cc_library(
   NAME
     common_x86_64
@@ -161,6 +166,9 @@ iree_cc_library(
     iree::schemas::cpu_data
 )
 
+set(IREE_UK_X86_64_DEPS "")
+
+if(IREE_UK_BUILD_X86_64_AVX2_FMA)
 iree_cc_library(
   NAME
     x86_64_avx2_fma
@@ -173,7 +181,10 @@ iree_cc_library(
   DEPS
     iree::builtins::ukernel::internal_headers
 )
+list(APPEND IREE_UK_X86_64_DEPS "::x86_64_avx2_fma")
+endif()  # IREE_UK_BUILD_X86_64_AVX2_FMA
 
+if(IREE_UK_BUILD_X86_64_AVX512_BASE)
 iree_cc_library(
   NAME
     x86_64_avx512_base
@@ -186,7 +197,10 @@ iree_cc_library(
   DEPS
     iree::builtins::ukernel::internal_headers
 )
+list(APPEND IREE_UK_X86_64_DEPS "::x86_64_avx512_base")
+endif()  # IREE_UK_BUILD_X86_64_AVX512_BASE
 
+if(IREE_UK_BUILD_X86_64_AVX512_VNNI)
 iree_cc_library(
   NAME
     x86_64_avx512_vnni
@@ -197,20 +211,19 @@ iree_cc_library(
   DEPS
     iree::builtins::ukernel::internal_headers
 )
+list(APPEND IREE_UK_X86_64_DEPS "::x86_64_avx512_vnni")
+endif()  # IREE_UK_BUILD_X86_64_AVX512_VNNI
 
 iree_cc_library(
   NAME
     x86_64
   SRCS
-    "mmt4d_x86_64.c"
-    "pack_x86_64.c"
-    "query_tile_sizes_x86_64.c"
-    "unpack_x86_64.c"
+    "mmt4d_x86_64_entry_point.c"
+    "pack_x86_64_entry_point.c"
+    "query_tile_sizes_x86_64_entry_point.c"
+    "unpack_x86_64_entry_point.c"
   DEPS
     ::common_x86_64
-    ::x86_64_avx2_fma
-    ::x86_64_avx512_base
-    ::x86_64_avx512_vnni
     iree::base::core_headers
     iree::builtins::ukernel::internal_headers
     ${IREE_UK_X86_64_DEPS}

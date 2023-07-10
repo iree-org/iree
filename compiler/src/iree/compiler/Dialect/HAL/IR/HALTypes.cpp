@@ -23,8 +23,8 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
-#include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -93,7 +93,7 @@ constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
                                               int32_t bitCount) {
   return (static_cast<uint32_t>(numericalType) << 24) | bitCount;
 }
-}  // namespace
+} // namespace
 
 std::optional<int32_t> getElementTypeValue(Type type) {
   if (auto intType = llvm::dyn_cast_if_present<IntegerType>(type)) {
@@ -114,17 +114,17 @@ std::optional<int32_t> getElementTypeValue(Type type) {
     return makeElementTypeValue(numericalType, intType.getWidth());
   } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(type)) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
-      case APFloat::S_IEEEhalf:
-      case APFloat::S_IEEEsingle:
-      case APFloat::S_IEEEdouble:
-      case APFloat::S_IEEEquad:
-        return makeElementTypeValue(NumericalType::kFloatIEEE,
-                                    floatType.getWidth());
-      case APFloat::S_BFloat:
-        return makeElementTypeValue(NumericalType::kFloatBrain,
-                                    floatType.getWidth());
-      default:
-        return std::nullopt;
+    case APFloat::S_IEEEhalf:
+    case APFloat::S_IEEEsingle:
+    case APFloat::S_IEEEdouble:
+    case APFloat::S_IEEEquad:
+      return makeElementTypeValue(NumericalType::kFloatIEEE,
+                                  floatType.getWidth());
+    case APFloat::S_BFloat:
+      return makeElementTypeValue(NumericalType::kFloatBrain,
+                                  floatType.getWidth());
+    default:
+      return std::nullopt;
     }
   } else if (auto complexType = llvm::dyn_cast_if_present<ComplexType>(type)) {
     return makeElementTypeValue(
@@ -144,7 +144,7 @@ std::optional<int32_t> getEncodingTypeValue(Attribute attr) {
 // See the iree/hal/command_buffer.h iree_hal_collective_op_t for details.
 uint32_t CollectiveAttr::getEncodedValue() const {
   union {
-    uint32_t packed;  // packed value
+    uint32_t packed; // packed value
     struct {
       uint8_t kind;
       uint8_t reduction;
@@ -164,7 +164,8 @@ uint32_t CollectiveAttr::getEncodedValue() const {
 //===----------------------------------------------------------------------===//
 
 llvm::MaybeAlign commonAlignment(llvm::MaybeAlign lhs, llvm::MaybeAlign rhs) {
-  if (!lhs.has_value() || !rhs.has_value()) return std::nullopt;
+  if (!lhs.has_value() || !rhs.has_value())
+    return std::nullopt;
   return llvm::MaybeAlign(
       llvm::MinAlign(lhs.value().value(), rhs.value().value()));
 }
@@ -179,7 +180,8 @@ std::optional<uint64_t> lookupOffsetOrAlignment(Value value) {
   }
 
   auto op = value.getDefiningOp();
-  if (!op) return std::nullopt;
+  if (!op)
+    return std::nullopt;
   if (auto alignmentAttr = op->getAttrOfType<IntegerAttr>("stream.alignment")) {
     // The op has an alignment tagged on it we can use directly.
     return alignmentAttr.getValue().getZExtValue();
@@ -291,8 +293,8 @@ SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
 }
 
 // static
-SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
-    Operation *op) {
+SmallVector<IREE::HAL::DeviceTargetAttr, 4>
+DeviceTargetAttr::lookup(Operation *op) {
   auto attrId = mlir::StringAttr::get(op->getContext(), "hal.device.targets");
   while (op) {
     auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
@@ -305,32 +307,36 @@ SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
     }
     op = op->getParentOp();
   }
-  return {};  // No devices found; let caller decide what to do.
+  return {}; // No devices found; let caller decide what to do.
 }
 
 // Returns a set of all configuration attributes from all device targets with
 // a configuration set. Targets with no configuration set are ignored.
 static SmallVector<DictionaryAttr> lookupOptionalConfigAttrs(Operation *op) {
   auto targetAttrs = IREE::HAL::DeviceTargetAttr::lookup(op);
-  if (targetAttrs.empty()) return {};
+  if (targetAttrs.empty())
+    return {};
   SmallVector<DictionaryAttr> configAttrs;
   for (auto targetAttr : targetAttrs) {
     auto configAttr = targetAttr.getConfiguration();
-    if (configAttr) configAttrs.push_back(configAttr);
+    if (configAttr)
+      configAttrs.push_back(configAttr);
   }
   return configAttrs;
 }
 
 // Returns a set of all configuration attributes from all device targets.
 // Returns nullopt if any target is missing a configuration attribute.
-static std::optional<SmallVector<DictionaryAttr>> lookupRequiredConfigAttrs(
-    Operation *op) {
+static std::optional<SmallVector<DictionaryAttr>>
+lookupRequiredConfigAttrs(Operation *op) {
   auto targetAttrs = IREE::HAL::DeviceTargetAttr::lookup(op);
-  if (targetAttrs.empty()) return std::nullopt;
+  if (targetAttrs.empty())
+    return std::nullopt;
   SmallVector<DictionaryAttr> configAttrs;
   for (auto targetAttr : targetAttrs) {
     auto configAttr = targetAttr.getConfiguration();
-    if (!configAttr) return std::nullopt;
+    if (!configAttr)
+      return std::nullopt;
     configAttrs.push_back(configAttr);
   }
   return configAttrs;
@@ -342,13 +348,16 @@ static std::optional<typename AttrT::ValueType> joinConfigAttrs(
     std::function<typename AttrT::ValueType(typename AttrT::ValueType,
                                             typename AttrT::ValueType)>
         join) {
-  if (configAttrs.empty()) return std::nullopt;
+  if (configAttrs.empty())
+    return std::nullopt;
   auto firstValue = configAttrs.front().getAs<AttrT>(name);
-  if (!firstValue) return std::nullopt;
+  if (!firstValue)
+    return std::nullopt;
   auto result = firstValue.getValue();
   for (auto configAttr : configAttrs.drop_front(1)) {
     auto value = configAttr.getAs<AttrT>(name);
-    if (!value) return std::nullopt;
+    if (!value)
+      return std::nullopt;
     result = join(result, value.getValue());
   }
   return result;
@@ -361,13 +370,16 @@ joinConfigStaticRanges(ArrayRef<DictionaryAttr> configAttrs, StringRef name,
                            StaticRange<typename AttrT::ValueType>,
                            StaticRange<typename AttrT::ValueType>)>
                            join) {
-  if (configAttrs.empty()) return std::nullopt;
+  if (configAttrs.empty())
+    return std::nullopt;
   auto firstValue = configAttrs.front().getAs<AttrT>(name);
-  if (!firstValue) return std::nullopt;
+  if (!firstValue)
+    return std::nullopt;
   StaticRange<typename AttrT::ValueType> result{firstValue.getValue()};
   for (auto configAttr : configAttrs.drop_front(1)) {
     auto value = configAttr.getAs<AttrT>(name);
-    if (!value) return std::nullopt;
+    if (!value)
+      return std::nullopt;
     result =
         join(result, StaticRange<typename AttrT::ValueType>{value.getValue()});
   }
@@ -377,9 +389,11 @@ joinConfigStaticRanges(ArrayRef<DictionaryAttr> configAttrs, StringRef name,
 // static
 bool DeviceTargetAttr::lookupConfigAttrAny(Operation *op, StringRef name) {
   auto configAttrs = lookupOptionalConfigAttrs(op);
-  if (configAttrs.empty()) return false;
+  if (configAttrs.empty())
+    return false;
   for (auto configAttr : configAttrs) {
-    if (configAttr.get(name)) return true;
+    if (configAttr.get(name))
+      return true;
   }
   return false;
 }
@@ -387,9 +401,11 @@ bool DeviceTargetAttr::lookupConfigAttrAny(Operation *op, StringRef name) {
 // static
 bool DeviceTargetAttr::lookupConfigAttrAll(Operation *op, StringRef name) {
   auto configAttrs = lookupRequiredConfigAttrs(op);
-  if (!configAttrs) return false;
+  if (!configAttrs)
+    return false;
   for (auto configAttr : *configAttrs) {
-    if (!configAttr.get(name)) return false;
+    if (!configAttr.get(name))
+      return false;
   }
   return true;
 }
@@ -398,7 +414,8 @@ bool DeviceTargetAttr::lookupConfigAttrAll(Operation *op, StringRef name) {
 std::optional<bool> DeviceTargetAttr::lookupConfigAttrAnd(Operation *op,
                                                           StringRef name) {
   auto configAttrs = lookupRequiredConfigAttrs(op);
-  if (!configAttrs) return std::nullopt;
+  if (!configAttrs)
+    return std::nullopt;
   return joinConfigAttrs<BoolAttr>(
       configAttrs.value(), name, [](bool lhs, bool rhs) { return lhs && rhs; });
 }
@@ -407,16 +424,18 @@ std::optional<bool> DeviceTargetAttr::lookupConfigAttrAnd(Operation *op,
 std::optional<bool> DeviceTargetAttr::lookupConfigAttrOr(Operation *op,
                                                          StringRef name) {
   auto configAttrs = lookupRequiredConfigAttrs(op);
-  if (!configAttrs) return std::nullopt;
+  if (!configAttrs)
+    return std::nullopt;
   return joinConfigAttrs<BoolAttr>(
       configAttrs.value(), name, [](bool lhs, bool rhs) { return lhs || rhs; });
 }
 
 // static
-std::optional<StaticRange<APInt>> DeviceTargetAttr::lookupConfigAttrRange(
-    Operation *op, StringRef name) {
+std::optional<StaticRange<APInt>>
+DeviceTargetAttr::lookupConfigAttrRange(Operation *op, StringRef name) {
   auto configAttrs = lookupRequiredConfigAttrs(op);
-  if (!configAttrs) return std::nullopt;
+  if (!configAttrs)
+    return std::nullopt;
   return joinConfigStaticRanges<IntegerAttr>(
       configAttrs.value(), name,
       [](StaticRange<APInt> lhs, StaticRange<APInt> rhs) {
@@ -428,8 +447,8 @@ std::optional<StaticRange<APInt>> DeviceTargetAttr::lookupConfigAttrRange(
 }
 
 // static
-SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::lookupExecutableTargets(
-    Operation *op) {
+SmallVector<ExecutableTargetAttr, 4>
+DeviceTargetAttr::lookupExecutableTargets(Operation *op) {
   SmallVector<ExecutableTargetAttr, 4> resultAttrs;
   for (auto deviceTargetAttr : lookup(op)) {
     for (auto executableTargetAttr : deviceTargetAttr.getExecutableTargets()) {
@@ -515,16 +534,17 @@ bool ExecutableTargetAttr::isGenericOf(
   // This is the most common case for users manually specifying targets.
   auto genericConfigAttr = getConfiguration();
   auto specificConfigAttr = specificAttr.getConfiguration();
-  if (!genericConfigAttr || !specificConfigAttr) return true;
+  if (!genericConfigAttr || !specificConfigAttr)
+    return true;
 
   // Ensure all fields in specificConfigAttr either don't exist or match.
   for (auto expectedAttr : specificConfigAttr.getValue()) {
     auto actualValue = genericConfigAttr.getNamed(expectedAttr.getName());
     if (!actualValue) {
-      continue;  // ignore, not present in generic
+      continue; // ignore, not present in generic
     }
     if (actualValue->getValue() != expectedAttr.getValue()) {
-      return false;  // mismatch, both have values but they differ
+      return false; // mismatch, both have values but they differ
     }
   }
 
@@ -532,7 +552,7 @@ bool ExecutableTargetAttr::isGenericOf(
   // If missing then the generic is _more_ specific and can't match.
   for (auto actualAttr : genericConfigAttr.getValue()) {
     if (!specificConfigAttr.getNamed(actualAttr.getName())) {
-      return false;  // mismatch, present in generic but not specific
+      return false; // mismatch, present in generic but not specific
     }
   }
 
@@ -551,7 +571,8 @@ ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op) {
     }
     // Use an override if specified.
     auto attr = op->getAttrOfType<ExecutableTargetAttr>(attrId);
-    if (attr) return attr;
+    if (attr)
+      return attr;
     // Continue walk.
     op = op->getParentOp();
   }
@@ -596,7 +617,8 @@ void ExecutableObjectAttr::print(AsmPrinter &p) const {
 void ExecutableObjectAttr::filterObjects(
     ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
     SmallVectorImpl<ExecutableObjectAttr> &filteredAttrs) {
-  if (!objectAttrs) return;
+  if (!objectAttrs)
+    return;
   for (auto objectAttr :
        objectAttrs.getAsRange<IREE::HAL::ExecutableObjectAttr>()) {
     auto path = objectAttr.getPath();
@@ -610,17 +632,19 @@ void ExecutableObjectAttr::filterObjects(
 // Tries to find |filePath| on disk either at its absolute path or joined with
 // any of the specified |searchPaths| in order.
 // Returns the absolute file path when found or a failure if there are no hits.
-static FailureOr<std::string> findFileInPaths(
-    StringRef filePath, ArrayRef<std::string> searchPaths) {
+static FailureOr<std::string>
+findFileInPaths(StringRef filePath, ArrayRef<std::string> searchPaths) {
   // First try to see if it's an absolute path - we don't want to perform any
   // additional processing on top of that.
   if (llvm::sys::path::is_absolute(filePath)) {
-    if (llvm::sys::fs::exists(filePath)) return filePath.str();
+    if (llvm::sys::fs::exists(filePath))
+      return filePath.str();
     return failure();
   }
 
   // Try a relative lookup from the current working directory.
-  if (llvm::sys::fs::exists(filePath)) return filePath.str();
+  if (llvm::sys::fs::exists(filePath))
+    return filePath.str();
 
   // Search each path in turn for a file that exists.
   // It doesn't mean we can open it but we'll get a better error out of the
@@ -628,7 +652,8 @@ static FailureOr<std::string> findFileInPaths(
   for (auto searchPath : searchPaths) {
     SmallVector<char> tryPath{searchPath.begin(), searchPath.end()};
     llvm::sys::path::append(tryPath, filePath);
-    if (llvm::sys::fs::exists(Twine(tryPath))) return Twine(tryPath).str();
+    if (llvm::sys::fs::exists(Twine(tryPath)))
+      return Twine(tryPath).str();
   }
 
   // Not found in either the user-specified absolute path, cwd, or the search
@@ -644,7 +669,8 @@ static llvm::cl::list<std::string> clExecutableObjectSearchPath(
 
 FailureOr<std::string> ExecutableObjectAttr::getAbsolutePath() {
   auto pathAttr = getPath();
-  if (!pathAttr) return failure();  // not a file reference
+  if (!pathAttr)
+    return failure(); // not a file reference
   return findFileInPaths(pathAttr.getValue(), clExecutableObjectSearchPath);
 }
 
@@ -668,7 +694,8 @@ std::optional<std::string> ExecutableObjectAttr::loadData() {
       return std::nullopt;
     }
     auto file = llvm::MemoryBuffer::getFile(*filePath);
-    if (!file) return std::nullopt;
+    if (!file)
+      return std::nullopt;
     return std::string((*file)->getBuffer());
   }
   return std::nullopt;
@@ -706,7 +733,8 @@ Attribute ExecutableObjectsAttr::parse(AsmParser &p, Type type) {
   // `<{` target = [objects, ...], ... `}>`
   SmallVector<Attribute> targetAttrs;
   SmallVector<Attribute> objectsAttrs;
-  if (failed(p.parseLess())) return {};
+  if (failed(p.parseLess()))
+    return {};
   if (succeeded(p.parseLBrace()) && !succeeded(p.parseOptionalRBrace())) {
     do {
       Attribute targetAttr;
@@ -718,9 +746,11 @@ Attribute ExecutableObjectsAttr::parse(AsmParser &p, Type type) {
       targetAttrs.push_back(targetAttr);
       objectsAttrs.push_back(objectsAttr);
     } while (succeeded(p.parseOptionalComma()));
-    if (failed(p.parseRBrace())) return {};
+    if (failed(p.parseRBrace()))
+      return {};
   }
-  if (failed(p.parseGreater())) return {};
+  if (failed(p.parseGreater()))
+    return {};
   return get(p.getContext(), ArrayAttr::get(p.getContext(), targetAttrs),
              ArrayAttr::get(p.getContext(), objectsAttrs));
 }
@@ -749,7 +779,8 @@ std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
       allObjectAttrs.append(objectsArrayAttr.begin(), objectsArrayAttr.end());
     }
   }
-  if (allObjectAttrs.empty()) return std::nullopt;
+  if (allObjectAttrs.empty())
+    return std::nullopt;
   return ArrayAttr::get(specificTargetAttr.getContext(), allObjectAttrs);
 }
 
@@ -761,7 +792,8 @@ std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
 Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
   int64_t mask = 0;
   // `<`
-  if (failed(p.parseLess())) return {};
+  if (failed(p.parseLess()))
+    return {};
   // `*` (any)
   if (succeeded(p.parseOptionalStar())) {
     mask = -1;
@@ -769,7 +801,8 @@ Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
     // `[`queue_bit[, ...] `]`
     if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
           int64_t i = 0;
-          if (failed(p.parseInteger(i))) return failure();
+          if (failed(p.parseInteger(i)))
+            return failure();
           mask |= 1ll << i;
           return success();
         }))) {
@@ -777,7 +810,8 @@ Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
     }
   }
   // `>`
-  if (failed(p.parseGreater())) return {};
+  if (failed(p.parseGreater()))
+    return {};
   return get(p.getContext(), mask);
 }
 
@@ -791,7 +825,8 @@ void AffinityQueueAttr::print(AsmPrinter &p) const {
     os << "[";
     for (int i = 0, j = 0; i < sizeof(mask) * 8; ++i) {
       if (mask & (1ll << i)) {
-        if (j++ > 0) os << ", ";
+        if (j++ > 0)
+          os << ", ";
         os << i;
       }
     }
@@ -802,21 +837,25 @@ void AffinityQueueAttr::print(AsmPrinter &p) const {
 
 bool AffinityQueueAttr::isExecutableWith(
     IREE::Stream::AffinityAttr other) const {
-  if (!other) return true;
+  if (!other)
+    return true;
   // Only compatible with other queue affinities today. When we extend the
   // attributes to specify device targets we'd want to check here.
   auto otherQueueAttr = llvm::dyn_cast_if_present<AffinityQueueAttr>(other);
-  if (!otherQueueAttr) return false;
+  if (!otherQueueAttr)
+    return false;
   // If this affinity is a subset of the target affinity then it can execute
   // with it.
-  if ((getMask() & otherQueueAttr.getMask()) == getMask()) return true;
+  if ((getMask() & otherQueueAttr.getMask()) == getMask())
+    return true;
   // Otherwise not compatible.
   return false;
 }
 
-IREE::Stream::AffinityAttr AffinityQueueAttr::joinOR(
-    IREE::Stream::AffinityAttr other) const {
-  if (!other) return *this;
+IREE::Stream::AffinityAttr
+AffinityQueueAttr::joinOR(IREE::Stream::AffinityAttr other) const {
+  if (!other)
+    return *this;
   if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
@@ -825,9 +864,10 @@ IREE::Stream::AffinityAttr AffinityQueueAttr::joinOR(
                                 getMask() | otherQueueAttr.getMask());
 }
 
-IREE::Stream::AffinityAttr AffinityQueueAttr::joinAND(
-    IREE::Stream::AffinityAttr other) const {
-  if (!other) return *this;
+IREE::Stream::AffinityAttr
+AffinityQueueAttr::joinAND(IREE::Stream::AffinityAttr other) const {
+  if (!other)
+    return *this;
   if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
@@ -1057,7 +1097,7 @@ void HALDialect::registerAttributes() {
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc" // IWYU pragma: keep
       >();
 }
 
@@ -1078,7 +1118,8 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   Attribute genAttr;
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, &mnemonic, type, genAttr);
-  if (parseResult.has_value()) return genAttr;
+  if (parseResult.has_value())
+    return genAttr;
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};
@@ -1098,7 +1139,8 @@ void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
 
 Type HALDialect::parseType(DialectAsmParser &parser) const {
   StringRef typeKind;
-  if (parser.parseKeyword(&typeKind)) return {};
+  if (parser.parseKeyword(&typeKind))
+    return {};
   auto type =
       llvm::StringSwitch<Type>(typeKind)
           .Case("allocator", AllocatorType::get(getContext()))
@@ -1155,7 +1197,7 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
   }
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -18,6 +18,13 @@ on:
     - cron: '0 13 * * *'
   workflow_dispatch:
 
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit).
+  group: ${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
@@ -78,13 +85,13 @@ jobs:
       - name: "Building mmperf for CPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cpu" "${IREE_SHA}"
       - name: "Running mmperf on CPU"
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |
@@ -113,7 +120,7 @@ jobs:
       - name: "Building mmperf for CUDA"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cuda" "${IREE_SHA}"
       - name: "Removing unused files"
         run: |
@@ -144,7 +151,7 @@ jobs:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
+      - machine-type=a2-highgpu-1g
       - os-family=Linux
     env:
       RESULTS_DIR: mmperf-results-cuda
@@ -165,7 +172,7 @@ jobs:
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
           --gpus all \
-            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
+            gcr.io/iree-oss/mmperf@sha256:dfeebcaf8f417275d44c7b8d9a1360c6a26d280b526779c9e64384798cfd9c92 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |

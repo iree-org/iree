@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -153,59 +154,57 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
 /// Pass to splitReduce linalg operations.
 class LLVMCPUSplitReductionPass
     : public LLVMCPUSplitReductionBase<LLVMCPUSplitReductionPass> {
- public:
-  LLVMCPUSplitReductionPass(bool fpReductionReordering)
-      : fpReductionReordering(fpReductionReordering) {}
+public:
+  LLVMCPUSplitReductionPass(bool fpReductionReordering) {
+    this->enableFpReductionReordering = fpReductionReordering;
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, scf::SCFDialect>();
   }
   void runOnOperation() override;
-
- private:
-  bool fpReductionReordering = false;
 };
 
 void LLVMCPUSplitReductionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-      getLoweringConfig(computeOps);
-  if (failed(maybeLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "can't find lowering_config, skip SplitReduction");
-    return;
-  }
-  auto reductionSizes = maybeLoweringConfig.value().getTileSizeVals().back();
-  if (reductionSizes.empty()) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "the list of reduction tiling sizes is empty, skip SplitReduction");
-    return;
-  }
-  int64_t size = reductionSizes.back();
-
   IRRewriter rewriter(context);
   SmallVector<linalg::GenericOp> candidates;
   funcOp.walk([&](linalg::GenericOp op) { candidates.push_back(op); });
   for (auto genericOp : candidates) {
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << genericOp << "\n");
-    if (failed(splitReductionPrecondition(genericOp, fpReductionReordering))) {
+    if (failed(splitReductionPrecondition(genericOp,
+                                          enableFpReductionReordering))) {
       continue;
     }
+
+    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+        getLoweringConfig(genericOp);
+    if (failed(maybeLoweringConfig)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "can't find lowering_config, skip SplitReduction");
+      continue;
+    }
+    TilingConfig tilingConfig(maybeLoweringConfig.value());
+    auto reductionSizes = tilingConfig.getVectorReductionSizes();
+    if (reductionSizes.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "the list of reduction tiling sizes is empty, "
+                                 "skip SplitReduction");
+      continue;
+    }
+    int64_t size = reductionSizes.back();
     if (failed(splitReductionImpl(genericOp, size, rewriter))) {
       return signalPassFailure();
     }
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
-    const bool enableFpReductionReordering) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUSplitReductionPass(const bool enableFpReductionReordering) {
   return std::make_unique<LLVMCPUSplitReductionPass>(
       enableFpReductionReordering);
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

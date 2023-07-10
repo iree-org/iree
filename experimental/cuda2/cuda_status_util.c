@@ -124,12 +124,14 @@ iree_status_t iree_hal_cuda2_result_to_status(
   if (IREE_LIKELY(result == CUDA_SUCCESS)) return iree_ok_status();
 
   const char* error_name = NULL;
-  if (syms->cuGetErrorName(result, &error_name) != CUDA_SUCCESS) {
+  if (!syms->cuGetErrorName ||
+      syms->cuGetErrorName(result, &error_name) != CUDA_SUCCESS) {
     error_name = "CUDA_ERROR_UNKNOWN";
   }
 
   const char* error_string = NULL;
-  if (syms->cuGetErrorString(result, &error_string) != CUDA_SUCCESS) {
+  if (!syms->cuGetErrorString ||
+      syms->cuGetErrorString(result, &error_string) != CUDA_SUCCESS) {
     error_string = "unknown error";
   }
 

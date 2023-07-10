@@ -18,6 +18,7 @@
 #include "experimental/cuda2/nccl_channel.h"
 #include "experimental/cuda2/nccl_dynamic_symbols.h"
 #include "experimental/cuda2/nop_executable_cache.h"
+#include "experimental/cuda2/nop_semaphore.h"
 #include "experimental/cuda2/pipeline_layout.h"
 #include "experimental/cuda2/tracing.h"
 #include "iree/base/internal/arena.h"
@@ -484,15 +485,16 @@ static iree_status_t iree_hal_cuda2_device_create_pipeline_layout(
 static iree_status_t iree_hal_cuda2_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "semaphore not yet implmeneted");
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
+  return iree_hal_cuda2_semaphore_create(initial_value, device->host_allocator,
+                                         out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
 iree_hal_cuda2_device_query_semaphore_compatibility(
     iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
   // TODO: implement CUDA semaphores.
-  return IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE;
+  return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
 // TODO: implement multiple streams; today we only have one and queue_affinity

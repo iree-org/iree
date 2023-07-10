@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -74,13 +74,15 @@ void LLVMCPUTilePass::runOnOperation() {
 
   for (auto computeOp : computeOps) {
     auto op = cast<TilingInterface>(computeOp);
-    if (op.getLoopIteratorTypes().empty()) continue;
+    if (op.getLoopIteratorTypes().empty())
+      continue;
 
     // For now do not tile `tensor.pad` operations. The `tensor.pad`
     // operations might be those introduced by the padding-based
     // codegeneration strategy. Those are not meant to be tiled again.
     // Need a better way for handling this, but this works for now.
-    if (isa<tensor::PadOp>(computeOp)) continue;
+    if (isa<tensor::PadOp>(computeOp))
+      continue;
 
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     SmallVector<int64_t> tileSizes;
@@ -102,7 +104,8 @@ void LLVMCPUTilePass::runOnOperation() {
         });
     FailureOr<scf::SCFTilingResult> tiledResults =
         scf::tileUsingSCFForOp(rewriter, op, options);
-    if (failed(tiledResults)) continue;
+    if (failed(tiledResults))
+      continue;
     rewriter.replaceOp(op, tiledResults->replacements);
   }
 
@@ -118,12 +121,12 @@ void LLVMCPUTilePass::runOnOperation() {
     return signalPassFailure();
   }
 }
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
-    int64_t tilingLevel) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTilePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTilePass>(tilingLevel);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

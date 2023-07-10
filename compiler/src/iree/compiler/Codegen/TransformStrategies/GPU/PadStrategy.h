@@ -11,22 +11,21 @@
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
-struct GPUModel;
-
 struct PadConfig {};
 
 /// Simple padding strategy.
-class PadStrategy {
- public:
+class PadStrategy : GPUStrategy {
+public:
   PadStrategy(MLIRContext *context,
               const transform_ext::MatchedPadCaptures &captures,
-              const PadConfig &config)
-      : ctx(context), captures(captures) {
+              const PadConfig &config, const GPUModel &gpuModel)
+      : ctx(context), GPUStrategy(gpuModel), captures(captures) {
     initDefaultValues();
     (void)config;
   }
@@ -57,8 +56,8 @@ class PadStrategy {
   bool useAsyncCopies = false;
 };
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_PAD_STRATEGY_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_PAD_STRATEGY_H_

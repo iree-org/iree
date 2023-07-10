@@ -19,9 +19,9 @@ namespace {
 
 struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      tensor::DimOp dimOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(tensor::DimOp dimOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!llvm::isa<IREE::HAL::BufferViewType>(adaptor.getSource().getType())) {
       return failure();
     }
@@ -36,9 +36,9 @@ struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
 
 struct BufferViewRankPattern : public OpConversionPattern<tensor::RankOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      tensor::RankOp rankOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(tensor::RankOp rankOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     if (!llvm::isa<IREE::HAL::BufferViewType>(adaptor.getTensor().getType())) {
       return failure();
     }
@@ -48,7 +48,7 @@ struct BufferViewRankPattern : public OpConversionPattern<tensor::RankOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateStandardShapeToHALPatterns(MLIRContext *context,
                                         ConversionTarget &conversionTarget,
@@ -61,5 +61,5 @@ void populateStandardShapeToHALPatterns(MLIRContext *context,
   patterns.insert<BufferViewDimPattern, BufferViewRankPattern>(context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

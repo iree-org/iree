@@ -39,9 +39,7 @@ using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildDistributeVectors;
-using iree_compiler::gpu::kCudaMaxNumThreads;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::ReductionConfig;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::gpu::SmallReductionStrategy;
@@ -51,8 +49,8 @@ using iree_compiler::gpu::threadZ;
 
 mlir::iree_compiler::gpu::SmallReductionStrategy::SmallReductionStrategy(
     const transform_ext::MatchedReductionCaptures &captures,
-    const ReductionConfig &reductionConfig)
-    : AbstractReductionStrategy(captures, {}) {
+    const ReductionConfig &reductionConfig, const GPUModel &gpuModel)
+    : AbstractReductionStrategy(captures, {}), GPUStrategy(gpuModel) {
   configure(reductionConfig);
   LLVM_DEBUG(DBGS() << "use GPU small reduction strategy\n");
   LLVM_DEBUG(llvm::interleaveComma(workgroupTileSizes,
@@ -64,7 +62,7 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
     const ReductionConfig &reductionConfig) {
   int64_t maxNumThreadsToUse = reductionConfig.maxNumThreads;
   assert(maxNumThreadsToUse > 0 && "maxNumThreadsToUse must be > 0");
-  assert(maxNumThreadsToUse >= kCudaWarpSize && "not even a warp?");
+  assert(maxNumThreadsToUse >= subgroupSize && "not even a warp?");
 
   // Block-level
   // ===========
@@ -80,16 +78,17 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
   // in a crash in the associated upstream util.
   // TODO: More generally fix PadDynamicAlloc and the associated upstream util.
   bool hasTrailingElementwise = (captures.maybeTrailingRank > 0);
-  if (failed(maybeDivisor) && hasTrailingElementwise) maybeDivisor = 1;
+  if (failed(maybeDivisor) && hasTrailingElementwise)
+    maybeDivisor = 1;
 
   // If the captured dimension has no satisfactory divisor, just tile the last
-  // parallel dimension by 2 * kCudaWarpSize.
+  // parallel dimension by 2 * subgroupSize.
   int64_t numParallelLoops = captures.reductionRank - 1;
   workgroupTileSizes.append(numParallelLoops, 1);
   workgroupTileSizes.back() =
       hasTrailingElementwise
           ? *maybeDivisor
-          : std::min((int64_t)maxNumThreadsToUse, (int64_t)(2 * kCudaWarpSize));
+          : std::min((int64_t)maxNumThreadsToUse, (int64_t)(2 * subgroupSize));
 
   // Thread-level
   // ============
@@ -110,7 +109,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   iree_compiler::TileToForallAndFuseAndDistributeResult tileResult =
       iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*builder=*/b,
-          /*isolatedParentOpH=*/variantH,
+          /*variantH=*/variantH,
           /*rootH=*/fusionTargetH,
           /*opsToFuseH=*/fusionGroupH,
           /*numThreads=*/
@@ -137,7 +136,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // part.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
-      /*isolatedParentOpH=*/variantH,
+      /*variantH=*/variantH,
       /*opH=*/blockReductionH,
       /*rank=*/strategy.captures.reductionRank,
       // TODO: capture and generalize mostMinorDim.
@@ -150,7 +149,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // mapping part.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
-      /*isolatedParentOpH=*/variantH,
+      /*variantH=*/variantH,
       /*opH=*/maybeBlockTrailingH,
       /*rank=*/strategy.captures.maybeTrailingRank,
       // TODO: capture and generalize mostMinorDim.

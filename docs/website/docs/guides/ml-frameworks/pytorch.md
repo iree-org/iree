@@ -12,6 +12,42 @@ IREE supports compiling and running PyTorch programs represented as
 `nn.Module` [classes](https://pytorch.org/docs/stable/generated/torch.nn.Module.html)
 as well as models defined using [`functorch`](https://pytorch.org/functorch/).
 
+``` mermaid
+graph LR
+  accTitle: PyTorch to runtime deployment workflow overview
+  accDescr {
+    Programs start as either PyTorch nn.Module or functorch programs.
+    Programs are imported into MLIR as either StableHLO, TOSA, or Linalg.
+    The IREE compiler uses the imported MLIR.
+    Compiled programs are used by the runtime.
+  }
+
+  subgraph A[PyTorch]
+    direction TB
+    A1[nn.Module]
+    A2[functorch]
+
+    A1 --- A2
+  end
+
+  subgraph B[MLIR]
+    direction TB
+    B1[StableHLO]
+    B2[TOSA]
+    B3[Linalg]
+
+    B1 --- B2
+    B2 --- B3
+  end
+
+  C[IREE compiler]
+  D[Runtime deployment]
+
+  A -- torch_mlir --> B
+  B --> C
+  C --> D
+```
+
 ## Prerequisites
 
 Install IREE pip packages, either from pip or by

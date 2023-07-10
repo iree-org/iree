@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -24,7 +24,7 @@ namespace iree_compiler {
 ///   4. [[distribution], [cache-parallel], [cache-reduction],
 ///       [vector-parallel], [vector-reduction]]
 class TilingConfig {
- public:
+public:
   TilingConfig(IREE::Codegen::LoweringConfigAttr lc);
 
   /// Returns the number of tiling levels of the configuration.
@@ -99,7 +99,7 @@ class TilingConfig {
     return loweringConfig.getNativeVectorSizeVals();
   }
 
- private:
+private:
   /// Internal representation for all the supported tiling levels. All or just
   /// a subset of them may be available in a valid configuration.
   enum TilingLevel : unsigned {
@@ -123,7 +123,7 @@ class TilingConfig {
       tilingLevelToActualLevelMap;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_

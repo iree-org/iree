@@ -34,14 +34,11 @@ using iree_compiler::blockX;
 using iree_compiler::blockY;
 using iree_compiler::blockZ;
 using iree_compiler::buildPad;
-using iree_compiler::buildTileFuseDistToForallWithNumThreads;
-using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::buildBufferize;
 using iree_compiler::gpu::buildConvertToAsyncCopies;
 using iree_compiler::gpu::buildDistributeOnePadOrCopyWithNumThreads;
 using iree_compiler::gpu::buildDistributeOnePadOrCopyWithTileSizes;
-using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::PadStrategy;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
@@ -80,8 +77,9 @@ void iree_compiler::gpu::PadStrategy::initDefaultValues() {
 
 void iree_compiler::gpu::PadStrategy::configure(GPUModel gpuModel) {}
 
-static std::tuple<Value, Value> buildPadStrategyBlockDistribution(
-    ImplicitLocOpBuilder &b, Value variantH, const PadStrategy &strategy) {
+static std::tuple<Value, Value>
+buildPadStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
+                                  const PadStrategy &strategy) {
   // Step 1. Call the matcher. Note that this is the same matcher as used to
   // trigger this compilation path, so it must always apply.
   b.create<RegisterMatchCallbacksOp>();
@@ -115,15 +113,16 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
       /*threadDimMapping=*/{threadY(ctx), threadX(ctx)}, /*foldIfBranch=*/true);
 
   // Step 3. Masked vectorization.
+  SmallVector<bool> scalableSizes(strategy.vectorSize.size(), false);
   b.create<transform::MaskedVectorizeOp>(padThreadH, ValueRange(), false,
-                                         strategy.vectorSize);
+                                         scalableSizes, strategy.vectorSize);
 
   // Step 4. Lower all masked vector transfers at this point, as they make
   // canonicalization generate incorrect IR.
   // TODO: don't rematch, apply on the variant op directly.
   Value funcH =
       b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildLowerMaskedTransfersAndCleanup(b, funcH);
+  buildLowerMaskedTransfersAndCleanup(b, funcH);
 
   // Step 5. Vectorize the rest of func normally.
   funcH = buildVectorize(b, funcH, /*applyCleanups=*/true);

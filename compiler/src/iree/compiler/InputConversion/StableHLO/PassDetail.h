@@ -16,6 +16,6 @@ namespace mlir::iree_compiler::stablehlo {
 #define GEN_PASS_DECL
 #include "iree/compiler/InputConversion/StableHLO/Passes.h.inc"
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSDETAIL_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSDETAIL_H_

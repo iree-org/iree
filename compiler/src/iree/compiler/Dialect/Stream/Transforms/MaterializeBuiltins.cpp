@@ -45,10 +45,10 @@
 
 // TODO(#13984): memset emulation of all types is required for CUDA graphs due
 // to a driver bug. Once it's fixed we can remove this global flag.
-static llvm::cl::opt<bool> clEmulateMemset(
-    "iree-stream-emulate-memset",
-    llvm::cl::desc("Emulate all memset types with dispatches."),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    clEmulateMemset("iree-stream-emulate-memset",
+                    llvm::cl::desc("Emulate all memset types with dispatches."),
+                    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
@@ -69,8 +69,8 @@ enum class TypeSupport {
 };
 
 // Returns the support for the given type based on the resource configuration.
-static TypeSupport queryTypeSupport(
-    IREE::Stream::ResourceConfigAttr resourceConfig, Type type) {
+static TypeSupport
+queryTypeSupport(IREE::Stream::ResourceConfigAttr resourceConfig, Type type) {
   unsigned bitWidth = IREE::Util::getTypeBitWidth(type);
 
   if (bitWidth > 32) {
@@ -125,7 +125,7 @@ static LogicalResult mergeBuiltinModuleSource(Location loc, StringRef fileName,
 // Tracks all builtin modules required by the program and the locations of the
 // ops that require them.
 class RequiredModules {
- public:
+public:
   // Inserts a module into the required module set for use by the op at |loc|.
   void insert(Location loc, StringRef moduleFile) {
     modules[moduleFile.str()].push_back(loc);
@@ -144,9 +144,9 @@ class RequiredModules {
     return success();
   }
 
- private:
+private:
   // A map of builtin module filename to the locations using it.
-  std::map<std::string, SmallVector<Location>> modules;  // ordered
+  std::map<std::string, SmallVector<Location>> modules; // ordered
 };
 
 // Returns an OpBuilder at a point safe to insert arith/etc ops.
@@ -168,25 +168,24 @@ static LogicalResult replaceBuiltinSplatOp(IREE::Stream::AsyncSplatOp splatOp,
   unsigned bitWidth = pattern.getType().getIntOrFloatBitWidth();
   StringRef builtinName;
   switch (bitWidth) {
-    case 8:
-      builtinName = "__builtin_splat_i8";
-      requiredModules.insert(loc, "splat_i8.mlir");
-      break;
-    case 16:
-      builtinName = "__builtin_splat_i16";
-      requiredModules.insert(loc, "splat_i16.mlir");
-      break;
-    case 32:
-      builtinName = "__builtin_splat_i32";
-      requiredModules.insert(loc, "splat_i32.mlir");
-      break;
-    case 64:
-      builtinName = "__builtin_splat_i64";
-      requiredModules.insert(loc, "splat_i64.mlir");
-      break;
-    default:
-      return splatOp.emitOpError()
-             << "has no builtin for bit width " << bitWidth;
+  case 8:
+    builtinName = "__builtin_splat_i8";
+    requiredModules.insert(loc, "splat_i8.mlir");
+    break;
+  case 16:
+    builtinName = "__builtin_splat_i16";
+    requiredModules.insert(loc, "splat_i16.mlir");
+    break;
+  case 32:
+    builtinName = "__builtin_splat_i32";
+    requiredModules.insert(loc, "splat_i32.mlir");
+    break;
+  case 64:
+    builtinName = "__builtin_splat_i64";
+    requiredModules.insert(loc, "splat_i64.mlir");
+    break;
+  default:
+    return splatOp.emitOpError() << "has no builtin for bit width " << bitWidth;
   }
 
   auto arithBuilder = getParentBuilder(splatOp);
@@ -234,17 +233,17 @@ static LogicalResult processSplatOp(IREE::Stream::AsyncSplatOp splatOp,
   auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(splatOp);
   auto pattern = splatOp.getValue();
   switch (queryTypeSupport(resourceConfig, pattern.getType())) {
-    case TypeSupport::Native:
-      // Already ok!
-      return success();
-    case TypeSupport::Builtin:
-      return replaceBuiltinSplatOp(splatOp, pattern, requiredModules);
-    default:
-    case TypeSupport::Unsupported:
-      return splatOp.emitOpError()
-             << "has unsupported fill pattern type "
-             << splatOp.getValue().getType() << " (tried converting to "
-             << pattern.getType() << ")";
+  case TypeSupport::Native:
+    // Already ok!
+    return success();
+  case TypeSupport::Builtin:
+    return replaceBuiltinSplatOp(splatOp, pattern, requiredModules);
+  default:
+  case TypeSupport::Unsupported:
+    return splatOp.emitOpError()
+           << "has unsupported fill pattern type "
+           << splatOp.getValue().getType() << " (tried converting to "
+           << pattern.getType() << ")";
   }
 }
 
@@ -255,25 +254,24 @@ static LogicalResult replaceBuiltinFillOp(IREE::Stream::AsyncFillOp fillOp,
   unsigned bitWidth = pattern.getType().getIntOrFloatBitWidth();
   StringRef builtinName;
   switch (bitWidth) {
-    case 8:
-      builtinName = "__builtin_fill_i8";
-      requiredModules.insert(loc, "fill_i8.mlir");
-      break;
-    case 16:
-      builtinName = "__builtin_fill_i16";
-      requiredModules.insert(loc, "fill_i16.mlir");
-      break;
-    case 32:
-      builtinName = "__builtin_fill_i32";
-      requiredModules.insert(loc, "fill_i32.mlir");
-      break;
-    case 64:
-      builtinName = "__builtin_fill_i64";
-      requiredModules.insert(loc, "fill_i64.mlir");
-      break;
-    default:
-      return fillOp.emitOpError()
-             << "has no builtin for bit width " << bitWidth;
+  case 8:
+    builtinName = "__builtin_fill_i8";
+    requiredModules.insert(loc, "fill_i8.mlir");
+    break;
+  case 16:
+    builtinName = "__builtin_fill_i16";
+    requiredModules.insert(loc, "fill_i16.mlir");
+    break;
+  case 32:
+    builtinName = "__builtin_fill_i32";
+    requiredModules.insert(loc, "fill_i32.mlir");
+    break;
+  case 64:
+    builtinName = "__builtin_fill_i64";
+    requiredModules.insert(loc, "fill_i64.mlir");
+    break;
+  default:
+    return fillOp.emitOpError() << "has no builtin for bit width " << bitWidth;
   }
 
   auto arithBuilder = getParentBuilder(fillOp);
@@ -331,17 +329,17 @@ static LogicalResult processFillOp(IREE::Stream::AsyncFillOp fillOp,
   auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(fillOp);
   auto pattern = fillOp.getValue();
   switch (queryTypeSupport(resourceConfig, pattern.getType())) {
-    case TypeSupport::Native:
-      // Already ok!
-      return success();
-    case TypeSupport::Builtin:
-      return replaceBuiltinFillOp(fillOp, pattern, requiredModules);
-    default:
-    case TypeSupport::Unsupported:
-      return fillOp.emitOpError()
-             << "has unsupported fill pattern type "
-             << fillOp.getValue().getType() << " (tried converting to "
-             << pattern.getType() << ")";
+  case TypeSupport::Native:
+    // Already ok!
+    return success();
+  case TypeSupport::Builtin:
+    return replaceBuiltinFillOp(fillOp, pattern, requiredModules);
+  default:
+  case TypeSupport::Unsupported:
+    return fillOp.emitOpError()
+           << "has unsupported fill pattern type "
+           << fillOp.getValue().getType() << " (tried converting to "
+           << pattern.getType() << ")";
   }
 }
 
@@ -351,7 +349,7 @@ static LogicalResult processFillOp(IREE::Stream::AsyncFillOp fillOp,
 
 class MaterializeBuiltinsPass
     : public MaterializeBuiltinsBase<MaterializeBuiltinsPass> {
- public:
+public:
   MaterializeBuiltinsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -369,7 +367,8 @@ class MaterializeBuiltinsPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
 
     // Find and replace (if needed) ops that we want to turn into builtins
     // across the entire program.
@@ -405,7 +404,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeBuiltinsPass() {
   return std::make_unique<MaterializeBuiltinsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

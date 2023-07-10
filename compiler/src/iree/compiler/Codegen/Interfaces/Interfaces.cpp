@@ -67,5 +67,5 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   vector::registerTransformDialectExtension(registry);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

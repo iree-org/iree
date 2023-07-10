@@ -7,10 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_
 
-#include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
-#include "iree/compiler/Codegen/TransformStrategies/GPU/PadStrategy.h"
-#include "iree/compiler/Codegen/TransformStrategies/GPU/SmallReductionStrategy.h"
-#include "iree/compiler/Codegen/TransformStrategies/GPU/StagedReductionStrategy.h"
+#include "llvm/ADT/StringRef.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir {
 class ImplicitLocOpBuilder;
@@ -18,14 +16,44 @@ class Value;
 namespace iree_compiler {
 namespace gpu {
 
+/// Forward declarations of all supported strategies.
+struct BatchMatmulStrategy;
+struct MatmulStrategy;
+class PadStrategy;
+class SmallReductionStrategy;
+class StagedReductionStrategy;
+
+static constexpr int64_t kCudaWarpSize = 32;
+static constexpr int64_t kCudaMaxNumThreads = 1024;
+
 /// Placeholder for some hardware model proxy that contains relevant information
-/// to configure the reduction strategy. In the future, this will need to be
+/// to configure the strategies. In the future, this will need to be
 /// driven by some contract with the runtime.
 struct GPUModel {
-  static constexpr StringLiteral kDefaultGPU = "DefaultGPU";
-  StringRef model = kDefaultGPU;
+  static constexpr llvm::StringLiteral kDefaultGPU = "DefaultGPU";
+  llvm::StringRef model = kDefaultGPU;
+  /// TODO: Support a range of subgroup sizes.
+  int64_t subgroupSize = kCudaWarpSize;
+  int64_t maxWorkGroupInvocations = kCudaMaxNumThreads;
+  int64_t maxWorkGroupSize[3] = {1024, 1024, 64};
   bool hasWarpShuffle = false;
   bool hasTF32TensorCore = false;
+  bool hasMmaSync = false;
+};
+
+//===--------------------------------------------------------------------===//
+// GPU strategy base.
+//===--------------------------------------------------------------------===//
+/// Basic structure to hold target specific information needed for all gpu
+/// strategies. Certain quantities that can be dynamically selected, such as
+/// subgroup size, will need to be configured with some contract with the
+/// runtime.
+struct GPUStrategy {
+  /// TODO: Configure subgroup size with the strategy and return the selected
+  /// size to the target (i.e. LLVMGPU or SPIR-V).
+  GPUStrategy(const GPUModel &gpuModel) : subgroupSize(gpuModel.subgroupSize) {}
+  /// TODO: Add other quantities relevant to strategy builders.
+  int64_t subgroupSize;
 };
 
 //===--------------------------------------------------------------------===//
@@ -36,6 +64,14 @@ struct GPUModel {
 /// Does not support leading or trailing operations atm.
 void buildMatmulTensorCoreStrategy(ImplicitLocOpBuilder &b, Value variantH,
                                    const MatmulStrategy &strategy);
+
+//===--------------------------------------------------------------------===//
+// Batch matmul strategies.
+//===--------------------------------------------------------------------===//
+/// Entry point to build the transform IR corresponding to an FMA-based strategy
+/// for linalg.fill + linalg.batch_matmul.
+void buildBatchMatmulStrategy(ImplicitLocOpBuilder &b, Value variantH,
+                              const BatchMatmulStrategy &strategy);
 
 //===--------------------------------------------------------------------===//
 // Pad strategies.
@@ -81,8 +117,18 @@ void buildSmallReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
 void buildStagedReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
                                   const StagedReductionStrategy &strategy);
 
-}  // namespace gpu
-}  // namespace iree_compiler
-}  // namespace mlir
+//===----------------------------------------------------------------------===//
+// Higher-level strategy creation APIs, these should favor
+// user-friendliness.
+//===----------------------------------------------------------------------===//
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_
+/// Try to find an exisiting transform dialect strategy for a given entry point.
+LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,
+                                           Operation *op,
+                                           const GPUModel &gpuModel);
+
+} // namespace gpu
+} // namespace iree_compiler
+} // namespace mlir
+
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_

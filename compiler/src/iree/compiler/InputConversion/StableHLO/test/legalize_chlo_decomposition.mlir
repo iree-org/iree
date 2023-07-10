@@ -505,3 +505,29 @@ func.func @erf_inv_wide(%arg0 : tensor<16x16xf64>) {
   %0 = chlo.erf_inv %arg0 : tensor<16x16xf64> -> tensor<16x16xf64>
   return
 }
+
+// -----
+
+func.func @complex_tan(%arg0 : tensor<1xf32>, %arg1 : tensor<1xf32>) -> (tensor<1xf32>, tensor<1xf32>) {
+  %0 = stablehlo.complex %arg0, %arg1 : tensor<1xcomplex<f32>>
+  %1 = chlo.tan %0 : tensor<1xcomplex<f32>> -> tensor<1xcomplex<f32>>
+  %2 = stablehlo.real %1 : (tensor<1xcomplex<f32>>) -> tensor<1xf32>
+  %3 = stablehlo.imag %1 : (tensor<1xcomplex<f32>>) -> tensor<1xf32>
+  func.return %2, %3 : tensor<1xf32>, tensor<1xf32>
+}
+
+// CHECK-LABEL: @complex_tan
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1xf32>, %[[ARG1:.+]]: tensor<1xf32>
+// CHECK: %[[ONE:.+]] = stablehlo.constant dense<1.000000e+00> : tensor<1xf32>
+// CHECK: %[[SINE:.+]] = stablehlo.sine %[[ARG0]]
+// CHECK: %[[COS:.+]] = stablehlo.cosine %[[ARG0]]
+// CHECK: %[[TAN:.+]] = stablehlo.divide %[[SINE]], %[[COS]]
+// CHECK: %[[TANH:.+]] = stablehlo.tanh %[[ARG1]]
+// CHECK: %[[NUM:.+]] = stablehlo.complex %[[TAN]], %[[TANH]]
+// CHECK: %[[MUL:.+]] = stablehlo.multiply %[[TAN]], %[[TANH]]
+// CHECK: %[[NEG:.+]] = stablehlo.negate %[[MUL]]
+// CHECK: %[[DEN:.+]] = stablehlo.complex %[[ONE]], %[[NEG]]
+// CHECK: %[[RES:.+]] = stablehlo.divide %[[NUM]], %[[DEN]]
+// CHECK: %[[REAL:.+]] = stablehlo.real %[[RES]]
+// CHECK: %[[IMAG:.+]] = stablehlo.imag %[[RES]]
+// CHECK: return %[[REAL]], %[[IMAG]]

@@ -18,7 +18,7 @@
 namespace mlir::iree_compiler::stablehlo {
 namespace {
 class ArithOpBuilder {
- public:
+public:
   ArithOpBuilder(OpBuilder b, Location l, Value v)
       : builder(b), loc(l), value(v) {}
 
@@ -38,7 +38,8 @@ class ArithOpBuilder {
   }
 
   ArithOpBuilder truncI(int64_t bits) {
-    if (value.getType().getIntOrFloatBitWidth() == bits) return *this;
+    if (value.getType().getIntOrFloatBitWidth() == bits)
+      return *this;
     Value trunc = builder.create<arith::TruncIOp>(
         loc, builder.getIntegerType(bits), value);
     return ArithOpBuilder(builder, loc, trunc);
@@ -100,7 +101,7 @@ class ArithOpBuilder {
     return ArithOpBuilder(builder, loc, shr);
   }
 
- private:
+private:
   OpBuilder builder;
   Location loc;
   Value value;
@@ -123,8 +124,9 @@ ArithOpBuilder fuseI32s(ArithOpBuilder low, ArithOpBuilder high) {
 // Implements the ThreeFry counter-based PRNG algorithm.
 // Salmon et al. SC 2011. Parallel random numbers: as easy as 1, 2, 3.
 // http://www.thesalmons.org/john/random123/papers/random123sc11.pdf
-std::pair<ArithOpBuilder, ArithOpBuilder> runThreeFry2xi32(
-    ArithOpBuilder key0, ArithOpBuilder key1, ArithOpBuilder initialState) {
+std::pair<ArithOpBuilder, ArithOpBuilder>
+runThreeFry2xi32(ArithOpBuilder key0, ArithOpBuilder key1,
+                 ArithOpBuilder initialState) {
   ArithOpBuilder index = initialState.linalgIndex(0);
   index = index.indexCast(64);
   index = index + initialState;
@@ -169,7 +171,8 @@ std::pair<ArithOpBuilder, ArithOpBuilder> runThreeFry2xi32(
 std::pair<Value, Value> extractKey32(OpBuilder &builder, Location loc,
                                      Value store) {
   auto storeTy = cast<ShapedType>(store.getType());
-  if (storeTy.getRank() != 1) return {nullptr, nullptr};
+  if (storeTy.getRank() != 1)
+    return {nullptr, nullptr};
 
   Type storeETy = storeTy.getElementType();
   IntegerType i32Ty = builder.getIntegerType(32);
@@ -199,7 +202,8 @@ std::pair<Value, Value> extractKey32(OpBuilder &builder, Location loc,
 // Extract and potentially reconstruct the i64 state as necessary.
 Value extractState64(OpBuilder &builder, Location loc, Value store) {
   auto storeTy = cast<ShapedType>(store.getType());
-  if (storeTy.getRank() != 1) return nullptr;
+  if (storeTy.getRank() != 1)
+    return nullptr;
 
   Type storeETy = storeTy.getElementType();
   IntegerType i64Ty = builder.getIntegerType(64);
@@ -228,7 +232,8 @@ Value extractState64(OpBuilder &builder, Location loc, Value store) {
 
 Value setState64(OpBuilder &b, Location loc, Value store, Value state) {
   auto storeTy = cast<ShapedType>(store.getType());
-  if (storeTy.getRank() != 1) return nullptr;
+  if (storeTy.getRank() != 1)
+    return nullptr;
 
   Type storeETy = storeTy.getElementType();
 
@@ -293,7 +298,8 @@ std::pair<ShapedType, int64_t> threeFry32Shape(ShapedType resultTy) {
       std::max_element(shape.begin(), shape.end()) - shape.begin();
 
   for (int i = 0, s = shape.size(); i < s; i++) {
-    if (shape[i] & 0x1) continue;
+    if (shape[i] & 0x1)
+      continue;
     halfDim = i;
     break;
   }
@@ -321,10 +327,12 @@ LogicalResult generateLinalgThreeFry32(OpBuilder &builder, Location loc,
 
   // Extract the stateful values as an i64 and increment the state ahead.
   Value initialState = extractState64(builder, loc, store);
-  if (!initialState) return failure();
+  if (!initialState)
+    return failure();
 
   std::pair<Value, Value> keys = extractKey32(builder, loc, store);
-  if (!keys.first || !keys.second) return failure();
+  if (!keys.first || !keys.second)
+    return failure();
 
   ArithOpBuilder key0(builder, loc, keys.first);
   ArithOpBuilder key1(builder, loc, keys.second);
@@ -412,10 +420,12 @@ LogicalResult generateLinalgThreeFry64(OpBuilder &builder, Location loc,
 
   // Extract the stateful values as an i64 and increment the state ahead.
   Value initialState = extractState64(builder, loc, store);
-  if (!initialState) return failure();
+  if (!initialState)
+    return failure();
 
   std::pair<Value, Value> keys = extractKey32(builder, loc, store);
-  if (!keys.first || !keys.second) return failure();
+  if (!keys.first || !keys.second)
+    return failure();
 
   ArithOpBuilder key0(builder, loc, keys.first);
   ArithOpBuilder key1(builder, loc, keys.second);
@@ -523,10 +533,12 @@ LogicalResult generateLinalgPhilox32(OpBuilder &builder, Location loc,
   Type resultETy = resultTy.getElementType();
 
   Value initialState = extractState64(builder, loc, store);
-  if (!initialState) return failure();
+  if (!initialState)
+    return failure();
 
   std::pair<Value, Value> keys = extractKey32(builder, loc, store);
-  if (!keys.first || !keys.second) return failure();
+  if (!keys.first || !keys.second)
+    return failure();
 
   int64_t numElements = resultTy.getNumElements();
   int64_t count = (numElements + 3) / 4;
@@ -621,10 +633,12 @@ LogicalResult generateLinalgPhilox64(OpBuilder &builder, Location loc,
   Type resultETy = resultTy.getElementType();
 
   Value initialState = extractState64(builder, loc, store);
-  if (!initialState) return failure();
+  if (!initialState)
+    return failure();
 
   std::pair<Value, Value> keys = extractKey32(builder, loc, store);
-  if (!keys.first || !keys.second) return failure();
+  if (!keys.first || !keys.second)
+    return failure();
 
   int64_t numElements = resultTy.getNumElements();
   int64_t count = (numElements + 1) / 2;
@@ -744,9 +758,9 @@ struct RngBitGeneratorConverter final
     : OpConversionPattern<mlir::stablehlo::RngBitGeneratorOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::RngBitGeneratorOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::RngBitGeneratorOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value state = adaptor.getInitialState();
     auto resultTy = dyn_cast_or_null<ShapedType>(
@@ -784,9 +798,9 @@ struct RngUniformConversion final
     : OpConversionPattern<mlir::stablehlo::RngOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      mlir::stablehlo::RngOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::RngOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // We only handle uniform distributions.
     if (op.getRngDistribution() != mlir::stablehlo::RngDistribution::UNIFORM) {
       return failure();
@@ -864,7 +878,7 @@ struct RngUniformConversion final
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 namespace detail {
 void populateStableHloRandomToLinalgConversionPatterns(
@@ -873,5 +887,5 @@ void populateStableHloRandomToLinalgConversionPatterns(
   patterns->add<RngBitGeneratorConverter, RngUniformConversion>(typeConverter,
                                                                 context);
 }
-}  // namespace detail
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace detail
+} // namespace mlir::iree_compiler::stablehlo

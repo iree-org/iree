@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -38,7 +38,7 @@ struct LLVMCPUMmt4dVectorLoweringPass
   }
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -46,11 +46,13 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
 
   std::optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {
-    if (numLoops) return signalPassFailure();
+    if (numLoops)
+      return signalPassFailure();
     numLoops = op.getIndexingMapsArray()[0].getNumDims();
   });
   // No vector.contract op to optimize.
-  if (!numLoops) return;
+  if (!numLoops)
+    return;
 
   {
     // Fold consumer add ops into the contraction op itself.
@@ -179,5 +181,5 @@ createLLVMCPUMmt4dVectorLoweringPass() {
   return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

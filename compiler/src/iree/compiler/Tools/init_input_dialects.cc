@@ -9,13 +9,13 @@
 #ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
-#endif  // IREE_HAVE_STABLEHLO_INPUT
+#endif // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
 #endif
 #ifdef IREE_HAVE_TOSA_INPUT
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
-#endif  // IREE_HAVE_TOSA_INPUT
+#endif // IREE_HAVE_TOSA_INPUT
 
 namespace mlir {
 namespace iree_compiler {
@@ -23,14 +23,14 @@ namespace iree_compiler {
 void registerInputDialects(DialectRegistry &registry) {
 #ifdef IREE_HAVE_STABLEHLO_INPUT
   registry.insert<mlir::chlo::ChloDialect, mlir::stablehlo::StablehloDialect>();
-#endif  // IREE_HAVE_STABLEHLO_INPUT
+#endif // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
   registry.insert<mlir::torch::TMTensor::TMTensorDialect>();
-#endif  // IREE_HAVE_TORCH_INPUT
+#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
   registry.insert<tosa::TosaDialect>();
-#endif  // IREE_HAVE_TOSA_INPUT
+#endif // IREE_HAVE_TOSA_INPUT
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -30,7 +30,7 @@ namespace HAL {
 class MaterializeResourceCachesPass
     : public PassWrapper<MaterializeResourceCachesPass,
                          OperationPass<ModuleOp>> {
- public:
+public:
   explicit MaterializeResourceCachesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -50,7 +50,8 @@ class MaterializeResourceCachesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
     moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
 
     // Find all relevant ops. If we don't find any we skip the pass as it's
@@ -63,7 +64,8 @@ class MaterializeResourceCachesPass
     SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
     for (Operation &funcLikeOp : moduleOp.getOps()) {
       auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
-      if (!funcOp) continue;
+      if (!funcOp)
+        continue;
       for (auto &block : funcOp.getFunctionBody()) {
         block.walk([&](Operation *op) {
           if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
@@ -115,7 +117,7 @@ class MaterializeResourceCachesPass
     }
   }
 
- private:
+private:
   IREE::Util::GlobalOp defineDescriptorSetLayoutOp(Location loc,
                                                    ArrayAttr bindingAttrs) {
     auto existingIt = descriptorSetLayoutCache_.find(bindingAttrs);
@@ -148,8 +150,9 @@ class MaterializeResourceCachesPass
     return globalOp;
   }
 
-  IREE::Util::GlobalOp definePipelineLayoutOp(
-      Location loc, IREE::HAL::PipelineLayoutAttr layoutAttr) {
+  IREE::Util::GlobalOp
+  definePipelineLayoutOp(Location loc,
+                         IREE::HAL::PipelineLayoutAttr layoutAttr) {
     auto existingIt = pipelineLayoutCache_.find(layoutAttr);
     if (existingIt != pipelineLayoutCache_.end()) {
       return existingIt->second;
@@ -313,8 +316,8 @@ class MaterializeResourceCachesPass
                                [](OpResult result) -> Value { return result; });
   }
 
-  void replaceDescriptorSetLayoutLookupOp(
-      DescriptorSetLayoutLookupOp &lookupOp) {
+  void
+  replaceDescriptorSetLayoutLookupOp(DescriptorSetLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto globalOp =
         defineDescriptorSetLayoutOp(lookupOp.getLoc(), lookupOp.getBindings());
@@ -361,8 +364,8 @@ class MaterializeResourceCachesPass
   int nextUniqueDescriptorSetLayoutId = 0;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
-    TargetOptions targetOptions) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createMaterializeResourceCachesPass(TargetOptions targetOptions) {
   return std::make_unique<MaterializeResourceCachesPass>(targetOptions);
 }
 
@@ -371,7 +374,7 @@ static PassRegistration<MaterializeResourceCachesPass> pass([] {
   return std::make_unique<MaterializeResourceCachesPass>(options);
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

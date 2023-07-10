@@ -15,4 +15,5 @@ GPU = common_definitions.DeviceSpec.build(
     device_name=DEVICE_NAME,
     architecture=common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-    tags=["gpu"])
+    tags=["gpu"],
+)

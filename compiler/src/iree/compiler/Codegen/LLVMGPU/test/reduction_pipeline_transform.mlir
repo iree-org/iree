@@ -364,7 +364,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
 
-//         CHECK: %[[ALLOC0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<1xi8, #gpu.address_space<workgroup>>
+//     CHECK-DAG: %[[ALLOC0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<1xi8, #gpu.address_space<workgroup>>
 // Local per-thread scf.for-based reduction.
 //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
 //         CHECK: scf.for {{.*}} -> (vector<1xi8>)

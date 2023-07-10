@@ -56,10 +56,10 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 
 void registerHALInlinePasses();
 
-}  // namespace Inline
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Inline
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_HAL_INLINE_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_MODULES_HAL_INLINE_TRANSFORMS_PASSES_H_

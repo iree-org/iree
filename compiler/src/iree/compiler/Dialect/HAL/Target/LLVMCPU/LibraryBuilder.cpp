@@ -97,8 +97,8 @@ static llvm::StructType *makeWorkgroupStateType(llvm::LLVMContext &context) {
 // i32 (%struct.iree_hal_executable_environment_v0_t*,
 //      %struct.iree_hal_executable_dispatch_state_v0_t*,
 //      i8*)
-static llvm::FunctionType *makeDispatchFunctionType(
-    llvm::LLVMContext &context) {
+static llvm::FunctionType *
+makeDispatchFunctionType(llvm::LLVMContext &context) {
   auto *environmentType = makeEnvironmentType(context);
   auto *dispatchStateType = makeDispatchStateType(context);
   auto *workgroupStateType = makeWorkgroupStateType(context);
@@ -324,8 +324,8 @@ llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   return func;
 }
 
-llvm::Constant *LibraryBuilder::buildLibraryV0ImportTable(
-    std::string libraryName) {
+llvm::Constant *
+LibraryBuilder::buildLibraryV0ImportTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *importTableType = makeImportTableType(context);
   auto *i8Type = llvm::IntegerType::getInt8Ty(context);
@@ -363,8 +363,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ImportTable(
                        });
 }
 
-llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
-    std::string libraryName) {
+llvm::Constant *
+LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *exportTableType = makeExportTableType(context);
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
@@ -511,8 +511,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
                        });
 }
 
-llvm::Constant *LibraryBuilder::buildLibraryV0ConstantTable(
-    std::string libraryName) {
+llvm::Constant *
+LibraryBuilder::buildLibraryV0ConstantTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *constantTableType = makeConstantTableType(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
@@ -574,7 +574,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
   return library;
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

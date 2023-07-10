@@ -25,8 +25,8 @@ namespace cpu {
 /// the variant op.
 // TODO: pass control to LowerVectorsOp once the builder allows it.
 std::pair<Value, Value> buildCommonTrailingStrategy(
-    ImplicitLocOpBuilder& b, Value variantH,
-    const vector::LowerVectorsOptions& lowerVectorsOpts);
+    ImplicitLocOpBuilder &b, Value variantH,
+    const vector::LowerVectorsOptions &lowerVectorsOpts);
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
@@ -52,9 +52,9 @@ struct CPUModel {
 /// ModuleOp after the `entryPoint` func::FuncOp.
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                            linalg::LinalgOp op,
-                                           const CPUModel& cpuModel);
-}  // namespace cpu
-}  // namespace iree_compiler
-}  // namespace mlir
+                                           const CPUModel &cpuModel);
+} // namespace cpu
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_
+#endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_

@@ -49,7 +49,8 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
                           getStrArrayAttr(builder, blockRegStrs));
 
     for (auto &op : block.getOperations()) {
-      if (op.getNumResults() == 0) continue;
+      if (op.getNumResults() == 0)
+        continue;
       SmallVector<std::string, 8> regStrs;
       regStrs.reserve(op.getNumResults());
       for (auto result : op.getResults()) {
@@ -174,8 +175,8 @@ struct RegisterUsage {
 // all of the following blocks are dominated only by blocks that have come
 // before them in the list. This ensures that we always know all registers for
 // block live-in values as we walk the blocks.
-static SmallVector<Block *, 8> sortBlocksInDominanceOrder(
-    IREE::VM::FuncOp funcOp) {
+static SmallVector<Block *, 8>
+sortBlocksInDominanceOrder(IREE::VM::FuncOp funcOp) {
   if (funcOp.getBlocks().size() == 1) {
     // Dominance info cannot be computed for regions with one block.
     return {&funcOp.getBlocks().front()};
@@ -188,7 +189,8 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0) return;
+    if (markedBlocks.count(block) > 0)
+      return;
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
       visit(childBlock->getBlock());
     }
@@ -410,15 +412,18 @@ struct FeedbackArcSet {
       SmallVector<FASEdge> outEdges;
       outEdges.reserve(node->outdegree);
       for (auto &edge : edges) {
-        if (edge.sink == node) inEdges.push_back(edge);
-        if (edge.source == node) outEdges.push_back(edge);
+        if (edge.sink == node)
+          inEdges.push_back(edge);
+        if (edge.source == node)
+          outEdges.push_back(edge);
       }
       bool collectInEdges = node->indegree <= node->outdegree;
       bool collectOutEdges = !collectInEdges;
 
       SmallVector<Edge> results;
       for (auto &edge : inEdges) {
-        if (edge.source == node) continue;
+        if (edge.source == node)
+          continue;
         if (collectInEdges) {
           results.push_back({edge.source->id, edge.sink->id});
         }
@@ -428,7 +433,8 @@ struct FeedbackArcSet {
         assignBucket(edge.source);
       }
       for (auto &edge : outEdges) {
-        if (edge.sink == node) continue;
+        if (edge.sink == node)
+          continue;
         if (collectOutEdges) {
           results.push_back({edge.source->id, edge.sink->id});
         }
@@ -454,9 +460,11 @@ struct FeedbackArcSet {
         ends.erase(ends.begin());
         removeNode(node);
       }
-      if (remainingNodes.empty()) break;
+      if (remainingNodes.empty())
+        break;
       for (ssize_t i = buckets.size() - 1; i >= 0; --i) {
-        if (buckets[i].empty()) continue;
+        if (buckets[i].empty())
+          continue;
         auto *bucket = buckets[i].front();
         buckets[i].erase(buckets[i].begin());
         auto feedbackEdges = removeNode(bucket);
@@ -486,9 +494,11 @@ struct FeedbackArcSet {
     llvm::SmallSetVector<NodeID, 8> unmarkedNodes = acyclicNodes;
     llvm::SmallSetVector<NodeID, 8> markedNodes;
     std::function<void(NodeID)> visit = [&](NodeID node) {
-      if (markedNodes.count(node) > 0) return;
+      if (markedNodes.count(node) > 0)
+        return;
       for (auto &edge : acyclicEdges) {
-        if (edge.first != node) continue;
+        if (edge.first != node)
+          continue;
         visit(edge.second);
       }
       markedNodes.insert(node);
@@ -498,7 +508,8 @@ struct FeedbackArcSet {
     }
     for (auto node : markedNodes.takeVector()) {
       for (auto &edge : acyclicEdges) {
-        if (edge.first != node) continue;
+        if (edge.first != node)
+          continue;
         result.acyclicEdges.push_back({edge.first, edge.second});
       }
     }
@@ -541,33 +552,40 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
   }
 
   // The tail registers in each bank is reserved for swapping, when required.
-  int scratchI32Reg = maxI32RegisterOrdinal_;
-  int scratchRefReg = maxRefRegisterOrdinal_;
+  int localScratchI32RegCount = 0;
+  int localScratchRefRegCount = 0;
   for (auto feedbackEdge : feedbackArcSet.feedbackEdges) {
     Register scratchReg;
     if (feedbackEdge.first.isRef()) {
-      scratchReg =
-          Register::getWithSameType(feedbackEdge.first, ++scratchRefReg);
+      localScratchRefRegCount += 1;
+      scratchReg = Register::getWithSameType(
+          feedbackEdge.first, maxRefRegisterOrdinal_ + localScratchRefRegCount);
     } else {
-      scratchReg =
-          Register::getWithSameType(feedbackEdge.first, ++scratchI32Reg);
+      localScratchI32RegCount += 1;
+      scratchReg = Register::getWithSameType(
+          feedbackEdge.first, maxI32RegisterOrdinal_ + localScratchI32RegCount);
+      // Integer types that use more than one register slot will be emitted
+      // as remapping per 4-byte word, so we have to account for the extra
+      // temporaries. See BytecodeEncoder:encodeBranch().
+      assert(scratchReg.byteWidth() >= 4 && "expected >= i32");
+      localScratchI32RegCount += scratchReg.byteWidth() / 4 - 1;
     }
     feedbackArcSet.acyclicEdges.insert(feedbackArcSet.acyclicEdges.begin(),
                                        {feedbackEdge.first, scratchReg});
     feedbackArcSet.acyclicEdges.push_back({scratchReg, feedbackEdge.second});
   }
-  if (scratchI32Reg != maxI32RegisterOrdinal_) {
-    scratchI32RegisterCount_ = std::max(scratchI32RegisterCount_,
-                                        scratchI32Reg - maxI32RegisterOrdinal_);
+  if (localScratchI32RegCount > 0) {
+    scratchI32RegisterCount_ =
+        std::max(scratchI32RegisterCount_, localScratchI32RegCount);
     assert(getMaxI32RegisterOrdinal() <= Register::kInt32RegisterCount &&
            "spilling i32 regs");
     if (getMaxI32RegisterOrdinal() > Register::kInt32RegisterCount) {
       op->emitOpError() << "spilling entire i32 register address space";
     }
   }
-  if (scratchRefReg != maxRefRegisterOrdinal_) {
-    scratchRefRegisterCount_ = std::max(scratchRefRegisterCount_,
-                                        scratchRefReg - maxRefRegisterOrdinal_);
+  if (localScratchRefRegCount > 0) {
+    scratchRefRegisterCount_ =
+        std::max(scratchRefRegisterCount_, localScratchRefRegCount);
     assert(getMaxRefRegisterOrdinal() <= Register::kRefRegisterCount &&
            "spilling ref regs");
     if (getMaxRefRegisterOrdinal() > Register::kRefRegisterCount) {
@@ -578,5 +596,5 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
   return feedbackArcSet.acyclicEdges;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CommonPasses.h"
-#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -78,14 +78,16 @@ struct FoldTrailingUnitTranspose
     int numDropDims = 0;
     ArrayRef<int64_t> perm = op.getPermutation();
     for (int idx = inputTy.getRank() - 1; idx >= 0; idx--) {
-      if (idx != perm[idx] || inputTy.getDimSize(idx) != 1) break;
+      if (idx != perm[idx] || inputTy.getDimSize(idx) != 1)
+        break;
       numDropDims++;
     }
-    if (numDropDims == 0) return failure();
+    if (numDropDims == 0)
+      return failure();
 
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> srcMixedSizes =
-        tensor::createDimValues(rewriter, loc, op.getInput());
+        tensor::getMixedSizes(rewriter, loc, op.getInput());
     SmallVector<OpFoldResult> mixedStride(inputTy.getRank(),
                                           rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> mixedOffsets(inputTy.getRank(),
@@ -97,7 +99,7 @@ struct FoldTrailingUnitTranspose
         op.getInput(), mixedOffsets, srcMixedSizes, mixedStride);
 
     SmallVector<OpFoldResult> destMixedSizes =
-        tensor::createDimValues(rewriter, loc, op.getInit());
+        tensor::getMixedSizes(rewriter, loc, op.getInit());
     auto initTy = llvm::cast<ShapedType>(op.getInit().getType());
     destMixedSizes.resize(initTy.getRank() - numDropDims);
     auto dest = rewriter.create<tensor::EmptyOp>(loc, destMixedSizes,
@@ -127,7 +129,7 @@ struct DecomposePackUnPackOpsPass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void DecomposePackUnPackOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
@@ -188,7 +190,8 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
           scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
               rewriter, cast<TilingInterface>(op.getOperation()), packOptions);
-      if (failed(tileAndFuseResult)) return signalPassFailure();
+      if (failed(tileAndFuseResult))
+        return signalPassFailure();
       rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
     });
 
@@ -215,7 +218,8 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
           rewriter, cast<TilingInterface>(op.getOperation()),
           unpackTilingOptions);
-      if (failed(tilingResult)) return signalPassFailure();
+      if (failed(tilingResult))
+        return signalPassFailure();
       rewriter.replaceOp(op, tilingResult->replacements);
     });
 
@@ -264,10 +268,10 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass(
-    bool tileOuterToOne) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
   return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -233,7 +233,9 @@ IREE_API_EXPORT iree_hal_dim_t iree_hal_buffer_view_shape_dim(
 // Returns the dimensions of the shape in |out_shape| and its rank in
 // |out_shape_rank|. |rank_capacity| indicates the number of dimensions
 // available in the |out_shape| buffer. If there is not enough capacity to store
-// all of the dimensions IREE_STATUS_OUT_OF_RANGE is returned.
+// all of the dimensions IREE_STATUS_OUT_OF_RANGE is returned
+// without populating |out_shape|.
+// If the shape rank of |buffer_view| is 0, |out_shape| can be NULL.
 // |out_shape_rank| can be omitted if the rank is already known.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,

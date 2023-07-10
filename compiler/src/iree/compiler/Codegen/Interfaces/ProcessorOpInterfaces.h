@@ -11,7 +11,7 @@
 #include "mlir/IR/OpDefinition.h"
 
 /// Include the generated interface declarations.
-#include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h.inc" // IWYU pragma: export
 
 namespace mlir {
 namespace iree_compiler {
@@ -19,7 +19,7 @@ namespace iree_compiler {
 /// Registers external models implemented for the `TiledOpInterface`.
 void registerProcessorOpInterfaceExternalModels(DialectRegistry &registry);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_INTERFACES_PROCESSOROPINTERFACES_H_
+#endif // IREE_COMPILER_CODEGEN_INTERFACES_PROCESSOROPINTERFACES_H_

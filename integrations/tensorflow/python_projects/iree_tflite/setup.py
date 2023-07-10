@@ -15,9 +15,9 @@ import os
 import platform
 from setuptools import setup, find_namespace_packages
 
-README = r'''
+README = r"""
 TensorFlow TFLite Compiler Tools
-'''
+"""
 
 exe_suffix = ".exe" if platform.system() == "Windows" else ""
 
@@ -28,15 +28,15 @@ VERSION_INFO_FILE = os.path.join(IREESRC_DIR, "version_info.json")
 
 
 def load_version_info():
-  with open(VERSION_INFO_FILE, "rt") as f:
-    return json.load(f)
+    with open(VERSION_INFO_FILE, "rt") as f:
+        return json.load(f)
 
 
 try:
-  version_info = load_version_info()
+    version_info = load_version_info()
 except FileNotFoundError:
-  print("version_info.json not found. Using defaults")
-  version_info = {}
+    print("version_info.json not found. Using defaults")
+    version_info = {}
 
 PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
 PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
@@ -60,12 +60,16 @@ setup(
         "Programming Language :: Python :: 3.10",
     ],
     python_requires=">=3.8",
-    packages=find_namespace_packages(include=[
-        "iree.tools.tflite",
-        "iree.tools.tflite.*",
-    ]),
+    packages=find_namespace_packages(
+        include=[
+            "iree.tools.tflite",
+            "iree.tools.tflite.*",
+        ]
+    ),
     package_data={
-        "iree.tools.tflite": [f"iree-import-tflite{exe_suffix}",],
+        "iree.tools.tflite": [
+            f"iree-import-tflite{exe_suffix}",
+        ],
     },
     entry_points={
         "console_scripts": [

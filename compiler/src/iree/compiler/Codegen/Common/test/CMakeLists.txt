@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "affinemin_canonicalization.mlir"
+    "batch_matmuls.mlir"
     "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
@@ -61,6 +62,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    batch_matmul_match_spec.mlir
     convolution_match_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir

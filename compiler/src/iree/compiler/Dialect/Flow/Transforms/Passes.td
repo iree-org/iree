@@ -88,6 +88,12 @@ def FormDispatchWorkgroups :
   ];
 }
 
+def FormScalarDispatches :
+    InterfacePass<"iree-flow-form-scalar-dispatches", "mlir::FunctionOpInterface"> {
+  let summary = "Form Dispatch Regions for scalar computations.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFormScalarDispatchesPass()";
+}
+
 def CloneProducersIntoDispatchRegions :
     InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Clone producers into dispatch regions to be isolated above";
@@ -284,6 +290,12 @@ def RaiseSpecialOps :
     Pass<"iree-flow-raise-special-ops", ""> {
   let summary = "raise special ops like softmax to the high level linalg.ext representation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
+}
+
+def RemoveZeroExtentTensors :
+    InterfacePass<"iree-flow-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
+  let summary = "Remove tensors that have 0-extents";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createRemoveZeroExtentTensorsPass()";
 }
 
 def SplitReduction :

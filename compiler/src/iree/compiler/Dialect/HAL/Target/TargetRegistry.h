@@ -32,14 +32,14 @@ using CreateTargetBackendFn = std::function<std::shared_ptr<TargetBackend>()>;
 //   vulkan-v1.1-low
 //   vulkan-v1.1-high
 class TargetBackendRegistration {
- public:
+public:
   // TODO: Remove the registerStaticGlobal mode once callers are migrated.
   TargetBackendRegistration(StringRef name, CreateTargetBackendFn fn,
                             bool registerStaticGlobal = true);
 
   std::shared_ptr<TargetBackend> acquire();
 
- private:
+private:
   CreateTargetBackendFn initFn;
   std::once_flag initFlag;
   std::shared_ptr<TargetBackend> cachedValue;
@@ -47,19 +47,19 @@ class TargetBackendRegistration {
 
 // A registry of target
 class TargetBackendList {
- public:
+public:
   void add(llvm::StringRef name, CreateTargetBackendFn fn) {
     entries.push_back(std::make_pair(name, fn));
   }
 
- private:
+private:
   llvm::SmallVector<std::pair<llvm::StringRef, CreateTargetBackendFn>> entries;
   friend class TargetBackendRegistry;
 };
 
 // A concrete target backend registry.
 class TargetBackendRegistry {
- public:
+public:
   // Merge from a list of of targets. The registry will own the registration
   // entries.
   void mergeFrom(const TargetBackendList &targets);
@@ -79,10 +79,10 @@ class TargetBackendRegistry {
   std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) const;
 
   // Returns one backend per entry in |targetNames|.
-  SmallVector<std::shared_ptr<TargetBackend>> getTargetBackends(
-      ArrayRef<std::string> targetNames) const;
+  SmallVector<std::shared_ptr<TargetBackend>>
+  getTargetBackends(ArrayRef<std::string> targetNames) const;
 
- private:
+private:
   llvm::StringMap<TargetBackendRegistration *> registrations;
   llvm::SmallVector<std::unique_ptr<TargetBackendRegistration>>
       ownedRegistrations;
@@ -91,15 +91,15 @@ class TargetBackendRegistry {
 };
 
 // Returns a sorted uniqued set of target backends used in the executable.
-SmallVector<std::string> gatherExecutableTargetNames(
-    IREE::HAL::ExecutableOp executableOp);
+SmallVector<std::string>
+gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp);
 
 // Returns a sorted uniqued set of target backends used in the entire module.
 SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETREGISTRY_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETREGISTRY_H_

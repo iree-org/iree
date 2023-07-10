@@ -56,17 +56,19 @@ static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
             return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
           })
           .Default([](Type type) { return nullptr; });
-  if (!zeroVal) return failure();
+  if (!zeroVal)
+    return failure();
   return builder.create<arith::ConstantOp>(loc, elementType, zeroVal)
       .getResult();
 }
 
 /// Pads `value` to `padding` if needed. If no padding is specified,
 /// return `value` itself.
-static FailureOr<Value> padIfNeeded(
-    OpBuilder &builder, Location loc, Value value,
-    std::optional<int64_t> padding = std::nullopt) {
-  if (!padding) return value;
+static FailureOr<Value>
+padIfNeeded(OpBuilder &builder, Location loc, Value value,
+            std::optional<int64_t> padding = std::nullopt) {
+  if (!padding)
+    return value;
 
   OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());
   FailureOr<SmallVector<OpFoldResult>> shape =
@@ -114,12 +116,13 @@ namespace {
 struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
   SetMatmulEncoding(MLIRContext *context, int64_t padding,
                     PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
-        padding(padding) {}
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit), padding(padding) {
+  }
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics()) return failure();
+    if (!matmulOp.hasTensorSemantics())
+      return failure();
     auto inputs = matmulOp.getDpsInputOperands();
     auto outputs = matmulOp.getDpsInitOperands();
     auto hasEncoding = [](OpOperand *operand) -> bool {
@@ -157,6 +160,26 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       lhsEncoding = TensorEncoding::MATMUL_F32F32F32_LHS;
       rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS;
       outEncoding = TensorEncoding::MATMUL_F32F32F32_RESULT;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF32()) {
+      lhsEncoding = TensorEncoding::MATMUL_F16F16F32_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_F16F16F32_RHS;
+      outEncoding = TensorEncoding::MATMUL_F16F16F32_RESULT;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF16()) {
+      lhsEncoding = TensorEncoding::MATMUL_F16F16F16_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_F16F16F16_RHS;
+      outEncoding = TensorEncoding::MATMUL_F16F16F16_RESULT;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isF32()) {
+      lhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_BF16BF16F32_RHS;
+      outEncoding = TensorEncoding::MATMUL_BF16BF16F32_RESULT;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isBF16()) {
+      lhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_LHS;
+      rhsEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RHS;
+      outEncoding = TensorEncoding::MATMUL_BF16BF16BF16_RESULT;
     } else if (lhsElemType.isSignlessInteger(8) &&
                rhsElemType.isSignlessInteger(8) &&
                outElemType.isSignlessInteger(32)) {
@@ -229,7 +252,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     return success();
   }
 
- private:
+private:
   int64_t padding;
 };
 
@@ -242,13 +265,14 @@ struct FoldFillWithSetEncoding
   LogicalResult matchAndRewrite(IREE::LinalgExt::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto fillOp = encodingOp.getSource().getDefiningOp<linalg::FillOp>();
-    if (!fillOp) return failure();
+    if (!fillOp)
+      return failure();
 
     // Create a new fill op, with outs being defined by a new `tensor.empty` op.
     RankedTensorType encodingType = encodingOp.getResultType();
     Location loc = fillOp.getLoc();
     SmallVector<OpFoldResult> dimValues =
-        tensor::createDimValues(rewriter, loc, fillOp.getOutputs()[0]);
+        tensor::getMixedSizes(rewriter, loc, fillOp.getOutputs()[0]);
     auto newEmptyOp = rewriter.create<tensor::EmptyOp>(
         loc, dimValues, encodingType.getElementType(),
         encodingType.getEncoding());
@@ -265,7 +289,7 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -286,7 +310,7 @@ std::unique_ptr<Pass> createSetEncodingPass() {
   return std::make_unique<SetEncodingPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

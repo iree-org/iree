@@ -6,7 +6,7 @@
 
 #include "./LLVMPasses.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUPasses.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -41,6 +41,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
@@ -105,7 +106,7 @@ struct CUDAOptions {
         llvm::cl::desc("Passes the given additional parameters to ptxas."));
   }
 };
-}  // namespace
+} // namespace
 
 static constexpr char kPtxasCompilerName[] = "ptxas";
 
@@ -113,11 +114,14 @@ static constexpr char kPtxasCompilerName[] = "ptxas";
 static FailureOr<std::string> findPtxasCompiler(const CUDAOptions &options,
                                                 std::string *message) {
   std::string ptxasCompiler;
-  if (!options.clUsePtxasFrom.empty()) ptxasCompiler = options.clUsePtxasFrom;
-  if (llvm::sys::fs::exists(ptxasCompiler)) return ptxasCompiler;
+  if (!options.clUsePtxasFrom.empty())
+    ptxasCompiler = options.clUsePtxasFrom;
+  if (llvm::sys::fs::exists(ptxasCompiler))
+    return ptxasCompiler;
 
   ptxasCompiler = findTool(kPtxasCompilerName);
-  if (llvm::sys::fs::exists(ptxasCompiler)) return ptxasCompiler;
+  if (llvm::sys::fs::exists(ptxasCompiler))
+    return ptxasCompiler;
 
   *message = std::string(
       "Could not find ptxas compiler. Try passing it explicitly with "
@@ -164,12 +168,13 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
   auto Tokenize = llvm::cl::TokenizeWindowsCommandLine;
 #else
   auto Tokenize = llvm::cl::TokenizeGNUCommandLine;
-#endif  // _WIN32
+#endif // _WIN32
   llvm::BumpPtrAllocator scratchAllocator;
   llvm::StringSaver stringSaver(scratchAllocator);
   SmallVector<const char *> rawArgs;
   Tokenize(ptxasParams, stringSaver, rawArgs, /*MarkEOLs=*/false);
-  for (auto rawArg : rawArgs) ArgVector.push_back(StringRef(rawArg));
+  for (auto rawArg : rawArgs)
+    ArgVector.push_back(StringRef(rawArg));
 
   std::optional<StringRef> redirects[] = {
       stdinFile.str(),
@@ -219,7 +224,8 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
 // executable, let the runtime compile.
 static std::string produceGpuImage(const CUDAOptions &options,
                                    std::string &ptxImage) {
-  if (!options.clUsePtxas) return ptxImage;
+  if (!options.clUsePtxas)
+    return ptxImage;
 
   std::string message;
   FailureOr<std::string> ptxasCompiler = findPtxasCompiler(options, &message);
@@ -228,7 +234,8 @@ static std::string produceGpuImage(const CUDAOptions &options,
     FailureOr<std::string> maybeCubinImage =
         compileWithPtxas(ptxasCompiler.value(), options.clTargetChip,
                          options.clUsePtxasParams, ptxImage, &message);
-    if (succeeded(maybeCubinImage)) return maybeCubinImage.value();
+    if (succeeded(maybeCubinImage))
+      return maybeCubinImage.value();
   }
 
   llvm::WithColor::warning()
@@ -284,6 +291,11 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
   // Link user modules and libdevice (if required).
   // Note that linking order matters:
   llvm::Linker linker(module);
+  if (failed(linkCmdlineBitcodeFile(loc, linker, llvm::Linker::OverrideFromSrc,
+                                    targetMachine, module.getContext()))) {
+    return failure();
+  }
+
   unsigned linkerFlags =
       llvm::Linker::LinkOnlyNeeded | llvm::Linker::OverrideFromSrc;
   if (failed(linkBitcodeObjects(loc, linker, linkerFlags, targetMachine,
@@ -355,21 +367,24 @@ static void optimizeModule(llvm::Module &module,
 }
 
 class CUDATargetBackend final : public TargetBackend {
- public:
+public:
   CUDATargetBackend(const CUDAOptions &options) : options(options) {}
 
   std::string name() const override { return "cuda"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    // TODO: Derive the use of TransformDialect from inner
+    // `LLVMGPULowerExecutableTargetPass`.
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+                    IREE::Codegen::IREECodegenDialect,
+                    transform::TransformDialect>();
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -390,7 +405,8 @@ class CUDATargetBackend final : public TargetBackend {
     // For now we disable translation if the variant has external object files.
     // We could instead perform linking with those objects (if they're bitcode
     // ala libdevice.bc, etc).
-    if (variantOp.isExternal()) return;
+    if (variantOp.isExternal())
+      return;
 
     buildLLVMGPUTransformPassPipeline(passManager, false);
   }
@@ -490,7 +506,8 @@ class CUDATargetBackend final : public TargetBackend {
            llvm::zip_equal(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
                            workgroupSizes)) {
         auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
-        if (llvmFunc->isDeclaration()) continue;
+        if (llvmFunc->isDeclaration())
+          continue;
 
         // setName will make sure the function name is unique.
         llvmFunc->setName(sanitizeSymbolName(exportOp.getName()));
@@ -629,7 +646,7 @@ class CUDATargetBackend final : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // If we had multiple target environments we would generate one target attr
@@ -638,8 +655,8 @@ class CUDATargetBackend final : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     // Add some configurations to the `hal.executable.target` attribute.
@@ -674,12 +691,12 @@ struct CUDASession
     });
   }
 };
-}  // namespace
+} // namespace
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 extern "C" bool iree_register_compiler_plugin_hal_target_cuda(
     mlir::iree_compiler::PluginRegistrar *registrar) {

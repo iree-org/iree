@@ -75,8 +75,9 @@ func.func @vecadd2d() -> (!type2) {
 //     CHECK-PARTIAL-TILE:  hal.executable.export
 //     CHECK-PARTIAL-TILE:  bb0(%[[DEV:.*]]: !hal.device):
 //     CHECK-PARTIAL-TILE:  %[[C1:.*]] = arith.constant 1 : index
+//     CHECK-PARTIAL-TILE:  %[[C1_2:.*]] = arith.constant 1 : index
 //     CHECK-PARTIAL-TILE:  %[[C171:.*]] = arith.constant 171 : index
-//     CHECK-PARTIAL-TILE:  hal.return %[[C1]], %[[C1]], %[[C171]] : index, index, index
+//     CHECK-PARTIAL-TILE:  hal.return %[[C1]], %[[C1_2]], %[[C171]] : index, index, index
 
 //      EXEC: EXEC @vecadd2d
 //      EXEC: result[0]: hal.buffer_view

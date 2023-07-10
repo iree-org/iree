@@ -60,8 +60,9 @@ std::unique_ptr<llvm::Module> loadIRModule(const std::string &filename,
   return module;
 }
 
-LogicalResult linkWithBitcodeVector(
-    llvm::Module *module, const std::vector<std::string> &bitcode_path_vector) {
+LogicalResult
+linkWithBitcodeVector(llvm::Module *module,
+                      const std::vector<std::string> &bitcode_path_vector) {
   llvm::Linker linker(*module);
 
   for (auto &bitcode_path : bitcode_path_vector) {
@@ -210,7 +211,7 @@ std::string createHsaco(const std::string isa, StringRef name) {
 }
 //==============Create HSACO End=============//
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
