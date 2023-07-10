@@ -154,7 +154,7 @@ def set_output(d: Mapping[str, str]):
     print(f"Setting outputs: {d}")
     step_output_file = os.environ["GITHUB_OUTPUT"]
     with open(step_output_file, "a") as f:
-        f.writelines(f"{k}=v" + "\n" for k, v in d.items())
+        f.writelines(f"{k}={v}" + "\n" for k, v in d.items())
 
 
 def write_job_summary(summary: str):
