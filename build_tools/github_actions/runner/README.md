@@ -213,12 +213,24 @@ changes you make need to be forward and backward compatible with changes to
 anything that is picked up directly from tip of tree (such as workflow files).
 These should be changed in separate PRs.
 
-To deploy to prod, create new prod templates. Then use the update script to
-canary to a single instance:
+To deploy to prod, create new prod templates. Then canary the new template for
+one instance in each group.
+
+Note: The a100 groups are special. We only run one instance in each group and
+have one of every type in every region, so canarying within a single instance
+group doesn't really make any sense. Also, we use the `balanced` target
+distribution shape, which theoretically means that the group manager will avoid
+zones with no available capacity (which happens a lot). This distribution shape
+is for some reason incompatible with having multiple templates. So in the
+canarying below, we treat these differently.
 
 ```shell
 build_tools/github_actions/runner/gcp/update_instance_groups.py canary \
-  --env=prod --region=all --group=all --type=all --version="${VERSION}"
+  --env=prod --region='us-\w+' --group=all --type='[^a]\w+' \
+  --version="${VERSION}"
+build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
+  --env=prod --region='us-central1' --group=all --type=a100 \
+  --version="${VERSION}"
 ```
 
 Watch to make sure that your new runners are starting up and registering as
@@ -228,7 +240,10 @@ configuration is good, complete the update with your new template:
 
 ```shell
 build_tools/github_actions/runner/gcp/update_instance_groups.py promote-canary \
-  --env=prod --region=all --group=all --type=all
+  --env=prod --region=all --group=all --type='[^a]\w+'
+build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
+  --env=prod --region='us-\w+' --group=all --type=a100 \
+  --version="${VERSION}"
 ```
 
 ## Known Issues / Future Work
