@@ -61,12 +61,12 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
     input_types=["1x384xi32", "1x384xi32", "1x384xi32"],
 )
 
-TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084"
+TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251"
 
 ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
 NAME_FORMAT = string.Template("${name}Batch${batch_size}")
 SOURCE_URL_FORMAT = string.Template(
-    TF_MODELS_ROOT_DIR + "/${directory}/batch_${batch_size}/hlo.mlirbc"
+    TF_MODELS_ROOT_DIR + "/${directory}_BATCH${batch_size}/stablehlo.mlirbc"
 )
 
 # Derived from https://huggingface.co/docs/transformers/model_doc/bert#transformers.TFBertModel.
@@ -80,7 +80,7 @@ BERT_LARGE_384_FP32_TF_BATCHES = model_utils.generate_batch_models(
     tags=["fp32", "seqlen384", "tensorflow", "bert-variant"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     source_url_template=model_utils.partial_template_substitute(
-        SOURCE_URL_FORMAT, directory="BERT_LARGE"
+        SOURCE_URL_FORMAT, directory="BERT_LARGE_FP32_TF_384XI32"
     ),
     entry_function="forward",
     input_type_templates=[
@@ -101,10 +101,10 @@ RESNET50_3X224X224_FP32_TF_BATCHES = model_utils.generate_batch_models(
     tags=["fp32", "cnn"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     source_url_template=model_utils.partial_template_substitute(
-        SOURCE_URL_FORMAT, directory="RESNET50"
+        SOURCE_URL_FORMAT, directory="RESNET50_FP32_TF_224X224X3XF32"
     ),
     entry_function="forward",
-    input_type_templates=[string.Template("${batch_size}x224x224x3xf32")],
+    input_type_templates=[string.Template("${batch_size}x3x224x224xf32")],
     batch_sizes=[1, 8, 64, 128, 256, 2048],
 )
 
@@ -119,7 +119,7 @@ T5_LARGE_512_FP32_TF_BATCHES = model_utils.generate_batch_models(
     tags=["fp32", "seqlen512", "tensorflow"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     source_url_template=model_utils.partial_template_substitute(
-        SOURCE_URL_FORMAT, directory="T5_LARGE"
+        SOURCE_URL_FORMAT, directory="T5_LARGE_FP32_TF_512XI32"
     ),
     entry_function="forward",
     input_type_templates=[

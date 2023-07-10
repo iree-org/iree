@@ -702,7 +702,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1112,7 +1112,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1124,7 +1124,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch16.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch16.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1136,7 +1136,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch24.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch24.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1148,7 +1148,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch32.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch32.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1160,7 +1160,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch48.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch48.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1172,7 +1172,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1184,7 +1184,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch512.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch512.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1196,7 +1196,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1024.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1024.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1208,7 +1208,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1280.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1280.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1220,7 +1220,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1232,7 +1232,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch8.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch8.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1244,7 +1244,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1256,7 +1256,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch128.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch128.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1268,7 +1268,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch256.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch256.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1280,7 +1280,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch2048.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch2048.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1292,7 +1292,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1304,7 +1304,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch8.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch8.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1316,7 +1316,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1328,7 +1328,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch128.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch128.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1340,7 +1340,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch256.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch256.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1352,7 +1352,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch2048.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch2048.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1364,7 +1364,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch16.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch16.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1376,7 +1376,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch24.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch24.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1388,7 +1388,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch32.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch32.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1400,7 +1400,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch48.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch48.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1412,7 +1412,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1424,7 +1424,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch512.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch512.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1436,7 +1436,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1024.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1024.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -1448,7 +1448,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1280.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1280.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -3609,7 +3609,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4151,7 +4151,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4167,7 +4167,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch16.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch16.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4183,7 +4183,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch24.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch24.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4199,7 +4199,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch32.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch32.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4215,7 +4215,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch48.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch48.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4231,7 +4231,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4247,7 +4247,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch512.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch512.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4263,7 +4263,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1024.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1024.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4279,7 +4279,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargePTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1280.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1280.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargePTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4295,7 +4295,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4311,7 +4311,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch8.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch8.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4327,7 +4327,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4343,7 +4343,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch128.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch128.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4359,7 +4359,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch256.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch256.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4375,7 +4375,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch2048.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch2048.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4391,7 +4391,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch1.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4407,7 +4407,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch8.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch8.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch8_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4423,7 +4423,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4439,7 +4439,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch128.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch128.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch128_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4455,7 +4455,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch256.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch256.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch256_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4471,7 +4471,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-Resnet50fp16PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch2048.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch2048.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Resnet50fp16PTBatch2048_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4487,7 +4487,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch16.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch16.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch16_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4503,7 +4503,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch24.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch24.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch24_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4519,7 +4519,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch32.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch32.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch32_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4535,7 +4535,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch48.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch48.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch48_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4551,7 +4551,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch64.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch64.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch64_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4567,7 +4567,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch512.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch512.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch512_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4583,7 +4583,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1024.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1024.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1024_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -4599,7 +4599,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertLargefp16PTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1280.mlir"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1280.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1280_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"

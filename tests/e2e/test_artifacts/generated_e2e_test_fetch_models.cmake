@@ -126,63 +126,63 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_1/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_32/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch32.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_64/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50TFBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_1/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/RESNET50_FP32_TF_224X224X3XF32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50TFBatch1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50TFBatch64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_64/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/RESNET50_FP32_TF_224X224X3XF32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50TFBatch64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50TFBatch128"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_128/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/RESNET50_FP32_TF_224X224X3XF32_BATCH128/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50TFBatch128.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5LargeTFBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_1/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/T5_LARGE_FP32_TF_512XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5LargeTFBatch16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_16/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/T5_LARGE_FP32_TF_512XI32_BATCH16/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch16.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5LargeTFBatch32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_32/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/T5_LARGE_FP32_TF_512XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch32.mlirbc"
   UNPACK
 )
@@ -203,8 +203,8 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_1/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH1/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlirbc"
   UNPACK
 )
 
@@ -287,441 +287,441 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-Resnet50TFBatch8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_8/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/RESNET50_FP32_TF_224X224X3XF32_BATCH8/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50TFBatch8.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50TFBatch256"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_256/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/RESNET50_FP32_TF_224X224X3XF32_BATCH256/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50TFBatch256.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50TFBatch2048"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_2048/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/RESNET50_FP32_TF_224X224X3XF32_BATCH2048/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50TFBatch2048.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_16/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH16/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch16.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_24/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH24/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch24.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_48/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH48/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch48.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch512"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_512/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH512/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch512.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch1024"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_1024/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH1024/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1024.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTFBatch1280"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_1280/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/BERT_LARGE_FP32_TF_384XI32_BATCH1280/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1280.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5LargeTFBatch24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_24/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/T5_LARGE_FP32_TF_512XI32_BATCH24/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch24.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5LargeTFBatch48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_48/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/T5_LARGE_FP32_TF_512XI32_BATCH48/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch48.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5LargeTFBatch64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_64/hlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251/T5_LARGE_FP32_TF_512XI32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_1/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH1/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_16/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch16.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH16/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch16.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_24/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch24.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH24/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch24.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_32/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch32.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH32/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch32.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_48/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch48.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH48/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch48.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_64/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch64.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH64/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch512"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_512/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch512.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH512/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch512.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch1024"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_1024/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1024.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH1024/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1024.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargePTBatch1280"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_1280/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1280.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH1280/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1280.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50PTBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_1/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch1.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP32_PT_3X224X224XF32_BATCH1/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50PTBatch8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_8/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch8.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP32_PT_3X224X224XF32_BATCH8/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch8.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50PTBatch64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_64/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch64.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP32_PT_3X224X224XF32_BATCH64/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50PTBatch128"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_128/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch128.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP32_PT_3X224X224XF32_BATCH128/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch128.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50PTBatch256"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_256/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch256.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP32_PT_3X224X224XF32_BATCH256/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch256.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50PTBatch2048"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_2048/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch2048.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP32_PT_3X224X224XF32_BATCH2048/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50PTBatch2048.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50fp16PTBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_1/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch1.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP16_PT_3X224X224XF16_BATCH1/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50fp16PTBatch8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_8/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch8.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP16_PT_3X224X224XF16_BATCH8/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch8.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50fp16PTBatch64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_64/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch64.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP16_PT_3X224X224XF16_BATCH64/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50fp16PTBatch128"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_128/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch128.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP16_PT_3X224X224XF16_BATCH128/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch128.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50fp16PTBatch256"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_256/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch256.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP16_PT_3X224X224XF16_BATCH256/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch256.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-Resnet50fp16PTBatch2048"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_2048/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch2048.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP16_PT_3X224X224XF16_BATCH2048/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Resnet50fp16PTBatch2048.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_16/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch16.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH16/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch16.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_24/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch24.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH24/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch24.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_32/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch32.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH32/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch32.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_48/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch48.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH48/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch48.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_64/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch64.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH64/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch512"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_512/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch512.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH512/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch512.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch1024"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_1024/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1024.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH1024/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1024.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargefp16PTBatch1280"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_1280/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1280.mlir"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH1280/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1280.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_16/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH16/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH16.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_24/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH24/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH24.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_32/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH32.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_48/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH48/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH48.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_64/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH512"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_512/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH512/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH512.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH1024"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1024/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH1024/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1024.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH1280"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_1280/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH1280/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1280.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_1/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_8/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH8/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH8.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_64/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH128"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_128/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH128/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH128.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH256"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_256/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH256/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH256.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH2048"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_2048/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH2048/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH2048.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_1/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH1.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_16/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH16/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH16.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_24/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH24/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH24.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_32/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH32.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_48/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH48/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH48.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_64/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH64.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH512"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/T5_LARGE/batch_512/stablehlo.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH512/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH512.mlirbc"
   UNPACK
 )

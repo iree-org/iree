@@ -11,12 +11,12 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 import e2e_test_framework.models.utils as model_utils
 
-GCS_ARTIFACT_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752"
+GCS_ARTIFACT_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404"
 
 ID_FORMAT = string.Template("${model_id}-batch${batch_size}")
 NAME_FORMAT = string.Template("${name}_BATCH${batch_size}")
 SOURCE_URL_FORMAT = string.Template(
-    GCS_ARTIFACT_ROOT_DIR + "/${directory}/batch_${batch_size}/stablehlo.mlirbc"
+    GCS_ARTIFACT_ROOT_DIR + "/${directory}_BATCH${batch_size}/stablehlo.mlirbc"
 )
 
 # Derived from https://huggingface.co/docs/transformers/model_doc/resnet#transformers.FlaxResNetModel.
@@ -32,7 +32,7 @@ RESNET50_FP32_JAX_3X224X224XF32_BATCHES = model_utils.generate_batch_models(
     tags=RESNET50_TAGS,
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     source_url_template=model_utils.partial_template_substitute(
-        SOURCE_URL_FORMAT, directory="RESNET50"
+        SOURCE_URL_FORMAT, directory="RESNET50_FP32_JAX_3X224X224XF32"
     ),
     entry_function="main",
     input_type_templates=[string.Template("${batch_size}x3x224x224xf32")],
@@ -52,7 +52,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCHES = model_utils.generate_batch_models(
     tags=BERT_LARGE_TAGS,
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     source_url_template=model_utils.partial_template_substitute(
-        SOURCE_URL_FORMAT, directory="BERT_LARGE"
+        SOURCE_URL_FORMAT, directory="BERT_LARGE_FP32_JAX_384XI32"
     ),
     entry_function="main",
     input_type_templates=[
@@ -75,7 +75,7 @@ T5_LARGE_FP32_JAX_512XI32_BATCHES = model_utils.generate_batch_models(
     tags=T5_TAGS,
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     source_url_template=model_utils.partial_template_substitute(
-        SOURCE_URL_FORMAT, directory="T5_LARGE"
+        SOURCE_URL_FORMAT, directory="T5_LARGE_FP32_JAX_512XI32"
     ),
     entry_function="main",
     input_type_templates=[
