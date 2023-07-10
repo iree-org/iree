@@ -92,16 +92,16 @@ EFFICIENTNET_B7_FP32_TORCH = common_definitions.Model(
 ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
 NAME_FORMAT = string.Template("${name}Batch${batch_size}")
 BERT_LARGE_FP32_URL = string.Template(
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/BERT_LARGE/batch_${batch_size}/linalg.mlir"
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP32_PT_384XI32_BATCH${batch_size}/linalg.mlirbc"
 )
 BERT_LARGE_FP16_URL = string.Template(
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_${batch_size}/linalg.mlir"
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH${batch_size}/linalg.mlirbc"
 )
 RESNET50_FP32_URL = string.Template(
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_${batch_size}/linalg.mlir"
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP32_PT_3X224X224XF32_BATCH${batch_size}/linalg.mlirbc"
 )
 RESNET50_FP16_URL = string.Template(
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_${batch_size}/linalg.mlir"
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/RESNET50_FP16_PT_3X224X224XF16_BATCH${batch_size}/linalg.mlirbc"
 )
 
 # Converted from https://huggingface.co/docs/transformers/v4.27.2/en/model_doc/bert#transformers.BertModel
