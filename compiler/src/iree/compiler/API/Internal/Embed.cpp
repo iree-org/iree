@@ -628,6 +628,30 @@ bool Invocation::initializeInvocation() {
     return false;
   }
 
+  // Validate flags.
+  // Validate inputTypeMnemonic.
+  if (session.inputOptions.parseInputTypeMnemonic() ==
+      InputDialectOptions::Type::plugin) {
+    llvm::StringSet<> inputTypeMnemonics;
+    session.pluginSession.populateCustomInputConversionTypes(
+        inputTypeMnemonics);
+    if (!inputTypeMnemonics.contains(session.inputOptions.inputTypeMnemonic)) {
+      auto diag = emitError(UnknownLoc::get(&session.context))
+                  << "unknown custom value for --input-input-type='"
+                  << session.inputOptions.inputTypeMnemonic << "'";
+      if (inputTypeMnemonics.empty()) {
+        diag << " (none registered)";
+      } else {
+        diag << " (available:";
+        for (auto &s : inputTypeMnemonics) {
+          diag << " '" << s.first() << "'";
+        }
+        diag << ")";
+      }
+      return false;
+    }
+  }
+
   return true;
 }
 

@@ -102,7 +102,24 @@ public:
     }
   }
 
-  // Forward pipeline extensions.
+  void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
+    for (auto *s : initializedSessions) {
+      s->populateCustomInputConversionTypes(typeMnemonics);
+    }
+  }
+
+  bool extendCustomInputConversionPassPipeline(
+      OpPassManager &passManager, std::string_view typeMnemonic) override {
+    bool matched = false;
+    for (auto *s : initializedSessions) {
+      if (s->extendCustomInputConversionPassPipeline(passManager,
+                                                     typeMnemonic)) {
+        matched = true;
+      }
+    }
+    return matched;
+  }
+
   void extendPreprocessingPassPipeline(OpPassManager &passManager) override {
     for (auto *s : initializedSessions) {
       s->extendPreprocessingPassPipeline(passManager);
