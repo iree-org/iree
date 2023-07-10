@@ -189,6 +189,10 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
 void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
                   DominanceInfo &dominators);
 
+// Track temporary allocations that are never read from. If this is the case
+// it means both the allocations and associated stores can be removed.
+void eraseDeadAllocAndStores(Operation *parentOp);
+
 } // namespace iree_compiler
 } // namespace mlir
 

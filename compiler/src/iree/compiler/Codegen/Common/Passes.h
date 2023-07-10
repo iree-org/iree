@@ -92,6 +92,10 @@ createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 /// during bufferization.
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 
+/// Creates a pass to erase dead alloc ops where all uses are just store ops.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createEraseDeadAllocAndStoresPass();
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass();
 
