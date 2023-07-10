@@ -226,8 +226,14 @@ struct Session {
   }
 
   GlobalInit &globalInit;
+  // When created, the Session owns the context, but there are situations
+  // where ownership can be released, in which case the ownedContext will be
+  // release()'d. This happens if we are doing some form of interop that
+  // makes someone else own the context.
+  std::unique_ptr<MLIRContext> ownedContext;
+  // All user access to the context is done via this reference.
+  MLIRContext &context;
   OptionsBinder binder;
-  MLIRContext context;
   // PluginManagerOptions must initialize first because the session depends on
   // it.
   PluginManagerOptions pluginManagerOptions;
@@ -256,7 +262,8 @@ struct Session {
 };
 
 Session::Session(GlobalInit &globalInit)
-    : globalInit(globalInit), binder(OptionsBinder::local()),
+    : globalInit(globalInit), ownedContext(std::make_unique<MLIRContext>()),
+      context(*ownedContext), binder(OptionsBinder::local()),
       pluginSession(globalInit.pluginManager, binder, pluginManagerOptions) {
   context.allowUnregisteredDialects();
   context.appendDialectRegistry(globalInit.registry);
@@ -523,9 +530,10 @@ void Output::keep() {
 // Invocation corresponds to iree_compiler_invocation_t
 struct Invocation {
   Invocation(Session &session);
+  ~Invocation();
   bool initializeInvocation();
   bool parseSource(Source &source);
-  bool importModule(OwningOpRef<Operation *> inputModule);
+  bool importModule(Operation *inputModule, bool steal);
   bool runPipeline(enum iree_compiler_pipeline_t pipeline);
   Error *outputIR(Output &output);
   Error *outputVMBytecode(Output &output);
@@ -542,7 +550,8 @@ struct Invocation {
   std::optional<SourceMgrDiagnosticHandler> consoleDiagnosticHandler;
   std::optional<FormattingDiagnosticHandler> callbackDiagnosticHandler;
 
-  OwningOpRef<Operation *> parsedModule;
+  Operation *parsedModule = nullptr;
+  bool parsedModuleIsOwned = false;
 
   // Run options.
   std::string compileToPhaseName{"end"};
@@ -577,6 +586,12 @@ Invocation::Invocation(Session &session)
   // The PluginSession implements PipelineExtensions and delegates it to
   // activated plugins.
   pipelineHooks.pipelineExtensions = &session.pluginSession;
+}
+
+Invocation::~Invocation() {
+  if (parsedModuleIsOwned) {
+    parsedModule->erase();
+  }
 }
 
 bool Invocation::initializeInvocation() {
@@ -625,24 +640,29 @@ bool Invocation::parseSource(Source &source) {
   if (!initializeInvocation()) {
     return false;
   }
-  parsedModule =
+  OwningOpRef<ModuleOp> ownedModule =
       mlir::parseSourceFile<ModuleOp>(source.sourceMgr, &session.context);
-  if (!parsedModule || failed(mlir::verify(*parsedModule))) {
+  if (!ownedModule || failed(mlir::verify(*ownedModule))) {
     return false;
   }
+
+  // Transfer to the instance.
+  parsedModule = ownedModule.release();
+  parsedModuleIsOwned = true;
   return true;
 }
 
-bool Invocation::importModule(OwningOpRef<Operation *> inputModule) {
+bool Invocation::importModule(Operation *inputModule, bool steal) {
   // Take ownership of the module first so we don't have anything dangling
   // on error.
-  parsedModule = std::move(inputModule);
+  this->parsedModule = inputModule;
+  this->parsedModuleIsOwned = steal;
 
   if (!initializeInvocation()) {
     return false;
   }
   if (enableVerifier) {
-    if (failed(mlir::verify(*parsedModule))) {
+    if (failed(mlir::verify(parsedModule))) {
       return false;
     }
   }
@@ -661,7 +681,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
           }
         });
     if (!compileToPhase) {
-      (*parsedModule)->emitError()
+      parsedModule->emitError()
           << "unrecognized compile-to phase name: " << compileToPhaseName;
       return false;
     }
@@ -674,14 +694,14 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     break;
   }
   case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
-    auto &bodyBlock = (*parsedModule)->getRegion(0).front();
+    auto &bodyBlock = parsedModule->getRegion(0).front();
     auto executableOps =
         llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableOp>());
     auto sourceOps =
         llvm::to_vector(bodyBlock.getOps<IREE::HAL::ExecutableSourceOp>());
     size_t usableOpCount = executableOps.size() + sourceOps.size();
     if (usableOpCount != 1) {
-      (*parsedModule)->emitError()
+      parsedModule->emitError()
           << "HAL executable translation requires "
              "exactly 1 top level hal.executable/hal.executable.source "
              "op";
@@ -692,20 +712,19 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     break;
   }
   default:
-    (*parsedModule)->emitError()
-        << "unsupported pipeline type " << (int)pipeline;
+    parsedModule->emitError() << "unsupported pipeline type " << (int)pipeline;
     return false;
   }
 
   passManager.enableVerifier(enableVerifier);
-  if (failed(passManager.run(parsedModule.get()))) {
+  if (failed(passManager.run(parsedModule))) {
     return false;
   }
   return true;
 }
 
 Error *Invocation::outputIR(Output &output) {
-  (*output.outputStream) << *parsedModule.get();
+  (*output.outputStream) << *parsedModule;
   return output.getWriteError();
 }
 
@@ -722,7 +741,7 @@ Error *Invocation::outputVMBytecode(Output &output) {
                                        session.bytecodeTargetOptions,
                                        *output.outputStream);
   } else {
-    (*parsedModule)->emitError() << "expected a vm.module or builtin.module";
+    parsedModule->emitError() << "expected a vm.module or builtin.module";
   }
   if (failed(result)) {
     return new Error("failed to generate bytecode");
@@ -746,7 +765,7 @@ Error *Invocation::outputVMCSource(Output &output) {
     result = mlir::iree_compiler::IREE::VM::translateModuleToC(
         builtinModule, session.cTargetOptions, *output.outputStream);
   } else {
-    (*parsedModule)->emitError() << "expected a vm.module or builtin.module";
+    parsedModule->emitError() << "expected a vm.module or builtin.module";
   }
   if (failed(result)) {
     return new Error("failed to generate bytecode");
@@ -758,7 +777,7 @@ Error *Invocation::outputVMCSource(Output &output) {
 
 Error *Invocation::outputHALExecutable(Output &output) {
   // Extract the serialized binary representation from the executable.
-  auto &block = (*parsedModule)->getRegion(0).front();
+  auto &block = parsedModule->getRegion(0).front();
   auto executableOp = *(block.getOps<IREE::HAL::ExecutableOp>().begin());
   auto binaryOps =
       llvm::to_vector(executableOp.getOps<IREE::HAL::ExecutableBinaryOp>());
@@ -1210,12 +1229,20 @@ void ireeCompilerRegisterDialects(MlirDialectRegistry registry) {
   mlir::iree_compiler::registerLLVMIRTranslations(*cppRegistry);
 }
 
-MlirContext ireeCompilerSessionGetContext(iree_compiler_session_t *session) {
+MlirContext ireeCompilerSessionBorrowContext(iree_compiler_session_t *session) {
   return wrap(&unwrap(session)->context);
 }
 
-bool ireeCompilerInvocationImportModule(iree_compiler_invocation_t *inv,
-                                        MlirOperation moduleOp) {
-  mlir::OwningOpRef<mlir::Operation *> cppOwnedModule(unwrap(moduleOp));
-  return unwrap(inv)->importModule(std::move(cppOwnedModule));
+MlirContext ireeCompilerSessionStealContext(iree_compiler_session_t *session) {
+  return wrap(unwrap(session)->ownedContext.release());
+}
+
+bool ireeCompilerInvocationImportBorrowModule(iree_compiler_invocation_t *inv,
+                                              MlirOperation moduleOp) {
+  return unwrap(inv)->importModule(unwrap(moduleOp), /*steal=*/false);
+}
+
+bool ireeCompilerInvocationImportStealModule(iree_compiler_invocation_t *inv,
+                                             MlirOperation moduleOp) {
+  return unwrap(inv)->importModule(unwrap(moduleOp), /*steal=*/true);
 }
