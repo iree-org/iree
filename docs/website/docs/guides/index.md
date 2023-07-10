@@ -25,3 +25,7 @@ Guides for specific configurations:
 * [CPU - Bare-Metal](./deployment-configurations/bare-metal.md)
 * [GPU - Vulkan](./deployment-configurations/gpu-vulkan.md)
 * [GPU - CUDA/ROCm](./deployment-configurations/gpu-cuda-rocm.md)
+
+## Other topics
+
+* [Developer tips and tricks](./developer-tips.md)
