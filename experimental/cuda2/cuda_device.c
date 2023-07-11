@@ -539,7 +539,7 @@ static iree_status_t iree_hal_cuda2_device_queue_alloca(
   // indicates that the stream is unchanged (it's not really since we waited
   // above, but we at least won't deadlock like this).
   if (iree_status_is_ok(status)) {
-    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
   return status;
 }
@@ -573,7 +573,7 @@ static iree_status_t iree_hal_cuda2_device_queue_dealloca(
   // indicates that the stream is unchanged (it's not really since we waited
   // above, but we at least won't deadlock like this).
   if (iree_status_is_ok(status)) {
-    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
   return status;
 }
@@ -599,9 +599,9 @@ static iree_status_t iree_hal_cuda2_device_queue_execute(
   // TODO(antiagainst): implement semaphores - for now this conservatively
   // synchronizes after every submit.
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "cuStreamSynchronize");
-  IREE_CUDA_RETURN_IF_ERROR(device->cuda_symbols,
-                            cuStreamSynchronize(device->cu_stream),
-                            "cuStreamSynchronize");
+  IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(z0, device->cuda_symbols,
+                                         cuStreamSynchronize(device->cu_stream),
+                                         "cuStreamSynchronize");
   iree_hal_cuda2_tracing_context_collect(device->tracing_context);
   IREE_TRACE_ZONE_END(z0);
 
