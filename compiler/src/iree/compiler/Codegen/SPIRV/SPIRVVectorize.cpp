@@ -16,9 +16,6 @@
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -30,6 +27,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -406,7 +404,7 @@ public:
       RewritePatternSet patterns(context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-      vector::populateVectorTransferTensorSliceTransforms(patterns);
+      tensor::populateFoldTensorSubsetOpPatterns(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -555,7 +553,7 @@ public:
 
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-      vector::populateVectorTransferTensorSliceTransforms(patterns);
+      tensor::populateFoldTensorSubsetOpPatterns(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -645,7 +643,7 @@ public:
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-      vector::populateVectorTransferTensorSliceTransforms(patterns);
+      tensor::populateFoldTensorSubsetOpPatterns(patterns);
       vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
       scf::IfOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

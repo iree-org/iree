@@ -6,16 +6,13 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
-#include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
@@ -279,7 +276,7 @@ void GenericVectorizationPass::runOnOperation() {
                                                       funcOp.getContext());
   vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                        funcOp.getContext());
-  vector::populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
+  tensor::populateFoldTensorSubsetOpPatterns(vectorizationPatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the

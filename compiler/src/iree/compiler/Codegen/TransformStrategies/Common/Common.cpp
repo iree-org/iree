@@ -346,7 +346,9 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
   buildCanonicalizationAndEnablingTransforms(
       b, funcH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyReassociativeReshapeFoldingPatternsOp>(loc);
-        b.create<transform::ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
+        b.create<
+            transform::ApplyFoldTensorSubsetOpsIntoVectorTransfersPatternsOp>(
+            loc);
       });
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
