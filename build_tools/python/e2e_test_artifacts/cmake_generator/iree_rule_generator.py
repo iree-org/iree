@@ -11,7 +11,7 @@ from typing import Dict, List, Sequence
 import pathlib
 
 from benchmark_suites.iree import benchmark_presets
-from e2e_test_artifacts import iree_artifacts
+from e2e_test_artifacts import iree_artifacts, utils
 from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import iree_definitions
 import cmake_builder.rules
@@ -66,8 +66,8 @@ class IreeRuleBuilder(object):
                 cmake_rules=[],
             )
 
-        # Import target name: iree-imported-model-<imported_model_id>
-        target_name = f"iree-imported-model-{imported_model.composite_id}"
+        # Import target name: iree-imported-model-<imported_model_name>
+        target_name = utils.get_safe_name(f"iree-imported-model-{imported_model.name}")
 
         import_flags = import_config.materialize_import_flags(model)
         if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
@@ -109,8 +109,10 @@ class IreeRuleBuilder(object):
             module_dir_path=output_file_path.parent
         )
 
-        # Module target name: iree-module-<gen_config_id>
-        target_name = f"iree-module-{module_generation_config.composite_id}"
+        # Module target name: iree-module-<gen_config_name>
+        target_name = utils.get_safe_name(
+            f"iree-module-{module_generation_config.name}"
+        )
 
         cmake_rules = [
             cmake_builder.rules.build_iree_bytecode_module(

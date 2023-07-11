@@ -14,6 +14,14 @@ on:
     - cron: '0 09,21 * * *'
   workflow_dispatch:
 
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit). The workflow name is prepended to avoid conflicts between
+  # different workflows.
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   # This needs to be in env instead of the outputs of setup because it contains
   # the run attempt and we want that to be the current attempt, not whatever

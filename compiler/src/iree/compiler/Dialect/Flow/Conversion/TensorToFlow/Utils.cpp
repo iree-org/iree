@@ -132,9 +132,9 @@ convertInsertSliceOpToFlowUpdateOp(RewriterBase &rewriter,
                                                     insertOp.getMixedOffsets());
   Value dest = insertOp.getDest();
   auto destDynamicDims = tensor::createDynamicDimValues(rewriter, loc, dest);
-  rewriter.replaceOpWithNewOp<TensorUpdateOp>(
-      insertOp, insertOp.getType(), dest, destDynamicDims, offsetVals, source,
-      sourceDynamicDims, rewriter.getIndexArrayAttr({0}));
+  rewriter.replaceOpWithNewOp<TensorUpdateOp>(insertOp, insertOp.getType(),
+                                              dest, destDynamicDims, offsetVals,
+                                              source, sourceDynamicDims);
   return success();
 }
 

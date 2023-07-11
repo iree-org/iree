@@ -8,7 +8,7 @@ import pathlib
 import unittest
 
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_artifacts import model_artifacts, iree_artifacts
+from e2e_test_artifacts import model_artifacts, iree_artifacts, utils
 
 
 class IreeArtifactsTest(unittest.TestCase):
@@ -29,10 +29,12 @@ class IreeArtifactsTest(unittest.TestCase):
             imported_model=imported_model, root_path=root_path
         )
 
+        filename = utils.get_safe_name(
+            f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{imported_model.name}.mlir"
+        )
         self.assertEqual(
             path,
-            root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.name}_"
-            f"{imported_model.composite_id}.mlir",
+            root_path / filename,
         )
 
     def test_get_imported_model_path_with_mlir_model(self):
@@ -87,10 +89,12 @@ class IreeArtifactsTest(unittest.TestCase):
             module_generation_config=gen_config, root_path=root_path
         )
 
+        filename = utils.get_safe_name(
+            f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_module_{gen_config.name}"
+        )
         self.assertEqual(
             path,
-            root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.name}_"
-            f"module_{gen_config.composite_id}",
+            root_path / filename,
         )
 
     def test_get_dependent_model_map(self):

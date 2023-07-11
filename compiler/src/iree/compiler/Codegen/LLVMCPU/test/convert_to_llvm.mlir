@@ -85,7 +85,7 @@ module attributes {
       cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+fma,+bmi,+bmi2,+pclmul,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+rdrnd,+sahf,+x87,+xsave,+xsaveopt",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 32 : index,
-      target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = true}>} {
+      target_triple = "x86_64-none-elf", ukernels = true}>} {
   func.func private @paramstruct_cconv_with_extra_fields_and_executable_target(memref<f32>, i32, f64) -> (f32) attributes {
       hal.import.bitcode = true,
       hal.import.cconv = 1 : i32,

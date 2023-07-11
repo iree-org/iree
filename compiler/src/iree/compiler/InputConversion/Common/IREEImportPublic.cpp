@@ -8,7 +8,6 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -19,7 +18,6 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -53,8 +51,106 @@ public:
   IREETypeConverter();
 };
 
+//===----------------------------------------------------------------------===//
+// Attributes conversion from IREE::Input to IREE::HAL.
+//===----------------------------------------------------------------------===//
+
+template <typename To, typename From, typename Converter>
+static SmallVector<To> convertAttributes(ArrayRef<From> src, Converter fn) {
+  SmallVector<To> result;
+  llvm::transform(src, std::back_inserter(result), fn);
+  return result;
+}
+
+template <typename To, typename From, typename Converter>
+static ArrayAttr convertArrayAttribute(ArrayAttr src, Converter fn) {
+  SmallVector<Attribute> result;
+  for (auto attr : src) {
+    if (auto arr = attr.dyn_cast<ArrayAttr>()) {
+      result.push_back(convertArrayAttribute<To, From, Converter>(arr, fn));
+    } else {
+      result.push_back(fn(attr.template cast<From>()));
+    }
+  }
+  return ArrayAttr::get(src.getContext(), result);
+}
+
+static IREE::HAL::DescriptorType
+convertDescriptorType(IREE::Input::DescriptorType src) {
+  switch (src) {
+  case IREE::Input::DescriptorType::StorageBuffer:
+    return IREE::HAL::DescriptorType::StorageBuffer;
+  case IREE::Input::DescriptorType::UniformBuffer:
+    return IREE::HAL::DescriptorType::UniformBuffer;
+  }
+}
+
+static std::optional<IREE::HAL::DescriptorFlags>
+convertDescriptorFlags(std::optional<IREE::Input::DescriptorFlags> src) {
+  if (!src.has_value())
+    return std::nullopt;
+
+  switch (*src) {
+  case IREE::Input::DescriptorFlags::None:
+    return IREE::HAL::DescriptorFlags::None;
+  case IREE::Input::DescriptorFlags::ReadOnly:
+    return IREE::HAL::DescriptorFlags::ReadOnly;
+  }
+}
+
+static IREE::HAL::DescriptorSetBindingAttr
+convertDescriptorSetBinding(IREE::Input::DescriptorSetBindingAttr src) {
+  return IREE::HAL::DescriptorSetBindingAttr::get(
+      src.getContext(), src.getOrdinal(), convertDescriptorType(src.getType()),
+      convertDescriptorFlags(src.getFlags()));
+}
+
+static IREE::HAL::DescriptorSetLayoutAttr
+convertDescriptorSetLayout(IREE::Input::DescriptorSetLayoutAttr src) {
+  return IREE::HAL::DescriptorSetLayoutAttr::get(
+      src.getContext(), src.getOrdinal(),
+      convertAttributes<IREE::HAL::DescriptorSetBindingAttr>(
+          src.getBindings(), convertDescriptorSetBinding));
+}
+
+static IREE::HAL::PipelineLayoutAttr
+convertPipelineLayout(IREE::Input::PipelineLayoutAttr src) {
+  return IREE::HAL::PipelineLayoutAttr::get(
+      src.getContext(), src.getPushConstants(),
+      convertAttributes<IREE::HAL::DescriptorSetLayoutAttr>(
+          src.getSetLayouts(), convertDescriptorSetLayout));
+}
+
+static IREE::HAL::ExecutableObjectAttr
+convertExecutableObject(IREE::Input::ExecutableObjectAttr src) {
+  return IREE::HAL::ExecutableObjectAttr::get(src.getContext(), src.getPath(),
+                                              src.getData());
+}
+
+static IREE::HAL::ExecutableTargetAttr
+convertExecutableTarget(IREE::Input::ExecutableTargetAttr src) {
+  return IREE::HAL::ExecutableTargetAttr::get(src.getContext(),
+                                              src.getBackend(), src.getFormat(),
+                                              src.getConfiguration());
+}
+
+static IREE::HAL::ExecutableObjectsAttr
+convertExecutableObjects(IREE::Input::ExecutableObjectsAttr src) {
+  return IREE::HAL::ExecutableObjectsAttr::get(
+      src.getContext(),
+      convertArrayAttribute<IREE::HAL::ExecutableTargetAttr,
+                            IREE::Input::ExecutableTargetAttr>(
+          src.getTargets(), convertExecutableTarget),
+      convertArrayAttribute<IREE::HAL::ExecutableObjectAttr,
+                            IREE::Input::ExecutableObjectAttr>(
+          src.getTargetObjects(), convertExecutableObject));
+}
+
+//===----------------------------------------------------------------------===//
 // Generic 1:1 conversion pattern which effectively just renames an op.
 // It does not support regions or ops with successors.
+//===----------------------------------------------------------------------===//
+
 class OneToOneConverionPattern : public ConversionPattern {
 public:
   OneToOneConverionPattern(TypeConverter &converter, StringRef srcName,
@@ -83,12 +179,15 @@ private:
   StringRef targetName;
 };
 
-class BufferViewToTensorPattern
-    : public OpConversionPattern<IREE::Input::BufferViewToTensorOp> {
-  using OpConversionPattern<
-      IREE::Input::BufferViewToTensorOp>::OpConversionPattern;
+//===----------------------------------------------------------------------===//
+// Tensor operations conversion patterns
+//===----------------------------------------------------------------------===//
+
+class TensorImportPattern
+    : public OpConversionPattern<IREE::Input::TensorImportOp> {
+  using OpConversionPattern<IREE::Input::TensorImportOp>::OpConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Input::TensorImportOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     TensorType resultType = llvm::dyn_cast_if_present<TensorType>(
         typeConverter->convertType(srcOp.getTarget().getType()));
@@ -112,12 +211,11 @@ class BufferViewToTensorPattern
   }
 };
 
-class TensorToBufferViewPattern
-    : public OpConversionPattern<IREE::Input::TensorToBufferViewOp> {
-  using OpConversionPattern<
-      IREE::Input::TensorToBufferViewOp>::OpConversionPattern;
+class TensorExportPattern
+    : public OpConversionPattern<IREE::Input::TensorExportOp> {
+  using OpConversionPattern<IREE::Input::TensorExportOp>::OpConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Input::TensorExportOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type resultType = typeConverter->convertType(srcOp.getTarget().getType());
     auto sourceType = llvm::dyn_cast<TensorType>(adaptor.getSource().getType());
@@ -141,6 +239,44 @@ class TensorToBufferViewPattern
     return success();
   }
 };
+
+//===----------------------------------------------------------------------===//
+// Executable source conversion patterns
+//===----------------------------------------------------------------------===//
+
+class ExecutableSourcePattern
+    : public OpConversionPattern<IREE::Input::ExecutableSourceOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Input::ExecutableSourceOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto halSource = rewriter.create<IREE::HAL::ExecutableSourceOp>(
+        srcOp.getLoc(), srcOp.getSymVisibilityAttr(), srcOp.getSymNameAttr(),
+        convertExecutableObjects(srcOp.getObjectsAttr()));
+    rewriter.inlineRegionBefore(srcOp.getBody(), halSource.getBody(),
+                                halSource.getBody().end());
+    rewriter.eraseOp(srcOp);
+    return success();
+  }
+};
+
+class ExecutableExportPattern
+    : public OpConversionPattern<IREE::Input::ExecutableExportOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Input::ExecutableExportOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::ExecutableExportOp>(
+        srcOp, srcOp.getSymNameAttr(), srcOp.getOrdinalAttr(),
+        convertPipelineLayout(srcOp.getLayout()), srcOp.getWorkgroupSizeAttr(),
+        srcOp.getSubgroupSizeAttr(), srcOp.getWorkgroupLocalMemoryAttr());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 
 class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
@@ -262,6 +398,9 @@ public:
 
 IREETypeConverter::IREETypeConverter() {
   addConversion([](Type t) { return t; });
+  addConversion([=](IREE::Input::BufferType t) {
+    return IREE::HAL::BufferType::get(t.getContext());
+  });
   addConversion([=](IREE::Input::BufferViewType t) {
     return IREE::HAL::BufferViewType::get(t.getContext());
   });
@@ -331,17 +470,18 @@ void IREEImportPublicPass::runOnOperation() {
   patterns.insert<GenericTypeConvert>(typeConverter, &getContext(), 0);
   patterns.insert<BuiltinFuncOpPattern>(typeConverter, &getContext(),
                                         specific_benefit);
-  patterns.insert<BufferViewToTensorPattern>(typeConverter, &getContext(),
-                                             specific_benefit);
-  patterns.insert<TensorToBufferViewPattern>(typeConverter, &getContext(),
-                                             specific_benefit);
   patterns.insert<GlobalOpPattern>(typeConverter, &getContext(), 0);
+  patterns.insert<TensorExportPattern, TensorImportPattern>(
+      typeConverter, &getContext(), specific_benefit);
+  patterns.insert<ExecutableSourcePattern, ExecutableExportPattern>(
+      typeConverter, &getContext(), specific_benefit);
 
 #define ONE_TO_ONE(SrcOpTy, TargetOpTy)                                        \
   patterns.insert<OneToOneConverionPattern>(                                   \
       typeConverter, SrcOpTy::getOperationName(),                              \
       TargetOpTy::getOperationName(), &getContext(), specific_benefit)
 
+  ONE_TO_ONE(IREE::Input::BufferViewCreateOp, IREE::HAL::BufferViewCreateOp);
   ONE_TO_ONE(IREE::Input::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
   ONE_TO_ONE(IREE::Input::BufferViewDimOp, IREE::HAL::BufferViewDimOp);
   ONE_TO_ONE(IREE::Input::ListCreateOp, IREE::Util::ListCreateOp);
@@ -358,6 +498,7 @@ void IREEImportPublicPass::runOnOperation() {
   ONE_TO_ONE(IREE::Input::TensorStoreOp, IREE::Flow::TensorStoreOp);
   ONE_TO_ONE(IREE::Input::TensorUpdateOp, IREE::Flow::TensorUpdateOp);
   ONE_TO_ONE(IREE::Input::TensorTraceOp, IREE::Flow::TensorTraceOp);
+  ONE_TO_ONE(IREE::Input::DispatchOp, IREE::Flow::DispatchOp);
   ONE_TO_ONE(IREE::Input::GlobalAddressOp, IREE::Util::GlobalAddressOp);
   ONE_TO_ONE(IREE::Input::GlobalLoadOp, IREE::Util::GlobalLoadOp);
   ONE_TO_ONE(IREE::Input::GlobalLoadIndirectOp,
@@ -365,6 +506,10 @@ void IREEImportPublicPass::runOnOperation() {
   ONE_TO_ONE(IREE::Input::GlobalStoreOp, IREE::Util::GlobalStoreOp);
   ONE_TO_ONE(IREE::Input::GlobalStoreIndirectOp,
              IREE::Util::GlobalStoreIndirectOp);
+  ONE_TO_ONE(IREE::Input::OptimizationBarrierOp,
+             IREE::Util::OptimizationBarrierOp);
+  ONE_TO_ONE(IREE::Input::ExecutableSourceEndOp,
+             IREE::HAL::ExecutableSourceEndOp);
 
   if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
     signalPassFailure();

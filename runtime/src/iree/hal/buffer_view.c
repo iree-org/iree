@@ -142,10 +142,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank) {
   IREE_ASSERT_ARGUMENT(buffer_view);
-  IREE_ASSERT_ARGUMENT(out_shape);
-  if (out_shape_rank) {
-    *out_shape_rank = 0;
-  }
 
   if (out_shape_rank) {
     *out_shape_rank = buffer_view->shape_rank;
@@ -155,6 +151,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_shape(
     return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
 
+  IREE_ASSERT(buffer_view->shape_rank == 0 || out_shape);
   for (iree_host_size_t i = 0; i < buffer_view->shape_rank; ++i) {
     out_shape[i] = buffer_view->shape[i];
   }

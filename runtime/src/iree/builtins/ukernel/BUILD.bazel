@@ -105,19 +105,21 @@ if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
     inline = True,
 )
 
-UKERNEL_BASE_SRCS = [
-    "mmt4d.c",
-    "mmt4d_tile.c",
-    "pack.c",
-    "pack_tile.c",
-    "query_tile_sizes.c",
-    "unpack_tile.c",
-    "weak.c",
-]
-
 [iree_bitcode_library(
     name = "ukernel_bitcode_%sbit_base" % bitness,
-    srcs = UKERNEL_BASE_SRCS,
+    srcs = [
+        "mmt4d.c",
+        "mmt4d_tile.c",
+        "pack.c",
+        "pack_tile.c",
+        "query_tile_sizes.c",
+        "unpack_tile.c",
+        "weak.c",
+    ],
+    # wasm_X here is a proxy for "some reasonable X-bit architecture". The
+    # exact architecture should not matter (other than bitness) as the code here
+    # is not architecture-specialized, and ukernel source code is carefully
+    # written to be completely stand-alone.
     arch = "wasm_%s" % bitness,
     internal_hdrs = [
         ":internal_headers_filegroup",
@@ -134,7 +136,9 @@ c_embed_data(
         ":ukernel_bitcode_32bit_base.bc",
         ":ukernel_bitcode_64bit_base.bc",
         "//runtime/src/iree/builtins/ukernel/arch/arm_64:ukernel_bitcode_arm_64.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/arm_64:ukernel_bitcode_arm_64_entry_points.bc",
         "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64_entry_points.bc",
     ],
     c_file_output = "ukernel_bitcode.c",
     flatten = True,

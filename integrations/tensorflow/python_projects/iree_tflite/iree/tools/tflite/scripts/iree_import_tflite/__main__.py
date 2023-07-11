@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 import sys
 import iree.tools.tflite
-from tensorflow.python.pywrap_mlir import experimental_tflite_to_tosa_bytecode
+from tensorflow.mlir.experimental import tflite_to_tosa_bytecode
 
 
 def main():
@@ -66,7 +66,7 @@ def tflite_to_tosa(
     ordered_input_arrays=None,
     ordered_output_arrays=None,
 ):
-    experimental_tflite_to_tosa_bytecode(
+    tflite_to_tosa_bytecode(
         flatbuffer,
         bytecode,
         use_external_constant,

@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -64,55 +65,9 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
       }
     }
 
-    OpBuilder::InsertionGuard g(rewriter);
-    Location loc = padTensorOp.getLoc();
-    auto lowPad = padTensorOp.getMixedLowPad();
-    auto highPad = padTensorOp.getMixedHighPad();
-    Value source = padTensorOp.getSource();
-    RankedTensorType sourceType = padTensorOp.getSourceType();
-    int64_t rank = sourceType.getRank();
-
-    // TODO(ravishankarm): Use shape inference interface to get this.
-    SmallVector<OpFoldResult> sourceShape;
-    SmallVector<OpFoldResult> outputShape;
-    for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
-      SmallVector<Value> mapValues;
-      Value sourceDim = rewriter.createOrFold<tensor::DimOp>(loc, source, dim);
-      mapValues.push_back(sourceDim);
-      if (auto cstDim = sourceDim.getDefiningOp<arith::ConstantIndexOp>()) {
-        sourceShape.push_back(cstDim.getValue());
-      } else {
-        sourceShape.push_back(sourceDim);
-      }
-      AffineExpr expr = rewriter.getAffineDimExpr(0);
-      unsigned numSymbols = 0;
-      auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          e = e + llvm::cast<IntegerAttr>(attr).getInt();
-          return e;
-        }
-        e = e + rewriter.getAffineSymbolExpr(numSymbols++);
-        mapValues.push_back(valueOrAttr.get<Value>());
-        return e;
-      };
-      expr = addValueOrAttr(expr, lowPad[dim]);
-      expr = addValueOrAttr(expr, highPad[dim]);
-      Value v = affine::applyMapToValues(
-          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
-      if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
-        outputShape.push_back(cst.getValue());
-      } else {
-        outputShape.push_back(v);
-      }
-    }
-    Value emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, outputShape, sourceType.getElementType());
-    Value fill = rewriter.create<linalg::FillOp>(loc, yieldVal, emptyTensor)
-                     .getResult(0);
-    SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
-    rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
-        padTensorOp, source, fill, lowPad, sourceShape, strides);
-    return success();
+    // Rewrite tensor.pad to tensor.empty + linalg.fill + tensor.insert_slice.
+    return static_cast<LogicalResult>(
+        linalg::rewriteInDestinationPassingStyle(rewriter, padTensorOp));
   }
 
 private:

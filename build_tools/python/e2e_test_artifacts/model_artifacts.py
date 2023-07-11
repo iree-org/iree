@@ -3,11 +3,12 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Helpers that generates paths for model artifacts."""
+"""Helpers that generate paths for model artifacts."""
 
 import pathlib
 import urllib.parse
 
+from e2e_test_artifacts import utils
 from e2e_test_framework.definitions import common_definitions
 
 MODEL_ARTIFACT_PREFIX = "model"
@@ -34,5 +35,6 @@ def get_model_path(
         file_exts.pop()
     model_ext = "".join(file_exts)
 
-    # Model path: <root_path>/<model_artifact_prefix>_<model_id>_<model_name><model_ext>
-    return root_path / f"{MODEL_ARTIFACT_PREFIX}_{model.id}_{model.name}{model_ext}"
+    # Model path: <root_path>/<model_artifact_prefix>_<model_name><model_ext>
+    filename = utils.get_safe_name(model.name + model_ext)
+    return root_path / f"{MODEL_ARTIFACT_PREFIX}_{filename}"

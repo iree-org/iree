@@ -2670,15 +2670,6 @@ DEFINE_OP_GET_EFFECTS(AttentionOp)
 // iree_linalg_ext.set_encoding
 //===----------------------------------------------------------------------===//
 
-void SetEncodingOp::build(OpBuilder &builder, OperationState &state,
-                          Value source, TensorEncoding encoding) {
-  auto encodingAttr = EncodingAttr::get(builder.getContext(), encoding);
-  auto sourceType = source.getType().cast<RankedTensorType>();
-  RankedTensorType encodingType = RankedTensorType::get(
-      sourceType.getShape(), sourceType.getElementType(), encodingAttr);
-  build(builder, state, encodingType, source);
-}
-
 LogicalResult SetEncodingOp::verify() {
   // Source and the result have the same rank.
   if (getSourceType().getEncoding()) {
@@ -2709,14 +2700,6 @@ LogicalResult SetEncodingOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 // iree_linalg_ext.unset_encoding
 //===----------------------------------------------------------------------===//
-
-void UnsetEncodingOp::build(OpBuilder &builder, OperationState &state,
-                            Value source) {
-  auto sourceType = source.getType().cast<RankedTensorType>();
-  auto resultType =
-      RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
-  return build(builder, state, resultType, source);
-}
 
 LogicalResult UnsetEncodingOp::verify() {
   if (getResultType().getEncoding()) {

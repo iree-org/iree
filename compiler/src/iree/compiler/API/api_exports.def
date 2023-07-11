@@ -13,7 +13,8 @@ EXPORTS
   ireeCompilerInvocationDestroy
   ireeCompilerInvocationEnableCallbackDiagnostics
   ireeCompilerInvocationEnableConsoleDiagnostics
-  ireeCompilerInvocationImportModule
+  ireeCompilerInvocationImportBorrowModule
+  ireeCompilerInvocationImportStealModule
   ireeCompilerInvocationOutputHALExecutable
   ireeCompilerInvocationOutputIR
   ireeCompilerInvocationOutputVMBytecode
@@ -33,11 +34,12 @@ EXPORTS
   ireeCompilerRegisterDialects
   ireeCompilerRunLldMain
   ireeCompilerRunMain
+  ireeCompilerSessionBorrowContext
   ireeCompilerSessionCreate
   ireeCompilerSessionDestroy
-  ireeCompilerSessionGetContext
   ireeCompilerSessionGetFlags
   ireeCompilerSessionSetFlags
+  ireeCompilerSessionStealContext
   ireeCompilerSetupGlobalCL
   ireeCompilerSourceDestroy
   ireeCompilerSourceOpenFile
@@ -303,7 +305,6 @@ EXPORTS
   mlirF32TypeGet
   mlirF64TypeGet
   mlirFlatSymbolRefAttrGet
-  mlirFlatSymbolRefAttrGetTypeID
   mlirFlatSymbolRefAttrGetValue
   mlirFloat16TypeGetTypeID
   mlirFloat32TypeGetTypeID
@@ -322,6 +323,7 @@ EXPORTS
   mlirFloatAttrDoubleGetChecked
   mlirFloatAttrGetTypeID
   mlirFloatAttrGetValueDouble
+  mlirFloatTF32TypeGetTypeID
   mlirFunctionTypeGet
   mlirFunctionTypeGetInput
   mlirFunctionTypeGetNumInputs
@@ -544,6 +546,7 @@ EXPORTS
   mlirSymbolTableLookup
   mlirSymbolTableReplaceAllSymbolUses
   mlirSymbolTableWalkSymbolTables
+  mlirTF32TypeGet
   mlirTransformAnyOpTypeGet
   mlirTransformOperationTypeGet
   mlirTransformOperationTypeGetOperationName
@@ -590,6 +593,7 @@ EXPORTS
   mlirTypeIsAPDLValueType
   mlirTypeIsARankedTensor
   mlirTypeIsAShaped
+  mlirTypeIsATF32
   mlirTypeIsATensor
   mlirTypeIsATransformAnyOpType
   mlirTypeIsATransformOperationType

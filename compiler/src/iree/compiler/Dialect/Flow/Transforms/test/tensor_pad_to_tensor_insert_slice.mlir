@@ -32,6 +32,8 @@ module  {
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       ins(%[[VAL]] :
 //  CHECK-SAME:       outs(%[[INIT]] :
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //       CHECK:   %[[RESULT:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][4, %[[ARG2]]] [%[[D0]], %[[D1]]] [1, 1]
 //       CHECK:   return %[[RESULT]]
 

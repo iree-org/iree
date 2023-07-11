@@ -29,7 +29,22 @@ ireeCompilerRegisterDialects(MlirDialectRegistry registry);
 // Gets the MlirContext that the session manages. The context is owned by the
 // session and valid until it is destroyed.
 MLIR_CAPI_EXPORTED MlirContext
-ireeCompilerSessionGetContext(iree_compiler_session_t *session);
+ireeCompilerSessionBorrowContext(iree_compiler_session_t *session);
+
+// Gets the MlirContext that the session manages, releasing it for external
+// management of its lifetime. If the context has already been released,
+// then {nullptr} is returned. Upon return, it is up to the caller to destroy
+// the context and ensure that its lifetime extends at least as long as the
+// session remains in use.
+MLIR_CAPI_EXPORTED MlirContext
+ireeCompilerSessionStealContext(iree_compiler_session_t *session);
+
+// Same as |ireeCompilerInvocationStealModule| but ownership of the module
+// remains with the caller, who is responsible for ensuring that it is not
+// destroyed before the invocation is destroyed.
+MLIR_CAPI_EXPORTED bool
+ireeCompilerInvocationImportBorrowModule(iree_compiler_invocation_t *inv,
+                                         MlirOperation moduleOp);
 
 // Imports an externally built MlirModule into the invocation as an alternative
 // to parsing with |ireeCompilerInvocationParseSource|.
@@ -37,8 +52,8 @@ ireeCompilerSessionGetContext(iree_compiler_session_t *session);
 // whether the call succeeds or fails.
 // On failure, returns false and issues diagnostics.
 MLIR_CAPI_EXPORTED bool
-ireeCompilerInvocationImportModule(iree_compiler_invocation_t *inv,
-                                   MlirOperation moduleOp);
+ireeCompilerInvocationImportStealModule(iree_compiler_invocation_t *inv,
+                                        MlirOperation moduleOp);
 
 #ifdef __cplusplus
 }

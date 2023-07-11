@@ -4,7 +4,7 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> !transform.any_op
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
     : (!transform.any_op) -> !transform.any_op
-  %isolated = transform.get_closest_isolated_parent %warp 
+  %isolated = transform.get_parent_op %warp {isolated_from_above} 
     : (!transform.any_op) -> !transform.any_op
   transform.iree.vector.warp_distribute %isolated
     : (!transform.any_op) -> ()

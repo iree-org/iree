@@ -272,11 +272,17 @@ Value mlir::iree_compiler::buildPad(
   SmallVector<Attribute> transposeAttrs;
   for (auto &transp : transposePaddings)
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
-  return b.create<transform::PadOp>(
-      opH.getType(), opH, b.getArrayAttr(paddingValues),
-      b.getI64ArrayAttr(paddingDimensions), b.getI64ArrayAttr(padToMultipleOf),
-      b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs),
-      /*copyBack=*/b.getBoolAttr(false));
+  SmallVector<Type> resultTypes;
+  resultTypes.push_back(opH.getType());
+  resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
+  return b
+      .create<transform::PadOp>(resultTypes, opH, b.getArrayAttr(paddingValues),
+                                b.getI64ArrayAttr(paddingDimensions),
+                                b.getI64ArrayAttr(padToMultipleOf),
+                                b.getI64ArrayAttr(packingDimensions),
+                                b.getArrayAttr(transposeAttrs),
+                                /*copyBack=*/b.getBoolAttr(false))
+      ->getResult(0);
 }
 
 /// Apply patterns and vectorize.

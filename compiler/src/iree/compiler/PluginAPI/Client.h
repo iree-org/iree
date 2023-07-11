@@ -7,12 +7,14 @@
 #ifndef IREE_COMPILER_PLUGINAPI_CLIENT_H_
 #define IREE_COMPILER_PLUGINAPI_CLIENT_H_
 
+#include <functional>
 #include <optional>
 #include <string_view>
 
 #include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace mlir {
 class DialectRegistry;
@@ -47,9 +49,23 @@ public:
   virtual ~PipelineExtensions();
 
   // Add passes to the input preprocessing pipeline, which allows to process the
-  // raw input to IREE.
+  // raw input to IREE. This applies to builtin Type enum input pipelines.
   virtual void extendInputConversionPreprocessingPassPipeline(
       OpPassManager &passManager, InputDialectOptions::Type inputType) {}
+
+  // Adds input type mnemonics that this instance supports. At least one plugin
+  // must advertise support for a custom input type in order for it to be
+  // considered valid.
+  virtual void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) {}
+
+  // Adds passes to the input preprocessing pipeline for the given
+  // InputDialectOptions::Type::plugin type with the given mnemonic.
+  // Returns true if extensions were made.
+  virtual bool
+  extendCustomInputConversionPassPipeline(OpPassManager &passManager,
+                                          std::string_view typeMnemonic) {
+    return false;
+  }
 
   // Adds passes to the |buildPreprocessingPassPipeline| pipeline at the end.
   virtual void extendPreprocessingPassPipeline(OpPassManager &passManager) {}

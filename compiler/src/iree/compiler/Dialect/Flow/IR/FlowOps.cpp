@@ -1599,7 +1599,7 @@ void TensorUpdateOp::build(OpBuilder &builder, OperationState &state,
   auto updateDims =
       IREE::Util::buildDynamicDimsForValue(state.location, update, builder);
   build(builder, state, target.getType(), target, targetDims, startIndices,
-        update, updateDims, builder.getIndexArrayAttr({0}));
+        update, updateDims);
 }
 
 LogicalResult TensorUpdateOp::verify() {

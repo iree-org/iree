@@ -10,7 +10,7 @@ from typing import Dict, Iterable, List
 import pathlib
 import urllib.parse
 
-from e2e_test_artifacts import model_artifacts
+from e2e_test_artifacts import model_artifacts, utils
 from e2e_test_framework.definitions import common_definitions
 import cmake_builder.rules
 
@@ -29,8 +29,8 @@ def generate_model_rule_map(
 
     model_rules = {}
     for model in models:
-        # Model target: <package_name>-model-<model_id>
-        target_name = f"model-{model.id}"
+        # Model target: <package_name>-model-<model_name>
+        target_name = utils.get_safe_name(f"model-{model.name}")
         model_path = model_artifacts.get_model_path(model=model, root_path=root_path)
 
         model_url = urllib.parse.urlparse(model.source_url)

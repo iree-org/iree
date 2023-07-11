@@ -119,7 +119,15 @@ We frequently need to update the runner instances. In particular, after a Runner
 release, the version of the program running on the runners must be updated
 [within 30 days](https://docs.github.com/en/enterprise-cloud@latest/actions/hosting-your-own-runners/autoscaling-with-self-hosted-runners#controlling-runner-software-updates-on-self-hosted-runners),
 otherwise the GitHub control plane will refuse their connection. Testing and
-rolling out these updates involves a few steps.
+rolling out these updates involves a few steps. Performing the runner update
+is assisted by the script [`update_instance_groups.py`](./gcp/update_instance_groups.py).
+
+The GCP API only allows querying MIGs by region, so the script has to perform a
+separate call for every region of interest. It is therefore useful to limit the
+regions to only those in which we operate. Right now, that is only the US, so
+you can pass a regex like `us-\w+` to the regions argument in the commands
+below. If we start running in non-US regions, make sure to update these
+commands!
 
 For updating the runner version in particular, you can use
 [`update_runner_version.py`](./gcp/update_runner_version.py) and skip deployment
@@ -154,7 +162,7 @@ refresh updates is a bit of a false one, as for the update to fully take affect
 for anything that happens as part of the startup script (which is basically
 everything, in our case) the VM has to restart anyway.
 
-Proactive updates can be slow because VMs generally only get deleted when they
+Opportunistic updates can be slow because VMs generally only get deleted when they
 complete a job. To speed them along, you can use
 [`remove_idle_runners.sh`](./gcp/remove_idle_runners.sh) to relatively safely
 bring down instances that aren't currently processing a job.
@@ -177,13 +185,12 @@ build_tools/github_actions/runner/gcp/update_autoscaling.sh \
   github-runner-testing-presubmit-cpu-us-west1 us-west1 1 10
 ```
 
-Update the testing instance group to your new template using
-[`update_instance_groups.py`](./gcp/update_instance_groups.py) (no need to
-canary to the test group):
+Update the testing instance group to your new template (no need to canary to the
+test group):
 
 ```shell
 build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
-  --env=testing --region=all --group=all --type=all --version="${VERSION?}"
+  --env=testing --region='us-\w+' --group=all --type=all --version="${VERSION?}"
 ```
 
 Check that your runners successfully start up and register with the GitHub UI.
@@ -213,12 +220,24 @@ changes you make need to be forward and backward compatible with changes to
 anything that is picked up directly from tip of tree (such as workflow files).
 These should be changed in separate PRs.
 
-To deploy to prod, create new prod templates. Then use the update script to
-canary to a single instance:
+To deploy to prod, create new prod templates. Then canary the new template for
+one instance in each group.
+
+Note: The a100 groups are special. We only run one instance in each group and
+have one of every type in every region, so canarying within a single instance
+group doesn't really make any sense. Also, we use the `balanced` target
+distribution shape, which theoretically means that the group manager will avoid
+zones with no available capacity (which happens a lot). This distribution shape
+is for some reason incompatible with having multiple templates. So in the
+canarying below, we treat these differently.
 
 ```shell
 build_tools/github_actions/runner/gcp/update_instance_groups.py canary \
-  --env=prod --region=all --group=all --type=all --version="${VERSION}"
+  --env=prod --region='us-\w+' --group=all --type='[^a]\w+' \
+  --version="${VERSION}"
+build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
+  --env=prod --region='us-central1' --group=all --type=a100 \
+  --version="${VERSION}"
 ```
 
 Watch to make sure that your new runners are starting up and registering as
@@ -228,7 +247,10 @@ configuration is good, complete the update with your new template:
 
 ```shell
 build_tools/github_actions/runner/gcp/update_instance_groups.py promote-canary \
-  --env=prod --region=all --group=all --type=all
+  --env=prod --region='us-\w+' --group=all --type='[^a]\w+'
+build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
+  --env=prod --region='us-\w+' --group=all --type=a100 \
+  --version="${VERSION}"
 ```
 
 ## Known Issues / Future Work

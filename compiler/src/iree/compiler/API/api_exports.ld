@@ -14,7 +14,8 @@ VER_0 {
     ireeCompilerInvocationDestroy;
     ireeCompilerInvocationEnableCallbackDiagnostics;
     ireeCompilerInvocationEnableConsoleDiagnostics;
-    ireeCompilerInvocationImportModule;
+    ireeCompilerInvocationImportBorrowModule;
+    ireeCompilerInvocationImportStealModule;
     ireeCompilerInvocationOutputHALExecutable;
     ireeCompilerInvocationOutputIR;
     ireeCompilerInvocationOutputVMBytecode;
@@ -34,11 +35,12 @@ VER_0 {
     ireeCompilerRegisterDialects;
     ireeCompilerRunLldMain;
     ireeCompilerRunMain;
+    ireeCompilerSessionBorrowContext;
     ireeCompilerSessionCreate;
     ireeCompilerSessionDestroy;
-    ireeCompilerSessionGetContext;
     ireeCompilerSessionGetFlags;
     ireeCompilerSessionSetFlags;
+    ireeCompilerSessionStealContext;
     ireeCompilerSetupGlobalCL;
     ireeCompilerSourceDestroy;
     ireeCompilerSourceOpenFile;
@@ -304,7 +306,6 @@ VER_0 {
     mlirF32TypeGet;
     mlirF64TypeGet;
     mlirFlatSymbolRefAttrGet;
-    mlirFlatSymbolRefAttrGetTypeID;
     mlirFlatSymbolRefAttrGetValue;
     mlirFloat16TypeGetTypeID;
     mlirFloat32TypeGetTypeID;
@@ -323,6 +324,7 @@ VER_0 {
     mlirFloatAttrDoubleGetChecked;
     mlirFloatAttrGetTypeID;
     mlirFloatAttrGetValueDouble;
+    mlirFloatTF32TypeGetTypeID;
     mlirFunctionTypeGet;
     mlirFunctionTypeGetInput;
     mlirFunctionTypeGetNumInputs;
@@ -545,6 +547,7 @@ VER_0 {
     mlirSymbolTableLookup;
     mlirSymbolTableReplaceAllSymbolUses;
     mlirSymbolTableWalkSymbolTables;
+    mlirTF32TypeGet;
     mlirTransformAnyOpTypeGet;
     mlirTransformOperationTypeGet;
     mlirTransformOperationTypeGetOperationName;
@@ -591,6 +594,7 @@ VER_0 {
     mlirTypeIsAPDLValueType;
     mlirTypeIsARankedTensor;
     mlirTypeIsAShaped;
+    mlirTypeIsATF32;
     mlirTypeIsATensor;
     mlirTypeIsATransformAnyOpType;
     mlirTypeIsATransformOperationType;

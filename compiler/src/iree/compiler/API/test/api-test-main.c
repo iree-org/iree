@@ -30,7 +30,7 @@ struct invocation_state_t {
 static void initializeCompiler(struct compiler_state_t *state) {
   ireeCompilerGlobalInitialize();
   state->session = ireeCompilerSessionCreate();
-  state->context = ireeCompilerSessionGetContext(state->session);
+  state->context = ireeCompilerSessionBorrowContext(state->session);
 }
 
 static void shutdownCompiler(struct compiler_state_t *state) {
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 
   // Import module.
   iree_compiler_invocation_t *inv = ireeCompilerInvocationCreate(state.session);
-  if (!ireeCompilerInvocationImportModule(inv, module)) {
+  if (!ireeCompilerInvocationImportStealModule(inv, module)) {
     // ireeCompilerInvocationCreate takes ownership of the module regardless
     // of success or error, so we let it destroy it.
     ireeCompilerInvocationDestroy(inv);

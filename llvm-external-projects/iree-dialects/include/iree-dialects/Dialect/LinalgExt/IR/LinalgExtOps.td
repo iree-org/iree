@@ -824,9 +824,6 @@ def IREELinalgExt_SetEncodingOp : IREELinalgExt_PureOp<"set_encoding",[
     attr-dict $source `:` type($source) `->` type($result)
   }];
 
-let builders = [
-    OpBuilder<(ins "Value":$source, "TensorEncoding":$encoding)>
-  ];
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
@@ -835,10 +832,6 @@ let builders = [
     }
     RankedTensorType getResultType() {
       return getResult().getType().cast<RankedTensorType>();
-    }
-    TensorEncoding getResultTensorEncoding() {
-      return getResultType().getEncoding().cast<EncodingAttr>()
-          .getEncoding().getValue();
     }
   }];
 }
@@ -859,9 +852,6 @@ def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
     attr-dict $source `:` type($source) `->` type($result)
   }];
 
-let builders = [
-    OpBuilder<(ins "Value":$source)>
-  ];
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
@@ -870,10 +860,6 @@ let builders = [
     }
     RankedTensorType getResultType() {
       return getResult().getType().cast<RankedTensorType>();
-    }
-    TensorEncoding getSourceTensorEncoding() {
-      return getSourceType().getEncoding().cast<EncodingAttr>()
-          .getEncoding().getValue();
     }
   }];
 }

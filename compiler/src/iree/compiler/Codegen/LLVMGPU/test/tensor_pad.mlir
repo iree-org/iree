@@ -50,11 +50,11 @@ func.func @transpose_no_align_dispatch_0_generic_48x32() {
 //       CHECK:      %[[D7:.*]] = flow.dispatch.tensor.load %[[D1]], offsets = {{\[}}%[[ARG0]], %[[ARG1]]], sizes = {{\[}}%[[D4]], 32], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<48x32xf32>> -> tensor<?x32xf32>
 //       CHECK:      %[[D8:.*]] = flow.dispatch.tensor.load %[[D0]], offsets = {{\[}}%[[ARG1]], %[[ARG0]]], sizes = [32, %[[D4]]], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x48xf32>> -> tensor<32x?xf32>
 //       CHECK:      %[[D9:.*]] = affine.apply #{{.*}}(%[[D4]])
-//       CHECK:      %[[D10:.*]] = tensor.pad %[[D8]] low{{\[}}%[[C0]], %[[C0]]] high{{\[}}%[[C0]], %[[D9]]] {
+//       CHECK:      %[[D10:.*]] = tensor.pad %[[D8]] low[0, 0] high[0, %[[D9]]] {
 //       CHECK:      ^bb0(%[[ARG2:.*]]: index, %[[ARG3:.*]]: index):
 //       CHECK:        tensor.yield %[[CST]] : f32
 //       CHECK:      } : tensor<32x?xf32> to tensor<32x32xf32>
-//       CHECK:      %[[D11:.*]] = tensor.pad %[[D7]] low{{\[}}%[[C0]], %[[C0]]] high{{\[}}%[[D9]], %[[C0]]] {
+//       CHECK:      %[[D11:.*]] = tensor.pad %[[D7]] low[0, 0] high[%[[D9]], 0] {
 //       CHECK:      ^bb0(%[[ARG2:.*]]: index, %[[ARG3:.*]]: index):
 //       CHECK:        tensor.yield %[[CST]] : f32
 //       CHECK:      } : tensor<?x32xf32> to tensor<32x32xf32>

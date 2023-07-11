@@ -9,6 +9,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
@@ -246,22 +247,21 @@ struct MaterializeFlowDispatchTensorStoreOp
 } // namespace
 
 IREE::LinalgExt::MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(MatmulType type, MatmulOperandRole operandRole,
-                            MatmulTileParams tileParams) {
+chooseEncodingInfoForMatmul(EncodingRole role, MatmulTileParams tileParams) {
   MaterializeEncodingInfo encodingInfo;
   encodingInfo.innerDimsPos = {0, 1};
-  switch (operandRole) {
-  case (MatmulOperandRole::LHS): {
+  switch (role) {
+  case (EncodingRole::LHS): {
     encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
     break;
   }
-  case (MatmulOperandRole::RHS): {
+  case (EncodingRole::RHS): {
     encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
     encodingInfo.innerDimsPos = {1, 0};
     encodingInfo.outerDimsPerm = {1, 0};
     break;
   }
-  case (MatmulOperandRole::RESULT): {
+  case (EncodingRole::RESULT): {
     encodingInfo.innerTileSizes = {tileParams.M, tileParams.N};
     break;
   }

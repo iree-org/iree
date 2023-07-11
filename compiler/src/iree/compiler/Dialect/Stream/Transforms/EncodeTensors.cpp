@@ -140,20 +140,8 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
     unsigned elementBitWidth =
         complexType.getElementType().getIntOrFloatBitWidth();
     assert(elementBitWidth <= 32 && "unsupported complex<f64>");
-    Type bwElemType = builder.getIntegerType(elementBitWidth);
     Type bwType = builder.getIntegerType(elementBitWidth * 2);
-    Value shiftAmount = builder.create<arith::ConstantOp>(
-        loc, bwType, builder.getIntegerAttr(bwType, elementBitWidth));
-    Value real = builder.create<mlir::complex::ReOp>(loc, pattern);
-    Value realInt = builder.create<arith::BitcastOp>(loc, bwElemType, real);
-    Value imag = builder.create<mlir::complex::ImOp>(loc, pattern);
-    Value imagInt = builder.create<arith::BitcastOp>(loc, bwElemType, imag);
-    realInt = builder.create<arith::ExtUIOp>(loc, bwType, realInt);
-    imagInt = builder.create<arith::ExtUIOp>(loc, bwType, imagInt);
-    Value shiftReal =
-        builder.create<arith::ShLIOp>(loc, bwType, realInt, shiftAmount);
-    Value orImag = builder.create<arith::OrIOp>(loc, shiftReal, imagInt);
-    return orImag;
+    return builder.create<complex::BitcastOp>(loc, bwType, pattern);
   }
 
   // Get floats into integer form first; may need additional processing below.
@@ -538,6 +526,12 @@ struct EncodeTensorLoadOp
                                 PatternRewriter &rewriter) const override {
     auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
+    auto loadType = op.getResult().getType();
+    if (auto complexTy = dyn_cast<ComplexType>(loadType)) {
+      loadType = IntegerType::get(
+          loadType.getContext(),
+          complexTy.getElementType().getIntOrFloatBitWidth() * 2);
+    }
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
@@ -550,10 +544,16 @@ struct EncodeTensorLoadOp
     // Dense:
     auto sourceOffset = calculateElementByteOffset(
         op.getLoc(), sourceType, sourceDims, op.getIndices(), rewriter);
-    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncLoadOp>(
-        op, op.getResult().getType(), op.getSource(), op.getSourceSize(),
+    Value load = rewriter.create<IREE::Stream::AsyncLoadOp>(
+        op.getLoc(), loadType, op.getSource(), op.getSourceSize(),
         sourceOffset);
 
+    if (loadType != op.getType()) {
+      load =
+          rewriter.create<complex::BitcastOp>(op.getLoc(), op.getType(), load);
+    }
+
+    rewriter.replaceOp(op, load);
     return success();
   }
 };

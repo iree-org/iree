@@ -490,10 +490,8 @@ func.func @gather_to_slice(%arg0: tensor<5x6x7xf32>) -> tensor<3x6x5xf32> {
     indices_are_sorted = false,
     slice_sizes = dense<[3, 6, 5]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6x5xf32>
   return %1 : tensor<3x6x5xf32>
-  // CHECK:      %[[RET:.*]] = "stablehlo.slice"(%arg0)
-  // CHECK-SAME:   {limit_indices = dense<[4, 6, 7]> : tensor<3xi64>,
-  // CHECK-SAME:    start_indices = dense<[1, 0, 2]> : tensor<3xi64>,
-  // CHECK-SAME:    strides = dense<1> : tensor<3xi64>} : (tensor<5x6x7xf32>) -> tensor<3x6x5xf32>
+  // CHECK:      %[[RET:.*]] = stablehlo.slice %arg0 [1:4, 0:6, 2:7]
+  // CHECK-SAME:    : (tensor<5x6x7xf32>) -> tensor<3x6x5xf32>
   // CHECK-NEXT: return %[[RET]] : tensor<3x6x5xf32>
 }
 
@@ -511,10 +509,8 @@ func.func @gather_scalar_index_to_slice(%arg0: tensor<5x6x7xf32>) -> tensor<5x6x
     indices_are_sorted = false,
     slice_sizes = dense<[5, 6, 4]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<i32>) -> tensor<5x6x4xf32>
   return %1 : tensor<5x6x4xf32>
-  // CHECK:      %[[RET:.*]] = "stablehlo.slice"(%arg0)
-  // CHECK-SAME:   {limit_indices = dense<[5, 6, 5]> : tensor<3xi64>,
-  // CHECK-SAME:    start_indices = dense<[0, 0, 1]> : tensor<3xi64>,
-  // CHECK-SAME:    strides = dense<1> : tensor<3xi64>} : (tensor<5x6x7xf32>) -> tensor<5x6x4xf32>
+  // CHECK:      %[[RET:.*]] = stablehlo.slice %arg0 [0:5, 0:6, 1:5]
+  // CHECK-SAME:    : (tensor<5x6x7xf32>) -> tensor<5x6x4xf32>
   // CHECK-NEXT: return %[[RET]] : tensor<5x6x4xf32>
 }
 
@@ -533,10 +529,8 @@ func.func @gather_to_slice_reshape(%arg0: tensor<5x6x7xf32>) -> tensor<3x6xf32> 
     indices_are_sorted = false,
     slice_sizes = dense<[3, 6, 1]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6xf32>
   return %1 : tensor<3x6xf32>
-  // CHECK:      %[[V0:.*]] = "stablehlo.slice"(%arg0)
-  // CHECK-SAME:   {limit_indices = dense<[4, 6, 3]> : tensor<3xi64>,
-  // CHECK-SAME:    start_indices = dense<[1, 0, 2]> : tensor<3xi64>,
-  // CHECK-SAME:    strides = dense<1> : tensor<3xi64>} : (tensor<5x6x7xf32>) -> tensor<3x6x1xf32>
+  // CHECK:      %[[V0:.*]] = stablehlo.slice %arg0 [1:4, 0:6, 2:3]
+  // CHECK-SAME:    : (tensor<5x6x7xf32>) -> tensor<3x6x1xf32>
   // CHECK-NEXT: %[[V1:.*]] = stablehlo.reshape %[[V0]] : (tensor<3x6x1xf32>) -> tensor<3x6xf32>
   // CHECK-NEXT: return %[[V1]] : tensor<3x6xf32>
 }
@@ -555,10 +549,8 @@ func.func @gather_to_slice_indices_clamp_upperbound(%arg0 : tensor<4x2xui32>) ->
     >, indices_are_sorted = true,
     slice_sizes = dense<[1, 2]> : tensor<2xi64>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
   return %1 : tensor<2xui32>
-  // CHECK:      %[[V0:.*]] = "stablehlo.slice"(%arg0)
-  // CHECK-SAME:   {limit_indices = dense<[4, 2]> : tensor<2xi64>,
-  // CHECK-SAME:    start_indices = dense<[3, 0]> : tensor<2xi64>,
-  // CHECK-SAME:    strides = dense<1> : tensor<2xi64>} : (tensor<4x2xui32>) -> tensor<1x2xui32>
+  // CHECK:      %[[V0:.*]] = stablehlo.slice %arg0 [3:4, 0:2]
+  // CHECK-SAME:    : (tensor<4x2xui32>) -> tensor<1x2xui32>
   // CHECK-NEXT: %[[V1:.*]] = stablehlo.reshape %[[V0]] : (tensor<1x2xui32>) -> tensor<2xui32>
   // CHECK-NEXT: return %[[V1]] : tensor<2xui32>
 }
@@ -577,10 +569,8 @@ func.func @gather_to_slice_indices_clamp_lowerbound(%arg0 : tensor<4x2xui32>) ->
     >, indices_are_sorted = true,
     slice_sizes = dense<[1, 2]> : tensor<2xi64>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
   return %1 : tensor<2xui32>
-  // CHECK:      %[[V0:.*]] = "stablehlo.slice"(%arg0)
-  // CHECK-SAME:   {limit_indices = dense<[1, 2]> : tensor<2xi64>,
-  // CHECK-SAME:    start_indices = dense<0> : tensor<2xi64>,
-  // CHECK-SAME:    strides = dense<1> : tensor<2xi64>} : (tensor<4x2xui32>) -> tensor<1x2xui32>
+  // CHECK:      %[[V0:.*]] = stablehlo.slice %arg0 [0:1, 0:2]
+  // CHECK-SAME:    : (tensor<4x2xui32>) -> tensor<1x2xui32>
   // CHECK-NEXT: %[[V1:.*]] = stablehlo.reshape %[[V0]] : (tensor<1x2xui32>) -> tensor<2xui32>
   // CHECK-NEXT: return %[[V1]] : tensor<2xui32>
 }

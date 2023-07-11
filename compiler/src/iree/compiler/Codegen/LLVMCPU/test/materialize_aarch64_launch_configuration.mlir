@@ -12,7 +12,7 @@ hal.executable private @matmul_tensors  {
   hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
-    target_triple = "aarch64-unknown-unknown-eabi-elf"
+    target_triple = "aarch64-none-elf"
   }> {
     hal.executable.export @matmul_tensors layout(#pipeline_layout)
     builtin.module {
@@ -64,7 +64,7 @@ hal.executable private @batch_matmul_tensors {
   hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
-    target_triple = "aarch64-unknown-unknown-eabi-elf"
+    target_triple = "aarch64-none-elf"
   }> {
     hal.executable.export @batch_matmul_tensors layout(#pipeline_layout)
     builtin.module {

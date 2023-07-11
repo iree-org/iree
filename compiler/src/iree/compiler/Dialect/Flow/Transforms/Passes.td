@@ -292,6 +292,12 @@ def RaiseSpecialOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
 }
 
+def RemoveZeroExtentTensors :
+    InterfacePass<"iree-flow-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
+  let summary = "Remove tensors that have 0-extents";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createRemoveZeroExtentTensorsPass()";
+}
+
 def SplitReduction :
     Pass<"iree-flow-split-reduction-ops", ""> {
   let summary = "Split reduction dimension to increase parallelism.";
