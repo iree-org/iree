@@ -812,7 +812,8 @@ static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
 
   // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
   // if the dim size is small (e.g., K=24).
-  SmallVector<int64_t> reductionTileSizes(vecTileSizes.size() - 1, 0);
+  int64_t numTilingDims = vecTileSizes.size();
+  SmallVector<int64_t> reductionTileSizes(numTilingDims - 1, 0);
   auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
   int64_t K = lhsShapedType.getShape().back();
   reductionTileSizes.push_back(
@@ -823,7 +824,7 @@ static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
   // No need for tiling inner parallel dims.
-  tileSizes.emplace_back(parallelTileSizes.size(), 0);
+  tileSizes.emplace_back(numTilingDims, 0);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -890,7 +891,8 @@ static LogicalResult setMatmulNoPadRootConfig(
   newTileSizes.push_back(parallelTileSizes);
   newTileSizes.push_back(reductionTileSizes);
   // No need for tiling inner parallel dims.
-  newTileSizes.emplace_back(parallelTileSizes.size(), 0);
+  int64_t numTilingDims = parallelTileSizes.size();
+  newTileSizes.emplace_back(numTilingDims, 0);
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for no-padding contraction: "
                        << newTileSizes << "\n");
@@ -927,7 +929,8 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
   // No need for tiling inner parallel dims.
-  tileSizes.emplace_back(parallelTileSizes.size(), 0);
+  int64_t numTilingDims = parallelTileSizes.size();
+  tileSizes.emplace_back(numTilingDims, 0);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -1171,6 +1174,8 @@ static bool isPackMatmulLHS(tensor::PackOp op) {
          op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1;
 }
 
+/// Returns vectorization tile sizes for a pack op. It is driven by pack op
+/// configurations and target CPU features.
 static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
                                                    tensor::PackOp op) {
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
@@ -1374,7 +1379,7 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
   // No need for tiling inner parallel dims.
-  tileSizes.emplace_back(parallelTileSizes.size(), 0);
+  tileSizes.emplace_back(numLoops, 0);
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
@@ -1815,8 +1820,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   // Tiling for vectorization.
   tileSizes.emplace_back(std::move(vectorTileSizes));
   // No further tiling.
-  tileSizes.push_back({});
-  tileSizes.push_back({});
+  int64_t numTilingDims = vectorTileSizes.size();
+  SmallVector<int64_t> zeros(numTilingDims, 0);
+  tileSizes.push_back(zeros);
+  tileSizes.push_back(zeros);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, padOp, tileSizes,
@@ -2042,6 +2049,47 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
                                                tileSizesList, pipeline);
 }
 
+/// Set the lowering configs for all the compute ops. The lowering config is
+/// already set on `rootOperation`. We will duplicate the tile sizes of
+/// distribution and common parallel dims to other compute ops (so they have
+/// consistent configuraionts); set the tile size for the rest of dims. E.g., it
+/// sets the lowering_config for reduction + broadcast + pack op like:
+///
+///   %11 = linalg.fill ... -> tensor<384xf32>
+///   %12 = linalg.generic {
+///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+///                      affine_map<(d0, d1) -> (d0)>,
+///                      affine_map<(d0, d1) -> (d0)>],
+///     iterator_types = ["parallel", "reduction"]}
+///     ins(%5, %6 : tensor<384x528xf32>, tensor<384xf32>)
+///     outs(%11 : tensor<384xf32>) {
+///   ^bb0(%in: f32, %in_2: f32, %out: f32):
+///     ...
+///   } -> tensor<384xf32>
+///   %13 = linalg.generic {
+///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+///                      affine_map<(d0, d1) -> (d0)>,
+///                      affine_map<(d0, d1) -> (d0, d1)>],
+///     iterator_types = ["parallel", "parallel"]}
+///     ins(%4, %12 : tensor<384x1024xf32>, tensor<384xf32>)
+///     outs(%9 : tensor<384x1024xf32>) {
+///   ^bb0(%in: f32, %in_2: f32, %out: f32):
+///     ...
+///   } -> tensor<384x1024xf32>
+///   %pack = tensor.pack %13
+///     inner_dims_pos = [0, 1]
+///     inner_tiles = [16, 1]
+///     into %14 : tensor<384x1024xf32> -> tensor<24x1024x16x1xf32>
+///
+/// The lowering config is set on `rootOperation`, which is the reduction ops in
+/// this case. The configuration is [[X, 0], [Y, 0], [0, Z], [0, 0]]. The `d0`
+/// is the common parallel dims for all the ops. The lowering config from
+/// `rootOperation` sets the tile sizes for `d0` and the rest of dims in
+/// reduction. But it does not have tile sizes for the rest of dims in
+/// elementwise op and pack ops. This method sets the vectorization tile sizes
+/// for other compute ops. E.g., [[X, 0], [Y, 0], [0, 0], [0, 4]] for the
+/// elementwise operations and [[X, 0], [Y, 0], [0, 0], [0, 16]] for the pack
+/// op.
 static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                                            ArrayRef<Operation *> computeOps,
                                            Operation *rootOperation) {
@@ -2064,7 +2112,8 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
         .Case<tensor::PackOp>([&](auto packOp) {
           SmallVector<int64_t> vecTileSizes =
               getPackVectorTileSizes(entryPointFn, packOp);
-          tileSizesList.push_back(zeros);
+          tileSizesList.push_back(zeros); // tensor.pack op does not have
+                                          // reduction loops.
           tileSizesList.push_back(vecTileSizes);
         })
         .Case<linalg::GenericOp>([&](auto genericOp) {
@@ -2088,6 +2137,7 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
           tileSizesList.push_back(vecTileSizes);
         })
         .Default([&](auto) {
+          // Do nothing for unknown ops.
           tileSizesList.push_back(zeros);
           tileSizesList.push_back(zeros);
         });

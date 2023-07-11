@@ -53,7 +53,7 @@ bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Find the root operation for the dispatch region. The priority is:
 ///   1. A Linalg operation that has reduction loops.
-///   2. Any other Lainlg op or LinalgExt op.
+///   2. Any other Linalg op or LinalgExt op.
 ///   3. An operation that implements TilingInterface.
 /// If there are multiple operations meeting the same priority, the one closer
 /// to the end of the function is the root op.

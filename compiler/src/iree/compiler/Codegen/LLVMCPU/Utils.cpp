@@ -7,8 +7,8 @@
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-utils"
 
