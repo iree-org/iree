@@ -9,6 +9,7 @@
 from contextlib import closing
 from pathlib import Path
 import tempfile
+import os
 import unittest
 
 from iree.compiler.api import *
@@ -168,4 +169,7 @@ class DlInteropTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    if os.system() == "Windows":
+        print("WARNING: Test disabled on Windows due to suspected MSVC bug")
+    else:
+        unittest.main()
