@@ -24,6 +24,8 @@ iree_cc_library(
     "cuda_device.c"
     "cuda_device.h"
     "cuda_driver.c"
+    "graph_command_buffer.c"
+    "graph_command_buffer.h"
     "memory_pools.c"
     "memory_pools.h"
     "native_executable.c"
@@ -46,6 +48,8 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::collective_batch
+    iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
