@@ -38,20 +38,22 @@ def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
 def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 15>;
 def LLVMGPU_MatmulTensorCoreMmaSync : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 16>;
 
+def SPIRV_BaseLowering
+    : I32EnumAttrCase<"SPIRVBaseLowering", 17>;
 def SPIRV_BaseDistribute
-    : I32EnumAttrCase<"SPIRVBaseDistribute", 17>;
+    : I32EnumAttrCase<"SPIRVBaseDistribute", 18>;
 def SPIRV_BaseVectorize
-    : I32EnumAttrCase<"SPIRVBaseVectorize", 18>;
+    : I32EnumAttrCase<"SPIRVBaseVectorize", 19>;
 def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 19>;
+    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 20>;
 def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 20>;
+    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 21>;
 def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 21>;
+    : I32EnumAttrCase<"SPIRVSubgroupReduce", 22>;
 def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 22>;
+    : I32EnumAttrCase<"SPIRVWinogradVectorize", 23>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 23>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 24>;
 
 
 def Linalg_TransformDialectCodegen
@@ -72,7 +74,7 @@ def DispatchLoweringPassPipelineEnum
             LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
             LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
             LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
-            SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+            SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
             SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
             SPIRV_SubgroupReduce, SPIRV_WinogradVectorize, VMVX_Default,
             // Transform dialect based codegen
