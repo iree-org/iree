@@ -299,6 +299,7 @@ function(iree_cc_library)
     message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
   endif()
   add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
     # If the library name matches the final component of the package then treat
     # it as a default. For example, foo/bar/ library 'bar' would end up as
