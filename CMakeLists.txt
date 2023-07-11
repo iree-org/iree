@@ -133,6 +133,9 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 # In addition, certain in-tree plugin directories are included regardless of
 # this variable (possibly based on other flags).
 #
+# Super-projects can populate the list IREE_COMPILER_BUILTIN_PLUGIN_PATHS to
+# statically configure more plugin directories to be used.
+#
 # A plugin directory must contain an iree_compiler_plugin_group.cmake file that
 # is loaded and must specify:
 #   - any needed add_subdirectory() calls to populate targets.
@@ -151,7 +154,7 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 #-------------------------------------------------------------------------------
 
 set(IREE_COMPILER_PLUGIN_PATHS "" CACHE STRING "Paths to external compiler plugins")
-set(IREE_COMPILER_BUILTIN_PLUGIN_PATHS "compiler/plugins")
+list(APPEND IREE_COMPILER_BUILTIN_PLUGIN_PATHS "compiler/plugins")
 if(IREE_BUILD_SAMPLES)
   list(APPEND IREE_COMPILER_BUILTIN_PLUGIN_PATHS "samples/compiler_plugins")
 endif()
