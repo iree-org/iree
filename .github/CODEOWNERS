@@ -12,8 +12,8 @@
 # CMakeLists.txt file to always ping a bunch of people.
 
 # Third-Party Code
-/.gitmodules @GMNGeoffrey @ScottTodd @stellaraccident
-/third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
+/.gitmodules @ScottTodd @stellaraccident
+/third_party/ @ScottTodd @stellaraccident
 # Except for routinely-updated submodules
 /third_party/llvm-project @ghost
 /third_party/llvm-project.branch-pin @ghost
@@ -30,7 +30,7 @@
 
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
-/experimental/ @benvanik @GMNGeoffrey @stellaraccident
+/experimental/ @benvanik @stellaraccident
 /experimental/cpu_ukernel/ @bjacob
 /experimental/cuda2/ @antiagainst
 /experimental/dispatch_profiler/ @manishucsd
@@ -39,13 +39,13 @@
 /experimental/webgpu/ @benvanik @ScottTodd
 
 # Infra Top-Level Directories
-/build_tools/ @GMNGeoffrey @ScottTodd @pzread
-/build_tools/benchmarks/ @GMNGeoffrey @antiagainst @pzread
-/build_tools/python/ @GMNGeoffrey @pzread
+/build_tools/ @ScottTodd @pzread
+/build_tools/benchmarks/ @antiagainst @pzread
+/build_tools/python/ @pzread
 /build_tools/python_deploy/ @stellaraccident
-/build_tools/scripts/ @GMNGeoffrey @ScottTodd
-/build_tools/third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
-/.github/ @GMNGeoffrey @ScottTodd
+/build_tools/scripts/ @ScottTodd
+/build_tools/third_party/ @ScottTodd @stellaraccident
+/.github/ @ScottTodd
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
@@ -56,7 +56,7 @@
 # Other Top-Level Directories
 /docs/ @ScottTodd
 /samples/ @ScottTodd
-/tools/ @benvanik @GMNGeoffrey
+/tools/ @benvanik
 
 # Compiler
 /compiler/src/iree/compiler/ @benvanik
