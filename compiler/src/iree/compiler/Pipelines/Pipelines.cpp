@@ -54,10 +54,11 @@ void buildIREEVMTransformPassPipeline(
   // and must run before generating bindings.
   // After input processing, there should only be IREE legal types in
   // signatures.
+  auto inputType = inputOptions.parseInputTypeMnemonic();
   IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Input");
   if (hooks.pipelineExtensions) {
     hooks.pipelineExtensions->extendInputConversionPreprocessingPassPipeline(
-        passManager, inputOptions.type);
+        passManager, inputType);
   }
   AutoInputConversionPipelineOptions autoOptions;
   autoOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
@@ -71,12 +72,29 @@ void buildIREEVMTransformPassPipeline(
   stablehloOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
 #endif // IREE_HAVE_STABLEHLO_INPUT
 
-  switch (inputOptions.type) {
+  switch (inputType) {
   case InputDialectOptions::Type::none:
     break;
   case InputDialectOptions::Type::auto_detect:
     passManager.addPass(createAutoInputConversionPipelinePass(autoOptions));
     break;
+  case InputDialectOptions::Type::plugin: {
+    bool foundExtension = false;
+    if (hooks.pipelineExtensions) {
+      foundExtension =
+          hooks.pipelineExtensions->extendCustomInputConversionPassPipeline(
+              passManager, inputOptions.inputTypeMnemonic);
+    }
+    // We expect that callers properly validate supported extensions and that
+    // if a plugin advertises support, it actually provides it.
+    assert(foundExtension && "InputDialect::type::plugin extension not found");
+    if (!foundExtension) {
+      llvm::errs()
+          << "internal error: InputDialect::type::plugin extension not found ("
+          << inputOptions.inputTypeMnemonic << ")\n";
+    }
+    break;
+  }
 #ifdef IREE_HAVE_STABLEHLO_INPUT
   case InputDialectOptions::Type::stablehlo:
     stablehlo::buildStableHLOInputConversionPassPipeline(passManager,
@@ -128,8 +146,8 @@ void buildIREEVMTransformPassPipeline(
   flowOptions.numericPrecisionReduction =
       highLevelOptimizationOptions.numericPrecisionReduction;
 
-  // Enable const-eval via hook. For debug builds, we assert if enabled without
-  // a hook. For release, we just silently skip enabling const-eval.
+  // Enable const-eval via hook. For debug builds, we assert if enabled
+  // without a hook. For release, we just silently skip enabling const-eval.
   if (highLevelOptimizationOptions.constEval) {
     assert(hooks.buildConstEvalPassPipelineCallback &&
            "if const-eval is enabled the buildConstEvalPassPipelineCallback "

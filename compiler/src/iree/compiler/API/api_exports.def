@@ -13,7 +13,8 @@ EXPORTS
   ireeCompilerInvocationDestroy
   ireeCompilerInvocationEnableCallbackDiagnostics
   ireeCompilerInvocationEnableConsoleDiagnostics
-  ireeCompilerInvocationImportModule
+  ireeCompilerInvocationImportBorrowModule
+  ireeCompilerInvocationImportStealModule
   ireeCompilerInvocationOutputHALExecutable
   ireeCompilerInvocationOutputIR
   ireeCompilerInvocationOutputVMBytecode
@@ -33,11 +34,12 @@ EXPORTS
   ireeCompilerRegisterDialects
   ireeCompilerRunLldMain
   ireeCompilerRunMain
+  ireeCompilerSessionBorrowContext
   ireeCompilerSessionCreate
   ireeCompilerSessionDestroy
-  ireeCompilerSessionGetContext
   ireeCompilerSessionGetFlags
   ireeCompilerSessionSetFlags
+  ireeCompilerSessionStealContext
   ireeCompilerSetupGlobalCL
   ireeCompilerSourceDestroy
   ireeCompilerSourceOpenFile
