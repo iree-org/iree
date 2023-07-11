@@ -386,10 +386,10 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
 
 /// Returns the default tile sizes to use for the loops that are distributed.
 static SmallVector<int64_t>
-getDefaultDistributedLoopTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
-                                   ArrayRef<int64_t> minTileSizes,
-                                   ArrayRef<int64_t> maxTileSizes,
-                                   ArrayRef<int64_t> vectorSizeHints) {
+getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
+                                ArrayRef<int64_t> minTileSizes,
+                                ArrayRef<int64_t> maxTileSizes,
+                                ArrayRef<int64_t> vectorSizeHints) {
   assert(lbs.size() == ubs.size() && lbs.size() == minTileSizes.size() &&
          lbs.size() == maxTileSizes.size() &&
          "expected all vectors to be of equal size");
