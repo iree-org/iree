@@ -658,6 +658,14 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
     plan.dump();
   });
 
+  funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    tieOperandsForOperandFusion(linalgOp, plan);
+  });
+  LLVM_DEBUG({
+    llvm::dbgs() << "After tie-ing operands for fusion";
+    plan.dump();
+  });
+
   if (funcOp
           .walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
             return analyseInterfaceStoreTensorOp(storeOp, plan);

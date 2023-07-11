@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-convert-to-destination-passing-style --canonicalize -cse --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-codegen-convert-to-destination-passing-style --canonicalize -cse --split-input-file661 | FileCheck %s
 
 func.func @matmul() {
   %m = hal.interface.constant.load[0] : index
@@ -656,10 +656,14 @@ func.func @gemm_gather() {
   return
 }
 // CHECK-LABEL: func @gemm_gather
+//       CHECK:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(5)
+//       CHECK:   %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]]
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:       outs(%[[OUT]] :
 //       CHECK:   %[[GEMM:.+]] = linalg.matmul
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%{{[a-zA-Z0-9]+}} :
-//  CHECK-SAME:       outs(%[[GEMM]] :
+//  CHECK-SAME:       ins(%[[GEMM]], %{{[a-zA-Z0-9]+}} :
+//  CHECK-SAME:       outs(%[[OUT]] :
 
 // -----
 
