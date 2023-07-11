@@ -253,6 +253,15 @@ build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
   --version="${VERSION}"
 ```
 
+You can monitor the state of rollouts via the GitHub API. This requires elevated
+permissions in the organizations. A command like this would help see how many
+runners are still running the old version
+
+```shell
+gh api --paginate '/orgs/openxla/actions/runners?per_page=100' \
+  | jq --raw-output \
+  ".runners[] | select(.labels | map(.name == \"runner-version=${OLD_RUNNER_VERSION?}\") | any) | .name"
+```
 ## Known Issues / Future Work
 
 There are number of known issues and areas of improvement for the runners:
