@@ -7,12 +7,12 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_BINDING_H_
 #define IREE_BINDINGS_PYTHON_IREE_BINDING_H_
 
-#include <nanobind/nanobind.h>
-#include <nanobind/ndarray.h>
-#include <nanobind/stl/optional.h>
-#include <nanobind/stl/string.h>
-#include <nanobind/stl/string_view.h>
-#include <nanobind/stl/vector.h>
+#include "nanobind/nanobind.h"
+#include "nanobind/ndarray.h"
+#include "nanobind/stl/optional.h"
+#include "nanobind/stl/string.h"
+#include "nanobind/stl/string_view.h"
+#include "nanobind/stl/vector.h"
 
 #include <optional>
 #include <vector>
