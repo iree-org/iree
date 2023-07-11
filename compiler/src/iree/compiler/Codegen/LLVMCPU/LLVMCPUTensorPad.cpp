@@ -87,7 +87,7 @@ void LLVMCPUTensorPadPass::runOnOperation() {
       if (auto complexTy = elemType.dyn_cast<ComplexType>()) {
         auto zeroAttr = builder.getZeroAttr(complexTy.getElementType());
         paddingValueAttributes.push_back(
-          ArrayAttr::get(context, {zeroAttr, zeroAttr}));
+            ArrayAttr::get(context, {zeroAttr, zeroAttr}));
         continue;
       }
       paddingValueAttributes.push_back(builder.getZeroAttr(elemType));
