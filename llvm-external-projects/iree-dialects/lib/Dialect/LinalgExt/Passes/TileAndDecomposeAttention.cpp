@@ -199,14 +199,6 @@ extractSlices(Value key, Value value, Value query, ArrayRef<int64_t> queryShape,
   return std::make_tuple(keySlice, valueSlice, querySlice);
 }
 
-static std::tuple<Value, Value, Value>
-insertSlices(Value newResult, Value result, Value newMax, Value max,
-             Value newSum, Value sum, ArrayRef<int64_t> queryShape,
-             ArrayRef<Value> ivs, OpFoldResult sequenceTileLength,
-             OpFoldResult headDimension, Location loc, OpBuilder &builder) {
-  return std::make_tuple(newResult, newMax, newSum);
-}
-
 static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
                                     Value step, Value ub, ValueRange args,
                                     Location loc, OpBuilder &builder) {
@@ -295,7 +287,7 @@ static Value extractOrInsertOutputSlice(Value src, Value dst,
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
   SmallVector<OpFoldResult> strides(3, one);
-  SmallVector<OpFoldResult> sizes{one, sequenceTileLength, headDimension};
+  SmallVector<OpFoldResult> sizes = {one, sequenceTileLength, headDimension};
   SmallVector<OpFoldResult> offsets(3, zero);
   Value slice;
   if (!dst) {
