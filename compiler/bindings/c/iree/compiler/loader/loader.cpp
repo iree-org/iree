@@ -260,9 +260,8 @@ void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *run,
   __ireeCompilerInvocationSetCompileToPhase(run, phase);
 }
 
-IREE_EMBED_EXPORTED void
-ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *run,
-                                  bool enable) {
+void ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *run,
+                                       bool enable) {
   __ireeCompilerInvocationSetVerifyIR(run, enable);
 }
 
