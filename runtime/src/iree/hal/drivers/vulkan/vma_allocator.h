@@ -10,7 +10,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
-#include "iree/hal/drivers/vulkan/internal_vk_mem_alloc.h"  // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {

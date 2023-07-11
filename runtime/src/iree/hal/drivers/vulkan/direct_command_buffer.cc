@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
 #include "iree/base/internal/math.h"
+#include "iree/hal/drivers/vulkan/base_buffer.h"
 #include "iree/hal/drivers/vulkan/descriptor_set_arena.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
@@ -19,7 +20,6 @@
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
-#include "iree/hal/drivers/vulkan/vma_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
 using namespace iree::hal::vulkan;
@@ -374,8 +374,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_execution_barrier(
         iree_hal_vulkan_convert_access_mask(buffer_barrier.target_scope);
     info->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     info->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info->buffer = iree_hal_vulkan_vma_buffer_handle(
-        iree_hal_buffer_allocated_buffer(buffer_barrier.buffer));
+    info->buffer = iree_hal_vulkan_buffer_handle(buffer_barrier.buffer);
     info->offset = buffer_barrier.offset;
     info->size = buffer_barrier.length;
   }
@@ -476,8 +475,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_wait_events(
         iree_hal_vulkan_convert_access_mask(buffer_barrier.target_scope);
     info->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     info->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info->buffer = iree_hal_vulkan_vma_buffer_handle(
-        iree_hal_buffer_allocated_buffer(buffer_barrier.buffer));
+    info->buffer = iree_hal_vulkan_buffer_handle(buffer_barrier.buffer);
     info->offset = buffer_barrier.offset;
     info->size = buffer_barrier.length;
   }
@@ -534,8 +532,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
     iree_host_size_t pattern_length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(target_buffer));
+  VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_buffer));
@@ -591,8 +588,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
     iree_device_size_t target_offset, iree_device_size_t length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(target_buffer));
+  VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_buffer));
@@ -626,10 +622,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
     iree_device_size_t length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  VkBuffer source_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(source_buffer));
-  VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(target_buffer));
+  VkBuffer source_device_buffer = iree_hal_vulkan_buffer_handle(source_buffer);
+  VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
 
   const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
   IREE_RETURN_IF_ERROR(
@@ -769,8 +763,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   command_buffer->syms->vkCmdBindPipeline(
       command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_handle);
 
-  VkBuffer workgroups_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(workgroups_buffer));
+  VkBuffer workgroups_device_buffer =
+      iree_hal_vulkan_buffer_handle(workgroups_buffer);
   workgroups_offset += iree_hal_buffer_byte_offset(workgroups_buffer);
   command_buffer->syms->vkCmdDispatchIndirect(
       command_buffer->handle, workgroups_device_buffer, workgroups_offset);

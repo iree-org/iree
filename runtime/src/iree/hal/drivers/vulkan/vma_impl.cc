@@ -57,6 +57,6 @@ class IreeVmaRWMutex {
 #define VMA_RW_MUTEX IreeVmaRWMutex
 
 #define VMA_IMPLEMENTATION
-#include "iree/hal/drivers/vulkan/internal_vk_mem_alloc.h"
+#include "iree/hal/drivers/vulkan/vma_impl.h"
 
 #endif  // !VULKAN_MEMORY_ALLOCATOR_EXTERNAL_IMPL

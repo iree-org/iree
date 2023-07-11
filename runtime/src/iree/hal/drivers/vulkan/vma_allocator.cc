@@ -10,266 +10,181 @@
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/math.h"
+#include "iree/hal/drivers/vulkan/base_buffer.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
-#include "iree/hal/drivers/vulkan/vma_buffer.h"
+#include "iree/hal/drivers/vulkan/vma_impl.h"
 
 using namespace iree::hal::vulkan;
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+static const char* IREE_HAL_VULKAN_VMA_ALLOCATOR_ID = "Vulkan/VMA";
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
 //===----------------------------------------------------------------------===//
-// Memory types
+// iree_hal_vulkan_vma_buffer_t
 //===----------------------------------------------------------------------===//
 
-// Set of memory type indices into VkPhysicalDeviceMemoryProperties.
-// The set is bucketed by usage semantics to allow us to quickly map an
-// allocation request to an underlying memory type. Some buckets may point to
-// the same index - for example, on a CPU or integrated GPU all of them may
-// point at the same memory space.
-//
-// Major categories:
-// - Dispatch
-//   High-bandwidth device-local memory where we want to ensure that all
-//   accesses don't require going over a slow bus (PCI/etc).
-// - Bulk transfer
-//   Low-bandwidth often host-local or host-visible memory for
-//   uploading/downloading large buffers, usually backed by system memory.
-//   Not expected to be usable by dispatches and just used for staging.
-// - Staging transfer
-//   High-bandwidth device-local memory that is also host-visible for
-//   low-latency staging. These are generally small buffers used by dispatches
-//   (like uniform buffers) as the amount of memory available can be very
-//   limited (~256MB). Because of the device limits we only use these for
-//   TRANSIENT allocations that are used by dispatches.
-typedef union {
-  struct {
-    // Preferred memory type for device-local dispatch operations.
-    // This memory _may_ be host visible, though we try to select the most
-    // exclusive device local memory when available.
-    int dispatch_idx;
+typedef struct iree_hal_vulkan_vma_buffer_t {
+  iree_hal_vulkan_base_buffer_t base;
+  VmaAllocator vma;
+  VmaAllocation allocation;
+  VmaAllocationInfo allocation_info;
+} iree_hal_vulkan_vma_buffer_t;
 
-    // Preferred memory type for bulk uploads (host->device).
-    // These may be slow to access from dispatches or not possible at all, but
-    // generally have the entire system memory available for storage.
-    int bulk_upload_idx;
-    // Preferred memory type for bulk downloads (device->host).
-    int bulk_download_idx;
+namespace {
+extern const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable;
+}  // namespace
 
-    // Preferred memory type for staging uploads (host->device).
-    int staging_upload_idx;
-    // Preferred memory type for staging downloads (device->host).
-    int staging_download_idx;
-  };
-  int indices[5];
-} iree_hal_vulkan_memory_types_t;
-
-// Returns the total unique memory types.
-static int iree_hal_vulkan_memory_types_unique_count(
-    const iree_hal_vulkan_memory_types_t* memory_types) {
-  uint32_t indices = 0;
-  for (size_t i = 0; i < IREE_ARRAYSIZE(memory_types->indices); ++i) {
-    indices |= 1u << memory_types->indices[i];
-  }
-  return iree_math_count_ones_u32(indices);
+static iree_hal_vulkan_vma_buffer_t* iree_hal_vulkan_vma_buffer_cast(
+    iree_hal_buffer_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_vulkan_vma_buffer_vtable);
+  return (iree_hal_vulkan_vma_buffer_t*)base_value;
 }
 
-// Returns true if the memory type at |type_idx| is in a device-local heap.
-static bool iree_hal_vulkan_is_heap_device_local(
-    const VkPhysicalDeviceMemoryProperties* memory_props, uint32_t type_idx) {
-  const uint32_t heap_idx = memory_props->memoryTypes[type_idx].heapIndex;
-  return iree_all_bits_set(memory_props->memoryHeaps[heap_idx].flags,
-                           VK_MEMORY_HEAP_DEVICE_LOCAL_BIT);
-}
-
-// Returns true if the memory type is not usable by us (today).
-static bool iree_hal_vulkan_is_memory_type_usable(VkMemoryPropertyFlags flags) {
-  return !iree_all_bits_set(flags, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) &&
-         !iree_all_bits_set(flags, VK_MEMORY_PROPERTY_PROTECTED_BIT);
-}
-
-static void iree_hal_vulkan_populate_dispatch_memory_types(
-    const VkPhysicalDeviceProperties* device_props,
-    const VkPhysicalDeviceMemoryProperties* memory_props,
-    iree_hal_vulkan_memory_types_t* out_types) {
-  int least_bits_count = 0;
-  int least_bits_idx = -1;
-  for (uint32_t i = 0; i < memory_props->memoryTypeCount; ++i) {
-    VkMemoryPropertyFlags flags = memory_props->memoryTypes[i].propertyFlags;
-    if (!iree_hal_vulkan_is_heap_device_local(memory_props, i) ||
-        !iree_hal_vulkan_is_memory_type_usable(flags)) {
-      // Only want device-local memory that is usable for storage buffers.
-      continue;
-    }
-    // Prefer the type that is device-local and has as few other bits set as
-    // possible (host-visible/etc). On integrated systems we may not have any
-    // type that is purely device-local but still want to ensure we pick
-    // uncached over cached.
-    int bit_count = iree_math_count_ones_u32(flags);
-    if (least_bits_idx == -1) {
-      least_bits_count = bit_count;
-      least_bits_idx = (int)i;
-    } else if (bit_count < least_bits_count) {
-      least_bits_count = bit_count;
-      least_bits_idx = (int)i;
-    }
-  }
-  out_types->dispatch_idx = least_bits_idx;
-}
-
-static void iree_hal_vulkan_find_transfer_memory_types(
-    const VkPhysicalDeviceProperties* device_props,
-    const VkPhysicalDeviceMemoryProperties* memory_props,
-    VkMemoryPropertyFlags include_flags, VkMemoryPropertyFlags exclude_flags,
-    int* out_upload_idx, int* out_download_idx) {
-  int cached_idx = -1;
-  int uncached_idx = -1;
-  int visible_idx = -1;
-  for (uint32_t i = 0; i < memory_props->memoryTypeCount; ++i) {
-    VkMemoryPropertyFlags flags = memory_props->memoryTypes[i].propertyFlags;
-    if (!iree_all_bits_set(flags, include_flags) ||
-        iree_any_bit_set(flags, exclude_flags)) {
-      // Caller allows/disallows certain flags.
-      continue;
-    } else if (!iree_hal_vulkan_is_memory_type_usable(flags)) {
-      // Only want memory that is usable for storage buffers.
-      continue;
-    } else if (!iree_all_bits_set(flags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
-      // Must be host-visible for transfers.
-      continue;
-    }
-    if (visible_idx == -1) visible_idx = i;
-    if (iree_all_bits_set(flags, VK_MEMORY_PROPERTY_HOST_CACHED_BIT)) {
-      if (cached_idx == -1) cached_idx = i;
-    } else {
-      if (uncached_idx == -1) uncached_idx = i;
-    }
-  }
-  // Prefer uncached for uploads to enable write-through to the device.
-  *out_upload_idx = uncached_idx != -1 ? uncached_idx : visible_idx;
-  // Prefer cached for downloads to enable prefetching/read caching.
-  *out_download_idx = cached_idx != -1 ? cached_idx : visible_idx;
-}
-
-static void iree_hal_vulkan_populate_transfer_memory_types(
-    const VkPhysicalDeviceProperties* device_props,
-    const VkPhysicalDeviceMemoryProperties* memory_props,
-    iree_hal_vulkan_memory_types_t* out_types) {
-  int host_local_upload_idx = -1;
-  int host_local_download_idx = -1;
-  iree_hal_vulkan_find_transfer_memory_types(
-      device_props, memory_props, /*include_flags=*/0,
-      /*exclude_flags=*/VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      &host_local_upload_idx, &host_local_download_idx);
-  int device_local_upload_idx = -1;
-  int device_local_download_idx = -1;
-  iree_hal_vulkan_find_transfer_memory_types(
-      device_props, memory_props,
-      /*include_flags=*/VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      /*exclude_flags=*/0, &device_local_upload_idx,
-      &device_local_download_idx);
-
-  // For bulk try first to select host-local memory.
-  // In case that fails we will use device-local memory; common on integrated.
-  out_types->bulk_upload_idx = host_local_upload_idx != -1
-                                   ? host_local_upload_idx
-                                   : device_local_upload_idx;
-  out_types->bulk_download_idx = host_local_download_idx != -1
-                                     ? host_local_download_idx
-                                     : device_local_download_idx;
-
-  // Always use device-local for staging if we have it. This is usually PCI-E
-  // BAR/page-locked memory on discrete devices while it may just be host
-  // allocations with special caching flags on integrated ones.
-  out_types->staging_upload_idx = device_local_upload_idx != -1
-                                      ? device_local_upload_idx
-                                      : host_local_upload_idx;
-  out_types->staging_download_idx = device_local_download_idx != -1
-                                        ? device_local_download_idx
-                                        : host_local_download_idx;
-}
-
-// Queries the underlying Vulkan implementation to decide which memory type
-// should be used for particular operations.
-//
-// This is a train-wreck of a decision space and definitely wrong in some cases.
-// The only thing we can do is try to be less wrong than RNG.
-//
-// Common Android:
-//   - DEVICE_LOCAL (dispatch)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_COHERENT (upload)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_CACHED (download)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_COHERENT | HOST_CACHED (everything)
-// Samsung Android: 🤡
-// (https://vulkan.gpuinfo.org/displayreport.php?id=14487#memory)
-//
-// Swiftshader/Intel (VK_PHYSICAL_DEVICE_TYPE_CPU):
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_COHERENT | HOST_CACHED (everything)
-//
-// iOS via MoltenVK (VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU):
-//   - DEVICE_LOCAL (dispatch)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_COHERENT | HOST_CACHED (everything)
-//
-// NVIDIA Tegra-like (VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU):
-//   - DEVICE_LOCAL (dispatch)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_COHERENT (upload)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_CACHED (everything)
-//
-// NVIDIA/AMD discrete (VK_PHYSICAL_DEVICE_TYPE_GPU):
-//   - DEVICE_LOCAL (dispatch)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_COHERENT (staging upload)
-//   - DEVICE_LOCAL | HOST_VISIBLE | HOST_CACHED (staging download)
-//   - HOST_VISIBLE | HOST_COHERENT (upload)
-//   - HOST_VISIBLE | HOST_CACHED (download)
-static iree_status_t iree_hal_vulkan_populate_memory_types(
-    const VkPhysicalDeviceProperties* device_props,
-    const VkPhysicalDeviceMemoryProperties* memory_props,
-    iree_hal_vulkan_memory_types_t* out_memory_types) {
+iree_status_t iree_hal_vulkan_vma_buffer_wrap(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    VmaAllocator vma, VkBuffer handle, VmaAllocation allocation,
+    VmaAllocationInfo allocation_info, iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(vma);
+  IREE_ASSERT_ARGUMENT(handle);
+  IREE_ASSERT_ARGUMENT(allocation);
+  IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
 
-  // NOT_FOUND sentinel.
-  for (size_t i = 0; i < IREE_ARRAYSIZE(out_memory_types->indices); ++i) {
-    out_memory_types->indices[i] = -1;
+  iree_allocator_t host_allocator =
+      iree_hal_allocator_host_allocator(allocator);
+  iree_hal_vulkan_vma_buffer_t* buffer = NULL;
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_initialize(
+        host_allocator, allocator, &buffer->base.base, allocation_size,
+        byte_offset, byte_length, memory_type, allowed_access, allowed_usage,
+        &iree_hal_vulkan_vma_buffer_vtable, &buffer->base.base);
+    buffer->base.device_memory = allocation_info.deviceMemory;
+    buffer->base.handle = handle;
+    buffer->vma = vma;
+    buffer->allocation = allocation;
+    buffer->allocation_info = allocation_info;
+
+    // TODO(benvanik): set debug name instead and use the
+    //     VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT flag.
+    vmaSetAllocationUserData(buffer->vma, buffer->allocation, buffer);
+
+    IREE_TRACE_ALLOC_NAMED(IREE_HAL_VULKAN_VMA_ALLOCATOR_ID,
+                           (void*)buffer->base.handle, byte_length);
+
+    *out_buffer = &buffer->base.base;
+  } else {
+    vmaDestroyBuffer(vma, handle, allocation);
   }
 
-  // Find the memory type that is most device-local.
-  // We try to satisfy all device access requests with this type.
-  iree_hal_vulkan_populate_dispatch_memory_types(device_props, memory_props,
-                                                 out_memory_types);
-
-  // Find the memory types for upload/download.
-  iree_hal_vulkan_populate_transfer_memory_types(device_props, memory_props,
-                                                 out_memory_types);
-
-  // Because this is all bananas we trace out what indices we chose; this will
-  // let us correlate the memory types with vulkan-info and see if we got the
-  // "right" ones.
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, "dispatch:");
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->dispatch_idx);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, "bulk-upload:");
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->bulk_upload_idx);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, "bulk-download:");
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->bulk_download_idx);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, "staging-upload:");
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->staging_upload_idx);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, "staging-download:");
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, out_memory_types->staging_download_idx);
   IREE_TRACE_ZONE_END(z0);
+  return status;
+}
 
-  // Check to make sure all memory types were found. If we didn't find any
-  // special staging transfer memory we reuse bulk memory.
-  if (out_memory_types->dispatch_idx == -1) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "dispatch-compatible memory type not found");
-  } else if (out_memory_types->bulk_upload_idx == -1 ||
-             out_memory_types->bulk_download_idx == -1 ||
-             out_memory_types->staging_upload_idx == -1 ||
-             out_memory_types->staging_download_idx == -1) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "transfer-compatible memory types not found");
+static void iree_hal_vulkan_vma_buffer_destroy(iree_hal_buffer_t* base_buffer) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  iree_allocator_t host_allocator = base_buffer->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));
+
+  IREE_TRACE_FREE_NAMED(IREE_HAL_VULKAN_VMA_ALLOCATOR_ID,
+                        (void*)buffer->base.handle);
+
+  vmaDestroyBuffer(buffer->vma, buffer->base.handle, buffer->allocation);
+  iree_allocator_free(host_allocator, buffer);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
+    iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access,
+    iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
+    iree_hal_buffer_mapping_t* mapping) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+
+  // TODO(benvanik): add upload/download for unmapped buffers.
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+      iree_hal_buffer_memory_type(base_buffer),
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(base_buffer),
+                                     IREE_HAL_BUFFER_USAGE_MAPPING));
+
+  uint8_t* data_ptr = nullptr;
+  VK_RETURN_IF_ERROR(
+      vmaMapMemory(buffer->vma, buffer->allocation, (void**)&data_ptr),
+      "vmaMapMemory");
+  mapping->contents =
+      iree_make_byte_span(data_ptr + local_byte_offset, local_byte_length);
+
+  // If we mapped for discard scribble over the bytes. This is not a mandated
+  // behavior but it will make debugging issues easier. Alternatively for
+  // heap buffers we could reallocate them such that ASAN yells, but that
+  // would only work if the entire buffer was discarded.
+#ifndef NDEBUG
+  if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
+    memset(mapping->contents.data, 0xCD, local_byte_length);
   }
+#endif  // !NDEBUG
+
   return iree_ok_status();
 }
+
+static iree_status_t iree_hal_vulkan_vma_buffer_unmap_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  vmaUnmapMemory(buffer->vma, buffer->allocation);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_vma_buffer_invalidate_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  VK_RETURN_IF_ERROR(
+      vmaInvalidateAllocation(buffer->vma, buffer->allocation,
+                              local_byte_offset, local_byte_length),
+      "vmaInvalidateAllocation");
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_vma_buffer_flush_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  VK_RETURN_IF_ERROR(vmaFlushAllocation(buffer->vma, buffer->allocation,
+                                        local_byte_offset, local_byte_length),
+                     "vmaFlushAllocation");
+  return iree_ok_status();
+}
+
+namespace {
+const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
+    /*.recycle=*/iree_hal_buffer_recycle,
+    /*.destroy=*/iree_hal_vulkan_vma_buffer_destroy,
+    /*.map_range=*/iree_hal_vulkan_vma_buffer_map_range,
+    /*.unmap_range=*/iree_hal_vulkan_vma_buffer_unmap_range,
+    /*.invalidate_range=*/iree_hal_vulkan_vma_buffer_invalidate_range,
+    /*.flush_range=*/iree_hal_vulkan_vma_buffer_flush_range,
+};
+}  // namespace
 
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_vma_allocator_t
@@ -468,51 +383,11 @@ static void iree_hal_vulkan_vma_allocator_query_statistics(
   });
 }
 
-// Maps a Vulkan device memory type enum to an allocator heap structure.
-static void iree_hal_vulkan_map_memory_type_to_heap(
-    const VkPhysicalDeviceMemoryProperties* memory_props, int type_idx,
-    iree_device_size_t max_allocation_size, iree_device_size_t min_alignment,
-    iree_hal_allocator_memory_heap_t* out_heap) {
-  VkMemoryPropertyFlags flags =
-      memory_props->memoryTypes[type_idx].propertyFlags;
-  iree_hal_memory_type_t memory_type = 0;
-  iree_hal_buffer_usage_t allowed_usage = 0;
-  if (iree_all_bits_set(flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-    memory_type |= IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
-    allowed_usage |= IREE_HAL_BUFFER_USAGE_TRANSFER |
-                     IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
-                     IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                     IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ;
-  }
-  if (iree_all_bits_set(flags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
-    memory_type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    allowed_usage |=
-        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
-  }
-  if (iree_all_bits_set(flags, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-    memory_type |= IREE_HAL_MEMORY_TYPE_HOST_COHERENT;
-  }
-  if (iree_all_bits_set(flags, VK_MEMORY_PROPERTY_HOST_CACHED_BIT)) {
-    memory_type |= IREE_HAL_MEMORY_TYPE_HOST_CACHED;
-  }
-  out_heap->type = memory_type;
-  out_heap->allowed_usage = allowed_usage;
-
-  // Some memory heaps have very small limits (like 256MB or less) and it may
-  // be less than the maximum allocation size of the API.
-  const VkMemoryHeap* memory_heap =
-      &memory_props->memoryHeaps[memory_props->memoryTypes[type_idx].heapIndex];
-  out_heap->max_allocation_size =
-      iree_min(max_allocation_size, memory_heap->size);
-  out_heap->min_alignment = min_alignment;
-}
-
 static iree_status_t iree_hal_vulkan_vma_allocator_query_memory_heaps(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_host_size_t capacity,
     iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
     iree_host_size_t* IREE_RESTRICT out_count) {
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_vulkan_vma_allocator_t* allocator =
       iree_hal_vulkan_vma_allocator_cast(base_allocator);
 
@@ -522,58 +397,10 @@ static iree_status_t iree_hal_vulkan_vma_allocator_query_memory_heaps(
   const VkPhysicalDeviceMemoryProperties* memory_props = NULL;
   vmaGetMemoryProperties(allocator->vma, &memory_props);
 
-  const iree_device_size_t max_allocation_size =
-      device_props->limits.maxStorageBufferRange;
-  const iree_device_size_t min_alignment =
-      iree_max(16, device_props->limits.minStorageBufferOffsetAlignment);
-
   const iree_hal_vulkan_memory_types_t* memory_types = &allocator->memory_types;
-  iree_host_size_t count =
-      iree_hal_vulkan_memory_types_unique_count(memory_types);
-  if (capacity >= count) {
-    uint32_t has_idx = 0;
-    iree_host_size_t i = 0;
-    if (!(has_idx & (1u << memory_types->dispatch_idx))) {
-      has_idx |= 1u << memory_types->dispatch_idx;
-      iree_hal_vulkan_map_memory_type_to_heap(
-          memory_props, memory_types->dispatch_idx, max_allocation_size,
-          min_alignment, &heaps[i++]);
-    }
-    if (!(has_idx & (1u << memory_types->bulk_upload_idx))) {
-      has_idx |= 1u << memory_types->bulk_upload_idx;
-      iree_hal_vulkan_map_memory_type_to_heap(
-          memory_props, memory_types->bulk_upload_idx, max_allocation_size,
-          min_alignment, &heaps[i++]);
-    }
-    if (!(has_idx & (1u << memory_types->bulk_download_idx))) {
-      has_idx |= 1u << memory_types->bulk_download_idx;
-      iree_hal_vulkan_map_memory_type_to_heap(
-          memory_props, memory_types->bulk_download_idx, max_allocation_size,
-          min_alignment, &heaps[i++]);
-    }
-    if (!(has_idx & (1u << memory_types->staging_upload_idx))) {
-      has_idx |= 1u << memory_types->staging_upload_idx;
-      iree_hal_vulkan_map_memory_type_to_heap(
-          memory_props, memory_types->staging_upload_idx, max_allocation_size,
-          min_alignment, &heaps[i++]);
-    }
-    if (!(has_idx & (1u << memory_types->staging_download_idx))) {
-      has_idx |= 1u << memory_types->staging_download_idx;
-      iree_hal_vulkan_map_memory_type_to_heap(
-          memory_props, memory_types->staging_download_idx, max_allocation_size,
-          min_alignment, &heaps[i++]);
-    }
-    IREE_ASSERT(i == count);
-  }
 
-  if (out_count) *out_count = count;
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
-  IREE_TRACE_ZONE_END(z0);
-  if (capacity < count) {
-    // NOTE: lightweight as this is hit in normal pre-sizing usage.
-    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
-  }
-  return iree_ok_status();
+  return iree_hal_vulkan_query_memory_heaps(
+      device_props, memory_props, memory_types, capacity, heaps, out_count);
 }
 
 static iree_hal_buffer_compatibility_t
