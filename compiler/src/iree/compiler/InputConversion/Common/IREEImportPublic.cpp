@@ -82,6 +82,8 @@ convertDescriptorType(IREE::Input::DescriptorType src) {
     return IREE::HAL::DescriptorType::StorageBuffer;
   case IREE::Input::DescriptorType::UniformBuffer:
     return IREE::HAL::DescriptorType::UniformBuffer;
+  default:
+    llvm_unreachable("Unexpected descriptor type");
   }
 }
 
@@ -95,6 +97,8 @@ convertDescriptorFlags(std::optional<IREE::Input::DescriptorFlags> src) {
     return IREE::HAL::DescriptorFlags::None;
   case IREE::Input::DescriptorFlags::ReadOnly:
     return IREE::HAL::DescriptorFlags::ReadOnly;
+  default:
+    return std::nullopt;
   }
 }
 

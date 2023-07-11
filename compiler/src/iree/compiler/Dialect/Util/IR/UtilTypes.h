@@ -190,11 +190,31 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
   return align(value, alignment.getZExtValue());
 }
 
+// Returns the bit-width of the scalar type. If the type is complex, it returns
+// the type of individual elements * 2 (1 for real and 1 for complex).
+static inline unsigned getTypeBitWidth(Type type) {
+  if (auto complexType = type.dyn_cast<ComplexType>()) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
+
+// HACK: we currently have no way to specify packing on types and as such have
+// to guess (poorly) what physical storage for each type looks like. The
+// heuristic for non-power-of-two bit width types is to take the next
+// power-of-two byte width that can fit at least 2 elements, up to 64-bit.
+static inline unsigned getTypePhysicalStorageBitWidth(Type type) {
+  unsigned logicalBitWidth = getTypeBitWidth(type);
+  unsigned desiredBitWidth = logicalBitWidth * 2;   // at least 2
+  desiredBitWidth = std::min(desiredBitWidth, 64u); // no larger than 64-bits
+  return llvm::PowerOf2Ceil(llvm::divideCeil(desiredBitWidth, 8)) * 8;
+}
+
 // Returns the number of bytes an element of the given type occupies in memory.
 // This is in the default dense conversion to machine words where sizes must be
 // powers of two aligned to bytes.
 //
-// Example:
+// Examples:
 //   getRoundedElementByteWidth(i1) = 1
 //   getRoundedElementByteWidth(i23) = 4
 //   getRoundedElementByteWidth(i32) = 4
@@ -205,6 +225,8 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
   if (auto complexType = type.dyn_cast<ComplexType>()) {
     return 2 * getRoundedElementByteWidth(complexType.getElementType());
   }
+  // TODO(ravishankarm): evaluate if this vector packing works with sub-byte
+  // element types.
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     return vectorType.getNumElements() *
            getRoundedElementByteWidth(vectorType.getElementType());
@@ -217,13 +239,42 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
-// Returns the bit-width of the scalar type. If the type is complex, it returns
-// the type of individual elements * 2 (1 for real and 1 for complex).
-static int64_t getTypeBitWidth(Type type) {
-  if (auto complexType = type.dyn_cast<ComplexType>()) {
-    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+// Returns the number of physical bytes required to store |elementCount|
+// elements of |elementType| in a packed representation. This will include any
+// additional padding required to round out the type to the next power-of-two
+// machine word size.
+//
+// Examples:
+//   getRoundedPhysicalStorageSize(1, i2) = 1 (1-byte aligned packed)
+//   getRoundedPhysicalStorageSize(3, i3) = 2 (1-byte aligned packed)
+//   getRoundedPhysicalStorageSize(4, i32) = 16 (4-byte aligned native)
+//   getRoundedPhysicalStorageSize(4, i33) = 32 (8-byte aligned packed)
+static inline int64_t getRoundedPhysicalStorageSize(int64_t elementCount,
+                                                    Type elementType) {
+  const unsigned logicalBitWidth = getTypeBitWidth(elementType);
+  switch (logicalBitWidth) {
+  case 1:
+    return elementCount * sizeof(uint8_t);
+  case 8:
+  case 16:
+  case 32:
+  case 64:
+    return elementCount * logicalBitWidth / 8;
+  default:
+    break; // sub-byte handling below
   }
-  return type.getIntOrFloatBitWidth();
+  // Round up to the next power of two (unless already a power of two) of the
+  // 8-bit aligned logical bit width.
+  const unsigned physicalBitWidth = getTypePhysicalStorageBitWidth(elementType);
+  const unsigned elementsPerPhysicalWord = physicalBitWidth / logicalBitWidth;
+  const int64_t unalignedBitCount =
+      llvm::divideCeil(elementCount, elementsPerPhysicalWord) *
+      physicalBitWidth;
+  return llvm::divideCeil(align(unalignedBitCount, physicalBitWidth), 8);
+}
+static inline int64_t getRoundedPhysicalStorageSize(ShapedType type) {
+  return getRoundedPhysicalStorageSize(type.getNumElements(),
+                                       type.getElementType());
 }
 
 } // namespace Util

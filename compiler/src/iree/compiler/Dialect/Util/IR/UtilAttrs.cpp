@@ -82,12 +82,12 @@ static bool canUseRawData(DenseElementsAttr attr,
     return false;
   }
 
-  int32_t bitwidth = getTypeBitWidth(elementType);
-  if (bitwidth == 8) {
+  int32_t bitWidth = getTypeBitWidth(elementType);
+  if (bitWidth == 8) {
     // Don't care about endianness at all for single-byte data.
     return true;
-  } else if (bitwidth % 8 != 0) {
-    // Any non-byte aligned bitwidth is stored byte aligned.
+  } else if (bitWidth % 8 != 0) {
+    // Any non-byte aligned bit width is stored byte aligned.
     return false;
   } else if (endian != llvm::support::endian::system_endianness()) {
     // Can't use raw data if the endianness of the system doesn't match the
@@ -98,32 +98,40 @@ static bool canUseRawData(DenseElementsAttr attr,
 }
 
 // Appends the raw bytes of |value| in the given endianness to |buffer|.
-static LogicalResult getAPIntRawData(APInt value, size_t bitWidth,
-                                     llvm::support::endianness endian,
-                                     SmallVectorImpl<char> &buffer) {
-  buffer.resize(bitWidth / 8);
-  switch (bitWidth) {
-  case 8: {
+// Non-byte-aligned types are rounded up to the next power of two byte-aligned
+// bit width (i1 -> i8, i4 -> i8, i17 -> i32, etc).
+static LogicalResult serializeAPIntRawData(APInt value, uint64_t bitWidth,
+                                           llvm::support::endianness endian,
+                                           SmallVectorImpl<char> &buffer) {
+  // Round up to 8-bit aligned bytes.
+  uint64_t byteAligned = llvm::divideCeil(bitWidth, 8);
+  // Round up to the next power of two (unless already a power of two).
+  uint64_t byteWidth = llvm::PowerOf2Ceil(byteAligned);
+  // Storage is in aligned bytes.
+  buffer.resize(byteWidth);
+  // Extract up to the declared bit width and pad.
+  switch (byteWidth) {
+  case 1: {
     uint8_t rawValue = llvm::support::endian::byte_swap<uint8_t>(
-        value.extractBitsAsZExtValue(8, 0), endian);
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
     std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
     return success();
   }
-  case 16: {
+  case 2: {
     uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
-        value.extractBitsAsZExtValue(16, 0), endian);
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
     std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
     return success();
   }
-  case 32: {
+  case 4: {
     uint32_t rawValue = llvm::support::endian::byte_swap<uint32_t>(
-        value.extractBitsAsZExtValue(32, 0), endian);
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
     std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
     return success();
   }
-  case 64: {
+  case 8: {
     uint64_t rawValue = llvm::support::endian::byte_swap<uint64_t>(
-        value.extractBitsAsZExtValue(64, 0), endian);
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
     std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
     return success();
   }
@@ -133,11 +141,17 @@ static LogicalResult getAPIntRawData(APInt value, size_t bitWidth,
 }
 
 // Appends the raw bytes of |value| in the given endianness to |buffer|.
-static LogicalResult getAPFloatRawData(APFloat value, size_t bitWidth,
-                                       llvm::support::endianness endian,
-                                       SmallVectorImpl<char> &buffer) {
+static LogicalResult serializeAPFloatRawData(APFloat value, size_t bitWidth,
+                                             llvm::support::endianness endian,
+                                             SmallVectorImpl<char> &buffer) {
   buffer.resize(bitWidth / 8);
   switch (bitWidth) {
+  case 8: {
+    uint8_t rawValue = llvm::support::endian::byte_swap<uint8_t>(
+        value.bitcastToAPInt().extractBitsAsZExtValue(8, 0), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
   case 16: {
     uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
         value.bitcastToAPInt().extractBitsAsZExtValue(16, 0), endian);
@@ -169,21 +183,20 @@ static LogicalResult serializeSplatValue(Attribute splatAttr, int64_t count,
                                          llvm::raw_ostream &os) {
   // Get the encoded byte contents of the splat element.
   SmallVector<char> elementBuffer;
-  if (auto attr =
-          llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(splatAttr)) {
+  if (auto attr = llvm::dyn_cast<SerializableAttrInterface>(splatAttr)) {
     if (failed(attr.serializeToVector(endian, elementBuffer))) {
       return failure();
     }
   } else if (auto attr = llvm::dyn_cast<IntegerAttr>(splatAttr)) {
-    if (failed(getAPIntRawData(attr.getValue(),
-                               attr.getType().getIntOrFloatBitWidth(), endian,
-                               elementBuffer))) {
+    if (failed(serializeAPIntRawData(attr.getValue(),
+                                     attr.getType().getIntOrFloatBitWidth(),
+                                     endian, elementBuffer))) {
       return failure();
     }
   } else if (auto attr = llvm::dyn_cast<FloatAttr>(splatAttr)) {
-    if (failed(getAPFloatRawData(attr.getValue(),
-                                 attr.getType().getIntOrFloatBitWidth(), endian,
-                                 elementBuffer))) {
+    if (failed(serializeAPFloatRawData(attr.getValue(),
+                                       attr.getType().getIntOrFloatBitWidth(),
+                                       endian, elementBuffer))) {
       return failure();
     }
   } else {
@@ -208,51 +221,121 @@ static LogicalResult serializeRawData(DenseElementsAttr elementsAttr,
   return success();
 }
 
+// Stream writer that supports bit packing.
+// In the initial state the writer starts at a byte-aligned offset 0 and as new
+// values of |logicalBitWidth| are written they will be appended in
+// |physicalBitWidth| chunks in the specified endianness. When completed any
+// additional bits remaining in the last |physicalBitWidth| chunk will be padded
+// with zeros.
+//
+// Note that the logical bit width may not evenly divide the physical bit width:
+// a logical width of 3 and a physical width of 8 will always include 2 bits of
+// zero padding.
+template <typename physicalType,
+          unsigned physicalBitWidth = sizeof(physicalType) * 8>
+class PackedWriter {
+public:
+  explicit PackedWriter(unsigned logicalBitWidth,
+                        llvm::support::endianness endian, llvm::raw_ostream &os)
+      : logicalBitWidth(logicalBitWidth), endian(endian), os(os) {}
+
+  void write(const uint64_t value) {
+    if (bitOffset + logicalBitWidth > physicalBitWidth)
+      flush();
+    physicalBuffer |= value << bitOffset;
+    bitOffset += logicalBitWidth;
+  }
+
+  void flush() {
+    if (bitOffset == 0)
+      return;
+    physicalType physicalValue =
+        llvm::support::endian::byte_swap<physicalType>(physicalBuffer, endian);
+    os.write((const char *)&physicalValue, sizeof(physicalValue));
+    physicalBuffer = 0;
+    bitOffset = 0;
+  }
+
+private:
+  const unsigned logicalBitWidth;
+  const llvm::support::endianness endian;
+  llvm::raw_ostream &os;
+  unsigned bitOffset = 0;
+  physicalType physicalBuffer = 0;
+};
+
+static LogicalResult
+serializeSubByteIntegerElements(DenseIntElementsAttr attr,
+                                llvm::support::endianness endian,
+                                llvm::raw_ostream &os) {
+  const unsigned logicalBitWidth =
+      attr.getElementType().getIntOrFloatBitWidth();
+  // Round up to the next power of two (unless already a power of two) of the
+  // 8-bit aligned logical bit width.
+  const unsigned physicalBitWidth =
+      getTypePhysicalStorageBitWidth(attr.getElementType());
+  switch (physicalBitWidth) {
+  case 8: {
+    PackedWriter<uint8_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  case 16: {
+    PackedWriter<uint16_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  case 32: {
+    PackedWriter<uint32_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  case 64: {
+    PackedWriter<uint64_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  default:
+    return emitError(UnknownLoc::get(attr.getContext()))
+           << "unhandled packed integer physical bit width " << physicalBitWidth
+           << " for type " << attr.getType();
+  }
+}
+
 template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
 static LogicalResult
-serializeGenericIntElements(DenseIntElementsAttr attr,
-                            llvm::support::endianness endian,
-                            llvm::raw_ostream &os) {
+serializeGenericIntegerElements(DenseIntElementsAttr attr,
+                                llvm::support::endianness endian,
+                                llvm::raw_ostream &os) {
   for (const APInt &value : attr.getValues<APInt>()) {
     elementType rawValue = llvm::support::endian::byte_swap<elementType>(
         value.extractBitsAsZExtValue(numBits, 0), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
+    os.write((const char *)&rawValue, sizeof(rawValue));
   }
   return success();
 }
 
+template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
 static LogicalResult
-serializeGenericF16Elements(DenseFPElementsAttr attr,
-                            llvm::support::endianness endian,
-                            llvm::raw_ostream &os) {
+serializeGenericFloatElements(DenseFPElementsAttr attr,
+                              llvm::support::endianness endian,
+                              llvm::raw_ostream &os) {
   for (const APFloat &value : attr.getValues<APFloat>()) {
-    uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
-        value.bitcastToAPInt().extractBitsAsZExtValue(16, 0), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
-  }
-  return success();
-}
-
-static LogicalResult
-serializeGenericF32Elements(DenseFPElementsAttr attr,
-                            llvm::support::endianness endian,
-                            llvm::raw_ostream &os) {
-  for (const APFloat &value : attr.getValues<APFloat>()) {
-    float rawValue =
-        llvm::support::endian::byte_swap<float>(value.convertToFloat(), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
-  }
-  return success();
-}
-
-static LogicalResult
-serializeGenericF64Elements(DenseFPElementsAttr attr,
-                            llvm::support::endianness endian,
-                            llvm::raw_ostream &os) {
-  for (const APFloat &value : attr.getValues<APFloat>()) {
-    double rawValue = llvm::support::endian::byte_swap<double>(
-        value.convertToDouble(), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
+    elementType rawValue = llvm::support::endian::byte_swap<elementType>(
+        value.bitcastToAPInt().extractBitsAsZExtValue(numBits, 0), endian);
+    os.write((const char *)&rawValue, sizeof(rawValue));
   }
   return success();
 }
@@ -264,37 +347,48 @@ serializeGenericElementData(DenseElementsAttr elementsAttr,
                             llvm::support::endianness endian,
                             llvm::raw_ostream &os) {
   if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
-    // Don't hoist |bitwidth| given `getElementTypeBitWidth()` asserts if the
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
-    int32_t bitwidth = attr.getType().getElementTypeBitWidth();
-    switch (bitwidth) {
+    unsigned bitWidth = attr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
     case 8:
       return serializeRawData(attr, os);
     case 16:
-      return serializeGenericIntElements<uint16_t>(attr, endian, os);
+      return serializeGenericIntegerElements<uint16_t>(attr, endian, os);
     case 32:
-      return serializeGenericIntElements<uint32_t>(attr, endian, os);
+      return serializeGenericIntegerElements<uint32_t>(attr, endian, os);
     case 64:
-      return serializeGenericIntElements<uint64_t>(attr, endian, os);
+      return serializeGenericIntegerElements<uint64_t>(attr, endian, os);
     default:
+      // NOTE: i1 is treated as i8 in a lot of places in MLIR/IREE and will need
+      // a larger cleanup to serialize as a sub-byte value.
+      if (bitWidth != 1 && bitWidth < 64) {
+        // Special case for bit-packing of sub-byte aligned types.
+        // This could be extended to handle larger widths (i33, etc) but they
+        // are rare today.
+        return serializeSubByteIntegerElements(attr, endian, os);
+      }
       return emitError(UnknownLoc::get(elementsAttr.getContext()))
-             << "unhandled integer element bitwidth " << bitwidth
+             << "unhandled integer element bit width " << bitWidth
              << " for type " << elementsAttr.getType();
     }
   } else if (auto attr = llvm::dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
-    // Don't hoist |bitwidth| given `getElementTypeBitWidth()` asserts if the
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
-    int32_t bitwidth = attr.getType().getElementTypeBitWidth();
-    switch (bitwidth) {
+    unsigned bitWidth = attr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 8:
+      // TODO(benvanik): see if serializeRawData works for f8 types.
+      return serializeGenericFloatElements<uint8_t>(attr, endian, os);
     case 16:
-      return serializeGenericF16Elements(attr, endian, os);
+      return serializeGenericFloatElements<uint16_t>(attr, endian, os);
     case 32:
-      return serializeGenericF32Elements(attr, endian, os);
+      return serializeGenericFloatElements<uint32_t>(attr, endian, os);
     case 64:
-      return serializeGenericF64Elements(attr, endian, os);
+      return serializeGenericFloatElements<uint64_t>(attr, endian, os);
     default:
       return emitError(UnknownLoc::get(elementsAttr.getContext()))
-             << "unhandled float element bitwidth " << bitwidth << " for type "
+             << "unhandled float element bit width " << bitWidth << " for type "
              << elementsAttr.getType();
     }
   }
@@ -494,9 +588,9 @@ struct SerializableDenseElementsAttrModel
           SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = llvm::cast<ElementsAttr>(baseAttr);
-    return attr.getNumElements() *
-           IREE::Util::getRoundedElementByteWidth(
-               cast<ShapedType>(attr.getType()).getElementType());
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(),
+        cast<ShapedType>(attr.getType()).getElementType());
   }
 
   LogicalResult serializeToVector(Attribute baseAttr,
@@ -547,8 +641,8 @@ struct SerializableDenseResourceElementsAttrModel
           DenseResourceElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
-    return attr.getNumElements() * IREE::Util::getRoundedElementByteWidth(
-                                       attr.getType().getElementType());
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(), attr.getType().getElementType());
   }
 
   LogicalResult serializeToVector(Attribute baseAttr,
@@ -581,9 +675,7 @@ struct SerializableDenseResourceElementsAttrModel
                   "values or pass --iree-util-zero-fill-elided-attrs for "
                   "testing and expect invalid execution results";
       }
-      os.write_zeros(attr.getNumElements() *
-                     IREE::Util::getRoundedElementByteWidth(
-                         attr.getType().getElementType()));
+      os.write_zeros(getStorageSize(baseAttr));
       return success();
     }
 

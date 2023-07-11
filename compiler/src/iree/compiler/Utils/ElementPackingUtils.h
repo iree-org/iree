@@ -14,9 +14,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Returns true if the given |bitwidth|, if appearing at runtime-kernel
+/// Returns true if the given |bitWidth|, if appearing at runtime-kernel
 /// interface, is less than a byte that should be tightly packed together.
-bool needToPackSubByteElementBitWidth(unsigned bitwidth);
+bool needToPackSubByteElementBitWidth(unsigned bitWidth);
 /// Returns true if the given |shapedType|, if appearing at runtime-kernel
 /// interface, has sub-byte element types that should be tightly packed
 /// together.
@@ -26,7 +26,7 @@ bool needToPackSubByteElements(RankedTensorType shapedType);
 ///
 /// In IREE, if compiling from the same source model, we control both the
 /// runtime and kernel. For such cases, we perform tight packing for supported
-/// sub-byte elements, and expand to the next power-of-two bitwidth for other
+/// sub-byte elements, and expand to the next power-of-two bit width for other
 /// cases.
 Type legalizeStorageElementType(Type elementType);
 

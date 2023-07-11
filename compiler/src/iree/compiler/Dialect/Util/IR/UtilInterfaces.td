@@ -1099,9 +1099,10 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the total storage size required by the serialized value.
+        Returns the storage size in bytes required by the serialized value.
         Any of the serialization methods will write precisely this number of
-        bytes.
+        bytes. If the value is sub-byte aligned the storage size will be rounded
+        up to the next whole byte.
       }],
       /*retTy=*/"int64_t",
       /*methodName=*/"getStorageSize",
