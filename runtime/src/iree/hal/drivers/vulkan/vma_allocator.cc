@@ -257,6 +257,9 @@ static void VKAPI_PTR iree_hal_vulkan_vma_free_callback(
 
 #endif  // IREE_STATISTICS_ENABLE
 
+static void iree_hal_vulkan_vma_allocator_destroy(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator);
+
 iree_status_t iree_hal_vulkan_vma_allocator_create(
     const iree_hal_vulkan_device_options_t* options, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
@@ -341,7 +344,7 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   if (iree_status_is_ok(status)) {
     *out_allocator = (iree_hal_allocator_t*)allocator;
   } else {
-    vmaDestroyAllocator(vma);
+    iree_hal_vulkan_vma_allocator_destroy((iree_hal_allocator_t*)allocator);
   }
 
   IREE_TRACE_ZONE_END(z0);

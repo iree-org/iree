@@ -64,6 +64,15 @@ typedef union {
   int indices[5];
 } iree_hal_vulkan_memory_types_t;
 
+// Finds the memory type that satisfies the required and preferred buffer
+// |params| and returns it in |out_memory_type_index|. Fails if no memory type
+// satisfies the requirements.
+iree_status_t iree_hal_vulkan_find_memory_type(
+    const VkPhysicalDeviceProperties* device_props,
+    const VkPhysicalDeviceMemoryProperties* memory_props,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    uint32_t* out_memory_type_index);
+
 // Queries the underlying Vulkan implementation to decide which memory type
 // should be used for particular operations.
 iree_status_t iree_hal_vulkan_populate_memory_types(
@@ -88,6 +97,8 @@ iree_status_t iree_hal_vulkan_query_memory_heaps(
 // to get access to the API VkBuffer handle.
 typedef struct iree_hal_vulkan_base_buffer_t {
   iree_hal_buffer_t base;
+  // NOTE: may be VK_NULL_HANDLE if sparse residency is used to back the buffer
+  // with multiple device memory allocations.
   VkDeviceMemory device_memory;
   VkBuffer handle;
 } iree_hal_vulkan_base_buffer_t;

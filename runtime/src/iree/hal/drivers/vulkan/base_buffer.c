@@ -36,6 +36,74 @@ static bool iree_hal_vulkan_is_memory_type_usable(VkMemoryPropertyFlags flags) {
          !iree_all_bits_set(flags, VK_MEMORY_PROPERTY_PROTECTED_BIT);
 }
 
+iree_status_t iree_hal_vulkan_find_memory_type(
+    const VkPhysicalDeviceProperties* device_props,
+    const VkPhysicalDeviceMemoryProperties* memory_props,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    uint32_t* out_memory_type_index) {
+  *out_memory_type_index = 0;
+
+  VkMemoryPropertyFlags require_flags = 0;
+  VkMemoryPropertyFlags prefer_flags = 0;
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      // Device-local, host-visible.
+      require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+      prefer_flags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    } else {
+      // Device-local only.
+      require_flags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    }
+  } else {
+    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+      // Host-local, device-visible.
+      require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    } else {
+      // Host-local only.
+      require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    }
+  }
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
+    require_flags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+  }
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    require_flags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  }
+  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
+    require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  }
+
+  int most_bits_count = 0;
+  int most_bits_idx = -1;
+  for (uint32_t i = 0; i < memory_props->memoryTypeCount; ++i) {
+    VkMemoryPropertyFlags flags = memory_props->memoryTypes[i].propertyFlags;
+    if (!iree_all_bits_set(flags, require_flags) ||
+        !iree_hal_vulkan_is_memory_type_usable(flags)) {
+      // Excluded (required bits missing or memory type is not usable).
+      continue;
+    }
+    // When all required bits are satisfied try to find the memory type that
+    // has the most preferred bits set.
+    int bit_count = iree_math_count_ones_u32(flags & prefer_flags);
+    if (most_bits_idx == -1) {
+      most_bits_count = bit_count;
+      most_bits_idx = (int)i;
+    } else if (bit_count > most_bits_count) {
+      most_bits_count = bit_count;
+      most_bits_idx = (int)i;
+    }
+  }
+  if (most_bits_idx == -1) {
+    // No valid memory type found.
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "no memory type available that satisfies the required flags");
+  }
+
+  *out_memory_type_index = (uint32_t)most_bits_idx;
+  return iree_ok_status();
+}
+
 static void iree_hal_vulkan_populate_dispatch_memory_types(
     const VkPhysicalDeviceProperties* device_props,
     const VkPhysicalDeviceMemoryProperties* memory_props,

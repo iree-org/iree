@@ -36,6 +36,9 @@ IREE_FLAG(bool, vulkan_robust_buffer_access, false,
 IREE_FLAG(
     bool, vulkan_dedicated_compute_queue, false,
     "Use a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch workloads.");
+IREE_FLAG(bool, vulkan_vma_allocator, true,
+          "Whether to use the VMA allocator instead of native Vulkan API "
+          "memory allocations.");
 IREE_FLAG(
     int64_t, vulkan_large_heap_block_size, 0,
     "Preferred allocator block size for large allocations in bytes. Sets the\n"
@@ -81,6 +84,13 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   if (FLAG_vulkan_dedicated_compute_queue) {
     driver_options.device_options.flags |=
         IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
+  }
+  if (FLAG_vulkan_vma_allocator) {
+    driver_options.device_options.flags |=
+        IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR;
+  } else {
+    driver_options.device_options.flags &=
+        ~IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR;
   }
   if (FLAG_vulkan_large_heap_block_size) {
     driver_options.device_options.large_heap_block_size =
