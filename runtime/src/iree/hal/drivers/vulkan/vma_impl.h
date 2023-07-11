@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
-#define IREE_HAL_DRIVERS_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
+#ifndef IREE_HAL_DRIVERS_VULKAN_VMA_IMPL_H_
+#define IREE_HAL_DRIVERS_VULKAN_VMA_IMPL_H_
 
 #include "iree/hal/drivers/vulkan/vulkan_headers.h"
 
@@ -20,4 +20,4 @@
 
 #include <vk_mem_alloc.h>  // IWYU pragma: export
 
-#endif  // IREE_HAL_DRIVERS_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
+#endif  // IREE_HAL_DRIVERS_VULKAN_VMA_IMPL_H_
