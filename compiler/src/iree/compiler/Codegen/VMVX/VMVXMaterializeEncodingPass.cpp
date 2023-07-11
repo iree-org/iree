@@ -37,8 +37,7 @@ static MatmulTileParams chooseMicrokernelMatmulTileParams() {
   return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
 }
 
-static MatmulTileParams chooseMatmulTileParams(MatmulType type,
-                                               ExecutableTargetAttr target) {
+static MatmulTileParams chooseMatmulTileParams(ExecutableTargetAttr target) {
   if (hasMicrokernels(target)) {
     return chooseMicrokernelMatmulTileParams();
   }
@@ -74,19 +73,13 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
   MaterializeEncodingTypeConverter typeConverter(
       [targetAttr](
           RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
-        std::optional<TensorEncoding> encoding = getEncoding(tensorType);
+        auto encoding = tensorType.getEncoding()
+                            .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
         if (!encoding)
           return failure();
-
-        auto matmulType = getMatmulType(*encoding);
-        auto matmulOperandRole = getMatmulOperandRole(*encoding);
-        if (!matmulType || !matmulOperandRole) {
-          return failure();
-        }
-        MatmulTileParams tileParams =
-            chooseMatmulTileParams(*matmulType, targetAttr);
-        auto encodingInfo = chooseEncodingInfoForMatmul(
-            *matmulType, *matmulOperandRole, tileParams);
+        auto role = encoding.getRole().getValue();
+        MatmulTileParams tileParams = chooseMatmulTileParams(targetAttr);
+        auto encodingInfo = chooseEncodingInfoForMatmul(role, tileParams);
         adjustTileSizesToNarrowStaticShape(encodingInfo, tensorType.getShape());
         return encodingInfo;
       });

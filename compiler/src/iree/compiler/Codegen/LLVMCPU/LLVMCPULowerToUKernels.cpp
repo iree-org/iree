@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -21,6 +21,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -354,6 +355,34 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op) {
       genericMicroKernelOp.getOperation());
 }
 
+static uint32_t flagForUser(IREE::LinalgExt::EncodingUser user) {
+  switch (user) {
+  case IREE::LinalgExt::EncodingUser::MATMUL_F32F32F32:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
+  case IREE::LinalgExt::EncodingUser::MATMUL_I8I8I32:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
+  case IREE::LinalgExt::EncodingUser::MATMUL_F16F16F32:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32;
+  case IREE::LinalgExt::EncodingUser::MATMUL_F16F16F16:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F16;
+  case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16F32:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32;
+  case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16BF16:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
+  }
+}
+
+static uint32_t flagForRole(IREE::LinalgExt::EncodingRole role) {
+  switch (role) {
+  case IREE::LinalgExt::EncodingRole::LHS:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
+  case IREE::LinalgExt::EncodingRole::RHS:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
+  case IREE::LinalgExt::EncodingRole::RESULT:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
+  }
+}
+
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
   auto tensorType = op.getTensorType().dyn_cast<RankedTensorType>();
@@ -364,39 +393,10 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
   if (tensorType.getRank() != 2) {
     return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
   }
-  auto encoding = getEncoding(tensorType);
+  auto encoding = tensorType.getEncoding()
+                      .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no TensorEncoding attribute");
-  }
-  auto matmulType = getMatmulType(*encoding);
-  auto matmulOperandRole = getMatmulOperandRole(*encoding);
-  if (!matmulType || !matmulOperandRole) {
-    return rewriter.notifyMatchFailure(op, "unhandled TensorEncoding");
-  }
-  uint32_t flags = 0;
-  if (*matmulType == MatmulType::F32F32F32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
-  } else if (*matmulType == MatmulType::I8I8I32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
-  } else if (*matmulType == MatmulType::F16F16F32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32;
-  } else if (*matmulType == MatmulType::F16F16F16) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F16;
-  } else if (*matmulType == MatmulType::BF16BF16F32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32;
-  } else if (*matmulType == MatmulType::BF16BF16BF16) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
-  } else {
-    return failure();
-  }
-  if (*matmulOperandRole == MatmulOperandRole::LHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RESULT) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
-  } else {
-    return failure();
   }
   SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
   SmallVector<Value> inputValues;
@@ -404,7 +404,11 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
   for (int64_t i : tensorType.getShape()) {
     inputValues.push_back(rewriter.create<arith::ConstantIndexOp>(loc, i));
   }
-  inputValues.push_back(rewriter.create<arith::ConstantIntOp>(loc, flags, 32));
+  inputValues.push_back(rewriter.create<arith::ConstantIntOp>(
+      loc,
+      flagForUser(encoding.getUser().getValue()) |
+          flagForRole(encoding.getRole().getValue()),
+      32));
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   auto fn = getFnNameAndDefAttrs("query_tile_sizes.2d", rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(

@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 namespace mlir {
@@ -25,7 +25,7 @@ void adjustTileSizesToNarrowStaticShape(
     ArrayRef<int64_t> shape);
 
 IREE::LinalgExt::MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(MatmulType type, MatmulOperandRole operandRole,
+chooseEncodingInfoForMatmul(IREE::LinalgExt::EncodingRole role,
                             MatmulTileParams tileParams);
 
 IREE::LinalgExt::MaterializeEncodingValueFn
