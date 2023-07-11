@@ -33,9 +33,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.iree.match_callback failures(propagate) "convolution"
 // CHECK: transform.structured.convert_conv2d_to_img2col
 // CHECK: get_producer_of_operand %{{.*}}[0]
-// CHECK: apply_patterns to %{{.*}} {
-// CHECK:   transform.apply_patterns.iree.bubble_collapse
-// CHECK: } : !transform.any_op
+// CHECK: transform.apply_patterns.iree.bubble_collapse
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [] tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.iree.populate_workgroup_count_region_using_num_threads_slice %{{.*}}
@@ -44,7 +42,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.structured.tile_to_scf_for %{{.*}}[0, 0, 0, 16]
 // CHECK: transform.structured.fuse_into_containing_op
-// CHECK: transform.structured.pad %{{.*}} {copy_back = false, pack_paddings = [1, 0, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// CHECK: transform.structured.pad %{{.*}} {copy_back = false, pack_paddings = [1, 0, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: transform.structured.match ops{["linalg.fill"]}
 // CHECK: %[[RES:.+]] = get_producer_of_operand %{{.*}}[2]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RES]]
@@ -53,13 +51,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[LHS]]
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // CHECK: transform.structured.tile_to_forall_op %[[RHS]]   num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
-// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [0, 2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [0, 2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK: apply_patterns to %{{.*}} {
-// CHECK:   transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
-// CHECK:   transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
-// CHECK:   transform.apply_patterns.vector.cast_away_vector_leading_one_dim
-// CHECK: } : !transform.any_op
+// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
+// CHECK: transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+// CHECK: transform.apply_patterns.vector.cast_away_vector_leading_one_dim
 // CHECK: transform.structured.vectorize %{{.*}} {vectorize_nd_extract}
 // CHECK: transform.iree.eliminate_empty_tensors
 // CHECK: transform.iree.bufferize {target_gpu}
@@ -68,15 +64,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.iree.forall_to_workgroup
 // CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
 // CHECK: transform.iree.hoist_static_alloc %{{.*}}
-// CHECK: apply_patterns to %{{.*}} {
-// CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
-// CHECK: } : !transform.any_op
-// CHECK: apply_patterns to %{{.*}} {
-// CHECK:   transform.apply_patterns.memref.extract_address_computations
-// CHECK: } : !transform.any_op
-// CHECK: apply_patterns to %{{.*}} {
-// CHECK:   transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
-// CHECK: } : !transform.any_op
+// CHECK: transform.apply_patterns.memref.fold_memref_alias_ops
+// CHECK: transform.apply_patterns.memref.extract_address_computations
+// CHECK: transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
 // CHECK: transform.structured.hoist_redundant_vector_transfers
 // CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync}
 
@@ -113,7 +103,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // CHECK: transform.sequence  failures(propagate) {
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [] tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
-// CHECK: transform.structured.pad %{{.*}} {copy_back = false, pack_paddings = [0, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// CHECK: transform.structured.pad %{{.*}} {copy_back = false, pack_paddings = [0, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: %[[RES:.+]] = get_producer_of_operand %{{.*}}[2]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RES]]
 // CHECK: %[[LHS:.+]] = get_producer_of_operand %{{.*}}[0]
@@ -121,8 +111,8 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RHS]]
 // CHECK: transform.structured.tile_to_forall_op %[[LHS]]   num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
-// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [0, 2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [0, 2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
 
 

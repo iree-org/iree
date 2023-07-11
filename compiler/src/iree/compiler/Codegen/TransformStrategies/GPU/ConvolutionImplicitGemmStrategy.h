@@ -49,27 +49,25 @@ public:
 
   LogicalResult validate(const GPUModel &gpuModel) const override;
 
+  int64_t batch() const { return captures.convolutionOpSizes[0]; }
   int64_t m() const override { return derivedM; }
   int64_t n() const override { return derivedN; }
   int64_t k() const override { return derivedK; }
 
-  int64_t blockTileM() const override {
-    assert(blockTileSizes.size() >= 3 && "need at least 3 tile sizes");
-    return blockTileSizes[0];
-  }
-  int64_t blockTileN() const override {
-    assert(blockTileSizes.size() >= 3 && "need at least 3 tile sizes");
-    return blockTileSizes[1];
-  }
+  /// Named accessors to block tile sizes associated with shapes.
+  int64_t blockTileBatch() const { return blockTileSizes[0]; }
+  int64_t blockTileM() const override { return blockTileSizes[1]; }
+  int64_t blockTileN() const override { return blockTileSizes[2]; }
 
-  int64_t numWarpsX() const override {
-    assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
-    return numWarps[0];
-  }
-  int64_t numWarpsY() const override {
-    assert(numWarps.size() >= 2 && "need at least 2 warp sizes");
-    return numWarps[1];
-  }
+  /// Number of threads to use.
+  int64_t numThreadsX() const { return numThreads[0]; }
+  int64_t numThreadsY() const { return numThreads[1]; }
+  int64_t numThreadsZ() const { return numThreads[2]; }
+
+  /// Number of warps to use.
+  int64_t numWarpsX() const override { return numWarps[0]; }
+  int64_t numWarpsY() const override { return numWarps[1]; }
+  int64_t numWarpsZ() const { return numWarps[2]; }
 
   Type getLhsElementalType() const override {
     return filterLHS ? captures.filterElementType : captures.inputElementType;
@@ -85,88 +83,69 @@ public:
     // 2D named convolutions are always batched.
     return MappingInfo{
         /*numThreads=*/{},
-        /*tileSizes=*/{blockTileSizes[2], blockTileM(), blockTileN()},
+        /*tileSizes=*/{blockTileBatch(), blockTileM(), blockTileN()},
         /*threadMapping=*/{blockZ(ctx), blockY(ctx), blockX(ctx)}};
   }
 
-  // LHS copy is of size mxk.
+  // LHS copy is of size (batch) x M x K.
   MappingInfo lhsCopyMapping() const override {
     return CopyMapping::getMappingInfo(
         ctx, totalNumThreads(),
         /*alignment=*/k(),
         /*copySizes=*/
         filterLHS ? ArrayRef<int64_t>{blockTileM(), reductionTileSize}
-                  : ArrayRef<int64_t>{1, blockTileM(), reductionTileSize},
+                  : ArrayRef<int64_t>{blockTileBatch(), blockTileM(),
+                                      reductionTileSize},
         /*favorPredication=*/false,
         /*elementalBitWidth=*/lhsElementalBitWidth());
   }
-  LogicalResult validateLhsCopyMapping() const override {
-    MappingInfo mapping = lhsCopyMapping();
-    // It is fine to use fewer threads to copy the LHS.
-    int64_t mappingThreadCount = 1;
-    for (auto numThread : mapping.numThreads)
-      mappingThreadCount *= numThread;
-    if (totalNumThreads() < mappingThreadCount) {
-      llvm::errs() << "too many threads used for transferring lhs: "
-                   << mappingThreadCount << " > " << totalNumThreads() << "\n";
-      return failure();
-    }
-    return success();
-  }
 
-  // RHS copy is of size kxn.
+  // RHS copy is of size (batch) x K x N.
   MappingInfo rhsCopyMapping() const override {
     return CopyMapping::getMappingInfo(
         ctx, totalNumThreads(),
         /*alignment=*/n(),
         /*copySizes=*/
-        filterLHS ? ArrayRef<int64_t>{1, reductionTileSize, blockTileN()}
+        filterLHS ? ArrayRef<int64_t>{blockTileBatch(), reductionTileSize,
+                                      blockTileN()}
                   : ArrayRef<int64_t>{reductionTileSize, blockTileN()},
         /*favorPredication=*/false,
         /*elementalBitWidth=*/rhsElementalBitWidth());
   }
-  LogicalResult validateRhsCopyMapping() const override {
-    MappingInfo mapping = rhsCopyMapping();
-    // It is fine to use fewer threads to copy the RHS.
-    int64_t mappingThreadCount = 1;
-    for (auto numThread : mapping.numThreads)
-      mappingThreadCount *= numThread;
-    if (totalNumThreads() < mappingThreadCount) {
-      llvm::errs() << "too many threads used for transferring rhs: "
-                   << mappingThreadCount << " > " << totalNumThreads() << "\n";
-      return failure();
-    }
-    return success();
-  }
 
-  // RES copy is of size mxn.
+  // RES copy is of size batch x M x N.
   MappingInfo resCopyMapping() const override {
     return CopyMapping::getMappingInfo(
         ctx, totalNumThreads(),
         /*alignment=*/n(),
-        /*copySizes=*/{1, blockTileM(), blockTileN()},
+        /*copySizes=*/{blockTileBatch(), blockTileM(), blockTileN()},
         /*favorPredication=*/false,
         /*elementalBitWidth=*/resElementalBitWidth());
   }
+
+  /// Check that the mapping computed for a copy is valid.
+  LogicalResult validateLhsCopyMapping() const override {
+    return validateCopyMapping(ctx, lhsCopyMapping(), "lhs");
+  }
+  LogicalResult validateRhsCopyMapping() const override {
+    return validateCopyMapping(ctx, rhsCopyMapping(), "rhs");
+  }
   LogicalResult validateResCopyMapping() const override {
-    MappingInfo mapping = resCopyMapping();
-    // It is fine to use fewer threads to copy the RES.
-    int64_t mappingThreadCount = 1;
-    for (auto numThread : mapping.numThreads)
-      mappingThreadCount *= numThread;
-    if (totalNumThreads() < mappingThreadCount) {
-      llvm::errs() << "too many threads used for transferring res: "
-                   << mappingThreadCount << " > " << totalNumThreads() << "\n";
-      return failure();
-    }
-    return success();
+    return validateCopyMapping(ctx, resCopyMapping(), "result");
   }
 
-  // COMPUTE is of size mxn.
+  // COMPUTE is of size batch x M x N.
   MappingInfo computeMapping() const override {
-    return MappingInfo{/*numThreads=*/{0, numWarpsY(), numWarpsX()},
+    if (useFma) {
+      return MappingInfo{
+          /*numThreads=*/{numThreadsZ(), numThreadsY(), numThreadsX()},
+          /*tileSizes=*/{},
+          /*threadMapping=*/{threadZ(ctx), threadY(ctx), threadX(ctx)},
+          /*vectorSize=*/std::nullopt};
+    }
+    return MappingInfo{/*numThreads=*/{numWarpsZ(), numWarpsY(), numWarpsX()},
                        /*tileSizes=*/{},
-                       /*threadMapping=*/{warpY(ctx), warpX(ctx)},
+                       /*threadMapping=*/{warpZ(ctx), warpY(ctx), warpX(ctx)},
                        /*vectorSize=*/std::nullopt};
   }
 

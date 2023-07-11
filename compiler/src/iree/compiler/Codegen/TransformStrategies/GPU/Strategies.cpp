@@ -554,6 +554,8 @@ static FailureOr<ImplicitGemmStrategy> applyKnownGoodConvolutionConfigurations(
 
 static void failSafeOverrides(ImplicitGemmStrategy &strategy,
                               const GPUModel &gpuModel) {
+  // Prefer a default block tile of 1 for the batch.
+  strategy.blockTileSizes = SmallVector<int64_t>{1, 128, 128};
   // Failsafe for blockTileM to avoid tiling by > size (i.e. no tiling).
   int64_t blockTileM = selectLargestFailsafeValueIfNeeded(
       strategy.blockTileM(), strategy.m(), {16, 32, 64, 128}, {1, 16, 32, 64});
@@ -564,7 +566,13 @@ static void failSafeOverrides(ImplicitGemmStrategy &strategy,
   int64_t reductionTileSize = selectLargestFailsafeValueIfNeeded(
       strategy.reductionTileSize, strategy.k(), {8, 16, 24, 32, 40, 48, 56, 64},
       {1, 8, 16, 24, 32, 40, 48, 56});
-  strategy.blockTileSizes = {blockTileM, blockTileN, 1};
+  // Failsafe for blockTileBatch to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileBatch = selectLargestFailsafeValueIfNeeded(
+      /*value=*/strategy.blockTileBatch(),
+      /*limit=*/strategy.batch(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
+  strategy.blockTileSizes = {blockTileBatch, blockTileM, blockTileN};
   strategy.reductionTileSize = reductionTileSize;
   // Avoid too deep pipelines. This should also look at shared memory usage in
   // the future.

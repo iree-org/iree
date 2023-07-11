@@ -464,7 +464,7 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
     copyBackOpH = buildDistributeOnePadOrCopyWithNumThreads(
         b, variantH, copyBackOpH,
         /*numThreads=*/resCopyMapping.numThreads,
-        /*threadDimMapping=*/rhsCopyMapping.threadMapping);
+        /*threadDimMapping=*/resCopyMapping.threadMapping);
   }
 
   return std::make_tuple(lhsCopyOpH, rhsCopyOpH, copyBackOpH);
@@ -475,7 +475,8 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
 // TODO: generalize and don't hardcode.
 void mlir::iree_compiler::gpu::buildMatmulVectorization(
     ImplicitLocOpBuilder &b, Value variantH, Value lhsCopyOpH, Value rhsCopyOpH,
-    Value copyBackOpH, const AbstractGemmLikeStrategy &strategy) {
+    Value copyBackOpH, const AbstractGemmLikeStrategy &strategy,
+    bool vectorizePadding, bool vectorizeNdExtract) {
   // Canonicalize to make padOp outputs static shaped: this is currently a
   // prerequisite for vector masking.
   // Also, no canonicalization is allowed after vector masking and before we
@@ -516,7 +517,8 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 
   // Apply vectorization + cleanups to what remains.
-  funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true);
+  funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true,
+                                        vectorizePadding, vectorizeNdExtract);
 }
 
 /// Build the transform IR to perform conversion to tensor core operations.

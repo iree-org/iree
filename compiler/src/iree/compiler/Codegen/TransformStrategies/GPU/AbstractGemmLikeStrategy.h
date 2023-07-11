@@ -111,6 +111,11 @@ struct AbstractGemmLikeStrategy : GPUStrategy {
   virtual MappingInfo resCopyMapping() const = 0;
   virtual LogicalResult validateResCopyMapping() const = 0;
 
+  /// Validates the mapping and emits a diagnostic on failure.
+  LogicalResult validateCopyMapping(MLIRContext *ctx,
+                                    const MappingInfo &mapping,
+                                    StringRef name) const;
+
   //===--------------------------------------------------------------------===//
   // Parameters that control compute mapping decisions.
   //===--------------------------------------------------------------------===//
