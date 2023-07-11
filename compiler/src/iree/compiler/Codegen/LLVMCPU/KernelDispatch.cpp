@@ -2053,22 +2053,19 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   auto targetMLTransInfo =
       TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
   for (auto op : computeOps) {
+    // The lowering config is already set on rootOperation, so we skip it.
     if (op == rootOperation)
       continue;
+
     int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    SmallVector<int64_t> zeros(numLoops, 0);
     TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
-    SmallVector<int64_t> zeros(tileAndFuseSizes.size(), 0);
     TypeSwitch<Operation *>(op)
         .Case<tensor::PackOp>([&](auto packOp) {
           SmallVector<int64_t> vecTileSizes =
               getPackVectorTileSizes(entryPointFn, packOp);
           tileSizesList.push_back(zeros);
           tileSizesList.push_back(vecTileSizes);
-          for (auto &ts : tileSizesList)
-            ts.resize(numLoops, 0);
-          auto packLoweringConfig =
-              IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
-          setLoweringConfig(op, packLoweringConfig);
         })
         .Case<linalg::GenericOp>([&](auto genericOp) {
           auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
@@ -2089,21 +2086,15 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
 
           tileSizesList.push_back(reductionTiles);
           tileSizesList.push_back(vecTileSizes);
-          for (auto &ts : tileSizesList)
-            ts.resize(numLoops, 0);
-          auto config =
-              IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
-          setLoweringConfig(op, config);
         })
         .Default([&](auto) {
           tileSizesList.push_back(zeros);
           tileSizesList.push_back(zeros);
-          for (auto &ts : tileSizesList)
-            ts.resize(numLoops, 0);
-          auto config =
-              IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
-          setLoweringConfig(op, config);
         });
+    for (auto &ts : tileSizesList)
+      ts.resize(numLoops, 0);
+    auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
+    setLoweringConfig(op, config);
   }
 }
 
