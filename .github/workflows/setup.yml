@@ -12,6 +12,12 @@ name: Setup
 
 on:
   workflow_call:
+    inputs:
+      workflow-file:
+        description: |
+          Workflow file to parse jobs.
+        required: true
+        type: string
     outputs:
       enabled-jobs:
         description: |
@@ -95,6 +101,7 @@ jobs:
       - name: "Configuring CI options"
         id: configure
         env:
+          WORKFLOW_FILE: ${{ inputs.workflow-file }}
           PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
           PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
           PR_BRANCH: ${{ fromJSON(steps.fetch-pr.outputs.pr-branch || '""') }}

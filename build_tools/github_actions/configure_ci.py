@@ -76,7 +76,6 @@ class Trailer(str, enum.Enum):
 # starts with this prefix but isn't in our list. We can add known commonly used
 # trailers to our list or we might consider relaxing this.
 RESERVED_TRAILER_PREFIXES = ["ci-", "bewnchmark-", "skip-"]
-CI_WORKFLOW_FILE = ".github/workflows/ci.yml"
 ALL_KEY = "all"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
@@ -348,7 +347,8 @@ def parse_jobs_trailer(
 
 
 def parse_jobs_from_workflow_file() -> Set[str]:
-    with open(CI_WORKFLOW_FILE) as f:
+    workflow_file = os.environ["WORKFLOW_FILE"]
+    with open(workflow_file) as f:
         workflow = yaml.load(f.read(), Loader=yaml.SafeLoader)
     all_jobs = set(workflow["jobs"].keys())
     all_jobs -= CONTROL_JOBS
