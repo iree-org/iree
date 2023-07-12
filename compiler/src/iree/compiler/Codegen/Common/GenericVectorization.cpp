@@ -279,7 +279,7 @@ void GenericVectorizationPass::runOnOperation() {
                                                       funcOp.getContext());
   vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                        funcOp.getContext());
-  vector::populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
+  populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the

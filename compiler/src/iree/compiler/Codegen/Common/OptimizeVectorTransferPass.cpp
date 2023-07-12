@@ -150,6 +150,7 @@ struct OptimizeVectorTransferPass
     // forwarding.
     eraseDeadAllocAndStores(funcOp);
   }
+
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) {
       return failure();

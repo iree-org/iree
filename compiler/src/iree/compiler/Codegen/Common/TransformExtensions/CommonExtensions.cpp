@@ -293,6 +293,11 @@ void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::
   populateReshapeToInterfaceTensorPatterns(patterns);
 }
 
+void transform_dialect::ApplyFoldTensorSliceIntoTransferPatternsOp::
+    populatePatterns(RewritePatternSet &patterns) {
+  populateVectorTransferTensorSliceTransforms(patterns);
+}
+
 void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   populatePrepareVectorToMMAPatterns(patterns, getUseNvGpu());
