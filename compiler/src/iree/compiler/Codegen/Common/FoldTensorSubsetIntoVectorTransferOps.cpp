@@ -207,8 +207,7 @@ public:
 } // namespace
 
 void mlir::iree_compiler::populateVectorTransferTensorSliceTransforms(
-    RewritePatternSet &patterns,
-    PatternBenefit benefit) {
+    RewritePatternSet &patterns, PatternBenefit benefit) {
   patterns
       .add<FoldExtractSliceIntoTransferRead, FoldInsertSliceIntoTransferWrite>(
           patterns.getContext(), benefit);
