@@ -35,7 +35,7 @@ jobs:
 
   build_all:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
     uses: ./.github/workflows/build_all.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -44,7 +44,7 @@ jobs:
 
   build_benchmark_tools:
     needs: [setup, build_all]
-    if: fromJson(needs.setup.outputs.should-run)
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_benchmark_tools')
     uses: ./.github/workflows/build_benchmark_tools.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -55,7 +55,7 @@ jobs:
 
   build_e2e_test_artifacts:
     needs: [setup, build_all]
-    if: fromJson(needs.setup.outputs.should-run)
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_e2e_test_artifacts')
     uses: ./.github/workflows/build_e2e_test_artifacts.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -68,7 +68,7 @@ jobs:
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
-    if: fromJson(needs.setup.outputs.should-run)
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'compilation_benchmarks')
     uses: ./.github/workflows/benchmark_compilation.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -80,7 +80,7 @@ jobs:
 
   execution_benchmarks:
     needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
-    if: fromJson(needs.setup.outputs.should-run)
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'execution_benchmarks')
     uses: ./.github/workflows/benchmark_execution.yml
     with:
       # env.GCS_DIR is also duplicated in this workflow. See the note there on

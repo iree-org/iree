@@ -35,7 +35,7 @@ jobs:
 
   build_all:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
     uses: ./.github/workflows/build_all.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -44,7 +44,7 @@ jobs:
 
   profile_cuda:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'profile_cuda')
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}

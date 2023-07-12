@@ -60,8 +60,6 @@ env:
 jobs:
   setup:
     uses: ./.github/workflows/setup.yml
-    with:
-      workflow-file: ${{ github.workflow_ref }}
 
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
