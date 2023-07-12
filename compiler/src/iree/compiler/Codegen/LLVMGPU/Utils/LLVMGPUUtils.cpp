@@ -292,12 +292,17 @@ void createAsyncGroups(RewriterBase &rewriter, func::FuncOp funcOp,
       Value storeBase = getMemrefOperand(writeOp);
       Value loadBase = getMemrefOperand(readOp);
       Value mask = getMaskValue(rewriter, readOp);
+      auto dstMemref = llvm::cast<MemRefType>(storeBase.getType());
+      int64_t sizeInBytes =
+          (dstMemref.getElementTypeBitWidth() * numElements) / 8;
+      UnitAttr bypassL1 =
+          useMMASync && sizeInBytes == 16 ? rewriter.getUnitAttr() : UnitAttr();
       Value token = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
           writeOp->getLoc(),
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
           rewriter.getIndexAttr(numElements), mask,
-          /*bypassL1=*/useMMASync ? rewriter.getUnitAttr() : UnitAttr());
+          /*bypassL1=*/bypassL1);
       tokens.push_back(token);
     }
     // Create the group and wait for it right after.
