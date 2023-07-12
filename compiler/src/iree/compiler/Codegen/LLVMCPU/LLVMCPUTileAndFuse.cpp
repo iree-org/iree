@@ -100,8 +100,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   };
 
   // The rest of this method is similar to
-  // scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp, except that also
-  // yields replacements for values of the fused producer.
+  // scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp, except that this
+  // replaces DPS out operand with iter_arg when they use the same init
+  // operands.
 
   // 1. Tile the consumer.
   SmallVector<OpResult> yieldedValuesToOrigValues;
@@ -140,12 +141,27 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   // computing the slices of these producers in-place. This results in more
   // slices created for operands of the "fused producer". This open up more
   // opportunities for fusion. Use a worklist to fuse greedily.
-  auto addCandidateSlices = [](Operation *fusedOp,
-                               std::deque<tensor::ExtractSliceOp> &candidates) {
-    for (Value operand : fusedOp->getOperands())
-      if (auto sliceOp = operand.getDefiningOp<tensor::ExtractSliceOp>())
-        candidates.push_back(sliceOp);
-  };
+  auto addCandidateSlices =
+      [&](Operation *fusedOp, std::deque<tensor::ExtractSliceOp> &candidates) {
+        for (OpOperand &operand : fusedOp->getOpOperands()) {
+          auto sliceOp = operand.get().getDefiningOp<tensor::ExtractSliceOp>();
+          if (!sliceOp)
+            continue;
+          candidates.push_back(sliceOp);
+
+          auto dpsOp = dyn_cast<DestinationStyleOpInterface>(fusedOp);
+          if (!dpsOp)
+            continue;
+
+          if (dpsOp.isDpsInit(&operand) &&
+              mapToIterArg.contains(sliceOp.getSource())) {
+            rewriter.startRootUpdate(sliceOp);
+            sliceOp.getSourceMutable().assign(
+                mapToIterArg[sliceOp.getSource()]);
+            rewriter.finalizeRootUpdate(sliceOp);
+          }
+        }
+      };
 
   std::deque<tensor::ExtractSliceOp> candidates;
   addCandidateSlices(tilingResult->tiledOps.back(), candidates);
@@ -154,12 +170,6 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     // Traverse the slices in BFS fashion.
     tensor::ExtractSliceOp candidateSliceOp = candidates.front();
     candidates.pop_front();
-    if (mapToIterArg.contains(candidateSliceOp.getSource())) {
-      rewriter.startRootUpdate(candidateSliceOp);
-      candidateSliceOp.getSourceMutable().assign(
-          mapToIterArg[candidateSliceOp.getSource()]);
-      rewriter.finalizeRootUpdate(candidateSliceOp);
-    }
 
     // Materialize the slice of the producer in place.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
