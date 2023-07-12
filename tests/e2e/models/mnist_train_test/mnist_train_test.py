@@ -43,7 +43,7 @@ def build_module(artifacts_dir: str):
             os.unlink(mmap_vmfb.name)
 
         return load_vm_flatbuffer_file(
-            vmfb_file, driver=args.driver, destroy_callback=cleanup
+            mmap_vmfb.name, driver=args.driver, destroy_callback=cleanup
         )
 
 
