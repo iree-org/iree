@@ -357,7 +357,8 @@ def parse_path_from_workflow_ref(repo: str, workflow_ref: str) -> pathlib.Path:
             f" '{workflow_ref}' outside the repo '{repo}'."
         )
     # The format of workflow ref: `${repo}/${workflow file path}@${ref}`
-    workflow_file = workflow_ref[len(repo + "/") :].split("@", maxsplit=1)[0]
+    workflow_file = workflow_ref[len(repo) :].lstrip("/")
+    workflow_file = workflow_file.split("@", maxsplit=1)[0]
     return pathlib.Path(workflow_file)
 
 
