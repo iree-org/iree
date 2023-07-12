@@ -6,6 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import pathlib
 import unittest
 
 import configure_ci
@@ -259,6 +260,21 @@ class ConfigureCITest(unittest.TestCase):
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, {postsubmit_job})
+
+    def test_parse_path_from_workflow_ref(self):
+        path = configure_ci.parse_path_from_workflow_ref(
+            "octocat/example", "octocat/example/.github/test.yml@1234"
+        )
+
+        self.assertEqual(path, pathlib.Path(".github/test.yml"))
+
+    def test_parse_path_from_workflow_ref_invalid_ref(self):
+        self.assertRaises(
+            ValueError,
+            lambda: configure_ci.parse_path_from_workflow_ref(
+                "octocat/example", "squid/unknown/.github/test.yml@1234"
+            ),
+        )
 
 
 if __name__ == "__main__":

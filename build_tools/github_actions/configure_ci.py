@@ -8,6 +8,9 @@
 """Determines whether CI should run on a given PR.
 
 The following environment variables are required:
+- GITHUB_REPOSITORY: GitHub org and repository, e.g. openxla/iree.
+- GITHUB_WORKFLOW_REF: GitHub workflow ref, e.g.
+    openxla/iree/.github/workflows/ci.yml@refs/pull/1/merge.
 - GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
 - GITHUB_OUTPUT: path to write workflow output variables.
 - GITHUB_STEP_SUMMARY: path to write workflow summary output.
@@ -37,6 +40,7 @@ import fnmatch
 import json
 import os
 import re
+import pathlib
 import string
 import subprocess
 import sys
@@ -76,7 +80,6 @@ class Trailer(str, enum.Enum):
 # starts with this prefix but isn't in our list. We can add known commonly used
 # trailers to our list or we might consider relaxing this.
 RESERVED_TRAILER_PREFIXES = ["ci-", "bewnchmark-", "skip-"]
-CI_WORKFLOW_FILE = ".github/workflows/ci.yml"
 ALL_KEY = "all"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
@@ -347,9 +350,22 @@ def parse_jobs_trailer(
     return jobs
 
 
-def parse_jobs_from_workflow_file() -> Set[str]:
-    with open(CI_WORKFLOW_FILE) as f:
-        workflow = yaml.load(f.read(), Loader=yaml.SafeLoader)
+def parse_path_from_workflow_ref(repo: str, workflow_ref: str) -> pathlib.Path:
+    if not workflow_ref.startswith(repo):
+        raise ValueError(
+            "Can't parse the external workflow ref"
+            f" '{workflow_ref}' outside the repo '{repo}'."
+        )
+    # The format of workflow ref: `${repo}/${workflow file path}@${ref}`
+    workflow_file = workflow_ref[len(repo) :].lstrip("/")
+    workflow_file = workflow_file.split("@", maxsplit=1)[0]
+    return pathlib.Path(workflow_file)
+
+
+def parse_jobs_from_workflow_file(workflow_file: pathlib.Path) -> Set[str]:
+    print(f"Parsing workflow file: '{workflow_file}'.")
+
+    workflow = yaml.load(workflow_file.read_text(), Loader=yaml.SafeLoader)
     all_jobs = set(workflow["jobs"].keys())
     all_jobs -= CONTROL_JOBS
 
@@ -504,13 +520,16 @@ def main():
         or LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", ""))
         or LLVM_INTEGRATE_LABEL in labels
     )
+    repo = os.environ["GITHUB_REPOSITORY"]
+    workflow_ref = os.environ["GITHUB_WORKFLOW_REF"]
+    workflow_file = parse_path_from_workflow_ref(repo=repo, workflow_ref=workflow_ref)
 
     modifies = modifies_included_path()
     try:
         benchmark_presets = get_benchmark_presets(
             trailers, labels, is_pr, is_llvm_integrate_pr
         )
-        all_jobs = parse_jobs_from_workflow_file()
+        all_jobs = parse_jobs_from_workflow_file(workflow_file)
         enabled_jobs = get_enabled_jobs(
             trailers,
             all_jobs,
