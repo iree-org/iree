@@ -320,7 +320,7 @@ void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
   }
 }
 
-FailureOr<MaterializeEncodingValueInfo>
+static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
   SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());

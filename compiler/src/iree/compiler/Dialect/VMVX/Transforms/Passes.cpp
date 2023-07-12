@@ -35,7 +35,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
   addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createVMVXMaterializeEncodingPass());
+      createLLVMCPUMaterializeEncodingPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
