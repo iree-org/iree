@@ -2128,10 +2128,13 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                                   VectorPreProcStrategy::Masking);
           }
           // If the dimension is already tiled, we don't tile it again.
-          for (auto i : llvm::seq<int64_t>(
-                   0, std::min(tileAndFuseSizes.size(), vecTileSizes.size()))) {
-            if (tileAndFuseSizes[i])
-              vecTileSizes[i] = 0;
+          if (!isRISCV(targetAttr)) {
+            for (auto i :
+                 llvm::seq<int64_t>(0, std::min(tileAndFuseSizes.size(),
+                                                vecTileSizes.size()))) {
+              if (tileAndFuseSizes[i])
+                vecTileSizes[i] = 0;
+            }
           }
           SmallVector<int64_t> reductionTiles;
           splitParallelAndReductionTiles(genericOp, vecTileSizes,
