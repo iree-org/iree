@@ -67,40 +67,6 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
       mlir::iree_compiler::IREE::transform_dialect::CommonExtensions>();
 }
 
-// Return true if all the uses of op are either Store/transfer_write.
-// There can be SubviewOp users as long as all its users are also
-// StoreOp/transfer_write. If return true it also fills out the uses, if it
-// returns false uses is unchanged.
-static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
-  std::vector<Operation *> opUses;
-  for (OpOperand &use : op->getUses()) {
-    Operation *useOp = use.getOwner();
-    if (isa<memref::DeallocOp, vector::TransferWriteOp, memref::StoreOp>(
-            useOp) ||
-        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
-      opUses.push_back(useOp);
-      continue;
-    }
-    return false;
-  }
-  uses.insert(uses.end(), opUses.begin(), opUses.end());
-  return true;
-}
-
-// Track temporary allocations that are never read from. If this is the case
-// it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(RewriterBase &rewriter,
-                                    Operation *parentOp) {
-  std::vector<Operation *> opToErase;
-  parentOp->walk([&](memref::AllocOp op) {
-    if (allUsesAreStores(op, opToErase)) {
-      opToErase.push_back(op.getOperation());
-    }
-  });
-  for (Operation *op : opToErase)
-    rewriter.eraseOp(op);
-}
-
 //===---------------------------------------------------------------------===//
 // ApplyBufferOptimizationsOp
 //===---------------------------------------------------------------------===//
@@ -112,7 +78,7 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
   vector::transferOpflowOpt(rewriter, target);
-  eraseDeadAllocAndStores(rewriter, target);
+  eraseDeadAllocAndStores(target);
   return DiagnosedSilenceableFailure::success();
 }
 

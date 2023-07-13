@@ -130,6 +130,7 @@ iree_cc_library(
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
+    "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
     "FlattenMemRefSubspanPass.cpp"

@@ -150,6 +150,13 @@ def EliminateEmptyTensors :
   let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
 }
 
+def EraseDeadAllocAndStores :
+    Pass<"iree-codegen-erase-dead-alloc-and-stores", "func::FuncOp"> {
+  let summary = "Erase alloc ops if all the uses are just stores";
+  let constructor =
+      "mlir::iree_compiler::createEraseDeadAllocAndStoresPass()";
+}
+
 def EraseHALDescriptorTypeFromMemRef :
     Pass<"iree-codegen-erase-hal-descriptor-type-from-memref", "func::FuncOp"> {
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
