@@ -2019,7 +2019,12 @@ module {
       %5 = arith.addf %in, %in_0 : f32
       linalg.yield %5 : f32
     } -> tensor<784x96xf32>
-    return %3 : tensor<784x96xf32>
+    %4 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%3, %3 : tensor<784x96xf32>, tensor<784x96xf32>) outs(%1 : tensor<784x96xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.addf %in, %in_0 : f32
+      linalg.yield %5 : f32
+    } -> tensor<784x96xf32>
+    return %4 : tensor<784x96xf32>
   }
 }
 //      CHECL: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
@@ -2040,7 +2045,10 @@ module {
 //      CHECK:     %[[GENERIC0:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP1]]],
 // CHECK-SAME:       iterator_types = ["parallel", "parallel"]} ins(%[[LOAD1]], %[[UNSET]]
 // CHECK-SAME:       : tensor<96xf32>, tensor<784x96xf32>) outs(%[[OUT]] : tensor<784x96xf32>)
-//      CHECK:     flow.dispatch.tensor.store %[[GENERIC0]], %[[OUTARG]], offsets = [0, 0], sizes = [784, 96], strides = [1, 1] : tensor<784x96xf32>
+//      CHECK:     %[[GENERIC1:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]]],
+// CHECK-SAME:       iterator_types = ["parallel", "parallel"]} ins(%[[GENERIC0]], %[[GENERIC0]]
+// CHECK-SAME:       : tensor<784x96xf32>, tensor<784x96xf32>) outs(%[[OUT]] : tensor<784x96xf32>)
+//      CHECK:     flow.dispatch.tensor.store %[[GENERIC1]], %[[OUTARG]], offsets = [0, 0], sizes = [784, 96], strides = [1, 1] : tensor<784x96xf32>
 //      CHECK:     flow.return
 
 // -----
