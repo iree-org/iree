@@ -186,6 +186,16 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/IREEInput/</loc>
+         <lastmod>2023-07-13</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/reference/mlir-dialects/IREELinalgExt/</loc>
+         <lastmod>2023-07-13</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/Stream/</loc>
          <lastmod>2023-07-13</lastmod>
          <changefreq>daily</changefreq>
