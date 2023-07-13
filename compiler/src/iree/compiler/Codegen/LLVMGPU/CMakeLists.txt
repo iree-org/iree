@@ -100,6 +100,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRNVGPUDialect
     MLIRNVGPUToNVVM
+    MLIRNVVMToLLVM
     MLIRNVGPUTransforms
     MLIRNVGPUUtils
     MLIRNVVMDialect

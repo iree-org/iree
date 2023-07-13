@@ -21,6 +21,7 @@
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/NVGPUToNVVM/NVGPUToNVVM.h"
+#include "mlir/Conversion/NVVMToLLVM/NVVMToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -144,6 +145,14 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       configureGpuToNVVMConversionLegality(target);
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();
+      }
+    }
+    // Convert NVVM ops to Inline Assembly.
+    {
+      RewritePatternSet patterns(&getContext());
+      populateNVVMToLLVMConversionPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
       }
     }
     ConvertToDynamicSharedMemory(m);
