@@ -2004,6 +2004,55 @@ func.func @unset_encoding_and_slice(
 
 // -----
 
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @root_on_unset_encoding(
+      %arg0: tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
+      %arg1: tensor<96xf32>) -> tensor<784x96xf32> {
+    %0 = iree_linalg_ext.unset_encoding %arg0 : tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<784x96xf32>
+    %1 = tensor.empty() : tensor<784x96xf32>
+    %cst = arith.constant 0.000000e+00 : f32
+    %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<784x96xf32>) -> tensor<784x96xf32>
+    %3 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg1, %0 : tensor<96xf32>, tensor<784x96xf32>) outs(%1 : tensor<784x96xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.addf %in, %in_0 : f32
+      linalg.yield %5 : f32
+    } -> tensor<784x96xf32>
+    %4 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%3, %3 : tensor<784x96xf32>, tensor<784x96xf32>) outs(%1 : tensor<784x96xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.addf %in, %in_0 : f32
+      linalg.yield %5 : f32
+    } -> tensor<784x96xf32>
+    return %4 : tensor<784x96xf32>
+  }
+}
+//      CHECL: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
+//      CHECK: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//      CHECK: func @root_on_unset_encoding
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<96xf32>
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups(%[[ARG0]], %[[ARG1]])
+// CHECK-NEXT:     %[[INARG0:.+]]: !flow.dispatch.tensor<readonly:tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+// CHECK-SAME:     %[[INARG1:.+]]: !flow.dispatch.tensor<readonly:tensor<96xf32>>
+// CHECK-SAME:     %[[OUTARG:.+]]: !flow.dispatch.tensor<writeonly:tensor<784x96xf32>>
+//      CHECK:     %[[LOAD0:.+]] = flow.dispatch.tensor.load %[[INARG0]], offsets = [0, 0], sizes = [784, 96], strides = [1, 1]
+// CHECK-SAME:       : !flow.dispatch.tensor<readonly:tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+//      CHECK:     %[[LOAD1:.+]] = flow.dispatch.tensor.load %[[INARG1]], offsets = [0], sizes = [96], strides = [1]
+// CHECK-SAME:       : !flow.dispatch.tensor<readonly:tensor<96xf32>>
+//      CHECK:     %[[OUT:.+]] = tensor.empty() : tensor<784x96xf32>
+//      CHECK:     %[[UNSET:.+]] = iree_linalg_ext.unset_encoding %[[LOAD0]] : tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<784x96xf32>
+//      CHECK:     %[[GENERIC0:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP1]]],
+// CHECK-SAME:       iterator_types = ["parallel", "parallel"]} ins(%[[LOAD1]], %[[UNSET]]
+// CHECK-SAME:       : tensor<96xf32>, tensor<784x96xf32>) outs(%[[OUT]] : tensor<784x96xf32>)
+//      CHECK:     %[[GENERIC1:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]]],
+// CHECK-SAME:       iterator_types = ["parallel", "parallel"]} ins(%[[GENERIC0]], %[[GENERIC0]]
+// CHECK-SAME:       : tensor<784x96xf32>, tensor<784x96xf32>) outs(%[[OUT]] : tensor<784x96xf32>)
+//      CHECK:     flow.dispatch.tensor.store %[[GENERIC1]], %[[OUTARG]], offsets = [0, 0], sizes = [784, 96], strides = [1, 1] : tensor<784x96xf32>
+//      CHECK:     flow.return
+
+// -----
+
 func.func @gemm_encoded(
     %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
     %arg1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>,
