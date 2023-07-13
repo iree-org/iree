@@ -24,12 +24,14 @@ BUILD_DIR="${BUILD_DIR:-${REPO_ROOT}/build-docs}"
 source ${REPO_ROOT}/build_tools/cmake/setup_build.sh
 source ${REPO_ROOT}/build_tools/cmake/setup_ccache.sh
 
-# Build `iree-doc` CMake target. This requires the LLVM submodule and can take
-# several minutes, as it builds `iree-tblgen`.
+# Build `iree-doc` and `iree-dialects-doc` CMake targets. This requires the LLVM
+# submodule and can take several minutes with an empty cache, as it builds
+# `iree-tblgen` and `mlir-tblgen`.
 cmake -G Ninja \
   -B "${BUILD_DIR}" "${REPO_ROOT}" \
   -DIREE_BUILD_DOCS=ON
 cmake --build "${BUILD_DIR}" --target iree-doc
+cmake --build "${BUILD_DIR}" --target iree-dialects-doc
 
 if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
@@ -37,17 +39,27 @@ fi
 
 # Copy into a new directory before making edits, so CMake only runs when needed.
 BUILD_DOCS_ORIGINAL_DIR="${BUILD_DIR}/doc/Dialects/"
+BUILD_DOCS_DIALECTS_ORIGINAL_DIR="${BUILD_DIR}/llvm-external-projects/mlir-iree-dialects/docs/Dialects"
 BUILD_DOCS_PROCESSED_DIR="${BUILD_DIR}/doc/Dialects_for_website/"
 mkdir -p "${BUILD_DOCS_PROCESSED_DIR}"
 cp -r "${BUILD_DOCS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
+cp -r "${BUILD_DOCS_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
 
-# Delete any dialect docs we don't want to publish (e.g. sample dialects).
-rm "${BUILD_DOCS_PROCESSED_DIR}/SimpleIODialect.md"
+# Delete any dialect docs we don't want to publish (yet?).
+rm "${BUILD_DOCS_PROCESSED_DIR}/SimpleIODialect.md" # Sample dialect, just ignore
+rm "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" # Dialect extensions
+rm "${BUILD_DOCS_PROCESSED_DIR}/LinalgTransformOps.md" # Small dialect, unknown state
 
 # Trim "Dialect" suffix from file names, e.g. FlowDialect.md -> Flow.md.
 for f in ${BUILD_DOCS_PROCESSED_DIR}/*Dialect.md; do
   mv "$f" "${f/%Dialect.md/.md}"
 done
+
+# Rename iree-dialect files.
+mv "${BUILD_DOCS_PROCESSED_DIR}/InputOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEInput.md"
+mv "${BUILD_DOCS_PROCESSED_DIR}/LinalgExtOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREELinalgExt.md"
+# mv "${BUILD_DOCS_PROCESSED_DIR}/LinalgTransformOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREELinalgTransform.md"
+# mv "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEStructuredTransformExt.md"
 
 # Postprocess the dialect docs (e.g. making tweaks to the markdown source).
 python3 "${THIS_DIR}/postprocess_dialect_docs.py" "${BUILD_DOCS_PROCESSED_DIR}"

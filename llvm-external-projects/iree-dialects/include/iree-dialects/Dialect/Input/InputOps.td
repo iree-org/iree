@@ -14,24 +14,16 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def IREEInput_NullOp : IREEInput_PureOp<"null"> {
-  let summary = "a null value";
-  let description = [{
-    Initializes reference and variant types with a null value.
-  }];
-
-  let results = (outs
-    AnyType:$result
-  );
-
-  let assemblyFormat = [{
-    attr-dict `:` type($result)
-  }];
-}
-
 //===----------------------------------------------------------------------===//
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
+
+def OpGroupPseudoOps : OpDocGroup {
+  let summary = "Pseudo ops for conversion support";
+  let description = "";
+}
+
+let opDocGroup = OpGroupPseudoOps in {
 
 def IREEInput_TensorExportOp : IREEInput_PureOp<"tensor.export"> {
   let summary = "Exports a tensor to a Buffer(View), capturing dynamic dims";
@@ -63,9 +55,18 @@ def IREEInput_TensorImportOp : IREEInput_PureOp<"tensor.import"> {
   }];
 }
 
+} // OpGroupPseudoOps
+
 //===----------------------------------------------------------------------===//
 // Global variables
 //===----------------------------------------------------------------------===//
+
+def OpGroupGlobalVariableOps : OpDocGroup {
+  let summary = "Global variable ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupGlobalVariableOps in {
 
 def IREEInput_GlobalOp : IREEInput_Op<"global", [
     Symbol,
@@ -203,9 +204,18 @@ def IREEInput_GlobalStoreIndirectOp : IREEInput_Op<"global.store.indirect"> {
   let hasVerifier = 1;
 }
 
+} // OpGroupGlobalVariableOps
+
 //===----------------------------------------------------------------------===//
 // Buffers and Buffer Views
 //===----------------------------------------------------------------------===//
+
+def OpGroupBufferAndBufferViewOps : OpDocGroup {
+  let summary = "Buffer and buffer view ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupBufferAndBufferViewOps in {
 
 def IREEInput_BufferViewCreateOp : IREEInput_PureOp<"buffer_view.create"> {
   let summary = [{buffer view reference initializer}];
@@ -296,9 +306,18 @@ def IREEInput_BufferViewDimOp : IREEInput_PureOp<"buffer_view.dim"> {
   }];
 }
 
+} // OpGroupBufferAndBufferViewOps
+
 //===----------------------------------------------------------------------===//
 // Mutable Lists
 //===----------------------------------------------------------------------===//
+
+def OpGroupMutableListOps : OpDocGroup {
+  let summary = "Mutable list ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupMutableListOps in {
 
 def IREEInput_ListCreateOp : IREEInput_PureOp<
     "list.create", [MemoryEffects<[MemAlloc]>]> {
@@ -382,9 +401,18 @@ def IREEInput_ListSetOp : IREEInput_Op<"list.set", [MemoryEffects<[MemWrite]>]> 
   let assemblyFormat = "$list `[` $index `]` `,` $value attr-dict `:` type($list) `,` type($value)";
 }
 
+} // OpGroupMutableListOps
+
 //===----------------------------------------------------------------------===//
 // Tensor ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupTensorOps : OpDocGroup {
+  let summary = "Tensor ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTensorOps in {
 
 def IREEInput_TensorReshapeOp : IREEInput_PureOp<"tensor.reshape", [
     AllElementTypesMatch<["source", "result"]>,
@@ -604,11 +632,20 @@ def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", []> {
   let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
 }
 
+} // OpGroupTensorOps
+
 //===----------------------------------------------------------------------===//
 // Workgroup dispatch
 // These ops allow both scheduling and accessing parameters of workgroup
 // dispatches across an arbitrary nd-grid.
 //===----------------------------------------------------------------------===//
+
+def OpGroupWorkgroupDispatchOps : OpDocGroup {
+  let summary = "Workgroup dispatch ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupWorkgroupDispatchOps in {
 
 // TODO: Define dispatch.workgroup op.
 
@@ -695,11 +732,35 @@ def IREEInput_DispatchWorkgroupSizeOp : IREEInput_PureOp<"dispatch.workgroup.siz
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 }
 
+} // OpGroupWorkgroupDispatchOps
+
 //===----------------------------------------------------------------------===//
 // Utilities
 // Various utility ops needed for program completeness. These arguably should
 // not be exclusive to IREE.
 //===----------------------------------------------------------------------===//
+
+def OpGroupUtilityOps : OpDocGroup {
+  let summary = "Utility ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupUtilityOps in {
+
+def IREEInput_NullOp : IREEInput_PureOp<"null"> {
+  let summary = "a null value";
+  let description = [{
+    Initializes reference and variant types with a null value.
+  }];
+
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result)
+  }];
+}
 
 def IREEInput_AlignOp : IREEInput_PureOp<"align", [
   SameOperandsAndResultType
@@ -734,9 +795,18 @@ def IREEInput_AlignOp : IREEInput_PureOp<"align", [
   ];
 }
 
+} // OpGroupUtilityOps
+
 //===----------------------------------------------------------------------===//
 // Executable Source
 //===----------------------------------------------------------------------===//
+
+def OpGroupExecutableSourceOps : OpDocGroup {
+  let summary = "Executable source ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExecutableSourceOps in {
 
 def IREEInput_ExecutableSourceOp : IREEInput_Op<"executable.source", [
     IsolatedFromAbove,
@@ -813,9 +883,18 @@ def IREEInput_ExecutableExportOp : IREEInput_Op<"executable.export", [
   // TODO(ezhulenev): Add verifier.
 }
 
+} // OpGroupExecutableSourceOps
+
 //===----------------------------------------------------------------------===//
 // Dispatch
 //===----------------------------------------------------------------------===//
+
+def OpGroupDispatchOps : OpDocGroup {
+  let summary = "Dispatch ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupDispatchOps in {
 
 def IREEInput_DispatchOp : IREEInput_PureOp<"dispatch", [
   AttrSizedOperandSegments,
@@ -871,9 +950,18 @@ def IREEInput_DispatchOp : IREEInput_PureOp<"dispatch", [
   ];
 }
 
+} // OpGroupDispatchOps
+
 //===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
+
+def OpGroupCompilerHintOps : OpDocGroup {
+  let summary = "Compiler hint ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupCompilerHintOps in {
 
 def IREEInput_OptimizationBarrierOp : IREEInput_Op<"optimization_barrier", [
   SameOperandsAndResultType,
@@ -901,5 +989,7 @@ def IREEInput_OptimizationBarrierOp : IREEInput_Op<"optimization_barrier", [
 
   let hasVerifier = 1;
 }
+
+} // OpGroupCompilerHintOps
 
 #endif // IREE_DIALECTS_DIALECT_INPUT_OPS_TD

@@ -24,5 +24,23 @@ function(_add_dialect)
   add_dependencies(mlir-headers IREELinalgExtIncGen)
 endfunction()
 
+function(_add_doc)
+  set(LLVM_TARGET_DEFINITIONS LinalgExtOps.td)
+  set(_FLAGS
+    "--strip-prefix=::mlir::iree_compiler::IREE::"
+  )
+  mlir_tablegen(LinalgExtOps.md -gen-dialect-doc ${_FLAGS})
+  set(GEN_DOC_FILE ${IREE_DIALECTS_BINARY_DIR}/docs/Dialects/LinalgExtOps.md)
+  add_custom_command(
+          OUTPUT ${GEN_DOC_FILE}
+          COMMAND ${CMAKE_COMMAND} -E copy
+                  ${CMAKE_CURRENT_BINARY_DIR}/LinalgExtOps.md
+                  ${GEN_DOC_FILE}
+          DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/LinalgExtOps.md)
+  add_custom_target(LinalgExtOpsDocGen DEPENDS ${GEN_DOC_FILE})
+  add_dependencies(iree-dialects-doc LinalgExtOpsDocGen)
+endfunction()
+
 _add_dialect()
 _add_interfaces()
+_add_doc()
