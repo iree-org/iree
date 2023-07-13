@@ -28,8 +28,8 @@ namespace {
 /// Builds a proper tile sizes vector for the op.
 /// scf::tileUsingSCFForOp expects the num of tile sizes = num of loops. This
 /// method returns a proper tile sizes vector for each op during tiling.
-static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
-                                              ArrayRef<int64_t> tileSizes) {
+SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
+                                       ArrayRef<int64_t> tileSizes) {
   auto tilingOp = cast<TilingInterface>(op);
 
   SmallVector<int64_t> newTileSizes(tileSizes);
@@ -48,6 +48,10 @@ struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
   LLVMCPUTilePass(int64_t tilingLevel = -1) {
     this->tilingLevel.setValue(tilingLevel);
   }
+  LLVMCPUTilePass(ArrayRef<int64_t> sizes) {
+    this->tileSizes.setInitialValues(sizes);
+    this->tilingLevel.setValue(-1);
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
                     linalg::LinalgDialect, scf::SCFDialect>();
@@ -57,14 +61,15 @@ struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
 };
 
 void LLVMCPUTilePass::runOnOperation() {
-  if (tilingLevel == -1) {
+  if (tileSizes.empty() && tilingLevel == -1) {
     LLVM_DEBUG(llvm::dbgs() << "tilingLevel not set, skip tiling\n");
     return;
   }
+
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+
   FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
       getLoweringConfig(computeOps);
   if (failed(rootLoweringConfig)) {
@@ -99,7 +104,7 @@ void LLVMCPUTilePass::runOnOperation() {
 
     IRRewriter rewriter(context);
     auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
-        [tileSizes](OpBuilder &b, Operation *op) {
+        [&](OpBuilder &b, Operation *op) {
           return buildTileSizesForOp(b, op, tileSizes);
         });
     FailureOr<scf::SCFTilingResult> tiledResults =
@@ -126,6 +131,11 @@ void LLVMCPUTilePass::runOnOperation() {
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUTilePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTilePass>(tilingLevel);
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTilePass(ArrayRef<int64_t> tileSizes) {
+  return std::make_unique<LLVMCPUTilePass>(tileSizes);
 }
 
 } // namespace iree_compiler
