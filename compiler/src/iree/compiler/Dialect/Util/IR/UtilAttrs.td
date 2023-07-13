@@ -46,8 +46,10 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
     the full flattened range is required it can be efficiently streamed via the
     SerializableAttrInterface. All values must also be serializable.
 
-    All values are tightly packed. If padding is required it can be inserted as
-    splat elements attributes with the padding value (usually 0).
+    All values are tightly packed to byte boundaries. If padding is required it
+    can be inserted as splat elements attributes with the padding value
+    (usually 0). Sub-byte aligned element types will have their individual
+    components padded to byte alignment.
   }];
 
   let parameters = (ins
