@@ -1347,6 +1347,41 @@ struct RngBitcastFloat final
   }
 };
 
+struct ZeroConcat final : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type || !type.hasStaticShape())
+      return failure();
+
+    uint64_t axis = op.getDimension();
+    OperandRange origInputs = op.getInputs();
+    SmallVector<Value> nonzeroInputs;
+    for (auto input : origInputs) {
+      auto type = dyn_cast<RankedTensorType>(input.getType());
+      ArrayRef<int64_t> shape = type.getShape();
+      if (axis > shape.size()) {
+        return failure();
+      }
+
+      if (shape[axis] != 0) {
+        nonzeroInputs.push_back(input);
+      }
+    }
+
+    if (nonzeroInputs.size() == origInputs.size()) {
+      return failure();
+    }
+
+    Value new_op = rewriter.create<mlir::stablehlo::ConcatenateOp>(
+        op.getLoc(), nonzeroInputs, /*dimension=*/axis);
+    rewriter.replaceOp(op, new_op);
+    return success();
+  }
+};
+
 // Similar to DotIsMul, this finds the case where a dot general
 // can be represented using a mul operation. This includes possibly making
 // an implicit cast explicit prior the mul.
@@ -1795,7 +1830,7 @@ struct StableHLOToStableHLOPreprocessing final
 
     // Additional canonicalizers that simplify to computationally
     // less-complex operations.
-    patterns.insert<DotToMul>(context);
+    patterns.insert<DotToMul, ZeroConcat>(context);
 
     // Unary elementwise op.
     patterns.insert<
