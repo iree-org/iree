@@ -227,6 +227,7 @@ static void concretizePadShape(func::FuncOp funcOp) {
   RewritePatternSet patterns(context);
   SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
   populateConcretizePadResultShapePatterns(patterns, numWorkgroups);
+  populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
   LLVM_DEBUG({
