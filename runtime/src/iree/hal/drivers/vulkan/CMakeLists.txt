@@ -37,6 +37,8 @@ iree_cc_library(
     "extensibility_util.cc"
     "extensibility_util.h"
     "handle_util.h"
+    "native_allocator.cc"
+    "native_allocator.h"
     "native_buffer.cc"
     "native_buffer.h"
     "native_event.cc"

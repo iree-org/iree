@@ -621,8 +621,8 @@ static inline void iree_hal_allocator_statistics_record_free(
 }
 
 #else
-#define iree_hal_allocator_statistics_record_alloc(...)
-#define iree_hal_allocator_statistics_record_free(...)
+#define iree_hal_allocator_statistics_record_alloc(statistics, ...)
+#define iree_hal_allocator_statistics_record_free(statistics, ...)
 #endif  // IREE_STATISTICS_ENABLE
 
 #ifdef __cplusplus

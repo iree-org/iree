@@ -22,6 +22,7 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
+#include "iree/hal/drivers/vulkan/native_allocator.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/native_semaphore.h"
@@ -513,7 +514,7 @@ static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->flags = 0;
+  out_options->flags = IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR;
   out_options->large_heap_block_size = 64 * 1024 * 1024;
 }
 
@@ -711,9 +712,17 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
 
   // Create the device memory allocator that will service all buffer
   // allocation requests.
-  iree_status_t status = iree_hal_vulkan_vma_allocator_create(
-      options, instance, physical_device, logical_device,
-      (iree_hal_device_t*)device, &device->device_allocator);
+  iree_status_t status = iree_ok_status();
+  if (iree_all_bits_set(options->flags,
+                        IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR)) {
+    status = iree_hal_vulkan_vma_allocator_create(
+        options, instance, physical_device, logical_device,
+        (iree_hal_device_t*)device, &device->device_allocator);
+  } else {
+    status = iree_hal_vulkan_native_allocator_create(
+        options, instance, physical_device, logical_device,
+        (iree_hal_device_t*)device, &device->device_allocator);
+  }
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
