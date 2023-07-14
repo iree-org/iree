@@ -15,7 +15,7 @@ name: CI
 # https://github.community/t/support-for-yaml-anchors/16128/92
 # https://github.com/actions/runner/issues/1182
 # Neither does it have any contexts that are available everywhere. The
-# top-level `env` field is available in many places, but not all. We already
+# top-level `env` fbuild_test_runtime_arm64:ield is available in many places, but not all. We already
 # have a "should-run" job that every other job depends on, so we leverage that
 # for variables that every other job can use, since that *is* available in all
 # sub-fields of the job.
@@ -396,6 +396,34 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:ec7faf4d80655fd436b324716bea4504ed47375dbf018e36b835f1d8ed10991c \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
+  build_test_runtime_arm64:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime_arm64')
+    runs-on: <TODO>
+    env:
+      BUILD_DIR: build-runtime
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Building runtime"
+        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
+        # and GitHub runners don't have write access to GCS
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "BUILD_PRESET=test" \
+            gcr.io/iree-oss/base@sha256:<TODO> \
+            ./build_tools/cmake/build_runtime.sh \
+            "${BUILD_DIR}"
+      - name: "Testing runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base@sha256:<TODO> \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
