@@ -131,7 +131,9 @@ def LLVMCPUTile :
       "mlir::iree_compiler::createLLVMCPUTilePass()";
   let options = [
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
+      "Use default tiling level used to retrieve the configuration from lowering_config">,
+    ListOption<"tileSizes", "tile-sizes", "int64_t",
+               "Use list of tile sizes for tiling">
   ];
 }
 
