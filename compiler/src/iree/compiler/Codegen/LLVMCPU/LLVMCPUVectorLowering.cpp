@@ -167,6 +167,17 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     vector::populateVectorShapeCastLoweringPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
+
+  // Lower high-level vector mask operations, such as `vector.create_mask` and
+  // `vector.constant_mask`, to simpler ops. The resulting code needs a go
+  // through a canonicalization pass before it's lowered to LLVM.
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorMaskMaterializationPatterns(
+        patterns, /*force32BitVectorIndices=*/false);
+    vector::populateVectorMaskOpLoweringPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 }
 } // namespace
 
