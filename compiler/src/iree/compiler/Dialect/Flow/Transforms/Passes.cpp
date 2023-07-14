@@ -246,6 +246,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createFoldUnitExtentDimsPass)
       .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
+      .addPass(createFuseDequantizationMatmulPass)
       .addPass(createCollapseDimsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)

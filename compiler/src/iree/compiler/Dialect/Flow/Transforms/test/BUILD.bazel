@@ -24,6 +24,7 @@ iree_lit_test_suite(
             "conv1x1_to_matmul.mlir",
             "convert_region_to_workgroups.mlir",
             "deduplicate_executables.mlir",
+            "dequantization_matmul_fuse.mlir",
             "detach_elementwise_from_named_ops.mlir",
             "dispatch_linalg_on_tensors.mlir",
             "collapse_linalg_generic_on_tensors.mlir",
