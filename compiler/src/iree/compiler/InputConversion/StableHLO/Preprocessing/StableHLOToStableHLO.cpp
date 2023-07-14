@@ -1362,22 +1362,18 @@ struct ZeroConcat final : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
     for (auto input : origInputs) {
       auto type = dyn_cast<RankedTensorType>(input.getType());
       ArrayRef<int64_t> shape = type.getShape();
-      if (axis > shape.size()) {
+      if (axis > shape.size())
         return failure();
-      }
 
-      if (shape[axis] != 0) {
+      if (shape[axis] != 0)
         nonzeroInputs.push_back(input);
-      }
     }
 
-    if (nonzeroInputs.size() == origInputs.size()) {
+    if (nonzeroInputs.size() == origInputs.size())
       return failure();
-    }
 
-    Value new_op = rewriter.create<mlir::stablehlo::ConcatenateOp>(
-        op.getLoc(), nonzeroInputs, /*dimension=*/axis);
-    rewriter.replaceOp(op, new_op);
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConcatenateOp>(
+        op, nonzeroInputs, /*dimension=*/axis);
     return success();
   }
 };
