@@ -126,12 +126,8 @@ do_build_mlir() {
   echo "CMake Options: ${cmake_options}"
   cmake -GNinja -S "${LLVM_SOURCE_DIR}/mlir" -B "${mlir_build_dir}" \
     $cmake_options
-  # TODO: We should be able to just do install-mlirdevelopment-distribution to
-  # tightly control distribution, but this presently leaves out the Python
-  # sources needed to build downstream Python bindings. Once this is fixed,
-  # we should use the more fine grained install target.
   cmake --build "${mlir_build_dir}" \
-    --target install
+    --target install-mlirdevelopment-distribution
 }
 
 print_iree_config() {
