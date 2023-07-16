@@ -225,7 +225,21 @@ static RankedTensorType getSourceTypeOfPackLikeOp(Operation *op) {
 /// that has unpack semantics
 // TODO(ravishankarm): This seems like a use case for interface.
 static bool isUnPackLikeOp(Operation *op) {
-  return isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op);
+  if (isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op)) {
+    return true;
+  }
+  // `unset_encoding` is usually followed by an extract_slice, as it does not
+  // have extract-slice semantics by itself. `unpack` does have extract-slice
+  // semantics, so these extracts should go away after materialization into
+  // `unpack`, so don't let them prevent fusion.
+  if (isa<tensor::ExtractSliceOp>(op)) {
+    Value source = op->getOperand(0);
+    Operation *producer = source.getDefiningOp();
+    if (isUnPackLikeOp(producer)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /// Since `iree_linalg_ext.set_encoding` doesnt have padding semantics a
