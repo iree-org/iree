@@ -87,6 +87,7 @@ void buildIREEVMTransformPassPipeline(
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager,
+    IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Input,
     IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::End);
 
 // Builds the above with options initialized from flags.

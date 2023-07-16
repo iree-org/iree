@@ -21,6 +21,7 @@ EXPORTS
   ireeCompilerInvocationOutputVMCSource
   ireeCompilerInvocationParseSource
   ireeCompilerInvocationPipeline
+  ireeCompilerInvocationSetCompileFromPhase
   ireeCompilerInvocationSetCompileToPhase
   ireeCompilerInvocationSetCrashHandler
   ireeCompilerInvocationSetVerifyIR

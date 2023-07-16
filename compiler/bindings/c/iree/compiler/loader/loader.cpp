@@ -255,6 +255,11 @@ bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *run,
   return __ireeCompilerInvocationParseSource(run, source);
 }
 
+void ireeCompilerInvocationSetCompileFromPhase(iree_compiler_invocation_t *run,
+                                               const char *phase) {
+  __ireeCompilerInvocationSetCompileFromPhase(run, phase);
+}
+
 void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *run,
                                              const char *phase) {
   __ireeCompilerInvocationSetCompileToPhase(run, phase);

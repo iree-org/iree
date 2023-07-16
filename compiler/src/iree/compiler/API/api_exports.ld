@@ -22,6 +22,7 @@ VER_0 {
     ireeCompilerInvocationOutputVMCSource;
     ireeCompilerInvocationParseSource;
     ireeCompilerInvocationPipeline;
+    ireeCompilerInvocationSetCompileFromPhase;
     ireeCompilerInvocationSetCompileToPhase;
     ireeCompilerInvocationSetCrashHandler;
     ireeCompilerInvocationSetVerifyIR;
