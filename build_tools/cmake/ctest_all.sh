@@ -139,7 +139,7 @@ if [[ -n "${IREE_CTEST_TESTS_REGEX}" ]]; then
 fi
 
 if [[ -n "${IREE_CTEST_LABEL_REGEX}" ]]; then
-  ctest_args+=("--label-regex ${IREE_CTEST_LABEL_REGEX}")
+  ctest_args+=("${IREE_CTEST_LABEL_REGEX}")
 fi
 
 if [[ -n "${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT}" ]]; then
