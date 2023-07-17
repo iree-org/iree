@@ -619,3 +619,22 @@ func.func @reduce_zero_ext(%arg0: tensor<0xi1>) -> tensor<i32> {
   // CHECK: return [[CST]] : tensor<i32>
   return %5 : tensor<i32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @add_zero_ext
+func.func @add_zero_ext(%arg0 : tensor<5x0xi32>, %arg1 : tensor<5x0xi32>) -> tensor<5x0xi32> {
+  %0 = stablehlo.add %arg0, %arg1 : tensor<5x0xi32>
+  func.return %0 : tensor<5x0xi32>
+}
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x0xi32>
+// CHECK:   return %[[EMPTY]] 
+
+// CHECK-LABEL: func.func @concat_zero_ext
+func.func @concat_zero_ext(%arg0 : tensor<4x1xf32>, %arg1 : tensor<4x0xf32>) -> tensor<4x1xf32> {
+  %0 = "stablehlo.concatenate"(%arg0, %arg1) {dimension = 1 : i64} : (tensor<4x1xf32>, tensor<4x0xf32>) -> tensor<4x1xf32>
+  func.return %0 : tensor<4x1xf32>
+}
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4x0xf32>
+// CHECK:   %[[CONCAT:.+]] = stablehlo.concatenate %arg0, %[[EMPTY]], dim = 1 : (tensor<4x1xf32>, tensor<4x0xf32>) -> tensor<4x1xf32>
+// CHECK:   return %[[CONCAT]] 

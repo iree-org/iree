@@ -992,6 +992,64 @@ struct TransposeOpCanon final : OpRewritePattern<mlir::stablehlo::TransposeOp> {
   }
 };
 
+/// Check if a `t` is a tensor with zero extents.
+static std::optional<RankedTensorType> isZeroExtent(Type t) {
+  auto operandType = dyn_cast<RankedTensorType>(t);
+  if (operandType &&
+      llvm::any_of(operandType.getShape(), [](int64_t s) { return s == 0; })) {
+    return operandType;
+  }
+  return std::nullopt;
+}
+
+// Replace instances of zero extent tensors with empty tensors of the same
+// type.
+struct ZeroExtentTensorCanon final : RewritePattern {
+  ZeroExtentTensorCanon(MLIRContext *context, PatternBenefit benefit)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    auto loc = op->getLoc();
+
+    if (!dyn_cast<::mlir::stablehlo::StablehloDialect>(op->getDialect())) {
+      return rewriter.notifyMatchFailure(op, "not stablehlo");
+    }
+
+    // If the result is a zero-extent tensor, replace the whole op with an empty
+    // tensor.
+    for (auto result : op->getResults()) {
+      auto resultType = isZeroExtent(result.getType());
+      if (!resultType) {
+        continue;
+      }
+      result.replaceAllUsesWith(rewriter.create<tensor::EmptyOp>(
+          loc, resultType->getShape(), resultType->getElementType()));
+      return success();
+    }
+
+    // If one of the operands is a zero-extent tensor, replace the operand with
+    // an empty tensor.
+    bool didUpdate = false;
+    for (OpOperand &operand : op->getOpOperands()) {
+      auto operandType = isZeroExtent(operand.get().getType());
+      if (!operandType) {
+        continue;
+      }
+      if (operand.get().getDefiningOp<tensor::EmptyOp>()) {
+        continue;
+      }
+      Operation *owner = operand.getOwner();
+      int operandNum = operand.getOperandNumber();
+      auto emptyTensorOp = rewriter.create<tensor::EmptyOp>(
+          loc, operandType->getShape(), operandType->getElementType());
+      rewriter.updateRootInPlace(
+          owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
+      didUpdate = true;
+    }
+    return success(didUpdate);
+  }
+};
+
 struct StableHLOCanonicalize final
     : impl::StableHLOCanonicalizeBase<StableHLOCanonicalize> {
   void runOnOperation() override {
@@ -1002,6 +1060,10 @@ struct StableHLOCanonicalize final
                                             std::move(patterns)))) {
       signalPassFailure();
     }
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<tensor::TensorDialect>();
   }
 };
 
@@ -1024,6 +1086,8 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
       ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
-      ReshapeOpCanon, TransposeOpCanon>(context, benefit);
+      ReshapeOpCanon, TransposeOpCanon,
+      // Types.
+      ZeroExtentTensorCanon>(context, benefit);
 }
 } // namespace mlir::iree_compiler::stablehlo
