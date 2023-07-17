@@ -1444,6 +1444,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_linalg_extupper_bound_tile_size-linalgextupperboundtilesizeop" class="md-nav__link">
+    iree_linalg_ext.upper_bound_tile_size (LinalgExt::UpperBoundTileSizeOp)
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1951,6 +1958,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_linalg_extupper_bound_tile_size-linalgextupperboundtilesizeop" class="md-nav__link">
+    iree_linalg_ext.upper_bound_tile_size (LinalgExt::UpperBoundTileSizeOp)
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2153,6 +2167,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <li><a href="#iree_linalg_extset_encoding-linalgextsetencodingop">iree_linalg_ext.set_encoding (LinalgExt::SetEncodingOp)</a></li>
 <li><a href="#iree_linalg_extunpack-linalgextunpackop">iree_linalg_ext.unpack (LinalgExt::UnPackOp)</a></li>
 <li><a href="#iree_linalg_extunset_encoding-linalgextunsetencodingop">iree_linalg_ext.unset_encoding (LinalgExt::UnsetEncodingOp)</a></li>
+<li><a href="#iree_linalg_extupper_bound_tile_size-linalgextupperboundtilesizeop">iree_linalg_ext.upper_bound_tile_size (LinalgExt::UpperBoundTileSizeOp)</a></li>
 </ul>
 </li>
 <li><a href="#non-structured-ops">Non-structured ops</a><ul>
@@ -2484,6 +2499,51 @@ For now in IREE the default layout is row-major.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="iree_linalg_extupper_bound_tile_size-linalgextupperboundtilesizeop"><code>iree_linalg_ext.upper_bound_tile_size</code> (LinalgExt::UpperBoundTileSizeOp)<a class="headerlink" href="#iree_linalg_extupper_bound_tile_size-linalgextupperboundtilesizeop" title="Permanent link">link</a></h4>
+<p><em>Returns an upper bound on tile sizes</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.upper_bound_tile_size` attr-dict $tensorType `-&gt;` type($results)
+</code></pre></div>
+<p>This returns the largest tile sizes that might result from materialization
+of the given encoding. This can be used outside of target-specific code, so
+there may be multiple targets, and this will return the maximum tile size
+from iterating over all of them. The evaluation happens in the
+MaterializeUpperBoundTileSize pass.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th align="center">Attribute</th>
+<th align="center">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>tensorType</code></td>
+<td align="center">::mlir::TypeAttr</td>
+<td>type attribute of ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th align="center">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>results</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
 <h3 id="non-structured-ops">Non-structured ops<a class="headerlink" href="#non-structured-ops" title="Permanent link">link</a></h3>
 <h4 id="iree_linalg_extattention-linalgextattentionop"><code>iree_linalg_ext.attention</code> (LinalgExt::AttentionOp)<a class="headerlink" href="#iree_linalg_extattention-linalgextattentionop" title="Permanent link">link</a></h4>
 <p><em>Attention operator</em></p>
@@ -2523,7 +2583,7 @@ have the same shape (BxNxd), while the key and value differ in sequence length
 </tr>
 </tbody>
 </table>
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2575,7 +2635,7 @@ context, they will be the second and third inputs.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2603,7 +2663,7 @@ tile and distribute them.
 }</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, LinalgExtOp, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2639,7 +2699,7 @@ tile and distribute them.
 </tr>
 </tbody>
 </table>
-<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2667,7 +2727,7 @@ tile and distribute them.
 <p>Computes the inclusive/exclusive scan along a given dimension.</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2708,7 +2768,7 @@ tile and distribute them.
 </tr>
 </tbody>
 </table>
-<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
+<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2763,7 +2823,7 @@ batch dims to be 1D. See more information in
   https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
+<h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2804,7 +2864,7 @@ batch dims to be 1D. See more information in
 </tr>
 </tbody>
 </table>
-<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
+<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2835,7 +2895,7 @@ f(x) = exp(x - m). Then, we sum f(x) along dimension d to get l(x). Finally,
 we compute the softmax as f(x) / l(x).</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
+<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2871,7 +2931,7 @@ we compute the softmax as f(x) / l(x).</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
+<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2900,7 +2960,7 @@ we compute the softmax as f(x) / l(x).</p>
 <p>See https://www.tensorflow.org/xla/operation_semantics#sort.</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
+<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2936,7 +2996,7 @@ we compute the softmax as f(x) / l(x).</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
+<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -2976,7 +3036,7 @@ i1. If true, the two values are swapped:
 Note: when the two values are equal, the first occurence is always selected.</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, LinalgExtOp, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
+<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3012,7 +3072,7 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
+<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3103,7 +3163,7 @@ where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
 of this operator is first collapsed and then fed to a batch matmul op.</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3149,7 +3209,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
+<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3191,7 +3251,7 @@ This operator is followed by a tensor.extract_slice which extracts
 only the non-padded part of the output.</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
-<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
+<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3237,7 +3297,7 @@ only the non-padded part of the output.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
+<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3258,7 +3318,8 @@ only the non-padded part of the output.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_linalg_ext.encoding&lt;
   EncodingUserAttr,   # user
-  EncodingRoleAttr   # role
+  EncodingRoleAttr,   # role
+  TypeAttr   # originalType
 &gt;
 </code></pre></div>
 <p>This attribute describes the change in the layout for
@@ -3288,6 +3349,11 @@ through operations like pack/unpack.</p>
 <td align="center">role</td>
 <td align="center"><code>EncodingRoleAttr</code></td>
 <td>role of this tensor as an operand</td>
+</tr>
+<tr>
+<td align="center">originalType</td>
+<td align="center"><code>TypeAttr</code></td>
+<td>type of the original tensor type before padding</td>
 </tr>
 </tbody>
 </table>
