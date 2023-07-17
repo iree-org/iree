@@ -1478,8 +1478,9 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(distTileSizes);
   tileSizes.push_back(parallelTileSizes);
   // No need for tiling reduction dims and inner parallel dims.
-  tileSizes.emplace_back(parallelTileSizes.size(), 0);
-  tileSizes.emplace_back(parallelTileSizes.size(), 0);
+  int64_t numTilingDims = parallelTileSizes.size();
+  tileSizes.emplace_back(numTilingDims, 0);
+  tileSizes.emplace_back(numTilingDims, 0);
 
   // For non-tensor based ops use the Buffer ops pipeline.
   auto passPipeline =
@@ -1692,7 +1693,8 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
   // No need for tiling inner parallel dims.
-  tileSizes.emplace_back(parallelTileSizes.size(), 0);
+  int64_t numTilingDims = parallelTileSizes.size();
+  tileSizes.emplace_back(numTilingDims, 0);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes,
@@ -2052,7 +2054,7 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
 /// Set the lowering configs for all the compute ops. The lowering config is
 /// already set on `rootOperation`. We will duplicate the tile sizes of
 /// distribution and common parallel dims to other compute ops (so they have
-/// consistent configuraionts); set the tile size for the rest of dims. E.g., it
+/// consistent configurations); set the tile size for the rest of dims. E.g., it
 /// sets the lowering_config for reduction + broadcast + pack op like:
 ///
 ///   %11 = linalg.fill ... -> tensor<384xf32>
@@ -2127,7 +2129,20 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                               vecPreProcStrategy ==
                                   VectorPreProcStrategy::Masking);
           }
-          // If the dimension is already tiled, we don't tile it again.
+
+          // If the dimension is already tiled, we don't tile it again. This
+          // prevents the mismatch common vector sizes between producer and
+          // consumers. E.g., the convolution vectorization does not support
+          // masking yet, while the strategy for generic op could use masking.
+          // This introduces odd behavior like convolution takes 12 as tile size
+          // while generic op takes 8 as tile size. It would introduce an
+          // inefficient loop and only apply masking on generic op, which hurts
+          // performance a lot. Thus, we do not tile it again, so they have
+          // consistent vector tile sizes.
+          // On RISC-V side, we prefer tiling it because unrolling is a big
+          // factor, especially for quantized models. A common case is a matmul
+          // on f32 types, followed by a elementwise op on i8 types. We want to
+          // limit unroll factors.
           if (!isRISCV(targetAttr)) {
             for (auto i :
                  llvm::seq<int64_t>(0, std::min(tileAndFuseSizes.size(),
