@@ -630,6 +630,17 @@ func.func @add_zero_ext(%arg0 : tensor<5x0xi32>, %arg1 : tensor<5x0xi32>) -> ten
 // CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x0xi32>
 // CHECK:   return %[[EMPTY]] 
 
+// -----
+
+// CHECK-LABEL: func.func @add_zero_ext_dynamic
+func.func @add_zero_ext_dynamic(%arg0 : tensor<?x0xi32>, %arg1 : tensor<?x0xi32>) -> tensor<?x0xi32> {
+  %0 = stablehlo.add %arg0, %arg1 : tensor<?x0xi32>
+  func.return %0 : tensor<?x0xi32>
+}
+// CHECK-NOT:   tensor.empty()
+
+// -----
+
 // CHECK-LABEL: func.func @scatter_zero_ext
 func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 : tensor<1xf32>) -> tensor<f32> {
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({

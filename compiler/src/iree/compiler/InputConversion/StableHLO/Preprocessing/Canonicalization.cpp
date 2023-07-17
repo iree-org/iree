@@ -994,10 +994,10 @@ struct TransposeOpCanon final : OpRewritePattern<mlir::stablehlo::TransposeOp> {
 
 /// Check if a `t` is a tensor with zero extents.
 static std::optional<RankedTensorType> isZeroExtent(Type t) {
-  auto operandType = dyn_cast<RankedTensorType>(t);
-  if (operandType &&
-      llvm::any_of(operandType.getShape(), [](int64_t s) { return s == 0; })) {
-    return operandType;
+  auto type = dyn_cast<RankedTensorType>(t);
+  if (type && type.hasStaticShape() &&
+      llvm::any_of(type.getShape(), [](int64_t s) { return s == 0; })) {
+    return type;
   }
   return std::nullopt;
 }
