@@ -584,6 +584,8 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     return nativeSize;
   }
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+    if (writeOp.getVectorType().getRank() < 2)
+      return std::nullopt;
     SmallVector<int64_t> nativeSize(writeOp.getVectorType().getRank() - 2, 1);
     nativeSize.append({m, n});
     return nativeSize;
@@ -721,6 +723,8 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
   // Shape of warp-level vector write operation.
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+    if (writeOp.getVectorType().getRank() < 2)
+      return std::nullopt;
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
     LLVM_DEBUG({

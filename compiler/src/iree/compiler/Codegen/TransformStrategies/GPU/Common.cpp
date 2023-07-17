@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/ConvolutionImplicitGemmStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -441,9 +442,9 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(1));
 
   // Rewrite aligned pads as destination passing (linalg.copy)
-  if (strategy.alignedLhs())
+  if (strategy.alignedLhs() && strategy.packingDimensions[0])
     lhsH = b.create<RewriteInDestinationPassingStyleOp>(lhsH.getType(), lhsH);
-  if (strategy.alignedRhs())
+  if (strategy.alignedRhs() && strategy.packingDimensions[1])
     rhsH = b.create<RewriteInDestinationPassingStyleOp>(rhsH.getType(), rhsH);
 
   MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
@@ -463,7 +464,7 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
     copyBackOpH = buildDistributeOnePadOrCopyWithNumThreads(
         b, variantH, copyBackOpH,
         /*numThreads=*/resCopyMapping.numThreads,
-        /*threadDimMapping=*/rhsCopyMapping.threadMapping);
+        /*threadDimMapping=*/resCopyMapping.threadMapping);
   }
 
   return std::make_tuple(lhsCopyOpH, rhsCopyOpH, copyBackOpH);
@@ -474,7 +475,8 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
 // TODO: generalize and don't hardcode.
 void mlir::iree_compiler::gpu::buildMatmulVectorization(
     ImplicitLocOpBuilder &b, Value variantH, Value lhsCopyOpH, Value rhsCopyOpH,
-    Value copyBackOpH, const AbstractGemmLikeStrategy &strategy) {
+    Value copyBackOpH, const AbstractGemmLikeStrategy &strategy,
+    bool vectorizePadding, bool vectorizeNdExtract) {
   // Canonicalize to make padOp outputs static shaped: this is currently a
   // prerequisite for vector masking.
   // Also, no canonicalization is allowed after vector masking and before we
@@ -515,7 +517,8 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 
   // Apply vectorization + cleanups to what remains.
-  funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true);
+  funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true,
+                                        vectorizePadding, vectorizeNdExtract);
 }
 
 /// Build the transform IR to perform conversion to tensor core operations.

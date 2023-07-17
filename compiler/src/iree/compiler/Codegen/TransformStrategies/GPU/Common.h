@@ -159,7 +159,9 @@ buildDistributeMatmulCopies(ImplicitLocOpBuilder &b, Value variantH,
 void buildMatmulVectorization(ImplicitLocOpBuilder &b, Value variantH,
                               Value lhsCopyOpH, Value rhsCopyOpH,
                               Value copyBackOpH,
-                              const AbstractGemmLikeStrategy &strategy);
+                              const AbstractGemmLikeStrategy &strategy,
+                              bool vectorizePadding = false,
+                              bool vectorizeNdExtract = false);
 
 /// Build the transform IR to perform conversion to tensor core operations.
 /// This is currently subject to phase orderings as follows:

@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
+
 #include "iree/compiler/Codegen/TransformStrategies/GPU/AbstractGemmLikeStrategy.h"
 
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
@@ -323,4 +325,26 @@ void AbstractGemmLikeStrategy::print(llvm::raw_ostream &os) const {
   os << "\n- res copy:\n";
   resCopyMapping().print(os << "    -> ");
   os << "\n";
+}
+
+/// Validates the mapping and emits a diagnostic on failure.
+LogicalResult AbstractGemmLikeStrategy::validateCopyMapping(
+    MLIRContext *ctx, const MappingInfo &mapping, StringRef name) const {
+  int64_t threadsUsed =
+      std::accumulate(mapping.numThreads.begin(), mapping.numThreads.end(), 1,
+                      std::multiplies<int64_t>());
+  if (totalNumThreads() < threadsUsed) {
+    InFlightDiagnostic diag = emitError(UnknownLoc::get(ctx))
+                              << "too many threads used for transferring "
+                              << name;
+
+    std::string str;
+    llvm::raw_string_ostream os(str);
+    llvm::interleave(mapping.numThreads, os, " * ");
+    os << " >= " << totalNumThreads();
+    diag.attachNote() << os.str();
+    return diag;
+  }
+
+  return success();
 }

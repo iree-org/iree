@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/ConvolutionImplicitGemmStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/PadStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/SmallReductionStrategy.h"
@@ -50,6 +51,10 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy",
     llvm::cl::desc("activate the matmul tensorcore strategy"),
     llvm::cl::init(true));
+llvm::cl::opt<bool> clGPUEnableTransformDialectImplicitGemmStrategy(
+    "iree-codegen-llvmgpu-enable-transform-dialect-implicit-gemm-strategy",
+    llvm::cl::desc("activate the convolution implicit gemm strategy"),
+    llvm::cl::init(false));
 llvm::cl::opt<bool> clGPUEnableTransformDialectAlignedMatmul(
     "iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul",
     llvm::cl::desc(
@@ -73,6 +78,7 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectBatchMatmulStrategy(
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
 using iree_compiler::gpu::BatchMatmulStrategy;
 using iree_compiler::gpu::GPUModel;
+using iree_compiler::gpu::ImplicitGemmStrategy;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::PadConfig;
@@ -534,6 +540,160 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 }
 
 //===--------------------------------------------------------------------===//
+// Convolution strategies.
+//===--------------------------------------------------------------------===//
+/// Placeholder to encode fixed convolutions that should take finer-grained
+/// precedence over other heuristics. In the future, this could be lifted to
+/// e.g. `gpuModel` or higher up in some transform dialect database summary of
+/// "known good things".
+static FailureOr<ImplicitGemmStrategy> applyKnownGoodConvolutionConfigurations(
+    const transform_ext::MatchedConvolutionCaptures &captures,
+    const GPUModel &gpuModel) {
+  return failure();
+}
+
+static void failSafeOverrides(ImplicitGemmStrategy &strategy,
+                              const GPUModel &gpuModel) {
+  // Prefer a default block tile of 1 for the batch.
+  strategy.blockTileSizes = SmallVector<int64_t>{1, 128, 128};
+  // Failsafe for blockTileM to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileM = selectLargestFailsafeValueIfNeeded(
+      strategy.blockTileM(), strategy.m(), {16, 32, 64, 128}, {1, 16, 32, 64});
+  // Failsafe for blockTileN to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileN = selectLargestFailsafeValueIfNeeded(
+      strategy.blockTileN(), strategy.n(), {16, 32, 64, 128}, {1, 16, 32, 64});
+  // Failsafe for reductionSize to avoid tiling by > size (i.e. no tiling).
+  int64_t reductionTileSize = selectLargestFailsafeValueIfNeeded(
+      strategy.reductionTileSize, strategy.k(), {8, 16, 24, 32, 40, 48, 56, 64},
+      {1, 8, 16, 24, 32, 40, 48, 56});
+  // Failsafe for blockTileBatch to avoid tiling by > size (i.e. no tiling).
+  int64_t blockTileBatch = selectLargestFailsafeValueIfNeeded(
+      /*value=*/strategy.blockTileBatch(),
+      /*limit=*/strategy.batch(),
+      /*thresholds=*/{2, 4, 8, 16, 32, 64, 128},
+      /*failSafeValues=*/{1, 2, 4, 8, 16, 32, 64});
+  strategy.blockTileSizes = {blockTileBatch, blockTileM, blockTileN};
+  strategy.reductionTileSize = reductionTileSize;
+  // Avoid too deep pipelines. This should also look at shared memory usage in
+  // the future.
+  if (strategy.pipelineDepth * strategy.reductionTileSize > strategy.k()) {
+    strategy.pipelineDepth =
+        mlir::floorDiv(strategy.k(), strategy.reductionTileSize);
+  }
+}
+
+/// The configurations below have been determined empirically.
+// TODO: Significantly improve these heuristics.
+static ImplicitGemmStrategy
+getConvolutionConfig(MLIRContext *context,
+                     const transform_ext::MatchedConvolutionCaptures &captures,
+                     const GPUModel &gpuModel) {
+  ImplicitGemmStrategy strategy(context, captures, gpuModel);
+  if (strategy.cliOptionsSpecified)
+    return strategy;
+
+  auto maybeHardcodedConfiguration =
+      applyKnownGoodConvolutionConfigurations(captures, gpuModel);
+  if (succeeded(maybeHardcodedConfiguration))
+    return *maybeHardcodedConfiguration;
+
+  // TODO: encode a decision tree of reasonnable heuristics here.
+
+  // Apply failsafe overrides to avoid identified bad corner cases.
+  failSafeOverrides(strategy, gpuModel);
+
+  return strategy;
+}
+
+static LogicalResult matchAndSetConvolutionStrategy(func::FuncOp entryPoint,
+                                                    linalg::LinalgOp op,
+                                                    const GPUModel &gpuModel) {
+  if (!clGPUEnableTransformDialectImplicitGemmStrategy) {
+    LDBG("--Implicit gemm strategy flag turned off\n");
+    return failure();
+  }
+
+  // 1. Match a reduction and surrounding ops.
+  StructuredOpMatcher *fill;
+  StructuredOpMatcher *convolution;
+  StructuredOpMatcher *trailing;
+  transform_ext::MatchedConvolutionCaptures captures;
+  transform_ext::MatcherContext matcherContext;
+  makeConvolutionMatcher(matcherContext, convolution, fill, trailing, captures,
+                         /*mustMatchEntireFunc=*/true);
+  if (!matchPattern(op, *convolution)) {
+    LDBG("--Implicit gemm strategy fail to match\n");
+    return failure();
+  }
+
+  // We are very peculiar about the dispatches we want to match for now:
+  //   - f32 or f16 only atm.
+  //   - Mandatory fill op.
+  //   - Require minimum tile alignment due to img2col.
+  //   - Otherwise, we take it.
+  if (!fill->getCaptured() || trailing->getCaptured()) {
+    LDBG("--Implicit gemm strategy fill / trailing preconditions failed\n");
+    return failure();
+  }
+
+  // Currently requires a typical 2d named convolution (conv_2d_nchw/nhwc).
+  if (captures.convolutionDims.outputChannel.size() != 1) {
+    return failure();
+  }
+  if (captures.convolutionDims.inputChannel.size() != 1) {
+    return failure();
+  }
+  if (captures.convolutionDims.outputImage.size() != 2) {
+    return failure();
+  }
+  if (captures.convolutionDims.filterLoop.size() != 2) {
+    return failure();
+  }
+  if (captures.convolutionDims.batch.size() != 1) {
+    return failure();
+  }
+
+  int64_t channelSize = 1;
+  for (auto dim : captures.convolutionDims.outputChannel)
+    channelSize *= captures.convolutionOpSizes[dim];
+  int64_t imageSize = 1;
+  for (auto dim : captures.convolutionDims.outputImage)
+    imageSize *= captures.convolutionOpSizes[dim];
+
+  int64_t derivedK = 1;
+  for (auto dim : captures.convolutionDims.filterLoop)
+    derivedK *= captures.convolutionOpSizes[dim];
+  for (auto dim : captures.convolutionDims.inputChannel)
+    derivedK *= captures.convolutionOpSizes[dim];
+
+  // Require tile-aligned due to the img2col op.
+  if (channelSize % 64 || imageSize % 64 || derivedK % 16) {
+    LDBG("--Implicit gemm strategy alignment check failed\n");
+    return failure();
+  }
+
+  iree_compiler::gpu::ImplicitGemmStrategy strategy =
+      getConvolutionConfig(op->getContext(), captures, gpuModel);
+
+  // Validate the strategy configuration against the compilation target.
+  if (failed(strategy.validate(gpuModel))) {
+    LDBG("--Implicit gemm strategy failed to validate\n");
+    return failure();
+  }
+
+  // 2. Construct the configuration and the strategy builder.
+  // TODO: Generalize along the HW axis.
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+    return buildConvolutionImplicitGemmStrategy(b, variant, strategy);
+  };
+
+  // 3. Build strategy embedded into the IR.
+  mlir::iree_compiler::createTransformRegion(entryPoint, strategyBuilder);
+
+  return success();
+}
+
+//===--------------------------------------------------------------------===//
 // Pad strategies.
 //===--------------------------------------------------------------------===//
 
@@ -645,6 +805,11 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
   if (succeeded(
           matchAndSetBatchMatmulStrategy(entryPoint, linalgOp, gpuModel))) {
     LDBG("Activate batch matmul\n");
+    return success();
+  }
+  if (succeeded(
+          matchAndSetConvolutionStrategy(entryPoint, linalgOp, gpuModel))) {
+    LDBG("Activate convolution\n");
     return success();
   }
   // TODO: Add more transform dialect strategy for other kind of dispatch
