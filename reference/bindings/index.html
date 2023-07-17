@@ -1008,8 +1008,6 @@
         
           
         
-          
-        
       
       
         
@@ -1039,7 +1037,7 @@
   
     <li class="md-nav__item">
       <a href="c-api/" class="md-nav__link">
-        Runtime C API
+        C API
       </a>
     </li>
   
@@ -1054,20 +1052,6 @@
     <li class="md-nav__item">
       <a href="python/" class="md-nav__link">
         Python
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="tensorflow-lite/" class="md-nav__link">
-        TensorFlow Lite
       </a>
     </li>
   
@@ -1656,6 +1640,75 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#official-api-bindings" class="md-nav__link">
+    Official API bindings
+  </a>
+  
+    <nav class="md-nav" aria-label="Official API bindings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cc" class="md-nav__link">
+    C/C++
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+     Python
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#javascript" class="md-nav__link">
+     JavaScript
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unofficial-api-bindings" class="md-nav__link">
+    Unofficial API bindings
+  </a>
+  
+    <nav class="md-nav" aria-label="Unofficial API bindings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#julia" class="md-nav__link">
+     Julia
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rust" class="md-nav__link">
+     Rust
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1676,13 +1729,105 @@
 
 
 <h1 id="api-bindings">API bindings<a class="headerlink" href="#api-bindings" title="Permanent link">link</a></h1>
-<p>IREE offers specialized sets of bindings for running compiled programs from
-various languages or with specific APIs:</p>
+<p>API bindings allow for programmatic use of IREE's compiler and runtime
+components. The core IREE project is written in C<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>, allowing for API bindings
+to be written in a variety of other languages.</p>
+<div class="admonition question -">
+<p class="admonition-title">Something missing?</p>
+<p>Want to use another language? Looking for something specific out of one of
+those already listed?</p>
+<p>We welcome discussions on our
+<a href="../../#communication-channels">communication channels</a> and
+contributions on <a href="https://github.com/openxla/iree">our GitHub page</a>!</p>
+</div>
+<h2 id="official-api-bindings">Official API bindings<a class="headerlink" href="#official-api-bindings" title="Permanent link">link</a></h2>
+<p>Members of the core project team and OpenXLA partners maintain these official
+bindings:</p>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Compiler API?</th>
+<th>Runtime API?</th>
+<th>Published packages?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#cc">C/C++</a></td>
+<td><img alt="✅" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2705.svg" title=":white_check_mark:" /> Supported</td>
+<td><img alt="✅" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2705.svg" title=":white_check_mark:" /> Supported</td>
+<td><img alt="❌" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/274c.svg" title=":x:" /> Unsupported</td>
+</tr>
+<tr>
+<td><a href="#python">Python</a></td>
+<td><img alt="✅" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2705.svg" title=":white_check_mark:" /> Supported</td>
+<td><img alt="✅" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2705.svg" title=":white_check_mark:" /> Supported</td>
+<td><img alt="✅" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2705.svg" title=":white_check_mark:" /> Supported</td>
+</tr>
+<tr>
+<td><a href="#javascript">JavaScript</a></td>
+<td><img alt="❔" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2754.svg" title=":grey_question:" /> Experimental</td>
+<td><img alt="❔" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2754.svg" title=":grey_question:" /> Experimental</td>
+<td><img alt="❌" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/274c.svg" title=":x:" /> Unsupported</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cc">C/C++<a class="headerlink" href="#cc" title="Permanent link">link</a></h3>
+<p>See the <a href="c-api/">C API</a> reference page.</p>
+<h3 id="python"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg></span> Python<a class="headerlink" href="#python" title="Permanent link">link</a></h3>
+<p>See the <a href="python/">Python</a> reference page.</p>
+<h3 id="javascript"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z"/></svg></span> JavaScript<a class="headerlink" href="#javascript" title="Permanent link">link</a></h3>
 <ul>
-<li><a href="c-api/">Runtime C API</a></li>
-<li><a href="python/">Compiler and runtime Python bindings</a></li>
-<li><a href="tensorflow-lite/">Runtime TensorFlow Lite bindings</a></li>
+<li>JavaScript bindings for WebAssembly and WebGPU are under development in IREE's
+<a href="https://github.com/openxla/iree/tree/main/experimental/web"><code>experimental/web/</code></a>
+directory.</li>
 </ul>
+<h2 id="unofficial-api-bindings">Unofficial API bindings<a class="headerlink" href="#unofficial-api-bindings" title="Permanent link">link</a></h2>
+<p>Members of our developer community have authored bindings using other languages:</p>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Compiler API?</th>
+<th>Runtime API?</th>
+<th>Published packages?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#julia">Julia</a></td>
+<td><img alt="❔" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2754.svg" title=":grey_question:" /> Experimental</td>
+<td><img alt="❔" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2754.svg" title=":grey_question:" /> Experimental</td>
+<td><img alt="❌" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/274c.svg" title=":x:" /> Unsupported</td>
+</tr>
+<tr>
+<td><a href="#rust">Rust</a></td>
+<td><img alt="❌" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/274c.svg" title=":x:" /> Unsupported</td>
+<td><img alt="❔" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2754.svg" title=":grey_question:" /> Experimental</td>
+<td><img alt="❔" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@14.1.2/assets/svg/2754.svg" title=":grey_question:" /> Experimental</td>
+</tr>
+</tbody>
+</table>
+<h3 id="julia"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.138 17.569a5.569 5.569 0 1 1-11.138 0 5.569 5.569 0 1 1 11.138 0zm6.431-11.138a5.569 5.569 0 1 1-11.138 0 5.569 5.569 0 1 1 11.138 0zM24 17.569a5.569 5.569 0 1 1-11.138 0 5.569 5.569 0 1 1 11.138 0z"/></svg></span> Julia<a class="headerlink" href="#julia" title="Permanent link">link</a></h3>
+<ul>
+<li><a href="https://github.com/Pangoraw/Coil.jl">Coil.jl</a> is an experimental package to
+lower and execute Julia tensor operations to IREE.</li>
+</ul>
+<h3 id="rust"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m23.835 11.703-1.008-.623a13.727 13.727 0 0 0-.028-.294l.866-.807a.348.348 0 0 0-.116-.578l-1.106-.414a8.496 8.496 0 0 0-.087-.285l.69-.96a.346.346 0 0 0-.226-.544l-1.166-.19a9.357 9.357 0 0 0-.14-.261l.49-1.076a.344.344 0 0 0-.028-.336.349.349 0 0 0-.3-.154l-1.185.041a6.744 6.744 0 0 0-.188-.227l.273-1.153a.347.347 0 0 0-.417-.417l-1.153.273a14.018 14.018 0 0 0-.228-.188l.041-1.184a.344.344 0 0 0-.49-.328l-1.076.49-.262-.14-.19-1.167a.348.348 0 0 0-.545-.226l-.96.69a8.487 8.487 0 0 0-.285-.086L14.597.453a.348.348 0 0 0-.578-.116l-.807.867a9.294 9.294 0 0 0-.294-.028L12.295.168a.346.346 0 0 0-.59 0l-.623 1.008a13.738 13.738 0 0 0-.294.028L9.98.337a.346.346 0 0 0-.578.116l-.414 1.106-.285.086-.959-.69a.348.348 0 0 0-.545.226l-.19 1.167a9.357 9.357 0 0 0-.262.14l-1.076-.49a.346.346 0 0 0-.49.328l.041 1.184a7.983 7.983 0 0 0-.228.187l-1.153-.272a.347.347 0 0 0-.417.417l.271 1.153-.186.227-1.184-.042a.346.346 0 0 0-.328.49l.49 1.077a9.167 9.167 0 0 0-.14.262l-1.166.19a.348.348 0 0 0-.226.544l.69.958a13.303 13.303 0 0 0-.087.286l-1.106.414a.348.348 0 0 0-.116.578l.866.807a9.294 9.294 0 0 0-.028.294l-1.008.623a.344.344 0 0 0 0 .59l1.008.623c.008.098.018.196.028.294l-.866.807a.346.346 0 0 0 .116.578l1.106.415c.028.096.057.191.087.285l-.69.959a.345.345 0 0 0 .227.544l1.166.19c.046.088.092.175.14.262l-.49 1.076a.346.346 0 0 0 .328.49l1.183-.041c.062.077.124.152.187.227l-.27 1.154a.346.346 0 0 0 .416.417l1.153-.272c.075.064.151.126.228.187l-.041 1.184a.344.344 0 0 0 .49.327l1.076-.49c.087.049.174.095.262.14l.19 1.167a.348.348 0 0 0 .545.227l.959-.69a9.299 9.299 0 0 0 .285.086l.414 1.107a.345.345 0 0 0 .578.115l.808-.865.294.03.623 1.006a.347.347 0 0 0 .59 0l.623-1.007c.098-.009.197-.018.294-.03l.807.866a.348.348 0 0 0 .578-.115l.414-1.107a8.463 8.463 0 0 0 .285-.087l.959.69a.345.345 0 0 0 .545-.226l.19-1.166.262-.14 1.076.49a.347.347 0 0 0 .49-.328l-.041-1.184a6.727 6.727 0 0 0 .227-.187l1.153.272a.347.347 0 0 0 .417-.416l-.272-1.155c.063-.075.126-.15.187-.227l1.184.041a.344.344 0 0 0 .328-.49l-.49-1.076c.048-.087.095-.174.141-.262l1.166-.19a.348.348 0 0 0 .226-.544l-.69-.959.087-.285 1.106-.414a.346.346 0 0 0 .116-.579l-.866-.807c.01-.098.02-.196.028-.294l1.008-.624a.344.344 0 0 0 0-.589zm-6.742 8.355a.714.714 0 0 1 .299-1.396.714.714 0 1 1-.3 1.396zm-.342-2.314a.649.649 0 0 0-.771.5l-.358 1.669a8.73 8.73 0 0 1-3.619.78 8.737 8.737 0 0 1-3.695-.815L7.95 18.21a.648.648 0 0 0-.772-.5l-1.473.317a8.722 8.722 0 0 1-.761-.898h7.167c.081 0 .136-.014.136-.088v-2.536c0-.074-.054-.088-.136-.088h-2.096v-1.608h2.268c.206 0 1.106.059 1.393 1.209.09.353.288 1.504.424 1.873.134.413.683 1.238 1.268 1.238h3.572a.75.75 0 0 0 .13-.013 8.787 8.787 0 0 1-.813.952zm-9.914 2.28a.714.714 0 1 1-.3-1.396.714.714 0 0 1 .3 1.396zM4.117 8.997a.714.714 0 1 1-1.303.58.714.714 0 0 1 1.304-.58zm-.834 1.981 1.534-.682a.65.65 0 0 0 .33-.858l-.316-.715h1.244v5.602H3.567a8.775 8.775 0 0 1-.284-3.348zm6.734-.543V8.784h2.96c.153 0 1.08.177 1.08.87 0 .574-.712.78-1.296.78zm10.757 1.486c0 .219-.008.436-.024.651h-.9c-.09 0-.127.059-.127.148v.413c0 .973-.548 1.184-1.03 1.238-.457.052-.964-.191-1.027-.472-.27-1.518-.72-1.843-1.43-2.403.882-.56 1.799-1.386 1.799-2.492 0-1.193-.82-1.945-1.377-2.315-.783-.516-1.65-.62-1.883-.62H5.468a8.765 8.765 0 0 1 4.907-2.77l1.098 1.152a.648.648 0 0 0 .918.02l1.227-1.173a8.775 8.775 0 0 1 6.004 4.276l-.84 1.898a.652.652 0 0 0 .33.859l1.618.718c.028.288.042.577.042.872zm-9.3-9.6a.713.713 0 1 1 .984 1.032.714.714 0 0 1-.984-1.031zm8.339 6.71a.71.71 0 0 1 .939-.362.714.714 0 1 1-.94.364z"/></svg></span> Rust<a class="headerlink" href="#rust" title="Permanent link">link</a></h3>
+<ul>
+<li><a href="https://github.com/SamKG/iree-rs">iree-rs</a> is
+<a href="https://crates.io/crates/iree-rs">a crate</a> containing rustic bindings for the
+IREE runtime.</li>
+</ul>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:1">
+<p>with some C++ tools and utilities&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>
 
 
 

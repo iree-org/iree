@@ -21,7 +21,7 @@
     
     
       
-        <title>Runtime C API - IREE</title>
+        <title>C API - IREE</title>
       
     
     
@@ -157,7 +157,7 @@
         <div data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Runtime C API
+              C API
             
           </span>
         </div>
@@ -1008,8 +1008,6 @@
         
           
         
-          
-        
       
       
         
@@ -1048,12 +1046,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          Runtime C API
+          C API
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Runtime C API
+        C API
       </a>
       
         
@@ -1072,13 +1070,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+  <a href="#overview" class="md-nav__link">
+    Overview
   </a>
   
 </li>
       
         <li class="md-nav__item">
+  <a href="#compiler-api" class="md-nav__link">
+    Compiler API
+  </a>
+  
+    <nav class="md-nav" aria-label="Compiler API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#concepts" class="md-nav__link">
     Concepts
   </a>
@@ -1087,16 +1093,62 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree-vm" class="md-nav__link">
-    IREE VM
+  <a href="#sessions" class="md-nav__link">
+    Sessions
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree-hal" class="md-nav__link">
-    IREE HAL
+  <a href="#invocations" class="md-nav__link">
+    Invocations
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    Sources
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    Outputs
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugins" class="md-nav__link">
+    Plugins
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#samples" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1106,43 +1158,90 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-the-c-api" class="md-nav__link">
-    Using the C API
+  <a href="#runtime-api" class="md-nav__link">
+    Runtime API
   </a>
   
-    <nav class="md-nav" aria-label="Using the C API">
+    <nav class="md-nav" aria-label="Runtime API">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
-    Setup
+  <a href="#concepts_1" class="md-nav__link">
+    Concepts
+  </a>
+  
+    <nav class="md-nav" aria-label="Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-level-session" class="md-nav__link">
+    High level - Session
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#configure-stateful-objects" class="md-nav__link">
-    Configure stateful objects
+  <a href="#high-level-instance" class="md-nav__link">
+    High level - Instance
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#invoke-functions" class="md-nav__link">
-    Invoke functions
+  <a href="#high-level-call" class="md-nav__link">
+    High level - Call
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#cleanup-resources" class="md-nav__link">
-    Cleanup resources
+  <a href="#low-level-vm" class="md-nav__link">
+    Low level - VM
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#low-level-hal" class="md-nav__link">
+    Low level - HAL
   </a>
   
 </li>
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage_1" class="md-nav__link">
+    Usage
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#samples_1" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compiler-runtime-jit" class="md-nav__link">
+    Compiler + Runtime = JIT
+  </a>
   
 </li>
       
@@ -1163,20 +1262,6 @@
     <li class="md-nav__item">
       <a href="../python/" class="md-nav__link">
         Python
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tensorflow-lite/" class="md-nav__link">
-        TensorFlow Lite
       </a>
     </li>
   
@@ -1772,13 +1857,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+  <a href="#overview" class="md-nav__link">
+    Overview
   </a>
   
 </li>
       
         <li class="md-nav__item">
+  <a href="#compiler-api" class="md-nav__link">
+    Compiler API
+  </a>
+  
+    <nav class="md-nav" aria-label="Compiler API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#concepts" class="md-nav__link">
     Concepts
   </a>
@@ -1787,16 +1880,62 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree-vm" class="md-nav__link">
-    IREE VM
+  <a href="#sessions" class="md-nav__link">
+    Sessions
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree-hal" class="md-nav__link">
-    IREE HAL
+  <a href="#invocations" class="md-nav__link">
+    Invocations
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    Sources
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    Outputs
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugins" class="md-nav__link">
+    Plugins
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#samples" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1806,43 +1945,90 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-the-c-api" class="md-nav__link">
-    Using the C API
+  <a href="#runtime-api" class="md-nav__link">
+    Runtime API
   </a>
   
-    <nav class="md-nav" aria-label="Using the C API">
+    <nav class="md-nav" aria-label="Runtime API">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
-    Setup
+  <a href="#concepts_1" class="md-nav__link">
+    Concepts
+  </a>
+  
+    <nav class="md-nav" aria-label="Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-level-session" class="md-nav__link">
+    High level - Session
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#configure-stateful-objects" class="md-nav__link">
-    Configure stateful objects
+  <a href="#high-level-instance" class="md-nav__link">
+    High level - Instance
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#invoke-functions" class="md-nav__link">
-    Invoke functions
+  <a href="#high-level-call" class="md-nav__link">
+    High level - Call
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#cleanup-resources" class="md-nav__link">
-    Cleanup resources
+  <a href="#low-level-vm" class="md-nav__link">
+    Low level - VM
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#low-level-hal" class="md-nav__link">
+    Low level - HAL
   </a>
   
 </li>
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage_1" class="md-nav__link">
+    Usage
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#samples_1" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compiler-runtime-jit" class="md-nav__link">
+    Compiler + Runtime = JIT
+  </a>
   
 </li>
       
@@ -1868,9 +2054,281 @@
 
 
 <h1 id="c-api-bindings">C API bindings<a class="headerlink" href="#c-api-bindings" title="Permanent link">link</a></h1>
-<p>IREE provides a low level C API for its runtime<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>, which can be used directly or
-through higher level APIs and language bindings built on top of it.</p>
-<p>API header files are organized by runtime component:</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h2>
+<p>The IREE compiler and IREE runtime both have their own C/C++ APIs for use in
+other projects.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>There are multiple ways to distribute and depend on C/C++ projects, each
+with varying levels of portability, flexibility, and toolchain
+compatibility. IREE aims to support common configurations and platforms.</p>
+</div>
+<h2 id="compiler-api">Compiler API<a class="headerlink" href="#compiler-api" title="Permanent link">link</a></h2>
+<p>The IREE compiler is structured as a monolithic shared object with a dynamic
+plugin system allowing for extensions. The shared object exports symbols for
+versioned API functions.</p>
+<pre class="mermaid"><code>graph TD
+  accTitle: IREE compiler linkage model diagram
+  accDescr {
+    The libIREECompiler.so or IREECompiler.dll shared object contains pipelines,
+    target backends, and general passes as private implementation details.
+    Compiler plugins interface with the compiler shared object to extend it with
+    custom targets, dialects, etc.
+    Applications interface with the compiler shared object through the compiler
+    C API's exported symbols.
+  }
+
+  subgraph compiler[libIREECompiler.so / IREECompiler.dll]
+    pipelines("Pipelines
+
+    • Flow
+    • Stream
+    • etc.")
+
+    targets("Target backends
+
+    • llvm-cpu
+    • vulkan-spirv
+    • etc.")
+
+    passes("General passes
+
+    • Const eval
+    • DCE
+    • etc.")
+  end
+
+  plugins("Compiler plugins
+
+    • Custom targets
+    • Custom dialects
+    • etc.")
+
+  application(Your application)
+
+  compiler &lt;-- "Plugin API&lt;br&gt;(static or dynamic linking)" --&gt; plugins
+  compiler -. "Compiler C API&lt;br&gt;(exported symbols)" .-&gt; application</code></pre>
+<p>API definitions can be found in the following locations:</p>
+<table>
+<thead>
+<tr>
+<th>Source location</th>
+<th>Overview</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/openxla/iree/blob/main/compiler/bindings/c/iree/compiler/embedding_api.h"><code>iree/compiler/embedding_api.h</code></a></td>
+<td>Top-level IREE compiler embedding API</td>
+</tr>
+<tr>
+<td><a href="https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/PluginAPI"><code>iree/compiler/PluginAPI/</code> directory</a></td>
+<td>IREE compiler plugin API</td>
+</tr>
+<tr>
+<td><a href="https://github.com/llvm/llvm-project/tree/main/mlir/include/mlir-c"><code>mlir/include/mlir-c/</code> directory</a></td>
+<td>MLIR C API headers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">link</a></h3>
+<p>The compiler API is centered around running pipelines to translate inputs to
+artifacts. These are modeled via <em>sessions</em>, <em>invocations</em>, <em>sources</em>, and
+<em>outputs</em>.</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  accTitle: IREE compiler session and invocation state diagram
+  accDescr {
+    Input files are opened (or buffers are wrapped) as sources in a session.
+    Sources are parsed into invocations, which run pipelines.
+    Output files are written (or buffers are mapped) for compilation artifacts.
+  }
+
+  direction LR
+  InputFile --&gt; Source1 : open file
+  InputBuffer --&gt; Source2 : wrap buffer
+
+  state Session {
+    Source1 --&gt; Invocation1
+    Source1 --&gt; Invocation2
+    Source2 --&gt; Invocation3
+    Invocation1 --&gt; Invocation1 : run pipeline
+    Invocation2 --&gt; Invocation2 : run pipeline
+    Invocation3 --&gt; Invocation3 : run pipeline
+  }
+
+  Invocation1 --&gt; OutputFile1   : write file
+  Invocation2 --&gt; OutputBuffer1 : map memory
+  Invocation3 --&gt; OutputBuffer2 : map memory</code></pre>
+<h4 id="sessions">Sessions<a class="headerlink" href="#sessions" title="Permanent link">link</a></h4>
+<p>A <em>session</em> represents a scope where one or more invocations can be executed.</p>
+<ul>
+<li>Internally, <em>sessions</em> consist of an <code>MLIRContext</code> and a private set of
+  <em>options</em>.</li>
+<li><em>Sessions</em> may activate available <em>plugins</em> based on their <em>options</em>.</li>
+</ul>
+<h4 id="invocations">Invocations<a class="headerlink" href="#invocations" title="Permanent link">link</a></h4>
+<p>An <em>invocation</em> represents a discrete run of the compiler.</p>
+<ul>
+<li><em>Invocations</em> run <em>pipelines</em>, consisting of <em>passes</em>, to translate from
+  <em>sources</em> to <em>outputs</em>.</li>
+</ul>
+<h4 id="sources">Sources<a class="headerlink" href="#sources" title="Permanent link">link</a></h4>
+<p>A <em>source</em> represents an input program, including operations and data.</p>
+<ul>
+<li><em>Sources</em> may refer to files or buffers in memory.</li>
+</ul>
+<h4 id="outputs">Outputs<a class="headerlink" href="#outputs" title="Permanent link">link</a></h4>
+<p>An <em>output</em> represents a compilation artifact.</p>
+<ul>
+<li><em>Outputs</em> can be standalone files or more advanced streams.</li>
+</ul>
+<h4 id="plugins">Plugins<a class="headerlink" href="#plugins" title="Permanent link">link</a></h4>
+<p>A <em>plugin</em> extends the compiler with some combination of target backends,
+options, passes, or pipelines.</p>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">link</a></h3>
+<div class="admonition todo -">
+<p class="admonition-title">Under construction, more coming soon</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip - building from source</p>
+<p>When <a href="../../../building-from-source/getting-started/">building from source</a>,
+some components may be disabled to reduce binary size and improve build
+time. There are also options for using your own LLVM or linking in external
+target backends.</p>
+</div>
+<h4 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Source</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/openxla/openxla-pjrt-plugin/">openxla-pjrt-plugin</a></td>
+<td><a href="https://github.com/openxla/openxla-pjrt-plugin/blob/main/iree/integrations/pjrt/common/iree_compiler.cc"><code>iree_compiler.cc</code></a></td>
+<td>JIT engine connecting TensorFlow and JAX to IREE</td>
+</tr>
+</tbody>
+</table>
+<h2 id="runtime-api">Runtime API<a class="headerlink" href="#runtime-api" title="Permanent link">link</a></h2>
+<p>The IREE runtime is structured as a modular set of library components. Each
+component is designed to be linked into applications directly and compiled
+with LTO style optimizations.</p>
+<p>The low level library components can be used directly or through a higher level
+API.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">High level API</label><label for="__tabbed_1_2">Low level API</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The high level 'runtime' API sits on top of the low level components. It is
+relatively terse but does not expose the full flexibility of the underlying
+systems.</p>
+<pre class="mermaid"><code>graph TD
+  accTitle: IREE runtime high level API diagram
+  accDescr {
+  The IREE runtime includes 'base', 'HAL', and 'VM' components, each with
+  their own types and API methods.
+  A high level "runtime API" sits on top of these component APIs.
+  Applications can interface indirectly with the IREE runtime via this
+  high level runtime API.
+  }
+
+  subgraph iree_runtime[IREE Runtime]
+    subgraph base
+      base_types("Types
+
+      • allocator
+      • status
+      • etc.")
+    end
+
+    subgraph hal[HAL]
+      hal_types("Types
+
+      • buffer
+      • device
+      • etc.")
+
+      hal_drivers("Drivers
+
+      • local-*
+      • vulkan
+      • etc.")
+    end
+
+    subgraph vm[VM]
+      vm_types("Types
+
+      • context
+      • invocation
+      • etc.")
+    end
+
+    runtime_api("Runtime API
+
+    • instance
+    • session
+    • call")
+
+    base_types &amp; hal_types &amp; hal_drivers &amp; vm_types --&gt; runtime_api
+  end
+
+  application(Your application)
+
+  runtime_api --&gt; application</code></pre>
+</div>
+<div class="tabbed-block">
+<p>Each runtime component has its own low level API. The low level APIs are
+typically verbose as they expose the full flexibility of each underlying
+system.</p>
+<pre class="mermaid"><code>graph TD
+  accTitle: IREE runtime low level API diagram
+  accDescr {
+    The IREE runtime includes 'base', 'HAL', and 'VM' components, each with
+    their own types and API methods.
+    Applications can interface directly with the IREE runtime via the low
+    level component APIs.
+  }
+
+  subgraph iree_runtime[IREE Runtime]
+    subgraph base
+      base_types("Types
+
+      • allocator
+      • status
+      • etc.")
+    end
+    subgraph hal[HAL]
+      hal_types("Types
+
+      • buffer
+      • device
+      • etc.")
+
+      hal_drivers("Drivers
+
+      • local-*
+      • vulkan
+      • etc.")
+    end
+    subgraph vm[VM]
+      vm_types("Types
+
+      • context
+      • invocation
+      • etc.")
+    end
+  end
+
+  application(Your application)
+
+  base_types &amp; hal_types &amp; hal_drivers &amp; vm_types --&gt; application</code></pre>
+</div>
+</div>
+</div>
+<p>Runtime API header files are organized by component:</p>
 <table>
 <thead>
 <tr>
@@ -1880,40 +2338,48 @@ through higher level APIs and language bindings built on top of it.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/base/api.h">iree/base/api.h</a></td>
+<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/runtime/api.h"><code>iree/runtime/api.h</code></a></td>
+<td>High level runtime API</td>
+</tr>
+<tr>
+<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/base/api.h"><code>iree/base/api.h</code></a></td>
 <td>Core API, type definitions, ownership policies, utilities</td>
 </tr>
 <tr>
-<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/api.h">iree/vm/api.h</a></td>
+<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/api.h"><code>iree/vm/api.h</code></a></td>
 <td>VM APIs: loading modules, I/O, calling functions</td>
 </tr>
 <tr>
-<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/api.h">iree/hal/api.h</a></td>
+<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/api.h"><code>iree/hal/api.h</code></a></td>
 <td>HAL APIs: device management, synchronization, accessing hardware features</td>
 </tr>
 </tbody>
 </table>
-<p>The <a href="https://github.com/openxla/iree/tree/main/samples">samples/</a>
-directory demonstrates several ways to use IREE's C API.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>To use IREE's C API, you will need to build the runtime
-<a href="../../../building-from-source/getting-started/">from source</a>. The
-<a href="https://github.com/iml130/iree-template-cpp">iree-template-cpp</a> community
-project also shows how to integrate IREE into an external project using
-CMake.</p>
-<h2 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">link</a></h2>
+<h3 id="concepts_1">Concepts<a class="headerlink" href="#concepts_1" title="Permanent link">link</a></h3>
+<!-- TODO(scotttodd): high level runtime API diagram(s) -->
+
+<h4 id="high-level-session">High level - Session<a class="headerlink" href="#high-level-session" title="Permanent link">link</a></h4>
+<div class="admonition todo -">
+<p class="admonition-title">Under construction, more coming soon</p>
+</div>
+<h4 id="high-level-instance">High level - Instance<a class="headerlink" href="#high-level-instance" title="Permanent link">link</a></h4>
+<div class="admonition todo -">
+<p class="admonition-title">Under construction, more coming soon</p>
+</div>
+<h4 id="high-level-call">High level - Call<a class="headerlink" href="#high-level-call" title="Permanent link">link</a></h4>
+<div class="admonition todo -">
+<p class="admonition-title">Under construction, more coming soon</p>
+</div>
+<h4 id="low-level-vm">Low level - VM<a class="headerlink" href="#low-level-vm" title="Permanent link">link</a></h4>
+<!-- TODO(scotttodd): VM module diagram (bytecode, HAL, custom) -->
+
 <p>By default, IREE uses its own tiny Virtual Machine (VM) at runtime to interpret
 program instructions on the host system. VM instructions may also be lowered
 further to LLVM IR, C, or other representations for static or resource
 constrained deployment.</p>
 <p>The VM supports generic operations like loads, stores, arithmetic, function
-calls, and control flow. It builds streams of more complex program logic and
-dense math into command buffers that are dispatched to hardware backends
-through the Hardware Abstraction Layer (HAL) interface.</p>
-<p>Most interaction with IREE's C API involves either the VM or the HAL.</p>
-<!-- TODO(scotttodd): diagrams -->
-
-<h3 id="iree-vm">IREE VM<a class="headerlink" href="#iree-vm" title="Permanent link">link</a></h3>
+calls, and control flow. The VM builds streams of more complex program logic and
+dense math into HAL command buffers that are dispatched to hardware backends.</p>
 <ul>
 <li>VM <em>instances</em> can serve multiple isolated execution <em>contexts</em></li>
 <li>VM <em>contexts</em> are effectively sandboxes for loading modules and running
@@ -1922,7 +2388,11 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
   access to hardware accelerators through the HAL. Compiled user programs are
   also modules.</li>
 </ul>
-<h3 id="iree-hal">IREE HAL<a class="headerlink" href="#iree-hal" title="Permanent link">link</a></h3>
+<h4 id="low-level-hal">Low level - HAL<a class="headerlink" href="#low-level-hal" title="Permanent link">link</a></h4>
+<!-- TODO(scotttodd): command buffer construction -> dispatch diagram -->
+<!-- TODO(scotttodd): input buffers -> output buffers diagram -->
+<!-- TODO(scotttodd): HAL interface diagram -->
+
 <ul>
 <li>HAL <em>drivers</em> are used to enumerate and create HAL <em>devices</em></li>
 <li>HAL <em>devices</em> interface with hardware, such as by allocating device memory,
@@ -1931,144 +2401,46 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <li>HAL <em>buffers</em> and <em>buffer views</em> represent storage and shaped/typed views
   into that storage (aka "tensors")</li>
 </ul>
-<h2 id="using-the-c-api">Using the C API<a class="headerlink" href="#using-the-c-api" title="Permanent link">link</a></h2>
-<h3 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">link</a></h3>
-<p>Include headers:</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/base/api.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/api.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/api.h&quot;</span>
-
-<span class="c1">// The VM bytecode and HAL modules will typically be included, along</span>
-<span class="c1">// with those for the specific HAL drivers your application uses.</span>
-<span class="c1">// Functionality extensions can be used via custom modules.</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/modules/hal/module.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/drivers/local_task/registration/driver_module.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/bytecode/module.h&quot;</span>
-</code></pre></div>
-<p>Check the API version and register components:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// Device drivers are managed through registries.</span>
-<span class="c1">// Applications may use multiple registries to more finely control driver</span>
-<span class="c1">// lifetimes and visibility.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_local_task_driver_module_register</span><span class="p">(</span>
-<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">()));</span>
-</code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>The <code>IREE_CHECK_OK()</code> macro calls <code>assert()</code> if an error occurs.
-Applications should propagate errors and handle or report them as desired.</p>
+<h3 id="usage_1">Usage<a class="headerlink" href="#usage_1" title="Permanent link">link</a></h3>
+<div class="admonition todo -">
+<p class="admonition-title">Under construction, more coming soon</p>
 </div>
-<h3 id="configure-stateful-objects">Configure stateful objects<a class="headerlink" href="#configure-stateful-objects" title="Permanent link">link</a></h3>
-<p>Create a VM instance along with a HAL driver and device:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// Applications should try to reuse instances so resource usage across contexts</span>
-<span class="c1">// is handled and extraneous device interaction is avoided.</span>
-<span class="n">iree_vm_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_instance_create</span><span class="p">(</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">));</span>
-
-<span class="c1">// Modules with custom types must be statically registered before use.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_all_types</span><span class="p">(</span><span class="n">instance</span><span class="p">));</span>
-
-<span class="c1">// We use the CPU &quot;local-task&quot; driver in this example, but could use a different</span>
-<span class="c1">// driver like the GPU &quot;vulkan&quot; driver. The driver(s) used should match with</span>
-<span class="c1">// the target(s) specified during compilation.</span>
-<span class="n">iree_hal_driver_t</span><span class="o">*</span><span class="w"> </span><span class="n">driver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_registry_try_create</span><span class="p">(</span>
-<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">(),</span>
-<span class="w">    </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span>
-<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">driver</span><span class="p">));</span>
-
-<span class="c1">// Drivers may support multiple devices, such as when a machine has multiple</span>
-<span class="c1">// GPUs. You may either enumerate devices and select based on their properties,</span>
-<span class="c1">// or just use the default device.</span>
-<span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_create_default_device</span><span class="p">(</span>
-<span class="w">    </span><span class="n">driver</span><span class="p">,</span><span class="w"> </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
-
-<span class="c1">// Create a HAL module initialized to use the newly created device.</span>
-<span class="c1">// We&#39;ll load this module into a VM context later.</span>
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">hal_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span>
-<span class="w">    </span><span class="n">iree_hal_module_create</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_MODULE_FLAG_NONE</span><span class="p">,</span>
-<span class="w">                           </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">hal_module</span><span class="p">));</span>
-<span class="c1">// The reference to the driver can be released now.</span>
-<span class="n">iree_hal_driver_release</span><span class="p">(</span><span class="n">driver</span><span class="p">);</span>
-</code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>The default <code>iree_allocator_system()</code> is backed by <code>malloc</code> and <code>free</code>,
-but custom allocators may also be used.</p>
-</div>
-<p>Load a <abbr title="VM FlatBuffer">vmfb</abbr> bytecode module containing program data:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// (Application-specific loading into memory, such as loading from a file)</span>
-
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">bytecode_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_bytecode_module_create</span><span class="p">(</span>
-<span class="w">    </span><span class="n">instance</span><span class="p">,</span>
-<span class="w">    </span><span class="n">iree_const_byte_span_t</span><span class="p">{</span><span class="n">module_data</span><span class="p">,</span><span class="w"> </span><span class="n">module_size</span><span class="p">},</span>
-<span class="w">    </span><span class="cm">/*flatbuffer_allocator=*/</span><span class="n">iree_allocator_null</span><span class="p">(),</span>
-<span class="w">    </span><span class="cm">/*allocator=*/</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bytecode_module</span><span class="p">));</span>
-</code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Many IREE samples use
-<a href="https://github.com/openxla/iree/tree/main/build_tools/embed_data"><code>c_embed_data</code></a>
-to embed <abbr title="VM FlatBuffer">vmfb</abbr> files as C code to avoid file I/O and ease portability.
-Applications should use what makes sense for their platforms and deployment
-configurations.</p>
-</div>
-<p>Create a VM context and load modules into it:</p>
-<div class="highlight"><pre><span></span><code><span class="n">iree_vm_context_t</span><span class="o">*</span><span class="w"> </span><span class="n">context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">modules</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">hal_module</span><span class="p">,</span><span class="w"> </span><span class="n">bytecode_module</span><span class="p">};</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_create_with_modules</span><span class="p">(</span>
-<span class="w">    </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_CONTEXT_FLAG_NONE</span><span class="p">,</span>
-<span class="w">    </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">modules</span><span class="p">),</span><span class="w"> </span><span class="n">modules</span><span class="p">,</span>
-<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">context</span><span class="p">));</span>
-<span class="c1">// References to the modules can be released now.</span>
-<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">hal_module</span><span class="p">);</span>
-<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">bytecode_module</span><span class="p">);</span>
-</code></pre></div>
-<p>Look up the function(s) to call:</p>
-<div class="highlight"><pre><span></span><code><span class="n">iree_vm_function_t</span><span class="w"> </span><span class="n">main_function</span><span class="p">;</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_resolve_function</span><span class="p">(</span>
-<span class="w">    </span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;module.main_function&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">main_function</span><span class="p">));</span>
-</code></pre></div>
-<h3 id="invoke-functions">Invoke functions<a class="headerlink" href="#invoke-functions" title="Permanent link">link</a></h3>
-<!-- TODO(scotttodd): I/O buffers (TODO pending new helpers) -->
-
-<div class="highlight"><pre><span></span><code><span class="c1">// (Application-specific I/O buffer setup, making data available to the device)</span>
-
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_invoke</span><span class="p">(</span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">main_function</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_INVOCATION_FLAG_NONE</span><span class="p">,</span>
-<span class="w">                             </span><span class="cm">/*policy=*/</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">,</span><span class="w"> </span><span class="n">outputs</span><span class="p">,</span>
-<span class="w">                             </span><span class="n">iree_allocator_system</span><span class="p">()));</span>
-
-<span class="c1">// (Application-specific output buffer retrieval and reading back from the device)</span>
-</code></pre></div>
-<h3 id="cleanup-resources">Cleanup resources<a class="headerlink" href="#cleanup-resources" title="Permanent link">link</a></h3>
-<div class="highlight"><pre><span></span><code><span class="n">iree_hal_device_release</span><span class="p">(</span><span class="n">device</span><span class="p">);</span>
-<span class="n">iree_vm_context_release</span><span class="p">(</span><span class="n">context</span><span class="p">);</span>
-<span class="n">iree_vm_instance_release</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
-</code></pre></div>
-<!-- ## Advanced usage -->
-
-<!-- TODO(scotttodd): async execution and synchronization -->
-<!-- TODO(scotttodd): specialized HAL APIs -->
-<!-- TODO(scotttodd): threadpools -->
-<!-- TODO(scotttodd): heterogenous execution -->
-
-<!-- ## Troubleshooting -->
-
-<!-- TODO(scotttodd): link to GitHub issues -->
-<!-- TODO(scotttodd): compiler/runtime compatibility -->
-<!-- TODO(scotttodd): common problems? object ownership? loaded modules (HAL)? -->
-
-<div class="footnote">
-<hr />
-<ol>
-<li id="fn:1">
-<p>We also have a C API for IREE's compiler, see
-  <a href="https://github.com/openxla/iree/issues/3817">this GitHub issue</a>&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
-</li>
-</ol>
-</div>
+<h4 id="samples_1">Samples<a class="headerlink" href="#samples_1" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th>Source location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/runtime/demo/">iree <code>runtime/demo/</code></a></td>
+<td>In-tree demos of the high level runtime API</td>
+</tr>
+<tr>
+<td><a href="https://github.com/openxla/iree/tree/main/samples">iree <code>samples/</code></a></td>
+<td>In-tree sample applications</td>
+</tr>
+<tr>
+<td><a href="https://github.com/benvanik/iree-template-runtime-cmake/">iree-template-runtime-cmake</a></td>
+<td>Template repository for runtime applications</td>
+</tr>
+<tr>
+<td><a href="https://github.com/iml130/iree-template-cpp">iree-template-cpp</a></td>
+<td>Demonstration of integration into a downstream project</td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree-samples/tree/main/runtime-library">iree-samples <code>runtime-library/</code></a></td>
+<td>Shared runtime library builder</td>
+</tr>
+</tbody>
+</table>
+<h2 id="compiler-runtime-jit">Compiler + Runtime = JIT<a class="headerlink" href="#compiler-runtime-jit" title="Permanent link">link</a></h2>
+<p>The compiler and runtime APIs may be used together to build a "just in time"
+(JIT) execution engine. JIT compilation allows for last-minute specialization
+with no prior knowledge of target devices and avoids issues with version drift,
+but it can also constrain deployment options and usage scenarios.</p>
 
 
 

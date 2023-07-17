@@ -151,11 +151,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://openxla.github.io/iree/reference/bindings/tensorflow-lite/</loc>
-         <lastmod>2023-07-17</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/</loc>
          <lastmod>2023-07-17</lastmod>
          <changefreq>daily</changefreq>
