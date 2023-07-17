@@ -630,11 +630,25 @@ func.func @add_zero_ext(%arg0 : tensor<5x0xi32>, %arg1 : tensor<5x0xi32>) -> ten
 // CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x0xi32>
 // CHECK:   return %[[EMPTY]] 
 
-// CHECK-LABEL: func.func @concat_zero_ext
-func.func @concat_zero_ext(%arg0 : tensor<4x1xf32>, %arg1 : tensor<4x0xf32>) -> tensor<4x1xf32> {
-  %0 = "stablehlo.concatenate"(%arg0, %arg1) {dimension = 1 : i64} : (tensor<4x1xf32>, tensor<4x0xf32>) -> tensor<4x1xf32>
-  func.return %0 : tensor<4x1xf32>
+// CHECK-LABEL: func.func @scatter_zero_ext
+func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 : tensor<1xf32>) -> tensor<f32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+    ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+      %1 = "stablehlo.add"(%arg3, %arg4) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+      "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [],
+      inserted_window_dims = [],
+      scatter_dims_to_operand_dims = [],
+      index_vector_dim = 1
+    >,
+    indices_are_sorted = true,
+    unique_indices = true
+  } : (tensor<f32>, tensor<1x0xi32>, tensor<1xf32>) -> tensor<f32>
+  func.return %0 : tensor<f32>
 }
-// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4x0xf32>
-// CHECK:   %[[CONCAT:.+]] = stablehlo.concatenate %arg0, %[[EMPTY]], dim = 1 : (tensor<4x1xf32>, tensor<4x0xf32>) -> tensor<4x1xf32>
-// CHECK:   return %[[CONCAT]] 
+
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x0xi32>
+// CHECK:   %[[SCATTER:.+]] = "stablehlo.scatter"(%arg0, %0, %arg2)
+// CHECK:   return %[[SCATTER]] 
