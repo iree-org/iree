@@ -93,8 +93,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 
   llvm::cl::opt<IREEVMPipelinePhase> compileFrom(
       "compile-from",
-      llvm::cl::desc("Compilation phase to start from (inclusive)."),
-      llvm::cl::init(IREEVMPipelinePhase::Input));
+      llvm::cl::desc("Compilation phase to resume from, starting with the "
+                     "following phase."),
+      llvm::cl::init(IREEVMPipelinePhase::Start));
   SmallVector<std::string> compileFromPhases;
   enumerateIREEVMPipelinePhases(
       [&](IREEVMPipelinePhase phase, StringRef name, StringRef desc) {

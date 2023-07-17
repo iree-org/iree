@@ -55,7 +55,7 @@ void buildIREEVMTransformPassPipeline(
   // and must run before generating bindings.
   // After input processing, there should only be IREE legal types in
   // signatures.
-  if (compileFrom <= IREEVMPipelinePhase::Input) { // late-entry
+  if (compileFrom < IREEVMPipelinePhase::Input) { // late-entry
     auto inputType = inputOptions.parseInputTypeMnemonic();
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Input");
     if (hooks.pipelineExtensions) {
@@ -127,7 +127,7 @@ void buildIREEVMTransformPassPipeline(
     return; // early-exit
 
   // Now that inputs are legalized, generate wrapper for entry functions.
-  if (compileFrom <= IREEVMPipelinePhase::ABI) { // late-entry
+  if (compileFrom < IREEVMPipelinePhase::ABI) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "ABI");
     IREE::ABI::InvocationOptions invocationOptions;
     invocationOptions.invocationModel =
@@ -182,7 +182,7 @@ void buildIREEVMTransformPassPipeline(
     // No flow/stream processing (implies no tensors).
     break;
   default:
-    if (compileFrom <= IREEVMPipelinePhase::Preprocessing) { // late-entry.
+    if (compileFrom < IREEVMPipelinePhase::Preprocessing) { // late-entry.
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
       IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
                                            hooks.pipelineExtensions);
@@ -191,7 +191,7 @@ void buildIREEVMTransformPassPipeline(
     if (compileTo == IREEVMPipelinePhase::Preprocessing)
       return; // early-exit
 
-    if (compileFrom <= IREEVMPipelinePhase::Flow) { // late-entry
+    if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
       IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Flow");
@@ -199,7 +199,7 @@ void buildIREEVMTransformPassPipeline(
     if (compileTo == IREEVMPipelinePhase::Flow)
       return; // early-exit
 
-    if (compileFrom <= IREEVMPipelinePhase::Stream) { // late-entry
+    if (compileFrom < IREEVMPipelinePhase::Stream) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Stream");
       IREE::Stream::buildStreamTransformPassPipeline(passManager,
                                                      streamOptions);
@@ -213,13 +213,13 @@ void buildIREEVMTransformPassPipeline(
   IREE::HAL::PipelinePhase halCompileFrom;
   switch (compileFrom) {
   default:
+    halCompileFrom = IREE::HAL::PipelinePhase::Start;
+    break;
+  case IREEVMPipelinePhase::ExecutableSources:
     halCompileFrom = IREE::HAL::PipelinePhase::ExecutableSources;
     break;
   case IREEVMPipelinePhase::ExecutableTargets:
     halCompileFrom = IREE::HAL::PipelinePhase::ExecutableTargets;
-    break;
-  case IREEVMPipelinePhase::HAL:
-    halCompileFrom = IREE::HAL::PipelinePhase::End;
     break;
   }
 
@@ -236,7 +236,7 @@ void buildIREEVMTransformPassPipeline(
     break;
   }
 
-  if (compileFrom <= IREEVMPipelinePhase::HAL) { // late-entry
+  if (compileFrom < IREEVMPipelinePhase::HAL) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "HAL");
     switch (schedulingOptions.executionModel) {
     case SchedulingOptions::ExecutionModel::HostOnly:
@@ -265,7 +265,7 @@ void buildIREEVMTransformPassPipeline(
     return; // early-exit
   }
 
-  if (compileFrom <= IREEVMPipelinePhase::VM) { // late-entry
+  if (compileFrom < IREEVMPipelinePhase::VM) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "VM");
     IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
     passManager.addPass(IREE::Util::createDropCompilerHintsPass());

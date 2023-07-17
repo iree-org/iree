@@ -34,6 +34,7 @@ struct IREEVMPipelineHooks {
 };
 
 enum class IREEVMPipelinePhase {
+  Start,
   Input,
   ABI,
   Preprocessing,
@@ -50,6 +51,8 @@ enum class IREEVMPipelinePhase {
 inline static void enumerateIREEVMPipelinePhases(
     std::function<void(IREEVMPipelinePhase, StringRef name, StringRef desc)>
         callback) {
+  callback(IREEVMPipelinePhase::Start, "start",
+           "Entry point to the compilation pipeline.");
   callback(IREEVMPipelinePhase::Input, "input",
            "Performs input processing and lowering into core IREE "
            "input dialects (linalg/etc).");
@@ -87,7 +90,7 @@ void buildIREEVMTransformPassPipeline(
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager,
-    IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Input,
+    IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
     IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::End);
 
 // Builds the above with options initialized from flags.

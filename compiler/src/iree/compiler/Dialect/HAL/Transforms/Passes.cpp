@@ -219,7 +219,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
-  if (compileFrom <= PipelinePhase::ExecutableSources) {
+  if (compileFrom < PipelinePhase::ExecutableSources) {
     buildHALConfigurationPassPipeline(passManager, targetRegistry,
                                       targetOptions);
 
@@ -252,7 +252,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // After this point the executables are opaque blobs and we cannot change
   // their interfaces.
 
-  if (compileFrom <= PipelinePhase::ExecutableTargets) {
+  if (compileFrom < PipelinePhase::ExecutableTargets) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(
         createTranslateExecutablesPass(targetRegistry));
   }
@@ -423,7 +423,7 @@ void registerHALTransformPassPipeline() {
         buildHALTransformPassPipeline(
             passManager, TargetBackendRegistry::getGlobal(),
             TargetOptions::FromFlags::get(), transformOptions,
-            PipelinePhase::ExecutableSources, PipelinePhase::End);
+            PipelinePhase::Start, PipelinePhase::End);
       });
 }
 

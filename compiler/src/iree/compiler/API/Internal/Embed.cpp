@@ -555,7 +555,7 @@ struct Invocation {
 
   // Run options.
   std::string compileToPhaseName{"end"};
-  std::string compileFromPhaseName{"input"};
+  std::string compileFromPhaseName{"start"};
   bool enableVerifier = true;
 
   // Diagnostic options.
@@ -719,10 +719,10 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
           << "unrecognized compile-to phase name: " << compileToPhaseName;
       return false;
     }
-    if (compileFromPhase > compileToPhase) {
+    if (compileFromPhase >= compileToPhase) {
       parsedModule->emitError()
-          << "compile-to phase " << compileToPhaseName
-          << " precedes compile-from phase " << compileFromPhaseName;
+          << "compile-from phase " << compileFromPhaseName
+          << " must precede compile-to phase " << compileToPhaseName;
       return false;
     }
 
