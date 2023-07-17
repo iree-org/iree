@@ -131,12 +131,9 @@ static or dynamic linkage and the associated function calls are generated.
 
 ### Running models
 
-IREE offers a low level C API, as well as several specialized sets of
-[bindings](./reference/bindings/index.md) for running IREE models using other languages:
-
-* [C API](./reference/bindings/c-api.md)
-* [Python](./reference/bindings/python.md)
-* [TensorFlow Lite](./reference/bindings/tensorflow-lite.md)
+IREE offers a low level C API, as well as several sets of
+[API bindings](./reference/bindings/index.md) for compiling and running programs
+using various languages.
 
 ## Communication channels
 
