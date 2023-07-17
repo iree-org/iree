@@ -42,14 +42,12 @@ iree_cc_library(
   NAME
     VMVX
   HDRS
-    "EncodingInfo.h"
     "Passes.h"
   SRCS
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
-    "VMVXMaterializeEncodingPass.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

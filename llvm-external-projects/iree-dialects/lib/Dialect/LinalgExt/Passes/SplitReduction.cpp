@@ -72,8 +72,8 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                                  int64_t splitReductionDepth) {
   // Determine if we should split the reduction. Requires aligned static shapes
   // and no input indicies.
-  auto valuesOrigType = topkOp.getInputType();
-  if (valuesOrigType.isDynamicDim(kDimOrig)) {
+  auto valuesOriginalType = topkOp.getInputType();
+  if (valuesOriginalType.isDynamicDim(kDimOrig)) {
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
   }
@@ -84,7 +84,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
   if (splitReductionRatio <= 1) {
     return rewriter.notifyMatchFailure(topkOp, "reduction ratio <= 1");
   }
-  if (valuesOrigType.getDimSize(kDimOrig) % splitReductionRatio != 0) {
+  if (valuesOriginalType.getDimSize(kDimOrig) % splitReductionRatio != 0) {
     return rewriter.notifyMatchFailure(
         topkOp,
         "reduction dimension must be perfectly aligned to (divisible by) the "
@@ -102,13 +102,13 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
                     int64_t splitReductionRatio, int64_t splitDimParallel,
                     int64_t kDimParallel, int64_t kSize) {
   Value valuesOrig = topkOp.values();
-  auto valuesOrigType = valuesOrig.getType().cast<ShapedType>();
-  Type valueElementType = valuesOrigType.getElementType();
+  auto valuesOriginalType = valuesOrig.getType().cast<ShapedType>();
+  Type valueElementType = valuesOriginalType.getElementType();
   Type indicesElementType =
       topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
 
   SmallVector<int64_t> expandedShape = getExpandedShape(
-      valuesOrigType.getShape(), splitReductionRatio, splitDimParallel);
+      valuesOriginalType.getShape(), splitReductionRatio, splitDimParallel);
   auto valuesExpandedType =
       RankedTensorType::get(expandedShape, valueElementType);
 
@@ -236,14 +236,14 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
                             int64_t splitReductionRatio, int64_t kDimOrig,
                             int64_t kSize) {
   Value valuesOrig = topkOp.values();
-  auto valuesOrigType = valuesOrig.getType().cast<ShapedType>();
-  Type valueElementType = valuesOrigType.getElementType();
+  auto valuesOriginalType = valuesOrig.getType().cast<ShapedType>();
+  Type valueElementType = valuesOriginalType.getElementType();
   Type indicesElementType =
       topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
 
   // Define the collapsed input shapes
   SmallVector<int64_t> collapsedShape = getCollapsedShape(
-      valuesOrigType.getShape(), splitReductionRatio, kSize, kDimOrig);
+      valuesOriginalType.getShape(), splitReductionRatio, kSize, kDimOrig);
   auto valuesCollapsedType =
       RankedTensorType::get(collapsedShape, valueElementType);
   auto indicesCollapsedType =

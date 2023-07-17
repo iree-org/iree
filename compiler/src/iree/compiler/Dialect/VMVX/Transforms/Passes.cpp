@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
@@ -35,7 +36,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
   addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createVMVXMaterializeEncodingPass());
+      createCPUMaterializeEncodingPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(

@@ -1072,6 +1072,25 @@ def IREELinalgExt_SetEncodingOp : IREELinalgExt_PureOp<"set_encoding",[
   }];
 }
 
+def IREELinalgExt_UpperBoundTileSizeOp : IREELinalgExt_PureOp<"upper_bound_tile_size",
+    [Pure]> {
+  let summary = "returns an upper bound on tile sizes";
+  let description = [{
+    This returns the largest tile sizes that might result from materialization
+    of the given encoding. This can be used outside of target-specific code, so
+    there may be multiple targets, and this will return the maximum tile size
+    from iterating over all of them. The evaluation happens in the
+    MaterializeUpperBoundTileSize pass.
+  }];
+
+  let arguments = (ins TypeAttrOf<AnyRankedTensor>:$tensorType);
+  let results = (outs Variadic<Index>:$results);
+
+  let assemblyFormat = [{
+    attr-dict $tensorType `->` type($results)
+  }];
+}
+
 def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {

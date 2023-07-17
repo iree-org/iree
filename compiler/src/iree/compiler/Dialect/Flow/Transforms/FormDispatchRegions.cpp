@@ -221,11 +221,28 @@ static RankedTensorType getSourceTypeOfPackLikeOp(Operation *op) {
   return llvm::cast<RankedTensorType>(source.getType());
 }
 
-/// Returns true if the operation is an `unpack` op or an `unset_encoding` op
-/// that has unpack semantics
-// TODO(ravishankarm): This seems like a use case for interface.
-static bool isUnPackLikeOp(Operation *op) {
-  return isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op);
+/// Returns true if the operation is an `unpack` op or an `unset_encoding` op,
+/// or an `extract_slice` op whose source operand matches those criteria,
+/// recursively.
+/// The idea is that we want to ensure that `extract_slice` ops can't prevent
+/// fusion between a `unset_encoding` producer and some linalg consumer. In
+///   %0 = unset_encoding ...
+///   %1 = extract_slice %0 ...
+///   %2 = linalg.generic ins(%1) ...
+/// we are not content to be fusing %1 into %0, we also want to be fusing %2,
+/// so we want to prevent %1 from acting as a consumer fusion barrier.
+static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
+  if (isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op)) {
+    return true;
+  }
+  if (isa<tensor::ExtractSliceOp>(op)) {
+    Value source = op->getOperand(0);
+    Operation *producer = source.getDefiningOp();
+    if (isUnpackLikeOpViaExtractSliceOps(producer)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /// Since `iree_linalg_ext.set_encoding` doesnt have padding semantics a
@@ -472,7 +489,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
-  if (isUnPackLikeOp(producer)) {
+  if (isUnpackLikeOpViaExtractSliceOps(producer)) {
     // Fuse `unset_encoding` -> `extract_slice` op since they get folded into
     // `unpack` on materialization.
     if (isa<tensor::ExtractSliceOp>(consumer)) {
