@@ -168,18 +168,35 @@ TEST(RoundingTest, UpToNextPow264) {
 //==============================================================================
 
 TEST(F16ConversionTest, F32ToF16) {
+  constexpr float kF16Max = 65504.f;
+  constexpr float kF16Min = 0.0000610351563f;
   // Within range, normal truncation.
   EXPECT_EQ(0x3400, iree_math_f32_to_f16(0.25f));
   EXPECT_EQ(0xd646, iree_math_f32_to_f16(-100.375f));
+  EXPECT_EQ(0x7BFF, iree_math_f32_to_f16(kF16Max));
+  EXPECT_EQ(0xFBFF, iree_math_f32_to_f16(-kF16Max));
+  EXPECT_EQ(0x0400, iree_math_f32_to_f16(kF16Min));
+  EXPECT_EQ(0x8400, iree_math_f32_to_f16(-kF16Min));
   // Infinity
   EXPECT_EQ(0x7c00, iree_math_f32_to_f16(INFINITY));
   EXPECT_EQ(0xfc00, iree_math_f32_to_f16(-INFINITY));
   // Overflow
   EXPECT_EQ(0x7C00, iree_math_f32_to_f16(FLT_MAX));
   EXPECT_EQ(0xFC00, iree_math_f32_to_f16(-FLT_MAX));
+  // Important case to test: overflow due to rounding to nearest-even of 65520
+  // to 65536.
+  EXPECT_EQ(0x7C00, iree_math_f32_to_f16(65520.f));
+  EXPECT_EQ(0xFC00, iree_math_f32_to_f16(-65520.f));
+  EXPECT_EQ(0x7C00, iree_math_f32_to_f16(65536.f));
+  EXPECT_EQ(0xFC00, iree_math_f32_to_f16(-65536.f));
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f16(FLT_MIN));
   EXPECT_EQ(0x8000, iree_math_f32_to_f16(-FLT_MIN));
+  // Denormals may or may not get flushed to zero. Accept both ways.
+  uint16_t positive_denormal = iree_math_f32_to_f16(kF16Min / 2);
+  EXPECT_TRUE(positive_denormal == 0 || positive_denormal == 0x0200);
+  uint16_t negative_denormal = iree_math_f32_to_f16(-kF16Min / 2);
+  EXPECT_TRUE(negative_denormal == 0x8000 || negative_denormal == 0x8200);
 }
 
 TEST(F16ConversionTest, F32ToF16ToF32) {
@@ -187,10 +204,38 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   constexpr float kF16Min = 0.0000610351563f;
   // Within range, should just round.
   EXPECT_EQ(0.25f, iree_math_f16_to_f32(iree_math_f32_to_f16(0.25f)));
+  EXPECT_EQ(-0.25f, iree_math_f16_to_f32(iree_math_f32_to_f16(-0.25f)));
+  EXPECT_EQ(100.375f, iree_math_f16_to_f32(iree_math_f32_to_f16(100.375f)));
   EXPECT_EQ(-100.375f, iree_math_f16_to_f32(iree_math_f32_to_f16(-100.375f)));
+  EXPECT_EQ(100.375f, iree_math_f16_to_f32(iree_math_f32_to_f16(100.4f)));
   EXPECT_EQ(-100.375f, iree_math_f16_to_f32(iree_math_f32_to_f16(-100.4f)));
   EXPECT_EQ(kF16Max, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Max)));
+  EXPECT_EQ(-kF16Max, iree_math_f16_to_f32(iree_math_f32_to_f16(-kF16Max)));
   EXPECT_EQ(kF16Min, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min)));
+  EXPECT_EQ(-kF16Min, iree_math_f16_to_f32(iree_math_f32_to_f16(-kF16Min)));
+  // Powers of two should always be exactly representable across the
+  // exponent range.
+  EXPECT_EQ(32768.f, iree_math_f16_to_f32(iree_math_f32_to_f16(32768.f)));
+  EXPECT_EQ(-32768.f, iree_math_f16_to_f32(iree_math_f32_to_f16(-32768.f)));
+  // Other integers should be exactly representable up to 2048 thanks to the
+  // 10-bit mantissa. The rounding mode should be nearest-even. With the 10-bit
+  // mantissa, rounding half-integers just below 2048 should be literally to the
+  // nearest even integer.
+  //
+  // Note: the case of 2047.5 is particularly important to test, because as it
+  // gets rounded to 2048, that rounding involves an increment of the exponent,
+  // so there is some code in the software implementation that is only exercised
+  // by this case.
+  EXPECT_EQ(2046.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(2046.0f)));
+  EXPECT_EQ(2046.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(2046.5f)));
+  EXPECT_EQ(2047.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(2047.0f)));
+  EXPECT_EQ(2048.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(2047.5f)));
+  EXPECT_EQ(2048.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(2048.0f)));
+  EXPECT_EQ(-2046.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-2046.0f)));
+  EXPECT_EQ(-2046.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-2046.5f)));
+  EXPECT_EQ(-2047.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-2047.0f)));
+  EXPECT_EQ(-2048.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-2047.5f)));
+  EXPECT_EQ(-2048.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-2048.0f)));
   // Overflow
   EXPECT_EQ(INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(FLT_MAX)));
   EXPECT_EQ(-INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MAX)));
@@ -199,8 +244,11 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   // Underflow
   EXPECT_EQ(0.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(FLT_MIN)));
   EXPECT_EQ(0.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MIN)));
-  EXPECT_EQ(0.0f,
-            iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min - kF16Min / 2)));
+  // Denormals may or may not get flushed to zero. Accept both ways.
+  float positive_denormal =
+      iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min / 2));
+  EXPECT_TRUE(positive_denormal == 0.0f ||
+              positive_denormal == 3.05175781e-05f);
   // Inf and Nan
   EXPECT_EQ(INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(INFINITY)));
   EXPECT_EQ(-INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(-INFINITY)));
@@ -212,32 +260,57 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
 TEST(BF16ConversionTest, F32ToBF16) {
   // Within range, normal truncation.
   EXPECT_EQ(0x3e80, iree_math_f32_to_bf16(0.25f));
-  EXPECT_EQ(0xc2c8, iree_math_f32_to_bf16(-100.375f));
+  EXPECT_EQ(0xc2c9, iree_math_f32_to_bf16(-100.375f));
   // Infinity
   EXPECT_EQ(0x7f80, iree_math_f32_to_bf16(INFINITY));
   EXPECT_EQ(0xff80, iree_math_f32_to_bf16(-INFINITY));
   // No overflow, just rounding, as bfloat16 has nearly the same range as
   // float32
-  EXPECT_EQ(0x7f7f, iree_math_f32_to_bf16(FLT_MAX));
-  EXPECT_EQ(0xff7f, iree_math_f32_to_bf16(-FLT_MAX));
+  EXPECT_EQ(0x7f80, iree_math_f32_to_bf16(FLT_MAX));
+  EXPECT_EQ(0xff80, iree_math_f32_to_bf16(-FLT_MAX));
   // No underflow, as bfloat16 has the same smallest normal value as float32.
   EXPECT_EQ(0x80, iree_math_f32_to_bf16(FLT_MIN));
   EXPECT_EQ(0x8080, iree_math_f32_to_bf16(-FLT_MIN));
 }
 
 TEST(BF16ConversionTest, F32ToBF16ToF32) {
-  constexpr float kBF16Max = 3.38953139e+38;
   // Within range, should just round.
   EXPECT_EQ(0.25f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(0.25f)));
-  EXPECT_EQ(-100.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-100.375f)));
-  EXPECT_EQ(kBF16Max, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MAX)));
-  EXPECT_EQ(FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MIN)));
+  EXPECT_EQ(-0.25f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-0.25f)));
+  EXPECT_EQ(100.5f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(100.375f)));
+  EXPECT_EQ(-100.5f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-100.375f)));
+  // Powers of two should always be exactly representable across the
+  // exponent range.
+  EXPECT_EQ(16777216.f,
+            iree_math_bf16_to_f32(iree_math_f32_to_bf16(16777216.f)));
+  EXPECT_EQ(-16777216.f,
+            iree_math_bf16_to_f32(iree_math_f32_to_bf16(-16777216.f)));
+  // Other integers should be exactly representable up to 256 thanks to the
+  // 7-bit mantissa. The rounding mode should be nearest-even. With the 7-bit
+  // mantissa, rounding half-integers just below 256 should be literally to the
+  // nearest even integer.
+  //
+  // Note: the case of 255.5 is particularly important to test, because as it
+  // gets rounded to 256, that rounding involves an increment of the exponent,
+  // so there is some code in the software implementation that is only exercised
+  // by this case.
+  EXPECT_EQ(254.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(254.0f)));
+  EXPECT_EQ(254.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(254.5f)));
+  EXPECT_EQ(255.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(255.0f)));
+  EXPECT_EQ(256.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(255.5f)));
+  EXPECT_EQ(256.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(256.0f)));
+  EXPECT_EQ(-254.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-254.0f)));
+  EXPECT_EQ(-254.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-254.5f)));
+  EXPECT_EQ(-255.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-255.0f)));
+  EXPECT_EQ(-256.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-255.5f)));
+  EXPECT_EQ(-256.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-256.0f)));
+  // Large finite values may round to infinity.
+  EXPECT_EQ(INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MAX)));
   // Smallest normal values.
   EXPECT_EQ(FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MIN)));
   EXPECT_EQ(-FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-FLT_MIN)));
   // Denormals
-  EXPECT_EQ(1.83670992e-40f,
-            iree_math_bf16_to_f32(iree_math_f32_to_bf16(2.0e-40f)));
+  EXPECT_EQ(0.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(2.0e-40f)));
   // Inf and Nan
   EXPECT_EQ(INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(INFINITY)));
   EXPECT_EQ(-INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-INFINITY)));

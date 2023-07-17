@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "contraction-packing-and-dispatch.mlir"
     "contraction-packing.mlir"
     "eltwise_reduction_eltwise.mlir"
+    "fold_tensor_slice_into_transfer.mlir"
     "matmul.mlir"
   TOOLS
     ${IREE_LLD_TARGET}

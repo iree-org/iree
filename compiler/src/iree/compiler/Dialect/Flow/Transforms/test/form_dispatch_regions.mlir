@@ -288,13 +288,10 @@ func.func @unset_encoding_slice_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
 //       CHECK:   %[[RESULT0:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_linalg_ext.unset_encoding %[[ARG0]]
-//       CHECK:     %[[SLICE:.+]] = tensor.extract_slice
-//       CHECK:     flow.return %[[SLICE]]
-//       CHECK:   %[[RESULT1:.+]] = flow.dispatch.region
-//       CHECK:     %[[GENERIC:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[RESULT0]], %[[ARG1]]
+//       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[UNSET_ENCODING]]
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic {{.*}} ins(%[[SLICE]]
 //       CHECK:     flow.return %[[GENERIC]]
-//       CHECK:   return %[[RESULT1]]
+//       CHECK:   return %[[RESULT0]]
 
 // -----
 

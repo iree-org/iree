@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "lowering_matmul_fusion.mlir"
     "lowering_matmul_promotion.mlir"
     "lowering_reduction.mlir"
+    "lowering_scalar_dispatch.mlir"
     "map_memref_storage_class.mlir"
     "pipeline_matmul_cooperative_ops.mlir"
     "pipeline_matmul_promotion.mlir"

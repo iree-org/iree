@@ -665,9 +665,10 @@ Value DeviceQueueAllocaOp::getResultSize(unsigned idx) {
 static LogicalResult verifyDeviceQueueFences(Operation *queueOp,
                                              Value waitFence,
                                              Value signalFence) {
-  if (waitFence == signalFence) {
+  if (waitFence == signalFence &&
+      !isa<IREE::Util::NullOp>(waitFence.getDefiningOp())) {
     return queueOp->emitOpError() << "device queue operations cannot wait and "
-                                     "signal on the same fence";
+                                     "signal on the same fence.";
   }
   return success();
 }

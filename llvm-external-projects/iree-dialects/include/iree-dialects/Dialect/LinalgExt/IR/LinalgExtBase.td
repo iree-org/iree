@@ -18,9 +18,12 @@ include "mlir/IR/EnumAttr.td"
 def IREELinalgExt_Dialect : Dialect {
   let name = "iree_linalg_ext";
   let cppNamespace = "::mlir::iree_compiler::IREE::LinalgExt";
+  let summary = [{
+    IREE Linalg Extensions.
+  }];
   let description = [{
-    The `iree_linalg_ext` dialect is intended to experiment more support for
-    non-structured operations, ie, can not be represented in Linalg operations.
+    A dialect designed for experimenting with non-structured operations that
+    cannot be represented efficiently/directly by the Linalg dialect.
   }];
   let hasCanonicalizer = 1;
   let useDefaultAttributePrinterParser = 1;
@@ -103,17 +106,18 @@ def EncodingAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `user` `=` $user
-      `,` `role` `=` $role `>`
+    `<` `user` `=` `` $user
+    `,` `role` `=` `` $role
+    (`,` `original_type` `=` $originalType^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
-    AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role
+    AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role,
+    OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$originalType
   );
 
   let genVerifyDecl = 0;
 }
-
 
 #endif // IREE_DIALECT_LINALGEXT_BASE

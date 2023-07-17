@@ -98,3 +98,58 @@ func.func @multi_config(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 
 //      CHECK:       linalg.fill
 //      CHECK:       linalg.matmul
 //      CHECK:       linalg.generic
+
+// -----
+
+func.func @shared_out_operand() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 6.000000e+00 : f32
+  %c600576 = arith.constant 600576 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = hal.interface.constant.load[1] : i32
+  %2 = arith.index_castui %0 {stream.alignment = 1024 : index, stream.values = [205824 : index, 795648 : index, 1385472 : index, 1975296 : index, 2565120 : index, 3154944 : index, 3744768 : index]} : i32 to index
+  %3 = arith.index_castui %1 {stream.alignment = 1024 : index, stream.values = [0 : index, 3072 : index, 6144 : index, 9216 : index, 12288 : index, 15360 : index, 18432 : index]} : i32 to index
+  %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<391x384xf32>>
+  %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%2) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384x384xf32>>
+  %6 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384xf32>>
+  %7 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c600576) : !flow.dispatch.tensor<writeonly:tensor<391x384xf32>>
+  %8 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<391x384xf32>> -> tensor<391x384xf32>
+  %9 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [384, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x384xf32>> -> tensor<384x384xf32>
+  %10 = flow.dispatch.tensor.load %6, offsets = [0], sizes = [384], strides = [1] : !flow.dispatch.tensor<readonly:tensor<384xf32>> -> tensor<384xf32>
+  %11 = flow.dispatch.tensor.load %7, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<391x384xf32>> -> tensor<391x384xf32>
+  %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<391x384xf32>) -> tensor<391x384xf32>
+  %13 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 128, 0]]>}
+    ins(%8, %9 : tensor<391x384xf32>, tensor<384x384xf32>)
+    outs(%12 : tensor<391x384xf32>) -> tensor<391x384xf32>
+  %14 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]
+    }
+    ins(%10, %13 : tensor<384xf32>, tensor<391x384xf32>)
+    outs(%11 : tensor<391x384xf32>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %15 = arith.addf %in, %in_1 : f32
+    %16 = arith.minf %15, %cst_0 : f32
+    %17 = arith.maxf %16, %cst : f32
+    linalg.yield %17 : f32
+  } -> tensor<391x384xf32>
+  flow.dispatch.tensor.store %14, %7, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : tensor<391x384xf32> -> !flow.dispatch.tensor<writeonly:tensor<391x384xf32>>
+  return
+}
+//      CHECK: func.func @shared_out_operand(
+//  CHECK-DAG:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
+//  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !flow.dispatch.tensor<writeonly:tensor<391x384xf32>>
+//      CHECK:   %[[DST:.+]] = flow.dispatch.tensor.load %[[DST_BINDING]]
+//      CHECK:   scf.for
+// CHECK-SAME:       iter_args(%[[ITER0:.+]] = %[[DST]])
+//      CHECK:     scf.for
+// CHECK-SAME:       iter_args(%[[ITER1:.+]] = %[[ITER0]])
+//      CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[ITER1]]
+//      CHECK:       %{{.+}} = linalg.fill ins(%[[CST0]] : f32) outs(%[[OUT_SLICE]]
+//      CHECK:       %{{.+}} = linalg.matmul
+//      CHECK:       %[[OUT_SLICE2:.+]] = tensor.extract_slice %[[ITER1]]
+//      CHECK:       %{{.+}} = linalg.generic
+// CHECK-SAME:         outs(%[[OUT_SLICE2]]

@@ -195,6 +195,14 @@ extern "C" {
 #define IREE_UK_HAVE_WEAK 0
 #endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
+#if IREE_UK_HAVE_ATTRIBUTE(maybe_unused) && defined(IREE_UK_COMPILER_CLANG)
+#define IREE_UK_ATTRIBUTE_UNUSED __attribute__((maybe_unused))
+#elif IREE_UK_HAVE_ATTRIBUTE(unused) || defined(IREE_UK_COMPILER_CLANG_OR_GCC)
+#define IREE_UK_ATTRIBUTE_UNUSED __attribute__((unused))
+#else
+#define IREE_UK_ATTRIBUTE_UNUSED
+#endif  // IREE_UK_HAVE_ATTRIBUTE(maybe_unused / unused)
+
 //===----------------------------------------------------------------------===//
 // Local replacement for stdbool.h
 //===----------------------------------------------------------------------===//
@@ -542,7 +550,7 @@ static inline iree_uk_type_t iree_uk_untie_type(int pos,
 //===----------------------------------------------------------------------===//
 
 // The `restrict` here have the effect of enabling the compiler to rewrite this
-// as a memcpy call.
+// as a iree_uk_memcpy call.
 static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
                                   const void* IREE_UK_RESTRICT src,
                                   iree_uk_index_t size) {
@@ -675,73 +683,186 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
 // Adapted from runtime/src/iree/base/internal/math.h.
 //===----------------------------------------------------------------------===//
 
-// Converts a 16-bit floating-point value to a 32-bit C `float`.
-//
-// NOTE: this implementation does not handle all corner cases around NaN and
-// such; we can improve this implementation over time if it is used for such
-// cases.
-static inline float iree_uk_f16_to_f32(const iree_uk_uint16_t f16_value) {
-  const iree_uk_uint32_t sign =
-      ((iree_uk_uint32_t)((f16_value & 0x8000u) >> 15)) << 31;
-  iree_uk_uint32_t exp = ((f16_value & 0x7C00u) >> 10);
-  iree_uk_uint32_t mantissa = 0;
-  if (exp == 0x1Fu) {
-    // NaN or Inf case.
-    exp = 0xFFu << 23;
-    // For NaN mantissa should not be 0.
-    if ((f16_value & 0x3FFu) != 0) mantissa = 1;
+#define IREE_UK_FP_FORMAT_CONSTANTS(prefix, bits, ebits)            \
+  const int prefix##exp_bits IREE_UK_ATTRIBUTE_UNUSED = ebits;      \
+  const int prefix##mantissa_bits IREE_UK_ATTRIBUTE_UNUSED =        \
+      bits - 1 - prefix##exp_bits;                                  \
+  const int prefix##sign_shift IREE_UK_ATTRIBUTE_UNUSED = bits - 1; \
+  const int prefix##exp_shift IREE_UK_ATTRIBUTE_UNUSED =            \
+      prefix##mantissa_bits;                                        \
+  const int prefix##sign_mask IREE_UK_ATTRIBUTE_UNUSED =            \
+      1u << prefix##sign_shift;                                     \
+  const int prefix##mantissa_mask IREE_UK_ATTRIBUTE_UNUSED =        \
+      (1u << prefix##exp_shift) - 1;                                \
+  const int prefix##exp_mask IREE_UK_ATTRIBUTE_UNUSED =             \
+      (1u << prefix##sign_shift) - (1u << prefix##exp_shift);
 
-  } else if (exp > 0) {
-    exp = (exp + 127 - 15) << 23;
-    mantissa = ((iree_uk_uint32_t)(f16_value & 0x3FFu)) << (23 - 10);
+static inline float iree_uk_generic_fp16_to_f32(iree_uk_uint16_t f16_value,
+                                                int exp_bits) {
+  IREE_UK_FP_FORMAT_CONSTANTS(f16_, 16, exp_bits)
+  IREE_UK_FP_FORMAT_CONSTANTS(f32_, 32, 8)
+  const iree_uk_uint32_t f16_sign = f16_value & f16_sign_mask;
+  const iree_uk_uint32_t f32_sign = f16_sign
+                                    << (f32_sign_shift - f16_sign_shift);
+  const iree_uk_uint32_t f16_exp = f16_value & f16_exp_mask;
+  const iree_uk_uint32_t f16_mantissa = f16_value & f16_mantissa_mask;
+  iree_uk_uint32_t f32_exp = 0;
+  iree_uk_uint32_t f32_mantissa = 0;
+  if (f16_exp == f16_exp_mask) {
+    // NaN or Inf case.
+    f32_exp = f32_exp_mask;
+    if (f16_mantissa) {
+      // NaN. Generate a quiet NaN.
+      f32_mantissa = f32_mantissa_mask;
+    } else {
+      // Inf. Leave zero mantissa.
+    }
+  } else if (f16_exp == 0) {
+    // Zero or subnormal. Generate zero. Leave zero mantissa.
+  } else {
+    // Normal finite value.
+    int arithmetic_f16_exp = f16_exp >> f16_exp_shift;
+    int arithmetic_f32_exp = arithmetic_f16_exp + (1 << (f32_exp_bits - 1)) -
+                             (1 << (f16_exp_bits - 1));
+    f32_exp = arithmetic_f32_exp << f32_exp_shift;
+    f32_mantissa = f16_mantissa << (f32_mantissa_bits - f16_mantissa_bits);
   }
-  const iree_uk_uint32_t u32_value = sign | exp | mantissa;
+  const iree_uk_uint32_t u32_value = f32_sign | f32_exp | f32_mantissa;
   float f32_value;
   iree_uk_memcpy(&f32_value, &u32_value, sizeof f32_value);
   return f32_value;
 }
 
-// Converts a 32-bit C `float` value to a 16-bit floating-point value.
-//
-// NOTE: this implementation does not handle corner cases around NaN and such;
-// we can improve this implementation over time if it is used for such cases.
-static inline iree_uk_uint16_t iree_uk_f32_to_f16(const float f32_value) {
+static inline iree_uk_uint16_t iree_uk_f32_to_generic_fp16(float value,
+                                                           int exp_bits) {
+  IREE_UK_FP_FORMAT_CONSTANTS(f16_, 16, exp_bits)
+  IREE_UK_FP_FORMAT_CONSTANTS(f32_, 32, 8)
   iree_uk_uint32_t u32_value;
-  iree_uk_memcpy(&u32_value, &f32_value, sizeof u32_value);
-  const iree_uk_uint32_t sign = ((u32_value & 0x80000000u) >> 31) << 15;
-  iree_uk_uint32_t mantissa = (u32_value & 0x007FFFFFu) >> (23 - 10);
-  iree_uk_int32_t exp = ((u32_value & 0x7F800000u) >> 23) - 127 + 15;
-  if (exp > 31) {
-    exp = 31 << 10;
-    // zero out the mantissa for infinity.
-    mantissa = 0;
-    // If this is a NaN value set the mantissa to a non zero value.
-    if (((u32_value & 0x7F800000u) >> 23) == 0xFF) {
-      if (((u32_value & 0x007FFFFFu) != 0)) {
-        mantissa = 1;
-      }
+  iree_uk_memcpy(&u32_value, &value, sizeof value);
+  const iree_uk_uint32_t f32_sign = u32_value & f32_sign_mask;
+  const iree_uk_uint32_t f16_sign =
+      f32_sign >> (f32_sign_shift - f16_sign_shift);
+  const iree_uk_uint32_t f32_exp = u32_value & f32_exp_mask;
+  const iree_uk_uint32_t f32_mantissa = u32_value & f32_mantissa_mask;
+  iree_uk_uint32_t f16_exp = 0;
+  iree_uk_uint32_t f16_mantissa = 0;
+  if (f32_exp == f32_exp_mask) {
+    // NaN or Inf case.
+    f16_exp = f16_exp_mask;
+    if (f32_mantissa) {
+      // NaN. Generate a quiet NaN.
+      f16_mantissa = f16_mantissa_mask;
+    } else {
+      // Inf. Leave zero mantissa.
     }
-  } else if (exp < 0) {
-    exp = 0;
+  } else if (f32_exp == 0) {
+    // Zero or subnormal. Generate zero. Leave zero mantissa.
   } else {
-    exp = exp << 10;
+    // Normal finite value.
+    int arithmetic_exp = (f32_exp >> f32_exp_shift) - (1 << (f32_exp_bits - 1));
+    if (arithmetic_exp >= (1 << (f16_exp_bits - 1))) {
+      // Overflow. Generate Inf. Leave zero mantissa.
+      f16_exp = f16_exp_mask;
+    } else if (arithmetic_exp < -(1 << (f16_exp_bits - 1))) {
+      // Underflow. Generate zero. Leave zero mantissa.
+      f16_exp = 0;
+    } else {
+      // Normal case.
+      // Implement round-to-nearest-even, by adding a bias before truncating.
+      // truncating.
+      int even_bit = 1u << (f32_mantissa_bits - f16_mantissa_bits);
+      int odd_bit = even_bit >> 1;
+      iree_uk_uint32_t biased_f32_mantissa =
+          f32_mantissa +
+          ((f32_mantissa & even_bit) ? (odd_bit) : (odd_bit - 1));
+      // Adding the bias may cause an exponent increment.
+      if (biased_f32_mantissa > f32_mantissa_mask) {
+        // Note: software implementations that try to be fast tend to get this
+        // conditional increment of exp and zeroing of mantissa for free by
+        // simplying incrementing the whole uint32 encoding of the float value,
+        // so that the mantissa overflows into the exponent bits.
+        // This results in magical-looking code like in the following links.
+        // We'd rather not care too much about performance of this function;
+        // we should only care about fp16 performance on fp16 hardware, and
+        // then, we should use hardware instructions.
+        // https://github.com/pytorch/pytorch/blob/e1502c0cdbfd17548c612f25d5a65b1e4b86224d/c10/util/BFloat16.h#L76
+        // https://gitlab.com/libeigen/eigen/-/blob/21cd3fe20990a5ac1d683806f605110962aac3f1/Eigen/src/Core/arch/Default/BFloat16.h#L565
+        biased_f32_mantissa = 0;
+        ++arithmetic_exp;
+      }
+      // The exponent increment in the above if() branch may cause overflow.
+      // This is exercised by converting 65520.0f from f32 to f16. No special
+      // handling is needed for this case: the above if() branch already set
+      // biased_f32_mantissa=0, so we will be generating a 0 mantissa, as
+      // needed for infinite values.
+      f16_exp = (arithmetic_exp + (1 << (f16_exp_bits - 1))) << f16_exp_shift;
+      f16_mantissa =
+          biased_f32_mantissa >> (f32_mantissa_bits - f16_mantissa_bits);
+    }
   }
-  return (iree_uk_uint16_t)(sign | exp | mantissa);
+  iree_uk_uint16_t f16_value = f16_sign | f16_exp | f16_mantissa;
+  return f16_value;
 }
+
+// https://godbolt.org/z/3a6WM39M1 shows that _Float16 <-> float conversions
+// work on:
+// * Clang >= 15 on x86-64
+// * Clang >= 13 on riscv32
+// * Clang >= 9 on arm64 and arm32
+// * GCC >= 13 on arm64 and riscv32
+// * GCC >= 12 on x86-64
+// We have to limit this to x86 and Arm architectures at the moment, because:
+// * On RISC-V this compiles, but the resulting references to builtin functions
+//   cause linking error in some of our CI configurations.
+// * On Wasm this just fails to compile.
+#if (defined(IREE_UK_ARCH_X86_32) || defined(IREE_UK_ARCH_X86_64) ||  \
+     defined(IREE_UK_ARCH_ARM_32) || defined(IREE_UK_ARCH_ARM_64)) && \
+    (IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(15, 0) ||                \
+     IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(13, 0))
+#define IREE_UK_HAVE_BUILTIN_FLOAT16
+#endif  // Compiler and architecture checks for _Float16.
+
+// Converts a fp16 value to a 32-bit C `float`.
+static inline float iree_uk_f16_to_f32(iree_uk_uint16_t f16_value) {
+#ifdef IREE_UK_HAVE_BUILTIN_FLOAT16
+  _Float16 builtin_float16_value;
+  iree_uk_memcpy(&builtin_float16_value, &f16_value, sizeof f16_value);
+  return (float)builtin_float16_value;
+#else
+  return iree_uk_generic_fp16_to_f32(f16_value, 5);
+#endif
+}
+
+// Converts a 32-bit C `float` value to a fp16 value, rounding to nearest
+// even.
+static inline iree_uk_uint16_t iree_uk_f32_to_f16(float value) {
+#ifdef IREE_UK_HAVE_BUILTIN_FLOAT16
+  _Float16 builtin_float16_value = (_Float16)value;
+  iree_uk_uint16_t f16_value;
+  iree_uk_memcpy(&f16_value, &builtin_float16_value, sizeof f16_value);
+  return f16_value;
+#else
+  return iree_uk_f32_to_generic_fp16(value, 5);
+#endif
+}
+
+// TODO(bjacob): Use the built-in compiler type __bf16 when available.
+// It is mentioned at
+//   https://clang.llvm.org/docs/LanguageExtensions.html#half-precision-floating-point
+// but at the moment the only place where it seems to be supported is GCC 13 and
+// only on some architectures (arm64 and x86_64, but not arm32 or riscv32):
+//   https://godbolt.org/z/5Wz3jPh69
+// Revisit that compiler explorer link in the future.
 
 // Converts a bfloat16 value to a 32-bit C `float`.
-static inline float iree_uk_bf16_to_f32(const iree_uk_uint16_t bf16_value) {
-  iree_uk_uint32_t u32_value = ((iree_uk_uint32_t)bf16_value) << 16;
-  float f32_value;
-  iree_uk_memcpy(&f32_value, &u32_value, sizeof f32_value);
-  return f32_value;
+static inline float iree_uk_bf16_to_f32(iree_uk_uint16_t bf16_value) {
+  return iree_uk_generic_fp16_to_f32(bf16_value, 8);
 }
 
-// Converts a 32-bit C `float` value to a bfloat16 value.
-static inline iree_uk_uint16_t iree_uk_f32_to_bf16(const float f32_value) {
-  iree_uk_uint32_t u32_value;
-  iree_uk_memcpy(&u32_value, &f32_value, sizeof u32_value);
-  return u32_value >> 16;
+// Converts a 32-bit C `float` value to a bfloat16 value, rounding to nearest
+// even.
+static inline iree_uk_uint16_t iree_uk_f32_to_bf16(float value) {
+  return iree_uk_f32_to_generic_fp16(value, 8);
 }
 
 #ifdef __cplusplus

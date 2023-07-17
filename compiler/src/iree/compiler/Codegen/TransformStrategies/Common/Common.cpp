@@ -290,8 +290,10 @@ Value mlir::iree_compiler::buildPad(
 /// func.func.
 // TODO: configure patterns.
 Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
-                                          bool applyCleanups) {
-  funcH = b.create<VectorizeOp>(funcH);
+                                          bool applyCleanups,
+                                          bool vectorizePadding,
+                                          bool vectorizeNdExtract) {
+  funcH = b.create<VectorizeOp>(funcH, vectorizePadding, vectorizeNdExtract);
   if (applyCleanups) {
     iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   }
@@ -346,7 +348,8 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
   buildCanonicalizationAndEnablingTransforms(
       b, funcH, [](OpBuilder &b, Location loc) {
         b.create<transform::ApplyReassociativeReshapeFoldingPatternsOp>(loc);
-        b.create<transform::ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
+        b.create<IREE::transform_dialect::
+                     ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
       });
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);

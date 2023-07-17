@@ -100,12 +100,16 @@ static Operation *replaceOpWithPredicatedOp(RewriterBase &rewriter,
   Value c0Index = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   auto srcElements =
       rewriter.create<arith::SelectOp>(loc, pred, originalSrcElement, c0Index);
+  int64_t sizeInBytes =
+      (asyncCopyOp.getDst().getType().getElementTypeBitWidth() *
+       asyncCopyOp.getDstElements().getZExtValue()) /
+      8;
+  UnitAttr bypassL1 = sizeInBytes == 16 ? rewriter.getUnitAttr() : UnitAttr();
   auto asyncCopyZfillOp = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
       loc, nvgpu::DeviceAsyncTokenType::get(asyncCopyOp.getContext()),
       asyncCopyOp.getDst(), asyncCopyOp.getDstIndices(), asyncCopyOp.getSrc(),
       asyncCopyOp.getSrcIndices(), asyncCopyOp.getDstElements(), srcElements,
-      UnitAttr());
-
+      bypassL1);
   rewriter.eraseOp(asyncCopyOp);
 
   // Return the newly create predicated AsyncCopyZfillOp.

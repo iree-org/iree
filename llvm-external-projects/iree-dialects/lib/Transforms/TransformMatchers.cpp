@@ -1715,9 +1715,10 @@ void transform_ext::makeConvolutionMatcher(
           .convolutionDims(CaptureConvDims(captures.convolutionDims))
           // Capture op sizes.
           .dim(AllDims(), CaptureDims(captures.convolutionOpSizes))
-          // Capture convolution element type.
-          .output(0, CaptureElementTypeBitWidth(
-                         captures.convolutionOutputElementalTypeBitWidth));
+          // Capture convolution element types.
+          .input(0, CaptureElementType(captures.inputElementType))
+          .input(1, CaptureElementType(captures.filterElementType))
+          .output(0, CaptureElementType(captures.outputElementType));
   convolutionCapture = &convolution;
 
   // Optional FillOp to create the unique output of the convolution.

@@ -122,6 +122,19 @@ def ApplyFoldReshapeIntoTensorHalInterfacePatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyFoldTensorSliceIntoTransferPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.fold_tensor_slice_into_transfer",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Indicates that tensor.extract_slice -> vector.transfer_read and
+    vector.transfer_write -> tensor.insert_slice op chains should be folded into
+    vector tranfer read and write ops
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyIreeLinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.linalg_elementwise_greedy_fusion",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,

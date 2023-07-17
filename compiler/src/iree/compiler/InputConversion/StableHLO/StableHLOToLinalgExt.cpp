@@ -257,6 +257,8 @@ struct ScatterOpConversion final
     Value indices = adaptor.getScatterIndices();
     Value updates = adaptor.getUpdates().front();
 
+    auto originalType = llvm::dyn_cast<ShapedType>(original.getType());
+
     llvm::SmallVector<int64_t> scatterDimMap;
     for (auto dim :
          op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
@@ -264,7 +266,7 @@ struct ScatterOpConversion final
     }
 
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
-        op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
+        op.getLoc(), originalType, ValueRange{updates, indices},
         ValueRange{original}, scatterDimMap, op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),

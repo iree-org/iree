@@ -18,6 +18,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Pass pipeline to lower IREE HAL executables without any tiling and
+/// distribution.
+void addSPIRVBaseLoweringPassPipeline(OpPassManager &pm);
+
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
 /// workgroups and invocations. Each invocation handles a scalar.
 void addSPIRVBaseDistributePassPipeline(OpPassManager &pm);

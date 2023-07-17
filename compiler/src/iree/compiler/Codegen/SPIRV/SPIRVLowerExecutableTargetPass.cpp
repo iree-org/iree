@@ -166,6 +166,9 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+    case CodeGenPipeline::SPIRVBaseLowering:
+      addSPIRVBaseLoweringPassPipeline(pipeline);
+      break;
     case CodeGenPipeline::SPIRVBaseDistribute:
       addSPIRVBaseDistributePassPipeline(pipeline);
       break;

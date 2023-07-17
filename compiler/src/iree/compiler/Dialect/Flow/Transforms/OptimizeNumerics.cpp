@@ -28,18 +28,18 @@ int getNextPotBitWidth(int bitWidth, int minBitWidth = 8) {
   }
 }
 
-Type withNewElementType(Type origType, Type elementType) {
-  if (auto st = llvm::dyn_cast<ShapedType>(origType)) {
+Type withNewElementType(Type originalType, Type elementType) {
+  if (auto st = llvm::dyn_cast<ShapedType>(originalType)) {
     return st.clone(elementType);
   } else {
     return elementType;
   }
 }
 
-Type makeLowPType(Type origType, int bitWidth) {
-  auto *context = origType.getContext();
+Type makeLowPType(Type originalType, int bitWidth) {
+  auto *context = originalType.getContext();
   auto elementType = IntegerType::get(context, bitWidth);
-  return withNewElementType(origType, elementType);
+  return withNewElementType(originalType, elementType);
 }
 
 Value castNumeric(Value origValue, Type toType, bool isSigned,

@@ -258,37 +258,15 @@ public:
         captures.outputElementType.getIntOrFloatBitWidth());
   }
 
-  /// Validates the mapping for one of the lhs, rhs or res copies.
-  LogicalResult validateCopyMapping(const MappingInfo &mapping,
-                                    StringRef name) const {
-    int64_t threadsUsed =
-        std::accumulate(mapping.numThreads.begin(), mapping.numThreads.end(), 1,
-                        std::multiplies<int64_t>());
-    if (totalNumThreads() < threadsUsed) {
-      InFlightDiagnostic diag = emitError(UnknownLoc::get(ctx))
-                                << "too many threads used for transferring "
-                                << name;
-
-      std::string str;
-      llvm::raw_string_ostream os(str);
-      llvm::interleave(mapping.numThreads, os, " * ");
-      os << " >= " << totalNumThreads();
-      diag.attachNote() << os.str();
-      return diag;
-    }
-
-    return success();
-  }
-
   /// Check that the mapping computed for a copy is valid.
   LogicalResult validateLhsCopyMapping() const override {
-    return validateCopyMapping(lhsCopyMapping(), "lhs");
+    return validateCopyMapping(ctx, lhsCopyMapping(), "lhs");
   }
   LogicalResult validateRhsCopyMapping() const override {
-    return validateCopyMapping(rhsCopyMapping(), "rhs");
+    return validateCopyMapping(ctx, rhsCopyMapping(), "rhs");
   }
   LogicalResult validateResCopyMapping() const override {
-    return validateCopyMapping(resCopyMapping(), "result");
+    return validateCopyMapping(ctx, resCopyMapping(), "result");
   }
 
   // Compute is of the size batch x M x N.

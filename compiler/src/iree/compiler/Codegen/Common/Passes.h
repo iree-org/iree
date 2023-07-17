@@ -92,6 +92,10 @@ createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 /// during bufferization.
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 
+/// Creates a pass to erase dead alloc ops where all uses are just store ops.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createEraseDeadAllocAndStoresPass();
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass();
 
@@ -254,6 +258,12 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 /// out of bound semantics.
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
+
+/// Collect patterns to fold tensor.extract_slice -> vector.transfer_read and
+/// vector.transfer_write -> tensor.insert_slice op chains into vector tranfer
+/// read and write ops.
+void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
+                                                 PatternBenefit benefit = 1);
 
 /// Method to register all passes.
 void registerCodegenCommonPasses();

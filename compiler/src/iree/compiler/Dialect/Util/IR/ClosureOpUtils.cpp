@@ -139,8 +139,7 @@ static bool isConstantInlinable(const ClosureOptimizationOptions &options,
     // Smallish constants are worth moving inside.
     auto shapedType = llvm::cast<ShapedType>(constantType);
     uint64_t estimatedByteLength =
-        shapedType.getNumElements() *
-        getRoundedElementByteWidth(shapedType.getElementType());
+        IREE::Util::getRoundedPhysicalStorageSize(shapedType);
     return denseAttr.isSplat() ||
            estimatedByteLength <= maxInlinedConstantBytes;
   } else if (constantType.isIntOrIndexOrFloat()) {

@@ -81,12 +81,6 @@ def LLVMCPULowerToUKernels :
       "mlir::iree_compiler::createLLVMCPULowerToUKernelsPass()";
 }
 
-def LLVMCPUMaterializeEncoding :
-    Pass<"iree-llvmcpu-materialize-encoding", "func::FuncOp"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend";
-  let constructor = "mlir::iree_compiler::createLLVMCPUMaterializeEncodingPass()";
-}
-
 def LLVMCPUMmt4dVectorLowering
     : Pass<"iree-llvmcpu-mmt4d-vector-lowering", "func::FuncOp"> {
   let summary = "Apply vector lowering logic to vector ops";

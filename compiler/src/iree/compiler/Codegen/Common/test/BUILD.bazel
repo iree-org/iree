@@ -27,7 +27,7 @@ iree_lit_test_suite(
             "convert_bf16_arith_to_f32.mlir",
             "convert_to_destination_passing_style.mlir",
             "convolutions.mlir",
-            "dead_alloc.mlir",
+            "erase_dead_alloc_and_stores.mlir",
             "decompose_affine_ops.mlir",
             "decompose_linalg_generic.mlir",
             "decompose_pack_unpack_ops.mlir",

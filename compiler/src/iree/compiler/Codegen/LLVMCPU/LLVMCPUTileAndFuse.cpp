@@ -100,8 +100,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   };
 
   // The rest of this method is similar to
-  // scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp, except that also
-  // yields replacements for values of the fused producer.
+  // scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp, except that this
+  // replaces DPS out operand with iter_arg when they use the same init
+  // operands.
 
   // 1. Tile the consumer.
   SmallVector<OpResult> yieldedValuesToOrigValues;
@@ -113,6 +114,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   }
   yieldedValuesToOrigValues.append(rootOp->result_begin(),
                                    rootOp->result_end());
+  // A map from untiled value to scf.for iter_arg. The iter_arg is used for DPS
+  // init operand if they use the same init operands.
+  llvm::DenseMap<Value, Value> mapToIterArg;
 
   // WAR for `if` ops generating `scf.if` operations.
   if (auto rootPadOp = dyn_cast<tensor::PadOp>(rootOp)) {
@@ -123,6 +127,12 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     if (!failed(replacementTiledOp)) {
       tilingResult->tiledOps[0] = replacementTiledOp.value();
     }
+  } else if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(rootOp)) {
+    for (auto [init, iterArg] :
+         llvm::zip_equal(dpsOp.getDpsInitOperands(),
+                         tilingResult->loops.back().getRegionIterArgs())) {
+      mapToIterArg[init->get()] = iterArg;
+    }
   }
   tiledOps.append(tilingResult->tiledOps);
 
@@ -131,12 +141,27 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   // computing the slices of these producers in-place. This results in more
   // slices created for operands of the "fused producer". This open up more
   // opportunities for fusion. Use a worklist to fuse greedily.
-  auto addCandidateSlices = [](Operation *fusedOp,
-                               std::deque<tensor::ExtractSliceOp> &candidates) {
-    for (Value operand : fusedOp->getOperands())
-      if (auto sliceOp = operand.getDefiningOp<tensor::ExtractSliceOp>())
-        candidates.push_back(sliceOp);
-  };
+  auto addCandidateSlices =
+      [&](Operation *fusedOp, std::deque<tensor::ExtractSliceOp> &candidates) {
+        for (OpOperand &operand : fusedOp->getOpOperands()) {
+          auto sliceOp = operand.get().getDefiningOp<tensor::ExtractSliceOp>();
+          if (!sliceOp)
+            continue;
+          candidates.push_back(sliceOp);
+
+          auto dpsOp = dyn_cast<DestinationStyleOpInterface>(fusedOp);
+          if (!dpsOp)
+            continue;
+
+          if (dpsOp.isDpsInit(&operand) &&
+              mapToIterArg.contains(sliceOp.getSource())) {
+            rewriter.startRootUpdate(sliceOp);
+            sliceOp.getSourceMutable().assign(
+                mapToIterArg[sliceOp.getSource()]);
+            rewriter.finalizeRootUpdate(sliceOp);
+          }
+        }
+      };
 
   std::deque<tensor::ExtractSliceOp> candidates;
   addCandidateSlices(tilingResult->tiledOps.back(), candidates);

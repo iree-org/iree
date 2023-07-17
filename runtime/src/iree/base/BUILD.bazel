@@ -42,7 +42,6 @@ iree_runtime_cc_library(
         "wait_source.h",
     ],
     hdrs = ["api.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":core_headers",
         "//runtime/src/iree/base/tracing:provider",

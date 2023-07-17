@@ -365,6 +365,31 @@ func.func @scatter_partial(%arg0: tensor<10x5xf32>, %arg1: tensor<3x1xi32>, %arg
 
 // -----
 
+// CHECK-LABEL: func.func @scatter_ui32
+func.func @scatter_ui32(%arg0: tensor<1xui32>, %arg1: tensor<1x1xi32>, %arg2: tensor<1xui32>) -> tensor<1xui32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<ui32>, %arg4: tensor<ui32>):
+    stablehlo.return %arg4 : tensor<ui32>
+  }) {indices_are_sorted = true, scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>, unique_indices = true} : (tensor<1xui32>, tensor<1x1xi32>, tensor<1xui32>) -> tensor<1xui32>
+  return %0 : tensor<1xui32>
+}
+
+// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK:         %[[BITCAST0:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<1xui32> to tensor<1xi32>
+// CHECK:         %[[BITCAST2:.+]] = builtin.unrealized_conversion_cast %[[ARG2]] : tensor<1xui32> to tensor<1xi32>
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:      unique_indices(true)
+// CHECK-SAME:      ins(%[[BITCAST2]], %[[ARG1]] : tensor<1xi32>, tensor<1x1xi32>)
+// CHECK-SAME:      outs(%[[BITCAST0]] : tensor<1xi32>)
+// CHECK:           ^bb0(%[[ARG3:.+]]: i32, %[[ARG4:.+]]: i32):
+// CHECK:              iree_linalg_ext.yield %[[ARG3]]
+// CHECK:         %[[BITCAST_OUT:.+]] = builtin.unrealized_conversion_cast %[[SCATTER]] : tensor<1xi32> to tensor<1xui32>
+// CHECK:         return %[[BITCAST_OUT]]
+
+// -----
+
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
 // CHECK:      func.func @rfft_1d
 func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {

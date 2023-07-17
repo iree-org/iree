@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
@@ -149,6 +150,57 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
   return enableMicrokernels && enableMicrokernels->getValue();
+}
+
+std::optional<StringRef>
+getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
+  if (!cpuFeatures)
+    return std::nullopt;
+  return cpuFeatures->getValue();
+}
+
+// TODO(dcaballe): If we have to check for a significantly large number of
+// features in the future, we may want to consider a persistent state to carry
+// over processed HAL information or keeping the TTI instance alive and query
+// subtarget features data structure.
+bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
+  std::optional<StringRef> features = getCpuFeatures(targetAttr);
+  if (!features) {
+    return false;
+  }
+
+  // Find feature string in list of features, making sure that we don't match a
+  // sub-string.
+  std::stringstream sstream(features->str());
+  std::string str;
+  while (std::getline(sstream, str, ',')) {
+    if (str == feature) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isX86();
+}
+
+bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().getArch() == llvm::Triple::x86_64;
+}
+
+bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isAArch64();
+}
+
+bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isRISCV();
 }
 
 bool isReadOnly(Value v) {
@@ -877,6 +929,38 @@ SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp) {
   }
 
   return result;
+}
+
+// Return true if all the uses of op are either Store/transfer_write.
+// There can be SubviewOp users as long as all its users are also
+// StoreOp/transfer_write. If return true it also fills out the uses, if it
+// returns false uses is unchanged.
+static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
+  std::vector<Operation *> opUses;
+  for (OpOperand &use : op->getUses()) {
+    Operation *useOp = use.getOwner();
+    if (isa<memref::DeallocOp, vector::TransferWriteOp, memref::StoreOp>(
+            useOp) ||
+        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
+      opUses.push_back(useOp);
+      continue;
+    }
+    return false;
+  }
+  uses.insert(uses.end(), opUses.begin(), opUses.end());
+  return true;
+}
+
+void eraseDeadAllocAndStores(Operation *parentOp) {
+  std::vector<Operation *> opToErase;
+  parentOp->walk([&](memref::AllocOp op) {
+    if (allUsesAreStores(op, opToErase)) {
+      opToErase.push_back(op.getOperation());
+    }
+  });
+  for (Operation *op : opToErase) {
+    op->erase();
+  }
 }
 
 } // namespace iree_compiler

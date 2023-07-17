@@ -14,7 +14,9 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def IREEInput_Dialect : Dialect {
   let name = "iree_input";
-  let summary = "Public ops/type/attributes legal for input to IREE's compiler";
+  let summary = [{
+    Public ops/type/attributes legal for input to IREE's compiler.
+  }];
   let description = [{
     IREE's compiler allows as input a number of common dialects. This dialect
     contains structural and unique ops that do not exist elsewhere or that IREE

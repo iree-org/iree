@@ -113,6 +113,11 @@ def get_test_shapes(shapes_id: ShapesId):
             # square matrices. Start by the simplest case of 1x1x1.
             TestShape(m=1, k=1, n=1, accumulate=True),
             TestShape(m=1, k=1, n=1, accumulate=False),
+            # Test some small powers of two, that exercise in particular the
+            # adjustment of data-tiling tile sizes to narrow cases.
+            TestShape(m=2, k=2, n=2, accumulate=True),
+            TestShape(m=4, k=4, n=4, accumulate=True),
+            TestShape(m=8, k=8, n=8, accumulate=True),
             # test 9x9x9 because as many kernel M0/K0/N0 dims are equal to 8,
             # this will often be the smallest value that exercises something above
             # the kernel's size.
