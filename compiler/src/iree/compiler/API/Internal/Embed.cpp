@@ -84,7 +84,7 @@
 #endif
 
 #define IREE_COMPILER_API_MAJOR 1
-#define IREE_COMPILER_API_MINOR 2
+#define IREE_COMPILER_API_MINOR 3
 
 namespace mlir::iree_compiler::embed {
 namespace {
@@ -555,6 +555,7 @@ struct Invocation {
 
   // Run options.
   std::string compileToPhaseName{"end"};
+  std::string compileFromPhaseName{"start"};
   bool enableVerifier = true;
 
   // Diagnostic options.
@@ -697,16 +698,31 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {
     // Parse the compile to phase name.
+    std::optional<IREEVMPipelinePhase> compileFromPhase;
     std::optional<IREEVMPipelinePhase> compileToPhase;
     enumerateIREEVMPipelinePhases(
         [&](IREEVMPipelinePhase phase, StringRef mnemonic, StringRef desc) {
+          if (mnemonic == compileFromPhaseName) {
+            compileFromPhase = phase;
+          }
           if (mnemonic == compileToPhaseName) {
             compileToPhase = phase;
           }
         });
+    if (!compileFromPhase) {
+      parsedModule->emitError()
+          << "unrecognized compile-from phase name: " << compileFromPhaseName;
+      return false;
+    }
     if (!compileToPhase) {
       parsedModule->emitError()
           << "unrecognized compile-to phase name: " << compileToPhaseName;
+      return false;
+    }
+    if (compileFromPhase >= compileToPhase) {
+      parsedModule->emitError()
+          << "compile-from phase " << compileFromPhaseName
+          << " must precede compile-to phase " << compileToPhaseName;
       return false;
     }
 
@@ -714,7 +730,8 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
         session.schedulingOptions, session.halTargetOptions,
-        session.vmTargetOptions, pipelineHooks, passManager, *compileToPhase);
+        session.vmTargetOptions, pipelineHooks, passManager, *compileFromPhase,
+        *compileToPhase);
     break;
   }
   case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
@@ -1125,6 +1142,11 @@ void ireeCompilerInvocationSetCrashHandler(
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
                                        iree_compiler_source_t *source) {
   return unwrap(inv)->parseSource(*unwrap(source));
+}
+
+void ireeCompilerInvocationSetCompileFromPhase(iree_compiler_invocation_t *inv,
+                                               const char *phase) {
+  unwrap(inv)->compileFromPhaseName = std::string(phase);
 }
 
 void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *inv,

@@ -435,3 +435,12 @@ $ iree-compile simple_exp_abi.mlir \
   --iree-hal-target-backends=llvm-cpu \
   -o simple_exp_cpu.vmfb
 ```
+
+or explicitly resume from an intermediate phase with `--compile-from=<phase name>`:
+
+```console
+$ iree-compile simple_exp_abi.mlir \
+  --iree-hal-target-backends=llvm-cpu \
+  --compile-from=abi \
+  -o simple_exp_cpu.vmfb
+```

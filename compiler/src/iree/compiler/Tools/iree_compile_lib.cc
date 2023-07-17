@@ -91,6 +91,18 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::desc("Verifies the IR for correctness throughout compilation."),
       llvm::cl::init(true));
 
+  llvm::cl::opt<IREEVMPipelinePhase> compileFrom(
+      "compile-from",
+      llvm::cl::desc("Compilation phase to resume from, starting with the "
+                     "following phase."),
+      llvm::cl::init(IREEVMPipelinePhase::Start));
+  SmallVector<std::string> compileFromPhases;
+  enumerateIREEVMPipelinePhases(
+      [&](IREEVMPipelinePhase phase, StringRef name, StringRef desc) {
+        compileFrom.getParser().addLiteralOption(name, phase, desc);
+        compileFromPhases.push_back(name.str());
+      });
+
   llvm::cl::opt<IREEVMPipelinePhase> compileTo(
       "compile-to",
       llvm::cl::desc(
@@ -188,6 +200,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     InvState r(s);
 
     ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
+    ireeCompilerInvocationSetCompileFromPhase(
+        r.inv,
+        compileFromPhases[static_cast<int>(compileFrom.getValue())].c_str());
     ireeCompilerInvocationSetCompileToPhase(
         r.inv, compileToPhases[static_cast<int>(compileTo.getValue())].c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);

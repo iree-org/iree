@@ -40,7 +40,8 @@ void buildIREEVMTransformPassPipeline(
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
-    OpPassManager &passManager, IREEVMPipelinePhase compileTo) {
+    OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
+    IREEVMPipelinePhase compileTo) {
   // If the user specified a set of target devices we attach them to the module
   // IR so that they are available for all passes that may want to use this
   // information. If trying to compile in a generic mode the user should omit
@@ -54,89 +55,94 @@ void buildIREEVMTransformPassPipeline(
   // and must run before generating bindings.
   // After input processing, there should only be IREE legal types in
   // signatures.
-  auto inputType = inputOptions.parseInputTypeMnemonic();
-  IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Input");
-  if (hooks.pipelineExtensions) {
-    hooks.pipelineExtensions->extendInputConversionPreprocessingPassPipeline(
-        passManager, inputType);
-  }
-  AutoInputConversionPipelineOptions autoOptions;
-  autoOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
-  autoOptions.demoteF64ToF32 = inputOptions.demoteF64ToF32;
-  autoOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
+  if (compileFrom < IREEVMPipelinePhase::Input) { // late-entry
+    auto inputType = inputOptions.parseInputTypeMnemonic();
+    IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Input");
+    if (hooks.pipelineExtensions) {
+      hooks.pipelineExtensions->extendInputConversionPreprocessingPassPipeline(
+          passManager, inputType);
+    }
+    AutoInputConversionPipelineOptions autoOptions;
+    autoOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
+    autoOptions.demoteF64ToF32 = inputOptions.demoteF64ToF32;
+    autoOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
 
 #ifdef IREE_HAVE_STABLEHLO_INPUT
-  stablehlo::StableHloOptions stablehloOptions;
-  stablehloOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
-  stablehloOptions.demoteF64ToF32 = inputOptions.demoteF64ToF32;
-  stablehloOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
+    stablehlo::StableHloOptions stablehloOptions;
+    stablehloOptions.demoteI64ToI32 = inputOptions.demoteI64ToI32;
+    stablehloOptions.demoteF64ToF32 = inputOptions.demoteF64ToF32;
+    stablehloOptions.promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
 #endif // IREE_HAVE_STABLEHLO_INPUT
 
-  switch (inputType) {
-  case InputDialectOptions::Type::none:
-    break;
-  case InputDialectOptions::Type::auto_detect:
-    passManager.addPass(createAutoInputConversionPipelinePass(autoOptions));
-    break;
-  case InputDialectOptions::Type::plugin: {
-    bool foundExtension = false;
-    if (hooks.pipelineExtensions) {
-      foundExtension =
-          hooks.pipelineExtensions->extendCustomInputConversionPassPipeline(
-              passManager, inputOptions.inputTypeMnemonic);
+    switch (inputType) {
+    case InputDialectOptions::Type::none:
+      break;
+    case InputDialectOptions::Type::auto_detect:
+      passManager.addPass(createAutoInputConversionPipelinePass(autoOptions));
+      break;
+    case InputDialectOptions::Type::plugin: {
+      bool foundExtension = false;
+      if (hooks.pipelineExtensions) {
+        foundExtension =
+            hooks.pipelineExtensions->extendCustomInputConversionPassPipeline(
+                passManager, inputOptions.inputTypeMnemonic);
+      }
+      // We expect that callers properly validate supported extensions and that
+      // if a plugin advertises support, it actually provides it.
+      assert(foundExtension &&
+             "InputDialect::type::plugin extension not found");
+      if (!foundExtension) {
+        llvm::errs() << "internal error: InputDialect::type::plugin extension "
+                        "not found ("
+                     << inputOptions.inputTypeMnemonic << ")\n";
+      }
+      break;
     }
-    // We expect that callers properly validate supported extensions and that
-    // if a plugin advertises support, it actually provides it.
-    assert(foundExtension && "InputDialect::type::plugin extension not found");
-    if (!foundExtension) {
-      llvm::errs()
-          << "internal error: InputDialect::type::plugin extension not found ("
-          << inputOptions.inputTypeMnemonic << ")\n";
-    }
-    break;
-  }
 #ifdef IREE_HAVE_STABLEHLO_INPUT
-  case InputDialectOptions::Type::stablehlo:
-    stablehlo::buildStableHLOInputConversionPassPipeline(passManager,
-                                                         stablehloOptions);
-    break;
-  case InputDialectOptions::Type::stablehlo_xla:
-    stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager,
-                                                            stablehloOptions);
-    break;
+    case InputDialectOptions::Type::stablehlo:
+      stablehlo::buildStableHLOInputConversionPassPipeline(passManager,
+                                                           stablehloOptions);
+      break;
+    case InputDialectOptions::Type::stablehlo_xla:
+      stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager,
+                                                              stablehloOptions);
+      break;
 #endif // IREE_HAVE_STABLEHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
-  case InputDialectOptions::Type::tm_tensor:
-    passManager.addNestedPass<func::FuncOp>(
-        TMTensor::createConvertTMTensorToLinalgExtPass());
-    break;
+    case InputDialectOptions::Type::tm_tensor:
+      passManager.addNestedPass<func::FuncOp>(
+          TMTensor::createConvertTMTensorToLinalgExtPass());
+      break;
 #endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
-  case InputDialectOptions::Type::tosa:
-    buildTOSAInputConversionPassPipeline(passManager);
-    break;
+    case InputDialectOptions::Type::tosa:
+      buildTOSAInputConversionPassPipeline(passManager);
+      break;
 #endif // IREE_HAVE_TOSA_INPUT
+    }
+    buildCommonInputConversionPassPipeline(passManager);
+    IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Input");
   }
-  buildCommonInputConversionPassPipeline(passManager);
-  IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Input");
   if (compileTo == IREEVMPipelinePhase::Input)
     return; // early-exit
 
   // Now that inputs are legalized, generate wrapper for entry functions.
-  IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "ABI");
-  IREE::ABI::InvocationOptions invocationOptions;
-  invocationOptions.invocationModel =
-      schedulingOptions.executionModel ==
-              SchedulingOptions::ExecutionModel::AsyncExternal
-          ? IREE::ABI::InvocationModel::CoarseFences
-          : IREE::ABI::InvocationModel::Sync;
-  if (bindingOptions.native) {
-    IREE::ABI::buildTransformPassPipeline(passManager, invocationOptions);
+  if (compileFrom < IREEVMPipelinePhase::ABI) { // late-entry
+    IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "ABI");
+    IREE::ABI::InvocationOptions invocationOptions;
+    invocationOptions.invocationModel =
+        schedulingOptions.executionModel ==
+                SchedulingOptions::ExecutionModel::AsyncExternal
+            ? IREE::ABI::InvocationModel::CoarseFences
+            : IREE::ABI::InvocationModel::Sync;
+    if (bindingOptions.native) {
+      IREE::ABI::buildTransformPassPipeline(passManager, invocationOptions);
+    }
+    if (bindingOptions.tflite) {
+      IREE::TFLite::buildTransformPassPipeline(passManager);
+    }
+    IREE_TRACE_ADD_END_FRAME_PASS(passManager, "ABI");
   }
-  if (bindingOptions.tflite) {
-    IREE::TFLite::buildTransformPassPipeline(passManager);
-  }
-  IREE_TRACE_ADD_END_FRAME_PASS(passManager, "ABI");
   if (compileTo == IREEVMPipelinePhase::ABI)
     return; // early-exit
 
@@ -176,24 +182,44 @@ void buildIREEVMTransformPassPipeline(
     // No flow/stream processing (implies no tensors).
     break;
   default:
-    IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
-    IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
-                                         hooks.pipelineExtensions);
-    IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Preprocessing");
+    if (compileFrom < IREEVMPipelinePhase::Preprocessing) { // late-entry.
+      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
+      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
+                                           hooks.pipelineExtensions);
+      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Preprocessing");
+    }
     if (compileTo == IREEVMPipelinePhase::Preprocessing)
       return; // early-exit
 
-    IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
-    IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
-    IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Flow");
+    if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
+      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
+      IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
+      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Flow");
+    }
     if (compileTo == IREEVMPipelinePhase::Flow)
       return; // early-exit
 
-    IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Stream");
-    IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
-    IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Stream");
+    if (compileFrom < IREEVMPipelinePhase::Stream) { // late-entry
+      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Stream");
+      IREE::Stream::buildStreamTransformPassPipeline(passManager,
+                                                     streamOptions);
+      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Stream");
+    }
     if (compileTo == IREEVMPipelinePhase::Stream)
       return; // early-exit
+    break;
+  }
+
+  IREE::HAL::PipelinePhase halCompileFrom;
+  switch (compileFrom) {
+  default:
+    halCompileFrom = IREE::HAL::PipelinePhase::Start;
+    break;
+  case IREEVMPipelinePhase::ExecutableSources:
+    halCompileFrom = IREE::HAL::PipelinePhase::ExecutableSources;
+    break;
+  case IREEVMPipelinePhase::ExecutableTargets:
+    halCompileFrom = IREE::HAL::PipelinePhase::ExecutableTargets;
     break;
   }
 
@@ -210,36 +236,41 @@ void buildIREEVMTransformPassPipeline(
     break;
   }
 
-  IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "HAL");
-  switch (schedulingOptions.executionModel) {
-  case SchedulingOptions::ExecutionModel::HostOnly:
-    // No HAL required.
-    break;
-  default:
-  case SchedulingOptions::ExecutionModel::AsyncInternal:
-  case SchedulingOptions::ExecutionModel::AsyncExternal:
-    IREE::HAL::buildHALTransformPassPipeline(passManager, targetRegistry,
-                                             executableOptions, halCompileTo);
-    break;
-  case SchedulingOptions::ExecutionModel::InlineStatic:
-    IREE::HAL::Inline::buildHALInlineStaticTransformPassPipeline(
-        passManager, targetRegistry, executableOptions);
-    break;
-  case SchedulingOptions::ExecutionModel::InlineDynamic:
-    IREE::HAL::Loader::buildHALInlineDynamicTransformPassPipeline(
-        passManager, targetRegistry, executableOptions);
-    break;
+  if (compileFrom < IREEVMPipelinePhase::HAL) { // late-entry
+    IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "HAL");
+    switch (schedulingOptions.executionModel) {
+    case SchedulingOptions::ExecutionModel::HostOnly:
+      // No HAL required.
+      break;
+    default:
+    case SchedulingOptions::ExecutionModel::AsyncInternal:
+    case SchedulingOptions::ExecutionModel::AsyncExternal:
+      IREE::HAL::buildHALTransformPassPipeline(passManager, targetRegistry,
+                                               executableOptions,
+                                               halCompileFrom, halCompileTo);
+      break;
+    case SchedulingOptions::ExecutionModel::InlineStatic:
+      IREE::HAL::Inline::buildHALInlineStaticTransformPassPipeline(
+          passManager, targetRegistry, executableOptions);
+      break;
+    case SchedulingOptions::ExecutionModel::InlineDynamic:
+      IREE::HAL::Loader::buildHALInlineDynamicTransformPassPipeline(
+          passManager, targetRegistry, executableOptions);
+      break;
+    }
+    IREE_TRACE_ADD_END_FRAME_PASS(passManager, "HAL");
   }
-  IREE_TRACE_ADD_END_FRAME_PASS(passManager, "HAL");
   if (compileTo == IREEVMPipelinePhase::HAL ||
       halCompileTo != IREE::HAL::PipelinePhase::End) {
     return; // early-exit
   }
 
-  IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "VM");
-  IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
-  passManager.addPass(IREE::Util::createDropCompilerHintsPass());
-  IREE_TRACE_ADD_END_FRAME_PASS(passManager, "VM");
+  if (compileFrom < IREEVMPipelinePhase::VM) { // late-entry
+    IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "VM");
+    IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
+    passManager.addPass(IREE::Util::createDropCompilerHintsPass());
+    IREE_TRACE_ADD_END_FRAME_PASS(passManager, "VM");
+  }
   if (compileTo == IREEVMPipelinePhase::VM)
     return; // early-exit
 }
