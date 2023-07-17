@@ -2188,6 +2188,12 @@ then resume compilation and continue through the pipeline:</p>
 <span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
 </code></pre></div>
+<p>or explicitly resume from an intermediate phase with <code>--compile-from=&lt;phase name&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_exp_abi.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--compile-from<span class="o">=</span>abi<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
+</code></pre></div>
 
 
 
