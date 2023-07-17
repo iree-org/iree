@@ -68,7 +68,6 @@ iree_runtime_cc_library(
         "vulkan_device.h",
         "vulkan_driver.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         ":dynamic_symbols",
         "//runtime/src/iree/base",
