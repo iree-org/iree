@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -54,13 +55,21 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
       return failure();
     }
 
-    if (skipSingleLinalgOpUses && padTensorOp->hasOneUse()) {
+    if (padTensorOp->hasOneUse()) {
       Operation *use = padTensorOp->use_begin()->getOwner();
-      // TODO(#10312): Relax the condition to not check quantized ops. They
-      // are going to be deprecated. We don't expect them being IREE's input.
-      if (isa<linalg::LinalgOp>(use) &&
-          !isa<linalg::Conv2DNhwcHwcfQOp, linalg::DepthwiseConv2DNhwcHwcQOp,
-               linalg::DepthwiseConv2DNhwcHwcmQOp>(use)) {
+      if (skipSingleLinalgOpUses) {
+        // TODO(#10312): Relax the condition to not check quantized ops. They
+        // are going to be deprecated. We don't expect them being IREE's input.
+        if (isa<linalg::LinalgOp>(use) &&
+            !isa<linalg::Conv2DNhwcHwcfQOp, linalg::DepthwiseConv2DNhwcHwcQOp,
+                 linalg::DepthwiseConv2DNhwcHwcmQOp>(use)) {
+          return failure();
+        }
+      }
+      // (pad + set_encoding) gets folded in to tensor.pack in the
+      // MaterializeEncoding pass. Rewriting those pads into insert_slice would
+      // defeat that.
+      if (isa<IREE::LinalgExt::SetEncodingOp>(use)) {
         return failure();
       }
     }
