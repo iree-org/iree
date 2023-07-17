@@ -227,6 +227,7 @@ ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
 // Sets a mnemonic phase name to run compilation from. Default is "input".
 // The meaning of this is pipeline specific. See IREEVMPipelinePhase
 // for the standard pipeline.
+// Available since: 1.3
 IREE_EMBED_EXPORTED void
 ireeCompilerInvocationSetCompileFromPhase(iree_compiler_invocation_t *inv,
                                           const char *phase);

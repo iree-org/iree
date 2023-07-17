@@ -84,7 +84,7 @@
 #endif
 
 #define IREE_COMPILER_API_MAJOR 1
-#define IREE_COMPILER_API_MINOR 2
+#define IREE_COMPILER_API_MINOR 3
 
 namespace mlir::iree_compiler::embed {
 namespace {
