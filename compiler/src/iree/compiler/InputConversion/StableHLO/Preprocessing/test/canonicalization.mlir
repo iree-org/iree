@@ -619,3 +619,47 @@ func.func @reduce_zero_ext(%arg0: tensor<0xi1>) -> tensor<i32> {
   // CHECK: return [[CST]] : tensor<i32>
   return %5 : tensor<i32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @add_zero_ext
+func.func @add_zero_ext(%arg0 : tensor<5x0xi32>, %arg1 : tensor<5x0xi32>) -> tensor<5x0xi32> {
+  %0 = stablehlo.add %arg0, %arg1 : tensor<5x0xi32>
+  func.return %0 : tensor<5x0xi32>
+}
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x0xi32>
+// CHECK:   return %[[EMPTY]] 
+
+// -----
+
+// CHECK-LABEL: func.func @add_zero_ext_dynamic
+func.func @add_zero_ext_dynamic(%arg0 : tensor<?x0xi32>, %arg1 : tensor<?x0xi32>) -> tensor<?x0xi32> {
+  %0 = stablehlo.add %arg0, %arg1 : tensor<?x0xi32>
+  func.return %0 : tensor<?x0xi32>
+}
+// CHECK-NOT:   tensor.empty()
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_zero_ext
+func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 : tensor<1xf32>) -> tensor<f32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+    ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+      %1 = "stablehlo.add"(%arg3, %arg4) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+      "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [],
+      inserted_window_dims = [],
+      scatter_dims_to_operand_dims = [],
+      index_vector_dim = 1
+    >,
+    indices_are_sorted = true,
+    unique_indices = true
+  } : (tensor<f32>, tensor<1x0xi32>, tensor<1xf32>) -> tensor<f32>
+  func.return %0 : tensor<f32>
+}
+
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x0xi32>
+// CHECK:   %[[SCATTER:.+]] = "stablehlo.scatter"(%arg0, %0, %arg2)
+// CHECK:   return %[[SCATTER]] 
