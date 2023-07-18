@@ -14,12 +14,15 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -27,12 +30,14 @@
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -478,10 +483,71 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
+// Intentionally simplistic cost model for linalg ops: returns the number of
+// loop iterations times a measure of the cost of the block, which is
+// the number of ops in the block plus the number of arguments; adding the
+// number of arguments is done to account for the cost of reading elements from
+// memory. We are not nearly at the level of details where we would want to
+// account for relative cost of different ops, and we couldn't do that here
+// anyway.
+//
+// TODO: Should use APInt instead of int64 to avoid any risk of overflow; though
+// that is unlikely to happen as long as kDynSizeEstimate is small.
+static int64_t evalCost(linalg::LinalgOp op) {
+  // For dynamic dims, we have to arbitrarily pick a value. Fortunately, at the
+  // coarse level of detail that we are working at, the exact value should not
+  // matter --- the very basic fusion decisions made here should be the same
+  // for all but the tiniest sizes (it's plausible that values <=4 would affect
+  // the decision).
+  const int64_t kDynSizeEstimate = 16;
+  int64_t itersEstimate = 1;
+  for (int64_t r : op.getStaticLoopRanges()) {
+    itersEstimate *= (r == ShapedType::kDynamic) ? kDynSizeEstimate : r;
+  }
+  Block *block = op.getBlock();
+  int64_t blockCost = block->getNumArguments();
+  for (const auto &unused : block->getOperations()) {
+    (void)unused;
+    ++blockCost;
+  }
+  return itersEstimate * blockCost;
+}
+
+// Returns the cost of the fused op, or failure if we were not able to evaluate
+// it.
+static FailureOr<int64_t> evalFusedCost(MLIRContext *context,
+                                        linalg::LinalgOp producerOp,
+                                        linalg::LinalgOp consumerOp) {
+  OpBuilder b(context);
+  for (OpResult producerResult : producerOp->getOpResults()) {
+    const auto &uses = OpOperand::getUseList(producerResult)->getUses();
+    for (auto &use : uses) {
+      if (use.getOwner() == consumerOp) {
+        auto info = linalg::fuseProducerOfTensor(b, producerResult, use);
+        if (succeeded(info)) {
+          return evalCost(info->fusedProducer);
+        }
+      }
+    }
+  }
+  return failure();
+}
+
+// Returns true if the cost model thinks that fusion would be beneficial.
+static bool isCostLowerWhenFused(MLIRContext *context,
+                                 linalg::LinalgOp producerOp,
+                                 linalg::LinalgOp consumerOp) {
+  FailureOr<int64_t> fusedCost = evalFusedCost(context, producerOp, consumerOp);
+  if (failed(fusedCost)) {
+    return false;
+  }
+  return *fusedCost < evalCost(producerOp) + evalCost(consumerOp);
+}
+
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
-isFusableWithConsumer(OpOperand &fusedOperand,
+isFusableWithConsumer(MLIRContext *context, OpOperand &fusedOperand,
                       const llvm::SmallBitVector &rootOuterParallelLoops,
                       FormDispatchRegionsOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
@@ -531,18 +597,6 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   if (!producerLinalgOp || !consumerLinalgOp)
     return false;
 
-  // Check that the producer is all parallel.
-  if (producerLinalgOp.getNumLoops() !=
-      producerLinalgOp.getNumParallelLoops()) {
-    return false;
-  }
-
-  // Check that the consumer is all parallel.
-  if (consumerLinalgOp.getNumLoops() !=
-      consumerLinalgOp.getNumParallelLoops()) {
-    return false;
-  }
-
   if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
     return false;
   }
@@ -571,7 +625,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  return true;
+  return isCostLowerWhenFused(context, producerLinalgOp, consumerLinalgOp);
 }
 
 /// Fuses roots with its consumers. If a root is fused with its consumer, it is
@@ -611,8 +665,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
         continue;
       }
 
-      if (isFusableWithConsumer(*(fusableUse.value()), rootOuterParallelLoops,
-                                options)) {
+      if (isFusableWithConsumer(context, *(fusableUse.value()),
+                                rootOuterParallelLoops, options)) {
         updateRootTo(consumerOp);
         workList.push_back(consumerOp);
       }
@@ -622,7 +676,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 
 /// Method to check if the consumer of a use can be fused with its producer.
 static bool
-isFusableWithProducer(OpOperand &operand,
+isFusableWithProducer(MLIRContext *context, OpOperand &operand,
                       const llvm::SmallBitVector &rootOuterParallelLoops,
                       FormDispatchRegionsOptions const &options) {
   Operation *producer = operand.get().getDefiningOp();
@@ -663,18 +717,6 @@ isFusableWithProducer(OpOperand &operand,
   auto producerLinalgOp = cast<linalg::LinalgOp>(producer);
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
 
-  // Check that the producer is all parallel.
-  if (producerLinalgOp.getNumLoops() !=
-      producerLinalgOp.getNumParallelLoops()) {
-    return false;
-  }
-
-  // Check that the consumer is all parallel.
-  if (consumerLinalgOp.getNumLoops() !=
-      consumerLinalgOp.getNumParallelLoops()) {
-    return false;
-  }
-
   if (consumerLinalgOp.isDpsInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
     if (!isa<linalg::GenericOp>(consumer) ||
@@ -685,7 +727,11 @@ isFusableWithProducer(OpOperand &operand,
     return false;
   }
 
-  return areOpsFusable(producer, consumer, rootOuterParallelLoops);
+  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
+    return false;
+  }
+
+  return isCostLowerWhenFused(context, producerLinalgOp, consumerLinalgOp);
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
@@ -713,7 +759,8 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
       if (!fusableUse || fusableUse.value()->getOwner() != candidate)
         continue;
 
-      if (!isFusableWithProducer(operand, rootOuterParallelLoops, options)) {
+      if (!isFusableWithProducer(context, operand, rootOuterParallelLoops,
+                                 options)) {
         continue;
       }
 
