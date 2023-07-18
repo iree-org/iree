@@ -146,7 +146,7 @@ hal.executable private @pad_with_producer {
 //  CHECK-SAME:                     outs(%[[CONV_OUTPUT]] :
 //       CHECK:               %[[BIAS_INPUT:.+]] = memref.subview %[[BIAS_SUBVIEW]]
 //       CHECK:               linalg.generic
-//  CHECK-SAME:                   ins(%[[CONV_OUTPUT]], %[[BIAS_INPUT]] :
+//  CHECK-SAME:                   ins(%[[FILL_ALLOC]], %[[BIAS_INPUT]] :
 //  CHECK-SAME:                   outs(%[[BIAS_ALLOC]]
 //       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
 //       CHECK:               linalg.fill ins(%{{.+}} :   f32) outs(%[[OUTPUT_SLICE]]

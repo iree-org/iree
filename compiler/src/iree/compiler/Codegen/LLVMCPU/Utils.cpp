@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-utils"
 
@@ -50,6 +51,51 @@ bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
 
 bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+sme");
+}
+
+FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
+  Operation *rootOperation = nullptr;
+  for (auto op : llvm::reverse(computeOps)) {
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      // Do not treat linalg ops that are all parallel as root operations in
+      // this sweep.
+      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops())
+        continue;
+
+      // All other linalg ops are root ops.
+      rootOperation = op;
+      break;
+    }
+
+    if (isa<TilingInterface>(op) &&
+        !isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+      // All other operations that implement this interface are root ops.
+      rootOperation = op;
+      break;
+    }
+  }
+
+  if (!rootOperation) {
+    // Check for elementwise operations.
+    for (auto op : llvm::reverse(computeOps)) {
+      if (isa<linalg::LinalgOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  if (!rootOperation) {
+    // Check for pad/pack/unpack ops by themselves.
+    for (auto op : llvm::reverse(computeOps)) {
+      if (isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  return rootOperation;
 }
 
 } // namespace iree_compiler

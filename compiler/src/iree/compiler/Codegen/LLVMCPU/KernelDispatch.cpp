@@ -812,7 +812,8 @@ static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
 
   // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
   // if the dim size is small (e.g., K=24).
-  SmallVector<int64_t> reductionTileSizes(vecTileSizes.size() - 1, 0);
+  int64_t numTilingDims = vecTileSizes.size();
+  SmallVector<int64_t> reductionTileSizes(numTilingDims - 1, 0);
   auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
   int64_t K = lhsShapedType.getShape().back();
   reductionTileSizes.push_back(
@@ -822,6 +823,8 @@ static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
   tileSizes.emplace_back(distTileSizes.begin(), distTileSizes.end());
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  // No need for tiling inner parallel dims.
+  tileSizes.emplace_back(numTilingDims, 0);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -887,6 +890,9 @@ static LogicalResult setMatmulNoPadRootConfig(
             std::back_inserter(newTileSizes));
   newTileSizes.push_back(parallelTileSizes);
   newTileSizes.push_back(reductionTileSizes);
+  // No need for tiling inner parallel dims.
+  int64_t numTilingDims = parallelTileSizes.size();
+  newTileSizes.emplace_back(numTilingDims, 0);
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for no-padding contraction: "
                        << newTileSizes << "\n");
@@ -922,6 +928,9 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
   tileSizes.emplace_back(distTileSizes.begin(), distTileSizes.end());
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  // No need for tiling inner parallel dims.
+  int64_t numTilingDims = parallelTileSizes.size();
+  tileSizes.emplace_back(numTilingDims, 0);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -1165,6 +1174,19 @@ static bool isPackMatmulLHS(tensor::PackOp op) {
          op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1;
 }
 
+/// Returns vectorization tile sizes for a pack op. It is driven by pack op
+/// configurations and target CPU features.
+static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
+                                                   tensor::PackOp op) {
+  SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
+  if (hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
+    tileSizes.back() = vectorSize;
+  }
+  return tileSizes;
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
@@ -1183,15 +1205,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     distTileSizes[pos] = std::max<int64_t>(distTileSizes[pos], 1);
   }
 
-  SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  if (hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
-    tileSizes.back() = vectorSize;
-  }
-
+  SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
   TileSizesListType tileSizesList = {distTileSizes};
-  tileSizesList.push_back(tileSizes);
+  tileSizesList.push_back(vecTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
@@ -1362,6 +1378,8 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(distTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  // No need for tiling inner parallel dims.
+  tileSizes.emplace_back(numLoops, 0);
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
@@ -1459,7 +1477,10 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
   tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(/*reduction tile sizes=*/{});
+  // No need for tiling reduction dims and inner parallel dims.
+  int64_t numTilingDims = parallelTileSizes.size();
+  tileSizes.emplace_back(numTilingDims, 0);
+  tileSizes.emplace_back(numTilingDims, 0);
 
   // For non-tensor based ops use the Buffer ops pipeline.
   auto passPipeline =
@@ -1542,6 +1563,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
   tileSizes.push_back(vecTileSizes);
+  tileSizes.push_back(zeros);
+  // No need for further tiling inner parallel dims.
   tileSizes.push_back(zeros);
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for element-wise op: " << tileSizes
@@ -1669,6 +1692,10 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
   tileSizes.push_back(distTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  // No need for tiling inner parallel dims.
+  int64_t numTilingDims = parallelTileSizes.size();
+  tileSizes.emplace_back(numTilingDims, 0);
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
@@ -1795,7 +1822,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   // Tiling for vectorization.
   tileSizes.emplace_back(std::move(vectorTileSizes));
   // No further tiling.
-  tileSizes.push_back({});
+  int64_t numTilingDims = vectorTileSizes.size();
+  SmallVector<int64_t> zeros(numTilingDims, 0);
+  tileSizes.push_back(zeros);
+  tileSizes.push_back(zeros);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, padOp, tileSizes,
@@ -1915,70 +1945,12 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
   return setRootConfigFn(op);
 }
 
-/// Find the root operation for the dispatch region. The priority is:
-///   1. A Linalg operation that has reduction loops.
-///   2. Any other Lainlg op or LinalgExt op.
-///   3. An operation that implements TilingInterface.
-/// If there are multiple operations meeting the same priority, the one closer
-/// to the end of the function is the root op.
-static FailureOr<Operation *>
-getRootOperation(ArrayRef<Operation *> computeOps) {
-  Operation *rootOperation = nullptr;
-  for (auto op : llvm::reverse(computeOps)) {
-    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-      // Do not treat linalg ops that are all parallel as root operations in
-      // this sweep.
-      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops())
-        continue;
-
-      // All other linalg ops are root ops.
-      rootOperation = op;
-      break;
-    }
-
-    if (isa<TilingInterface>(op) &&
-        !isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
-      // All other operations that implement this interface are root ops.
-      rootOperation = op;
-      break;
-    }
-  }
-
-  if (!rootOperation) {
-    // Check for elementwise operations.
-    for (auto op : llvm::reverse(computeOps)) {
-      if (isa<linalg::LinalgOp>(op)) {
-        rootOperation = op;
-        break;
-      }
-    }
-  }
-
-  if (!rootOperation) {
-    // Check for pad/pack/unpack ops by themselves.
-    for (auto op : llvm::reverse(computeOps)) {
-      if (isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
-        rootOperation = op;
-        break;
-      }
-    }
-  }
-
-  return rootOperation;
-}
-
 static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
                                               Operation *rootOp) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp)
     return success();
 
-  // The transform dialect codegen has differnet logics and codegen flow. Ignore
-  // the adjustment for it.
-  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
-  if (pipeline == DispatchLoweringPassPipeline::TransformDialectCodegen) {
-    return success();
-  }
   TileSizesListType tileSizesList =
       getLoweringConfig(linalgOp).getTileSizeVals();
 
@@ -2012,6 +1984,7 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
   if (res.wasInterrupted())
     return failure();
 
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
                                                tileSizesList, pipeline);
 }
@@ -2022,12 +1995,6 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
   if (!linalgOp)
     return success();
 
-  // The transform dialect codegen has differnet logics and codegen flow. Ignore
-  // the adjustment for it.
-  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
-  if (pipeline == DispatchLoweringPassPipeline::TransformDialectCodegen) {
-    return success();
-  }
   TileSizesListType tileSizesList =
       getLoweringConfig(linalgOp).getTileSizeVals();
 
@@ -2073,6 +2040,7 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
     }
   }
 
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
   if (pipeline == DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert) {
     LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
                             "back to non-peeling path");
@@ -2081,6 +2049,127 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
 
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
                                                tileSizesList, pipeline);
+}
+
+/// Set the lowering configs for all the compute ops. The lowering config is
+/// already set on `rootOperation`. We will duplicate the tile sizes of
+/// distribution and common parallel dims to other compute ops (so they have
+/// consistent configurations); set the tile size for the rest of dims. E.g., it
+/// sets the lowering_config for reduction + broadcast + pack op like:
+///
+///   %11 = linalg.fill ... -> tensor<384xf32>
+///   %12 = linalg.generic {
+///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+///                      affine_map<(d0, d1) -> (d0)>,
+///                      affine_map<(d0, d1) -> (d0)>],
+///     iterator_types = ["parallel", "reduction"]}
+///     ins(%5, %6 : tensor<384x528xf32>, tensor<384xf32>)
+///     outs(%11 : tensor<384xf32>) {
+///   ^bb0(%in: f32, %in_2: f32, %out: f32):
+///     ...
+///   } -> tensor<384xf32>
+///   %13 = linalg.generic {
+///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+///                      affine_map<(d0, d1) -> (d0)>,
+///                      affine_map<(d0, d1) -> (d0, d1)>],
+///     iterator_types = ["parallel", "parallel"]}
+///     ins(%4, %12 : tensor<384x1024xf32>, tensor<384xf32>)
+///     outs(%9 : tensor<384x1024xf32>) {
+///   ^bb0(%in: f32, %in_2: f32, %out: f32):
+///     ...
+///   } -> tensor<384x1024xf32>
+///   %pack = tensor.pack %13
+///     inner_dims_pos = [0, 1]
+///     inner_tiles = [16, 1]
+///     into %14 : tensor<384x1024xf32> -> tensor<24x1024x16x1xf32>
+///
+/// The lowering config is set on `rootOperation`, which is the reduction ops in
+/// this case. The configuration is [[X, 0], [Y, 0], [0, Z], [0, 0]]. The `d0`
+/// is the common parallel dims for all the ops. The lowering config from
+/// `rootOperation` sets the tile sizes for `d0` and the rest of dims in
+/// reduction. But it does not have tile sizes for the rest of dims in
+/// elementwise op and pack ops. This method sets the vectorization tile sizes
+/// for other compute ops. E.g., [[X, 0], [Y, 0], [0, 0], [0, 4]] for the
+/// elementwise operations and [[X, 0], [Y, 0], [0, 0], [0, 16]] for the pack
+/// op.
+static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
+                                           ArrayRef<Operation *> computeOps,
+                                           Operation *rootOperation) {
+  auto ctx = entryPointFn.getContext();
+  auto rootLoweringConfig = getLoweringConfig(rootOperation);
+  auto distTileSizes = rootLoweringConfig.getTileSizeVals(0);
+  auto tileAndFuseSizes = rootLoweringConfig.getTileSizeVals(1);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  auto targetMLTransInfo =
+      TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
+  for (auto op : computeOps) {
+    // The lowering config is already set on rootOperation, so we skip it.
+    if (op == rootOperation)
+      continue;
+
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    SmallVector<int64_t> zeros(numLoops, 0);
+    TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
+    TypeSwitch<Operation *>(op)
+        .Case<tensor::PackOp>([&](auto packOp) {
+          SmallVector<int64_t> vecTileSizes =
+              getPackVectorTileSizes(entryPointFn, packOp);
+          tileSizesList.push_back(zeros); // tensor.pack op does not have
+                                          // reduction loops.
+          tileSizesList.push_back(vecTileSizes);
+        })
+        .Case<linalg::GenericOp>([&](auto genericOp) {
+          auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+          auto linalgOpInfo = LinalgOpInfo(genericOp);
+          int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
+          SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
+              entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+          for (auto &i : vecTileSizes) {
+            i = roundUpToPow2(std::min(i, vecSize),
+                              vecPreProcStrategy ==
+                                  VectorPreProcStrategy::Masking);
+          }
+
+          // If the dimension is already tiled, we don't tile it again. This
+          // prevents the mismatch common vector sizes between producer and
+          // consumers. E.g., the convolution vectorization does not support
+          // masking yet, while the strategy for generic op could use masking.
+          // This introduces odd behavior like convolution takes 12 as tile size
+          // while generic op takes 8 as tile size. It would introduce an
+          // inefficient loop and only apply masking on generic op, which hurts
+          // performance a lot. Thus, we do not tile it again, so they have
+          // consistent vector tile sizes.
+          // On RISC-V side, we prefer tiling it because unrolling is a big
+          // factor, especially for quantized models. A common case is a matmul
+          // on f32 types, followed by a elementwise op on i8 types. We want to
+          // limit unroll factors.
+          if (!isRISCV(targetAttr)) {
+            for (auto i :
+                 llvm::seq<int64_t>(0, std::min(tileAndFuseSizes.size(),
+                                                vecTileSizes.size()))) {
+              if (tileAndFuseSizes[i])
+                vecTileSizes[i] = 0;
+            }
+          }
+          SmallVector<int64_t> reductionTiles;
+          splitParallelAndReductionTiles(genericOp, vecTileSizes,
+                                         reductionTiles);
+          setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+                                         vecTileSizes, reductionTiles);
+
+          tileSizesList.push_back(reductionTiles);
+          tileSizesList.push_back(vecTileSizes);
+        })
+        .Default([&](auto) {
+          // Do nothing for unknown ops.
+          tileSizesList.push_back(zeros);
+          tileSizesList.push_back(zeros);
+        });
+    for (auto &ts : tileSizesList)
+      ts.resize(numLoops, 0);
+    auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
+    setLoweringConfig(op, config);
+  }
 }
 
 /// Sets the translation information to use for a dispatch region.
@@ -2140,12 +2229,20 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
     }
   }
 
-  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
-    return failure();
-  }
+  // The transform dialect codegen has differnet logics and codegen flow. Ignore
+  // the tile sizes adjustment.
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
+    if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
+      return failure();
+    }
 
-  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
-    return failure();
+    if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+      return failure();
+    }
+
+    // Set vector level tile sizes for other operations individually.
+    setLoweringConfigForComputeOps(entryPointFn, computeOps, rootOperation);
   }
 
   return success();
