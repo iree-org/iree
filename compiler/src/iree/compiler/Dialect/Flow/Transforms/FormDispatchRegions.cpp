@@ -531,6 +531,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   if (!producerLinalgOp || !consumerLinalgOp)
     return false;
 
+  // Check that the producer is all parallel.
+  if (producerLinalgOp.getNumLoops() !=
+      producerLinalgOp.getNumParallelLoops()) {
+    return false;
+  }
+
   // Check that the consumer is all parallel.
   if (consumerLinalgOp.getNumLoops() !=
       consumerLinalgOp.getNumParallelLoops()) {
@@ -654,7 +660,21 @@ isFusableWithProducer(OpOperand &operand,
     return false;
   }
 
+  auto producerLinalgOp = cast<linalg::LinalgOp>(producer);
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
+
+  // Check that the producer is all parallel.
+  if (producerLinalgOp.getNumLoops() !=
+      producerLinalgOp.getNumParallelLoops()) {
+    return false;
+  }
+
+  // Check that the consumer is all parallel.
+  if (consumerLinalgOp.getNumLoops() !=
+      consumerLinalgOp.getNumParallelLoops()) {
+    return false;
+  }
+
   if (consumerLinalgOp.isDpsInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
     if (!isa<linalg::GenericOp>(consumer) ||
