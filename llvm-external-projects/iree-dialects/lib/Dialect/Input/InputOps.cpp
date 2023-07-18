@@ -621,6 +621,32 @@ LogicalResult GlobalStoreIndirectOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_input.buffer_view.create
+//===----------------------------------------------------------------------===//
+
+void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
+                               Value sourceBuffer, Value sourceOffset,
+                               Value sourceLength, int32_t elementType,
+                               int32_t encodingType, ValueRange shape) {
+  build(builder, state, sourceBuffer, sourceOffset, sourceLength,
+        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
+                                                   32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
+                                                   32),
+        shape);
+}
+
+void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
+                               Value sourceBuffer, Value sourceOffset,
+                               Value sourceLength, Value elementType,
+                               Value encodingType, ValueRange shape) {
+  state.addOperands(
+      {sourceBuffer, sourceOffset, sourceLength, elementType, encodingType});
+  state.addOperands(shape);
+  state.addTypes({BufferViewType::get(builder.getContext())});
+}
+
+//===----------------------------------------------------------------------===//
 // iree_input.tensor.update
 //===----------------------------------------------------------------------===//
 
