@@ -1032,10 +1032,7 @@ struct ZeroExtentTensorCanon final : RewritePattern {
     bool didUpdate = false;
     for (OpOperand &operand : op->getOpOperands()) {
       auto operandType = isZeroExtent(operand.get().getType());
-      if (!operandType) {
-        continue;
-      }
-      if (operand.get().getDefiningOp<tensor::EmptyOp>()) {
+      if (!operandType || operand.get().getDefiningOp<tensor::EmptyOp>()) {
         continue;
       }
       Operation *owner = operand.getOwner();
