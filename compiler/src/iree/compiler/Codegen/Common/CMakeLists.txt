@@ -135,6 +135,7 @@ iree_cc_library(
     "ExtractAddressComputation.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
+    "FoldTensorExtractFillPass.cpp"
     "FoldTensorExtractOpPass.cpp"
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
     "ForOpCanonicalizationPass.cpp"

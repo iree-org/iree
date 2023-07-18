@@ -115,6 +115,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFoldAffineMinInDistributedLoopsPass();
 
+// folds tensor.extract(linalg.fill(%x)) to %x
+std::unique_ptr<Pass> createFoldTensorExtractFillPass();
+
 /// After running the upstream TensorConstantBufferize pass, remove
 /// tensor_loads introduced for use only in tensor_extract. These can be
 /// folded to use a load of the created memref object that holds the constant

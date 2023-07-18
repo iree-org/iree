@@ -200,6 +200,12 @@ def FoldAffineMinInDistributedLoops :
   let constructor = "mlir::iree_compiler::createFoldAffineMinInDistributedLoopsPass()";
 }
 
+def FoldTensorExtractFill :
+  Pass<"iree-codegen-fold-tensor-extract-fill", ""> {
+  let summary = "Fold `tensor.extract(linalg.fill)` operations prior to lowering to LLVM";
+  let constructor = "mlir::iree_compiler::createFoldTensorExtractFillPass()";
+}
+
 def FoldTensorExtractOp :
   Pass<"iree-codegen-fold-tensor-extract-op", ""> {
   let summary = "Fold `tensor.extract` operations prior to lowering to LLVM";
