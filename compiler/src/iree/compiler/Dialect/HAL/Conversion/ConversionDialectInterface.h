@@ -24,7 +24,7 @@ namespace iree_compiler {
 // same dialect.
 class HALConversionDialectInterface
     : public DialectInterface::Base<HALConversionDialectInterface> {
- public:
+public:
   HALConversionDialectInterface(Dialect *dialect) : Base(dialect) {}
 
   // Populates |patterns| with rewrites that convert from a higher-level
@@ -43,7 +43,7 @@ class HALConversionDialectInterface
   }
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONDIALECTINTERFACE_H_
+#endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONDIALECTINTERFACE_H_

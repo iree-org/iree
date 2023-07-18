@@ -57,13 +57,13 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createRaiseSpecialOps() {
   return std::make_unique<RaiseSpecialOpsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -24,17 +24,10 @@
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_EMSCRIPTEN)
 #include <emscripten/threading.h>
 #endif  // IREE_PLATFORM_EMSCRIPTEN
-
-// Older glibc doesn't have a gettid wrapper:
-// https://stackoverflow.com/a/63494768
-#if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
-#define gettid() syscall(SYS_gettid)
-#endif
 
 struct iree_thread_t {
   iree_atomic_ref_count_t ref_count;

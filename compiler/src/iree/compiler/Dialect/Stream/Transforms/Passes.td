@@ -172,14 +172,6 @@ def LayoutSlices :
 // TODO(benvanik): outline streams (ala dispatch regions).
 // TODO(benvanik): deduplicate outlined streams.
 
-def MemoizeChannels :
-    Pass<"iree-stream-memoize-channels", "mlir::ModuleOp"> {
-  let summary = "Memoizes channel creation by migrating accesses to globals.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createMemoizeChannelsPass()
-  }];
-}
-
 //===----------------------------------------------------------------------===//
 // Dispatch optimization
 //===----------------------------------------------------------------------===//
@@ -198,11 +190,6 @@ def FuseDispatchBindings :
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createFuseDispatchBindingsPass()
   }];
-  let options = [
-    Option<"aliasMutableBindings", "alias-mutable-bindings",
-           "bool", /*default=*/"false",
-           "Fuses bindings that are mutable instead of leaving them split.">
-  ];
 }
 
 def SpecializeDispatches :
@@ -252,6 +239,14 @@ def DumpStatistics :
            "std::string", /*default=*/"std::string()",
            "File path to write to; or `` for stderr or `-` for stdout.">
   ];
+}
+
+def VerifyAsyncAccessRanges :
+    Pass<"iree-stream-verify-async-access-ranges", "mlir::ModuleOp"> {
+  let summary = "Verifies that stream.async.* access ranges are in bounds where possible.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createVerifyAsyncAccessRangesPass()
+  }];
 }
 
 def VerifyInput :

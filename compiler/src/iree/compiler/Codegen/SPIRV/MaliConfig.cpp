@@ -27,7 +27,7 @@ static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
   Type inputType = op.getDpsInputOperand(0)->get().getType();
-  Type elementType = inputType.cast<ShapedType>().getElementType();
+  Type elementType = llvm::cast<ShapedType>(inputType).getElementType();
   if (elementType.getIntOrFloatBitWidth() == 16) {
     threadMNK = {2, 8, 8};
   } else if (elementType.isInteger(8)) {
@@ -56,16 +56,18 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32) return failure();
+    if (bitwidth > 32)
+      return failure();
     const int multipler = 32 / bitwidth;
     bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
     const int bestTilingFactor = (hasPaddedInput ? 8 : 16) * multipler;
-    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
   }
 
   return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

@@ -34,8 +34,8 @@ static constexpr unsigned kNumMaxParallelDims = 3;
 bool isEntryPoint(func::FuncOp func);
 
 /// Returns a map from function symbol name to corresponding entry point op.
-llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
-    ModuleOp module);
+llvm::StringMap<IREE::HAL::ExecutableExportOp>
+getAllEntryPoints(ModuleOp module);
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp);
@@ -46,26 +46,46 @@ FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(Operation *op);
 
 /// Returns the StringAttr with the name `stringAttr` in the `targetAttr`, if
 /// found.
-std::optional<StringAttr> getConfigStringAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr);
+std::optional<StringAttr>
+getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                    StringRef stringAttr);
 
 /// Returns the IntegerAttr with the name `integerAttr` in the `targetAttr`, if
 /// found.
-std::optional<IntegerAttr> getConfigIntegerAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
+std::optional<IntegerAttr>
+getConfigIntegerAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                     StringRef integerAttr);
 
 /// Returns the BoolAttr with the name `integerAttr` in the `targetAttr`, if
 /// found.
-std::optional<BoolAttr> getConfigBoolAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
+std::optional<BoolAttr>
+getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                  StringRef integerAttr);
 
 /// Returns the LLVM Target triple associated with the `targetAttr`, if set.
-std::optional<llvm::Triple> getTargetTriple(
-    IREE::HAL::ExecutableTargetAttr targetAttr);
+std::optional<llvm::Triple>
+getTargetTriple(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+/// Returns the target architecture name, in IREE_ARCH convention, from the
+/// given target triple.
+const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 
 /// Methods to get target information.
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+/// Returns the CPU target features associated with the `targetAttr`, if set.
+std::optional<StringRef>
+getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+/// Returns true if `targetAttr` has `feature` in its CPU features.
+bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
+
+// Architecture identification.
+bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
@@ -143,12 +163,12 @@ SmallVector<Operation *> getComputeOps(func::FuncOp funcOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.
-std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
-    scf::ForOp forOp);
+std::optional<LoopTilingAndDistributionInfo>
+isTiledAndDistributedLoop(scf::ForOp forOp);
 
 /// Collects information about loops matching tiled+distribute pattern.
-SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
-    func::FuncOp funcOp);
+SmallVector<LoopTilingAndDistributionInfo>
+getTiledAndDistributedLoopInfo(func::FuncOp funcOp);
 
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
@@ -182,7 +202,11 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
 void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
                   DominanceInfo &dominators);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+// Track temporary allocations that are never read from. If this is the case
+// it means both the allocations and associated stores can be removed.
+void eraseDeadAllocAndStores(Operation *parentOp);
 
-#endif  // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
+} // namespace iree_compiler
+} // namespace mlir
+
+#endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

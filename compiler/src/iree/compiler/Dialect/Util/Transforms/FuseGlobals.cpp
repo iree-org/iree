@@ -100,7 +100,7 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 //  builtin.func @foo(%arg0: i32) {
 //    util.global.store %arg0, @fused : i32
 class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
@@ -129,7 +129,8 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
         llvm::dbgs() << ":\n";
       });
       auto *region = callableOp.getCallableRegion();
-      if (!region) continue;
+      if (!region)
+        continue;
       for (auto &block : *region) {
         DenseMap<Value, SmallVector<IREE::Util::GlobalStoreOpInterface>>
             valueStores;
@@ -141,7 +142,8 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
             storeOp.print(llvm::dbgs(), *asmState);
             llvm::dbgs() << "; candidate=" << global.isCandidate() << "\n";
           });
-          if (!global.isCandidate()) continue;
+          if (!global.isCandidate())
+            continue;
           valueStores[storeOp.getStoredGlobalValue()].push_back(storeOp);
         }
         for (auto valueStore : valueStores) {
@@ -182,7 +184,8 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
       llvm::BitVector tempBits = correlationBits;
       for (auto ordinal : correlationBits.set_bits()) {
         auto &otherGlobalName = globalTable.globalOrder[ordinal];
-        if (otherGlobalName == globalName) continue;
+        if (otherGlobalName == globalName)
+          continue;
         auto &otherBits = correlationMap[otherGlobalName];
         if (!otherBits.test(global.ordinal)) {
           LLVM_DEBUG(llvm::dbgs() << "Fixup: " << globalName
@@ -230,8 +233,10 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
     // differ.
     SmallVector<SmallVector<Global *>> fusableSets;
     for (auto it = ec.begin(), end = ec.end(); it != end; ++it) {
-      if (!it->isLeader()) continue;  // Ignore non-leader sets.
-      if (++ec.member_begin(it) == ec.member_end()) continue;  // size 1
+      if (!it->isLeader())
+        continue; // Ignore non-leader sets.
+      if (++ec.member_begin(it) == ec.member_end())
+        continue; // size 1
       DenseMap<Attribute, SmallVector<Global *>> initialValueMap;
       for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
         Global &global = globalTable.globalMap[*mi];
@@ -267,7 +272,8 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
       auto baseGlobalNameAttr = FlatSymbolRefAttr::get(
           baseGlobalOp.getContext(), baseGlobalOp.getGlobalName());
       for (auto *global : fusableSet) {
-        if (global->op == baseGlobalOp) continue;
+        if (global->op == baseGlobalOp)
+          continue;
 
         // Redirect all loads to the new fused global.
         for (auto loadOp : global->loadOps) {
@@ -285,13 +291,13 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass() {
   return std::make_unique<FuseGlobalsPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

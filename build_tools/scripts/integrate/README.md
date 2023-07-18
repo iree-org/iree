@@ -4,7 +4,7 @@ This directory contains scripts for managing some of our more storied third
 party dependencies (which are submodules in the project):
 
 * llvm-project
-* mlir-hlo
+* stablehlo
 
 Depending on your activity, please refer to the appropriate script,
 which has comments at the top on how to use it:
@@ -87,11 +87,11 @@ In this guide, we reference this directory as `$SCRIPTS`.
 
 ### Advancing the mainline branch in forks
 
-The IREE team maintains fork repositories for both llvm-project and mlir-hlo,
+The IREE team maintains fork repositories for both llvm-project and stablehlo,
 allowing them to be patched out of band. These repositories are:
 
 * https://github.com/iree-org/iree-llvm-fork (`main` branch)
-* https://github.com/iree-org/iree-mhlo-fork (`master` branch)
+* https://github.com/iree-org/stablehlo (`main` branch)
 * https://github.com/iree-org/iree-tf-fork (`master` branch)
 
 Iree repository has an
@@ -106,9 +106,9 @@ it manually.
 #### Strategy 1: Bump third_party/llvm-project in isolation
 
 It is very common to only bump llvm-project and not sync to new versions of
-mlir-hlo and tensorflow. However, as we need to periodically integrate those
+stablehlo and tensorflow. However, as we need to periodically integrate those
 as well, if the Google repositories are up to date and you have the option
-to integrate to a common LLVM commit, bringing mlir-hlo and tensorflow up
+to integrate to a common LLVM commit, bringing stablehlo and tensorflow up
 to date as well, it can save some cycles overall.
 
 In order to bump to the current ToT commit, simply run:
@@ -140,7 +140,7 @@ Bazel can help, especially for catching nit-picky strict things:
 
 ```
 bazel build tools:iree-compile
-bazel test iree/compiler/...
+bazel test compiler/...
 ```
 
 Once Bazel is good, remember to run
@@ -152,20 +152,20 @@ the CI and fix it directly. But if dealing with some large/breaking changes,
 be prepared to settle in for a bit and play a triage role, working to get things
 minimally to a point that you can shard failures to others.
 
-Note that if not bumping mlir-hlo, then it is likely that you will hit a
-compiler error in mlir-hlo at some point and will need to fix it. Advancing
+Note that if not bumping stablehlo, then it is likely that you will hit a
+compiler error in stablehlo at some point and will need to fix it. Advancing
 it to HEAD is always an option, if that contains the fix, but this dependency
 is unstable and should be maintained version locked with the integrations
 directory. It is possible to advance it, but only if integrations tests pass,
 and even then there is the chance for untested compatibility issues.
 
-Typically, for the parts of mlir-hlo that we use, changes can be trivial (a
+Typically, for the parts of stablehlo that we use, changes can be trivial (a
 few lines, likely that you have already patched something similar in IREE).
 Just make the changes in your submodule, commit them and push to a patch
 branch with:
 
 ```
-$SCRIPTS/patch_module.py --module_name=mlir-hlo
+$SCRIPTS/patch_module.py --module_name=stablehlo
 ```
 
 You can just do this in your integrate branch and incorporate the changes.
@@ -175,130 +175,6 @@ local fixes are sound. See the "Cherry-Picking" section below for more
 details.
 
 Good luck!
-
-#### Strategy 2: Sync everything to a Google/TensorFlow commit
-
-TODO: Add a script for this.
-
-```
-cd ~/src
-git clone --branch master https://github.com/iree-org/iree-tf-fork.git
-git clone --branch master https://github.com/iree-org/iree-mhlo-fork.git
-```
-
-Get MHLO's published version:
-
-We use this one because it is the easiest to get at and most of the
-activity is LLVM integrates.
-
-```
-cat mlir-hlo/build_tools/llvm_version.txt
-```
-
-Or `git log` to find a commit like:
-
-```
-commit f9f696890acbe198b6164a7ca43523e2bddd630a (HEAD -> master, origin/master, origin/HEAD)
-Author: Stephan Herhut <herhut@google.com>
-Date:   Wed Jan 12 08:00:24 2022 -0800
-
-    Integrate LLVM at llvm/llvm-project@c490f8feb71e
-
-    Updates LLVM usage to match
-    [c490f8feb71e](https://github.com/llvm/llvm-project/commit/c490f8feb71e)
-
-    PiperOrigin-RevId: 421298939
-```
-
-You can correlate this with a tensorflow commit by searching TensorFlow commits
-for the `PiperOrigin-RevId`, which is shared between them. While not strictly
-necessary to keep all of this in sync, if doing so, it will yield fewer
-surprises.
-
-An example of a corresponding commit in the tensorflow repo:
-
-```
-commit a20bfc24dfbc34ef4de644e6bf46b41e6e57b878
-Author: Stephan Herhut <herhut@google.com>
-Date:   Wed Jan 12 08:00:24 2022 -0800
-
-    Integrate LLVM at llvm/llvm-project@c490f8feb71e
-
-    Updates LLVM usage to match
-    [c490f8feb71e](https://github.com/llvm/llvm-project/commit/c490f8feb71e)
-
-    PiperOrigin-RevId: 421298939
-    Change-Id: I7e6c1c25d42f6936f626550930957f5ee522b645
-```
-
-From this example:
-
-```
-LLVM_COMMIT="c490f8feb71e"
-MHLO_COMMIT="f9f696890acbe198b6164a7ca43523e2bddd630a"
-TF_COMMIT="a20bfc24dfbc34ef4de644e6bf46b41e6e57b878"
-```
-
-Apply:
-
-```
-cd ~/src/iree
-git fetch
-(cd third_party/llvm-project && git checkout $LLVM_COMMIT)
-(cd third_party/mlir-hlo && git checkout $MHLO_COMMIT)
-sed -i "s/^TENSORFLOW_COMMIT = .*$/TENSORFLOW_COMMIT = \"$TF_COMMIT\"/" integrations/tensorflow/WORKSPACE
-
-# git status should show:
-#        modified:   integrations/tensorflow/WORKSPACE
-#        modified:   third_party/llvm-project (new commits)
-#        modified:   third_party/mlir-hlo (new commits)
-```
-
-Make a patch:
-
-```
-git add -A
-git commit
-# Message like:
-#    Integrate llvm-project and bump dependencies.
-#
-#    * llvm-project: c490f8feb71e
-#    * mlir-hlo: f9f696890acbe198b6164a7ca43523e2bddd630a
-#    * tensorflow: a20bfc24dfbc34ef4de644e6bf46b41e6e57b878
-```
-
-Either Yolo and send a PR to have the CI run it or do a local build. I will
-typically only build integrations/tensorflow if the CI indicates there is an
-issue.
-
-```
-# Push to the main repo so that we can better collaboratively apply fixes.
-# If there are failures, feel free to call people in who know areas for help.
-git push origin HEAD:llvm-bump
-```
-
-Either fix any issues or get people to do so and land patches until the
-PR is green.
-
-A script from [iree-samples](https://github.com/iree-org/iree-samples/blob/main/scripts/integrate/bump_llvm.py)
-repository can help with bumping the LLVM version and creating a PR.
-To use the script the steps are
-
-```
-cd ~/src/iree
-$SCRIPTS/bump_llvm.py --llvm-commit $LLVM_COMMIT
-```
-
-This creates a new in IREE repository (named bump-llvm-yyyymmdd). A PR can
-be created from that. Following that MHLO and TF can be bumped the same way
-
-```
-(cd third_party/mlir-hlo && git checkout $MHLO_COMMIT)
-sed -i "s/^TENSORFLOW_COMMIT = .*$/TENSORFLOW_COMMIT = \"$TF_COMMIT\"/" integrations/tensorflow/WORKSPACE
-git add -A
-git commit ...
-git push UPSTREAM_AUTOMATION bump-llvm-...
-```
 
 ### Update C-API exported
 
@@ -320,7 +196,7 @@ Please add the integrator to reviewers in the cherry-pick PR, so the integrator
 won't miss the commits when bumping submodules. If you don't know who is the
 integrator, you can reach out to @hanchung on discord or add hanhanW as a reviewer.
 
-We support cherry-picking specific commits in to both llvm-project and mlir-hlo.
+We support cherry-picking specific commits in to both llvm-project and stablehlo.
 This should only ever be done to incorporate patches that enable further
 development and which will resolve automatically as part of a future
 integrate of the respective module: make sure that you are only cherry-picking
@@ -329,12 +205,12 @@ experimental changes, feel free to push a personal branch to the fork repo
 with such changes, which will let you use the CI -- but please do not commit
 experimental, non-upstream committed commits to the main project.
 
-The process for cherry-picking into llvm-project or mlir-hlo uses the same
+The process for cherry-picking into llvm-project or stablehlo uses the same
 script. The first step is to prepare a patch branch and reset your local
 submodule to track it:
 
 ```
-$SCRIPTS/patch_module.py --module={llvm-project|mlir-hlo}
+$SCRIPTS/patch_module.py --module={llvm-project|stablehlo}
 ```
 
 If successful, this will allocate a new branch in the fork repo with a name
@@ -370,8 +246,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:eb0063d640d8402b077fcec5533f247ba3497921fa86fe47337b97a4a7df7b1a build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:eb0063d640d8402b077fcec5533f247ba3497921fa86fe47337b97a4a7df7b1a' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -379,7 +255,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:eb0063d640d8402b077fcec5533f247ba3497921fa86fe47337b97a4a7df7b1a
 ```
 
 To repro failures in `iree/e2e/`:

@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Attributes/PotentialValues.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"  // TODO: Remove
+#include "mlir/Dialect/Linalg/IR/Linalg.h" // TODO: Remove
 #include "mlir/Dialect/Math/IR/Math.h"
 
 #define DEBUG_TYPE "iree-util-attributes"
@@ -46,19 +46,20 @@ void FloatRangeStats::addDomainValue(double value) {
 }
 
 std::string FloatRangeStats::getAsStr(AsmState &asmState) const {
-  if (!valid) return std::string("<<INVALID>>");
+  if (!valid)
+    return std::string("<<INVALID>>");
   std::string s("[");
   s += std::to_string(minValue);
   s += ", ";
   s += std::to_string(maxValue);
   s += ", ";
   switch (truncationFlag) {
-    case TRUNC_UNKNOWN:
-      s += "!trunc";
-      break;
-    case TRUNC:
-      s += "TRUNC";
-      break;
+  case TRUNC_UNKNOWN:
+    s += "!trunc";
+    break;
+  case TRUNC:
+    s += "TRUNC";
+    break;
   }
   s += "]";
   return s;
@@ -108,7 +109,7 @@ const char FloatRangeValueElement::ID = 0;
 // of fp types.
 // TODO: getElementTypeOrSelf?
 static bool isFpType(Type type) {
-  return getElementTypeOrSelf(type).isa<FloatType>();
+  return llvm::isa<FloatType>(getElementTypeOrSelf(type));
 }
 
 void FloatRangeValueElement::initializeValue(Value value, DFX::Solver &solver) {
@@ -132,7 +133,7 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
   // TODO: We shouldn't need to hard switch on LinalgOp here and should
   // be relying on some kind of concept/interface. It just isn't
   // clear what that would be.
-  if (auto valueBlockArg = value.dyn_cast<BlockArgument>()) {
+  if (auto valueBlockArg = llvm::dyn_cast<BlockArgument>(value)) {
     Block *ownerBlock = valueBlockArg.getOwner();
     if (auto linalgParent = llvm::dyn_cast_or_null<linalg::LinalgOp>(
             ownerBlock->getParentOp())) {
@@ -146,12 +147,12 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
       *this, Position::forValue(value), DFX::Resolution::OPTIONAL);
   if (pvs.isValidState() && !pvs.isUndefContained()) {
     for (Attribute constValue : pvs.getAssumedSet()) {
-      if (auto scalarValue = constValue.dyn_cast<FloatAttr>()) {
+      if (auto scalarValue = llvm::dyn_cast<FloatAttr>(constValue)) {
         FloatRangeStats stats;
         stats.addDomainValue(scalarValue.getValueAsDouble());
         newState.setAssumed(stats);
         newState.indicateOptimisticFixpoint();
-      } else if (auto elements = constValue.dyn_cast<ElementsAttr>()) {
+      } else if (auto elements = llvm::dyn_cast<ElementsAttr>(constValue)) {
         FloatRangeStats stats;
         for (APFloat elementValue : elements.getValues<APFloat>()) {
           stats.addDomainValue(elementValue.convertToDouble());
@@ -262,7 +263,7 @@ const std::string FloatRangeValueElement::getAsStr(AsmState &asmState) const {
   return s;
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

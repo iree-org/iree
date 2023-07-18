@@ -11,8 +11,6 @@
 #include <type_traits>
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbol_tables.h"
 
 namespace iree {
@@ -144,7 +142,7 @@ iree_status_t ResolveFunctions(
 // static
 iree_status_t DynamicSymbols::Create(const GetProcAddrFn& get_proc_addr,
                                      ref_ptr<DynamicSymbols>* out_syms) {
-  IREE_TRACE_SCOPE0("DynamicSymbols::Create");
+  IREE_TRACE_SCOPE_NAMED("DynamicSymbols::Create");
 
   auto syms = make_ref<DynamicSymbols>();
   IREE_RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
@@ -157,7 +155,7 @@ iree_status_t DynamicSymbols::Create(const GetProcAddrFn& get_proc_addr,
 // static
 iree_status_t DynamicSymbols::CreateFromSystemLoader(
     ref_ptr<DynamicSymbols>* out_syms) {
-  IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
+  IREE_TRACE_SCOPE_NAMED("DynamicSymbols::CreateFromSystemLoader");
 
   iree_dynamic_library_t* loader_library = NULL;
   iree_status_t status = iree_dynamic_library_load_from_files(
@@ -193,13 +191,13 @@ iree_status_t DynamicSymbols::CreateFromSystemLoader(
 }
 
 iree_status_t DynamicSymbols::LoadFromInstance(VkInstance instance) {
-  IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromInstance");
+  IREE_TRACE_SCOPE_NAMED("DynamicSymbols::LoadFromInstance");
   return LoadFromDevice(instance, VK_NULL_HANDLE);
 }
 
 iree_status_t DynamicSymbols::LoadFromDevice(VkInstance instance,
                                              VkDevice device) {
-  IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromDevice");
+  IREE_TRACE_SCOPE_NAMED("DynamicSymbols::LoadFromDevice");
 
   if (!instance) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

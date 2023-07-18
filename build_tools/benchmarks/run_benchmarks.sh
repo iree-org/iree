@@ -33,7 +33,7 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:5651a746a052990af1acb5190f526b5160a72dd645e81b50e76a7cc074d60970 \
+    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:522491c028ec3b4070f23910c70c8162fd9612e11d9cf062a13444df7e88ab70 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
@@ -46,7 +46,7 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         --verbose
 elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
   ${DOCKER_WRAPPER} \
-    gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd \
+    gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
@@ -59,6 +59,19 @@ elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \
         --verbose
+elif [[ "${TARGET_DEVICE_NAME}" =~ ^(pixel-4|pixel-6-pro|moto-edge-x30)$ ]]; then
+  ./build_tools/benchmarks/run_benchmarks_on_android.py \
+    --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+    --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
+    --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
+    --capture_tarball="${BENCHMARK_TRACES}" \
+    --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
+    --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
+    --target_device_name="${TARGET_DEVICE_NAME}" \
+    --output="${BENCHMARK_RESULTS}" \
+    --pin-cpu-freq \
+    --pin-gpu-freq \
+    --verbose
 else
   echo "${TARGET_DEVICE_NAME} is not supported yet."
   exit 1

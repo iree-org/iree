@@ -26,7 +26,8 @@ static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {16, 8, 8};
   } else {
@@ -53,17 +54,19 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32) return failure();
+    if (bitwidth > 32)
+      return failure();
     const int multipler = 32 / bitwidth;
     linalg::detail::ConvolutionDimensions convDims;
     linalg::detail::isConvolutionInterfaceImpl(rootOp, &convDims);
     const int bestTilingFactor = (convDims.depth.empty() ? 32 : 16) * multipler;
-    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
   }
 
   return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

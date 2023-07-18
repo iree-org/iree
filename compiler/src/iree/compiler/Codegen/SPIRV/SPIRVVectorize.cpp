@@ -12,8 +12,9 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -50,8 +51,11 @@ namespace iree_compiler {
 namespace {
 
 int getComputeVectorSize(int64_t size) {
-  // Try to use 4 first, and then 2, and then 1.
-  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
+  for (int i : {4, 3, 2}) {
+    if (size % i == 0)
+      return i;
+  }
+  return 1;
 }
 
 int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
@@ -64,10 +68,13 @@ int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
     // 128-bit chunks. This helps with memory access performance. Such vector
     // sizes are not native in SPIR-V though; this relies on following passes to
     // bitcast them to 32-bit 4-element vectors to be valid.
-    if (bitwidth <= 8 && size % 16 == 0) return 16;
-    if (bitwidth <= 16 && size % 8 == 0) return 8;
+    if (bitwidth <= 8 && size % 16 == 0)
+      return 16;
+    if (bitwidth <= 16 && size % 8 == 0)
+      return 8;
   }
-  if (bitwidth <= 32 && size % 4 == 0) return 4;
+  if (bitwidth <= 32 && size % 4 == 0)
+    return 4;
   return size % 2 == 0 ? 2 : 1;
 }
 
@@ -104,7 +111,8 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
             })
             .Default([](Operation *) { return nullptr; });
 
-    if (!source) break;
+    if (!source)
+      break;
     op = source;
   }
 
@@ -114,7 +122,8 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
 /// Returns true when |op| has the i32 element type that is likely to be result
 /// of a zero/sign extension from i8.
 bool mayExtI8ToI32(Value op) {
-  if (!getElementTypeOrSelf(op.getType()).isInteger(32)) return false;
+  if (!getElementTypeOrSelf(op.getType()).isInteger(32))
+    return false;
 
   // Look through vector operations created by vector unrolling patterns,
   // hoping to find a zero/sign extension op. Note that we do not need to find
@@ -140,13 +149,15 @@ bool mayExtI8ToI32(Value op) {
 /// Succeeds when |contract| is a i32 matmul whose LHS and RHS operands may be
 /// result of zero/sign extension of i8 inputs.
 LogicalResult detectI8ToI32Matmul(vector::ContractionOp contract) {
-  if (contract.getKind() != vector::CombiningKind::ADD) return failure();
+  if (contract.getKind() != vector::CombiningKind::ADD)
+    return failure();
 
   if (!mayExtI8ToI32(contract.getLhs()) || !mayExtI8ToI32(contract.getRhs()))
     return failure();
 
   ArrayRef<Attribute> iteratorTypes = contract.getIteratorTypes().getValue();
-  if (iteratorTypes.size() != 3) return failure();
+  if (iteratorTypes.size() != 3)
+    return failure();
 
   return success(vector::isParallelIterator(iteratorTypes[0]) &&
                  vector::isParallelIterator(iteratorTypes[1]) &&
@@ -183,7 +194,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::ContractionOp op,
       lowerToInnerProd ? getReductionDim(op) : getInnermostParallelDim(op);
   auto iteratorTypes = op.getIteratorTypes().getValue();
   SmallVector<int64_t> nativeSize(iteratorTypes.size(), 1);
-  SmallVector<int64_t, 4> bounds;
+  SmallVector<int64_t> bounds;
   op.getIterationBounds(bounds);
   nativeSize[unrollDim] = getComputeVectorSize(bounds[unrollDim]);
   return nativeSize;
@@ -202,7 +213,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::MultiDimReductionOp op) {
 
 SmallVector<int64_t> getNativeVectorShapeImpl(vector::ReductionOp op) {
   VectorType srcVectorType = op.getSourceVectorType();
-  assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
+  assert(srcVectorType.getRank() == 1); // Guaranteed by semantics
   int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
   return {vectorSize};
 }
@@ -214,10 +225,17 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
   return nativeSize;
 }
 
-std::optional<SmallVector<int64_t>> getNativeVectorShape(
-    Operation *op, bool targetSupportsDotProd) {
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::GatherOp op) {
+  VectorType vectorType = op.getVectorType();
+  SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
+  nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
+  return nativeSize;
+}
+
+std::optional<SmallVector<int64_t>>
+getNativeVectorShape(Operation *op, bool targetSupportsDotProd) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
+    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
       nativeSize.back() = getComputeVectorSize(vecType.getShape().back());
       return nativeSize;
@@ -226,7 +244,7 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(
 
   return TypeSwitch<Operation *, std::optional<SmallVector<int64_t>>>(op)
       .Case<VectorTransferOpInterface, vector::MultiDimReductionOp,
-            vector::ReductionOp, vector::TransposeOp>(
+            vector::ReductionOp, vector::TransposeOp, vector::GatherOp>(
           [](auto typedOp) { return getNativeVectorShapeImpl(typedOp); })
       .Case<vector::ContractionOp>([=](auto contract) {
         return getNativeVectorShapeImpl(contract, targetSupportsDotProd);
@@ -236,14 +254,16 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(
 
 /// Add patterns to vectorize any supported Linalg ops.
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  IREE::LinalgExt::LinalgTransformationFilter f;
-  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
+  IREE::LinalgExt::LinalgTransformationFilter filter;
+  IREE::LinalgExt::LinalgVectorizationOptions options;
+  // Enable vectorizing tensor.extract in Linalg ops.
+  options.vectorizeGatherAccesses = true;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, vectorizationOptions, f);
+      patterns, options, filter);
   linalg::populateConvolutionVectorizationPatterns(patterns);
   patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), vectorizationOptions,
-      f.addOpFilter<linalg::ContractionOpInterface>());
+      patterns.getContext(), options,
+      filter.addOpFilter<linalg::ContractionOpInterface>());
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
@@ -262,7 +282,8 @@ bool supportsIntegerDotProductOps(func::FuncOp fn) {
     // attribute. This may be preferred in tests.
     targetEnvAttr =
         fn->getAttrOfType<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
-    if (!targetEnvAttr) return false;
+    if (!targetEnvAttr)
+      return false;
   }
 
   spirv::TargetEnv targetEnv(targetEnvAttr);
@@ -271,16 +292,19 @@ bool supportsIntegerDotProductOps(func::FuncOp fn) {
 
   // Query all the dot prod capabilities except for the packed one -- none of
   // the vectorization patterns need it.
-  if (!targetEnv.allows(spirv::Capability::DotProduct)) return false;
-  if (!targetEnv.allows(spirv::Capability::DotProductInput4x8Bit)) return false;
-  if (!targetEnv.allows(spirv::Capability::DotProductInputAll)) return false;
+  if (!targetEnv.allows(spirv::Capability::DotProduct))
+    return false;
+  if (!targetEnv.allows(spirv::Capability::DotProductInput4x8Bit))
+    return false;
+  if (!targetEnv.allows(spirv::Capability::DotProductInputAll))
+    return false;
 
   return true;
 }
 
 /// Vectorizes Linalg ops on buffer semantics.
 class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
- public:
+public:
   SPIRVVectorizePass() = default;
   SPIRVVectorizePass(const SPIRVVectorizePass &pass) = default;
 
@@ -314,6 +338,21 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    {
+      auto result = funcOp.walk([&](linalg::LinalgOp op) {
+        // linalg.generic ops for copy are fine to not vectorize; they will be
+        // handled in later steps.
+        if (isa<linalg::YieldOp>(op.getBlock()->begin())) {
+          return WalkResult::advance();
+        }
+        // Other ones should error out.
+        op.emitOpError("should not remain after vectorization");
+        return WalkResult::interrupt();
+      });
+      if (result.wasInterrupted())
+        return signalPassFailure();
+    }
+
     // Special peephole optimizations to clean up IR before further processing.
     {
       RewritePatternSet patterns(context);
@@ -340,6 +379,26 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // High dimension contraction can appear after vectorizing ops like 1-D
+    // convolution. Those 1-D convolution ops typically have a leading unit
+    // batch dimension. Try to drop that to map to matmul dimensions better.
+    SmallVector<vector::ContractionOp> contractOps;
+    funcOp.walk([&](vector::ContractionOp op) {
+      if (op.getIteratorTypes().size() > 3)
+        contractOps.push_back(op);
+    });
+    for (vector::ContractionOp op : contractOps) {
+      OpBuilder builder(op);
+      IRRewriter rewriter(builder);
+      (void)vector::castAwayContractionLeadingOneDim(op, rewriter);
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After trimming contract leading unit dims ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // Fold tensor.extract_slice/insert_slice ops into transfer ops. This helps
     // to remove those tensor slice ops so that we can enable further vector op
     // transformations.
@@ -347,6 +406,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      populateVectorTransferTensorSliceTransforms(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -384,22 +444,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After lowering multi_reduction ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // Similarly for vector.gather ops, whose lowering patterns unroll
-    // internally.
-    {
-      RewritePatternSet patterns(context);
-      vector::populateVectorGatherLoweringPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering gather ops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
@@ -511,6 +555,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      populateVectorTransferTensorSliceTransforms(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -580,6 +625,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
+      vector::populateVectorGatherLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -599,7 +645,9 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      populateVectorTransferTensorSliceTransforms(patterns);
       vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
+      scf::IfOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -607,11 +655,11 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass() {
   return std::make_unique<SPIRVVectorizePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -16,11 +16,23 @@ namespace iree_compiler::stablehlo {
 
 std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter();
 
+struct StableHloOptions : public PassPipelineOptions<StableHloOptions> {
+  bool demoteI64ToI32 = true;
+  bool demoteF64ToF32 = false;
+  bool promoteBF16ToF32 = false;
+};
+
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-// TODO: Add a full conversion pipeline and passes.
+void buildStableHLOInputConversionPassPipeline(OpPassManager &passManager,
+                                               const StableHloOptions &options);
+
+// Performs input legalization on programs that may have originated from an XLA
+// import (or made to interop with it).
+void buildStableHLOXLAInputConversionPassPipeline(
+    OpPassManager &passManager, const StableHloOptions &options);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -28,6 +40,6 @@ std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter();
 
 void registerStableHLOConversionPasses();
 
-}  // namespace iree_compiler::stablehlo
-}  // namespace mlir
-#endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES_H_
+} // namespace iree_compiler::stablehlo
+} // namespace mlir
+#endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES_H_

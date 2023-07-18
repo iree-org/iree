@@ -20,13 +20,14 @@ namespace HAL {
 static const iree_file_toc_t *lookupDeviceFile(StringRef filename) {
   for (size_t i = 0; i < iree_builtins_libdevice_bitcode_size(); ++i) {
     const auto &file_toc = iree_builtins_libdevice_bitcode_create()[i];
-    if (filename == file_toc.name) return &file_toc;
+    if (filename == file_toc.name)
+      return &file_toc;
   }
   return nullptr;
 }
 
-static const iree_file_toc_t *lookupDeviceFile(
-    llvm::TargetMachine *targetMachine) {
+static const iree_file_toc_t *
+lookupDeviceFile(llvm::TargetMachine *targetMachine) {
   const auto &triple = targetMachine->getTargetTriple();
 
   // NOTE: other arch-specific checks go here.
@@ -52,8 +53,9 @@ static const iree_file_toc_t *lookupDeviceFile(
   }
 }
 
-llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
-    llvm::TargetMachine *targetMachine, llvm::LLVMContext &context) {
+llvm::Expected<std::unique_ptr<llvm::Module>>
+loadDeviceBitcode(llvm::TargetMachine *targetMachine,
+                  llvm::LLVMContext &context) {
   // Find a bitcode file for the current architecture.
   const auto *file = lookupDeviceFile(targetMachine);
   if (!file) {
@@ -65,7 +67,8 @@ llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
   llvm::MemoryBufferRef bitcodeBufferRef(
       llvm::StringRef(file->data, file->size), file->name);
   auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
-  if (!bitcodeModuleValue) return bitcodeModuleValue;
+  if (!bitcodeModuleValue)
+    return bitcodeModuleValue;
   auto bitcodeModule = std::move(bitcodeModuleValue.get());
 
   // Clang adds its own per-function attributes that we need to strip so that
@@ -83,7 +86,8 @@ static void overridePlatformGlobal(llvm::Module &module, StringRef globalName,
                                    uint32_t newValue) {
   // NOTE: the global will not be defined if it is not used in the module.
   auto *globalValue = module.getNamedGlobal(globalName);
-  if (!globalValue) return;
+  if (!globalValue)
+    return;
   globalValue->setLinkage(llvm::GlobalValue::PrivateLinkage);
   globalValue->setDSOLocal(true);
   globalValue->setConstant(true);
@@ -97,7 +101,7 @@ void specializeDeviceModule(IREE::HAL::ExecutableVariantOp variantOp,
   overridePlatformGlobal(module, "libdevice_platform_example_flag", 0u);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

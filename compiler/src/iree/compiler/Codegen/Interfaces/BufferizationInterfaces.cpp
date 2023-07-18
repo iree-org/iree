@@ -62,9 +62,10 @@ static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   return strides;
 }
 
-static MemRefType getMemrefTypeForTensor(
-    IREE::Flow::DispatchTensorType tensorType,
-    MemRefLayoutAttrInterface layout = {}, Attribute memorySpace = {}) {
+static MemRefType
+getMemrefTypeForTensor(IREE::Flow::DispatchTensorType tensorType,
+                       MemRefLayoutAttrInterface layout = {},
+                       Attribute memorySpace = {}) {
   return MemRefType::get(tensorType.getShape(),
                          tensorType.getBoundElementType(), layout, memorySpace);
 }
@@ -74,19 +75,17 @@ static MemRefType getMemrefTypeForTensor(
 // TODO(#12933): Because of regressions in CUDA backend, there is an
 // option to keep a legacy mode of not representing the offset in the
 // type. Remove once the bug is fixed.
-static Value findOrCreateSubspanBuffer(
-    RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp,
-    bool embedSubspanOffsetIntoMemRefType) {
+static Value
+findOrCreateSubspanBuffer(RewriterBase &rewriter,
+                          IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
   // Ensure that this a tensor subspan op.
-  auto shapedType = subspanOp.getResult()
-                        .getType()
-                        .dyn_cast<IREE::Flow::DispatchTensorType>();
+  auto shapedType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+      subspanOp.getResult().getType());
   assert(shapedType && shapedType.hasRank());
 
   Value byteOffset = subspanOp.getByteOffset();
   MemRefLayoutAttrInterface layoutAttr = {};
-  if (embedSubspanOffsetIntoMemRefType && byteOffset &&
-      !matchPattern(byteOffset, m_Zero())) {
+  if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
     OpFoldResult elementOffset = convertByteOffsetToElementOffset(
         rewriter, subspanOp->getLoc(), subspanOp.getByteOffset(),
         shapedType.getBoundElementType());
@@ -95,7 +94,7 @@ static Value findOrCreateSubspanBuffer(
     if (!elementOffsetInt) {
       elementOffsetInt = ShapedType::kDynamic;
     }
-    auto tensorType = shapedType.getBoundType().cast<RankedTensorType>();
+    auto tensorType = llvm::cast<RankedTensorType>(shapedType.getBoundType());
     SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
                                         elementOffsetInt.value(), strides);
@@ -106,13 +105,16 @@ static Value findOrCreateSubspanBuffer(
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
   for (Operation &op : *block) {
-    if (&op == subspanOp.getOperation()) break;
+    if (&op == subspanOp.getOperation())
+      break;
     auto bufferSubspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(&op);
-    if (!bufferSubspanOp) continue;
+    if (!bufferSubspanOp)
+      continue;
 
     auto bufferMemrefType =
-        bufferSubspanOp.getResult().getType().dyn_cast<MemRefType>();
-    if (!bufferMemrefType) continue;
+        llvm::dyn_cast<MemRefType>(bufferSubspanOp.getResult().getType());
+    if (!bufferMemrefType)
+      continue;
 
     if (bufferSubspanOp.getSet() != subspanOp.getSet() ||
         bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
@@ -163,8 +165,8 @@ struct DispatchTensorLoadOpInterface
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
-    auto shapedType =
-        loadOp.getSource().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+    auto shapedType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+        loadOp.getSource().getType());
     assert(shapedType && "unexpected source type");
     return shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly;
   }
@@ -176,16 +178,12 @@ struct DispatchTensorLoadOpInterface
         loadOp.getSource()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that source is a SubspanOp");
-    auto ireeOptions =
-        static_cast<const IREEOneShotBufferizationOptions *>(&options);
-    Value source = findOrCreateSubspanBuffer(
-        rewriter, tensorSubspanOp,
-        ireeOptions->embedSubspanOffsetIntoMemRefType);
+    Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
-    if (equalTensorShape(
-            loadOp.getType(), loadOp.sizes(),
-            loadOp.getSource().getType().cast<IREE::Flow::DispatchTensorType>(),
-            loadOp.getSourceDims())) {
+    if (equalTensorShape(loadOp.getType(), loadOp.sizes(),
+                         llvm::cast<IREE::Flow::DispatchTensorType>(
+                             loadOp.getSource().getType()),
+                         loadOp.getSourceDims())) {
       // The entire tensor is loaded.
       replaceOpWithBufferizedValues(rewriter, op, source);
       return success();
@@ -193,11 +191,11 @@ struct DispatchTensorLoadOpInterface
 
     // Bufferize to subview.
     auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
-        loadOp.getType().getShape(), source.getType().cast<MemRefType>(),
+        loadOp.getType().getShape(), llvm::cast<MemRefType>(source.getType()),
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
     replaceOpWithNewBufferizedOp<memref::SubViewOp>(
-        rewriter, op, subviewMemRefType.cast<MemRefType>(), source,
+        rewriter, op, llvm::cast<MemRefType>(subviewMemRefType), source,
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
 
@@ -218,8 +216,9 @@ struct DispatchTensorStoreOpInterface
     return false;
   }
 
-  bufferization::AliasingOpResultList getAliasingOpResults(
-      Operation *op, OpOperand &opOperand, const AnalysisState &state) const {
+  bufferization::AliasingOpResultList
+  getAliasingOpResults(Operation *op, OpOperand &opOperand,
+                       const AnalysisState &state) const {
     return {};
   }
 
@@ -230,35 +229,31 @@ struct DispatchTensorStoreOpInterface
         storeOp.getTarget()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that target is a SubspanOp");
-    auto ireeOptions =
-        static_cast<const IREEOneShotBufferizationOptions *>(&options);
-    Value target = findOrCreateSubspanBuffer(
-        rewriter, tensorSubspanOp,
-        ireeOptions->embedSubspanOffsetIntoMemRefType);
+    Value target = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
-    if (!equalTensorShape(storeOp.getValue().getType().cast<RankedTensorType>(),
-                          storeOp.getSizes(),
-                          storeOp.getTarget()
-                              .getType()
-                              .cast<IREE::Flow::DispatchTensorType>(),
-                          storeOp.getTargetDims())) {
+    if (!equalTensorShape(
+            llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
+            storeOp.getSizes(),
+            llvm::cast<IREE::Flow::DispatchTensorType>(
+                storeOp.getTarget().getType()),
+            storeOp.getTargetDims())) {
       // Writing to a part of the tensor.
       auto subviewMemRefType =
-          memref::SubViewOp::inferRankReducedResultType(
+          llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
               storeOp.getValue().getType().cast<ShapedType>().getShape(),
               target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
-              storeOp.getMixedSizes(), storeOp.getMixedStrides())
-              .cast<MemRefType>();
+              storeOp.getMixedSizes(), storeOp.getMixedStrides()));
 
       target = rewriter.create<memref::SubViewOp>(
           storeOp->getLoc(), subviewMemRefType, target,
           storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
           storeOp.getMixedStrides());
-    }  // else: Writing the entire tensor, no subview required.
+    } // else: Writing the entire tensor, no subview required.
 
     auto maybeBuffer =
         getBuffer(rewriter, storeOp->getOpOperand(0).get(), options);
-    if (failed(maybeBuffer)) return failure();
+    if (failed(maybeBuffer))
+      return failure();
     Value srcMemref = *maybeBuffer;
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
@@ -271,7 +266,7 @@ struct DispatchTensorStoreOpInterface
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 /// Generic conversion for any LinalgExtOp on tensors.
 static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
@@ -288,7 +283,8 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   rewriter.setInsertionPoint(op);
 
   // Nothing to do. This op is already bufferized.
-  if (dspOp.hasBufferSemantics()) return success();
+  if (dspOp.hasBufferSemantics())
+    return success();
 
   // Ensure op has only tensors. Allow mixed tensor-buffer mode on a per-need
   // basis.
@@ -304,7 +300,8 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
       continue;
     }
     auto maybeBuffer = getBuffer(rewriter, opOperand->get(), options);
-    if (failed(maybeBuffer)) return failure();
+    if (failed(maybeBuffer))
+      return failure();
     // Input operands are never written to.
     newInputBuffers.push_back(*maybeBuffer);
   }
@@ -319,7 +316,8 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
     FailureOr<Value> resultBuffer = getBuffer(
         rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
         options);
-    if (failed(resultBuffer)) return failure();
+    if (failed(resultBuffer))
+      return failure();
     newOutputBuffers.push_back(*resultBuffer);
   }
 
@@ -363,7 +361,8 @@ struct LinalgExtOpInterface
     // are a limited number of LinalgExt ops, so we hardcode them here. We don't
     // expect to add more LinalgExt ops.
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
-    if (linalgExtOp.isInputTensor(&opOperand)) return true;
+    if (linalgExtOp.isInputTensor(&opOperand))
+      return true;
     return !isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::ReverseOp>(op);
   }
 
@@ -376,8 +375,9 @@ struct LinalgExtOpInterface
                 .empty();
   }
 
-  bufferization::AliasingOpOperandList getAliasingOpOperands(
-      Operation *op, OpResult opResult, const AnalysisState &state) const {
+  bufferization::AliasingOpOperandList
+  getAliasingOpOperands(Operation *op, OpResult opResult,
+                        const AnalysisState &state) const {
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
 
     // The i-th OpResult may alias with the i-th "out" tensor.
@@ -387,8 +387,9 @@ struct LinalgExtOpInterface
         /*isDefinite=*/false)};
   }
 
-  bufferization::AliasingOpResultList getAliasingOpResults(
-      Operation *op, OpOperand &opOperand, const AnalysisState &state) const {
+  bufferization::AliasingOpResultList
+  getAliasingOpResults(Operation *op, OpOperand &opOperand,
+                       const AnalysisState &state) const {
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
@@ -400,8 +401,9 @@ struct LinalgExtOpInterface
     return {};
   }
 
-  bufferization::BufferRelation bufferRelation(
-      Operation *op, OpResult opResult, const AnalysisState &state) const {
+  bufferization::BufferRelation
+  bufferRelation(Operation *op, OpResult opResult,
+                 const AnalysisState &state) const {
     return bufferization::BufferRelation::Equivalent;
   }
 
@@ -415,12 +417,14 @@ struct LinalgExtOpInterface
 /// Returns the buffers of the source and destination for pack and unpack ops.
 /// Returns a failure if the buffers can not be found.
 template <typename OpTy>
-static FailureOr<std::pair<Value, Value>> getSourceAndDestFromPackUnPackOp(
-    RewriterBase &rewriter, OpTy op, const BufferizationOptions &options) {
+static FailureOr<std::pair<Value, Value>>
+getSourceAndDestFromPackUnPackOp(RewriterBase &rewriter, OpTy op,
+                                 const BufferizationOptions &options) {
   static_assert(llvm::is_one_of<OpTy, tensor::PackOp, tensor::UnPackOp>::value);
   Value source;
   auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
-  if (failed(maybeBuffer)) return failure();
+  if (failed(maybeBuffer))
+    return failure();
   source = *maybeBuffer;
 
   Value dest;
@@ -431,7 +435,8 @@ static FailureOr<std::pair<Value, Value>> getSourceAndDestFromPackUnPackOp(
   FailureOr<Value> resultBuffer = getBuffer(
       rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
       options);
-  if (failed(resultBuffer)) return failure();
+  if (failed(resultBuffer))
+    return failure();
   dest = *resultBuffer;
   return std::make_pair(source, dest);
 }
@@ -444,7 +449,8 @@ static LogicalResult bufferizePackOp(RewriterBase &rewriter, tensor::PackOp op,
 
   auto maybeSrcAndDest =
       getSourceAndDestFromPackUnPackOp(rewriter, op, options);
-  if (failed(maybeSrcAndDest)) return failure();
+  if (failed(maybeSrcAndDest))
+    return failure();
   auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
@@ -468,7 +474,8 @@ static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
 
   auto maybeSrcAndDest =
       getSourceAndDestFromPackUnPackOp(rewriter, op, options);
-  if (failed(maybeSrcAndDest)) return failure();
+  if (failed(maybeSrcAndDest))
+    return failure();
   auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
@@ -499,8 +506,9 @@ struct PackUnPackOpInterface
     return dpsOp.isDpsInit(&opOperand);
   }
 
-  SmallVector<OpOperand *> getAliasingOpOperand(
-      Operation *op, OpResult opResult, const AnalysisState &state) const {
+  SmallVector<OpOperand *>
+  getAliasingOpOperand(Operation *op, OpResult opResult,
+                       const AnalysisState &state) const {
     auto dpsOp = cast<DestinationStyleOpInterface>(op);
     return {dpsOp.getDpsInitOperand(opResult.getResultNumber())};
   }
@@ -510,12 +518,14 @@ struct PackUnPackOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
+    if (dspOp.isDpsInit(&opOperand))
+      return {dspOp.getTiedOpResult(&opOperand)};
     return {};
   }
 
-  bufferization::AliasingOpResultList getAliasingOpResults(
-      Operation *op, OpOperand &opOperand, const AnalysisState &state) const {
+  bufferization::AliasingOpResultList
+  getAliasingOpResults(Operation *op, OpOperand &opOperand,
+                       const AnalysisState &state) const {
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
@@ -526,8 +536,9 @@ struct PackUnPackOpInterface
     return {};
   }
 
-  bufferization::BufferRelation bufferRelation(
-      Operation *op, OpResult opResult, const AnalysisState &state) const {
+  bufferization::BufferRelation
+  bufferRelation(Operation *op, OpResult opResult,
+                 const AnalysisState &state) const {
     return bufferization::BufferRelation::Equivalent;
   }
 
@@ -583,7 +594,8 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
       [&](OpOperand &operand, SmallVector<Value> &neededValues) {
         auto storeOp =
             dyn_cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
-        if (!storeOp) return false;
+        if (!storeOp)
+          return false;
         neededValues.push_back(storeOp.getTarget());
         neededValues.append(storeOp.getTargetDims().begin(),
                             storeOp.getTargetDims().end());
@@ -600,7 +612,7 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
         auto storeOp =
             cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
         auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-            loc, storeOp.getValue().getType().cast<RankedTensorType>(),
+            loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
             storeOp.getTarget(), storeOp.getTargetDims(),
             storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
             storeOp.getMixedStrides());
@@ -660,5 +672,5 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

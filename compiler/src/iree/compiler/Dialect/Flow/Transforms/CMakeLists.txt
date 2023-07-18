@@ -47,10 +47,12 @@ iree_cc_library(
     "ExportBenchmarkFuncs.cpp"
     "FormDispatchRegions.cpp"
     "FormDispatchWorkgroups.cpp"
+    "FormScalarDispatches.cpp"
     "FusionOfTensorOps.cpp"
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
+    "InsertDispatchDebugTargets.cpp"
     "InterchangeGenericOps.cpp"
     "InterchangeTransposeGenericOps.cpp"
     "OptimizeNumerics.cpp"
@@ -59,6 +61,7 @@ iree_cc_library(
     "Passes.cpp"
     "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
+    "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
     "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"
@@ -74,12 +77,12 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgExtUtils
     IREELinalgTransformDialect
-    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
+    MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
@@ -101,6 +104,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTosaDialect
     MLIRTransformDialect
+    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow

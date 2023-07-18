@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "bitcast.mlir"
     "cast.mlir"
     "extract.mlir"
     "extract_slice.mlir"

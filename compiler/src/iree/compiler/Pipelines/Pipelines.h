@@ -34,6 +34,7 @@ struct IREEVMPipelineHooks {
 };
 
 enum class IREEVMPipelinePhase {
+  Start,
   Input,
   ABI,
   Preprocessing,
@@ -50,6 +51,8 @@ enum class IREEVMPipelinePhase {
 inline static void enumerateIREEVMPipelinePhases(
     std::function<void(IREEVMPipelinePhase, StringRef name, StringRef desc)>
         callback) {
+  callback(IREEVMPipelinePhase::Start, "start",
+           "Entry point to the compilation pipeline.");
   callback(IREEVMPipelinePhase::Input, "input",
            "Performs input processing and lowering into core IREE "
            "input dialects (linalg/etc).");
@@ -79,6 +82,7 @@ inline static void enumerateIREEVMPipelinePhases(
 // If a |runTo| phase is specified the pipeline will stop and output the full
 // IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
@@ -86,6 +90,7 @@ void buildIREEVMTransformPassPipeline(
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager,
+    IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
     IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::End);
 
 // Builds the above with options initialized from flags.
@@ -94,7 +99,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
 // Registration hooks.
 void registerIREEVMTransformPassPipeline();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_PIPELINES_PIPELINES_H_
+#endif // IREE_COMPILER_PIPELINES_PIPELINES_H_

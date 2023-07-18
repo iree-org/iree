@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFTransformOps
     MLIRTensorDialect
+    MLIRTensorTransformOps
     MLIRVectorTransformOps
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
@@ -144,7 +145,7 @@ iree_cc_library(
     "ProcessorOpInterfaces.cpp"
   DEPS
     ::ProcessorOpInterfaceGen
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     iree::compiler::Dialect::HAL::IR
   PUBLIC

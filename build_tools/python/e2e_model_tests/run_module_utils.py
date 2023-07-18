@@ -12,16 +12,17 @@ from e2e_test_framework.device_specs import device_parameters
 
 
 def build_linux_wrapper_cmds_for_device_spec(
-    device_spec: common_definitions.DeviceSpec) -> List[str]:
-  """Builds the commands with tools to create the execution environment."""
+    device_spec: common_definitions.DeviceSpec,
+) -> List[str]:
+    """Builds the commands with tools to create the execution environment."""
 
-  affinity_mask = None
-  for param in device_spec.device_parameters:
-    if param != device_parameters.ALL_CORES:
-      raise ValueError(f"Unsupported device parameter: {param}.")
+    affinity_mask = None
+    for param in device_spec.device_parameters:
+        if param != device_parameters.ALL_CORES:
+            raise ValueError(f"Unsupported device parameter: {param}.")
 
-  cmds = []
-  if affinity_mask is not None:
-    cmds += ["taskset", affinity_mask]
+    cmds = []
+    if affinity_mask is not None:
+        cmds += ["taskset", affinity_mask]
 
-  return cmds
+    return cmds

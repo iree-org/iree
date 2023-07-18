@@ -8,7 +8,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/api.h"
 #include "iree/hal/drivers/cuda/cuda_device.h"
@@ -70,12 +69,15 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
 
-  // Initialize NCCL too if a channel provider is defined or any default
-  // collective group values.
-  if (iree_status_is_ok(status) &&
-      default_params->channel_provider.query_group_params) {
+  if (iree_status_is_ok(status)) {
+    // Try to load NCCL. This will fail if NCCL is unavailable or incompatible.
+    // We only fail on unavailability when the user tries to create a channel
+    // and otherwise defer reporting.
     status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
                                                            &driver->syms);
+    if (iree_status_is_unavailable(status)) {
+      status = iree_status_ignore(status);
+    }
   }
 
   if (iree_status_is_ok(status)) {
@@ -251,7 +253,8 @@ static iree_status_t iree_hal_cuda_driver_select_default_device(
                               "no compatible CUDA devices were found");
   } else if (default_device_index >= device_count) {
     status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "default device %d not found (of %ld enumerated)",
+                              "default device %d not found (of %" PRIhsz
+                              " enumerated)",
                               default_device_index, device_count);
   } else {
     *out_device =
@@ -358,6 +361,16 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
 
   // Ensure CUDA is initialized before querying it.
   IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
+
+  // Query the number of available CUDA devices.
+  int device_count = 0;
+  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetCount(&device_count),
+                       "cuDeviceGetCount");
+  if (device_index >= device_count) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "device %d not found (of %d enumerated)",
+                            device_index, device_count);
+  }
 
   CUdevice device = 0;
   CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGet(&device, device_index),

@@ -9,7 +9,7 @@
 # Runs Markdownlint on Markdown (.md) files
 # https://github.com/igorshubovych/markdownlint-cli
 
-set -xuo pipefail
+set -euo pipefail
 
 declare -a included_files_patterns=(
   # All .md files (disabled while we decide how rigorously to apply lint checks)
@@ -20,10 +20,15 @@ declare -a included_files_patterns=(
 )
 
 declare -a excluded_files_patterns=(
-  "/third_party/"
+  "**/third_party/**"
   "**/node_modules/**"
 )
 
-markdownlint "${included_files_patterns[*]}" \
-    --config ./docs/.markdownlint.yml \
-    --ignore "${excluded_files_patterns[*]}"
+# ${excluded_files_patterns} is expanded into
+# "--ignore=pattern1 --ignore=pattern2 ...", since markdownlint doesn't accept
+# "--ignore pattern1 pattern2 ...".
+# The expansion trick is explained in
+# https://stackoverflow.com/questions/20366609/prefix-and-postfix-elements-of-a-bash-array
+markdownlint "${included_files_patterns[@]}" \
+    --config=./docs/.markdownlint.yml \
+    "${excluded_files_patterns[@]/#/--ignore=}"

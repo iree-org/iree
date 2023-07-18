@@ -24,7 +24,7 @@ iree_status_t iree_hal_executable_library_verify(
     if (library->exports.count != executable_params->pipeline_layout_count) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "executable provides %u entry points but caller "
-                              "provided %zu; must match",
+                              "provided %" PRIhsz "; must match",
                               library->exports.count,
                               executable_params->pipeline_layout_count);
     }
@@ -34,7 +34,7 @@ iree_status_t iree_hal_executable_library_verify(
   if (library->constants.count != executable_params->constant_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "executable requires %u constants but caller "
-                            "provided %zu; must match",
+                            "provided %" PRIhsz "; must match",
                             library->constants.count,
                             executable_params->constant_count);
   }
@@ -52,7 +52,7 @@ iree_status_t iree_hal_executable_library_initialize_imports(
   IREE_ASSERT_ARGUMENT(import_thunk);
   if (!import_table || !import_table->count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, import_table->count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, import_table->count);
 
   // The thunk is used to give the loader a chance to intercept import calls
   // in cases where it needs to JIT, perform FFI/ABI conversion, etc.

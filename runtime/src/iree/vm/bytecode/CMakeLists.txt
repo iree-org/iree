@@ -29,7 +29,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::tracing
     iree::vm
     iree::vm::bytecode::utils
     iree::vm::ops

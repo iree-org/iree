@@ -172,8 +172,9 @@ class NativeModule {
     auto* module = FromModulePointer(self);
     if (IREE_UNLIKELY(ordinal > module->dispatch_table_.size())) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "function out of bounds: 0 < %zu < %zu", ordinal,
-                              module->dispatch_table_.size());
+                              "function out of bounds: 0 < %" PRIhsz
+                              " < %" PRIhsz,
+                              ordinal, module->dispatch_table_.size());
     }
     const auto& dispatch_function = module->dispatch_table_[ordinal];
     if (out_function) {
@@ -190,10 +191,10 @@ class NativeModule {
     return iree_ok_status();
   }
 
-  static iree_status_t ModuleLookupFunction(void* self,
-                                            iree_vm_function_linkage_t linkage,
-                                            iree_string_view_t name,
-                                            iree_vm_function_t* out_function) {
+  static iree_status_t ModuleLookupFunction(
+      void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+      const iree_vm_function_signature_t* expected_signature,
+      iree_vm_function_t* out_function) {
     IREE_ASSERT_ARGUMENT(out_function);
     std::memset(out_function, 0, sizeof(*out_function));
     if (IREE_UNLIKELY(!name.data || !name.size)) {
@@ -210,6 +211,7 @@ class NativeModule {
         return iree_ok_status();
       }
     }
+
     return iree_make_status(IREE_STATUS_NOT_FOUND, "function %.*s not exported",
                             (int)name.size, name.data);
   }
@@ -253,10 +255,10 @@ class NativeModule {
     auto* module = FromModulePointer(self);
     if (IREE_UNLIKELY(call.function.ordinal >=
                       module->dispatch_table_.size())) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "function ordinal out of bounds: 0 < %u < %zu",
-                              call.function.ordinal,
-                              module->dispatch_table_.size());
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "function ordinal out of bounds: 0 < %u < %" PRIhsz,
+          call.function.ordinal, module->dispatch_table_.size());
     }
     const auto& info = module->dispatch_table_[call.function.ordinal];
 

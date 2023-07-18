@@ -42,7 +42,7 @@ static size_t getGlobalStorageSize(IREE::Util::GlobalOpInterface globalOp) {
 // clustered together to make use of paging in memory mapped files.
 class OrdinalAllocationPass
     : public PassWrapper<OrdinalAllocationPass, OperationPass<ModuleOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "iree-vm-ordinal-allocation";
   }
@@ -60,7 +60,7 @@ class OrdinalAllocationPass
     int nextExportOrdinal = 0;
     int nextGlobalRefOrdinal = 0;
     int nextRodataOrdinal = 0;
-    SmallVector<SmallVector<IREE::Util::GlobalOpInterface, 4>, 8>
+    SmallVector<SmallVector<IREE::Util::GlobalOpInterface>, 8>
         primitiveGlobalOps(sizeof(int64_t) + 1);
     for (auto &op : getOperation().getBlock().getOperations()) {
       std::optional<int> ordinal = std::nullopt;
@@ -73,7 +73,7 @@ class OrdinalAllocationPass
       } else if (isa<RodataOp>(op)) {
         ordinal = nextRodataOrdinal++;
       } else if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-        if (globalOp.getGlobalType().isa<IREE::VM::RefType>()) {
+        if (llvm::isa<IREE::VM::RefType>(globalOp.getGlobalType())) {
           ordinal = nextGlobalRefOrdinal++;
         } else {
           // Bucket the primitive global ops (like vm.global.i32) by byte size
@@ -94,7 +94,8 @@ class OrdinalAllocationPass
     int globalBytes = 0;
     for (auto sizeGlobalOps : llvm::enumerate(primitiveGlobalOps)) {
       size_t storageSize = sizeGlobalOps.index();
-      if (sizeGlobalOps.value().empty()) continue;
+      if (sizeGlobalOps.value().empty())
+        continue;
       nextGlobalBytesOrdinal =
           llvm::alignTo(nextGlobalBytesOrdinal, storageSize);
       for (auto &globalOp : sizeGlobalOps.value()) {
@@ -140,7 +141,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createOrdinalAllocationPass() {
 
 static PassRegistration<OrdinalAllocationPass> pass;
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -41,10 +41,10 @@ OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 
 SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
                                   Value shapedTypeValue) {
-  return llvm::to_vector(llvm::map_range(
+  return llvm::map_to_vector(
       llvm::seq<int64_t>(
           0, shapedTypeValue.getType().cast<ShapedType>().getRank()),
-      [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); }));
+      [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); });
 }
 
 SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,

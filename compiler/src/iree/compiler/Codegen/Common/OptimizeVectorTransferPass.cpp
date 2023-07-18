@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -19,40 +20,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// Return true if all the uses of op are either Store/transfer_write.
-// There can be SubviewOp users as long as all its users are also
-// StoreOp/transfer_write. If return true it also fills out the uses, if it
-// returns false uses is unchanged.
-static bool allUsesAreStores(Operation* op, std::vector<Operation*>& uses) {
-  std::vector<Operation*> opUses;
-  for (OpOperand& use : op->getUses()) {
-    Operation* useOp = use.getOwner();
-    if (isa<vector::TransferWriteOp, memref::StoreOp>(useOp) ||
-        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
-      opUses.push_back(useOp);
-      continue;
-    }
-    return false;
-  }
-  uses.insert(uses.end(), opUses.begin(), opUses.end());
-  return true;
-}
-
-// Track temporary allocations that are never read from. If this is the case
-// it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(func::FuncOp funcOp) {
-  std::vector<Operation*> opToErase;
-  funcOp.walk([&](memref::AllocOp op) {
-    if (allUsesAreStores(op, opToErase)) {
-      opToErase.push_back(op.getOperation());
-    }
-  });
-  for (Operation* op : opToErase) {
-    op->erase();
-  }
-}
-
 namespace {
 
 // Pattern to canonialize tranpose where only one dimension is not unit
@@ -63,15 +30,16 @@ namespace {
 // on the semantic of transpose in this case.
 class TransposeUnitDimToShapeCast
     : public OpRewritePattern<vector::TransposeOp> {
- public:
+public:
   using OpRewritePattern<vector::TransposeOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::TransposeOp op,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
     unsigned numNonUnitSrcDim =
         llvm::count_if(op.getSourceVectorType().getShape(),
                        [](int64_t dim) { return dim != 1; });
-    if (numNonUnitSrcDim > 1) return failure();
+    if (numNonUnitSrcDim > 1)
+      return failure();
     rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
         op, op.getResultVectorType(), op.getVector());
     return success();
@@ -88,7 +56,8 @@ static void loopInvariantCodeMotion(func::FuncOp funcOp) {
 
 struct OptimizeVectorTransferPass
     : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
-  OptimizeVectorTransferPass(bool flatten) : flatten(flatten) {}
+  OptimizeVectorTransferPass(bool flatten, bool dropUnitDims)
+      : flatten(flatten), dropUnitDims(dropUnitDims) {}
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     // Generate vector.shape_cast for dropping leading one dimensions in vector
@@ -125,10 +94,20 @@ struct OptimizeVectorTransferPass
       }
     }
 
+    // TODO(#14191): SPIR-V can't handle the vector.shape_cast created for
+    // dropping unit dims so this option is disabled in SPIR-V pipeline.
+    // This option should go away after all backend issues have been resolved.
+    if (dropUnitDims) {
+      RewritePatternSet patterns(&getContext());
+      mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
     // Second stage of patterns to flatten transfer ops.
     if (flatten) {
       RewritePatternSet patterns(&getContext());
-      mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
       mlir::vector::populateFlattenVectorTransferPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -138,6 +117,7 @@ struct OptimizeVectorTransferPass
     // forwarding.
     eraseDeadAllocAndStores(funcOp);
   }
+
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) {
       return failure();
@@ -149,16 +129,17 @@ struct OptimizeVectorTransferPass
     return success();
   }
 
- private:
+private:
   bool flatten;
+  bool dropUnitDims;
 };
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
-    bool flatten) {
-  return std::make_unique<OptimizeVectorTransferPass>(flatten);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createOptimizeVectorTransferPass(bool flatten, bool dropUnitDims) {
+  return std::make_unique<OptimizeVectorTransferPass>(flatten, dropUnitDims);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

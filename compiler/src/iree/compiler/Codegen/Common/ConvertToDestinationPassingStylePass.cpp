@@ -14,8 +14,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -32,6 +32,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -52,7 +53,7 @@ namespace {
 class ConvertToDestinationPassingStylePass
     : public ConvertToDestinationPassingStyleBase<
           ConvertToDestinationPassingStylePass> {
- public:
+public:
   ConvertToDestinationPassingStylePass() = default;
   ConvertToDestinationPassingStylePass(bool useWARForCooperativeMatrixCodegen) {
     this->useWARForCooperativeMatrixCodegen = useWARForCooperativeMatrixCodegen;
@@ -68,17 +69,19 @@ class ConvertToDestinationPassingStylePass
   }
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 /// Returns the subview into the buffer that is supposed to be populated with
 /// the `value` of the `flow.dispatch.tensor.store` operation. This can be used
 /// to compute the results in place.
-static Value getTensorLoadOpForTensorStoreOp(
-    OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp) {
+static Value
+getTensorLoadOpForTensorStoreOp(OpBuilder &b,
+                                IREE::Flow::DispatchTensorStoreOp storeOp) {
   // Clone the offset, size and stride values. They will be CSE-ed later.
   SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      storeOp.getLoc(), storeOp.getValue().getType().cast<RankedTensorType>(),
+      storeOp.getLoc(),
+      llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
       storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
       clonedVals.sizes, clonedVals.strides);
   return tensorLoadOp;
@@ -132,10 +135,10 @@ static Value getTiedResultForOperand(OpOperand &operand,
 /// `flow.dispatch.tensor.store` operation. For each use, gets the tied result
 /// and follow its uses. The traversed uses and thir tied results are returned
 /// in `traversedUses`.
-static IREE::Flow::DispatchTensorStoreOp walkUseToGetDispatchTensorStoreOp(
-    Value value, const BufferizationPlan &plan,
-    SmallVectorImpl<OpOperand *> &traversedUses,
-    llvm::DenseSet<Value> &processed) {
+static IREE::Flow::DispatchTensorStoreOp
+walkUseToGetDispatchTensorStoreOp(Value value, const BufferizationPlan &plan,
+                                  SmallVectorImpl<OpOperand *> &traversedUses,
+                                  llvm::DenseSet<Value> &processed) {
   Operation *user = nullptr;
   while (value.hasOneUse()) {
     processed.insert(value);
@@ -145,7 +148,8 @@ static IREE::Flow::DispatchTensorStoreOp walkUseToGetDispatchTensorStoreOp(
       return storeOp;
     }
     value = getTiedResultForOperand(use, plan);
-    if (!value) return nullptr;
+    if (!value)
+      return nullptr;
     traversedUses.push_back(&use);
   }
   // If the value has a use which is a store, then use that directly.
@@ -181,9 +185,10 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
 
 /// For an operation whose `resultValue` is the result of the dispatch region,
 /// gets the buffer to use to compute the value in-place.
-static LogicalResult modifyResultToUseStoreBuffer(
-    OpBuilder &b, OpResult resultValue, const BufferizationPlan &plan,
-    llvm::DenseSet<Value> &processed) {
+static LogicalResult
+modifyResultToUseStoreBuffer(OpBuilder &b, OpResult resultValue,
+                             const BufferizationPlan &plan,
+                             llvm::DenseSet<Value> &processed) {
   // Traverse the use-def chains to get the `flow.dispatch.tensor.store`
   // operation keeping track of all the traversed operations. Note that the
   // equivalence set construction should ensure that all operations traversed
@@ -254,7 +259,8 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
   auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
       [&](tensor::EmptyOp emptyOp) -> WalkResult {
         for (auto result : emptyOp->getResults()) {
-          if (!result.getType().isa<RankedTensorType>()) continue;
+          if (!llvm::isa<RankedTensorType>(result.getType()))
+            continue;
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
           }
@@ -273,8 +279,8 @@ static LogicalResult duplicateTensorEmptyOps(OpBuilder &b,
                                              tensor::EmptyOp emptyOp) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(emptyOp);
-  SmallVector<OpOperand *> uses = llvm::to_vector(
-      llvm::map_range(emptyOp->getUses(), [](OpOperand &use) { return &use; }));
+  SmallVector<OpOperand *> uses = llvm::map_to_vector(
+      emptyOp->getUses(), [](OpOperand &use) { return &use; });
   for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
     auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
     Operation *user = use->getOwner();
@@ -285,32 +291,35 @@ static LogicalResult duplicateTensorEmptyOps(OpBuilder &b,
 
 // Checks if the `inOperand` can be used in place of the `initOperand`
 // to mimic in-place update behavior for parallel elementwise ops.
-static bool canUseInOperandAsInitOperand(
-    OpOperand *inOperand, OpOperand *initOperand,
-    bool useWARForCooperativeMatrixCodegen = false) {
+static bool
+canUseInOperandAsInitOperand(OpOperand *inOperand, OpOperand *initOperand,
+                             bool useWARForCooperativeMatrixCodegen = false) {
   if (isReadOnly(inOperand->get())) {
     return false;
   }
 
-  if (inOperand->getOwner() != initOperand->getOwner()) return false;
+  if (inOperand->getOwner() != initOperand->getOwner())
+    return false;
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(inOperand->getOwner());
-  if (!linalgOp) return false;
+  if (!linalgOp)
+    return false;
 
   if (linalgOp.getMatchingIndexingMap(inOperand) !=
       linalgOp.getMatchingIndexingMap(initOperand)) {
     return false;
   }
 
-  if (inOperand->get().getType() != initOperand->get().getType()) return false;
+  if (inOperand->get().getType() != initOperand->get().getType())
+    return false;
 
   if (useWARForCooperativeMatrixCodegen) {
     return true;
   }
 
   if (auto producerOp = inOperand->get().getDefiningOp<linalg::LinalgOp>()) {
-    if (succeeded(linalg::vectorizeLinalgOpPrecondition(linalgOp)) &&
-        succeeded(linalg::vectorizeLinalgOpPrecondition(producerOp))) {
+    if (succeeded(linalg::vectorizeOpPrecondition(linalgOp)) &&
+        succeeded(linalg::vectorizeOpPrecondition(producerOp))) {
       return false;
     }
   }
@@ -319,16 +328,17 @@ static bool canUseInOperandAsInitOperand(
 
 /// Checks if the use of a result of a compute op can be modified
 /// so that it can be moved into a store set.
-static std::optional<OpOperand *> canModifyUseToGetValueIntoStoreSet(
-    BufferizationPlan &plan, OpOperand *use,
-    bool useWARForCooperativeMatrixCodegen) {
+static std::optional<OpOperand *>
+canModifyUseToGetValueIntoStoreSet(BufferizationPlan &plan, OpOperand *use,
+                                   bool useWARForCooperativeMatrixCodegen) {
   assert(!plan.isInStoreSet(use->get()) &&
          "attempting to move a value into a store set, when it is already part "
          "of one");
 
   // Currently only look at use in linalg.generic ops.
   auto genericOpConsumer = dyn_cast<linalg::GenericOp>(use->getOwner());
-  if (!genericOpConsumer) return std::nullopt;
+  if (!genericOpConsumer)
+    return std::nullopt;
 
   // All loops need to be parallel.
   if (genericOpConsumer.getNumLoops() !=
@@ -336,14 +346,17 @@ static std::optional<OpOperand *> canModifyUseToGetValueIntoStoreSet(
     return std::nullopt;
   }
 
-  if (genericOpConsumer.isDpsInit(use)) return std::nullopt;
+  if (genericOpConsumer.isDpsInit(use))
+    return std::nullopt;
 
   for (auto [index, initOperand] :
        llvm::enumerate(genericOpConsumer.getDpsInitOperands())) {
     // Output tensor is unused in the body computation.
-    if (genericOpConsumer.payloadUsesValueFromOperand(initOperand)) continue;
+    if (genericOpConsumer.payloadUsesValueFromOperand(initOperand))
+      continue;
     // The result of this operation needs to be in a store set.
-    if (!plan.isInStoreSet(genericOpConsumer->getResult(index))) continue;
+    if (!plan.isInStoreSet(genericOpConsumer->getResult(index)))
+      continue;
     if (!canUseInOperandAsInitOperand(use, initOperand,
                                       useWARForCooperativeMatrixCodegen)) {
       continue;
@@ -435,7 +448,8 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
         [&](TilingInterface computeOp) -> WalkResult {
       for (auto result : computeOp->getResults()) {
         // If result is already in a store set. Nothing to do.
-        if (plan.isInStoreSet(result)) continue;
+        if (plan.isInStoreSet(result))
+          continue;
 
         // Check if there are any uses that can be modified to reuse the output
         // buffer.
@@ -443,7 +457,8 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
           std::optional<OpOperand *> reusableOperand =
               canModifyUseToGetValueIntoStoreSet(
                   plan, &use, useWARForCooperativeMatrixCodegen);
-          if (!reusableOperand) continue;
+          if (!reusableOperand)
+            continue;
           if (failed(modifyUseToGetValueIntoStoreSet(rewriter, &use,
                                                      reusableOperand.value())))
             continue;
@@ -477,7 +492,8 @@ static LogicalResult replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
       return;
     }
     auto emptyOp = unpackOp.getDest().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyOp) return;
+    if (!emptyOp)
+      return;
 
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointAfter(emptyOp);
@@ -501,11 +517,14 @@ struct RemoveCstOutsDependency
     Location loc = op.getLoc();
     for (OpOperand *opOperand : op.getDpsInitOperands()) {
       DenseElementsAttr attr;
-      if (!matchPattern(opOperand->get(), m_Constant(&attr))) continue;
-      if (!attr.isSplat()) continue;
-      auto type = attr.getType().dyn_cast<RankedTensorType>();
-      if (!type) continue;
-      Attribute scalarAttr = attr.getValues<Attribute>()[0];
+      if (!matchPattern(opOperand->get(), m_Constant(&attr)))
+        continue;
+      if (!attr.isSplat())
+        continue;
+      auto type = llvm::dyn_cast<RankedTensorType>(attr.getType());
+      if (!type)
+        continue;
+      TypedAttr scalarAttr = attr.getValues<TypedAttr>()[0];
 
       modifiedOutput = true;
       Value emptyTensor = rewriter.create<tensor::EmptyOp>(
@@ -560,7 +579,8 @@ struct SwitchStoreOfIfResultValue
                                          "store source is not an if statement");
     }
 
-    auto resultNumber = storeOp.getValue().cast<OpResult>().getResultNumber();
+    auto resultNumber =
+        llvm::cast<OpResult>(storeOp.getValue()).getResultNumber();
     auto moveStoreInsideBody = [&](Block *body) {
       OpBuilder::InsertionGuard guard(rewriter);
       auto yieldOp = cast<scf::YieldOp>(body->getTerminator());
@@ -581,7 +601,7 @@ struct SwitchStoreOfIfResultValue
   }
 };
 
-}  // namespace
+} // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
@@ -642,5 +662,5 @@ createConvertToDestinationPassingStylePass(
       useWARForCooperativeMatrixCodegen);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

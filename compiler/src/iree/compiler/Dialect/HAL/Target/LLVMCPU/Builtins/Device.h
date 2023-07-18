@@ -18,17 +18,18 @@ namespace IREE {
 namespace HAL {
 
 // Loads the libdevice bitcode file and specializes it for |targetMachine|.
-llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
-    llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
+llvm::Expected<std::unique_ptr<llvm::Module>>
+loadDeviceBitcode(llvm::TargetMachine *targetMachine,
+                  llvm::LLVMContext &context);
 
 // Specializes |module| using |targetMachine|.
 void specializeDeviceModule(IREE::HAL::ExecutableVariantOp variantOp,
                             llvm::Module &module,
                             llvm::TargetMachine &targetMachine);
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_DEVICE_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_DEVICE_H_

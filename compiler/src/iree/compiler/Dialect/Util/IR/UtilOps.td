@@ -15,6 +15,7 @@ include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -33,8 +34,15 @@ class Util_PureOp<string mnemonic, list<Trait> traits = []> :
     Util_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
-// Byte buffers and host data
+// Type manipulation
 //===----------------------------------------------------------------------===//
+
+def OpGroupTypeManipulationOps : OpDocGroup {
+  let summary = "Type manipulation ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTypeManipulationOps in {
 
 def Util_NullOp : Util_PureOp<"null"> {
   let summary = [{returns a null type value}];
@@ -50,6 +58,36 @@ def Util_NullOp : Util_PureOp<"null"> {
   let assemblyFormat = [{
     attr-dict `:` type($result)
   }];
+}
+
+def Util_CastOp : Util_PureOp<"cast", [
+  DeclareOpInterfaceMethods<CastOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperand",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{casts one util type to another ala static_cast/dynamic_cast}];
+  let description = [{
+    Performs a type cast between object types known to the util dialect.
+  }];
+
+  let arguments = (ins
+    AnyType:$operand
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `to` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
@@ -77,9 +115,18 @@ def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
   let hasFolder = 1;
 }
 
+} // OpGroupTypeManipulationOps
+
 //===----------------------------------------------------------------------===//
 // Data type conversions
 //===----------------------------------------------------------------------===//
+
+def OpGroupDataTypeConversionOps : OpDocGroup {
+  let summary = "Data type conversion ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupDataTypeConversionOps in {
 
 def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
   SameOperandsAndResultType
@@ -152,9 +199,18 @@ def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
   }];
 }
 
+} // OpGroupDataTypeConversionOps
+
 //===----------------------------------------------------------------------===//
 // Range arithmetic
 //===----------------------------------------------------------------------===//
+
+def OpGroupRangeArithmeticOps : OpDocGroup {
+  let summary = "Range arithmetic ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupRangeArithmeticOps in {
 
 def Util_RangeMinOp : Util_PureOp<"range.min", [
   SameOperandsAndResultType,
@@ -235,9 +291,18 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupRangeArithmeticOps
+
 //===----------------------------------------------------------------------===//
 // Address/offset Arithmetic
 //===----------------------------------------------------------------------===//
+
+def OpGroupAddressOffsetArithmeticOps : OpDocGroup {
+  let summary = "Address/offset arithmetic ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupAddressOffsetArithmeticOps in {
 
 def Util_AlignOp : Util_PureOp<"align", [
   SameOperandsAndResultType
@@ -301,9 +366,67 @@ def Util_SizeOfOp : Util_PureOp<"sizeof"> {
   let hasFolder = 1;
 }
 
+} // OpGroupAddressOffsetArithmeticOps
+
+//===----------------------------------------------------------------------===//
+// Value utility ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupValueUtilityOps : OpDocGroup {
+  let summary = "Value utility ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupValueUtilityOps in {
+
+def Util_SwitchOp : Util_PureOp<"switch", [
+  AllTypesMatch<["default_value", "result"]>,
+]> {
+  let summary = [{primitive switch operation}];
+  let description = [{
+    Returns the value with the given `index` in `values` or `default_value` if
+    the index is out of bounds.
+
+    ```mlir
+    // Switch %index to cases of %c100/%c200/%c300 if index==0, ==1, ==2.
+    // If %index is out of range (<0 or >2) then default to %c5.
+    %0 = util.switch %index[%c100, %c200, %c300] else %c5 : i32
+    ```
+  }];
+
+  let arguments = (ins
+    Index:$index,
+    Util_Primitive:$default_value,
+    Variadic<Util_Primitive>:$values
+  );
+  let results = (outs
+    Util_Primitive:$result
+  );
+
+  let assemblyFormat = [{
+    type($default_value) `from`
+    custom<TypedValueList>(ref(type($default_value)), $values, type($values))
+    `at` $index
+    `else` $default_value
+    attr-dict
+    `:` type($result)
+  }];
+
+  let hasFolder = 1;
+}
+
+} // OpGroupValueUtilityOps
+
 //===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
+
+def OpGroupCompilerHintOps : OpDocGroup {
+  let summary = "Compiler hint ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupCompilerHintOps in {
 
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
   SameOperandsAndResultType,
@@ -379,9 +502,18 @@ def Util_UnreachableOp : Util_Op<"unreachable", [
   let assemblyFormat = "$message attr-dict";
 }
 
+} // OpGroupCompilerHintOps
+
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupStructuralOps : OpDocGroup {
+  let summary = "Structural ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupStructuralOps in {
 
 def Util_InitializerOp : Util_Op<"initializer", [
     IsolatedFromAbove,
@@ -463,9 +595,18 @@ def Util_InitializerReturnOp : Util_Op<"initializer.return", [
   let assemblyFormat = "attr-dict";
 }
 
+} // OpGroupStructuralOps
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
+
+def OpGroupGlobalOps : OpDocGroup {
+  let summary = "Global ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupGlobalOps in {
 
 def Util_GlobalOp : Util_Op<"global", [
   Symbol,
@@ -661,6 +802,8 @@ def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupGlobalOps
+
 //===----------------------------------------------------------------------===//
 // !util.list<T>
 //===----------------------------------------------------------------------===//
@@ -668,6 +811,15 @@ def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect", [
 // immutable and have operations like util.list.append/concat/etc the returned
 // new SSA values. This would make optimizing the list usage much easier and
 // enable hoisting/CSE of list access/mutation.
+
+def OpGroupListOps : OpDocGroup {
+  let summary = "List ops";
+  let description = [{
+    Ops for `!util.list<T>` (mostly just a placeholder for now).
+  }];
+}
+
+let opDocGroup = OpGroupListOps in {
 
 def Util_ListCreateOp : Util_PureOp<
     "list.create", [MemoryEffects<[MemAlloc]>]> {
@@ -755,9 +907,18 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let hasVerifier = 1;
 }
 
+} // OpGroupListOps
+
 //===----------------------------------------------------------------------===//
 // !util.buffer
 //===----------------------------------------------------------------------===//
+
+def OpGroupBufferOps : OpDocGroup {
+  let summary = "Buffer ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupBufferOps in {
 
 def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -1180,9 +1341,18 @@ def Util_BufferStoreOp : Util_Op<"buffer.store", [
   }];
 }
 
+} // OpGroupBufferOps
+
 //===----------------------------------------------------------------------===//
 // Status
 //===----------------------------------------------------------------------===//
+
+def OpGroupStatusOps : OpDocGroup {
+  let summary = "Status ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupStatusOps in {
 
 def Util_StatusCheckOkOp : Util_Op<"status.check_ok"> {
   let summary = [{raises a global failure if a status is not 'ok'}];
@@ -1217,5 +1387,7 @@ def Util_StatusCheckOkOp : Util_Op<"status.check_ok"> {
     }]>,
   ];
 }
+
+} // OpGroupStatusOps
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_OPS

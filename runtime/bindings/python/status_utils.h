@@ -8,7 +8,7 @@
 #define IREE_BINDINGS_PYTHON_IREE_COMMON_STATUS_UTILS_H_
 
 #include "iree/base/api.h"
-#include "pybind11/pybind11.h"
+#include "nanobind/nanobind.h"
 
 namespace iree {
 namespace python {
@@ -16,18 +16,17 @@ namespace python {
 // Raises a value error with the given message.
 // Correct usage:
 //   throw RaiseValueError(PyExc_ValueError, "Foobar'd");
-pybind11::error_already_set RaisePyError(PyObject* exc_class,
-                                         const char* message);
+nanobind::python_error RaisePyError(PyObject* exc_class, const char* message);
 
 // Raises a value error with the given message.
 // Correct usage:
 //   throw RaiseValueError("Foobar'd");
-inline pybind11::error_already_set RaiseValueError(const char* message) {
+inline nanobind::python_error RaiseValueError(const char* message) {
   return RaisePyError(PyExc_ValueError, message);
 }
 
-pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
-                                             const char* message);
+nanobind::python_error ApiStatusToPyExc(iree_status_t status,
+                                        const char* message);
 
 inline void CheckApiStatus(iree_status_t status, const char* message) {
   if (iree_status_is_ok(status)) {

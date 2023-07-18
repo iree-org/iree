@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -44,7 +46,8 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
     // scalar that is not one of the arguments of the linalg operation.
     Region &region = padTensorOp.getRegion();
     Block &block = region.front();
-    if (!llvm::hasSingleElement(block)) return failure();
+    if (!llvm::hasSingleElement(block))
+      return failure();
     auto yieldOp = cast<tensor::YieldOp>(block.getTerminator());
     Value yieldVal = yieldOp.getValue();
     if (llvm::any_of(block.getArguments(),
@@ -52,69 +55,31 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
       return failure();
     }
 
-    if (skipSingleLinalgOpUses && padTensorOp->hasOneUse()) {
+    if (padTensorOp->hasOneUse()) {
       Operation *use = padTensorOp->use_begin()->getOwner();
-      // TODO(#10312): Relax the condition to not check quantized ops. They
-      // are going to be deprecated. We don't expect them being IREE's input.
-      if (isa<linalg::LinalgOp>(use) &&
-          !isa<linalg::Conv2DNhwcHwcfQOp, linalg::DepthwiseConv2DNhwcHwcQOp,
-               linalg::DepthwiseConv2DNhwcHwcmQOp>(use)) {
+      if (skipSingleLinalgOpUses) {
+        // TODO(#10312): Relax the condition to not check quantized ops. They
+        // are going to be deprecated. We don't expect them being IREE's input.
+        if (isa<linalg::LinalgOp>(use) &&
+            !isa<linalg::Conv2DNhwcHwcfQOp, linalg::DepthwiseConv2DNhwcHwcQOp,
+                 linalg::DepthwiseConv2DNhwcHwcmQOp>(use)) {
+          return failure();
+        }
+      }
+      // (pad + set_encoding) gets folded in to tensor.pack in the
+      // MaterializeEncoding pass. Rewriting those pads into insert_slice would
+      // defeat that.
+      if (isa<IREE::LinalgExt::SetEncodingOp>(use)) {
         return failure();
       }
     }
 
-    OpBuilder::InsertionGuard g(rewriter);
-    Location loc = padTensorOp.getLoc();
-    auto lowPad = padTensorOp.getMixedLowPad();
-    auto highPad = padTensorOp.getMixedHighPad();
-    Value source = padTensorOp.getSource();
-    RankedTensorType sourceType = padTensorOp.getSourceType();
-    int64_t rank = sourceType.getRank();
-
-    // TODO(ravishankarm): Use shape inference interface to get this.
-    SmallVector<OpFoldResult> sourceShape;
-    SmallVector<OpFoldResult> outputShape;
-    for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
-      SmallVector<Value> mapValues;
-      Value sourceDim = rewriter.createOrFold<tensor::DimOp>(loc, source, dim);
-      mapValues.push_back(sourceDim);
-      if (auto cstDim = sourceDim.getDefiningOp<arith::ConstantIndexOp>()) {
-        sourceShape.push_back(cstDim.getValue());
-      } else {
-        sourceShape.push_back(sourceDim);
-      }
-      AffineExpr expr = rewriter.getAffineDimExpr(0);
-      unsigned numSymbols = 0;
-      auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          e = e + attr.cast<IntegerAttr>().getInt();
-          return e;
-        }
-        e = e + rewriter.getAffineSymbolExpr(numSymbols++);
-        mapValues.push_back(valueOrAttr.get<Value>());
-        return e;
-      };
-      expr = addValueOrAttr(expr, lowPad[dim]);
-      expr = addValueOrAttr(expr, highPad[dim]);
-      Value v = applyMapToValues(
-          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
-      if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
-        outputShape.push_back(cst.getValue());
-      } else {
-        outputShape.push_back(v);
-      }
-    }
-    Value emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, outputShape, sourceType.getElementType());
-    Value fill = rewriter.create<linalg::FillOp>(loc, yieldVal, emptyTensor)
-                     .getResult(0);
-    SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
-    rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
-        padTensorOp, source, fill, lowPad, sourceShape, strides);
-    return success();
+    // Rewrite tensor.pad to tensor.empty + linalg.fill + tensor.insert_slice.
+    return static_cast<LogicalResult>(
+        linalg::rewriteInDestinationPassingStyle(rewriter, padTensorOp));
   }
 
- private:
+private:
   // Option to skip the pattern when tensor.pad op has one use and is used by
   // a Linalg op.
   bool skipSingleLinalgOpUses = false;
@@ -152,19 +117,19 @@ struct TensorPadToTensorInsertSlicePass
     }
   }
 
- private:
+private:
   bool skipSingleLinalgOpUses;
 };
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
-    bool skipSingleLinalgOpUses) {
+std::unique_ptr<Pass>
+createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses) {
   return std::make_unique<TensorPadToTensorInsertSlicePass>(
       skipSingleLinalgOpUses);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

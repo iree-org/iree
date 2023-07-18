@@ -22,9 +22,9 @@ namespace {
 // Pass to test conversion to flow patterns.
 struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
@@ -32,7 +32,7 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
     RewritePatternSet convertToFlowPatterns(context);
     Flow::populateTensorToFlowConversionPatterns(context,
                                                  convertToFlowPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
         convertToFlowPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             getOperation(), std::move(convertToFlowPatterns)))) {
@@ -40,7 +40,7 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> Flow::createConvertToFlowPass() {
   return std::make_unique<ConvertToFlowPass>();

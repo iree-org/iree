@@ -11,7 +11,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/semaphore_base.h"
 
 // Sentinel used the semaphore has failed and an error status is set.

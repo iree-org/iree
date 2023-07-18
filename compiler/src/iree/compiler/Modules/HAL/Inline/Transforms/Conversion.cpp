@@ -34,11 +34,11 @@ namespace Inline {
 
 // Runs conversion with registered input dialects.
 class ConversionPass : public ConversionBase<ConversionPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::HAL::Inline::HALInlineDialect,
-                    mlir::arith::ArithDialect, mlir::AffineDialect>();
+                    mlir::arith::ArithDialect, mlir::affine::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -46,9 +46,9 @@ class ConversionPass : public ConversionBase<ConversionPass> {
 
     // Ensure all input dialects go away.
     ConversionTarget conversionTarget(*context);
-    conversionTarget
-        .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
-                         mlir::arith::ArithDialect, mlir::AffineDialect>();
+    conversionTarget.addLegalDialect<
+        mlir::func::FuncDialect, mlir::scf::SCFDialect,
+        mlir::arith::ArithDialect, mlir::affine::AffineDialect>();
 
     TypeConverter typeConverter;
     RewritePatternSet patterns(context);
@@ -97,8 +97,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();
 }
 
-}  // namespace Inline
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Inline
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

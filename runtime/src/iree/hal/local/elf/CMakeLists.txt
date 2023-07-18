@@ -29,8 +29,6 @@ iree_cc_library(
     ::arch
     ::platform
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -42,7 +40,6 @@ iree_cc_binary(
   DEPS
     ::elf_module
     iree::base
-    iree::base::core_headers
     iree::base::internal::cpu
     iree::hal::local::elf::testdata::elementwise_mul
     iree::hal::local::executable_environment
@@ -70,8 +67,6 @@ iree_cc_library(
     "elf_types.h"
   DEPS
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 
@@ -87,8 +82,6 @@ iree_cc_library(
     "platform/windows.c"
   DEPS
     iree::base
-    iree::base::core_headers
-    iree::base::tracing
   PUBLIC
 )
 

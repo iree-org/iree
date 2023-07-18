@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -288,7 +289,7 @@ static iree_status_t print_outputs_from_call(
         "variant %" PRIhsz " not present", i);
 
     if (iree_vm_variant_is_value(variant)) {
-      switch (variant.type.value_type) {
+      switch (iree_vm_type_def_as_value(variant.type)) {
         case IREE_VM_VALUE_TYPE_I8: {
           IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
               outputs_builder, "i8=%" PRIi8, variant.i8));
@@ -333,7 +334,7 @@ static iree_status_t print_outputs_from_call(
         // Query total length (excluding NUL terminator).
         iree_host_size_t result_length = 0;
         iree_status_t status = iree_hal_buffer_view_format(
-            buffer_view, SIZE_MAX, 0, NULL, &result_length);
+            buffer_view, IREE_HOST_SIZE_MAX, 0, NULL, &result_length);
         if (!iree_status_is_out_of_range(status)) return status;
         ++result_length;  // include NUL
 
@@ -342,7 +343,8 @@ static iree_status_t print_outputs_from_call(
         IREE_RETURN_IF_ERROR(iree_allocator_malloc(
             iree_allocator_system(), result_length, (void**)&result_str));
         IREE_RETURN_IF_ERROR(iree_hal_buffer_view_format(
-            buffer_view, SIZE_MAX, result_length, result_str, &result_length));
+            buffer_view, IREE_HOST_SIZE_MAX, result_length, result_str,
+            &result_length));
         IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
             outputs_builder, "%.*s", (int)result_length, result_str));
         iree_allocator_free(iree_allocator_system(), result_str);
@@ -436,5 +438,7 @@ const char* call_function(iree_program_state_t* program_state,
   }
 
   // Note: this leaks the buffer. It's up to the caller to free it after use.
-  return iree_string_builder_buffer(&outputs_builder);
+  char* outputs = strdup(iree_string_builder_buffer(&outputs_builder));
+  iree_string_builder_deinitialize(&outputs_builder);
+  return outputs;
 }

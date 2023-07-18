@@ -47,6 +47,21 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+iree_lit_test_suite(
+  NAME
+    system_ukernel
+  SRCS
+    "system_ukernel.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_system_plugin
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 
 # embedded-elf plugin mechanism for standalone portable ELFs.
@@ -54,10 +69,9 @@ endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 # compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/internal/EmbeddedLinkerTool.cpp
 if(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF)
 
-# This only builds for x86-64/aarch64 because that's all we have coded in here.
-if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64|amd64)" AND
-   NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)")
-  message(STATUS "IREE custom_dispatch/cpu/plugin standalone example ignored -- only builds for x86_64/aarch64 (today)")
+# This only builds for x86-64/arm_64 because that's all we have coded in here.
+if(NOT IREE_ARCH STREQUAL "arm_64" AND NOT IREE_ARCH STREQUAL "x86_64")
+  message(STATUS "IREE custom_dispatch/cpu/plugin standalone example ignored -- only builds for x86_64/arm_64 (today)")
   return()
 endif()
 
@@ -67,17 +81,28 @@ if(MSVC)
   return()
 endif()
 
-function(standalone_plugin_library _ARCH)
+# standalone_plugin_library()
+#
+# Creates the architecture-specific part of the standalone plugin, for the given
+# architecture (as in IREE_ARCH), and appends the generated library filename to
+# the output-variable _DST_VAR_ARCH_LIBRARIES. Skips if the compiler does not
+# support the specified architecture.
+function(standalone_plugin_library _DST_VAR_ARCH_LIBRARIES _ARCH)
+  iree_compiler_targeting_iree_arch(_ENABLED "${_ARCH}")
+  if(NOT _ENABLED)
+    return()
+  endif()
   set(_NAME iree_samples_custom_dispatch_cpu_standalone_plugin_${_ARCH})
+  iree_arch_to_llvm_arch(LLVM_ARCH "${_ARCH}")
   add_custom_command(
     OUTPUT
       standalone_plugin_${_ARCH}.o
     DEPENDS
       standalone_plugin.c
       ${IREE_CLANG_TARGET}
-    COMMAND ${IREE_CLANG_TARGET}
-      -target ${_ARCH}-unknown-unknown-eabi-elf
-      -isystem ${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include
+    COMMAND ${IREE_CLANG_BINARY}
+      -target ${LLVM_ARCH}-none-elf
+      -isystem ${IREE_CLANG_BUILTIN_HEADERS_PATH}
       -std=c17
       -fPIC
       -ffreestanding
@@ -93,13 +118,14 @@ function(standalone_plugin_library _ARCH)
       -o ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.o
     VERBATIM
   )
+  set(_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.so")
   add_custom_command(
     OUTPUT
       standalone_plugin_${_ARCH}.so
     DEPENDS
       standalone_plugin_${_ARCH}.o
       ${IREE_LLD_TARGET}
-    COMMAND ${IREE_LLD_TARGET}
+    COMMAND ${IREE_LLD_BINARY}
       -flavor gnu
       --build-id=none
       -nostdlib
@@ -118,28 +144,31 @@ function(standalone_plugin_library _ARCH)
       --hash-style=sysv
       --strip-debug
       ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.o
-      -o ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.so
+      -o "${_LIBRARY}"
     VERBATIM
   )
   add_custom_target(${_NAME} DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.so
+    "${_LIBRARY}"
   )
+  set(_LOCAL_ARCH_LIBRARIES "${${_DST_VAR_ARCH_LIBRARIES}}")
+  list(APPEND _LOCAL_ARCH_LIBRARIES "${_LIBRARY}")
+  set("${_DST_VAR_ARCH_LIBRARIES}" "${_LOCAL_ARCH_LIBRARIES}" PARENT_SCOPE)
 endfunction()
 
 # Build the standalone_plugin_*.so files for each architecture we target.
-standalone_plugin_library(aarch64)
-standalone_plugin_library(x86_64)
+set(_STANDALONE_PLUGIN_ARCH_LIBRARIES "")
+
+standalone_plugin_library(_STANDALONE_PLUGIN_ARCH_LIBRARIES arm_64)
+standalone_plugin_library(_STANDALONE_PLUGIN_ARCH_LIBRARIES x86_64)
 
 add_custom_command(
   OUTPUT
     standalone_plugin.sos
   DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_aarch64.so
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
+    ${_STANDALONE_PLUGIN_ARCH_LIBRARIES}
     iree-fatelf
   COMMAND iree-fatelf join
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_aarch64.so
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
+    ${_STANDALONE_PLUGIN_ARCH_LIBRARIES}
     > ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin.sos
   VERBATIM
 )
@@ -154,6 +183,22 @@ iree_lit_test_suite(
     standalone_example
   SRCS
     "standalone_example.mlir"
+  DATA
+    standalone_plugin.sos
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
+iree_lit_test_suite(
+  NAME
+    standalone_ukernel
+  SRCS
+    "standalone_ukernel.mlir"
   DATA
     standalone_plugin.sos
   TOOLS

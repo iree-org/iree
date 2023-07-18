@@ -10,7 +10,6 @@
 #include <stdbool.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/string_util.h"
@@ -73,7 +72,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
         "opaque and sub-byte aligned element types cannot be indexed");
   } else if (IREE_UNLIKELY(shape_rank != indices_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "shape rank/indices mismatch: %zu != %zu",
+                            "shape rank/indices mismatch: %" PRIhsz
+                            " != %" PRIhsz,
                             shape_rank, indices_count);
   }
 
@@ -81,7 +81,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
   for (iree_host_size_t i = 0; i < indices_count; ++i) {
     if (IREE_UNLIKELY(indices[i] >= shape[i])) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "index[%zu] out of bounds: %" PRIdim
+                              "index[%" PRIhsz "] out of bounds: %" PRIdim
                               " >= %" PRIdim,
                               i, indices[i], shape[i]);
     }
@@ -122,11 +122,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
         "opaque and sub-byte aligned element types cannot be indexed");
   } else if (IREE_UNLIKELY(indices_count != lengths_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "indices/lengths mismatch: %zu != %zu",
+                            "indices/lengths mismatch: %" PRIhsz " != %" PRIhsz,
                             indices_count, lengths_count);
   } else if (IREE_UNLIKELY(shape_rank != indices_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "shape rank/indices mismatch: %zu != %zu",
+                            "shape rank/indices mismatch: %" PRIhsz
+                            " != %" PRIhsz,
                             shape_rank, indices_count);
   }
 
@@ -382,9 +383,10 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
       !iree_status_is_out_of_range(shape_result)) {
     return shape_result;
   } else if (shape_rank > 128) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "a shape rank of %zu is just a little bit excessive, eh?", shape_rank);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "a shape rank of %" PRIhsz
+                            " is just a little bit excessive, eh?",
+                            shape_rank);
   }
   shape_result = iree_status_ignore(shape_result);
   iree_hal_dim_t* shape =

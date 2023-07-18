@@ -38,7 +38,8 @@ static Value buildQueueAffinityMaskFor(Operation *op, Value device,
   // its parent regions.
   auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
   if (auto queueAffinityAttr =
-          affinityAttr.dyn_cast_or_null<IREE::HAL::AffinityQueueAttr>()) {
+          llvm::dyn_cast_if_present<IREE::HAL::AffinityQueueAttr>(
+              affinityAttr)) {
     return builder.create<arith::ConstantIntOp>(
         op->getLoc(), queueAffinityAttr.getMask(), 64);
   }
@@ -47,8 +48,8 @@ static Value buildQueueAffinityMaskFor(Operation *op, Value device,
   return builder.create<arith::ConstantIntOp>(op->getLoc(), -1, 64);
 }
 
-static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
-    Operation *op, OpBuilder &builder) {
+static std::tuple<Value, Value>
+lookupDeviceAndQueueAffinityFor(Operation *op, OpBuilder &builder) {
   // NOTE: we have this combined method so that we can reuse any expensive
   // lookups we need to do. Today we aren't duplicating the lookups and don't
   // bother.
@@ -73,7 +74,8 @@ static Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
 // Returns the |timepointFence| or a util.null.
 static Value getOrCreateWaitFence(Location loc, Value timepointFence,
                                   OpBuilder &builder) {
-  if (timepointFence) return timepointFence;
+  if (timepointFence)
+    return timepointFence;
   return builder.create<IREE::Util::NullOp>(
       loc, builder.getType<IREE::HAL::FenceType>());
 }
@@ -84,15 +86,18 @@ static Value getOrCreateWaitFence(Location loc, Value timepointFence,
 static Value consumeBoundFence(Value timepoint,
                                ConversionPatternRewriter &rewriter) {
   // Must only have one use. We can't consume a fence multiple times.
-  if (!timepoint.hasOneUse()) return nullptr;  // >1 use
+  if (!timepoint.hasOneUse())
+    return nullptr; // >1 use
 
   // The use must be an export to a fence.
   auto chainOp = dyn_cast<IREE::Stream::TimepointChainExternalOp>(
       *timepoint.getUsers().begin());
-  if (!chainOp) return nullptr;  // non-export use
+  if (!chainOp)
+    return nullptr; // non-export use
   assert(!chainOp.getExternalValues().empty());
   auto fence = chainOp.getExternalValues().front();
-  if (!fence || !fence.getType().isa<IREE::HAL::FenceType>()) return nullptr;
+  if (!fence || !llvm::isa<IREE::HAL::FenceType>(fence.getType()))
+    return nullptr;
 
   // Try really hard to figure out if the fence can be used. A larger analysis
   // pass running prior to conversion that did some code motion could help
@@ -102,13 +107,13 @@ static Value consumeBoundFence(Value timepoint,
   // that the functions could consume it but inlining is pretty aggressive now.
   if (!IREE::Util::isValueUsableForOp(fence, rewriter.getBlock(),
                                       rewriter.getInsertionPoint())) {
-    return nullptr;  // unusable
+    return nullptr; // unusable
   }
 
   // Consume the op by erasing it.
   rewriter.eraseOp(chainOp);
 
-  return fence;  // usable
+  return fence; // usable
 }
 
 // Returns the a new fence for |timepoint| or an existing fence if one was
@@ -126,7 +131,8 @@ static Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
   // Check to see if the timepoint is associated with a fence. In common cases
   // when along ABI boundaries we can usually find an association.
   auto fence = consumeBoundFence(timepoint, rewriter);
-  if (fence) return fence;
+  if (fence)
+    return fence;
 
   // Create a new fence.
   return rewriter.create<IREE::HAL::FenceCreateOp>(
@@ -135,8 +141,8 @@ static Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
 }
 
 // Scans all of the stream.cmd.* ops in the region to derive a command category.
-static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
-    Region &region) {
+static IREE::HAL::CommandCategoryBitfield
+deriveCommandCategories(Region &region) {
   auto bits = IREE::HAL::CommandCategoryBitfield::None;
   for (auto &block : region) {
     for (auto &op : block) {
@@ -163,49 +169,50 @@ static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
 // This will fail if the resource type is not directly mappable to HAL bits.
 // The bits set here are those that must be set for the buffer to be used as the
 // buffer within the program with its defined resource lifetime.
-static LogicalResult deriveRequiredResourceBufferBits(
-    Location loc, IREE::Stream::ResourceType resourceType,
-    IREE::HAL::MemoryTypeBitfield &memoryTypes,
-    IREE::HAL::BufferUsageBitfield &bufferUsage) {
+static LogicalResult
+deriveRequiredResourceBufferBits(Location loc,
+                                 IREE::Stream::ResourceType resourceType,
+                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
+                                 IREE::HAL::BufferUsageBitfield &bufferUsage) {
   memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   bufferUsage = IREE::HAL::BufferUsageBitfield::None;
   switch (resourceType.getLifetime()) {
-    default:
-      return mlir::emitError(loc)
-             << "unsupported resource lifetime: "
-             << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
-    case IREE::Stream::Lifetime::Constant:
-      // Device local; copies required to get into external resources.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-      bufferUsage =
-          bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
-      break;
-    case IREE::Stream::Lifetime::Variable:
-      // Device local; copies required to get into external resources.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-      break;
-    case IREE::Stream::Lifetime::External:
-      // We only require device-visible for external buffers (as we don't today
-      // do anything else with them on the host). They may be mappable for user
-      // convenience. Ideally they would have been placed in device-local memory
-      // but so long as they are device visible the program will execute
-      // correctly.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-      break;
-    case IREE::Stream::Lifetime::Staging:
-      // Host local; copies required to get into device resources.
-      // We could vary this based on staging usage (upload/download) by
-      // making it device-local|host-visible, but host-local means we have
-      // a better chance of mapping it during uploads.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
-                    IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                    IREE::HAL::BufferUsageBitfield::Mapping;
-      break;
-    case IREE::Stream::Lifetime::Transient:
-      // Device local; copies required to get into external resources.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-      break;
+  default:
+    return mlir::emitError(loc)
+           << "unsupported resource lifetime: "
+           << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
+  case IREE::Stream::Lifetime::Constant:
+    // Device local; copies required to get into external resources.
+    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+    bufferUsage =
+        bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
+    break;
+  case IREE::Stream::Lifetime::Variable:
+    // Device local; copies required to get into external resources.
+    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+    break;
+  case IREE::Stream::Lifetime::External:
+    // We only require device-visible for external buffers (as we don't today
+    // do anything else with them on the host). They may be mappable for user
+    // convenience. Ideally they would have been placed in device-local memory
+    // but so long as they are device visible the program will execute
+    // correctly.
+    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceVisible;
+    break;
+  case IREE::Stream::Lifetime::Staging:
+    // Host local; copies required to get into device resources.
+    // We could vary this based on staging usage (upload/download) by
+    // making it device-local|host-visible, but host-local means we have
+    // a better chance of mapping it during uploads.
+    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
+                  IREE::HAL::MemoryTypeBitfield::DeviceVisible;
+    bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
+                  IREE::HAL::BufferUsageBitfield::Mapping;
+    break;
+  case IREE::Stream::Lifetime::Transient:
+    // Device local; copies required to get into external resources.
+    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+    break;
   }
 
   // TODO(benvanik): refine usage based on analysis.
@@ -220,10 +227,11 @@ static LogicalResult deriveRequiredResourceBufferBits(
 // The bits set here represent the superset of required and allowed bits and
 // are useful for providing buffers back to users via the ABI that may need to
 // be used for more than just what the internal program requires.
-static LogicalResult deriveAllowedResourceBufferBits(
-    Location loc, IREE::Stream::ResourceType resourceType,
-    IREE::HAL::MemoryTypeBitfield &memoryTypes,
-    IREE::HAL::BufferUsageBitfield &bufferUsage) {
+static LogicalResult
+deriveAllowedResourceBufferBits(Location loc,
+                                IREE::Stream::ResourceType resourceType,
+                                IREE::HAL::MemoryTypeBitfield &memoryTypes,
+                                IREE::HAL::BufferUsageBitfield &bufferUsage) {
   memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   bufferUsage = IREE::HAL::BufferUsageBitfield::None;
   if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
@@ -231,27 +239,27 @@ static LogicalResult deriveAllowedResourceBufferBits(
     return failure();
   }
   switch (resourceType.getLifetime()) {
-    default:
-      break;
-    case IREE::Stream::Lifetime::External:
-      // #yolo; these come from/go to outside the program.
-      // Today we assume they are device-local|host-visible just for
-      // practical purposes but that does not have to be true. We really
-      // want this to be something we analyze and handle on the edges
-      // (transferring devices/etc if needed).
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                    IREE::HAL::MemoryTypeBitfield::HostVisible;
-      // NOTE: we may not map it but users may after they get them back.
-      // Another reason we should annotate this - having a buffer be
-      // mappable is potentially expensive (may get a 2nd copy in memory!).
-      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
-      break;
+  default:
+    break;
+  case IREE::Stream::Lifetime::External:
+    // #yolo; these come from/go to outside the program.
+    // Today we assume they are device-local|host-visible just for
+    // practical purposes but that does not have to be true. We really
+    // want this to be something we analyze and handle on the edges
+    // (transferring devices/etc if needed).
+    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
+                  IREE::HAL::MemoryTypeBitfield::HostVisible;
+    // NOTE: we may not map it but users may after they get them back.
+    // Another reason we should annotate this - having a buffer be
+    // mappable is potentially expensive (may get a 2nd copy in memory!).
+    bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+    break;
   }
   return success();
 }
 
 class StreamConversionMapping {
- public:
+public:
   // Maps the stream dialect |executeOp| to the hal dialect |commandBuffer|
   // value used during recording. Patterns can use this to find the SSA value
   // they need to make hal.command_buffer.* ops.
@@ -277,7 +285,7 @@ class StreamConversionMapping {
     return it->second;
   }
 
- private:
+private:
   // Ops within stream.cmd.execute ops -> !hal.command_buffer.
   DenseMap<Operation *, Value> commandBuffers;
 };
@@ -296,9 +304,9 @@ struct StreamConversionPattern : public OpConversionPattern<OpT> {
 struct ResourceAllocOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceAllocOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto allocator = lookupAllocatorFor(allocOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
@@ -306,7 +314,7 @@ struct ResourceAllocOpPattern
     for (auto [resourceResult, storageSize] :
          llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
       auto resourceType =
-          resourceResult.getType().cast<IREE::Stream::ResourceType>();
+          llvm::cast<IREE::Stream::ResourceType>(resourceResult.getType());
 
       auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
       auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
@@ -329,9 +337,9 @@ struct ResourceAllocOpPattern
 struct ResourceAllocaOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceAllocaOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = allocaOp.getLoc();
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(allocaOp, rewriter);
@@ -368,9 +376,10 @@ struct ResourceAllocaOpPattern
 struct ResourceDeallocaOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceDeallocaOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceDeallocaOp deallocaOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceDeallocaOp deallocaOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = deallocaOp.getLoc();
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(deallocaOp, rewriter);
@@ -394,9 +403,9 @@ struct ResourceDeallocaOpPattern
 struct ResourceSizeOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceSizeOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceSizeOp sizeOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceSizeOp sizeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLengthOp>(
         sizeOp, rewriter.getIndexType(), adaptor.getOperand());
     return success();
@@ -406,9 +415,9 @@ struct ResourceSizeOpPattern
 struct ResourceMapOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceMapOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceMapOp mapOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceMapOp mapOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto allocator = lookupAllocatorFor(mapOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
@@ -430,37 +439,37 @@ struct ResourceMapOpPattern
 struct ResourceTryMapOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceTryMapOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto allocator = lookupAllocatorFor(tryMapOp, rewriter);
     auto resourceType =
-        tryMapOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+        llvm::cast<IREE::Stream::ResourceType>(tryMapOp.getResult().getType());
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
     switch (resourceType.getLifetime()) {
-      default:
-        return tryMapOp.emitOpError()
-               << "unsupported resource lifetime: "
-               << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
-      case IREE::Stream::Lifetime::Constant:
-        // Device local; copies required to get into external resources.
-        memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-        bufferUsage =
-            bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
-        break;
-      case IREE::Stream::Lifetime::Staging:
-        // Host local; copies required to get into device resources.
-        // We could vary this based on staging usage (upload/download) by
-        // making it device-local|host-visible, but host-local means we have
-        // a better chance of mapping it during uploads.
-        memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
-                      IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-        bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                      IREE::HAL::BufferUsageBitfield::Mapping;
-        break;
+    default:
+      return tryMapOp.emitOpError()
+             << "unsupported resource lifetime: "
+             << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
+    case IREE::Stream::Lifetime::Constant:
+      // Device local; copies required to get into external resources.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+      bufferUsage =
+          bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
+      break;
+    case IREE::Stream::Lifetime::Staging:
+      // Host local; copies required to get into device resources.
+      // We could vary this based on staging usage (upload/download) by
+      // making it device-local|host-visible, but host-local means we have
+      // a better chance of mapping it during uploads.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
+                    IREE::HAL::MemoryTypeBitfield::DeviceVisible;
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
+                    IREE::HAL::BufferUsageBitfield::Mapping;
+      break;
     }
 
     // TODO(benvanik): refine usage based on analysis.
@@ -478,9 +487,9 @@ struct ResourceTryMapOpPattern
 struct ResourceLoadOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceLoadOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceLoadOp loadOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceLoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loadType =
         getTypeConverter()->convertType(loadOp.getResult().getType());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
@@ -492,9 +501,9 @@ struct ResourceLoadOpPattern
 struct ResourceStoreOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceStoreOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferStoreOp>(
         storeOp, adaptor.getValue(), adaptor.getTarget(),
         adaptor.getTargetOffset());
@@ -505,9 +514,9 @@ struct ResourceStoreOpPattern
 struct ResourceSubviewOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceSubviewOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ResourceSubviewOp subviewOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceSubviewOp subviewOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
     // NOTE: this aliases! We assume at this point all useful alias analysis
     // has been performed and it's fine to lose the tie information here.
@@ -523,10 +532,11 @@ struct ResourceSubviewOpPattern
 // buffer must have compatibility with our target device allocator and the
 // buffer must have at least the minimum expected size (additional padding is
 // ok).
-static LogicalResult buildStorageAssertions(
-    Location loc, Value buffer, StringAttr message, Value allocator,
-    Value minimumLength, IREE::Stream::ResourceType resourceType,
-    OpBuilder &builder) {
+static LogicalResult
+buildStorageAssertions(Location loc, Value buffer, StringAttr message,
+                       Value allocator, Value minimumLength,
+                       IREE::Stream::ResourceType resourceType,
+                       OpBuilder &builder) {
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
   if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
@@ -548,10 +558,10 @@ static LogicalResult buildStorageAssertions(
 struct TensorImportBufferOpPattern
     : public StreamConversionPattern<IREE::Stream::TensorImportOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!importOp.getSource().getType().isa<IREE::HAL::BufferType>()) {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!llvm::isa<IREE::HAL::BufferType>(importOp.getSource().getType())) {
       return failure();
     }
 
@@ -565,7 +575,7 @@ struct TensorImportBufferOpPattern
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        importOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+        llvm::cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
     if (failed(buildStorageAssertions(
             importOp.getLoc(), adaptor.getSource(), message, targetAllocator,
             adaptor.getResultSize(), resourceType, rewriter))) {
@@ -579,12 +589,12 @@ struct TensorImportBufferOpPattern
 struct TensorImportBufferViewOpPattern
     : public StreamConversionPattern<IREE::Stream::TensorImportOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto sourceType = importOp.getSource().getType();
-    if (!sourceType.isa<IREE::HAL::BufferViewType>() &&
-        !sourceType.isa<TensorType>()) {
+    if (!llvm::isa<IREE::HAL::BufferViewType>(sourceType) &&
+        !llvm::isa<TensorType>(sourceType)) {
       return failure();
     }
 
@@ -601,7 +611,7 @@ struct TensorImportBufferViewOpPattern
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        importOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+        llvm::cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
     if (failed(buildStorageAssertions(loc, bufferOp.getResult(), message,
                                       targetAllocator, adaptor.getResultSize(),
                                       resourceType, rewriter))) {
@@ -615,10 +625,10 @@ struct TensorImportBufferViewOpPattern
 struct TensorExportBufferOpPattern
     : public StreamConversionPattern<IREE::Stream::TensorExportOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!exportOp.getResult().getType().isa<IREE::HAL::BufferType>()) {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!llvm::isa<IREE::HAL::BufferType>(exportOp.getResult().getType())) {
       return failure();
     }
     rewriter.replaceOp(exportOp, adaptor.getSource());
@@ -629,17 +639,17 @@ struct TensorExportBufferOpPattern
 struct TensorExportBufferViewOpPattern
     : public StreamConversionPattern<IREE::Stream::TensorExportOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto targetType = exportOp.getResult().getType();
-    if (!targetType.isa<IREE::HAL::BufferViewType>() &&
-        !targetType.isa<TensorType>()) {
+    if (!llvm::isa<IREE::HAL::BufferViewType>(targetType) &&
+        !llvm::isa<TensorType>(targetType)) {
       return failure();
     }
 
     auto loc = exportOp.getLoc();
-    auto tensorType = adaptor.getSourceEncoding().cast<RankedTensorType>();
+    auto tensorType = llvm::cast<RankedTensorType>(adaptor.getSourceEncoding());
     auto dynamicDims = adaptor.getSourceEncodingDims();
 
     // NOTE: we should have verified supported encodings/types at entry into the
@@ -675,9 +685,9 @@ struct TensorExportBufferViewOpPattern
 struct TensorTraceOpPattern
     : public StreamConversionPattern<IREE::Stream::TensorTraceOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewTraceOp>(
         traceOp, traceOp.getKeyAttr(), adaptor.getOperands());
     return success();
@@ -687,9 +697,9 @@ struct TensorTraceOpPattern
 struct CmdFlushOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdFlushOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdFlushOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdFlushOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): HAL command buffer op for flush.
     rewriter.eraseOp(op);
     return success();
@@ -699,9 +709,9 @@ struct CmdFlushOpPattern
 struct CmdInvalidateOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdInvalidateOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdInvalidateOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdInvalidateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): HAL command buffer op for invalidate.
     rewriter.eraseOp(op);
     return success();
@@ -711,9 +721,9 @@ struct CmdInvalidateOpPattern
 struct CmdDiscardOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDiscardOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdDiscardOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdDiscardOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): HAL command buffer op for discard.
     rewriter.eraseOp(op);
     return success();
@@ -723,9 +733,9 @@ struct CmdDiscardOpPattern
 struct CmdFillOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdFillOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdFillOp fillOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdFillOp fillOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto commandBuffer = mapping->lookupCommandBufferFor(fillOp);
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferFillBufferOp>(
         fillOp, commandBuffer, adaptor.getTarget(), adaptor.getTargetOffset(),
@@ -737,9 +747,9 @@ struct CmdFillOpPattern
 struct CmdCopyOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdCopyOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdCopyOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdCopyOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto commandBuffer = mapping->lookupCommandBufferFor(op);
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferCopyBufferOp>(
         op, commandBuffer, adaptor.getSource(), adaptor.getSourceOffset(),
@@ -749,12 +759,13 @@ struct CmdCopyOpPattern
 };
 
 // NOTE: this relies on the enums being the same today. Ew.
-static IREE::HAL::CollectiveAttr convertCollectiveAttr(
-    IREE::Stream::CollectiveAttr sourceAttr) {
+static IREE::HAL::CollectiveAttr
+convertCollectiveAttr(IREE::Stream::CollectiveAttr sourceAttr) {
   auto convertReductionOp =
       [](std::optional<IREE::Stream::CollectiveReductionOp> op)
       -> std::optional<IREE::HAL::CollectiveReductionOp> {
-    if (!op.has_value()) return std::nullopt;
+    if (!op.has_value())
+      return std::nullopt;
     return static_cast<IREE::HAL::CollectiveReductionOp>(op.value());
   };
   return IREE::HAL::CollectiveAttr::get(
@@ -768,9 +779,9 @@ static IREE::HAL::CollectiveAttr convertCollectiveAttr(
 struct CmdCollectiveOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdCollectiveOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdCollectiveOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdCollectiveOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto commandBuffer = mapping->lookupCommandBufferFor(op);
 
     Value sendBuffer;
@@ -780,27 +791,27 @@ struct CmdCollectiveOpPattern
     Value recvOffset;
     Value recvLength;
     switch (adaptor.getOp().getKind()) {
-      default:
-        assert(adaptor.getResources().size() == 2 && "should have verified");
-        sendBuffer = adaptor.getResources()[0];
-        sendOffset = adaptor.getResourceOffsets()[0];
-        sendLength = adaptor.getResourceLengths()[0];
-        recvBuffer = adaptor.getResources()[1];
-        recvOffset = adaptor.getResourceOffsets()[1];
-        recvLength = adaptor.getResourceLengths()[1];
-        break;
-      case IREE::Stream::CollectiveKind::Send:
-        assert(adaptor.getResources().size() == 1 && "should have verified");
-        sendBuffer = adaptor.getResources()[0];
-        sendOffset = adaptor.getResourceOffsets()[0];
-        sendLength = adaptor.getResourceLengths()[0];
-        break;
-      case IREE::Stream::CollectiveKind::Recv:
-        assert(adaptor.getResources().size() == 1 && "should have verified");
-        recvBuffer = adaptor.getResources()[0];
-        recvOffset = adaptor.getResourceOffsets()[0];
-        recvLength = adaptor.getResourceLengths()[0];
-        break;
+    default:
+      assert(adaptor.getResources().size() == 2 && "should have verified");
+      sendBuffer = adaptor.getResources()[0];
+      sendOffset = adaptor.getResourceOffsets()[0];
+      sendLength = adaptor.getResourceLengths()[0];
+      recvBuffer = adaptor.getResources()[1];
+      recvOffset = adaptor.getResourceOffsets()[1];
+      recvLength = adaptor.getResourceLengths()[1];
+      break;
+    case IREE::Stream::CollectiveKind::Send:
+      assert(adaptor.getResources().size() == 1 && "should have verified");
+      sendBuffer = adaptor.getResources()[0];
+      sendOffset = adaptor.getResourceOffsets()[0];
+      sendLength = adaptor.getResourceLengths()[0];
+      break;
+    case IREE::Stream::CollectiveKind::Recv:
+      assert(adaptor.getResources().size() == 1 && "should have verified");
+      recvBuffer = adaptor.getResources()[0];
+      recvOffset = adaptor.getResourceOffsets()[0];
+      recvLength = adaptor.getResourceLengths()[0];
+      break;
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferCollectiveOp>(
@@ -813,8 +824,8 @@ struct CmdCollectiveOpPattern
 };
 
 // Returns a hal.device.switch match expression that selects the given export.
-static Attribute getExportConditionAttr(
-    IREE::HAL::ExecutableExportOp exportOp) {
+static Attribute
+getExportConditionAttr(IREE::HAL::ExecutableExportOp exportOp) {
   // TODO(benvanik): customizable selection logic. Today this just checks
   // whether the variant target is supported but we can also allow
   // specialization of entry points based on dispatch site parameters.
@@ -825,9 +836,9 @@ static Attribute getExportConditionAttr(
 struct CmdDispatchOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = dispatchOp.getLoc();
     auto commandBuffer = mapping->lookupCommandBufferFor(dispatchOp);
 
@@ -889,7 +900,7 @@ struct CmdDispatchOpPattern
     // TODO(#5322): symbolic push constant names on the hal.interface so we can
     // sparsely pack these.
     if (!adaptor.getUniformOperands().empty()) {
-      int pushConstantBase = 0;  // always 0 today
+      int pushConstantBase = 0; // always 0 today
       SmallVector<Value> pushConstants;
       for (auto operand : adaptor.getUniformOperands()) {
         assert(
@@ -903,8 +914,8 @@ struct CmdDispatchOpPattern
     }
 
     // TODO(benvanik): typed accessors for bindings.
-    auto bindingAttrs = dispatchOp->getAttr("hal.interface.bindings")
-                            .dyn_cast_or_null<ArrayAttr>();
+    auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
+        dispatchOp->getAttr("hal.interface.bindings"));
     assert(bindingAttrs &&
            "interface materialization must annotate dispatch sites");
 
@@ -918,9 +929,10 @@ struct CmdDispatchOpPattern
     };
     for (unsigned i = 0; i < adaptor.getResources().size(); ++i) {
       auto bindingAttr =
-          bindingAttrs[i].cast<IREE::HAL::InterfaceBindingAttr>();
+          llvm::cast<IREE::HAL::InterfaceBindingAttr>(bindingAttrs[i]);
       int64_t set = bindingAttr.getSet();
-      if (currentSet != -1 && currentSet != set) flushSet();
+      if (currentSet != -1 && currentSet != set)
+        flushSet();
       currentSet = set;
       IREE::HAL::DescriptorSetBindingValue binding;
       binding.ordinal =
@@ -930,20 +942,21 @@ struct CmdDispatchOpPattern
       binding.byteLength = adaptor.getResourceLengths()[i];
       bindings.push_back(binding);
     }
-    if (currentSet != -1) flushSet();
+    if (currentSet != -1)
+      flushSet();
   }
 };
 
 struct CmdFuncOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdFuncOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdFuncOp funcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdFuncOp funcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     SmallVector<Type> newArgTypes;
     SmallVector<DictionaryAttr> newArgAttrs;
     newArgTypes.push_back(rewriter.getType<IREE::HAL::CommandBufferType>());
-    newArgAttrs.push_back(rewriter.getDictionaryAttr({}));  // command buffer
+    newArgAttrs.push_back(rewriter.getDictionaryAttr({})); // command buffer
     funcOp.getAllArgAttrs(newArgAttrs);
     SmallVector<Type> newResultTypes;
     if (failed(getTypeConverter()->convertTypes(funcOp.getArgumentTypes(),
@@ -967,9 +980,9 @@ struct CmdFuncOpPattern
 struct CmdCallOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdCallOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdCallOp callOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdCallOp callOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto commandBuffer = mapping->lookupCommandBufferFor(callOp);
 
     // Always pass the command buffer as the first arg.
@@ -978,7 +991,7 @@ struct CmdCallOpPattern
     size_t resourceIndex = 0;
     for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
              callOp.getResourceOperands(), adaptor.getResourceOperands())) {
-      if (originalOperand.getType().isa<IREE::Stream::ResourceType>()) {
+      if (llvm::isa<IREE::Stream::ResourceType>(originalOperand.getType())) {
         // Resource type, add offset/length.
         operands.push_back(convertedOperand);
         operands.push_back(adaptor.getResourceOperandOffsets()[resourceIndex]);
@@ -1025,9 +1038,11 @@ static void insertSerializationBarriers(Location loc, Block &block,
   // Note that we can't mutate the block while iterating it so we first grab
   // all the original ops.
   SmallVector<Operation *> serialOps;
-  for (auto &op : block) serialOps.push_back(&op);
+  for (auto &op : block)
+    serialOps.push_back(&op);
   for (auto *op : serialOps) {
-    if (op->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (op->hasTrait<OpTrait::IsTerminator>())
+      continue;
     builder.setInsertionPointAfter(op);
     builder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
         loc, commandBuffer, sourceStage, targetStage, flags);
@@ -1037,9 +1052,9 @@ static void insertSerializationBarriers(Location loc, Block &block,
 struct CmdExecuteOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdExecuteOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdExecuteOp executeOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdExecuteOp executeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = executeOp.getLoc();
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(executeOp, rewriter);
@@ -1099,9 +1114,9 @@ struct CmdExecuteOpPattern
 struct CmdSerialOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdSerialOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdSerialOp serialOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdSerialOp serialOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto commandBuffer = mapping->lookupCommandBufferFor(serialOp);
 
     // Run through the execution region and serialize execution by inserting
@@ -1120,9 +1135,9 @@ struct CmdSerialOpPattern
 struct CmdConcurrentOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdConcurrentOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdConcurrentOp concurrentOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdConcurrentOp concurrentOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Inline the concurrent execution region.
     // TODO(benvanik): split barriers (event set/wait) when nesting.
     rewriter.inlineBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
@@ -1134,9 +1149,10 @@ struct CmdConcurrentOpPattern
 struct TimepointImmediateOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointImmediateOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TimepointImmediateOp immediateOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TimepointImmediateOp immediateOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(
         immediateOp, rewriter.getType<IREE::HAL::FenceType>());
     return success();
@@ -1146,13 +1162,13 @@ struct TimepointImmediateOpPattern
 struct TimepointImportOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointImportOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TimepointImportOp importOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TimepointImportOp importOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle imports from HAL semaphores _or_ fences.
     auto operands = adaptor.getOperands();
     if (operands.size() == 1 &&
-        operands[0].getType().isa<IREE::HAL::FenceType>()) {
+        llvm::isa<IREE::HAL::FenceType>(operands[0].getType())) {
       rewriter.replaceOp(importOp, operands[0]);
       return success();
     } else {
@@ -1165,12 +1181,12 @@ struct TimepointImportOpPattern
 struct TimepointExportOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointExportOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TimepointExportOp exportOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TimepointExportOp exportOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle exports into HAL fences.
     if (exportOp.getNumResults() != 1 ||
-        !exportOp.getResult(0).getType().isa<IREE::HAL::FenceType>()) {
+        !llvm::isa<IREE::HAL::FenceType>(exportOp.getResult(0).getType())) {
       return rewriter.notifyMatchFailure(
           exportOp, "only exports to HAL fences are supported");
     }
@@ -1182,13 +1198,14 @@ struct TimepointExportOpPattern
 struct TimepointChainExternalOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointChainExternalOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TimepointChainExternalOp exportOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TimepointChainExternalOp exportOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle exports into HAL fences.
     auto externalValues = exportOp.getExternalValues();
     if (externalValues.size() != 1 ||
-        !externalValues[0].getType().isa<IREE::HAL::FenceType>()) {
+        !llvm::isa<IREE::HAL::FenceType>(externalValues[0].getType())) {
       return rewriter.notifyMatchFailure(
           exportOp, "only exports to HAL fences are supported");
     }
@@ -1205,9 +1222,9 @@ struct TimepointChainExternalOpPattern
 struct TimepointJoinOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointJoinOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TimepointJoinOp joinOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TimepointJoinOp joinOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::FenceJoinOp>(
         joinOp, rewriter.getType<IREE::HAL::FenceType>(),
         adaptor.getAwaitTimepoints());
@@ -1218,9 +1235,9 @@ struct TimepointJoinOpPattern
 struct TimepointBarrierOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointBarrierOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TimepointBarrierOp barrierOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TimepointBarrierOp barrierOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Replace with a signaled fence.
     // NOTE: this assumes that if this op still exists the input resource is
     // already available. If it isn't then timepoint propagation should have
@@ -1235,9 +1252,9 @@ struct TimepointBarrierOpPattern
 struct TimepointAwaitOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointAwaitOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::TimepointAwaitOp awaitOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::TimepointAwaitOp awaitOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = awaitOp.getLoc();
 
     // Perform the blocking wait.
@@ -1256,9 +1273,9 @@ struct TimepointAwaitOpPattern
 struct ChannelCreateOpPattern
     : public StreamConversionPattern<IREE::Stream::ChannelCreateOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ChannelCreateOp createOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ChannelCreateOp createOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(createOp, rewriter);
     Value neg1I32;
@@ -1305,12 +1322,30 @@ struct ChannelCreateOpPattern
   }
 };
 
+struct ChannelSplitOpPattern
+    : public StreamConversionPattern<IREE::Stream::ChannelSplitOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ChannelSplitOp splitOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value color = rewriter.create<arith::IndexCastOp>(
+        splitOp.getLoc(), rewriter.getI32Type(), adaptor.getColor());
+    Value key = rewriter.create<arith::IndexCastOp>(
+        splitOp.getLoc(), rewriter.getI32Type(), adaptor.getKey());
+    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelSplitOp>(
+        splitOp, rewriter.getType<IREE::HAL::ChannelType>(),
+        adaptor.getChannel(), color, key,
+        /*flags=*/rewriter.getI32IntegerAttr(0));
+    return success();
+  }
+};
+
 struct ChannelRankOpPattern
     : public StreamConversionPattern<IREE::Stream::ChannelRankOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ChannelRankOp rankOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ChannelRankOp rankOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto newOp = rewriter.create<IREE::HAL::ChannelRankAndCountOp>(
         rankOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
         adaptor.getChannel());
@@ -1324,9 +1359,9 @@ struct ChannelRankOpPattern
 struct ChannelCountOpPattern
     : public StreamConversionPattern<IREE::Stream::ChannelCountOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ChannelCountOp countOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ChannelCountOp countOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto newOp = rewriter.create<IREE::HAL::ChannelRankAndCountOp>(
         countOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
         adaptor.getChannel());
@@ -1340,9 +1375,9 @@ struct ChannelCountOpPattern
 struct ElideYieldOpPattern
     : public StreamConversionPattern<IREE::Stream::YieldOp> {
   using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::YieldOp yieldOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Stream::YieldOp yieldOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(yieldOp);
     return success();
   }
@@ -1353,18 +1388,20 @@ struct ElideYieldOpPattern
 struct GlobalTimepointConversionPattern
     : public OpConversionPattern<IREE::Util::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto initialValue = op.getInitialValue();
-    if (!initialValue.has_value()) return failure();
-    if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
+    if (!initialValue.has_value())
+      return failure();
+    if (!llvm::isa<IREE::Stream::TimepointAttr>(*initialValue))
+      return failure();
     rewriter.updateRootInPlace(op, [&]() { op.removeInitialValueAttr(); });
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateStreamToHALPatterns(MLIRContext *context,
                                  ConversionTarget &conversionTarget,
@@ -1414,10 +1451,11 @@ void populateStreamToHALPatterns(MLIRContext *context,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
-  patterns.insert<ChannelCreateOpPattern, ChannelRankOpPattern,
-                  ChannelCountOpPattern>(mapping, typeConverter, context);
+  patterns.insert<ChannelCreateOpPattern, ChannelSplitOpPattern,
+                  ChannelRankOpPattern, ChannelCountOpPattern>(
+      mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

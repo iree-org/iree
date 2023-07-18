@@ -72,9 +72,9 @@ inline void registerPasses() {
   createWrapEntryPointsPass();
 }
 
-}  // namespace ABI
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace ABI
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_BINDINGS_NATIVE_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_BINDINGS_NATIVE_TRANSFORMS_PASSES_H_

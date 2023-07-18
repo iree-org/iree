@@ -10,24 +10,54 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "PassDetail.h"
+    "Passes.h"
+    "Passes.h.inc"
+  DEPS
+    ::PassesIncGen
+    MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     VMVX
   HDRS
-    "EncodingInfo.h"
+    "Passes.h"
   SRCS
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
-    "VMVXMaterializeEncodingPass.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect
     MLIRBufferizationDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect
@@ -38,8 +68,7 @@ iree_cc_library(
     MLIRTransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Common::CommonPasses
-    iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

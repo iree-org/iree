@@ -6,65 +6,131 @@
 
 """Rules for compiling with clang to produce bitcode libraries."""
 
+def iree_arch_to_llvm_arch(
+        iree_arch = None):
+    """Converts an IREE_ARCH value to the corresponding LLVM arch name.
+
+    Similar to the CMake function with the same name.
+
+    Args:
+        iree_arch: IREE_ARCH string value.
+
+    Returns:
+        The LLVM name for that architecture (first component of target triple).
+    """
+
+    if not iree_arch:
+        return None
+    if iree_arch == "arm_64":
+        return "aarch64"
+    if iree_arch == "arm_32":
+        return "arm"
+    if iree_arch == "x86_64":
+        return "x86_64"
+    if iree_arch == "x86_32":
+        return "i386"
+    if iree_arch == "riscv_64":
+        return "riscv64"
+    if iree_arch == "riscv_32":
+        return "riscv32"
+    if iree_arch == "wasm_64":
+        return "wasm64"
+    if iree_arch == "wasm_32":
+        return "wasm32"
+    fail("Unhandled IREE_ARCH value %s" % iree_arch)
+
 def iree_bitcode_library(
         name,
+        arch,
         srcs,
-        hdrs = [],
+        internal_hdrs = [],
         copts = [],
-        defines = [],
-        data = [],
         out = None,
-        clang_tool = "@llvm-project//clang:clang",
-        link_tool = "@llvm-project//llvm:llvm-link",
-        builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen",
-        builtin_headers_path = "external/llvm-project/clang/staging/include/",
         **kwargs):
     """Builds an LLVM bitcode library from an input file via clang.
 
     Args:
         name: Name of the target.
+        arch: Target architecture to compile for, in IREE_ARCH format.
         srcs: source files to pass to clang.
-        hdrs: additional headers included by the source files.
+        internal_hdrs: all headers transitively included by the source files.
+                       Unlike typical Bazel `hdrs`, these are not exposed as
+                       interface headers. This would normally be part of `srcs`,
+                       but separating it was easier for `bazel_to_cmake`, as
+                       CMake does not need this, and making this explicitly
+                       Bazel-only allows using `filegroup` on the Bazel side.
         copts: additional flags to pass to clang.
-        defines: preprocessor definitions to pass to clang.
-        data: additional data required during compilation.
         out: output file name (defaults to name.bc).
-        clang_tool: the clang to use to compile the source.
-        link_tool: llvm-link tool used for linking bitcode files.
-        builtin_headers_dep: clang builtin headers (stdbool, stdint, etc).
-        builtin_headers_path: relative path to the builtin headers rule.
         **kwargs: any additional attributes to pass to the underlying rules.
     """
 
+    clang_tool = "@llvm-project//clang:clang"
+    link_tool = "@llvm-project//llvm:llvm-link"
+    builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
+    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+
+    base_copts = [
+        # Target architecture
+        "-target",
+        iree_arch_to_llvm_arch(arch),
+
+        # C17 with no system deps.
+        "-std=c17",
+        "-nostdinc",
+        "-ffreestanding",
+
+        # Optimized and unstamped.
+        "-O3",
+        "-DNDEBUG",
+        "-fno-ident",
+        "-fdiscard-value-names",
+
+        # Set the size of wchar_t to 4 bytes (instead of 2 bytes).
+        # This must match what the runtime is built with.
+        "-fno-short-wchar",
+
+        # Enable inline asm.
+        "-fasm",
+
+        # Object file only in bitcode format:
+        "-c",
+        "-emit-llvm",
+
+        # Force the library into standalone mode (not depending on build-directory
+        # configuration).
+        "-DIREE_DEVICE_STANDALONE=1",
+    ]
+
     bitcode_files = []
-    for bitcode_src in srcs:
-        bitcode_out = "%s_%s.bc" % (name, bitcode_src)
+    for src in srcs:
+        bitcode_out = "%s_%s.bc" % (name, src)
         bitcode_files.append(bitcode_out)
         native.genrule(
             name = "gen_%s" % (bitcode_out),
-            srcs = [bitcode_src],
+            srcs = [src, builtin_headers_dep] + internal_hdrs,
             outs = [bitcode_out],
             cmd = " && ".join([
                 " ".join([
                     "$(location %s)" % (clang_tool),
-                    "-isystem $(BINDIR)/%s" % (builtin_headers_path),
-                    " ".join(copts),
-                    " ".join(["-D%s" % (define) for define in defines]),
+                    "-isystem $(BINDIR)/%s" % builtin_headers_path,
+                    " ".join(base_copts + copts),
+                    " ".join(["-I $(BINDIR)/runtime/src"]),
+                    " ".join(["-I runtime/src"]),
                     "-o $(location %s)" % (bitcode_out),
-                    "$(location %s)" % (bitcode_src),
+                    "$(location %s)" % (src),
                 ]),
             ]),
-            tools = hdrs + data + [
+            tools = [
                 clang_tool,
-                builtin_headers_dep,
             ],
-            message = "Compiling %s to %s..." % (bitcode_src, bitcode_out),
+            message = "Compiling %s to %s..." % (src, bitcode_out),
             output_to_bindir = 1,
             **kwargs
         )
 
     if not out:
         out = "%s.bc" % (name)
+
     native.genrule(
         name = name,
         srcs = bitcode_files,
@@ -76,7 +142,138 @@ def iree_bitcode_library(
                 " ".join(["$(locations %s)" % (src) for src in bitcode_files]),
             ]),
         ]),
-        tools = data + [link_tool],
+        tools = [link_tool],
+        message = "Linking bitcode library %s to %s..." % (name, out),
+        output_to_bindir = 1,
+        **kwargs
+    )
+
+def iree_cuda_bitcode_library(
+        name,
+        cuda_arch,
+        srcs,
+        internal_hdrs = [],
+        copts = [],
+        out = None,
+        **kwargs):
+    """Builds an LLVM bitcode library for CUDA from an input file via clang.
+
+    Args:
+        name: Name of the target.
+        cuda_arch: Target sm architecture to compile for.
+        srcs: source files to pass to clang.
+        internal_hdrs: all headers transitively included by the source files.
+                       Unlike typical Bazel `hdrs`, these are not exposed as
+                       interface headers. This would normally be part of `srcs`,
+                       but separating it was easier for `bazel_to_cmake`, as
+                       CMake does not need this, and making this explicitly
+                       Bazel-only allows using `filegroup` on the Bazel side.
+        copts: additional flags to pass to clang.
+        out: output file name (defaults to name.bc).
+        **kwargs: any additional attributes to pass to the underlying rules.
+    """
+
+    clang_tool = "@llvm-project//clang:clang"
+    link_tool = "@llvm-project//llvm:llvm-link"
+    builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
+    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+
+    base_copts = [
+        "-x",
+        "cuda",
+
+        # Target architecture
+        "--cuda-gpu-arch=%s" % (cuda_arch),
+
+        # Suppress warnings
+        "-Wno-unknown-cuda-version",
+        "-nocudalib",
+        "--cuda-device-only",
+
+        # Optimized.
+        "-O3",
+
+        # Object file only in bitcode format:
+        "-c",
+        "-emit-llvm",
+    ]
+
+    bitcode_files = []
+    for src in srcs:
+        bitcode_out = "%s_%s.bc" % (name, src)
+        bitcode_files.append(bitcode_out)
+        native.genrule(
+            name = "gen_%s" % (bitcode_out),
+            srcs = [src, builtin_headers_dep] + internal_hdrs,
+            outs = [bitcode_out],
+            cmd = " && ".join([
+                " ".join([
+                    "$(location %s)" % (clang_tool),
+                    " ".join(base_copts + copts),
+                    "-o $(location %s)" % (bitcode_out),
+                    "$(location %s)" % (src),
+                ]),
+            ]),
+            tools = [
+                clang_tool,
+            ],
+            message = "Compiling %s to %s..." % (src, bitcode_out),
+            output_to_bindir = 1,
+            **kwargs
+        )
+
+    if not out:
+        out = "%s.bc" % (name)
+
+    native.genrule(
+        name = name,
+        srcs = bitcode_files,
+        outs = [out],
+        cmd = " && ".join([
+            " ".join([
+                "$(location %s)" % (link_tool),
+                "-o $(location %s)" % (out),
+                " ".join(["$(locations %s)" % (src) for src in bitcode_files]),
+            ]),
+        ]),
+        tools = [link_tool],
+        message = "Linking bitcode library %s to %s..." % (name, out),
+        output_to_bindir = 1,
+        **kwargs
+    )
+
+def iree_link_bitcode(
+        name,
+        bitcode_files,
+        out = None,
+        link_tool = "@llvm-project//llvm:llvm-link",
+        **kwargs):
+    """Builds an LLVM bitcode library from an input file via clang.
+
+    Args:
+        name: Name of the target.
+        bitcode_files: bitcode files to link together.
+        out: output file name (defaults to name.bc).
+        link_tool: llvm-link tool used for linking bitcode files.
+        **kwargs: any additional attributes to pass to the underlying rules.
+    """
+
+    bitcode_files_qualified = [(("//" + native.package_name() + "/" + b) if b.count(":") else b) for b in bitcode_files]
+
+    if not out:
+        out = "%s.bc" % (name)
+    native.genrule(
+        name = name,
+        srcs = bitcode_files_qualified,
+        outs = [out],
+        cmd = " && ".join([
+            " ".join([
+                "$(location %s)" % (link_tool),
+                "-o $(location %s)" % (out),
+                " ".join(["$(locations %s)" % (src) for src in bitcode_files_qualified]),
+            ]),
+        ]),
+        tools = [link_tool],
         message = "Linking bitcode library %s to %s..." % (name, out),
         output_to_bindir = 1,
         **kwargs

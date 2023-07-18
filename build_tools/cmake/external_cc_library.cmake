@@ -158,16 +158,6 @@ function(external_cc_library)
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
     )
-    target_compile_options(${_NAME}
-      INTERFACE
-        ${IREE_DEFAULT_COPTS}
-        ${_RULE_COPTS}
-    )
-    target_link_options(${_NAME}
-      INTERFACE
-        ${IREE_DEFAULT_LINKOPTS}
-        ${_RULE_LINKOPTS}
-    )
     target_link_libraries(${_NAME}
       INTERFACE
         ${_RULE_DEPS}

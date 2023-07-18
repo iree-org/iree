@@ -276,8 +276,8 @@ EOF
     # Doing these all in one command fails, probably because there's a dependency
     # between them and apt-fast makes it happen in parallel. Also, it turns out
     # that the Vulkan ICD is in libnvidia-gl for some reason.
-    apt-get install nvidia-headless-515
-    apt-get install libnvidia-gl-515-server nvidia-utils-515-server vulkan-tools
+    apt-get install nvidia-headless-530
+    apt-get install libnvidia-gl-530 nvidia-utils-530 vulkan-tools
     "${script_dir}/check_cuda.sh"
     "${script_dir}/check_vulkan.sh"
 
@@ -314,8 +314,9 @@ EOF
           bash -c "${script_dir}/check_cuda.sh && ${script_dir}/check_vulkan.sh"
     }
 
-    check_docker gcr.io/iree-oss/nvidia@sha256:b00fe1b21a288b6edd701b30d2b23c85ea96b5f8707792b071fe9f3b7f15b4bb
-    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:b0df86dff8bfcf5f43eedb70d178703b4538f31a2bf45e3b2eb035724a7f6a42
+    check_docker gcr.io/iree-oss/nvidia@sha256:de6e4453614aa48059fd611d7e7255f4d6ac27ac29a47aabdc04191ec1758533
+    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:d52c2e3d23e69b4f4c7b09e634722c0f4c6dd351bdea4d9dce11ecb448f724ba
+    check_docker gcr.io/iree-oss/nvidia-bleeding-edge@sha256:522491c028ec3b4070f23910c70c8162fd9612e11d9cf062a13444df7e88ab70
 
     # Remove the docker images we've fetched. We might want to pre-fetch Docker
     # images into the VM image, but that should be a separate decision.

@@ -21,7 +21,6 @@ iree_cc_library(
     ::executable_library
     iree::base
     iree::base::internal::cpu
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -48,7 +47,6 @@ iree_cc_binary_benchmark(
     iree::base
     iree::base::internal::file_io
     iree::base::internal::flags
-    iree::base::tracing
     iree::hal
     iree::hal::local::loaders::registration
     iree::hal::local::plugins::registration
@@ -67,7 +65,6 @@ iree_cc_test(
     ::executable_environment
     ::executable_library
     iree::base
-    iree::base::core_headers
     iree::base::internal::cpu
 )
 
@@ -84,7 +81,6 @@ iree_cc_library(
     ::executable_loader
     iree::base
     iree::base::internal
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -103,7 +99,6 @@ iree_cc_library(
     ::executable_library
     iree::base
     iree::base::internal
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -131,7 +126,6 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
   PUBLIC
 )
@@ -153,11 +147,9 @@ iree_cc_library(
     ::executable_environment
     ::executable_library
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::cpu
     iree::base::internal::fpu_state
-    iree::base::tracing
     iree::hal
   PUBLIC
 )

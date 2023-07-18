@@ -9,8 +9,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
-
 #define IREE_HAL_SYNC_DEVICE_ID_DEFAULT 0
 
 typedef struct iree_hal_sync_driver_t {
@@ -87,9 +85,11 @@ static void iree_hal_sync_driver_destroy(iree_hal_driver_t* base_driver) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_allocator_release(driver->device_allocator);
+
   for (iree_host_size_t i = 0; i < driver->loader_count; ++i) {
     iree_hal_executable_loader_release(driver->loaders[i]);
   }
+
   iree_allocator_free(host_allocator, driver);
 
   IREE_TRACE_ZONE_END(z0);

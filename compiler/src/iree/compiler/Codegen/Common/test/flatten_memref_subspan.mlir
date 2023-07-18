@@ -157,6 +157,7 @@ func.func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: i
   %alloc = memref.alloc() : memref<2x3x4xf32, 3>
   memref.store %value, %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
   %val = memref.load %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
+  memref.dealloc %alloc : memref<2x3x4xf32, 3>
   return %val: f32
 }
 
@@ -168,6 +169,7 @@ func.func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: i
 //      CHECK:   memref.store %[[VAL]], %[[ALLOC]][%[[INDEX0]]] : memref<24xf32, 3>
 //      CHECK:   %[[INDEX1:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[ALLOC]][%[[INDEX1]]] : memref<24xf32, 3>
+//      CHECK:   memref.dealloc %[[ALLOC]] : memref<24xf32, 3>
 //      CHECK:   return %[[LOAD]]
 
 // -----
@@ -176,6 +178,7 @@ func.func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, 
   %alloc = memref.alloca(%dim0, %dim1, %dim2) : memref<?x?x?xf32>
   memref.store %value, %alloc[%i0, %i1, %i2] : memref<?x?x?xf32>
   %val = memref.load %alloc[%i0, %i1, %i2] : memref<?x?x?xf32>
+  memref.dealloc %alloc : memref<?x?x?xf32>
   return %val: f32
 }
 
@@ -190,6 +193,7 @@ func.func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, 
 //      CHECK:   memref.store %[[VAL]], %[[ALLOC]][%[[INDEX0]]] : memref<?xf32>
 //      CHECK:   %[[INDEX1:.+]] = affine.apply #[[$INDEX_MAP]]()[%[[DIM2]], %[[I2]], %[[I0]], %[[DIM1]], %[[I1]]]
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[ALLOC]][%[[INDEX1]]] : memref<?xf32>
+//      CHECK:   memref.dealloc %[[ALLOC]] : memref<?xf32>
 //      CHECK:   return %[[LOAD]]
 
 // -----

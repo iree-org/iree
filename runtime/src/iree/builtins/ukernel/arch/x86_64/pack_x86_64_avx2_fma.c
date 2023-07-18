@@ -5,14 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
-#include "iree/builtins/ukernel/arch/x86_64/unpack_x86_64.h"
+#include "iree/builtins/ukernel/arch/x86_64/pack_x86_64_internal.h"
 
 void iree_uk_pack_tile_8x8_x32_x86_64_avx2_fma_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 4);
   IREE_UK_ASSERT(tile_size0 == 8);
   IREE_UK_ASSERT(tile_size1 == 8);
@@ -28,10 +28,10 @@ void iree_uk_pack_tile_8x8_x32_x86_64_avx2_fma_direct(
 
 static void iree_uk_pack_tile_8x4_x8_x86_64_avx2_fma_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 1);
   IREE_UK_ASSERT(tile_size0 == 8);
   IREE_UK_ASSERT(tile_size1 == 4);
@@ -52,10 +52,10 @@ static void iree_uk_pack_tile_8x4_x8_x86_64_avx2_fma_direct(
 
 void iree_uk_pack_tile_8x1_x32_x86_64_avx2_fma_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 4);
   IREE_UK_ASSERT(tile_size0 == 8);
   IREE_UK_ASSERT(tile_size1 == 1);
@@ -66,10 +66,10 @@ void iree_uk_pack_tile_8x1_x32_x86_64_avx2_fma_direct(
 
 void iree_uk_pack_tile_8x1_x32_x86_64_avx2_fma_transpose(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 4);
   IREE_UK_ASSERT(tile_size0 == 1);
   IREE_UK_ASSERT(tile_size1 == 8);
@@ -84,10 +84,10 @@ void iree_uk_pack_tile_8x1_x32_x86_64_avx2_fma_transpose(
 
 void iree_uk_pack_tile_8x2_x8_x86_64_avx2_fma_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 1);
   IREE_UK_ASSERT(tile_size0 == 8);
   IREE_UK_ASSERT(tile_size1 == 2);
@@ -108,16 +108,16 @@ void iree_uk_pack_tile_8x2_x8_x86_64_avx2_fma_direct(
 
 void iree_uk_pack_tile_8x2_x8_x86_64_avx2_fma_transpose(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 1);
   IREE_UK_ASSERT(tile_size0 == 2);
   IREE_UK_ASSERT(tile_size1 == 8);
   const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr = in_tile_ptr;
   iree_uk_int8_t* IREE_UK_RESTRICT out_ptr = out_tile_ptr;
-  iree_uk_ssize_t outer_i1 = 0;
+  iree_uk_index_t outer_i1 = 0;
   for (; outer_i1 <= outer_size1 - 4; outer_i1 += 4) {
     __m256i in0 = _mm256_loadu_si256((const __m256i*)in_ptr);
     __m256i in1 = _mm256_loadu_si256((const __m256i*)(in_ptr + in_stride0));

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
@@ -23,11 +23,13 @@ struct LLVMCPUAssignConstantOrdinalsPass
 
     // Ignore non-LLVMCPU variants.
     // TODO(benvanik): a way to nest this in the pipeline via dynamic passes.
-    if (variantOp.getTarget().getBackend().getValue() != "llvm-cpu") return;
+    if (variantOp.getTarget().getBackend().getValue() != "llvm-cpu")
+      return;
 
     // Get a constant key -> ordinal mapping.
     auto keyOrdinals = variantOp.gatherConstantOrdinals();
-    if (keyOrdinals.empty()) return;
+    if (keyOrdinals.empty())
+      return;
 
     // Update placeholders to hold the concrete ordinal values.
     // Eventually MLIR or LLVM will inline them.
@@ -36,7 +38,8 @@ struct LLVMCPUAssignConstantOrdinalsPass
          llvm::make_early_inc_range(moduleOp.getOps<LLVM::GlobalOp>())) {
       auto keyAttr = globalOp->getAttr(
           IREE::HAL::ExecutableConstantBlockOp::getKeyAttrName());
-      if (!keyAttr) continue;
+      if (!keyAttr)
+        continue;
       auto it = keyOrdinals.find(keyAttr);
       if (it == keyOrdinals.end()) {
         globalOp.emitOpError()
@@ -52,12 +55,12 @@ struct LLVMCPUAssignConstantOrdinalsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPUAssignConstantOrdinalsPass() {
   return std::make_unique<LLVMCPUAssignConstantOrdinalsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

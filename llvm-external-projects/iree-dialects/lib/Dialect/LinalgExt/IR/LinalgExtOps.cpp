@@ -511,8 +511,8 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {
-    resultTypes = llvm::to_vector<4>(
-        llvm::map_range(tiledOperands, [&](Value v) { return v.getType(); }));
+    resultTypes = llvm::map_to_vector<4>(tiledOperands,
+                                         [&](Value v) { return v.getType(); });
   }
   Operation *tiledSortOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
@@ -1223,10 +1223,10 @@ LogicalResult ReverseOp::getResultTilePosition(
     Value offset =
         getValueOrCreateConstantIndexOp(builder, loc, resultOffsets[dim]);
     Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
-    resultOffsets[dim] =
-        builder
-            .create<AffineApplyOp>(loc, map, ValueRange{size, offset, tileSize})
-            .getResult();
+    resultOffsets[dim] = builder
+                             .create<affine::AffineApplyOp>(
+                                 loc, map, ValueRange{size, offset, tileSize})
+                             .getResult();
   }
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
@@ -1781,7 +1781,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   bindSymbols(builder.getContext(), s0, s1);
   AffineExpr ceilDivExpr = s0.ceilDiv(s1);
   for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    resultDims[tiledDim.value()] = makeComposedFoldedAffineApply(
+    resultDims[tiledDim.value()] = affine::makeComposedFoldedAffineApply(
         builder, loc, ceilDivExpr,
         {resultDims[tiledDim.value()], innerTileSizes[tiledDim.index()]});
   }
@@ -1811,7 +1811,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
 }
 
 SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
-  return tensor::createDimValues(builder, getLoc(), getOutput());
+  return tensor::getMixedSizes(builder, getLoc(), getOutput());
 }
 
 ShapedType PackOp::getPackedType(ShapedType sourceType,
@@ -1881,7 +1881,7 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
       AffineExpr i, j, tile;
       bindDims(builder.getContext(), i, j);
       bindSymbols(builder.getContext(), tile);
-      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+      OpFoldResult sourceIndex = affine::makeComposedFoldedAffineApply(
           builder, loc, i * tile + j,
           ArrayRef<OpFoldResult>{
               interchangedIvs[dim],
@@ -2039,9 +2039,10 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   inputIvsPointLoops.reserve(dimAndTileMapping.size());
   for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
     if (dimAndTileMapping.count(dim)) {
-      DivModValue divMod = getDivMod(builder, loc, ivs[dim],
-                                     getValueOrCreateConstantIndexOp(
-                                         builder, loc, dimAndTileMapping[dim]));
+      affine::DivModValue divMod =
+          affine::getDivMod(builder, loc, ivs[dim],
+                            getValueOrCreateConstantIndexOp(
+                                builder, loc, dimAndTileMapping[dim]));
       inputIvsPointLoops.push_back(divMod.remainder);
       inputIvs.push_back(divMod.quotient);
     } else {
@@ -2531,12 +2532,14 @@ LogicalResult AttentionOp::verify() {
   ArrayRef<int64_t> keyShape = keyType.getShape();
   ArrayRef<int64_t> valueShape = valueType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
-  if (failed(verifyCompatibleShape(queryShape, keyShape)))
-    return op->emitOpError("incompatible key shape");
-  if (failed(verifyCompatibleShape(queryShape, valueShape)))
+  if (failed(verifyCompatibleShape(keyShape, valueShape)))
     return op->emitOpError("incompatible value shape");
   if (failed(verifyCompatibleShape(queryShape, outputShape)))
     return op->emitOpError("incompatible output shape");
+  if (keyShape[0] != queryShape[0])
+    return op->emitOpError("query and key batch mismatch");
+  if (keyShape[2] != queryShape[2])
+    return op->emitOpError("query and key head dimension mismatch");
   return success();
 }
 
@@ -2667,15 +2670,6 @@ DEFINE_OP_GET_EFFECTS(AttentionOp)
 // iree_linalg_ext.set_encoding
 //===----------------------------------------------------------------------===//
 
-void SetEncodingOp::build(OpBuilder &builder, OperationState &state,
-                          Value source, TensorEncoding encoding) {
-  auto encodingAttr = EncodingAttr::get(builder.getContext(), encoding);
-  auto sourceType = source.getType().cast<RankedTensorType>();
-  RankedTensorType encodingType = RankedTensorType::get(
-      sourceType.getShape(), sourceType.getElementType(), encodingAttr);
-  build(builder, state, encodingType, source);
-}
-
 LogicalResult SetEncodingOp::verify() {
   // Source and the result have the same rank.
   if (getSourceType().getEncoding()) {
@@ -2706,14 +2700,6 @@ LogicalResult SetEncodingOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 // iree_linalg_ext.unset_encoding
 //===----------------------------------------------------------------------===//
-
-void UnsetEncodingOp::build(OpBuilder &builder, OperationState &state,
-                            Value source) {
-  auto sourceType = source.getType().cast<RankedTensorType>();
-  auto resultType =
-      RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
-  return build(builder, state, resultType, source);
-}
 
 LogicalResult UnsetEncodingOp::verify() {
   if (getResultType().getEncoding()) {

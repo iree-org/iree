@@ -10,8 +10,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 void iree_task_topology_group_initialize(
     uint8_t group_index, iree_task_topology_group_t* out_group) {
@@ -81,7 +79,7 @@ iree_status_t iree_task_topology_push_group(
 void iree_task_topology_initialize_from_group_count(
     iree_host_size_t group_count, iree_task_topology_t* out_topology) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, group_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, group_count);
 
   iree_task_topology_initialize(out_topology);
   for (iree_host_size_t i = 0; i < group_count; ++i) {

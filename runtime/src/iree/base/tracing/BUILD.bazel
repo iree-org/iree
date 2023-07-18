@@ -1,0 +1,90 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Configuration
+#===------------------------------------------------------------------------===#
+
+string_flag(
+    name = "tracing_provider",
+    build_setting_default = "disabled",
+    values = [
+        "disabled",
+        "console",
+        "tracy",
+    ],
+)
+
+config_setting(
+    name = "_console_enable",
+    flag_values = {
+        ":tracing_provider": "console",
+    },
+)
+
+config_setting(
+    name = "_tracy_enable",
+    flag_values = {
+        ":tracing_provider": "tracy",
+    },
+)
+
+cc_library(
+    name = "disabled",
+)
+
+alias(
+    name = "provider",
+    actual = select({
+        ":_console_enable": ":console",
+        ":_tracy_enable": ":tracy",
+        "//conditions:default": ":disabled",
+    }),
+)
+
+#===------------------------------------------------------------------------===#
+# Console (stderr)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "console",
+    srcs = ["console.c"],
+    hdrs = ["console.h"],
+    defines = [
+        "IREE_TRACING_PROVIDER_H=\\\"iree/base/tracing/console.h\\\"",
+        "IREE_TRACING_MODE=2",
+    ],
+    deps = [
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Tracy
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "tracy",
+    srcs = ["tracy.cc"],
+    hdrs = ["tracy.h"],
+    defines = [
+        "IREE_TRACING_PROVIDER_H=\\\"iree/base/tracing/tracy.h\\\"",
+        "IREE_TRACING_MODE=2",
+    ],
+    deps = [
+        "//runtime/src/iree/base:core_headers",
+        "@tracy_client//:runtime",
+    ],
+)

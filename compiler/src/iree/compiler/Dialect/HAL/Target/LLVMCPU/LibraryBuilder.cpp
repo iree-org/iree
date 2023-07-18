@@ -97,8 +97,8 @@ static llvm::StructType *makeWorkgroupStateType(llvm::LLVMContext &context) {
 // i32 (%struct.iree_hal_executable_environment_v0_t*,
 //      %struct.iree_hal_executable_dispatch_state_v0_t*,
 //      i8*)
-static llvm::FunctionType *makeDispatchFunctionType(
-    llvm::LLVMContext &context) {
+static llvm::FunctionType *
+makeDispatchFunctionType(llvm::LLVMContext &context) {
   auto *environmentType = makeEnvironmentType(context);
   auto *dispatchStateType = makeDispatchStateType(context);
   auto *workgroupStateType = makeWorkgroupStateType(context);
@@ -324,8 +324,8 @@ llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   return func;
 }
 
-llvm::Constant *LibraryBuilder::buildLibraryV0ImportTable(
-    std::string libraryName) {
+llvm::Constant *
+LibraryBuilder::buildLibraryV0ImportTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *importTableType = makeImportTableType(context);
   auto *i8Type = llvm::IntegerType::getInt8Ty(context);
@@ -335,7 +335,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ImportTable(
   llvm::Constant *symbolNames =
       llvm::Constant::getNullValue(i8Type->getPointerTo());
   if (!imports.empty()) {
-    SmallVector<llvm::Constant *, 4> symbolNameValues;
+    SmallVector<llvm::Constant *> symbolNameValues;
     for (auto &import : imports) {
       auto symbolName = import.symbol_name;
       if (import.weak) {
@@ -363,8 +363,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ImportTable(
                        });
 }
 
-llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
-    std::string libraryName) {
+llvm::Constant *
+LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *exportTableType = makeExportTableType(context);
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
@@ -376,7 +376,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
   llvm::Constant *zero = llvm::ConstantInt::get(i32Type, 0);
 
   // iree_hal_executable_export_table_v0_t::ptrs
-  SmallVector<llvm::Constant *, 4> exportPtrValues;
+  SmallVector<llvm::Constant *> exportPtrValues;
   for (auto dispatch : exports) {
     exportPtrValues.push_back(dispatch.func);
   }
@@ -399,7 +399,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
         return !dispatch.attrs.isDefault();
       }) != exports.end();
   if (!hasNonDefaultAttrs) {
-    SmallVector<llvm::Constant *, 4> exportAttrValues;
+    SmallVector<llvm::Constant *> exportAttrValues;
     for (auto dispatch : exports) {
       exportAttrValues.push_back(llvm::ConstantStruct::get(
           dispatchAttrsType,
@@ -429,7 +429,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
   llvm::Constant *exportNames =
       llvm::Constant::getNullValue(i8Type->getPointerTo()->getPointerTo());
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
-    SmallVector<llvm::Constant *, 4> exportNameValues;
+    SmallVector<llvm::Constant *> exportNameValues;
     for (auto dispatch : exports) {
       exportNameValues.push_back(getStringConstant(dispatch.name, module));
     }
@@ -449,7 +449,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
   llvm::Constant *exportTags =
       llvm::Constant::getNullValue(i8Type->getPointerTo()->getPointerTo());
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
-    SmallVector<llvm::Constant *, 4> exportTagValues;
+    SmallVector<llvm::Constant *> exportTagValues;
     for (auto dispatch : exports) {
       exportTagValues.push_back(getStringConstant(dispatch.tag, module));
     }
@@ -469,7 +469,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
   llvm::Constant *exportSrcLocs =
       llvm::Constant::getNullValue(srcLocType->getPointerTo());
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
-    SmallVector<llvm::Constant *, 4> exportSrcLocValues;
+    SmallVector<llvm::Constant *> exportSrcLocValues;
     for (auto dispatch : exports) {
       exportSrcLocValues.push_back(llvm::ConstantStruct::get(
           srcLocType,
@@ -511,8 +511,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
                        });
 }
 
-llvm::Constant *LibraryBuilder::buildLibraryV0ConstantTable(
-    std::string libraryName) {
+llvm::Constant *
+LibraryBuilder::buildLibraryV0ConstantTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *constantTableType = makeConstantTableType(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
@@ -574,7 +574,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
   return library;
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -14,10 +14,10 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Stream/IR/StreamAttrs.cpp.inc"  // IWYU pragma: keep
-#include "iree/compiler/Dialect/Stream/IR/StreamEnums.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamAttrs.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamEnums.cpp.inc" // IWYU pragma: keep
 #define GET_TYPEDEF_CLASSES
-#include "iree/compiler/Dialect/Stream/IR/StreamTypes.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -28,7 +28,7 @@ namespace Stream {
 static llvm::cl::opt<Favor> clPartitioningFavor(
     "iree-stream-partitioning-favor",
     llvm::cl::desc("Default stream partitioning favor configuration."),
-    llvm::cl::init(Favor::MaxConcurrency),
+    llvm::cl::init(Favor::MinPeakMemory),
     llvm::cl::values(
         clEnumValN(Favor::Debug, "debug",
                    "Force debug partitioning (no concurrency or pipelining)."),
@@ -63,6 +63,11 @@ static llvm::cl::opt<unsigned> clResourceIndexBits(
     "iree-stream-resource-index-bits",
     llvm::cl::desc("Bit width of indices used to reference resource offsets."),
     llvm::cl::init(32));
+static llvm::cl::opt<bool> clResourceAliasMutableBindings(
+    "iree-stream-resource-alias-mutable-bindings",
+    llvm::cl::desc(
+        "Fuses bindings that are mutable instead of leaving them split."),
+    llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
@@ -70,13 +75,15 @@ static llvm::cl::opt<unsigned> clResourceIndexBits(
 
 // static
 Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess()) || failed(p.parseLBrace())) return {};
+  if (failed(p.parseLess()) || failed(p.parseLBrace()))
+    return {};
 
   int64_t maxAllocationSize = 0;
   int64_t minBufferOffsetAlignment = 0;
   int64_t maxBufferRange = 0;
   int64_t minBufferRangeAlignment = 0;
   int64_t indexBits = 32;
+  bool aliasMutableBindings = false;
   while (failed(p.parseOptionalRBrace())) {
     StringRef key;
     int64_t value = 0;
@@ -94,14 +101,17 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
       minBufferRangeAlignment = value;
     } else if (key == "index_bits") {
       indexBits = value;
+    } else if (key == "alias_mutable_bindings") {
+      aliasMutableBindings = (bool)value;
     }
     (void)p.parseOptionalComma();
   }
-  if (failed(p.parseGreater())) return {};
+  if (failed(p.parseGreater()))
+    return {};
 
-  return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
-                                 minBufferOffsetAlignment, maxBufferRange,
-                                 minBufferRangeAlignment, indexBits);
+  return ResourceConfigAttr::get(
+      p.getContext(), maxAllocationSize, minBufferOffsetAlignment,
+      maxBufferRange, minBufferRangeAlignment, indexBits, aliasMutableBindings);
 }
 
 void ResourceConfigAttr::print(AsmPrinter &p) const {
@@ -112,15 +122,19 @@ void ResourceConfigAttr::print(AsmPrinter &p) const {
      << ", ";
   os << "max_buffer_range = " << getMaxBufferRange() << ", ";
   os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment() << ", ";
-  os << "index_bits = " << getIndexBits();
+  os << "index_bits = " << getIndexBits() << ", ";
+  os << "alias_mutable_bindings = " << getAliasMutableBindings();
   os << "}>";
 }
 
 // static
-ResourceConfigAttr ResourceConfigAttr::intersectBufferConstraints(
-    ResourceConfigAttr lhs, ResourceConfigAttr rhs) {
-  if (!lhs) return rhs;
-  if (!rhs) return lhs;
+ResourceConfigAttr
+ResourceConfigAttr::intersectBufferConstraints(ResourceConfigAttr lhs,
+                                               ResourceConfigAttr rhs) {
+  if (!lhs)
+    return rhs;
+  if (!rhs)
+    return lhs;
   Builder b(lhs.getContext());
   return ResourceConfigAttr::get(
       b.getContext(),
@@ -130,18 +144,20 @@ ResourceConfigAttr ResourceConfigAttr::intersectBufferConstraints(
       std::min(lhs.getMaxBufferRange(), rhs.getMaxBufferRange()),
       std::max(lhs.getMinBufferRangeAlignment(),
                rhs.getMinBufferRangeAlignment()),
-      std::max(lhs.getIndexBits(), rhs.getIndexBits()));
+      std::max(lhs.getIndexBits(), rhs.getIndexBits()),
+      rhs.getAliasMutableBindings() && lhs.getAliasMutableBindings());
 }
 
 // static
-ResourceConfigAttr ResourceConfigAttr::getDefaultHostConstraints(
-    MLIRContext *context) {
+ResourceConfigAttr
+ResourceConfigAttr::getDefaultHostConstraints(MLIRContext *context) {
   // Picked to represent what we kind of want on CPU today.
   // We should be able to get rid of queries for this from real programs and
   // only use this during testing by ensuring affinities are always assigned.
   return ResourceConfigAttr::get(
       context, clResourceMaxAllocationSize, clResourceMinOffsetAlignment,
-      clResourceMaxRange, clResourceMinOffsetAlignment, clResourceIndexBits);
+      clResourceMaxRange, clResourceMinOffsetAlignment, clResourceIndexBits,
+      clResourceAliasMutableBindings);
 }
 
 // static
@@ -151,13 +167,15 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
   while (op) {
     // Use an override if specified.
     auto attr = op->getAttrOfType<ResourceConfigAttr>(attrId);
-    if (attr) return attr;
+    if (attr)
+      return attr;
     // See if the affinity specified provides a resource configuration.
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinityAttr = affinityOp.getAffinity();
       if (affinityAttr) {
         auto attr = affinityAttr.getResourceConfigAttr();
-        if (attr) return attr;
+        if (attr)
+          return attr;
       }
     }
     op = op->getParentOp();
@@ -172,11 +190,13 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
 
 Attribute TimepointAttr::parse(AsmParser &p, Type type) {
   StringRef timeStr;
-  if (failed(p.parseLess())) return {};
+  if (failed(p.parseLess()))
+    return {};
   if (failed(p.parseKeyword(&timeStr))) {
     return {};
   }
-  if (failed(p.parseGreater())) return {};
+  if (failed(p.parseGreater()))
+    return {};
   if (timeStr != "immediate") {
     p.emitError(p.getCurrentLocation(),
                 "only immediate timepoint attrs are supported");
@@ -200,19 +220,22 @@ AffinityAttr AffinityAttr::lookup(Operation *op) {
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinity = affinityOp.getAffinity();
-      if (affinity) return affinity;
+      if (affinity)
+        return affinity;
     }
     auto attr = op->getAttrOfType<AffinityAttr>(attrId);
-    if (attr) return attr;
+    if (attr)
+      return attr;
     op = op->getParentOp();
   }
-  return {};  // No affinity found; let caller decide what to do.
+  return {}; // No affinity found; let caller decide what to do.
 }
 
 // static
 bool AffinityAttr::areCompatible(AffinityAttr desiredAffinity,
                                  AffinityAttr requiredAffinity) {
-  if (desiredAffinity == requiredAffinity) return true;
+  if (desiredAffinity == requiredAffinity)
+    return true;
   if ((desiredAffinity && !requiredAffinity) ||
       (requiredAffinity && !desiredAffinity)) {
     return true;
@@ -223,8 +246,10 @@ bool AffinityAttr::areCompatible(AffinityAttr desiredAffinity,
 
 // static
 bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
-  if (lhs == rhs) return true;
-  if ((lhs && !rhs) || (rhs && !lhs)) return true;
+  if (lhs == rhs)
+    return true;
+  if ((lhs && !rhs) || (rhs && !lhs))
+    return true;
   return lhs.isExecutableWith(rhs);
 }
 
@@ -234,13 +259,15 @@ bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
 
 Attribute PartitioningConfigAttr::parse(AsmParser &p, Type type) {
   std::string favorStr;
-  if (failed(p.parseLess())) return {};
+  if (failed(p.parseLess()))
+    return {};
   if (succeeded(p.parseOptionalStar())) {
     favorStr = "size";
   } else if (failed(p.parseString(&favorStr))) {
     return {};
   }
-  if (failed(p.parseGreater())) return {};
+  if (failed(p.parseGreater()))
+    return {};
   auto favor = symbolizeFavor(favorStr);
   if (!favor.has_value()) {
     p.emitError(p.getNameLoc(), "unknown favor value: ") << favorStr;
@@ -261,7 +288,8 @@ PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
   auto attrId = StringAttr::get(op->getContext(), "stream.partitioning");
   while (op) {
     auto attr = op->getAttrOfType<PartitioningConfigAttr>(attrId);
-    if (attr) return attr;
+    if (attr)
+      return attr;
     op = op->getParentOp();
   }
   // No config found; use defaults.
@@ -301,13 +329,15 @@ static void printLifetime(Lifetime lifetime, llvm::raw_ostream &os) {
 
 Type ResourceType::parse(AsmParser &p) {
   StringRef lifetimeStr;
-  if (failed(p.parseLess())) return {};
+  if (failed(p.parseLess()))
+    return {};
   if (succeeded(p.parseOptionalStar())) {
     lifetimeStr = "*";
   } else if (failed(p.parseKeyword(&lifetimeStr))) {
     return {};
   }
-  if (failed(p.parseGreater())) return {};
+  if (failed(p.parseGreater()))
+    return {};
   auto lifetime = parseLifetime(lifetimeStr);
   if (!lifetime.has_value()) {
     p.emitError(p.getNameLoc(), "unknown lifetime value: ") << lifetimeStr;
@@ -323,12 +353,12 @@ void ResourceType::print(AsmPrinter &p) const {
 }
 
 bool ResourceType::isAccessStorageCompatible(Type accessType) const {
-  if (auto resourceType = accessType.dyn_cast<ResourceType>()) {
+  if (auto resourceType = llvm::dyn_cast<ResourceType>(accessType)) {
     // We could allow widening loads or stores here but today we require
     // transfers to accomplish that.
     return accessType == resourceType;
   }
-  return accessType.isa<ShapedType>();
+  return llvm::isa<ShapedType>(accessType);
 }
 
 Value ResourceType::inferSizeFromValue(Location loc, Value value,
@@ -349,9 +379,9 @@ Value ResourceType::createSubrangeOp(Location loc, Value resource,
 // Dialect registration
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Stream/IR/StreamAttrInterfaces.cpp.inc"  // IWYU pragma: export
-#include "iree/compiler/Dialect/Stream/IR/StreamOpInterfaces.cpp.inc"  // IWYU pragma: keep
-#include "iree/compiler/Dialect/Stream/IR/StreamTypeInterfaces.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamAttrInterfaces.cpp.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/Stream/IR/StreamOpInterfaces.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamTypeInterfaces.cpp.inc" // IWYU pragma: keep
 
 void StreamDialect::registerAttributes() {
   // Register command line flags:
@@ -363,18 +393,18 @@ void StreamDialect::registerAttributes() {
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Dialect/Stream/IR/StreamAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamAttrs.cpp.inc" // IWYU pragma: keep
       >();
 }
 
 void StreamDialect::registerTypes() {
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "iree/compiler/Dialect/Stream/IR/StreamTypes.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.cpp.inc" // IWYU pragma: keep
       >();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

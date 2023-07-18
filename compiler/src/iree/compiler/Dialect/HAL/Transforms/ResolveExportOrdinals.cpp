@@ -16,7 +16,7 @@ namespace HAL {
 
 class ResolveCommandBufferDispatchOrdinals
     : public OpRewritePattern<IREE::HAL::CommandBufferDispatchSymbolOp> {
- public:
+public:
   using OpRewritePattern<
       IREE::HAL::CommandBufferDispatchSymbolOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::HAL::CommandBufferDispatchSymbolOp op,
@@ -45,12 +45,12 @@ class ResolveCommandBufferDispatchOrdinals
 class ResolveCommandBufferDispatchIndirectOrdinals
     : public OpRewritePattern<
           IREE::HAL::CommandBufferDispatchIndirectSymbolOp> {
- public:
+public:
   using OpRewritePattern<
       IREE::HAL::CommandBufferDispatchIndirectSymbolOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferDispatchIndirectSymbolOp op,
-      PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferDispatchIndirectSymbolOp op,
+                  PatternRewriter &rewriter) const override {
     auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.getEntryPoint());
     assert(symbol && "missing ExecutableEntryPoint symbol");
     auto exportOp = cast<IREE::HAL::ExecutableExportOp>(symbol);
@@ -74,7 +74,7 @@ class ResolveCommandBufferDispatchIndirectOrdinals
 
 class ResolveExportOrdinalsPass
     : public PassWrapper<ResolveExportOrdinalsPass, OperationPass<ModuleOp>> {
- public:
+public:
   StringRef getArgument() const override {
     return "iree-hal-resolve-export-ordinals";
   }
@@ -101,7 +101,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createResolveExportOrdinalsPass() {
 
 static PassRegistration<ResolveExportOrdinalsPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

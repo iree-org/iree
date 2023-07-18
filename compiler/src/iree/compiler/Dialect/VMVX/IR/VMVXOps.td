@@ -20,6 +20,13 @@ class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
 // Utility ops
 //===----------------------------------------------------------------------===//
 
+def OpGroupUtilityOps : OpDocGroup {
+  let summary = "Utility ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupUtilityOps in {
+
 def VMVX_GetBufferDescriptorOp : VMVX_PureOp<"get_buffer_descriptor", [
     SameVariadicResultSize
   ]> {
@@ -75,30 +82,18 @@ def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
   }];
 }
 
-def VMVX_QueryTileSizesOp : VMVX_PureOp<"query_tile_sizes", [Pure]> {
-  let summary = "Returns tile sizes to use to materialize the given encoding, based on runtime CPU capabilities.";
-  let description = [{
-    TODO write me
-  }];
-
-  let arguments = (ins
-    Variadic<VMVX_Index>:$sizes,
-    I32Attr:$flags
-  );
-  let results = (outs
-    Variadic<VMVX_Index>:$tileSizes
-  );
-
-  let assemblyFormat = [{
-    `sizes` `` `(` $sizes `)`
-    `flags` `` `(` $flags `)`
-    `->` type(results) attr-dict
-  }];
-}
+} // OpGroupUtilityOps
 
 //===----------------------------------------------------------------------===//
 // VMVX Ops: ABI
 //===----------------------------------------------------------------------===//
+
+def OpGroupABIOps : OpDocGroup {
+  let summary = "ABI ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupABIOps in {
 
 def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
   let summary = "Performs a strided elementwise operation on two same-rank buffers";
@@ -111,22 +106,19 @@ def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
     Where `OP` is a concrete operation name as defined in ukernel/elementwise.h
   }];
   let arguments = (ins
-    // Input buffers
-    VMVX_Buffer:$lhs_buffer,
-    VMVX_Index:$lhs_offset,
-    VMVX_Buffer:$rhs_buffer,
-    VMVX_Index:$rhs_offset,
-    // Output buffers
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    // Other operands
     // Corresponds to lower-cased opcode suffix of a ukernel binary op.
     StrAttr:$opcode,
     // LHS.
+    VMVX_Buffer:$lhs_buffer,
+    VMVX_Index:$lhs_offset,
     Variadic<VMVX_Index>:$lhs_strides,
     // RHS.
+    VMVX_Buffer:$rhs_buffer,
+    VMVX_Index:$rhs_offset,
     Variadic<VMVX_Index>:$rhs_strides,
     // OUT.
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
     Variadic<VMVX_Index>:$out_strides,
 
     // Dimensions.
@@ -149,15 +141,13 @@ def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
 def VMVX_CopyOp : VMVX_Op<"copy", [SameVariadicOperandSize]> {
   let summary = "Copy from one buffer to another";
   let arguments = (ins
-    // Input buffers
+    // LHS.
     VMVX_Buffer:$in_buffer,
     VMVX_Index:$in_offset,
-    // Output buffers
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    // Other operands
     Variadic<VMVX_Index>:$in_strides,
     // OUT.
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
     Variadic<VMVX_Index>:$out_strides,
 
     // Dimensions.
@@ -181,12 +171,9 @@ def VMVX_Fill2DOp : VMVX_Op<"fill2d"> {
     Fills a tile with dimensions [m, n] with a scalar.
   }];
   let arguments = (ins
-    // Input buffers (none)
-    // Output buffers
+    VMVX_ElementType:$scalar,
     VMVX_Buffer:$out_buffer,
     VMVX_Index:$out_offset,
-    // Other operands
-    VMVX_ElementType:$scalar,
     VMVX_Index:$out_row_stride,
 
     // Dimensions.
@@ -202,146 +189,6 @@ def VMVX_Fill2DOp : VMVX_Op<"fill2d"> {
   }];
 }
 
-def VMVX_MatmulOp : VMVX_Op<"matmul"> {
-  let summary = "Matmul";
-  let description = [{
-    General matrix-multiply of the form:
-
-      OUT = alpha * (LHS * RHS) + beta * OUT
-  }];
-  let arguments = (ins
-    // Lhs buffer.
-    VMVX_Buffer:$lhs_buffer,
-    VMVX_Index:$lhs_offset,
-    VMVX_Index:$lhs_row_stride,
-    // Rhs buffer.
-    VMVX_Buffer:$rhs_buffer,
-    VMVX_Index:$rhs_offset,
-    VMVX_Index:$rhs_row_stride,
-    // Out buffer.
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    VMVX_Index:$out_row_stride,
-
-    // Dimensions.
-    VMVX_Index:$m,
-    VMVX_Index:$n,
-    VMVX_Index:$k,
-
-    // Type and flag attributes.
-    VMVX_ElementTypeAttr:$lhs_type,
-    VMVX_ElementTypeAttr:$rhs_type,
-    VMVX_ElementTypeAttr:$out_type,
-    I32Attr:$flags
-  );
-
-  let assemblyFormat = [{
-    `lhs` `` `(` $lhs_buffer `offset` $lhs_offset `row_stride` $lhs_row_stride `:` type($lhs_buffer) `)`
-    `rhs` `` `(` $rhs_buffer `offset` $rhs_offset `row_stride` $rhs_row_stride `:` type($rhs_buffer)`)`
-    `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
-    `mnk` `` `(` $m `,` $n `,` $k `)`
-    `flags` `` `(` $flags `)`
-    `:` `(` $lhs_type `,` $rhs_type `,` $out_type `)`
-    attr-dict
-  }];
-}
-
-def VMVX_UnpackOp : VMVX_Op<"unpack"> {
-  let summary = "unpack";
-  let description = [{
-    4D-to-2D unpacking op mirroring linalg_ext.unpack
-  }];
-  let arguments = (ins
-    // Input buffers
-    VMVX_Buffer:$in_buffer,
-    VMVX_Index:$in_offset,
-    // Output buffers
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    // Other operands
-    // In buffer.
-    VMVX_Index:$in_stride0,
-
-    // Out buffer.
-    VMVX_Index:$out_stride0,
-
-    // In dimensions.
-    VMVX_Index:$in_size0,
-    VMVX_Index:$in_size1,
-    VMVX_Index:$in_size2,
-    VMVX_Index:$in_size3,
-
-    // Out dimensions.
-    VMVX_Index:$out_size0,
-    VMVX_Index:$out_size1,
-
-    // Type and flag attributes.
-    VMVX_ElementTypeAttr:$in_type,
-    VMVX_ElementTypeAttr:$out_type,
-    I32Attr:$flags
-  );
-
-  let assemblyFormat = [{
-    `in` `` `(` $in_buffer `offset` $in_offset `stride0` $in_stride0 `:` type($in_buffer) `)`
-    `out` `` `(` $out_buffer `offset` $out_offset `stride0` $out_stride0 `:` type($out_buffer) `)`
-    `in_shape` `` `(` $in_size0 `,` $in_size1 `,` $in_size2 `,` $in_size3 `)`
-    `out_shape` `` `(` $out_size0 `,` $out_size1 `)`
-    `flags` `` `(` $flags `)`
-    `:` `(` $in_type `,` $out_type `)`
-    attr-dict
-  }];
-}
-
-def VMVX_PackOp : VMVX_Op<"pack"> {
-  let summary = "pack";
-  let description = [{
-    2D-to-4D packing op mirroring linalg_ext.pack
-  }];
-  let arguments = (ins
-    // Input buffers
-    VMVX_Buffer:$in_buffer,
-    VMVX_Index:$in_offset,
-    // Output buffers
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    // Other operands
-
-    // In buffer.
-    VMVX_Index:$in_stride0,
-
-    // Out buffer.
-    VMVX_Index:$out_stride0,
-
-    // In dimensions.
-    VMVX_Index:$in_size0,
-    VMVX_Index:$in_size1,
-
-    // Out dimensions.
-    VMVX_Index:$out_size0,
-    VMVX_Index:$out_size1,
-    VMVX_Index:$out_size2,
-    VMVX_Index:$out_size3,
-
-    VMVX_ElementType:$padding_value,
-
-    // Type and flag attributes.
-    VMVX_ElementTypeAttr:$in_type,
-    VMVX_ElementTypeAttr:$out_type,
-    I32Attr:$flags
-  );
-
-  let assemblyFormat = [{
-    `in` `` `(` $in_buffer `offset` $in_offset `stride0` $in_stride0 `:` type($in_buffer) `)`
-    `out` `` `(` $out_buffer `offset` $out_offset `stride0` $out_stride0 `:` type($out_buffer) `)`
-    `in_shape` `` `(` $in_size0 `,` $in_size1 `)`
-    `out_shape` `` `(` $out_size0 `,` $out_size1 `,` $out_size2 `,` $out_size3 `)`
-    `padding_value` `(` $padding_value `:` type($padding_value) `)`
-    `flags` `` `(` $flags `)`
-    `:` `(` $in_type `,` $out_type `)`
-    attr-dict
-  }];
-}
-
 def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
   let summary = "Performs a strided elementwise unary operation";
   let description = [{
@@ -353,19 +200,15 @@ def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
     Where `OP` is a concrete operation name as defined in ukernel/elementwise.h
   }];
   let arguments = (ins
-    // Input buffers
-    VMVX_Buffer:$in_buffer,
-    VMVX_Index:$in_offset,
-    // Output buffers
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    // Other operands
-
     // Corresponds to lower-cased opcode suffix of a ukernel unary op.
     StrAttr:$opcode,
     // IN.
+    VMVX_Buffer:$in_buffer,
+    VMVX_Index:$in_offset,
     Variadic<VMVX_Index>:$in_strides,
     // OUT.
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
     Variadic<VMVX_Index>:$out_strides,
 
     // Dimensions.
@@ -383,5 +226,7 @@ def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
     attr-dict
   }];
 }
+
+} // OpGroupABIOps
 
 #endif  // IREE_DIALECT_MODULES_VMVX_OPS

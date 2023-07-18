@@ -34,8 +34,9 @@ struct GlobalExpansionState {
 };
 
 static bool isExpandedType(Type type) {
-  if (type.isa<TensorType>()) return true;
-  if (auto ptrType = type.dyn_cast<IREE::Util::PtrType>()) {
+  if (llvm::isa<TensorType>(type))
+    return true;
+  if (auto ptrType = llvm::dyn_cast<IREE::Util::PtrType>(type)) {
     return isExpandedType(ptrType);
   }
   return false;
@@ -43,7 +44,7 @@ static bool isExpandedType(Type type) {
 
 template <typename T>
 class BaseGlobalConversionPattern : public OpConversionPattern<T> {
- public:
+public:
   BaseGlobalConversionPattern(
       std::shared_ptr<GlobalExpansionState> expansionState,
       TypeConverter &typeConverter, MLIRContext *context,
@@ -51,18 +52,19 @@ class BaseGlobalConversionPattern : public OpConversionPattern<T> {
       : OpConversionPattern<T>(typeConverter, context, benefit),
         expansionState(std::move(expansionState)) {}
 
- protected:
+protected:
   mutable std::shared_ptr<GlobalExpansionState> expansionState;
 };
 
 struct GlobalOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalOp globalOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalOp globalOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
-    if (!isExpandedType(globalOp.getType())) return failure();
+    if (!isExpandedType(globalOp.getType()))
+      return failure();
 
     SmallVector<Type> newTypes;
     if (failed(getTypeConverter()->convertType(globalOp.getType(), newTypes))) {
@@ -87,7 +89,7 @@ struct GlobalOpExpansion
     // current conversion to pick up the expanded initialization ops.
     auto initialValue = globalOp.getInitialValueAttr();
     bool tensorInitializerRequired =
-        initialValue ? initialValue.getType().isa<TensorType>() : false;
+        initialValue ? llvm::isa<TensorType>(initialValue.getType()) : false;
 
     // New global holding the initial value only if it is not a tensor type.
     auto resourceOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
@@ -119,7 +121,8 @@ struct GlobalOpExpansion
       rewriter.setInsertionPointToStart(entryBlock);
       auto constantOp = rewriter.create<IREE::Stream::TensorConstantOp>(
           globalOp.getLoc(), resourceOp.getType(),
-          initialValue.cast<ElementsAttr>(), TypeAttr::get(globalOp.getType()),
+          llvm::cast<ElementsAttr>(initialValue),
+          TypeAttr::get(globalOp.getType()),
           /*result_encoding_dims=*/ValueRange{}, /*affinity=*/nullptr);
       auto constantSizeOp = rewriter.create<IREE::Stream::ResourceSizeOp>(
           globalOp.getLoc(), indexType, constantOp.getResult());
@@ -143,11 +146,12 @@ struct GlobalOpExpansion
 struct GlobalLoadOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalLoadOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadOp loadOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalLoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
-    if (!isExpandedType(loadOp.getType())) return failure();
+    if (!isExpandedType(loadOp.getType()))
+      return failure();
     auto &expandedGlobal = expansionState->globalMap[adaptor.getGlobal()];
 
     // Insert a load/transfer to the unknown resource lifetime.
@@ -175,11 +179,12 @@ struct GlobalLoadOpExpansion
 struct GlobalStoreOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalStoreOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreOp storeOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalStoreOp storeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
-    if (!isExpandedType(storeOp.getValue().getType())) return failure();
+    if (!isExpandedType(storeOp.getValue().getType()))
+      return failure();
     auto &expandedGlobal = expansionState->globalMap[adaptor.getGlobal()];
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
@@ -202,7 +207,7 @@ struct GlobalStoreOpExpansion
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateUtilToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
@@ -221,7 +226,8 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
   typeConverter.addConversion([=](IREE::Util::PtrType type,
                                   SmallVectorImpl<Type> &resultTypes) {
     // Expand pointers to tensors to [resource, sizeof resource] pointers.
-    if (!isExpandedType(type)) return failure();
+    if (!isExpandedType(type))
+      return failure();
     resultTypes.push_back(
         IREE::Util::PtrType::get(IREE::Stream::ResourceType::get(context)));
     resultTypes.push_back(IREE::Util::PtrType::get(IndexType::get(context)));
@@ -231,7 +237,8 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
   typeConverter.addConversion(
       [=](IREE::Util::PtrType type, SmallVectorImpl<Type> &resultTypes) {
         // Expand pointers to tensors to [ptr<resource>, ptr<sizeof resource>].
-        if (!isExpandedType(type.getTargetType())) return failure();
+        if (!isExpandedType(type.getTargetType()))
+          return failure();
         resultTypes.push_back(IREE::Stream::ResourceType::get(context));
         resultTypes.push_back(IndexType::get(context));
         return success();
@@ -243,7 +250,7 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.getType()) &&
                (!op.getInitialValueAttr() ||
-                !op.getInitialValueAttr().getType().isa<TensorType>());
+                !llvm::isa<TensorType>(op.getInitialValueAttr().getType()));
       });
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalAddressOp>(
       [&](IREE::Util::GlobalAddressOp op) {
@@ -265,9 +272,13 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
       [&](IREE::Util::GlobalStoreIndirectOp op) {
         return typeConverter.isLegal(op.getValue().getType());
       });
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::OptimizationBarrierOp>(
+      [&](IREE::Util::OptimizationBarrierOp op) {
+        return typeConverter.isLegal(op.getResultTypes());
+      });
 
   populateUtilToStreamConversionPatterns(context, typeConverter, patterns);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

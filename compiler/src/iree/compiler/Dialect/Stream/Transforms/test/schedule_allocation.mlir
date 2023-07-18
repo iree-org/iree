@@ -394,12 +394,12 @@ func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %targ
 // TODO(#11249): add a test for in-place collectives (send == recv).
 
 // CHECK-LABEL: @applyAsyncCollectiveOpOutOfPlace
-// CHECK-SAME: (%[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
+// CHECK-SAME: (%[[CHANNEL:.+]]: !stream.channel,
+// CHECK-SAME:  %[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[RECV:.+]]: !stream.resource<transient>, %[[RECV_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[COUNT:[a-z0-9]+]]: index)
-func.func @applyAsyncCollectiveOpOutOfPlace(%send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
+func.func @applyAsyncCollectiveOpOutOfPlace(%channel: !stream.channel, %send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
   %c0 = arith.constant 0 : index
-  %channel = stream.channel.default : !stream.channel
   // CHECK: stream.cmd.execute
   // CHECK-SAME: with(%[[SEND]] as %[[SEND_CAPTURE:.+]]: !stream.resource<external>{%[[SEND_SIZE]]},
   // CHECK-SAME:      %[[RECV]] as %[[RECV_CAPTURE:.+]]: !stream.resource<transient>{%[[RECV_SIZE]]})
@@ -466,6 +466,45 @@ func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: in
   util.optimization_barrier %results#0 : !stream.resource<transient>
   // CHECK: util.optimization_barrier %[[ALLOC]]
   util.optimization_barrier %results#1 : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// Tests that unused dispatch results nested in concurrent regions are still
+// allocated memory.
+
+// CHECK-LABEL: @applyAsyncDispatchUnusedOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
+func.func @applyAsyncDispatchUnusedOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[PACK:.+]]:2 = stream.resource.pack
+  // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: await(%[[ALLOCA_TIMEPOINT]])
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOCA]] as %[[ALLOCA_CAPTURE:.+]]: !stream.resource<transient>{%[[PACK]]#0})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.concurrent
+    %concurrent = stream.async.concurrent with(%capture as %concurrent_capture: !stream.resource<transient>{%size}) -> (%capture as !stream.resource<transient>{%size}) {
+      // CHECK-NEXT: stream.cmd.dispatch @executable::@dispatch[%c1, %c1, %c1](%c4 : index) {
+      // CHECK-NEXT:   rw %[[OPERAND_CAPTURE]][%[[OFFSET]] for %[[LENGTH]]] : !stream.resource<transient>{%[[SIZE]]},
+      // CHECK-NEXT:   wo %[[ALLOCA_CAPTURE]][%[[PACK]]#1 for %[[SIZE]]] : !stream.resource<transient>{%[[PACK]]#0}
+      // CHECK-NEXT: }
+      %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%concurrent_capture[%offset to %end for %length], %c4) : (!stream.resource<transient>{%size}, index) -> (%concurrent_capture{%size}, !stream.resource<transient>{%size})
+      // NOTE: %0#1 is unused.
+      stream.yield %0#0 : !stream.resource<transient>{%size}
+    }
+    stream.yield %concurrent : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: %[[DEALLOCA:.+]] = stream.resource.dealloca await(%[[TIMEPOINT]]) => %[[ALLOCA]]
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA]], %[[TIMEPOINT]])
+  // CHECK: util.optimization_barrier %[[JOIN]]
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 

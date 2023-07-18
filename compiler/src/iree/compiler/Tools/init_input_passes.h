@@ -18,7 +18,7 @@ namespace iree_compiler {
 // Registers IREE input conversion passes with the global registry.
 void registerInputPasses();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_INPUT_PASSES_H_
+#endif // IREE_COMPILER_TOOLS_INIT_INPUT_PASSES_H_

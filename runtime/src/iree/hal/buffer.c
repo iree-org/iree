@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/detail.h"
 
@@ -589,9 +588,10 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
 
   if (IREE_UNLIKELY(pattern_length != 1 && pattern_length != 2 &&
                     pattern_length != 4)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "fill patterns must be 1, 2, or 4 bytes (got %zu)",
-                            pattern_length);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "fill patterns must be 1, 2, or 4 bytes (got %" PRIhsz ")",
+        pattern_length);
   }
 
   if (byte_length == 0) {
@@ -613,7 +613,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
     iree_status_ignore(iree_hal_buffer_unmap_range(&target_mapping));
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "attempting to fill a range with %zu byte values "
+                            "attempting to fill a range with %" PRIhsz
+                            " byte values "
                             "that is not aligned (offset=%" PRIdsz
                             ", length=%" PRIdsz ")",
                             pattern_length, byte_offset, byte_length);
@@ -653,7 +654,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
     }
     default:
       status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "unsupported fill pattern length: %zu",
+                                "unsupported fill pattern length: %" PRIhsz,
                                 pattern_length);
       break;
   }
@@ -681,7 +682,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_read(
   IREE_ASSERT_ARGUMENT(target_buffer);
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
   iree_hal_buffer_mapping_t source_mapping = {{0}};
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_buffer_map_range(source_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
@@ -705,7 +706,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
   IREE_ASSERT_ARGUMENT(source_buffer);
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
   iree_hal_buffer_mapping_t target_mapping;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
@@ -748,7 +749,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
 
   // Map source, which may have IREE_WHOLE_BUFFER length.
   iree_hal_buffer_mapping_t source_mapping;

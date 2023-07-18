@@ -44,7 +44,6 @@ function(iree_tablegen_doc)
     set(_TBLGEN "MLIR")
   endif()
 
-
   set(_INCLUDE_DIRS
     "${MLIR_INCLUDE_DIRS}"
     "${IREE_SOURCE_DIR}/compiler/src"
@@ -55,6 +54,10 @@ function(iree_tablegen_doc)
 
   set(_INPUTS ${_RULE_TD_FILE})
   set(LLVM_TARGET_DEFINITIONS ${_INPUTS})
+
+  set(_FLAGS
+    "--strip-prefix=::mlir::iree_compiler::IREE::"
+  )
 
   set(_OUTPUTS)
   while(_RULE_OUTS)
@@ -69,7 +72,7 @@ function(iree_tablegen_doc)
     list(REMOVE_AT _RULE_OUTS 0)
 
     # TableGen this output with the given command.
-    tablegen(${_TBLGEN} ${_OUTPUT} ${_COMMAND} ${_DIALECT} ${_INCLUDE_DIRS})
+    tablegen(${_TBLGEN} ${_OUTPUT} ${_COMMAND} ${_DIALECT} ${_INCLUDE_DIRS} ${_FLAGS})
     list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_OUTPUT})
   endwhile()
 

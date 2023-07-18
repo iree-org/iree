@@ -47,7 +47,7 @@ namespace TFLite {
 //   util.global private mutable @_tflite_xx_arg0_dim2 : index
 class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect,
                     mlir::tensor::TensorDialect, IREE::HAL::HALDialect,
@@ -63,10 +63,23 @@ class WrapEntryPointsPass
            "bindings";
   }
 
+  static StringAttr getArgId(func::FuncOp funcOp, int i) {
+    StringAttr id =
+        funcOp.getArgAttrOfType<StringAttr>(i, "ml_program.identifier");
+    return id ? id : funcOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
+  }
+
+  static StringAttr getResultId(func::FuncOp funcOp, int i) {
+    StringAttr id =
+        funcOp.getResultAttrOfType<StringAttr>(i, "ml_program.identifier");
+    return id ? id
+              : funcOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    SmallVector<func::FuncOp, 4> entryFuncOps;
+    SmallVector<func::FuncOp> entryFuncOps;
     for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
       if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
         entryFuncOps.push_back(funcOp);
@@ -88,7 +101,7 @@ class WrapEntryPointsPass
     wrapEntryPoint(entryFuncOps.front());
   }
 
- private:
+private:
   // Globals representing each dynamic dimension of an IO tensor.
   struct DynamicDims {
     TensorType tensorType;
@@ -137,11 +150,10 @@ class WrapEntryPointsPass
     // TFLite requires the tensor names at runtime. If they've previously been
     // extracted into iree.identifiers we use those and otherwise fallback to
     // a generic naming scheme that matches the IR (somewhat).
-    SmallVector<std::string, 4> inputNames;
-    SmallVector<std::string, 4> outputNames;
+    SmallVector<std::string> inputNames;
+    SmallVector<std::string> outputNames;
     for (unsigned i = 0; i < funcType.getNumInputs(); ++i) {
-      auto identifier =
-          funcOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
+      auto identifier = getArgId(funcOp, i);
       if (identifier) {
         inputNames.push_back(identifier.getValue().str());
       } else {
@@ -149,8 +161,7 @@ class WrapEntryPointsPass
       }
     }
     for (unsigned i = 0; i < funcType.getNumResults(); ++i) {
-      auto identifier =
-          funcOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
+      auto identifier = getResultId(funcOp, i);
       if (identifier) {
         outputNames.push_back(identifier.getValue().str());
       } else {
@@ -162,7 +173,7 @@ class WrapEntryPointsPass
     for (auto [arg, inputName, inputType] : llvm::zip_equal(
              funcOp.getArguments(), inputNames, funcType.getInputs())) {
       auto fullName = (namePrefix + "_" + inputName + "_shape").str();
-      auto tensorType = inputType.dyn_cast<TensorType>();
+      auto tensorType = llvm::dyn_cast<TensorType>(inputType);
       assert(tensorType && "expecting only tensors in tflite function I/O");
       inputDynamicDims.push_back(createDynamicDimGlobals(
           arg.getLoc(), fullName, tensorType, moduleBuilder));
@@ -171,7 +182,7 @@ class WrapEntryPointsPass
     for (auto [outputName, outputType] :
          llvm::zip_equal(outputNames, funcType.getResults())) {
       auto fullName = (namePrefix + "_" + outputName + "_shape").str();
-      auto tensorType = outputType.dyn_cast<TensorType>();
+      auto tensorType = llvm::dyn_cast<TensorType>(outputType);
       assert(tensorType && "expecting only tensors in tflite function I/O");
       outputDynamicDims.push_back(
           createDynamicDimGlobals(loc, fullName, tensorType, moduleBuilder));
@@ -236,7 +247,7 @@ class WrapEntryPointsPass
     // Replace each exit from the function with a storage back to the shape
     // variables.
     for (auto returnOp :
-         llvm::to_vector<4>(calcFuncOp.getOps<mlir::func::ReturnOp>())) {
+         llvm::to_vector(calcFuncOp.getOps<mlir::func::ReturnOp>())) {
       auto exitLoc = returnOp.getLoc();
       OpBuilder exitBuilder(returnOp);
 
@@ -282,8 +293,8 @@ class WrapEntryPointsPass
       builder.create<mlir::cf::BranchOp>(loc, exitBlock);
       return exitBlock;
     }
-    SmallVector<Block *, 4> compareBlocks;
-    SmallVector<Block *, 4> caseBlocks;
+    SmallVector<Block *> compareBlocks;
+    SmallVector<Block *> caseBlocks;
     for (size_t i = 0; i < caseCount; ++i) {
       compareBlocks.push_back(builder.createBlock(exitBlock));
       caseBlocks.push_back(builder.createBlock(exitBlock));
@@ -337,7 +348,8 @@ class WrapEntryPointsPass
     auto shapeType = dynamicDims.tensorType;
     unsigned dynamicDimIdx = 0;
     for (unsigned i = 0; i < shapeType.getRank(); ++i) {
-      if (!shapeType.isDynamicDim(i)) continue;
+      if (!shapeType.isDynamicDim(i))
+        continue;
       auto dimValue =
           builder
               .create<IREE::Util::ListGetOp>(
@@ -487,10 +499,10 @@ class WrapEntryPointsPass
     wrapperFuncOp.getOperation()->setAttr("iree.abi.stub",
                                           moduleBuilder.getUnitAttr());
 
-    SmallVector<DictionaryAttr, 4> argAttrDict;
+    SmallVector<DictionaryAttr> argAttrDict;
     entryFuncOp.getAllArgAttrs(argAttrDict);
     wrapperFuncOp.setAllArgAttrs(argAttrDict);
-    SmallVector<DictionaryAttr, 4> resultAttrDict;
+    SmallVector<DictionaryAttr> resultAttrDict;
     entryFuncOp.getAllResultAttrs(resultAttrDict);
     wrapperFuncOp.setAllResultAttrs(resultAttrDict);
 
@@ -598,7 +610,7 @@ class WrapEntryPointsPass
   // IO tensor names and quantization information.
   void populateReflectionAttrs(mlir::func::FuncOp entryFuncOp,
                                mlir::func::FuncOp wrapperFuncOp) {
-    SmallVector<NamedAttribute, 4> attrs;
+    SmallVector<NamedAttribute> attrs;
     attrs.push_back(buildIONamesAttr(entryFuncOp));
     // TODO(#3972): tfl.io.quant: quantization information.
     // TODO(#3978): tfl.io.types: tensor types (complex/strings/etc).
@@ -609,12 +621,11 @@ class WrapEntryPointsPass
   // Constructs an attribute containing all of the input and output identifiers:
   //   tfl.io.names=arg0;arg1;ret0;ret1
   //
-  // Default names will be used if no iree.identifiers are set on the function.
+  // Default names will be used if no identifiers are set on the function.
   NamedAttribute buildIONamesAttr(mlir::func::FuncOp entryFuncOp) {
-    SmallVector<std::string, 4> pieces;
+    SmallVector<std::string> pieces;
     for (int i = 0; i < entryFuncOp.getNumArguments(); ++i) {
-      auto identifierAttr =
-          entryFuncOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
+      auto identifierAttr = getArgId(entryFuncOp, i);
       if (!identifierAttr || identifierAttr.getValue().empty()) {
         pieces.push_back("arg" + std::to_string(i));
       } else {
@@ -622,8 +633,7 @@ class WrapEntryPointsPass
       }
     }
     for (int i = 0; i < entryFuncOp.getNumResults(); ++i) {
-      auto identifierAttr =
-          entryFuncOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
+      auto identifierAttr = getResultId(entryFuncOp, i);
       if (!identifierAttr || identifierAttr.getValue().empty()) {
         pieces.push_back("ret" + std::to_string(i));
       } else {
@@ -642,7 +652,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createWrapEntryPointsPass() {
 
 static PassRegistration<WrapEntryPointsPass> pass;
 
-}  // namespace TFLite
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace TFLite
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

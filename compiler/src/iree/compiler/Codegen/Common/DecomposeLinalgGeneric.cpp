@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
@@ -20,7 +20,7 @@ namespace {
 class DecomposeLinalgGenericPass
     : public DecomposeLinalgGenericBase<DecomposeLinalgGenericPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, linalg::LinalgDialect>();
+    registry.insert<affine::AffineDialect, linalg::LinalgDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
@@ -34,11 +34,11 @@ class DecomposeLinalgGenericPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass() {
   return std::make_unique<DecomposeLinalgGenericPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

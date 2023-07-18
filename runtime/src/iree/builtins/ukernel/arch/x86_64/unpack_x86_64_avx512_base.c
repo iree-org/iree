@@ -5,14 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
-#include "iree/builtins/ukernel/arch/x86_64/unpack_x86_64.h"
+#include "iree/builtins/ukernel/arch/x86_64/unpack_x86_64_internal.h"
 
 void iree_uk_unpack_tile_16x16_x32_x86_64_avx512_base_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
-    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
-    iree_uk_ssize_t out_stride0, iree_uk_ssize_t in_stride1,
-    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
-    iree_uk_ssize_t tile_size1) {
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride0, iree_uk_index_t in_stride1,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
   IREE_UK_ASSERT(elem_size == 4);
   IREE_UK_ASSERT(tile_size0 == 16);
   IREE_UK_ASSERT(tile_size1 == 16);

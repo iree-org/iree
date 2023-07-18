@@ -13,14 +13,14 @@
 namespace mlir {
 namespace iree_compiler {
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
-    IREE::VM::TargetOptions targetOptions);
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertHALToVMPass(IREE::VM::TargetOptions targetOptions);
 
 inline void registerHALConversionPasses() {
   createConvertHALToVMPass(IREE::VM::TargetOptions::FromFlags::get());
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSIONS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_HAL_CONVERSIONS_PASSES_H_

@@ -23,7 +23,7 @@ struct TopLevelSCFToCFGPass
   void runOnOperation() override;
 };
 
-}  // namespace
+} // namespace
 
 void TopLevelSCFToCFGPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
@@ -50,5 +50,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTopLevelSCFToCFGPass() {
   return std::make_unique<TopLevelSCFToCFGPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

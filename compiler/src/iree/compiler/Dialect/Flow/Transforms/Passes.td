@@ -88,6 +88,12 @@ def FormDispatchWorkgroups :
   ];
 }
 
+def FormScalarDispatches :
+    InterfacePass<"iree-flow-form-scalar-dispatches", "mlir::FunctionOpInterface"> {
+  let summary = "Form Dispatch Regions for scalar computations.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFormScalarDispatchesPass()";
+}
+
 def CloneProducersIntoDispatchRegions :
     InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Clone producers into dispatch regions to be isolated above";
@@ -111,9 +117,16 @@ def DispatchWithTransformDialect :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
+    Option<"transformLibraryFileName",
+           "transform-library-file-name",
+           "std::string",
+           /*default=*/"\"\"",
+           "If non-empty, the name of the file containing definitions of "
+           "external symbols referenced in the transform script. "
+           "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
             /*default=*/"\"\"",
-            "Select the operation with 'transform.iree_tag' attribute having "
+            "Select the operation with 'transform.target_tag' attribute having "
             "the given value as payload IR root. This allows user control on "
             "what operation to transform in debug mode, without requiring "
             "intimate knowledge of the IREE nested pass pipeline.\\n"
@@ -121,7 +134,7 @@ def DispatchWithTransformDialect :
             "operation in the IREE pipeline, as the payload IR root.">,
     Option<"debugTransformRootTag", "debug-transform-root-tag", "std::string",
             /*default=*/"\"\"",
-            "Select the operation with 'transform.iree_tag' attribute having "
+            "Select the operation with 'transform.target_tag' attribute having "
             "the given value as container IR for top-level transform ops. This "
             "allows user control on what transformation to apply in debug "
             "mode, without requiring intimate knowledge of the IREE nested "
@@ -182,6 +195,34 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def InsertDebugTargetAtSymbol :
+    Pass<"iree-flow-insert-debug-target-at-symbol", "mlir::ModuleOp"> {
+  let summary = "Crops and/or traces the program at the specified symbol";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInsertDebugTargetAtSymbolPass()";
+  let options = [
+    Option<"breakDebugTarget", "break-debug-target", "std::string",
+           /*default=*/"",
+           "Symbol at which to insert a break in the program.">,
+    Option<"traceDebugTarget", "trace-debug-target", "std::string",
+           /*default=*/"",
+           "Symbol to insert iree.flow.trace ops around.">
+  ];
+}
+
+def InsertDebugTargetAtOrdinal :
+    Pass<"iree-flow-insert-debug-target-at-ordinal", "mlir::ModuleOp"> {
+  let summary = "Crops and/or traces the program at the specified ordinal";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInsertDebugTargetAtOrdinalPass()";
+  let options = [
+    Option<"breakDebugTarget", "break-debug-target", "std::string",
+           /*default=*/"",
+           "Ordinal at which to insert a break in the program.">,
+    Option<"traceDebugTarget", "trace-debug-target", "std::string",
+           /*default=*/"",
+           "Ordinal to insert iree.flow.trace ops around.">
+  ];
+}
+
 def InterchangeGenericOps :
     Pass<"iree-flow-interchange-generic-ops", ""> {
   let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
@@ -209,11 +250,6 @@ def OutlineDispatchRegions :
 def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
-  let options = [
-    Option<"defaultPadding", "default-padding", "int64_t",
-           /*default=*/"16",
-           "Default padding to use so packing can be done without padding during the packing">
-  ];
 }
 
 def TensorPadToTensorInsertSlice :
@@ -249,6 +285,12 @@ def RaiseSpecialOps :
     Pass<"iree-flow-raise-special-ops", ""> {
   let summary = "raise special ops like softmax to the high level linalg.ext representation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
+}
+
+def RemoveZeroExtentTensors :
+    InterfacePass<"iree-flow-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
+  let summary = "Remove tensors that have 0-extents";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createRemoveZeroExtentTensorsPass()";
 }
 
 def SplitReduction :

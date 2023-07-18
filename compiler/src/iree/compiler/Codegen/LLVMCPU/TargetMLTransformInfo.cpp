@@ -20,7 +20,7 @@ struct RISCVTargetMLTransformInfo : TargetMLTransformInfo {
   }
 };
 
-}  // namespace
+} // namespace
 
 namespace mlir {
 namespace iree_compiler {
@@ -34,5 +34,5 @@ const TargetMLTransformInfo TargetMLTransformInfo::getTargetMLTransformInfo(
   return TargetMLTransformInfo();
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

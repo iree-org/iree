@@ -119,28 +119,51 @@ We frequently need to update the runner instances. In particular, after a Runner
 release, the version of the program running on the runners must be updated
 [within 30 days](https://docs.github.com/en/enterprise-cloud@latest/actions/hosting-your-own-runners/autoscaling-with-self-hosted-runners#controlling-runner-software-updates-on-self-hosted-runners),
 otherwise the GitHub control plane will refuse their connection. Testing and
-rolling out these updates involves a few steps.
+rolling out these updates involves a few steps. Performing the runner update
+is assisted by the script [`update_instance_groups.py`](./gcp/update_instance_groups.py).
+
+The GCP API only allows querying MIGs by region, so the script has to perform a
+separate call for every region of interest. It is therefore useful to limit the
+regions to only those in which we operate. Right now, that is only the US, so
+you can pass a regex like `us-\w+` to the regions argument in the commands
+below. If we start running in non-US regions, make sure to update these
+commands!
+
+For updating the runner version in particular, you can use
+[`update_runner_version.py`](./gcp/update_runner_version.py) and skip deployment
+to test runners, going straight to a prod canary.
 
 ### MIG Rolling Updates
 
 See https://cloud.google.com/compute/docs/instance-groups/updating-migs for the
-main documentation. There are two modes for a rolling MIG update, "proactive" and
-"opportunistic" (AKA "selective"). There are also three different actions the
-MIG can take to update an instance: "refresh", "restart", and "replace". A
+main documentation. There are two modes for a rolling MIG update, "proactive"
+and "opportunistic" (AKA "selective"). There are also three different actions
+the MIG can take to update an instance: "refresh", "restart", and "replace". A
 "refresh" update only allows updating instance metadata or adding extra disks,
-but is mostly safe to run as a "proactive" update. Instances will pick up the
-changes to the startup script when they restart naturally. If there are changes
-to metadata that is accessed outside of startup, make sure it's compatible with
-the old configuration. If it's not or you need to change something like the boot
-disk image, you need to do a replacement of the VM, which brings it down along
-with any jobs it's in the middle of running. That means it is not safe to do a
-"proactive" update. In an "opportunistic" update, the MIG is *supposed* to apply
-the update when the instances are created, which would work great for us since
-our instances shut themselves down when they're done with a job, but apparently
-it *doesn't* apply updates if it's recreating an instance deemed "unhealthy"
-which is unfortunately the case for instances that shut themselves down. So
-these sorts of updates need to be done as "opportunistic" updates which will
-need to be manually managed. You can use
+but is mostly safe to run as a "proactive" update. In our case, instances will
+pick up changes to the startup script when they restart naturally. If you need
+to change something like the boot disk image, you need to do a replacement of
+the VM, but in this case a "proactive" update is not safe because it would shut
+down the VM even if it was in the middle of running a job. In an "opportunistic"
+update, the MIG is *supposed* to apply the update when the instances are
+created, but it *doesn't* apply updates if it's recreating an instance deemed
+"unhealthy", which includes if the instance shuts itself down or fails its
+health check. There is also a restriction that you can have only one
+"in-progress" update at a time. This can lead to some weird states where
+instances are bootlooping and you can't update them. In this case, you can
+manually delete the misbehaving instances and try to get back to everything on a
+good version.
+
+In general, the recommended approach (which the scripting defaults to) is to do
+updates as opportunistic VM replacement. With refresh, a running VM can end up
+with a mismatch between the template it says it's using and commit it's actually
+configured from, which makes it difficult to track rollout state. The speed of
+refresh updates is a bit of a false one, as for the update to fully take affect
+for anything that happens as part of the startup script (which is basically
+everything, in our case) the VM has to restart anyway.
+
+Opportunistic updates can be slow because VMs generally only get deleted when they
+complete a job. To speed them along, you can use
 [`remove_idle_runners.sh`](./gcp/remove_idle_runners.sh) to relatively safely
 bring down instances that aren't currently processing a job.
 
@@ -162,13 +185,12 @@ build_tools/github_actions/runner/gcp/update_autoscaling.sh \
   github-runner-testing-presubmit-cpu-us-west1 us-west1 1 10
 ```
 
-Update the testing instance group to your new template using
-[`update_instance_groups.py`](./gcp/update_instance_groups.py) (no need to
-canary to the test group):
+Update the testing instance group to your new template (no need to canary to the
+test group):
 
 ```shell
 build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
-  --env=testing --region=all --group=all --type=all --version="${VERSION?}"
+  --env=testing --region='us-\w+' --group=all --type=all --version="${VERSION?}"
 ```
 
 Check that your runners successfully start up and register with the GitHub UI.
@@ -182,7 +204,8 @@ build_tools/github_actions/runner/gcp/update_autoscaling.sh \
   github-runner-testing-presubmit-cpu-us-west1 us-west1 0 0
 ```
 
-For now, you'll need to shut down the remaining runners:
+You'll also need to delete the remaining runners because without jobs to
+process, they will never delete themselves.
 
 ```shell
 build_tools/github_actions/runner/gcp/remove_idle_runners.sh \
@@ -197,12 +220,24 @@ changes you make need to be forward and backward compatible with changes to
 anything that is picked up directly from tip of tree (such as workflow files).
 These should be changed in separate PRs.
 
-To deploy to prod, create new prod templates. Then use the update script to
-canary to a single instance:
+To deploy to prod, create new prod templates. Then canary the new template for
+one instance in each group.
+
+Note: The a100 groups are special. We only run one instance in each group and
+have one of every type in every region, so canarying within a single instance
+group doesn't really make any sense. Also, we use the `balanced` target
+distribution shape, which theoretically means that the group manager will avoid
+zones with no available capacity (which happens a lot). This distribution shape
+is for some reason incompatible with having multiple templates. So in the
+canarying below, we treat these differently.
 
 ```shell
-build_tools/github_actions/runner/update_instance_groups.py canary-update \
-  --prod --region=all --group=all --type=all --version="${VERSION}"
+build_tools/github_actions/runner/gcp/update_instance_groups.py canary \
+  --env=prod --region='us-\w+' --group=all --type='[^a]\w+' \
+  --version="${VERSION}"
+build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
+  --env=prod --region='us-central1' --group=all --type=a100 \
+  --version="${VERSION}"
 ```
 
 Watch to make sure that your new runners are starting up and registering as
@@ -211,13 +246,22 @@ on the order of days before proceeding. When you are satisfied that your new
 configuration is good, complete the update with your new template:
 
 ```shell
-build_tools/github_actions/runner/update_instance_groups.py promote-canary \
-  --prod --region=all --group=all --type=all
+build_tools/github_actions/runner/gcp/update_instance_groups.py promote-canary \
+  --env=prod --region='us-\w+' --group=all --type='[^a]\w+'
+build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
+  --env=prod --region='us-\w+' --group=all --type=a100 \
+  --version="${VERSION}"
 ```
 
-To speed things along, you may want to remove idle instances since they'll only
-pick up the updates on restart.
+You can monitor the state of rollouts via the GitHub API. This requires elevated
+permissions in the organizations. A command like this would help see how many
+runners are still running the old version
 
+```shell
+gh api --paginate '/orgs/openxla/actions/runners?per_page=100' \
+  | jq --raw-output \
+  ".runners[] | select(.labels | map(.name == \"runner-version=${OLD_RUNNER_VERSION?}\") | any) | .name"
+```
 ## Known Issues / Future Work
 
 There are number of known issues and areas of improvement for the runners:

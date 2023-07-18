@@ -20,14 +20,14 @@ namespace IREE {
 namespace VM {
 
 class EmitCTypeConverter : public mlir::TypeConverter {
- public:
+public:
   EmitCTypeConverter();
-  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(
-      mlir::func::FuncOp &funcOp) {
+  FailureOr<std::reference_wrapper<VMAnalysis>>
+  lookupAnalysis(mlir::func::FuncOp &funcOp) {
     return lookupAnalysis(funcOp.getOperation());
   }
-  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(
-      IREE::VM::FuncOp &funcOp) {
+  FailureOr<std::reference_wrapper<VMAnalysis>>
+  lookupAnalysis(IREE::VM::FuncOp &funcOp) {
     return lookupAnalysis(funcOp.getOperation());
   }
   std::optional<Value> materializeRef(Value ref);
@@ -42,7 +42,7 @@ class EmitCTypeConverter : public mlir::TypeConverter {
     typeTable = buildTypeTable(module);
   }
   void mapType(Type type, size_t index) { typeOrdinalMap[type] = index; }
-  Optional<size_t> lookupType(Type type) {
+  std::optional<size_t> lookupType(Type type) {
     auto ptr = typeOrdinalMap.find(type);
     if (ptr == typeOrdinalMap.end()) {
       return std::nullopt;
@@ -54,14 +54,14 @@ class EmitCTypeConverter : public mlir::TypeConverter {
   VMAnalysisCache analysisCache;
   std::vector<TypeDef> typeTable;
 
- private:
+private:
   llvm::DenseMap<Type, int> typeOrdinalMap;
   FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(Operation *op);
 };
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_

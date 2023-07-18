@@ -158,8 +158,8 @@ iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
         iree_vm_FunctionDescriptor_vec_len(function_descriptors)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "exports[%zu] internal_ordinal out of bounds (0 < %zu < %zu)", i,
-          internal_ordinal,
+          "exports[%zu] internal_ordinal out of bounds (0 < %" PRIhsz " < %zu)",
+          i, internal_ordinal,
           iree_vm_FunctionDescriptor_vec_len(function_descriptors));
     }
   }
@@ -205,7 +205,7 @@ iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
             flatbuffers_uint8_vec_len(bytecode_data)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "functions[%zu] descriptor bytecode span out of "
-                              "range (0 < %d < %" PRIhsz ")",
+                              "range (0 < %d < %zu)",
                               i, function_descriptor->bytecode_offset,
                               flatbuffers_uint8_vec_len(bytecode_data));
     }
@@ -523,17 +523,17 @@ iree_status_t iree_vm_bytecode_function_verify(
   pc += 4;
 #define VM_VerifyConstI64(name)            \
   IREE_VM_VERIFY_PC_RANGE(pc + 8, max_pc); \
-  uint32_t name = OP_I64(0);               \
+  uint64_t name = OP_I64(0);               \
   (void)(name);                            \
   pc += 8;
 #define VM_VerifyConstF32(name)            \
   IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc); \
-  uint32_t name = OP_F32(0);               \
+  float name = OP_F32(0);                  \
   (void)(name);                            \
   pc += 4;
 #define VM_VerifyConstF64(name)            \
   IREE_VM_VERIFY_PC_RANGE(pc + 8, max_pc); \
-  uint32_t name = OP_F64(0);               \
+  double name = OP_F64(0);                 \
   (void)(name);                            \
   pc += 8;
 
@@ -557,37 +557,40 @@ iree_status_t iree_vm_bytecode_function_verify(
                                 verify_state->function_descriptors));       \
   }
 #define VM_VerifyGlobalAttr(name) VM_VerifyConstI32(name)
-#define VM_VerifyRwdataOffset(name, access_length)                  \
-  if (IREE_UNLIKELY(((name) + (access_length)) >                    \
-                    verify_state->rwdata_storage_size)) {           \
-    return iree_make_status(                                        \
-        IREE_STATUS_OUT_OF_RANGE,                                   \
-        "global byte_offset out of range: %d (rwdata=%zu)", (name), \
-        verify_state->rwdata_storage_size);                         \
+#define VM_VerifyRwdataOffset(name, access_length)                          \
+  if (IREE_UNLIKELY(((name) + (access_length)) >                            \
+                    verify_state->rwdata_storage_size)) {                   \
+    return iree_make_status(                                                \
+        IREE_STATUS_OUT_OF_RANGE,                                           \
+        "global byte_offset out of range: %d (rwdata=%" PRIhsz ")", (name), \
+        verify_state->rwdata_storage_size);                                 \
   }
-#define VM_VerifyGlobalRefOrdinal(name)                                        \
-  if (IREE_UNLIKELY((name) >= verify_state->global_ref_count)) {               \
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                          \
-                            "global ref ordinal out of range: %d (table=%zu)", \
-                            (name), verify_state->global_ref_count);           \
+#define VM_VerifyGlobalRefOrdinal(name)                                    \
+  if (IREE_UNLIKELY((name) >= verify_state->global_ref_count)) {           \
+    return iree_make_status(                                               \
+        IREE_STATUS_OUT_OF_RANGE,                                          \
+        "global ref ordinal out of range: %d (table=%" PRIhsz ")", (name), \
+        verify_state->global_ref_count);                                   \
   }
 #define VM_VerifyRodataAttr(name) VM_VerifyConstI32(name)
-#define VM_VerifyRodataOrdinal(name)                                           \
-  if (IREE_UNLIKELY((name) >= verify_state->rodata_ref_count)) {               \
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                          \
-                            "rodata ref ordinal out of range: %d (table=%zu)", \
-                            (name), verify_state->rodata_ref_count);           \
+#define VM_VerifyRodataOrdinal(name)                                       \
+  if (IREE_UNLIKELY((name) >= verify_state->rodata_ref_count)) {           \
+    return iree_make_status(                                               \
+        IREE_STATUS_OUT_OF_RANGE,                                          \
+        "rodata ref ordinal out of range: %d (table=%" PRIhsz ")", (name), \
+        verify_state->rodata_ref_count);                                   \
   }
-#define VM_VerifyType(name)                                                 \
-  IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc);                                  \
-  uint32_t name##_id = OP_I32(0);                                           \
-  if (IREE_UNLIKELY(name##_id >= module->type_count)) {                     \
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                       \
-                            "type id ordinal out of range: %d (table=%zu)", \
-                            name##_id, module->type_count);                 \
-  }                                                                         \
-  const iree_vm_type_def_t* name = &module->type_table[name##_id];          \
-  (void)(name);                                                             \
+#define VM_VerifyType(name)                                                    \
+  IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc);                                     \
+  uint32_t name##_id = OP_I32(0);                                              \
+  if (IREE_UNLIKELY(name##_id >= module->type_count)) {                        \
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                          \
+                            "type id ordinal out of range: %d (table=%" PRIhsz \
+                            ")",                                               \
+                            name##_id, module->type_count);                    \
+  }                                                                            \
+  const iree_vm_type_def_t* name = &module->type_table[name##_id];             \
+  (void)(name);                                                                \
   pc += 4;
 #define VM_VerifyTypeOf(name) VM_VerifyType(name)
 #define VM_VerifyIntAttr32(name) VM_VerifyConstI32(name)
@@ -848,14 +851,8 @@ static iree_status_t iree_vm_bytecode_function_verify_arguments(
   iree_host_size_t args_ref = 0;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_count_cconv_regs(
       verify_state->cconv_arguments, &args_i32, &args_ref));
-  iree_host_size_t rets_i32 = 0;
-  iree_host_size_t rets_ref = 0;
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_count_cconv_regs(
-      verify_state->cconv_results, &rets_i32, &rets_ref));
   if (verify_state->i32_register_count < args_i32 ||
-      verify_state->i32_register_count < rets_i32 ||
-      verify_state->ref_register_count < args_ref ||
-      verify_state->ref_register_count < rets_ref) {
+      verify_state->ref_register_count < args_ref) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "insufficient register storage for function arguments/results");
@@ -1361,14 +1358,14 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(CORE, SwitchI32, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyIntAttr32(default_value);
+      VM_VerifyOperandRegI32(default_value);
       VM_VerifyVariadicOperandsI32(values);
       VM_VerifyResultRegI32(result);
     });
 
     VERIFY_OP(CORE, SwitchI64, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyIntAttr64(default_value);
+      VM_VerifyOperandRegI64(default_value);
       VM_VerifyVariadicOperandsI64(values);
       VM_VerifyResultRegI64(result);
     });
@@ -1447,6 +1444,12 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP(CORE, ExtI32I64U, {
       VM_VerifyOperandRegI32(operand);
       VM_VerifyResultRegI64(result);
+    });
+
+    VERIFY_OP(CORE, CastAnyRef, {
+      VM_VerifyOperandRegRef(operand);
+      VM_VerifyTypeOf(result);
+      VM_VerifyResultRegRef(result);
     });
 
     //===------------------------------------------------------------------===//
@@ -1738,7 +1741,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(EXT_F32, SwitchF32, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyFloatAttr32(default_value);
+      VM_VerifyOperandRegF32(default_value);
       VM_VerifyVariadicOperandsF32(values);
       VM_VerifyResultRegF32(result);
     });
@@ -1758,6 +1761,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP_EXT_F32_UNARY_F32(CeilF32);
     VERIFY_OP_EXT_F32_UNARY_F32(FloorF32);
     VERIFY_OP_EXT_F32_UNARY_F32(RoundF32);
+    VERIFY_OP_EXT_F32_UNARY_F32(RoundF32Even);
     VERIFY_OP_EXT_F32_BINARY_F32(MinF32);
     VERIFY_OP_EXT_F32_BINARY_F32(MaxF32);
 

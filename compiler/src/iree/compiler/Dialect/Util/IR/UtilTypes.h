@@ -116,11 +116,11 @@ LogicalResult verifyGlobalLoadOp(GlobalLoadOpInterface loadOp,
 LogicalResult verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
                                   SymbolTableCollection &symbolTable);
 
-}  // namespace detail
+} // namespace detail
 
-IREE::Util::GlobalOpInterface lookupGlobalOp(
-    Operation *accessorOp, SymbolRefAttr globalRefAttr,
-    SymbolTableCollection &symbolTable);
+IREE::Util::GlobalOpInterface
+lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
+               SymbolTableCollection &symbolTable);
 
 //===----------------------------------------------------------------------===//
 // Tied operand interface utilities
@@ -132,19 +132,19 @@ std::optional<unsigned> getTiedResultOperandIndex(Operation *op,
                                                   unsigned resultIndex);
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
                                std::optional<unsigned> operandIndex);
-SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
+SmallVector<int64_t> getTiedResultOperandIndices(Operation *op);
 bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
 SmallVector<Value> getOperandTiedResults(Operation *op, unsigned operandIndex);
 LogicalResult verifyTiedOp(TiedOpInterface tiedOp);
 
-}  // namespace detail
+} // namespace detail
 
 // Resets or removes the indices in |tiedOperandIndices| based on the given
 // exclusion lists.
 void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices,
-    SmallVector<int64_t, 4> &tiedOperandIndices);
+    SmallVector<int64_t> &tiedOperandIndices);
 
 //===----------------------------------------------------------------------===//
 // Shape-aware interface utilities
@@ -190,11 +190,31 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
   return align(value, alignment.getZExtValue());
 }
 
+// Returns the bit-width of the scalar type. If the type is complex, it returns
+// the type of individual elements * 2 (1 for real and 1 for complex).
+static inline unsigned getTypeBitWidth(Type type) {
+  if (auto complexType = type.dyn_cast<ComplexType>()) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
+
+// HACK: we currently have no way to specify packing on types and as such have
+// to guess (poorly) what physical storage for each type looks like. The
+// heuristic for non-power-of-two bit width types is to take the next
+// power-of-two byte width that can fit at least 2 elements, up to 64-bit.
+static inline unsigned getTypePhysicalStorageBitWidth(Type type) {
+  unsigned logicalBitWidth = getTypeBitWidth(type);
+  unsigned desiredBitWidth = logicalBitWidth * 2;   // at least 2
+  desiredBitWidth = std::min(desiredBitWidth, 64u); // no larger than 64-bits
+  return llvm::PowerOf2Ceil(llvm::divideCeil(desiredBitWidth, 8)) * 8;
+}
+
 // Returns the number of bytes an element of the given type occupies in memory.
 // This is in the default dense conversion to machine words where sizes must be
 // powers of two aligned to bytes.
 //
-// Example:
+// Examples:
 //   getRoundedElementByteWidth(i1) = 1
 //   getRoundedElementByteWidth(i23) = 4
 //   getRoundedElementByteWidth(i32) = 4
@@ -205,6 +225,8 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
   if (auto complexType = type.dyn_cast<ComplexType>()) {
     return 2 * getRoundedElementByteWidth(complexType.getElementType());
   }
+  // TODO(ravishankarm): evaluate if this vector packing works with sub-byte
+  // element types.
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     return vectorType.getNumElements() *
            getRoundedElementByteWidth(vectorType.getElementType());
@@ -217,23 +239,61 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+// Returns the number of physical bytes required to store |elementCount|
+// elements of |elementType| in a packed representation. This will include any
+// additional padding required to round out the type to the next power-of-two
+// machine word size.
+//
+// Examples:
+//   getRoundedPhysicalStorageSize(1, i2) = 1 (1-byte aligned packed)
+//   getRoundedPhysicalStorageSize(3, i3) = 2 (1-byte aligned packed)
+//   getRoundedPhysicalStorageSize(4, i32) = 16 (4-byte aligned native)
+//   getRoundedPhysicalStorageSize(4, i33) = 32 (8-byte aligned packed)
+static inline int64_t getRoundedPhysicalStorageSize(int64_t elementCount,
+                                                    Type elementType) {
+  const unsigned logicalBitWidth = getTypeBitWidth(elementType);
+  switch (logicalBitWidth) {
+  case 1:
+    return elementCount * sizeof(uint8_t);
+  case 8:
+  case 16:
+  case 32:
+  case 64:
+    return elementCount * logicalBitWidth / 8;
+  default:
+    break; // sub-byte handling below
+  }
+  // Round up to the next power of two (unless already a power of two) of the
+  // 8-bit aligned logical bit width.
+  const unsigned physicalBitWidth = getTypePhysicalStorageBitWidth(elementType);
+  const unsigned elementsPerPhysicalWord = physicalBitWidth / logicalBitWidth;
+  const int64_t unalignedBitCount =
+      llvm::divideCeil(elementCount, elementsPerPhysicalWord) *
+      physicalBitWidth;
+  return llvm::divideCeil(align(unalignedBitCount, physicalBitWidth), 8);
+}
+static inline int64_t getRoundedPhysicalStorageSize(ShapedType type) {
+  return getRoundedPhysicalStorageSize(type.getNumElements(),
+                                       type.getElementType());
+}
 
-#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc"  // IWYU pragma: export
-#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc"  // IWYU pragma: export
-#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.h.inc"  // IWYU pragma: export
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
+
+#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.h.inc" // IWYU pragma: export
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilAttrs.h.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilAttrs.h.inc" // IWYU pragma: keep
 // clang-format on
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_TYPEDEF_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h.inc" // IWYU pragma: keep
 // clang-format on
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_

@@ -13,8 +13,8 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -38,12 +38,14 @@ struct MemRefTypeConverter final : public TypeConverter {
     addConversion([](BaseMemRefType memRefType) -> std::optional<Type> {
       // Expect #hal.descriptor_type memory spaces.
       Attribute spaceAttr = memRefType.getMemorySpace();
-      if (!spaceAttr) return std::nullopt;
-      auto dtAttr = spaceAttr.dyn_cast<IREE::HAL::DescriptorTypeAttr>();
-      if (!dtAttr) return std::nullopt;
+      if (!spaceAttr)
+        return std::nullopt;
+      auto dtAttr = llvm::dyn_cast<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
+      if (!dtAttr)
+        return std::nullopt;
 
       // Erase the #hal.descriptor_type memory space.
-      if (auto rankedType = memRefType.dyn_cast<MemRefType>()) {
+      if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
         return MemRefType::get(memRefType.getShape(),
                                memRefType.getElementType(),
                                rankedType.getLayout());
@@ -60,9 +62,9 @@ struct MemRefTypeConverter final : public TypeConverter {
 
 /// Returns true if the given `type` is considered as legal.
 static bool isLegalType(Type type) {
-  if (auto memRefType = type.dyn_cast<BaseMemRefType>()) {
+  if (auto memRefType = llvm::dyn_cast<BaseMemRefType>(type)) {
     Attribute spaceAttr = memRefType.getMemorySpace();
-    return !spaceAttr || !spaceAttr.isa<IREE::HAL::DescriptorTypeAttr>();
+    return !spaceAttr || !llvm::isa<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
   }
   return true;
 }
@@ -81,15 +83,15 @@ struct EraseMemorySpacePattern final : public ConversionPattern {
   EraseMemorySpacePattern(MLIRContext *context, TypeConverter &converter)
       : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
 
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override;
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override;
 };
 
 LogicalResult EraseMemorySpacePattern::matchAndRewrite(
     Operation *op, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
-  llvm::SmallVector<Type, 4> newResults;
+  llvm::SmallVector<Type> newResults;
   (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
   OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
@@ -123,7 +125,7 @@ struct EraseHALDescriptorTypeFromMemRefPass final
   }
 };
 
-}  // namespace
+} // namespace
 
 LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp) {
   MLIRContext *context = funcOp.getContext();
@@ -142,5 +144,5 @@ createEraseHALDescriptorTypeFromMemRefPass() {
   return std::make_unique<EraseHALDescriptorTypeFromMemRefPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

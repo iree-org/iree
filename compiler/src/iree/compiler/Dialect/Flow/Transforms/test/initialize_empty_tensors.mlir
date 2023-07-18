@@ -22,3 +22,28 @@ func.func @return_zero_init(%arg0 : index, %arg1 : index) -> (tensor<?x?x42xi32>
 //  EMPTY-CHECK-DAG:   %[[EMPTY_INT:.+]] = flow.tensor.empty : tensor<?x?x42xi32>{%[[ARG0]], %[[ARG1]]}
 //  EMPTY-CHECK-DAG:   %[[EMPTY_FLOAT:.+]] = flow.tensor.empty : tensor<?x42x?xf32>{%[[ARG1]], %[[ARG0]]}
 //      EMPTY-CHECK:   return %[[EMPTY_INT]], %[[EMPTY_FLOAT]]
+
+// -----
+
+func.func @empty_within_dispatch_workgroup(%arg0: index, %arg1: index) -> tensor<?x?xf32> {
+  %0 = flow.dispatch.workgroups[%arg0, %arg1](%arg0, %arg1, %arg0, %arg1) : (index, index, index, index) -> tensor<?x?xf32>{%arg0, %arg1} =
+    (%arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %1 = tensor.empty(%arg4, %arg5) : tensor<?x?xf32>
+      flow.dispatch.tensor.store %1, %arg6, offsets = [0, 0], sizes = [%arg4, %arg5], strides = [1, 1]
+          : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg4, %arg5}
+      flow.return
+    } count(%arg2: index, %arg3: index) -> (index, index, index) {
+      %c1 = arith.constant 1 : index
+      flow.return %arg2, %arg3, %c1 : index, index, index
+    }
+  return %0 : tensor<?x?xf32>
+}
+// ZERO-CHECK-LABEL: func.func @empty_within_dispatch_workgroup(
+//       ZERO-CHECK:   flow.dispatch.workgroup
+//       ZERO-CHECK:   tensor.empty
+//       ZERO-CHECK:   flow.return
+
+// EMPTY-CHECK-LABEL: func.func @empty_within_dispatch_workgroup(
+//       EMPTY-CHECK:   flow.dispatch.workgroup
+//       EMPTY-CHECK:   tensor.empty
+//       EMPTY-CHECK:   flow.return

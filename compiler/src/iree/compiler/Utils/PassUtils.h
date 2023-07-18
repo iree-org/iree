@@ -26,7 +26,7 @@ namespace iree_compiler {
 ///     .addPredicatedPass(enable, createMyOtherPass);
 template <typename... OpTys>
 struct MultiOpNest {
- public:
+public:
   MultiOpNest(OpPassManager &parentPm) : parentPm(parentPm) {
     addNest<0, OpTys...>();
   }
@@ -52,7 +52,7 @@ struct MultiOpNest {
     return *this;
   }
 
- private:
+private:
   // Initialize a nest.
   template <int index, typename T, typename... Rest>
   void addNest() {
@@ -83,7 +83,7 @@ struct MultiOpNest {
 // has been made which requires another iteration. No-op otherwise.
 void signalFixedPointModified(Operation *rootOp);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_FUNCTIONUTILS_H_
+#endif // IREE_COMPILER_UTILS_FUNCTIONUTILS_H_

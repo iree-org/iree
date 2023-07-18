@@ -4,12 +4,45 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = ["@llvm-project//mlir:PassBaseTdFiles"],
+)
+
+iree_compiler_cc_library(
+    name = "PassHeaders",
+    hdrs = [
+        "PassDetail.h",
+        "Passes.h",
+        "Passes.h.inc",
+    ],
+    deps = [
+        ":PassesIncGen",
+        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:NVGPUDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
+    ],
 )
 
 iree_compiler_cc_library(
@@ -20,15 +53,12 @@ iree_compiler_cc_library(
         "ConvertToROCDL.cpp",
         "ExtractAddressComputationGPUPass.cpp",
         "KernelConfig.cpp",
-        "LLVMGPUCheckIRBeforeLLVMConversion.cpp",
-        "LLVMGPUDistribute.cpp",
+        "LLVMGPUCastAddressSpaceFunction.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUPackSharedMemoryAlloc.cpp",
-        "LLVMGPUTensorAlloc.cpp",
         "LLVMGPUTensorCoreVectorization.cpp",
         "LLVMGPUTensorPad.cpp",
         "LLVMGPUTileAndDistribute.cpp",
-        "LLVMGPUTileTensor.cpp",
         "LLVMGPUVectorLowering.cpp",
         "LLVMGPUVectorToGPU.cpp",
         "Passes.cpp",
@@ -37,21 +67,25 @@ iree_compiler_cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
-        "TilingUtils.h",
-        "TransposeUtils.h",
+        "Passes.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/Codegen:PassHeaders",
+        ":PassHeaders",
+        ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Common:TransformDialectInterpreterPass",
+        "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/Utils",
-        "//compiler/src/iree/compiler/Codegen/TransformDialectStrategies/GPU:TransformDialectStrategies",
+        "//compiler/src/iree/compiler/Codegen/TransformStrategies/GPU",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
@@ -91,6 +125,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:NVGPUTransforms",
         "@llvm-project//mlir:NVGPUUtils",
         "@llvm-project//mlir:NVVMDialect",
+        "@llvm-project//mlir:NVVMToLLVM",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:Pass",

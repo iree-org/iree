@@ -1,7 +1,6 @@
 add_mlir_library(IREELinalgTransformDialectPasses
   ExpertExpansion.cpp
   TransformInterpreter.cpp
-  TransformInterpreterPassBase.cpp
 
   DEPENDS
   mlir-headers
@@ -19,6 +18,7 @@ add_mlir_library(IREELinalgTransformDialectPasses
   MLIRMemRefToLLVM
   MLIRPass
   MLIRTensorDialect
+  MLIRTransformDialectTransforms
   MLIRTransforms
   MLIRVectorDialect
   MLIRVectorToLLVM

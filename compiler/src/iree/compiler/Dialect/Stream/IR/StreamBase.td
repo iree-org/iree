@@ -105,6 +105,11 @@ def Stream_Dialect : Dialect {
     breaking execution correctness.
   }];
 
+  let dependentDialects = [
+    "mlir::complex::ComplexDialect",
+    "IREE::Util::UtilDialect",
+  ];
+
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
 }
@@ -122,8 +127,9 @@ class Stream_Op<string mnemonic, list<Trait> traits = []> :
 // Stream dialect types
 //===----------------------------------------------------------------------===//
 
-def Stream_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
-def Stream_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
+def Stream_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat, AnyComplex]>;
+def Stream_FillPatternType : AnyTypeOf<[I8, I16, I32, I64]>;
+def Stream_NativeFillPatternType : AnyTypeOf<[I8, I16, I32]>;
 
 def Stream_Offset : TypeAlias<Index>;
 def Stream_Size : TypeAlias<Index>;
@@ -152,20 +158,24 @@ def Stream_GlobalPtr : Util_AnyPtrOf<[Stream_Tensor, Stream_PrimitiveType]>;
 
 def Stream_CollectiveKind_AllGather : I32EnumAttrCase<"AllGather", 0, "all_gather">;
 def Stream_CollectiveKind_AllReduce : I32EnumAttrCase<"AllReduce", 1, "all_reduce">;
-def Stream_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 2, "broadcast">;
-def Stream_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 3, "reduce">;
-def Stream_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 4, "reduce_scatter">;
-def Stream_CollectiveKind_Send : I32EnumAttrCase<"Send", 5, "send">;
-def Stream_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 6, "recv">;
+def Stream_CollectiveKind_AllToAll : I32EnumAttrCase<"AllToAll", 2, "all_to_all">;
+def Stream_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 3, "broadcast">;
+def Stream_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 4, "reduce">;
+def Stream_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 5, "reduce_scatter">;
+def Stream_CollectiveKind_Send : I32EnumAttrCase<"Send", 6, "send">;
+def Stream_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 7, "recv">;
+def Stream_CollectiveKind_SendRecv : I32EnumAttrCase<"SendRecv", 8, "send_recv">;
 def Stream_CollectiveKindAttr :
     I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
       Stream_CollectiveKind_AllGather,
       Stream_CollectiveKind_AllReduce,
+      Stream_CollectiveKind_AllToAll,
       Stream_CollectiveKind_Broadcast,
       Stream_CollectiveKind_Reduce,
       Stream_CollectiveKind_ReduceScatter,
       Stream_CollectiveKind_Send,
       Stream_CollectiveKind_Recv,
+      Stream_CollectiveKind_SendRecv,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
 }
@@ -311,7 +321,9 @@ def Stream_ResourceConfigAttr :
     // bindings.
     "int64_t":$minBufferRangeAlignment,
     // Number of bits in `index` values as passed across device boundaries.
-    "int64_t":$indexBits
+    "int64_t":$indexBits,
+    // Fuses bindings that are mutable instead of leaving them split.
+    "bool":$aliasMutableBindings
   );
 
   let valueType = NoneType;
@@ -439,12 +451,10 @@ def Stream_Channel : TypeDef<Stream_Dialect, "Channel", [
     may exist within the same program to allow for partial operations or
     hierarchical operations.
 
-    In programs that have already been partitioned prior to being compiled there
-    will often exist only one channel and `stream.channel.default` can be used
-    to reference it. In programs that model SPMD behavior internally channels
-    can be created or provided by hosting applications. For example, the program
-    could expose a `@set_channels(!util.list<!stream.channel>)` method that
-    stores the channels in globals for use throughout the program allowing for
+    In programs that model SPMD behavior internally channels can be created or
+    provided by hosting applications. For example, the program could expose a
+    `@set_channels(!util.list<!stream.channel>)` method that stores the channels
+    in globals for use throughout the program allowing for
     application-controlled channel configuration.
   }];
 }

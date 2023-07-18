@@ -134,12 +134,15 @@ enum iree_hal_memory_access_bits_t {
   // within or across operations. The lack of the flag indicates that the access
   // is guaranteed not to alias (ala C's `restrict` keyword).
   IREE_HAL_MEMORY_ACCESS_MAY_ALIAS = 1u << 3,
+  // A flag that can be applied to any access type to indicate that the buffer
+  // storage may not be aligned.
+  IREE_HAL_MEMORY_ACCESS_UNALIGNED = 1u << 4,
   // Memory access may perform any operation and should not be validated.
   // Used upon access to bypass access verification at the API boundary and
   // effectively provides a `void*`.
   // This should only be used by device-side code where it is known-safe to
   // bypass the access verification.
-  IREE_HAL_MEMORY_ACCESS_ANY = 1u << 4,
+  IREE_HAL_MEMORY_ACCESS_ANY = 1u << 5,
   // Memory may have any operation performed on it.
   IREE_HAL_MEMORY_ACCESS_ALL = IREE_HAL_MEMORY_ACCESS_READ |
                                IREE_HAL_MEMORY_ACCESS_WRITE |
@@ -486,6 +489,25 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_usage_parse(
 IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
     iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp);
 
+typedef void(IREE_API_PTR* iree_hal_buffer_release_fn_t)(
+    void* user_data, struct iree_hal_buffer_t* buffer);
+
+// A callback issued when a buffer is released.
+typedef struct {
+  // Callback function pointer.
+  iree_hal_buffer_release_fn_t fn;
+  // User data passed to the callback function. Unowned.
+  void* user_data;
+} iree_hal_buffer_release_callback_t;
+
+// Returns a no-op buffer release callback that implies that no cleanup is
+// required.
+static inline iree_hal_buffer_release_callback_t
+iree_hal_buffer_release_callback_null(void) {
+  iree_hal_buffer_release_callback_t callback = {NULL, NULL};
+  return callback;
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
@@ -772,6 +794,25 @@ IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_heap_buffer_t
+//===----------------------------------------------------------------------===//
+
+// Wraps an existing host allocation in a buffer.
+// When the buffer is destroyed the provided |release_callback| will be called.
+//
+// The buffer must be aligned to at least IREE_HAL_HEAP_BUFFER_ALIGNMENT and if
+// it is not the call will fail with IREE_STATUS_OUT_OF_RANGE.
+//
+// |out_buffer| must be released by the caller. |data| must be kept live for the
+// lifetime of the wrapping buffer.
+iree_status_t iree_hal_heap_buffer_wrap(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_byte_span_t data, iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** out_buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_t implementation details

@@ -178,6 +178,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
     # warnings turned off above.
+    "-Wc++20-extensions"  # Enable until we use C++20 across all compilers
     "-Wctad-maybe-unsupported"
     "-Wfloat-overflow-conversion"
     "-Wfloat-zero-conversion"
@@ -198,7 +199,10 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wunused-comparison"
     "-Wvla"
 
+  CLANG_GTE_12
     # Clang is lax by default on SIMD vector typing. GCC is strict by default.
+    # Some Clang's circa version 10 had incorrect return types for some
+    # intrinsics (#14168).
     "-fno-lax-vector-conversions"
 
   # TODO(#6959): Enable -Werror once we have a presubmit CI.
@@ -334,14 +338,16 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
+# Find and add threads as dependency.
 if(NOT ANDROID AND IREE_ENABLE_THREADING)
-  iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
-    CLANG_OR_GCC
-      "-lpthread"
-  )
+  set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+  set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+  find_package(Threads)
+  set(IREE_THREADS_DEPS Threads::Threads)
 else()
   # Android provides its own pthreads support with no linking required.
 endif()
+
 
 # Emscripten needs -pthread specified in link _and_ compile options when using
 # atomics, shared memory, or pthreads. If we bring our own threading impl and
@@ -370,19 +376,22 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-lm"
-    ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
-# Our Emscripten library code uses dynCall, which needs these link flags.
-# TODO(scotttodd): Find a way to refactor this, this is nasty to always set :(
-if(EMSCRIPTEN)
+if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)
   iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ALL
-      "-sDYNCALLS=1"
-      "-sEXPORTED_RUNTIME_METHODS=['dynCall']"
+      # TODO(scotttodd): Only add when using WebGPU in a library/binary?
+      "-sUSE_WEBGPU"
+      # Hack: Used to create sync versions of requestAdapter and requestDevice
+      # TODO(scotttodd): Only set for test binaries, avoid sync code in apps
+      #   this doesn't _break_ apps that don't use the sync functions, but it
+      #   does bloat their binary size (and each Emscripten flag comes with
+      #   some risk of breaking compatibility with other features)
+      "-sASYNCIFY"
   )
 endif()
 

@@ -15,7 +15,7 @@ namespace IREE {
 namespace Vulkan {
 
 class VulkanDialect : public Dialect {
- public:
+public:
   explicit VulkanDialect(MLIRContext *context);
 
   static StringRef getDialectNamespace() { return "vk"; }
@@ -30,14 +30,14 @@ class VulkanDialect : public Dialect {
   /// Prints an attribute registered to this dialect.
   void printAttribute(Attribute, DialectAsmPrinter &printer) const override;
 
- private:
+private:
   /// Register the attributes of this dialect.
   void registerAttributes();
 };
 
-}  // namespace Vulkan
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Vulkan
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANDIALECT_H_
+#endif // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANDIALECT_H_

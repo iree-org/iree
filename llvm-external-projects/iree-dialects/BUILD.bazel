@@ -62,6 +62,24 @@ td_library(
 ################################################################################
 
 gentbl_cc_library(
+    name = "IREEInputInterfacesIncGen",
+    tags = ["manual"],
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "include/iree-dialects/Dialect/Input/InputOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "include/iree-dialects/Dialect/Input/InputOpInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/Input/InputInterfaces.td",
+    deps = [":TdFiles"],
+)
+
+gentbl_cc_library(
     name = "IREEInputIncGen",
     strip_include_prefix = "include",
     tbl_outs = [
@@ -89,6 +107,22 @@ gentbl_cc_library(
             ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/Input/InputTypes.cpp.inc",
         ),
+        (
+            ["--gen-attrdef-decls"],
+            "include/iree-dialects/Dialect/Input/InputAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "include/iree-dialects/Dialect/Input/InputAttrs.cpp.inc",
+        ),
+        (
+            ["--gen-enum-decls"],
+            "include/iree-dialects/Dialect/Input/InputEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "include/iree-dialects/Dialect/Input/InputEnums.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "include/iree-dialects/Dialect/Input/InputOps.td",
@@ -104,6 +138,7 @@ cc_library(
     includes = ["include"],
     deps = [
         ":IREEInputIncGen",
+        ":IREEInputInterfacesIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:IR",
@@ -382,6 +417,7 @@ cc_library(
         ":IREELinalgExtTransforms",
         ":IREELinalgTransformDialect",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AsyncDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
@@ -534,6 +570,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformPDLExtension",
 
         # IR
         "@llvm-project//mlir:IR",
@@ -609,6 +646,7 @@ cc_library(
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformDialectTransforms",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
@@ -687,6 +725,7 @@ cc_binary(
         "@llvm-project//mlir:BufferizationTransformOps",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FuncExtensions",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransformOps",
@@ -701,7 +740,9 @@ cc_binary(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformPDLExtension",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorTransformOps",
     ],

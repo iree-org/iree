@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(iree-transform-dialect-interpreter,transform-dialect-drop-schedule))" | FileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 #map = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<(d0) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
@@ -45,16 +45,20 @@ hal.executable private @distribute {
       }
       module {
         transform.sequence failures(propagate) {
-        ^bb0(%variant_op: !pdl.operation):
+        ^bb0(%variant_op: !transform.any_op):
         %17 = transform.structured.match ops{["func.func"]} in %variant_op 
-          : (!pdl.operation) -> !pdl.operation
+          : (!transform.any_op) -> !transform.any_op
         transform.iree.map_nested_forall_to_gpu_threads %17 
-          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] : (!pdl.operation) -> ()
+          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] : (!transform.any_op) -> ()
 
         // Late canonicalizations to cleanup and pass the checks.
         // Needs to occur on the whole variant to perform cse on the workgroup_count region
-        transform.iree.apply_patterns %variant_op
-          { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
+        %func_op = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+        transform.apply_patterns to %func_op {
+          transform.apply_patterns.canonicalization
+        } : !transform.any_op
+        transform.iree.apply_licm %func_op : !transform.any_op
+        transform.iree.apply_cse %func_op : !transform.any_op
       }
     }
   }

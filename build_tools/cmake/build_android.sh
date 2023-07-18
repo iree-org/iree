@@ -9,22 +9,26 @@
 # Cross-compile the runtime using CMake targeting Android
 #
 # The required IREE_HOST_BIN_DIR environment variable indicates the location
-# of the precompiled IREE binaries. Also requires that IREE_TARGET_ABI and
-# ANDROID_NDK variables be set. The BUILD_PRESET environment variable indicates
-# how the project should be configured: "test", "benchmark",
-# "benchmark-with-tracing", or "benchmark-suite-test". Defaults to "test".
+# of the precompiled IREE binaries. Also requires that ANDROID_NDK variables be
+# set. The BUILD_PRESET environment variable indicates how the project should be
+# configured: "test", "benchmark", "benchmark-with-tracing", or
+# "benchmark-suite-test". Defaults to "test".
 #
 # The desired build directory can be passed as the first argument. Otherwise, it
 # uses the environment variable IREE_TARGET_BUILD_DIR, defaulting to
 # "build-android". Designed for CI, but can be run manually. It reuses the build
 # directory if it already exists. Expects to be run from the root of the IREE
 # repository.
+#
+# The default Android ABI is arm64-v8a, you can specify it with the variable
+# IREE_ANDROID_ABI. See https://developer.android.com/ndk/guides/abis for the
+# supported ABIs.
 
 
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-android}}"
-ANDROID_ABI="${IREE_TARGET_ABI}"
+ANDROID_ABI="${IREE_ANDROID_ABI:-arm64-v8a}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"
 BUILD_PRESET="${BUILD_PRESET:-test}"

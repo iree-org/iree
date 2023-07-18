@@ -30,13 +30,15 @@ static bool hasAllOneValues(DenseIntElementsAttr attr) {
 
 static Value createAdd(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt) return builder.create<arith::AddIOp>(loc, x, y);
+  if (isInt)
+    return builder.create<arith::AddIOp>(loc, x, y);
   return builder.create<arith::AddFOp>(loc, x, y);
 }
 
 static Value createMul(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt) return builder.create<arith::MulIOp>(loc, x, y);
+  if (isInt)
+    return builder.create<arith::MulIOp>(loc, x, y);
   return builder.create<arith::MulFOp>(loc, x, y);
 }
 
@@ -77,21 +79,22 @@ namespace {
 // multplication.
 class ConvertConv2DNhwcHwcf final
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputType = convOp.getInputs()[0].getType().cast<ShapedType>();
-    auto filterType = convOp.getInputs()[1].getType().cast<ShapedType>();
-    auto outputType = convOp.getOutputs()[0].getType().cast<ShapedType>();
+    auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
+    auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
+    auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return failure();
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -110,7 +113,7 @@ class ConvertConv2DNhwcHwcf final
 
     auto loc = convOp.getLoc();
 
-    SmallVector<int64_t, 4> colTensorShape = {n, oh, ow, fh, fw, ic};
+    SmallVector<int64_t> colTensorShape = {n, oh, ow, fh, fw, ic};
 
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
@@ -123,8 +126,8 @@ class ConvertConv2DNhwcHwcf final
     auto swSym = rewriter.getAffineConstantExpr(
         convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr, 4> inputExprs = {nDim, ohDim * shSym + khDim,
-                                             owDim * swSym + kwDim, icDim};
+    SmallVector<AffineExpr> inputExprs = {nDim, ohDim * shSym + khDim,
+                                          owDim * swSym + kwDim, icDim};
 
     auto nloops = colTensorShape.size();
 
@@ -132,7 +135,7 @@ class ConvertConv2DNhwcHwcf final
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
 
-    SmallVector<AffineMap, 4> img2colIndexingMaps = {
+    SmallVector<AffineMap> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
@@ -199,7 +202,7 @@ class ConvertConv2DNhwcHwcf final
       auto resultMap = AffineMap::get(4, 0, {bDim, mDim, nDim}, getContext());
       SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
                                                            parallel, reduction};
-      bool isInt = outputType.getElementType().isa<IntegerType>();
+      bool isInt = llvm::isa<IntegerType>(outputType.getElementType());
       auto genericOp = rewriter.create<linalg::GenericOp>(
           loc, reshapedOutputType,
           /*inputs=*/ValueRange{reshapedImg2ColTensor, reshapedFilter},
@@ -228,37 +231,40 @@ class ConvertConv2DNhwcHwcf final
 // is a batched matrix-vector product.
 class ConvertDepthwiseConv2DNhwcHwc final
     : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
- public:
+public:
   using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputType = convOp.getInputs()[0].getType().cast<RankedTensorType>();
-    auto filterType = convOp.getInputs()[1].getType().cast<RankedTensorType>();
-    auto outputType = convOp.getOutputs()[0].getType().cast<RankedTensorType>();
+    auto inputType =
+        llvm::cast<RankedTensorType>(convOp.getInputs()[0].getType());
+    auto filterType =
+        llvm::cast<RankedTensorType>(convOp.getInputs()[1].getType());
+    auto outputType =
+        llvm::cast<RankedTensorType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return failure();
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     auto loc = convOp.getLoc();
 
     auto transposeOperand = [&](Value operand, ArrayRef<int64_t> indices) {
-      auto operandTensorType = operand.getType().cast<RankedTensorType>();
+      auto operandTensorType = llvm::cast<RankedTensorType>(operand.getType());
       auto nloops = indices.size();
       auto inputShape = operandTensorType.getShape();
 
-      SmallVector<AffineExpr, 4> exprs = llvm::to_vector<4>(
-          llvm::map_range(indices, [&](int64_t index) -> AffineExpr {
+      SmallVector<AffineExpr> exprs =
+          llvm::map_to_vector(indices, [&](int64_t index) -> AffineExpr {
             return rewriter.getAffineDimExpr(index);
-          }));
+          });
 
-      SmallVector<int64_t> targetShape = llvm::to_vector<4>(llvm::map_range(
-          indices,
-          [&](int64_t index) -> int64_t { return inputShape[index]; }));
+      SmallVector<int64_t> targetShape = llvm::map_to_vector(
+          indices, [&](int64_t index) -> int64_t { return inputShape[index]; });
 
       Value outputTensor = rewriter.create<tensor::EmptyOp>(
           loc, targetShape, operandTensorType.getElementType());
@@ -289,7 +295,8 @@ class ConvertDepthwiseConv2DNhwcHwc final
     // Transpose input, filter so channels are outermost
     auto inputT = transposeOperand(input, {0, 3, 1, 2});
     auto filterT = transposeOperand(filter, {2, 0, 1});
-    auto filterTShape = filterT.getType().cast<RankedTensorType>().getShape();
+    auto filterTShape =
+        llvm::cast<RankedTensorType>(filterT.getType()).getShape();
     auto outputShape = outputType.getShape();
 
     const int n = outputShape[0];
@@ -299,7 +306,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
     const int fh = filterTShape[1];
     const int fw = filterTShape[2];
 
-    SmallVector<int64_t, 4> colTensorShape = {n, c, oh, ow, fh, fw};
+    SmallVector<int64_t> colTensorShape = {n, c, oh, ow, fh, fw};
     Value transposedOutputTensor = transposeOperand(output, {0, 3, 1, 2});
 
     AffineExpr nDim, cDim, ohDim, owDim, khDim, kwDim;
@@ -381,21 +388,22 @@ class ConvertDepthwiseConv2DNhwcHwc final
 // (i.e. (D, C x Kh x Kw) * (C x Kh x Kw, Ho x Wo))
 class ConvertConv2DNchwFchw final
     : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputType = convOp.getInputs()[0].getType().cast<ShapedType>();
-    auto filterType = convOp.getInputs()[1].getType().cast<ShapedType>();
-    auto outputType = convOp.getOutputs()[0].getType().cast<ShapedType>();
+    auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
+    auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
+    auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return failure();
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
+    if (!hasAllOneValues(convOp.getDilations()))
+      return failure();
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -414,7 +422,7 @@ class ConvertConv2DNchwFchw final
 
     auto loc = convOp.getLoc();
 
-    SmallVector<int64_t, 4> colTensorShape = {n, ic, fh, fw, oh, ow};
+    SmallVector<int64_t> colTensorShape = {n, ic, fh, fw, oh, ow};
 
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
@@ -427,8 +435,8 @@ class ConvertConv2DNchwFchw final
     auto swSym = rewriter.getAffineConstantExpr(
         convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr, 4> inputExprs = {nDim, icDim, ohDim * shSym + khDim,
-                                             owDim * swSym + kwDim};
+    SmallVector<AffineExpr> inputExprs = {nDim, icDim, ohDim * shSym + khDim,
+                                          owDim * swSym + kwDim};
 
     auto nloops = colTensorShape.size();
 
@@ -436,7 +444,7 @@ class ConvertConv2DNchwFchw final
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
 
-    SmallVector<AffineMap, 4> img2colIndexingMaps = {
+    SmallVector<AffineMap> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
@@ -502,7 +510,7 @@ class ConvertConv2DNchwFchw final
       auto resultMap = AffineMap::get(4, 0, {bDim, mDim, nDim}, getContext());
       SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
                                                            parallel, reduction};
-      bool isInt = outputType.getElementType().isa<IntegerType>();
+      bool isInt = llvm::isa<IntegerType>(outputType.getElementType());
       auto genericOp = rewriter.create<linalg::GenericOp>(
           loc, reshapedOutputType,
           /*inputs=*/ValueRange{reshapedFilter, reshapedImg2ColTensor},
@@ -542,12 +550,12 @@ struct ConvertConv2DToImg2ColPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass() {
   return std::make_unique<ConvertConv2DToImg2ColPass>();
 }
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

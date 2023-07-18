@@ -1,3 +1,10 @@
+---
+hide:
+  - tags
+tags:
+  - Android
+---
+
 # Android cross-compilation
 
 Running on a platform like Android involves cross-compiling from a _host_

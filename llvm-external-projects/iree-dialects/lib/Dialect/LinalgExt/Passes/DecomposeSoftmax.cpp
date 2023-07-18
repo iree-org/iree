@@ -128,7 +128,7 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     Type elementType = inputType.getElementType();
     int64_t reductionDim = softmaxOp.getDimension();
     SmallVector<OpFoldResult> dims =
-        tensor::createDimValues(rewriter, loc, input);
+        tensor::getMixedSizes(rewriter, loc, input);
     Value outputNd = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
     dims.erase(dims.begin() + reductionDim);
     // Compute max along dim

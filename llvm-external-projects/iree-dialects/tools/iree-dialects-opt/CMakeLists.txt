@@ -17,6 +17,7 @@ set(LIBS
   MLIRControlFlowDialect
   MLIRDialect
   MLIRFuncDialect
+  MLIRFuncInlinerExtension
   MLIRIndexToLLVM
   MLIRLinalgDialect
   MLIRLinalgTransformOps
@@ -29,7 +30,9 @@ set(LIBS
   MLIRSCFTransformOps
   MLIRSCFTransforms
   MLIRTensorDialect
+  MLIRTensorTransformOps
   MLIRTransforms
+  MLIRTransformPDLExtension
   MLIRVectorTransformOps
 )
 

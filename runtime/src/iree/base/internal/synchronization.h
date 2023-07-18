@@ -17,8 +17,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 // NOTE: clang cannot support thread annotations in C code due to some
 // representational bugs... which means that we can't use it here. Boo.

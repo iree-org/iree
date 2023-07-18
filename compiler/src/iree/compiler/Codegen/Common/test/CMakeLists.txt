@@ -15,16 +15,19 @@ iree_lit_test_suite(
     lit
   SRCS
     "affinemin_canonicalization.mlir"
+    "batch_matmuls.mlir"
+    "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
+    "convert_bf16_arith_to_f32.mlir"
+    "convert_bf16_to_uint16_buffers.mlir"
     "convert_to_destination_passing_style.mlir"
     "convolutions.mlir"
-    "dead_alloc.mlir"
     "decompose_affine_ops.mlir"
     "decompose_linalg_generic.mlir"
     "decompose_pack_unpack_ops.mlir"
-    "distribute_gpu_shared_memory.mlir"
     "eliminate_empty_tensors.mlir"
+    "erase_dead_alloc_and_stores.mlir"
     "erase_hal_descriptor_type.mlir"
     "extract_address_computation.mlir"
     "flatten_memref_subspan.mlir"
@@ -32,30 +35,26 @@ iree_lit_test_suite(
     "fold_affine_min_of_block_id.mlir"
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
-    "gpu_pipeline.mlir"
-    "gpu_vectorization.mlir"
     "hoist_statically_bound_allocations.mlir"
     "iree_comprehensive_bufferize.mlir"
     "iree_expand_strided_metadata.mlir"
     "lower_ukernel_to_calls.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
-    "reduce_bank_conflicts.mlir"
     "reductions.mlir"
     "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "repeated_matcher_use.mlir"
-    "swizzle_workgroup.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
-    "tile_reduction.mlir"
     "transform_buffer_opt.mlir"
     "transform_dialect_apply_pattern_op.mlir"
-    "transform_im2col_workgroup.mlir"
+    "transform_match_partial_reduction.mlir"
     "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
+    "type_propagation_packing.mlir"
     "vectorize_tensor_pad.mlir"
     "warp_reduction.mlir"
     "workgroup_specialization.mlir"
@@ -63,6 +62,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    batch_matmul_match_spec.mlir
     convolution_match_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir

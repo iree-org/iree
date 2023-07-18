@@ -134,12 +134,12 @@ namespace {
 using llvm::support::ulittle16_t;
 using llvm::support::ulittle32_t;
 using llvm::support::ulittle64_t;
-}  // namespace
+} // namespace
 
 LLVM_PACKED_START
 
 struct ZIPLocalFileHeader {
-  ulittle32_t signature;  // 0x04034B50
+  ulittle32_t signature; // 0x04034B50
   ulittle16_t versionToExtract;
   ulittle16_t generalPurposeFlag;
   ulittle16_t compressionMethod;
@@ -156,7 +156,7 @@ struct ZIPLocalFileHeader {
 static_assert(sizeof(ZIPLocalFileHeader) == 30, "bad packing");
 
 struct ZIP64DataDescriptor {
-  ulittle32_t signature;  // 0x08074B50
+  ulittle32_t signature; // 0x08074B50
   ulittle32_t crc32;
   ulittle64_t compressedSize;
   ulittle64_t uncompressedSize;
@@ -177,7 +177,7 @@ struct ZIP64LocalExtraField {
 static_assert(sizeof(ZIP64LocalExtraField) == 20, "bad packing");
 
 struct ZIPCentralDirectoryRecord {
-  ulittle32_t signature;  // 0x02014B50
+  ulittle32_t signature; // 0x02014B50
   ulittle16_t versionMadeBy;
   ulittle16_t versionToExtract;
   ulittle16_t generalPurposeFlags;
@@ -209,7 +209,7 @@ struct ZIP64CentralExtraField {
 static_assert(sizeof(ZIP64CentralExtraField) == 28, "bad packing");
 
 struct ZIPEndOfCentralDirectoryRecord {
-  ulittle32_t signature;  // 0x06054B50
+  ulittle32_t signature; // 0x06054B50
   ulittle16_t diskNumber;
   ulittle16_t startDiskNumber;
   ulittle16_t entriesOnDisk;
@@ -222,7 +222,7 @@ struct ZIPEndOfCentralDirectoryRecord {
 static_assert(sizeof(ZIPEndOfCentralDirectoryRecord) == 22, "bad packing");
 
 struct ZIPEndOfCentralDirectoryRecord64 {
-  ulittle32_t signature;  // 0x06064B50
+  ulittle32_t signature; // 0x06064B50
   ulittle64_t sizeOfEOCD64Minus12;
   ulittle16_t versionMadeBy;
   ulittle16_t versionRequired;
@@ -237,7 +237,7 @@ struct ZIPEndOfCentralDirectoryRecord64 {
 static_assert(sizeof(ZIPEndOfCentralDirectoryRecord64) == 56, "bad packing");
 
 struct ZIPEndOfCentralDirectoryLocator64 {
-  ulittle32_t signature;  // 0x07064B50
+  ulittle32_t signature; // 0x07064B50
   ulittle32_t recordDiskNumber;
   ulittle64_t recordOffset;
   ulittle32_t diskCount;
@@ -287,15 +287,15 @@ static ZIPFileRef appendZIPLocalFileHeader(std::string fileName,
   // Append local file header.
   ZIPLocalFileHeader fileHeader;
   fileHeader.signature = 0x04034B50u;
-  fileHeader.versionToExtract = 0x2Du;  // 4.5 (for zip64)
+  fileHeader.versionToExtract = 0x2Du; // 4.5 (for zip64)
   fileHeader.generalPurposeFlag = 0;
-  fileHeader.compressionMethod = 0;  // COMP_STORED
+  fileHeader.compressionMethod = 0; // COMP_STORED
   // https://docs.microsoft.com/en-us/windows/win32/api/oleauto/nf-oleauto-dosdatetimetovarianttime
   fileHeader.lastModifiedTime = 0u;
-  fileHeader.lastModifiedDate = 0x21;  // 1980-01-01
+  fileHeader.lastModifiedDate = 0x21; // 1980-01-01
   fileHeader.crc32 = crc32;
-  fileHeader.compressedSize = 0xFFFFFFFFu;    // in extra field
-  fileHeader.uncompressedSize = 0xFFFFFFFFu;  // in extra field
+  fileHeader.compressedSize = 0xFFFFFFFFu;   // in extra field
+  fileHeader.uncompressedSize = 0xFFFFFFFFu; // in extra field
   fileHeader.fileNameLength = static_cast<uint16_t>(fileName.size());
   fileHeader.extraFieldLength = sizeof(ZIP64LocalExtraField) +
                                 sizeof(ZIPExtraFieldHeader) + interiorPadding;
@@ -311,7 +311,7 @@ static ZIPFileRef appendZIPLocalFileHeader(std::string fileName,
   // poorly written that they only ever look at the last field present for
   // getting the size. Have I mentioned how terrible of a format ZIP is?
   ZIPExtraFieldHeader paddingExtra;
-  paddingExtra.id = 0xFECAu;  // 'CAFE'; in the user prefix range
+  paddingExtra.id = 0xFECAu; // 'CAFE'; in the user prefix range
   paddingExtra.size = static_cast<uint16_t>(interiorPadding);
   os.write(reinterpret_cast<char *>(&paddingExtra), sizeof(paddingExtra));
   os.write_zeros(interiorPadding);
@@ -338,12 +338,12 @@ static ZIPFileRef appendZIPLocalFileHeader(std::string fileName,
 
 // Computes an Adler32 CRC and sends the data into the void.
 class null_crc32_ostream : public llvm::raw_ostream {
- public:
+public:
   explicit null_crc32_ostream(uint32_t &crc32) : crc32(crc32) {
     SetUnbuffered();
   }
 
- private:
+private:
   void write_impl(const char *Ptr, size_t Size) override {
     crc32 = llvm::crc32(
         crc32, ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(Ptr), Size));
@@ -357,10 +357,11 @@ class null_crc32_ostream : public llvm::raw_ostream {
 // appendZIPFile implementation used when |os| is a stream without random
 // access (like stdout). This requires us to serialize the file twice in order
 // to compute the total length and CRC32.
-static std::optional<ZIPFileRef> appendZIPFileToStream(
-    std::string fileName, uint64_t filePadding, uint64_t fileLength,
-    std::function<LogicalResult(llvm::raw_ostream &os)> write,
-    llvm::raw_ostream &os) {
+static std::optional<ZIPFileRef>
+appendZIPFileToStream(std::string fileName, uint64_t filePadding,
+                      uint64_t fileLength,
+                      std::function<LogicalResult(llvm::raw_ostream &os)> write,
+                      llvm::raw_ostream &os) {
   // Compute the Adler32 CRC as required in the local file header (and later the
   // central directory). Since we only have an unseekable raw_ostream we can't
   // go patch the header after we stream out the file and instead have to stream
@@ -396,13 +397,13 @@ static std::optional<ZIPFileRef> appendZIPFileToStream(
 
 // Computes an Adler32 CRC and passes the data along to an underlying ostream.
 class crc32_ostream : public llvm::raw_ostream {
- public:
+public:
   explicit crc32_ostream(llvm::raw_ostream &impl, uint32_t &crc32)
       : impl(impl), crc32(crc32) {
     SetUnbuffered();
   }
 
- private:
+private:
   void write_impl(const char *Ptr, size_t Size) override {
     crc32 = llvm::crc32(
         crc32, ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(Ptr), Size));
@@ -416,10 +417,11 @@ class crc32_ostream : public llvm::raw_ostream {
 // appendZIPFile implementation used when |os| is a file with random access.
 // This allows us to write the header and backpatch the CRC computed while while
 // serializing the file contents.
-static std::optional<ZIPFileRef> appendZIPFileToFD(
-    std::string fileName, uint64_t filePadding, uint64_t fileLength,
-    std::function<LogicalResult(llvm::raw_ostream &os)> write,
-    llvm::raw_fd_ostream &os) {
+static std::optional<ZIPFileRef>
+appendZIPFileToFD(std::string fileName, uint64_t filePadding,
+                  uint64_t fileLength,
+                  std::function<LogicalResult(llvm::raw_ostream &os)> write,
+                  llvm::raw_fd_ostream &os) {
   // Write the ZIP header and padding up to the start of the file.
   // We write a dummy CRC we'll patch up after we compute it while serializing
   // the file contents.
@@ -450,10 +452,10 @@ static std::optional<ZIPFileRef> appendZIPFileToFD(
 // Appends a file wrapped in a ZIP header and data descriptor.
 // |write| is used to stream the file contents to |os| while also capturing its
 // CRC as required for the central directory.
-static std::optional<ZIPFileRef> appendZIPFile(
-    std::string fileName, uint64_t filePadding, uint64_t fileLength,
-    std::function<LogicalResult(llvm::raw_ostream &os)> write,
-    llvm::raw_ostream &os) {
+static std::optional<ZIPFileRef>
+appendZIPFile(std::string fileName, uint64_t filePadding, uint64_t fileLength,
+              std::function<LogicalResult(llvm::raw_ostream &os)> write,
+              llvm::raw_ostream &os) {
   if (os.get_kind() == llvm::raw_ostream::OStreamKind::OK_FDStream) {
     auto &osFD = static_cast<llvm::raw_fd_ostream &>(os);
     if (osFD.supportsSeeking()) {
@@ -483,15 +485,15 @@ static void appendZIPCentralDirectory(ArrayRef<ZIPFileRef> fileRefs,
     ZIPCentralDirectoryRecord cdr;
     cdr.signature = 0x02014B50u;
     cdr.versionMadeBy = 0x031E;
-    cdr.versionToExtract = 0x2Du;  // 4.5 (for zip64)
+    cdr.versionToExtract = 0x2Du; // 4.5 (for zip64)
     cdr.generalPurposeFlags = 0;
-    cdr.compressionMethod = 0;  // COMP_STORED
+    cdr.compressionMethod = 0; // COMP_STORED
     // https://docs.microsoft.com/en-us/windows/win32/api/oleauto/nf-oleauto-dosdatetimetovarianttime
     cdr.lastModifiedTime = 0u;
-    cdr.lastModifiedDate = 0x21;  // 1980-01-01
+    cdr.lastModifiedDate = 0x21; // 1980-01-01
     cdr.crc32 = fileRef.crc32;
-    cdr.compressedSize = 0xFFFFFFFFu;    // in extra field
-    cdr.uncompressedSize = 0xFFFFFFFFu;  // in extra field
+    cdr.compressedSize = 0xFFFFFFFFu;   // in extra field
+    cdr.uncompressedSize = 0xFFFFFFFFu; // in extra field
     cdr.fileNameLength = static_cast<uint16_t>(fileRef.fileName.size());
     cdr.extraFieldLength =
         static_cast<uint16_t>(sizeof(ZIP64CentralExtraField));
@@ -523,7 +525,7 @@ static void appendZIPCentralDirectory(ArrayRef<ZIPFileRef> fileRefs,
   endOfCDR64.signature = 0x06064B50u;
   endOfCDR64.sizeOfEOCD64Minus12 = sizeof(endOfCDR64) - 12;
   endOfCDR64.versionMadeBy = 0x002Du;
-  endOfCDR64.versionRequired = 0x002Du;  // 4.5 (for zip64)
+  endOfCDR64.versionRequired = 0x002Du; // 4.5 (for zip64)
   endOfCDR64.diskNumber = 0;
   endOfCDR64.startDiskNumber = 0;
   endOfCDR64.entriesOnDisk = static_cast<uint64_t>(fileRefs.size());
@@ -671,7 +673,8 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
           return success();
         },
         os);
-    if (!zipFile.has_value()) return failure();
+    if (!zipFile.has_value())
+      return failure();
     fileRefs.push_back(*zipFile);
   }
 
@@ -682,7 +685,7 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
   return success();
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

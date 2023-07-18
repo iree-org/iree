@@ -14,7 +14,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
 
 #ifdef __cplusplus
@@ -97,7 +96,7 @@ void iree_hal_vulkan_tracing_context_free(
 void iree_hal_vulkan_tracing_context_collect(
     iree_hal_vulkan_tracing_context_t* context, VkCommandBuffer command_buffer);
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 // Begins a normal zone derived on the calling |src_loc|.
 // Must be perfectly nested and paired with a corresponding zone end.
@@ -147,7 +146,7 @@ void iree_hal_vulkan_tracing_zone_end_impl(
     function_name_length, name, name_length)
 #define IREE_VULKAN_TRACE_ZONE_END(context, command_buffer)
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #ifdef __cplusplus
 }  // extern "C"

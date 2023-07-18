@@ -21,10 +21,11 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+static constexpr int warpSize = 32;
 static constexpr int maxTensorDims = 2;
 namespace DimType {
-static constexpr int Batch0 = 0;  // Batch dimension for tensor dim 0
-static constexpr int Batch1 = 1;  // Batch dimension for tensor dim 1
+static constexpr int Batch0 = 0; // Batch dimension for tensor dim 0
+static constexpr int Batch1 = 1; // Batch dimension for tensor dim 1
 static constexpr int LaneIdZ = 2;
 static constexpr int LaneIdY = 3;
 static constexpr int LaneIdX = 4;
@@ -32,28 +33,28 @@ static constexpr int VecIdZ = 5;
 static constexpr int VecIdY = 6;
 static constexpr int VecIdX = 7;
 static constexpr int NumDims = 8;
-}  // namespace DimType
+} // namespace DimType
 
 static std::string typeToString(int i) {
   switch (i) {
-    case DimType::Batch0:
-      return "Batch0";
-    case DimType::Batch1:
-      return "Batch1";
-    case DimType::LaneIdZ:
-      return "LaneIdZ";
-    case DimType::LaneIdY:
-      return "LaneIdY";
-    case DimType::LaneIdX:
-      return "LaneIdX";
-    case DimType::VecIdZ:
-      return "VecIdZ";
-    case DimType::VecIdY:
-      return "VecIdY";
-    case DimType::VecIdX:
-      return "VecIdX";
-    default:
-      return "";
+  case DimType::Batch0:
+    return "Batch0";
+  case DimType::Batch1:
+    return "Batch1";
+  case DimType::LaneIdZ:
+    return "LaneIdZ";
+  case DimType::LaneIdY:
+    return "LaneIdY";
+  case DimType::LaneIdX:
+    return "LaneIdX";
+  case DimType::VecIdZ:
+    return "VecIdZ";
+  case DimType::VecIdY:
+    return "VecIdY";
+  case DimType::VecIdX:
+    return "VecIdX";
+  default:
+    return "";
   }
 }
 
@@ -94,58 +95,54 @@ enum class MMAType {
 
 enum class MMAMatrixType { AMatrix, BMatrix, CMatrix };
 
-static std::array<Dimension, 3> getMMADimensions(MMAType mmaType,
-                                                 MMAMatrixType matrixType,
-                                                 int dim) {
+static std::array<Dimension, 3>
+getMMADimensions(MMAType mmaType, MMAMatrixType matrixType, int dim) {
   switch (mmaType) {
-    case MMAType::M16N8K16:
-      switch (matrixType) {
-        case MMAMatrixType::AMatrix:
-          if (dim == 0)
-            return {{{DimType::LaneIdY, 8},
-                     {DimType::VecIdZ, 2},
-                     {DimType::LaneIdZ, 1}}};
-          return {{{DimType::VecIdX, 2},
-                   {DimType::LaneIdX, 4},
-                   {DimType::VecIdY, 2}}};
-        case MMAMatrixType::BMatrix:
-          if (dim == 0)
-            return {{{DimType::LaneIdY, 8},
-                     {DimType::LaneIdZ, 1},
-                     {DimType::VecIdZ, 1}}};
-          return {{{DimType::VecIdX, 2},
-                   {DimType::LaneIdX, 4},
-                   {DimType::VecIdY, 2}}};
-        case MMAMatrixType::CMatrix:
-          if (dim == 0)
-            return {{{DimType::LaneIdY, 8},
-                     {DimType::VecIdY, 2},
-                     {DimType::LaneIdZ, 1}}};
-          return {{{DimType::VecIdX, 2},
-                   {DimType::LaneIdX, 4},
-                   {DimType::VecIdZ, 1}}};
-      }
-      break;
-    default:
-      return {};
+  case MMAType::M16N8K16:
+    switch (matrixType) {
+    case MMAMatrixType::AMatrix:
+      if (dim == 0)
+        return {{{DimType::LaneIdY, 8},
+                 {DimType::VecIdZ, 2},
+                 {DimType::LaneIdZ, 1}}};
+      return {
+          {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdY, 2}}};
+    case MMAMatrixType::BMatrix:
+      if (dim == 0)
+        return {{{DimType::LaneIdY, 8},
+                 {DimType::LaneIdZ, 1},
+                 {DimType::VecIdZ, 1}}};
+      return {
+          {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdY, 2}}};
+    case MMAMatrixType::CMatrix:
+      if (dim == 0)
+        return {{{DimType::LaneIdY, 8},
+                 {DimType::VecIdY, 2},
+                 {DimType::LaneIdZ, 1}}};
+      return {
+          {{DimType::VecIdX, 2}, {DimType::LaneIdX, 4}, {DimType::VecIdZ, 1}}};
+    }
+    return {};
+  default:
+    return {};
   }
 }
 
 static std::array<int, 2> getMMACanonicalShape(MMAType mmaType,
                                                MMAMatrixType matrixType) {
   switch (mmaType) {
-    case MMAType::M16N8K16:
-      switch (matrixType) {
-        case MMAMatrixType::AMatrix:
-          return {16, 16};
-        case MMAMatrixType::BMatrix:
-          return {8, 16};
-        case MMAMatrixType::CMatrix:
-          return {16, 8};
-      }
-      break;
-    default:
-      return {};
+  case MMAType::M16N8K16:
+    switch (matrixType) {
+    case MMAMatrixType::AMatrix:
+      return {16, 16};
+    case MMAMatrixType::BMatrix:
+      return {8, 16};
+    case MMAMatrixType::CMatrix:
+      return {16, 8};
+    }
+    return {};
+  default:
+    return {};
   }
 }
 
@@ -185,18 +182,18 @@ AffineExpr Layout::computeDim(int i, const DimArray &state,
   AffineExpr dimScale = builder.getAffineConstantExpr(1);
   for (const auto &dimType : order[i]) {
     switch (dimType) {
-      case DimType::LaneIdX:
-        dim = dim + dimScale * d0;
-        break;
-      case DimType::LaneIdY:
-        dim = dim + dimScale * d1;
-        break;
-      case DimType::LaneIdZ:
-        dim = dim + dimScale * d2;
-        break;
-      default:
-        dim = dim + dimScale * builder.getAffineConstantExpr(state[dimType]);
-        break;
+    case DimType::LaneIdX:
+      dim = dim + dimScale * d0;
+      break;
+    case DimType::LaneIdY:
+      dim = dim + dimScale * d1;
+      break;
+    case DimType::LaneIdZ:
+      dim = dim + dimScale * d2;
+      break;
+    default:
+      dim = dim + dimScale * builder.getAffineConstantExpr(state[dimType]);
+      break;
     }
     dimScale = dimScale * builder.getAffineConstantExpr(shape[dimType]);
   }
@@ -229,22 +226,41 @@ static MMAType getMMAType(ArrayRef<int64_t> aShape, ArrayRef<int64_t> bShape,
                           ArrayRef<int64_t> cShape) {
   if ((aShape[0] % 16 == 0) && (aShape[1] % 16 == 0) && (cShape[0] % 16 == 0) &&
       (cShape[1] % 8 == 0)) {
-    if ((bShape[0] % 16 == 0) && (bShape[1] % 8 == 0)) return MMAType::M16N8K16;
+    if ((bShape[0] % 16 == 0) && (bShape[1] % 8 == 0))
+      return MMAType::M16N8K16;
   }
   return MMAType::NONE;
 }
 
+// The value needs to have the target layout before op, so
+// we create a layout conflict op that resolves the layout differences
+// before the op.
+static void createLayoutConflictOp(Value value, Layout targetLayout,
+                                   DenseMap<Value, Layout> &layoutMap,
+                                   Operation *op, RewriterBase &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(op);
+  vector::ShapeCastOp conflictOp = rewriter.create<vector::ShapeCastOp>(
+      op->getLoc(), value.getType(), value);
+  Value resolvedValue = conflictOp.getResult();
+  layoutMap.try_emplace(resolvedValue, targetLayout);
+  layoutMap.at(resolvedValue).debugPrint("layout conflict resolved");
+  rewriter.replaceAllUsesExcept(value, resolvedValue, conflictOp);
+}
+
 static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
-                         Value dMatrix, DenseMap<Value, Layout> &layoutMap) {
+                         Value dMatrix, DenseMap<Value, Layout> &layoutMap,
+                         Operation *op, RewriterBase &rewriter) {
   // First determine which variant of MMA this op is most suitable for
-  auto aType = aMatrix.getType().cast<ShapedType>();
-  auto bType = aMatrix.getType().cast<ShapedType>();
-  auto cType = aMatrix.getType().cast<ShapedType>();
+  auto aType = llvm::cast<ShapedType>(aMatrix.getType());
+  auto bType = llvm::cast<ShapedType>(aMatrix.getType());
+  auto cType = llvm::cast<ShapedType>(aMatrix.getType());
   ArrayRef<int64_t> aShape = aType.getShape();
   ArrayRef<int64_t> bShape = bType.getShape();
   ArrayRef<int64_t> cShape = cType.getShape();
   MMAType mmaType = getMMAType(aShape, bShape, cShape);
-  if (mmaType == MMAType::NONE) return;
+  if (mmaType == MMAType::NONE)
+    return;
   // Set layouts for A, B and C
   auto setLayout = [&](Value matrix, MMAMatrixType matrixType,
                        llvm::StringRef name) {
@@ -255,10 +271,15 @@ static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
     std::array<int, 2> canonicalShape =
         getMMACanonicalShape(mmaType, matrixType);
     Layout layout(dimOrder, canonicalShape);
-    ArrayRef<int64_t> shape = matrix.getType().cast<ShapedType>().getShape();
+    ArrayRef<int64_t> shape =
+        llvm::cast<ShapedType>(matrix.getType()).getShape();
     layout.updateBatchDims(shape[0], shape[1]);
-    layoutMap.try_emplace(matrix, layout);
-    layout.debugPrint(name);
+    if (layoutMap.count(matrix) && (layout != layoutMap.at(matrix))) {
+      createLayoutConflictOp(matrix, layout, layoutMap, op, rewriter);
+    } else {
+      layoutMap.try_emplace(matrix, layout);
+      layout.debugPrint(name);
+    }
   };
   setLayout(aMatrix, MMAMatrixType::AMatrix, "aMatrix");
   setLayout(bMatrix, MMAMatrixType::BMatrix, "bMatrix");
@@ -269,49 +290,58 @@ static void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
 static void propagateLayoutToReduceBroadcastTranspose(
     vector::MultiDimReductionOp reductionOp, vector::BroadcastOp broadcastOp,
     vector::TransposeOp transposeOp, DenseMap<Value, Layout> &layoutMap) {
-  if (!broadcastOp) return;
-  if (!transposeOp) return;
+  if (!broadcastOp)
+    return;
+  if (!transposeOp)
+    return;
   Value reductionSrc = reductionOp.getSource();
-  if (!layoutMap.count(reductionSrc)) return;
+  if (!layoutMap.count(reductionSrc))
+    return;
   // Get the reduction dims
-  auto reductionDims = llvm::to_vector<4>(
-      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  auto reductionDims =
+      llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
   // Get the transpose permutation
   SmallVector<int64_t> perm;
   transposeOp.getTransp(perm);
   // Don't support dim-1 broadcasted dims
   llvm::SetVector<int64_t> dimOneBroadcastedDims =
       broadcastOp.computeBroadcastedUnitDims();
-  if (dimOneBroadcastedDims.size() > 0) return;
+  if (dimOneBroadcastedDims.size() > 0)
+    return;
   Value broadcastSource = broadcastOp.getSource();
   Value broadcastResult = broadcastOp.getResult();
   int64_t broadcastSourceRank =
-      broadcastSource.getType().cast<VectorType>().getRank();
+      llvm::cast<VectorType>(broadcastSource.getType()).getRank();
   int64_t broadcastResultRank =
-      broadcastResult.getType().cast<VectorType>().getRank();
+      llvm::cast<VectorType>(broadcastResult.getType()).getRank();
   int64_t rankDiff = broadcastResultRank - broadcastSourceRank;
   llvm::SetVector<int64_t> broadcastedDims;
-  for (int64_t i = 0; i < rankDiff; i++) broadcastedDims.insert(i);
+  for (int64_t i = 0; i < rankDiff; i++)
+    broadcastedDims.insert(i);
   ArrayRef<int64_t> broadcastShape =
-      broadcastResult.getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(broadcastResult.getType()).getShape();
   ArrayRef<int64_t> srcShape =
-      reductionSrc.getType().cast<ShapedType>().getShape();
+      llvm::cast<ShapedType>(reductionSrc.getType()).getShape();
   // Check that the same number of dims are reduced and broadcasted
-  if (reductionDims.size() != broadcastedDims.size()) return;
+  if (reductionDims.size() != broadcastedDims.size())
+    return;
   // Check that transpose(reductionDim) == broadcastDim
   // and that the shapes match
   for (IntegerAttr dimAttr : reductionDims) {
     int64_t dim = dimAttr.getInt();
     int64_t transposedDim = perm[dim];
-    if (!broadcastedDims.contains(transposedDim)) return;
-    if (srcShape[dim] != broadcastShape[transposedDim]) return;
+    if (!broadcastedDims.contains(transposedDim))
+      return;
+    if (srcShape[dim] != broadcastShape[transposedDim])
+      return;
   }
   Value transposedResult = transposeOp.getResult();
   layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
   layoutMap.at(transposedResult).debugPrint("transposed");
   // Propagate 2D layout to 1D accumulator
   Value acc = reductionOp.getAcc();
-  if (layoutMap.count(acc)) return;
+  if (layoutMap.count(acc))
+    return;
   Layout accLayout = layoutMap.at(reductionSrc);
   accLayout.rank = 1;
   layoutMap.try_emplace(acc, accLayout);
@@ -340,7 +370,8 @@ static void propagateLayoutToFor(scf::ForOp forOp,
                                  DenseMap<Value, Layout> &layoutMap) {
   for (auto argIndex : llvm::enumerate(forOp.getRegionIterArgs())) {
     BlockArgument &arg = argIndex.value();
-    if (!layoutMap.count(arg)) continue;
+    if (!layoutMap.count(arg))
+      continue;
     OpOperand &operand = forOp.getOpOperandForRegionIterArg(arg);
     Value result = forOp.getResult(argIndex.index());
     Layout newLayout = layoutMap.at(arg);
@@ -357,11 +388,13 @@ static void propagateLayoutToOthers(SmallVectorImpl<Value> &operands,
   // Find an operand with a layout
   int i;
   for (i = 0; i < numOperands; i++) {
-    if (layoutMap.count(operands[i])) break;
+    if (layoutMap.count(operands[i]))
+      break;
   }
   // Propagate layout to others
   for (int j = 0; j < numOperands; j++) {
-    if (j == i) continue;
+    if (j == i)
+      continue;
     if (!layoutMap.count(operands[j])) {
       layoutMap.try_emplace(operands[j], layoutMap.at(operands[i]));
       layoutMap.at(operands[j]).debugPrint("binary/unary operand");
@@ -394,22 +427,26 @@ static void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
 }
 
 /// Get indices of transfer op after distribution.
-static SmallVector<Value> getDistributedIndices(
-    OpBuilder &rewriter, Location loc, Layout &layout,
-    std::array<int, DimType::NumDims> &state, ArrayRef<Value> indices,
-    AffineMap permutationMap, const std::array<Value, 3> &threadIds) {
+static SmallVector<Value>
+getDistributedIndices(OpBuilder &rewriter, Location loc, Layout &layout,
+                      std::array<int, DimType::NumDims> &state,
+                      ArrayRef<Value> indices, AffineMap permutationMap,
+                      const std::array<Value, 3> &threadIds) {
   AffineExpr row = layout.computeDim(0, state, rewriter);
   AffineMap rowMap = AffineMap::get(3, 0, row, rewriter.getContext());
   std::array<Value, 2> laneOffsets;
-  laneOffsets[0] = rewriter.create<AffineApplyOp>(loc, rowMap, threadIds);
+  laneOffsets[0] =
+      rewriter.create<affine::AffineApplyOp>(loc, rowMap, threadIds);
   AffineExpr col = layout.computeDim(1, state, rewriter);
   AffineMap colMap = AffineMap::get(3, 0, col, rewriter.getContext());
-  laneOffsets[1] = rewriter.create<AffineApplyOp>(loc, colMap, threadIds);
+  laneOffsets[1] =
+      rewriter.create<affine::AffineApplyOp>(loc, colMap, threadIds);
   SmallVector<Value> newIndices{indices.begin(), indices.end()};
   int64_t laneDim = 0;
   for (AffineExpr expr : permutationMap.getResults()) {
     auto dimExpr = expr.dyn_cast<AffineDimExpr>();
-    if (!dimExpr) continue;
+    if (!dimExpr)
+      continue;
     unsigned pos = dimExpr.getPosition();
     newIndices[pos] = rewriter.create<arith::AddIOp>(
         loc, laneOffsets[laneDim++], newIndices[pos]);
@@ -423,10 +460,11 @@ static bool isLdMatrixCompatible(vector::TransferReadOp readOp,
                                  const Layout &layout) {
   // ldMatrix requires loading from shared memory.
   if (!hasSharedMemoryAddressSpace(
-          readOp.getSource().getType().cast<MemRefType>()))
+          llvm::cast<MemRefType>(readOp.getSource().getType())))
     return false;
   // TODO: Can be any 16bits type.
-  if (!readOp.getVectorType().getElementType().isF16()) return false;
+  if (!readOp.getVectorType().getElementType().isF16())
+    return false;
   bool compatibleLayout = layout.order.back()[0] == DimType::VecIdX &&
                           layout.shape[DimType::VecIdX] == 2 &&
                           layout.order.back()[1] == DimType::LaneIdX &&
@@ -442,7 +480,8 @@ static bool isTransposedLdMatrix(AffineMap map) {
   }
   auto exprX = map.getResult(0).dyn_cast<AffineDimExpr>();
   auto exprY = map.getResult(1).dyn_cast<AffineDimExpr>();
-  if (!exprX || !exprY) return false;
+  if (!exprX || !exprY)
+    return false;
   return exprX.getPosition() > exprY.getPosition();
 }
 
@@ -464,17 +503,17 @@ static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
   AffineMap rowMap = AffineMap::get(3, 0, row, rewriter.getContext());
   std::array<Value, 2> vectorOffsets;
   vectorOffsets[0] =
-      rewriter.create<AffineApplyOp>(loc, rowMap, threadIdsLdMatrix);
+      rewriter.create<affine::AffineApplyOp>(loc, rowMap, threadIdsLdMatrix);
   AffineExpr col = layout.computeDim(1, state, rewriter);
   AffineMap colMap = AffineMap::get(3, 0, col, rewriter.getContext());
   vectorOffsets[1] =
-      rewriter.create<AffineApplyOp>(loc, colMap, threadIdsLdMatrix);
+      rewriter.create<affine::AffineApplyOp>(loc, colMap, threadIdsLdMatrix);
 
   // Then compute the offset for each lane.
   AffineExpr d0, d1, d2;
   bindDims(rewriter.getContext(), d0, d1, d2);
   AffineExpr laneIdModuloEight = (d0 + d1 * 4) % 8;
-  Value laneId = rewriter.create<AffineApplyOp>(
+  Value laneId = rewriter.create<affine::AffineApplyOp>(
       loc, laneIdModuloEight, ArrayRef<Value>({threadIds[0], threadIds[1]}));
   std::array<int, DimType::NumDims> emptyState = {0};
   threadIdsLdMatrix = {zero, laneId, zero};
@@ -482,11 +521,11 @@ static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
   AffineMap rowMap2 = AffineMap::get(3, 0, row2, rewriter.getContext());
   std::array<Value, 2> laneOffsets;
   laneOffsets[0] =
-      rewriter.create<AffineApplyOp>(loc, rowMap2, threadIdsLdMatrix);
+      rewriter.create<affine::AffineApplyOp>(loc, rowMap2, threadIdsLdMatrix);
   AffineExpr col2 = layout.computeDim(1, emptyState, rewriter);
   AffineMap colMap2 = AffineMap::get(3, 0, col2, rewriter.getContext());
   laneOffsets[1] =
-      rewriter.create<AffineApplyOp>(loc, colMap2, threadIdsLdMatrix);
+      rewriter.create<affine::AffineApplyOp>(loc, colMap2, threadIdsLdMatrix);
   SmallVector<Value> newIndices{indices.begin(), indices.end()};
   int64_t laneDim = 0;
   // When transposing we need to swap the lane offsets.
@@ -495,7 +534,8 @@ static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
   }
   for (AffineExpr expr : permutationMap.getResults()) {
     auto dimExpr = expr.dyn_cast<AffineDimExpr>();
-    if (!dimExpr) continue;
+    if (!dimExpr)
+      continue;
     unsigned pos = dimExpr.getPosition();
     newIndices[pos] = rewriter.create<arith::AddIOp>(
         loc, vectorOffsets[laneDim], newIndices[pos]);
@@ -503,7 +543,7 @@ static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
         loc, laneOffsets[laneDim++], newIndices[pos]);
   }
   Type vecType = VectorType::get(
-      {1, 2}, memrefValue.getType().cast<MemRefType>().getElementType());
+      {1, 2}, llvm::cast<MemRefType>(memrefValue.getType()).getElementType());
   Value el = rewriter.create<nvgpu::LdMatrixOp>(loc, vecType, memrefValue,
                                                 newIndices, transpose, 1);
   return el;
@@ -517,11 +557,12 @@ static void distributeTransferReads(vector::TransferReadOp readOp,
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(readOp);
   Value result = readOp.getResult();
-  if (!layoutMap.count(result)) return;
+  if (!layoutMap.count(result))
+    return;
   Value source = readOp.getSource();
   Location loc = readOp.getLoc();
   SmallVector<Value> indices = readOp.getIndices();
-  Type elementType = source.getType().cast<ShapedType>().getElementType();
+  Type elementType = llvm::cast<ShapedType>(source.getType()).getElementType();
   std::array<Value, 3> threadIds = {
       rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::x),
       rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::y),
@@ -586,14 +627,19 @@ static void distributeContracts(vector::ContractionOp contractOp,
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(contractOp);
   Value lhs = contractOp.getLhs();
-  if (!layoutMap.count(lhs)) return;
-  if (!simdToSimtMap.count(lhs)) return;
-  Type elementType = lhs.getType().cast<ShapedType>().getElementType();
+  if (!layoutMap.count(lhs))
+    return;
+  if (!simdToSimtMap.count(lhs))
+    return;
+  Type elementType = llvm::cast<ShapedType>(lhs.getType()).getElementType();
   Value rhs = contractOp.getRhs();
-  if (!layoutMap.count(rhs)) return;
-  if (!simdToSimtMap.count(rhs)) return;
+  if (!layoutMap.count(rhs))
+    return;
+  if (!simdToSimtMap.count(rhs))
+    return;
   Value acc = contractOp.getAcc();
-  if (!simdToSimtMap.count(acc)) return;
+  if (!simdToSimtMap.count(acc))
+    return;
   Location loc = contractOp.getLoc();
   Value contractResult = contractOp.getResult();
   Layout lhsLayout = layoutMap.at(lhs);
@@ -647,8 +693,10 @@ static void distributeTransferWrites(vector::TransferWriteOp writeOp,
       rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::x),
       rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::y),
       rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::z)};
-  if (!layoutMap.count(vector)) return;
-  if (!simdToSimtMap.count(vector)) return;
+  if (!layoutMap.count(vector))
+    return;
+  if (!simdToSimtMap.count(vector))
+    return;
   Layout layout = layoutMap.at(vector);
   std::array<int, DimType::NumDims> state;
   for (int b0 = 0; b0 < layout.shape[DimType::Batch0]; b0++) {
@@ -677,6 +725,10 @@ static void distributeTransferWrites(vector::TransferWriteOp writeOp,
   ops.insert(writeOp);
 }
 
+static bool isBatchId(int dimType) {
+  return ((dimType == DimType::Batch0) || (dimType == DimType::Batch1));
+}
+
 static bool isLaneId(int dimType) {
   return ((dimType == DimType::LaneIdX) || (dimType == DimType::LaneIdY) ||
           (dimType == DimType::LaneIdZ));
@@ -689,7 +741,8 @@ static bool isVectorId(int dimType) {
 
 static int getLaneIdIndex(std::array<int, 4> &order) {
   for (int i = 0; i < 4; i++) {
-    if (isLaneId(order[i])) return i;
+    if (isLaneId(order[i]))
+      return i;
   }
   return -1;
 }
@@ -697,7 +750,8 @@ static int getLaneIdIndex(std::array<int, 4> &order) {
 static int isSingleLaneIdReduced(std::array<int, 4> &order) {
   int count{0};
   for (int i = 0; i < 4; i++) {
-    if (isLaneId(order[i])) count++;
+    if (isLaneId(order[i]))
+      count++;
   }
   return count == 1;
 }
@@ -705,7 +759,8 @@ static int isSingleLaneIdReduced(std::array<int, 4> &order) {
 static int getVecSizes(std::array<int, 4> &order, const Layout &layout) {
   int size = 1;
   for (int i = 0; i < 4; i++) {
-    if (isVectorId(i)) size *= layout.shape[i];
+    if (isVectorId(i))
+      size *= layout.shape[i];
   }
   return size;
 }
@@ -734,6 +789,25 @@ static void iterate(int dimType, ArrayRef<int> order,
   }
 }
 
+/// Computes the 4D SIMT vector index using the current value
+/// of the induction variables of the loops being iterated
+/// (state) [b0, b1, lz, ly, lx, vz, vy, vx]
+/// and the layout shape.
+/// Dim 0 of the SIMT vector maps to b0
+/// Dim 1 of the SIMT vector maps to b1
+/// Dim 2 of the SIMT vector maps to vy * VZ + vz
+/// Dim 3 of the SIMT vector maps to vx
+/// where VZ is the shape of the VectorZ dimension of the layout.
+static SmallVector<int64_t>
+getIndicesFromState(std::array<int, DimType::NumDims> &state, Layout &layout) {
+  SmallVector<int64_t> indices{state[DimType::Batch0], state[DimType::Batch1],
+                               state[DimType::VecIdY] *
+                                       layout.shape[DimType::VecIdZ] +
+                                   state[DimType::VecIdZ],
+                               state[DimType::VecIdX]};
+  return indices;
+}
+
 static void distributeReductionBroadcastTranspose(
     vector::MultiDimReductionOp reductionOp, vector::BroadcastOp broadcastOp,
     vector::TransposeOp transposeOp, DenseMap<Value, Layout> &layoutMap,
@@ -742,22 +816,29 @@ static void distributeReductionBroadcastTranspose(
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(reductionOp);
   Value source = reductionOp.getSource();
-  Type elementType = source.getType().cast<ShapedType>().getElementType();
-  if (!layoutMap.count(source)) return;
-  if (!simdToSimtMap.count(source)) return;
-  if (!broadcastOp) return;
+  Type elementType = llvm::cast<ShapedType>(source.getType()).getElementType();
+  if (!layoutMap.count(source))
+    return;
+  if (!simdToSimtMap.count(source))
+    return;
+  if (!broadcastOp)
+    return;
+  if (!transposeOp)
+    return;
   Location loc = reductionOp.getLoc();
   Layout layout = layoutMap.at(source);
-  auto reductionDims = llvm::to_vector<4>(
-      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  auto reductionDims =
+      llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
   vector::CombiningKind combiningKind = reductionOp.getKind();
   // Only support reduction on one dimension
-  if (reductionDims.size() > 1) return;
+  if (reductionDims.size() > 1)
+    return;
   int reductionDim = reductionDims[0].getInt();
   std::array<int, 4> reductionOrder = layout.order[reductionDim];
   std::array<int, 4> parallelOrder = layout.order[!reductionDim];
   Value acc = reductionOp.getAcc();
-  if (!simdToSimtMap.count(acc)) return;
+  if (!simdToSimtMap.count(acc))
+    return;
   SmallVector<int64_t> vecShape{
       layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
       layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
@@ -766,103 +847,105 @@ static void distributeReductionBroadcastTranspose(
   Value output = rewriter.create<arith::ConstantOp>(
       loc, vecType, rewriter.getZeroAttr(vecType));
 
-  if (!isSingleLaneIdReduced(reductionOrder)) return;
+  if (!isSingleLaneIdReduced(reductionOrder))
+    return;
   int dimIndex = getLaneIdIndex(reductionOrder);
   int dimType = reductionOrder[dimIndex];
   int offset{0};
   switch (dimType) {
-    case DimType::LaneIdX:
-      offset = 1;
-      break;
-    case DimType::LaneIdY:
-      offset = layout.shape[DimType::LaneIdX];
-      break;
-    case DimType::LaneIdZ:
-      offset = layout.shape[DimType::LaneIdX] * layout.shape[DimType::LaneIdY];
-      break;
+  case DimType::LaneIdX:
+    offset = 1;
+    break;
+  case DimType::LaneIdY:
+    offset = layout.shape[DimType::LaneIdX];
+    break;
+  case DimType::LaneIdZ:
+    offset = layout.shape[DimType::LaneIdX] * layout.shape[DimType::LaneIdY];
+    break;
   }
 
   bodyType loopBody = [&](std::array<int, DimType::NumDims> &state) {
+    Value vector = simdToSimtMap.at(source);
+    VectorType vectorType = llvm::cast<VectorType>(vector.getType());
+    Type elementType = vectorType.getElementType();
+    bool isFP32 = elementType.isF32();
+    Value mask;
+
+    Value accValue = rewriter.create<vector::ExtractOp>(
+        loc, simdToSimtMap.at(acc), getIndicesFromState(state, layout));
+
+    int index{0};
+    auto zero =
+        rewriter.getZeroAttr(VectorType::get({isFP32 ? 1 : 2}, elementType));
+    Value tmp = rewriter.create<arith::ConstantOp>(loc, zero);
     Value result;
 
-    auto reduce = [&](std::array<int, DimType::NumDims> &state) {
-      Value vector = simdToSimtMap.at(source);
-      int vectorOffset =
-          state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
-          state[DimType::VecIdZ];
-      if (std::find(reductionOrder.begin(), reductionOrder.end(),
-                    DimType::VecIdX) == reductionOrder.end()) {
-        vector = rewriter.create<vector::TransposeOp>(
-            loc, vector, ArrayRef<int64_t>{0, 1, 3, 2});
-        vectorOffset = state[DimType::VecIdX];
+    // Returns vector<1xf32> or vector<2xf16>
+    auto reduceLocal = [&](std::array<int, DimType::NumDims> &state) {
+      Value current = rewriter.create<vector::ExtractOp>(
+          loc, vector, getIndicesFromState(state, layout));
+      tmp = rewriter.create<vector::InsertOp>(loc, current, tmp,
+                                              SmallVector<int64_t>{index});
+      if (!isFP32) {
+        index = !index;
+        if (index)
+          return;
       }
+      result = !result ? tmp
+                       : makeArithReduction(rewriter, loc, combiningKind,
+                                            result, tmp, mask);
+    };
+    iterate(0, reductionOrder, state, layout, reduceLocal);
 
-      vector = rewriter.create<vector::ExtractOp>(
-          loc, vector,
-          SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
-                               vectorOffset});
-      ArrayRef<int64_t> vShape = vector.getType().cast<VectorType>().getShape();
-      assert(vShape.size() == 1);
-
-      uint32_t size{32};
-      Value mask;
+    auto reduceGlobal = [&]() {
       for (uint64_t i = offset; i < offset * layout.shape[dimType]; i <<= 1) {
-        Value packed = packVectorToSupportedWidth(loc, rewriter, vector);
-        auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
-                                                         gpu::ShuffleMode::XOR);
+        Value packed = packVectorToSupportedWidth(loc, rewriter, result);
+        auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
+            loc, packed, i, warpSize, gpu::ShuffleMode::XOR);
         Value unpacked =
             unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
-                           vector.getType().cast<VectorType>());
-        vector = makeArithReduction(rewriter, loc, combiningKind, unpacked,
-                                    vector, mask);
+                           llvm::cast<VectorType>(result.getType()));
+        result = makeArithReduction(rewriter, loc, combiningKind, unpacked,
+                                    result, mask);
       }
 
-      // Since this is a broadcasted tensor, we only need to extract the 0th
-      // element
-      if (!result)
-        result = rewriter.create<vector::ExtractOp>(
-            loc, simdToSimtMap.at(acc),
-            SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
-                                 vectorOffset, 0});
-
-      for (int i = 0; i < vShape[0]; i++) {
-        Value v = rewriter.create<vector::ExtractOp>(loc, vector,
-                                                     SmallVector<int64_t>{i});
-        result =
-            makeArithReduction(rewriter, loc, combiningKind, result, v, mask);
+      // Convert to f16 or f32
+      Value v0 = rewriter.create<vector::ExtractOp>(loc, result,
+                                                    SmallVector<int64_t>{0});
+      if (isFP32) {
+        result = makeArithReduction(rewriter, loc, combiningKind, v0, accValue,
+                                    mask);
+      } else {
+        Value v1 = rewriter.create<vector::ExtractOp>(loc, result,
+                                                      SmallVector<int64_t>{1});
+        result = makeArithReduction(rewriter, loc, combiningKind, v0, v1, mask);
+        result = makeArithReduction(rewriter, loc, combiningKind, result,
+                                    accValue, mask);
       }
     };
-
-    // Iterate only over batch dimension
-    std::array<int, 1> batchDim = {{reductionOrder.back()}};
-    iterate(0, batchDim, state, layout, reduce);
+    reduceGlobal();
 
     auto broadcastResult = [&](std::array<int, DimType::NumDims> &state) {
       output = rewriter.create<vector::InsertOp>(
-          loc, result, output,
-          SmallVector<int64_t>{
-              state[DimType::Batch0], state[DimType::Batch1],
-              state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
-                  state[DimType::VecIdZ],
-              state[DimType::VecIdX]});
+          loc, result, output, getIndicesFromState(state, layout));
     };
-
     // Broadcast result to same shape as original
     iterate(0, reductionOrder, state, layout, broadcastResult);
+
+    // Reset reduction state
+    for (int type : reductionOrder)
+      state[type] = 0;
   };
 
   std::array<int, DimType::NumDims> state;
   state.fill(0);
   iterate(0, parallelOrder, state, layout, loopBody);
 
-  if (transposeOp)
-    simdToSimtMap.try_emplace(transposeOp.getResult(), output);
-  else
-    simdToSimtMap.try_emplace(broadcastOp.getResult(), output);
+  simdToSimtMap.try_emplace(transposeOp.getResult(), output);
 
   ops.insert(reductionOp);
   ops.insert(broadcastOp);
-  if (transposeOp) ops.insert(transposeOp);
+  ops.insert(transposeOp);
 }
 
 static void replaceForOpWithNewSignature(RewriterBase &rewriter,
@@ -878,7 +961,7 @@ static void replaceForOpWithNewSignature(RewriterBase &rewriter,
   // We will be using dummy values instead of the old operands
   // only for those operands that are being distributed
   SmallVector<Value> newOperands;
-  auto operands = llvm::to_vector<4>(loop.getIterOperands());
+  auto operands = llvm::to_vector(loop.getIterOperands());
   for (auto operand : operands) {
     if (!layoutMap.count(operand)) {
       newOperands.push_back(operand);
@@ -929,7 +1012,7 @@ static void replaceForOpWithNewSignature(RewriterBase &rewriter,
 
 static void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
                           DenseMap<Value, Value> &simdToSimtMap,
-                          IRRewriter &rewriter,
+                          RewriterBase &rewriter,
                           llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(forOp);
@@ -948,16 +1031,17 @@ static void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
 static void distributeYield(scf::YieldOp yieldOp,
                             DenseMap<Value, Layout> &layoutMap,
                             DenseMap<Value, Value> &simdToSimtMap,
-                            IRRewriter &rewriter,
+                            RewriterBase &rewriter,
                             llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(yieldOp);
 
   // Update yield op with additional operand
   auto loop = cast<scf::ForOp>(yieldOp->getParentOp());
-  auto yieldOperands = llvm::to_vector<4>(yieldOp.getOperands());
+  auto yieldOperands = llvm::to_vector(yieldOp.getOperands());
   for (const auto &operand : llvm::enumerate(yieldOp.getOperands())) {
-    if (!simdToSimtMap.count(operand.value())) continue;
+    if (!simdToSimtMap.count(operand.value()))
+      continue;
     // Replace the yield of old value with the for op argument to make it easier
     // to remove the dead code.
     yieldOperands[operand.index()] = loop.getIterOperands()[operand.index()];
@@ -970,17 +1054,20 @@ static void distributeYield(scf::YieldOp yieldOp,
 static void distributeConstants(arith::ConstantOp constantOp,
                                 DenseMap<Value, Layout> &layoutMap,
                                 DenseMap<Value, Value> &simdToSimtMap,
-                                IRRewriter &rewriter,
+                                RewriterBase &rewriter,
                                 llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(constantOp);
   Value constant = constantOp.getResult();
-  if (!layoutMap.count(constant)) return;
-  auto attr = constantOp.getValue().cast<DenseElementsAttr>();
+  if (!layoutMap.count(constant))
+    return;
+  auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
   // Only handle splat values for now
-  if (!attr.isSplat()) return;
+  if (!attr.isSplat())
+    return;
   Layout layout = layoutMap.at(constant);
-  Type elementType = constant.getType().cast<VectorType>().getElementType();
+  Type elementType =
+      llvm::cast<VectorType>(constant.getType()).getElementType();
   auto vType = VectorType::get(
       {layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
        layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
@@ -995,15 +1082,18 @@ static void distributeConstants(arith::ConstantOp constantOp,
 static void distributeElementwise(Operation *op,
                                   DenseMap<Value, Layout> &layoutMap,
                                   DenseMap<Value, Value> &simdToSimtMap,
-                                  IRRewriter &rewriter,
+                                  RewriterBase &rewriter,
                                   llvm::SetVector<Operation *> &ops) {
-  if (!OpTrait::hasElementwiseMappableTraits(op)) return;
-  if (op->getNumResults() != 1) return;
+  if (!OpTrait::hasElementwiseMappableTraits(op))
+    return;
+  if (op->getNumResults() != 1)
+    return;
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
   SmallVector<Value> newOperands;
   for (auto operand : op->getOperands()) {
-    if (!simdToSimtMap.count(operand)) return;
+    if (!simdToSimtMap.count(operand))
+      return;
     newOperands.push_back(simdToSimtMap.at(operand));
   }
   SmallVector<Type> resultTypes{newOperands.front().getType()};
@@ -1014,8 +1104,154 @@ static void distributeElementwise(Operation *op,
   ops.insert(op);
 }
 
+static Value resolveBatchConflict(SmallVectorImpl<int> &mismatchedDims,
+                                  Value vector, const Layout &targetLayout,
+                                  const Layout &currentLayout,
+                                  RewriterBase &rewriter, Location loc) {
+  assert(mismatchedDims.size() == 1);
+  int batchDim = mismatchedDims[0];
+  VectorType vectorType = llvm::cast<VectorType>(vector.getType());
+  ArrayRef<int64_t> vectorShape = vectorType.getShape();
+  SmallVector<int64_t> offsets(vectorShape.size(), 0);
+  SmallVector<int64_t> strides(vectorShape.size(), 1);
+  SmallVector<int64_t> shape(vectorShape);
+  shape[batchDim] = targetLayout.shape[batchDim];
+
+  Value newVector;
+  // If target layout shape is less than current, then extract a slice,
+  // otherwise broadcast
+  if (currentLayout.shape[batchDim] > targetLayout.shape[batchDim]) {
+    newVector = rewriter.create<vector::ExtractStridedSliceOp>(
+        loc, vector, offsets, shape, strides);
+  } else {
+    Value transposedVector = vector;
+    if (batchDim == DimType::Batch1) {
+      transposedVector = rewriter.create<vector::TransposeOp>(
+          loc, transposedVector, ArrayRef<int64_t>{1, 0, 2, 3});
+      std::swap(shape[DimType::Batch0], shape[DimType::Batch1]);
+    }
+    transposedVector = rewriter.create<vector::ExtractOp>(loc, transposedVector,
+                                                          ArrayRef<int64_t>{0});
+    Type elementType = vectorType.getElementType();
+    newVector = rewriter.create<vector::BroadcastOp>(
+        loc, VectorType::get(shape, elementType), transposedVector);
+    if (batchDim == DimType::Batch1) {
+      newVector = rewriter.create<vector::TransposeOp>(
+          loc, newVector, ArrayRef<int64_t>{1, 0, 2, 3});
+    }
+  }
+  return newVector;
+}
+
+static Value resolveBatchVectorConflict(SmallVectorImpl<int> &mismatchedDims,
+                                        Value vector,
+                                        const Layout &targetLayout,
+                                        const Layout &currentLayout,
+                                        RewriterBase &rewriter, Location loc) {
+  int numMismatchedVecDims{0};
+  int vecDim, batchDim;
+  for (auto dimType : mismatchedDims) {
+    if (isVectorId(dimType)) {
+      numMismatchedVecDims++;
+      vecDim = dimType;
+    }
+    if (isBatchId(dimType))
+      batchDim = dimType;
+  }
+  // Only support single vector mismatched dim
+  if (numMismatchedVecDims > 1)
+    return Value{};
+  // Assumes target layout vector dim > current layout vector dim
+  int ratio = ((float)targetLayout.shape[vecDim] / currentLayout.shape[vecDim]);
+
+  // Check that the batch can be used to compensate for vector layout
+  // differences
+  if (currentLayout.shape[batchDim] != targetLayout.shape[batchDim] * ratio)
+    return Value{};
+
+  SmallVector<int64_t> vecShape{
+      targetLayout.shape[DimType::Batch0], targetLayout.shape[DimType::Batch1],
+      targetLayout.shape[DimType::VecIdZ] * targetLayout.shape[DimType::VecIdY],
+      targetLayout.shape[DimType::VecIdX]};
+  Type elementType = llvm::cast<VectorType>(vector.getType()).getElementType();
+  auto vecType = VectorType::get(vecShape, elementType);
+  Value newVector = rewriter.create<arith::ConstantOp>(
+      loc, vecType, rewriter.getZeroAttr(vecType));
+  for (int i = 0; i < currentLayout.shape[DimType::Batch0]; i++) {
+    for (int j = 0, offset = 0; j < currentLayout.shape[DimType::Batch1]; j++) {
+      Value slice = rewriter.create<vector::ExtractOp>(
+          loc, vector, SmallVector<int64_t>{i, j});
+      int newI = batchDim == DimType::Batch0 ? i / ratio : i;
+      int newJ = batchDim == DimType::Batch0 ? j : j / ratio;
+      int newK = vecDim == DimType::VecIdX ? 0 : ratio * offset;
+      int newL = vecDim == DimType::VecIdX ? ratio * offset : 0;
+      SmallVector<int64_t> offsets{newI, newJ, newK, newL};
+      SmallVector<int64_t> strides{1, 1};
+      newVector = rewriter.create<vector::InsertStridedSliceOp>(
+          loc, slice, newVector, offsets, strides);
+      offset = (offset + 1) % ratio;
+    }
+  }
+  return newVector;
+}
+
+static void distributeLayoutConflicts(vector::ShapeCastOp op,
+                                      DenseMap<Value, Layout> &layoutMap,
+                                      DenseMap<Value, Value> &simdToSimtMap,
+                                      RewriterBase &rewriter,
+                                      llvm::SetVector<Operation *> &ops) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(op);
+  Value source = op.getSource();
+  if (!layoutMap.count(source) || !simdToSimtMap.count(source))
+    return;
+  Layout currentLayout = layoutMap.at(source);
+  Value result = op.getResult();
+  if (!layoutMap.count(result))
+    return;
+  Layout targetLayout = layoutMap.at(result);
+
+  Value resolvedResult = simdToSimtMap.at(source);
+  // For row and col of the vector, resolve layout differences
+  for (int i = 0; i < currentLayout.order.size(); i++) {
+    if (!resolvedResult)
+      return;
+    // Check which dimension(s) are mismatched.
+    SmallVector<int> mismatchedDims;
+    for (auto dimType : currentLayout.order[i]) {
+      if (currentLayout.shape[dimType] != targetLayout.shape[dimType]) {
+        mismatchedDims.push_back(dimType);
+      }
+    }
+    if (mismatchedDims.empty())
+      continue;
+    // If any of the mismatched dims are laneId, this layout conflict cannot be
+    // resolved.
+    if (llvm::any_of(mismatchedDims,
+                     [](int dimType) { return isLaneId(dimType); }))
+      return;
+    // Pure vector conflicts can be resolved, but not supported yet
+    if (llvm::all_of(mismatchedDims,
+                     [](int dimType) { return isVectorId(dimType); }))
+      return;
+    if (llvm::all_of(mismatchedDims,
+                     [](int dimType) { return isBatchId(dimType); })) {
+      resolvedResult =
+          resolveBatchConflict(mismatchedDims, resolvedResult, targetLayout,
+                               currentLayout, rewriter, op->getLoc());
+      continue;
+    }
+    resolvedResult =
+        resolveBatchVectorConflict(mismatchedDims, resolvedResult, targetLayout,
+                                   currentLayout, rewriter, op->getLoc());
+  }
+
+  simdToSimtMap.try_emplace(result, resolvedResult);
+  ops.insert(op);
+}
+
 static void eraseOps(llvm::SetVector<Operation *> &opsToErase,
-                     IRRewriter &rewriter) {
+                     RewriterBase &rewriter) {
   for (int i = opsToErase.size() - 1; i >= 0; i--) {
     assert(opsToErase[i]->getUses().empty());
     rewriter.eraseOp(opsToErase[i]);
@@ -1034,7 +1270,7 @@ static void collectOperations(Operation *rootOp,
   }
 }
 
-}  // namespace
+} // namespace
 
 static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
   // Set up the parallel/reduction structure in right form.
@@ -1047,22 +1283,23 @@ static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
         vector::isParallelIterator(iteratorTypes[1]) &&
         vector::isReductionIterator(iteratorTypes[2])))
     return false;
-  SmallVector<AffineMap, 4> maps = contractOp.getIndexingMapsArray();
+  SmallVector<AffineMap> maps = contractOp.getIndexingMapsArray();
   return maps == infer({{m, k}, {n, k}, {m, n}});
 }
 
-void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
+void doLayoutAnalysisAndDistribution(RewriterBase &rewriter,
                                      func::FuncOp funcOp) {
   // First walk through all the MMA ops and set their layouts
   DenseMap<Value, Layout> layoutMap;
   funcOp.walk([&](Operation *op) {
     if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-      if (!isMatmulTransposeB(contractOp)) return WalkResult::advance();
+      if (!isMatmulTransposeB(contractOp))
+        return WalkResult::advance();
       Value lhs = contractOp.getLhs();
       Value rhs = contractOp.getRhs();
       Value acc = contractOp.getAcc();
       Value result = contractOp.getResult();
-      setMMALayout(lhs, rhs, acc, result, layoutMap);
+      setMMALayout(lhs, rhs, acc, result, layoutMap, op, rewriter);
     }
     return WalkResult::advance();
   });
@@ -1111,6 +1348,10 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
       distributeConstants(constantOp, layoutMap, simdToSimtMap, rewriter,
                           opsToErase);
     }
+    if (auto conflictOp = dyn_cast<vector::ShapeCastOp>(op)) {
+      distributeLayoutConflicts(conflictOp, layoutMap, simdToSimtMap, rewriter,
+                                opsToErase);
+    }
     distributeElementwise(op, layoutMap, simdToSimtMap, rewriter, opsToErase);
   }
 
@@ -1118,4 +1359,4 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
   eraseOps(opsToErase, rewriter);
 }
 
-}  // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler

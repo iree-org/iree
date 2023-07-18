@@ -9,7 +9,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/vm/instance.h"
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_buffer, iree_vm_buffer_t);
@@ -25,11 +24,12 @@ static iree_status_t iree_vm_buffer_map(const iree_vm_buffer_t* buffer,
   length &= ~(alignment - 1);
   const iree_host_size_t end = offset + length;
   if (IREE_UNLIKELY(end > buffer->data.data_length)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "out-of-bounds access detected (offset=%zu, "
-                            "length=%zu, alignment=%zu, buffer length=%zu)",
-                            offset, length, alignment,
-                            buffer->data.data_length);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "out-of-bounds access detected (offset=%" PRIhsz
+        ", "
+        "length=%" PRIhsz ", alignment=%" PRIhsz ", buffer length=%" PRIhsz ")",
+        offset, length, alignment, buffer->data.data_length);
   }
   *out_data = buffer->data.data + offset;
   *out_data_length = length;
@@ -323,4 +323,14 @@ iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
   };
   return iree_vm_instance_register_type(instance, &descriptor,
                                         &iree_vm_buffer_registration);
+}
+
+iree_status_t iree_vm_buffer_resolve_types(iree_vm_instance_t* instance) {
+  iree_vm_buffer_registration =
+      iree_vm_instance_lookup_type(instance, IREE_SV("vm.buffer"));
+  return iree_vm_buffer_registration
+             ? iree_ok_status()
+             : iree_make_status(
+                   IREE_STATUS_INTERNAL,
+                   "VM type `vm.buffer` not registered with the instance");
 }

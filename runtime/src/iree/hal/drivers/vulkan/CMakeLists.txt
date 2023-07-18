@@ -19,6 +19,8 @@ iree_cc_library(
     "vulkan_driver.h"
   SRCS
     "api.cc"
+    "base_buffer.c"
+    "base_buffer.h"
     "builtin_executables.cc"
     "builtin_executables.h"
     "command_queue.h"
@@ -35,8 +37,10 @@ iree_cc_library(
     "extensibility_util.cc"
     "extensibility_util.h"
     "handle_util.h"
-    "internal_vk_mem_alloc.cc"
-    "internal_vk_mem_alloc.h"
+    "native_allocator.cc"
+    "native_allocator.h"
+    "native_buffer.cc"
+    "native_buffer.h"
     "native_event.cc"
     "native_event.h"
     "native_executable.cc"
@@ -53,8 +57,8 @@ iree_cc_library(
     "tracing.h"
     "vma_allocator.cc"
     "vma_allocator.h"
-    "vma_buffer.cc"
-    "vma_buffer.h"
+    "vma_impl.cc"
+    "vma_impl.h"
     "vulkan_device.cc"
     "vulkan_driver.cc"
     "vulkan_headers.h"
@@ -62,12 +66,10 @@ iree_cc_library(
     ::dynamic_symbols
     Vulkan::Headers
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
     iree::hal::drivers::vulkan::builtin
     iree::hal::drivers::vulkan::util::arena
@@ -94,9 +96,7 @@ iree_cc_library(
   DEPS
     Vulkan::Headers
     iree::base
-    iree::base::core_headers
     iree::base::internal::dynamic_library
-    iree::base::tracing
     iree::hal::drivers::vulkan::util::ref_ptr
   PUBLIC
 )

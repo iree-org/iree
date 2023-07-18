@@ -56,17 +56,20 @@ TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
 }
 SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
   SmallVector<tensor::DimOp> result;
-  for (Operation *op : dimOps) result.push_back(cast<tensor::DimOp>(op));
+  for (Operation *op : dimOps)
+    result.push_back(cast<tensor::DimOp>(op));
   return result;
 }
 void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
   IRRewriter::Listener::notifyOperationRemoved(op);
-  if (isa<tensor::DimOp>(op)) dimOps.erase(op);
+  if (isa<tensor::DimOp>(op))
+    dimOps.erase(op);
 }
 
 void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
   IRRewriter::Listener::notifyOperationInserted(op);
-  if (isa<tensor::DimOp>(op)) dimOps.insert(op);
+  if (isa<tensor::DimOp>(op))
+    dimOps.insert(op);
 }
 
 namespace iree_compiler {
@@ -78,10 +81,13 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
   for (tensor::DimOp dimOp : dimOps) {
     // Only DimOps with static indices are supported.
     std::optional<int64_t> idx = dimOp.getConstantIndex();
-    if (!idx.has_value()) continue;
+    if (!idx.has_value())
+      continue;
     // Only DimOps with ranked tensors are supported.
-    auto tensorType = dimOp.getSource().getType().dyn_cast<RankedTensorType>();
-    if (!tensorType) continue;
+    auto tensorType =
+        llvm::dyn_cast<RankedTensorType>(dimOp.getSource().getType());
+    if (!tensorType)
+      continue;
 
     if (!tensorType.isDynamicDim(*idx)) {
       // Rewrite static dimension with constant.
@@ -99,7 +105,8 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
       return failure();
     unsigned ctr = 0;
     for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
-      if (tensorType.isDynamicDim(i)) ++ctr;
+      if (tensorType.isDynamicDim(i))
+        ++ctr;
     rewriter.replaceOp(dimOp, dynamicDims[ctr]);
   }
 
@@ -141,9 +148,9 @@ static bool hasFusionGroupsAttribute(Operation *op) {
 static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
   SmallVector<int64_t, 1> fusionGroups = {};
   if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    fusionGroups = llvm::to_vector<1>(llvm::map_range(
-        fusionGroupsAttr,
-        [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+    fusionGroups = llvm::map_to_vector<1>(fusionGroupsAttr, [](Attribute attr) {
+      return llvm::cast<IntegerAttr>(attr).getInt();
+    });
   }
   return fusionGroups;
 }
@@ -157,7 +164,7 @@ static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
 static bool isInFusionGroup(Operation *op, unsigned targetGroup) {
   if (ArrayAttr opGroupAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
     return llvm::any_of(opGroupAttr, [&targetGroup](Attribute attr) {
-      return attr.cast<IntegerAttr>().getInt() == targetGroup;
+      return llvm::cast<IntegerAttr>(attr).getInt() == targetGroup;
     });
   }
   return false;
@@ -209,15 +216,33 @@ static Value getSourceOfPackLikeOp(Operation *op) {
 }
 static RankedTensorType getSourceTypeOfPackLikeOp(Operation *op) {
   Value source = getSourceOfPackLikeOp(op);
-  if (!source) return nullptr;
-  return source.getType().cast<RankedTensorType>();
+  if (!source)
+    return nullptr;
+  return llvm::cast<RankedTensorType>(source.getType());
 }
 
-/// Returns true if the operation is an `unpack` op or an `unset_encoding` op
-/// that has unpack semantics
-// TODO(ravishankarm): This seems like a use case for interface.
-static bool isUnPackLikeOp(Operation *op) {
-  return isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op);
+/// Returns true if the operation is an `unpack` op or an `unset_encoding` op,
+/// or an `extract_slice` op whose source operand matches those criteria,
+/// recursively.
+/// The idea is that we want to ensure that `extract_slice` ops can't prevent
+/// fusion between a `unset_encoding` producer and some linalg consumer. In
+///   %0 = unset_encoding ...
+///   %1 = extract_slice %0 ...
+///   %2 = linalg.generic ins(%1) ...
+/// we are not content to be fusing %1 into %0, we also want to be fusing %2,
+/// so we want to prevent %1 from acting as a consumer fusion barrier.
+static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
+  if (isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op)) {
+    return true;
+  }
+  if (isa<tensor::ExtractSliceOp>(op)) {
+    Value source = op->getOperand(0);
+    Operation *producer = source.getDefiningOp();
+    if (isUnpackLikeOpViaExtractSliceOps(producer)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /// Since `iree_linalg_ext.set_encoding` doesnt have padding semantics a
@@ -243,6 +268,10 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   if (auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(op)) {
     return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
   }
+  if (auto unsetEncodingOp = dyn_cast<IREE::LinalgExt::UnsetEncodingOp>(op)) {
+    return llvm::SmallBitVector(unsetEncodingOp.getResultType().getRank(),
+                                true);
+  }
 
   auto interfaceOp = dyn_cast<TilingInterface>(op);
   if (!interfaceOp) {
@@ -253,7 +282,8 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
       interfaceOp.getLoopIteratorTypes();
   llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
   for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() != utils::IteratorType::parallel) break;
+    if (iteratorType.value() != utils::IteratorType::parallel)
+      break;
     parallelLoops.set(iteratorType.index());
   }
   return parallelLoops;
@@ -263,8 +293,10 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 /// drop the result exprs that are constant zeros, the `map` will become an
 /// identity.
 static bool isIdentityMapWithZeros(AffineMap map) {
-  if (map.getNumSymbols() != 0) return false;
-  if (map.isEmpty()) return false;
+  if (map.getNumSymbols() != 0)
+    return false;
+  if (map.isEmpty())
+    return false;
   unsigned dimsSeen = 0;
   for (auto result : map.getResults()) {
     bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
@@ -278,14 +310,15 @@ static bool isIdentityMapWithZeros(AffineMap map) {
                              return constExpr.getValue() == 0;
                            })
                            .Default([](AffineExpr) { return false; });
-    if (!isValidExpr) return false;
+    if (!isValidExpr)
+      return false;
   }
   return dimsSeen == map.getNumDims();
 }
 
-static bool matchIteratorTypes(
-    const llvm::SmallBitVector &rootOuterParallelLoop,
-    const llvm::SmallBitVector &candidateOuterParallelLoop) {
+static bool
+matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
+                   const llvm::SmallBitVector &candidateOuterParallelLoop) {
   // If the candidate is not all parallel, then its loop configuration should be
   // the same as the root.
   if (candidateOuterParallelLoop.size() != candidateOuterParallelLoop.count()) {
@@ -297,7 +330,8 @@ static bool matchIteratorTypes(
   for (int pos : llvm::seq<int>(0, rootOuterParallelLoop.size())) {
     // If we reach the end of the outer loops of the root, break out of the
     // loop.
-    if (!rootOuterParallelLoop.test(pos)) break;
+    if (!rootOuterParallelLoop.test(pos))
+      break;
     // If the root loop is parallel, the candidate loop should also be parallel.
     if (pos >= candidateOuterParallelLoop.size() ||
         !candidateOuterParallelLoop.test(pos))
@@ -312,7 +346,8 @@ static bool hasCompatibleOuterParallelLoops(
     OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
   auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
   auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
-  if (!producer || !consumer) return false;
+  if (!producer || !consumer)
+    return false;
 
   llvm::SmallBitVector producerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(producer.getOperation()));
@@ -324,8 +359,8 @@ static bool hasCompatibleOuterParallelLoops(
     return false;
   }
 
-  auto producerIndexingMap =
-      producer.getIndexingMapMatchingResult(operand.get().cast<OpResult>());
+  auto producerIndexingMap = producer.getIndexingMapMatchingResult(
+      llvm::cast<OpResult>(operand.get()));
   auto consumerIndexingMap = consumer.getMatchingIndexingMap(&operand);
   if (!producerIndexingMap.isProjectedPermutation() ||
       !consumerIndexingMap.isProjectedPermutation()) {
@@ -349,8 +384,9 @@ static bool hasCompatibleOuterParallelLoops(
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
-static std::optional<OpOperand *> getFusableUse(
-    Operation *op, DominanceInfo const &dominanceInfo, bool fuseMultiUse) {
+static std::optional<OpOperand *>
+getFusableUse(Operation *op, DominanceInfo const &dominanceInfo,
+              bool fuseMultiUse) {
   if (!fuseMultiUse && llvm::count_if(op->getUses(), [](OpOperand &use) {
                          return !isa<tensor::DimOp>(use.getOwner());
                        }) != 1) {
@@ -360,14 +396,16 @@ static std::optional<OpOperand *> getFusableUse(
   // Collect non-dim users.
   SmallVector<Operation *> nonDimUsers;
   for (Operation *user : op->getUsers()) {
-    if (isa<tensor::DimOp>(user)) continue;
+    if (isa<tensor::DimOp>(user))
+      continue;
     nonDimUsers.push_back(user);
   }
 
   // Find the use in a non-dim user that dominates all other non-dim users.
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
-    if (isa<tensor::DimOp>(user)) continue;
+    if (isa<tensor::DimOp>(user))
+      continue;
     if (llvm::all_of(nonDimUsers, [&](Operation *c) {
           return dominanceInfo.dominates(user, c);
         })) {
@@ -383,7 +421,8 @@ static bool areOpsFusable(Operation *producer, Operation *consumer,
   // Collect all the uses from producer to consumer.
   SmallVector<OpOperand *> allUses;
   for (OpOperand &producerUse : producer->getUses()) {
-    if (producerUse.getOwner() != consumer) continue;
+    if (producerUse.getOwner() != consumer)
+      continue;
     allUses.push_back(&producerUse);
   }
 
@@ -408,7 +447,8 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 
   // Check that the owner is a `generic` op.
   auto genericOp = dyn_cast<linalg::GenericOp>(inOperand->getOwner());
-  if (!genericOp) return false;
+  if (!genericOp)
+    return false;
 
   // All loops to be parallel.
   if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
@@ -416,11 +456,13 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   }
 
   /// The input operand cannot be an init operand already.
-  if (genericOp.isDpsInit(inOperand)) return false;
+  if (genericOp.isDpsInit(inOperand))
+    return false;
 
   // If the init operand value is used it cannot be reused for the input
   // operand.
-  if (genericOp.payloadUsesValueFromOperand(initOperand)) return false;
+  if (genericOp.payloadUsesValueFromOperand(initOperand))
+    return false;
 
   // Indexing map used to access the input and init have to match.
   if (genericOp.getMatchingIndexingMap(inOperand) !=
@@ -430,22 +472,24 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 
   // Types have to match for the input operand to reuse the buffer from the init
   // operand
-  if (inOperand->get().getType() != initOperand->get().getType()) return false;
+  if (inOperand->get().getType() != initOperand->get().getType())
+    return false;
 
   return true;
 }
 
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
-static bool isFusableWithConsumer(
-    OpOperand &fusedOperand, const llvm::SmallBitVector &rootOuterParallelLoops,
-    FormDispatchRegionsOptions const &options) {
+static bool
+isFusableWithConsumer(OpOperand &fusedOperand,
+                      const llvm::SmallBitVector &rootOuterParallelLoops,
+                      FormDispatchRegionsOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
-  if (isUnPackLikeOp(producer)) {
+  if (isUnpackLikeOpViaExtractSliceOps(producer)) {
     // Fuse `unset_encoding` -> `extract_slice` op since they get folded into
     // `unpack` on materialization.
     if (isa<tensor::ExtractSliceOp>(consumer)) {
@@ -461,10 +505,9 @@ static bool isFusableWithConsumer(
     // could be generalized, but unpack fusion code-generation is harder.
     if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
       return linalg::isElementwise(consumerLinalgOp) &&
-             consumerLinalgOp.getNumLoops() == producer->getResult(0)
-                                                   .getType()
-                                                   .cast<RankedTensorType>()
-                                                   .getRank();
+             consumerLinalgOp.getNumLoops() ==
+                 llvm::cast<RankedTensorType>(producer->getResult(0).getType())
+                     .getRank();
     }
     return false;
   }
@@ -485,7 +528,8 @@ static bool isFusableWithConsumer(
 
   auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
   auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
-  if (!producerLinalgOp || !consumerLinalgOp) return false;
+  if (!producerLinalgOp || !consumerLinalgOp)
+    return false;
 
   // Check that the consumer is all parallel.
   if (consumerLinalgOp.getNumLoops() !=
@@ -501,7 +545,8 @@ static bool isFusableWithConsumer(
   // result of the dispatch. To avoid a stack allocation we have to ensure that
   // all operations can bufferize without needing additional memory.
   for (OpOperand *inputOperand : consumerLinalgOp.getDpsInputOperands()) {
-    if (inputOperand->get().getDefiningOp() != producer) continue;
+    if (inputOperand->get().getDefiningOp() != producer)
+      continue;
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
         !llvm::any_of(
             consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
@@ -550,7 +595,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 
       std::optional<OpOperand *> fusableUse = getFusableUse(
           currRoot, dominanceInfo, /*fuseMultiUse=*/options.fuseMultiUse);
-      if (!fusableUse) continue;
+      if (!fusableUse)
+        continue;
 
       // Analyse the use to see if it is fusable.
       Operation *consumerOp = fusableUse.value()->getOwner();
@@ -569,9 +615,10 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 }
 
 /// Method to check if the consumer of a use can be fused with its producer.
-static bool isFusableWithProducer(
-    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
-    FormDispatchRegionsOptions const &options) {
+static bool
+isFusableWithProducer(OpOperand &operand,
+                      const llvm::SmallBitVector &rootOuterParallelLoops,
+                      FormDispatchRegionsOptions const &options) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
@@ -634,7 +681,8 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
-      if (!producer) continue;
+      if (!producer)
+        continue;
       if (isClonableIntoDispatchOp(producer) ||
           hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
         continue;
@@ -642,7 +690,8 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 
       std::optional<OpOperand *> fusableUse = getFusableUse(
           producer, dominanceInfo, /*fuseMultiUse=*/options.fuseMultiUse);
-      if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
+      if (!fusableUse || fusableUse.value()->getOwner() != candidate)
+        continue;
 
       if (!isFusableWithProducer(operand, rootOuterParallelLoops, options)) {
         continue;
@@ -662,9 +711,10 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 /// be marked to fuse with multiple root operations (i.e. replicated). For now a
 /// very simple heuristic is used below, but the mechanism should be general
 /// enough to capture any heuristic.
-static unsigned decideFusableLinalgOps(
-    FunctionOpInterface funcOp, DominanceInfo const &dominanceInfo,
-    FormDispatchRegionsOptions const &options) {
+static unsigned
+decideFusableLinalgOps(FunctionOpInterface funcOp,
+                       DominanceInfo const &dominanceInfo,
+                       FormDispatchRegionsOptions const &options) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
@@ -677,7 +727,8 @@ static unsigned decideFusableLinalgOps(
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // Start with a root operation and fuse its producers.
-      if (hasFusionGroupsAttribute(&op) || !isRootOp(&op)) continue;
+      if (hasFusionGroupsAttribute(&op) || !isRootOp(&op))
+        continue;
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
@@ -694,7 +745,8 @@ static unsigned decideFusableLinalgOps(
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
-      if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op)) continue;
+      if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op))
+        continue;
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
       // to convert them to splats.
@@ -721,39 +773,12 @@ static unsigned decideFusableLinalgOps(
 // Dispatch region formation
 //===----------------------------------------------------------------------===//
 
-static void buildSetEncodingWorkloadRegion(OpBuilder &builder, Location loc,
-                                           ArrayRef<BlockArgument> args) {
-  auto numWorkgroupsOp =
-      builder.create<Flow::DispatchWorkgroupCountFromSetEncodingOp>(loc, args);
-  builder.create<Flow::ReturnOp>(loc, numWorkgroupsOp.getResults());
-}
-
-static void buildDefaultWorkloadRegion(OpBuilder &builder, Location loc,
-                                       ArrayRef<BlockArgument> args) {
-  auto numWorkgroupsOp =
-      builder.create<Flow::DispatchWorkgroupCountFromDagRootOp>(loc, args);
-  builder.create<Flow::ReturnOp>(loc, numWorkgroupsOp.getResults());
-}
-
-FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
-                                                    Operation *rootOp) {
-  Flow::WorkloadBuilder result;
-  // The workload region of the WorkgroupsOp is populated by the
-  // `regionBuilder` during ConvertRegionToWorkgroups .
-  if (isa<LinalgExt::SetEncodingOp>(rootOp)) {
-    result.regionBuilder = buildSetEncodingWorkloadRegion;
-  } else {
-    result.regionBuilder = buildDefaultWorkloadRegion;
-  }
-
-  return result;
-}
-
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
-static LogicalResult createFusionGroups(
-    TensorDimTrackingRewriter &rewriter, FunctionOpInterface funcOp,
-    DominanceInfo const &dominanceInfo,
-    FormDispatchRegionsOptions const &options) {
+static LogicalResult
+createFusionGroups(TensorDimTrackingRewriter &rewriter,
+                   FunctionOpInterface funcOp,
+                   DominanceInfo const &dominanceInfo,
+                   FormDispatchRegionsOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
   unsigned numRoots = decideFusableLinalgOps(funcOp, dominanceInfo, options);
@@ -783,18 +808,7 @@ static LogicalResult createFusionGroups(
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
-  DenseMap<Flow::DispatchRegionOp, std::optional<Flow::WorkloadBuilder>>
-      workloadBuilders;
   for (const auto &it : llvm::enumerate(roots)) {
-    // Compute workload.
-    std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
-    if (options.generateWorkloadRegion) {
-      auto maybeBuilder = iree_compiler::IREE::Flow::getWorkloadBuilder(
-          rewriter, /*rootOp=*/it.value());
-      if (failed(maybeBuilder)) return failure();
-      workloadBuilder = *maybeBuilder;
-    }
-
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
@@ -805,9 +819,9 @@ static LogicalResult createFusionGroups(
 
     // Create fusion group.
     Flow::DispatchRegionOp regionOp;
-    auto maybeRegionOp =
-        Flow::wrapOpInDispatchRegion(rewriter, it.value(), workloadBuilder);
-    if (failed(maybeRegionOp)) return failure();
+    auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, it.value());
+    if (failed(maybeRegionOp))
+      return failure();
     regionOp = *maybeRegionOp;
 
     // Sort producers topologically. All producers must be in the same block
@@ -828,9 +842,17 @@ static LogicalResult createFusionGroups(
       }
 
       auto newRegionOp =
-          movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
-      if (failed(newRegionOp)) return failure();
+          movePrecedingOpsIntoDispatchRegion(rewriter, producer, regionOp);
+      if (failed(newRegionOp))
+        return failure();
       regionOp = *newRegionOp;
+    }
+    // Simplify tensor::DimOps.
+    {
+      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        return failure();
+      }
     }
     regionOps.push_back(regionOp);
   }
@@ -851,9 +873,9 @@ struct FormDispatchRegionsPass
   using FormDispatchRegionsBase<
       FormDispatchRegionsPass>::FormDispatchRegionsBase;
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
   /// These constructors are auto-generated in `Passes.h.inc` from the
   /// tablegen file if `GEN_PASS_DEF_FORMDISPATCHREGIONS` is defined
@@ -876,7 +898,7 @@ struct FormDispatchRegionsPass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 /// Create dispatch.region Ops based on a fusion heuristic.
 void FormDispatchRegionsPass::runOnOperation() {
@@ -896,7 +918,7 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(FormDispatchRegionsOptions options) {
   return std::make_unique<FormDispatchRegionsPass>(options);
 }
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

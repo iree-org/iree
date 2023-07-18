@@ -33,15 +33,18 @@ struct GenericOpInterchangePattern
     SmallVector<unsigned> interchange;
     bool needInterchange = false;
     unsigned numParallelLoop = genericOp.getNumParallelLoops();
-    if (numParallelLoop == 0) return failure();
+    if (numParallelLoop == 0)
+      return failure();
     for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
       if (linalg::isParallelIterator(iter.value())) {
         interchange.push_back(iter.index());
-        if (iter.index() >= numParallelLoop) needInterchange = true;
+        if (iter.index() >= numParallelLoop)
+          needInterchange = true;
       }
     }
     // If all the parallel loops are outter loops skip the pattern.
-    if (!needInterchange) return failure();
+    if (!needInterchange)
+      return failure();
     for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
       if (linalg::isReductionIterator(iter.value())) {
         interchange.push_back(iter.index());
@@ -67,13 +70,13 @@ struct InterchangeGenericOpsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createInterchangeGenericOpsPass() {
   return std::make_unique<InterchangeGenericOpsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

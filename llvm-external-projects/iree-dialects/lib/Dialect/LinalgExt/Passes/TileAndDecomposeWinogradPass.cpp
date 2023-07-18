@@ -36,7 +36,7 @@ static void computeLoopParams(SmallVectorImpl<Value> &lbs,
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<OpFoldResult> dimValues =
-      tensor::createDimValues(builder, loc, tensor);
+      tensor::getMixedSizes(builder, loc, tensor);
   for (int i = numImageDims; i < dimValues.size(); i++) {
     lbs.push_back(zero);
     ubs.push_back(getValueOrCreateConstantIndexOp(builder, loc, dimValues[i]));
@@ -136,11 +136,11 @@ public:
         bindDims(rewriter.getContext(), dim0);
         AffineMap scaleMap =
             AffineMap::get(1, 0, {dim0 * ot}, rewriter.getContext());
-        offsets[i] = rewriter.createOrFold<AffineApplyOp>(loc, scaleMap,
-                                                          ValueRange{ivs[i]});
+        offsets[i] = rewriter.createOrFold<affine::AffineApplyOp>(
+            loc, scaleMap, ValueRange{ivs[i]});
         AffineMap minMap =
             AffineMap::get(1, 0, {-dim0 + delta, it}, rewriter.getContext());
-        sizes[i] = rewriter.createOrFold<AffineMinOp>(
+        sizes[i] = rewriter.createOrFold<affine::AffineMinOp>(
             loc, minMap,
             ValueRange{
                 getValueOrCreateConstantIndexOp(rewriter, loc, offsets[i])});
@@ -312,8 +312,8 @@ public:
         bindDims(rewriter.getContext(), dim0);
         AffineMap scaleMap =
             AffineMap::get(1, 0, {dim0 * ot}, rewriter.getContext());
-        offsets[i] = rewriter.createOrFold<AffineApplyOp>(loc, scaleMap,
-                                                          ValueRange{ivs[i]});
+        offsets[i] = rewriter.createOrFold<affine::AffineApplyOp>(
+            loc, scaleMap, ValueRange{ivs[i]});
         sizes[i] = outputTileSizeAttr;
       }
     }
@@ -370,9 +370,9 @@ struct TileAndDecomposeWinogradTransformPass
     : public TileAndDecomposeWinogradTransformBase<
           TileAndDecomposeWinogradTransformPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                    linalg::LinalgDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
+    registry.insert<
+        affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
+        linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;

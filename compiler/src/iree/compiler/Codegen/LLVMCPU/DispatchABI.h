@@ -36,7 +36,7 @@ namespace iree_compiler {
 // Debug information adapter for the executable_library.h types.
 // Manually synchronized with the runtime header as needed.
 class ExecutableLibraryDI {
- public:
+public:
   // Initializes a cached DI provider using |typeConverter| to determine
   // variable-width types such as index/size_t.
   explicit ExecutableLibraryDI(LLVMTypeConverter *typeConverter);
@@ -95,7 +95,7 @@ class ExecutableLibraryDI {
   // Returns `iree_hal_executable_workgroup_state_v0_t`.
   LLVM::DIDerivedTypeAttr getWorkgroupStateV0T();
 
- private:
+private:
   LLVMTypeConverter *typeConverter;
   Builder builder;
   LLVM::DIFileAttr fileAttr;
@@ -124,7 +124,7 @@ class ExecutableLibraryDI {
 // arguments so that we can adjust the ABI over time and support multiple
 // versions in the same compiled output.
 class HALDispatchABI {
- public:
+public:
   // Matches the field order in iree_hal_processor_v0_t.
   enum class ProcessorField {
     data = 0,
@@ -134,8 +134,8 @@ class HALDispatchABI {
   static constexpr int ProcessorDataCapacity = 8;
 
   // Returns a Type representing iree_hal_processor_v0_t.
-  static LLVM::LLVMStructType getProcessorType(
-      MLIRContext *context, LLVMTypeConverter *typeConverter);
+  static LLVM::LLVMStructType
+  getProcessorType(MLIRContext *context, LLVMTypeConverter *typeConverter);
 
   // Matches the field order in iree_hal_executable_environment_v0_t.
   enum class EnvironmentField {
@@ -147,9 +147,9 @@ class HALDispatchABI {
   };
 
   // Returns a Type representing iree_hal_executable_environment_v0_t.
-  static LLVM::LLVMStructType getEnvironmentType(
-      MLIRContext *context, LLVMTypeConverter *typeConverter,
-      LLVM::LLVMStructType processorType);
+  static LLVM::LLVMStructType
+  getEnvironmentType(MLIRContext *context, LLVMTypeConverter *typeConverter,
+                     LLVM::LLVMStructType processorType);
 
   // Matches the field order in iree_hal_executable_dispatch_state_v0_t.
   enum class DispatchStateField {
@@ -171,8 +171,8 @@ class HALDispatchABI {
   }
 
   // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
-  static LLVM::LLVMStructType getDispatchStateType(
-      MLIRContext *context, LLVMTypeConverter *typeConverter);
+  static LLVM::LLVMStructType
+  getDispatchStateType(MLIRContext *context, LLVMTypeConverter *typeConverter);
 
   enum class WorkgroupStateField {
     /*uint32_t*/ workgroup_id_x = 0,
@@ -188,8 +188,8 @@ class HALDispatchABI {
   }
 
   // Returns a Type representing iree_hal_executable_workgroup_state_v0_t.
-  static LLVM::LLVMStructType getWorkgroupStateType(
-      MLIRContext *context, LLVMTypeConverter *typeConverter);
+  static LLVM::LLVMStructType
+  getWorkgroupStateType(MLIRContext *context, LLVMTypeConverter *typeConverter);
 
   // Returns the types of the LLVM function inputs for the ABI.
   // This matches the signature of `iree_hal_executable_dispatch_v0_t` in
@@ -202,13 +202,12 @@ class HALDispatchABI {
   // tables) from MLIR into LLVM IR. It does not need to match the exact
   // definition but the closer we can make it to the real thing the more useful
   // downstream tools will be.
-  static LLVM::DISubprogramAttr buildScopeAttr(
-      mlir::ModuleOp moduleOp, StringRef funcName,
-      LLVMTypeConverter *typeConverter);
+  static LLVM::DISubprogramAttr
+  buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
+                 LLVMTypeConverter *typeConverter);
 
   explicit HALDispatchABI(LLVMTypeConverter *typeConverter)
-      : context(&typeConverter->getContext()),
-        typeConverter(typeConverter),
+      : context(&typeConverter->getContext()), typeConverter(typeConverter),
         processorType(getProcessorType(context, typeConverter)),
         environmentType(
             getEnvironmentType(context, typeConverter, processorType)),
@@ -267,9 +266,11 @@ class HALDispatchABI {
   // Loads the processor ID the code is (most likely) being run on.
   // Equivalent to:
   //   uint32_t processor_id = state->processor_id;
+  Type getProcessorIDType();
   Value loadProcessorID(Operation *forOp, OpBuilder &builder);
 
   // Loads a pointer to the processor information data fields.
+  Type getProcessorDataType();
   Value loadProcessorData(Operation *forOp, OpBuilder &builder);
 
   // Loads a processor information data field at the given index.
@@ -322,7 +323,41 @@ class HALDispatchABI {
                                        ArrayRef<StringRef> extraFields,
                                        OpBuilder &builder);
 
- private:
+  //===--------------------------------------------------------------------==//
+  // External/bitcode function ABI handling methods.
+  //===--------------------------------------------------------------------==//
+  // Methods required for handling ABI for functions whose definitions are
+  // external.
+
+  /// Check if the `funcType` is equivalent to a function with return being
+  /// of type `resultTypes` and operands of type `paramTypes`.
+  static bool hasCompatibleFunctionSignature(MLIRContext *context,
+                                             LLVM::LLVMFunctionType funcType,
+                                             TypeRange resultTypes,
+                                             TypeRange paramTypes);
+
+  /// Given a calling convention `cConv`, and callee with return of
+  /// `resultTypes` and operands with type `argTypes`, along with extra fields
+  /// to append to argument list specified in `extraFields`; return the function
+  /// type of use for the function that implements the specified calling
+  /// convention.
+  FailureOr<LLVM::LLVMFunctionType>
+  getABIFunctionType(Operation *forOp, IREE::HAL::CallingConvention cConv,
+                     TypeRange resultTypes, TypeRange argTypes,
+                     ArrayRef<StringRef> extraFields);
+
+  /// Given a calling convention `cConv`, and callee with return of
+  /// `resultTypes` and operands with type `argTypes`, along with extra fields
+  /// to append to argument list specified in `extraFields`; modify the `callOp`
+  /// to implement the specified ABI. The calleee signature is expected to have
+  /// been/to be modified separately, i.e. it isnt done within this method.
+  FailureOr<SmallVector<Value>>
+  materializeABI(Operation *callOp, StringRef symbolName,
+                 IREE::HAL::CallingConvention cConv, TypeRange resultTypes,
+                 ValueRange args, ArrayRef<StringRef> extraFields,
+                 RewriterBase &builder);
+
+private:
   Value getIndexValue(Location loc, int64_t value, OpBuilder &builder);
 
   Value castValueToType(Location loc, Value value, Type resultType,
@@ -334,11 +369,37 @@ class HALDispatchABI {
                        OpBuilder &builder);
   Value loadFieldValue(Operation *forOp, DispatchStateField field,
                        OpBuilder &builder);
+  Type getFieldType(WorkgroupStateField field);
   Value loadFieldValue(Operation *forOp, WorkgroupStateField field,
                        OpBuilder &builder);
 
+  Type getExtraFieldType(StringRef extraField);
   Value getExtraField(Operation *forOp, StringRef extraField,
                       OpBuilder &builder);
+
+  // Update the processor data based on the `cpu_features` present in
+  // `executable.target` attribute.
+  Value updateProcessorDataFromTargetAttr(Operation *forOp,
+                                          Value processorDataPtrValue,
+                                          OpBuilder &builder);
+
+  // Return LLVM Struct type that represents a container for arguments
+  // and return types. The struct type are ordered [results..., args...]
+  std::optional<Type> getParameterStructType(TypeRange resultTypes,
+                                             ValueRange args,
+                                             TypeRange extraFieldsTypes);
+  // For a given call operation, generate the struct that is the container
+  // for passing the arguments.
+  //
+  // The provided |resultTypes| and |args| are packed in a struct and transit
+  // through memory so that we can expose a single void* argument. Optionally
+  // |extraFields| can be specified with an ordered list of field names to be
+  // appended to the end of the struct.
+  std::tuple<Type, Value> packIntoParameterStruct(Operation *forOp,
+                                                  TypeRange resultTypes,
+                                                  ValueRange args,
+                                                  ValueRange extraFields,
+                                                  OpBuilder &builder);
 
   mlir::MLIRContext *context;
   LLVMTypeConverter *typeConverter;
@@ -354,7 +415,7 @@ class HALDispatchABI {
   static llvm::sys::Mutex sMutex;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_DISPATCHABI_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_DISPATCHABI_H_

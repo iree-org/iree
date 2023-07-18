@@ -63,15 +63,20 @@ jobs:
         target:
           - platform: "linux"
             arch: "x86_64"
-            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd"
+            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
             tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
           - platform: "linux"
             arch: "riscv_64"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:2e71c052d11b2526651af16e64816a30d164efcdfe6fb64623fb4737c37c466a"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:c4c3f409ab6461ccca920bce2f2c30285a17a61979b54570459f76797e381cb5"
             build_script: "./build_tools/cmake/build_riscv.sh"
             tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
+          - platform: "android"
+            arch: "armv8.2-a"
+            docker_image: "gcr.io/iree-oss/android@sha256:c05cb80509c818132378c04e638d5908ce961250a90dd60281b2f582378df063"
+            build_script: "./build_tools/cmake/build_android.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-arm_64-52b6af88"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}

@@ -41,6 +41,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRArithUtils
+    MLIRComplexDialect
     MLIRFuncDialect
     MLIRIR
     MLIRInferTypeOpInterface
@@ -51,7 +52,6 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRViewLikeInterface
-    iree::compiler::Dialect::Stream::Builtins
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC

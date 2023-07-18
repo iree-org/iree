@@ -18,7 +18,7 @@ namespace Util {
 
 class DropCompilerHintsPass
     : public DropCompilerHintsBase<DropCompilerHintsPass> {
- public:
+public:
   void runOnOperation() override {
     // We can't use patterns and applyPatternsAndFoldGreedily because that
     // automatically does canonicalization.
@@ -33,7 +33,7 @@ std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass() {
   return std::make_unique<DropCompilerHintsPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

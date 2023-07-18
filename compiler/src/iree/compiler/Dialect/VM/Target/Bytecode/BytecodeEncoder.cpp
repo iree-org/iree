@@ -25,7 +25,7 @@ namespace {
 // representation. Always generate this from source in tooling and never check
 // in any emitted files!
 class V0BytecodeEncoder : public BytecodeEncoder {
- public:
+public:
   V0BytecodeEncoder(llvm::DenseMap<Type, int> *typeTable,
                     RegisterAllocation *registerAllocation)
       : typeTable_(typeTable), registerAllocation_(registerAllocation) {}
@@ -75,7 +75,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeType(Value value) override {
-    auto refPtrType = value.getType().dyn_cast<IREE::VM::RefType>();
+    auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(value.getType());
     if (!refPtrType) {
       return currentOp_->emitOpError()
              << "type " << value.getType()
@@ -86,8 +86,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 
   LogicalResult encodeType(Type type) override {
     // HACK: it'd be nice to remove the implicit ref wrapper hiding.
-    if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
-      if (refType.getObjectType().isa<IREE::VM::ListType>()) {
+    if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
+      if (llvm::isa<IREE::VM::ListType>(refType.getObjectType())) {
         type = refType.getObjectType();
       }
     }
@@ -103,43 +103,43 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 
   LogicalResult encodePrimitiveAttr(TypedAttr attr) override {
     unsigned int bitWidth = attr.getType().getIntOrFloatBitWidth();
-    if (auto integerAttr = attr.dyn_cast<IntegerAttr>()) {
+    if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
       uint64_t limitedValue =
           integerAttr.getValue().extractBitsAsZExtValue(bitWidth, 0);
       switch (bitWidth) {
-        case 8:
-          return writeUint8(static_cast<uint8_t>(limitedValue));
-        case 16:
-          return writeUint16(static_cast<uint16_t>(limitedValue));
-        case 32:
-          return writeUint32(static_cast<uint32_t>(limitedValue));
-        case 64:
-          return writeUint64(static_cast<uint64_t>(limitedValue));
-        default:
-          return currentOp_->emitOpError()
-                 << "attribute of bitwidth " << bitWidth << " not supported";
+      case 8:
+        return writeUint8(static_cast<uint8_t>(limitedValue));
+      case 16:
+        return writeUint16(static_cast<uint16_t>(limitedValue));
+      case 32:
+        return writeUint32(static_cast<uint32_t>(limitedValue));
+      case 64:
+        return writeUint64(static_cast<uint64_t>(limitedValue));
+      default:
+        return currentOp_->emitOpError()
+               << "attribute of bitwidth " << bitWidth << " not supported";
       }
-    } else if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
+    } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
       switch (bitWidth) {
-        case 32: {
-          union {
-            float f32;
-            uint32_t u32;
-          } value;
-          value.f32 = floatAttr.getValue().convertToFloat();
-          return writeUint32(value.u32);
-        }
-        case 64: {
-          union {
-            double f64;
-            uint64_t u64;
-          } value;
-          value.f64 = floatAttr.getValue().convertToDouble();
-          return writeUint64(value.u64);
-        }
-        default:
-          return currentOp_->emitOpError()
-                 << "attribute of bitwidth " << bitWidth << " not supported";
+      case 32: {
+        union {
+          float f32;
+          uint32_t u32;
+        } value;
+        value.f32 = floatAttr.getValue().convertToFloat();
+        return writeUint32(value.u32);
+      }
+      case 64: {
+        union {
+          double f64;
+          uint64_t u64;
+        } value;
+        value.f64 = floatAttr.getValue().convertToDouble();
+        return writeUint64(value.u64);
+      }
+      default:
+        return currentOp_->emitOpError()
+               << "attribute of bitwidth " << bitWidth << " not supported";
       }
     } else {
       return currentOp_->emitOpError()
@@ -153,7 +153,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
-    for (auto el : value.getValues<Attribute>()) {
+    for (auto el : value.getValues<TypedAttr>()) {
       if (failed(encodePrimitiveAttr(el))) {
         return currentOp_->emitOpError() << "failed to encode element " << el;
       }
@@ -270,13 +270,15 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   LogicalResult ensureAlignment(size_t alignment) {
     size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
     size_t padding = paddedSize - bytecode_.size();
-    if (padding == 0) return success();
+    if (padding == 0)
+      return success();
     static const uint8_t kZeros[32] = {0};
-    if (padding > sizeof(kZeros)) return failure();
+    if (padding > sizeof(kZeros))
+      return failure();
     return writeBytes(kZeros, padding);
   }
 
- private:
+private:
   // TODO(benvanik): replace this with something not using an ever-expanding
   // vector. I'm sure LLVM has something.
 
@@ -340,7 +342,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   std::vector<std::pair<Block *, size_t>> blockOffsetFixups_;
 };
 
-}  // namespace
+} // namespace
 
 // static
 std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
@@ -361,6 +363,8 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
 
   V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
   for (auto &block : funcOp.getBlocks()) {
+    size_t blockStart = encoder.getOffset();
+
     if (failed(encoder.beginBlock(&block))) {
       funcOp.emitError() << "failed to begin block";
       return std::nullopt;
@@ -369,6 +373,10 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     for (auto &op : block.getOperations()) {
       auto serializableOp = dyn_cast<IREE::VM::VMSerializableOp>(op);
       if (!serializableOp) {
+        if (op.hasTrait<OpTrait::IREE::VM::AssignmentOp>()) {
+          // Assignment ops are ok to not be serializable.
+          continue;
+        }
         op.emitOpError() << "is not serializable";
         return std::nullopt;
       }
@@ -384,6 +392,17 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
 
     if (failed(encoder.endBlock(&block))) {
       funcOp.emitError() << "failed to end block";
+      return std::nullopt;
+    }
+
+    // From isa.h: IREE_VM_PC_BLOCK_MAX
+    static const size_t kVMMaxBlockSize = 0x00FFFFFFu;
+    size_t blockLength = encoder.getOffset() - blockStart;
+    if (blockLength > kVMMaxBlockSize) {
+      funcOp.emitError() << "encoded block too large; VM currently restricts "
+                            "bytecode function block bodies to "
+                         << kVMMaxBlockSize << "B but this function encodes to "
+                         << blockLength << "B";
       return std::nullopt;
     }
   }
@@ -408,7 +427,7 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   return result;
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -15,8 +15,8 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc"  // IWYU pragma: keep
-#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -46,14 +46,14 @@ struct ListTypeStorage : public TypeStorage {
   Type elementType;
 };
 
-}  // namespace detail
+} // namespace detail
 
 // static
 bool ListType::isCompatible(Type type) {
-  if (type.isa<OpaqueType>()) {
+  if (llvm::isa<OpaqueType>(type)) {
     // Allow all types (variant).
     return true;
-  } else if (type.isa<RefType>()) {
+  } else if (llvm::isa<RefType>(type)) {
     // Allow all ref types.
     return true;
   } else if (type.isIntOrFloat()) {
@@ -86,7 +86,7 @@ Type ListType::getElementType() { return getImpl()->elementType; }
 namespace detail {
 
 struct RefTypeStorage : public TypeStorage {
-  RefTypeStorage(Type objectType) : objectType(objectType.cast<Type>()) {}
+  RefTypeStorage(Type objectType) : objectType(llvm::cast<Type>(objectType)) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
@@ -101,14 +101,15 @@ struct RefTypeStorage : public TypeStorage {
   Type objectType;
 };
 
-}  // namespace detail
+} // namespace detail
 
 // static
 bool RefType::isCompatible(Type type) {
-  if (type.isa<RefType>()) {
+  if (llvm::isa<RefType>(type)) {
     // Already a ref - don't double-wrap.
     return false;
-  } else if (type.isSignlessIntOrIndexOrFloat()) {
+  } else if (type.isSignlessIntOrIndexOrFloat() ||
+             llvm::isa<ComplexType>(type)) {
     // Ignore known primitive types.
     return false;
   }
@@ -138,7 +139,7 @@ Type RefType::getObjectType() { return getImpl()->objectType; }
 void VMDialect::registerAttributes() {
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc" // IWYU pragma: keep
       >();
 }
 void VMDialect::registerTypes() {
@@ -155,7 +156,8 @@ Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
   Attribute genAttr;
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, &mnemonic, type, genAttr);
-  if (parseResult.has_value()) return genAttr;
+  if (parseResult.has_value())
+    return genAttr;
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};
@@ -169,7 +171,7 @@ void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   });
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

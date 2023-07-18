@@ -33,5 +33,5 @@ void populateHALBufferViewToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.buffer_view.trace");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

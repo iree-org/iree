@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=true})' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-fuse-dispatch-bindings)' %s | FileCheck %s
 
 // Test that bindings that are unique are rebased to the widest possible access
 // and to have a 0 offset by passing in the actual offset as operands. The
@@ -8,9 +8,13 @@
 // TODO(benvanik): do this in a canonicalize bindings pass. This should not be
 // happening here!
 
+#aliasConfig = #stream.resource_config<{
+  alias_mutable_bindings = true
+}>
+
 // CHECK-LABEL: @rebaseBindingsEx
 stream.executable private @rebaseBindingsEx {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch attributes {stream.resources = #aliasConfig}
   builtin.module  {
     // CHECK: func.func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
     // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)
@@ -85,9 +89,13 @@ func.func @rebaseBindings(%operand: index) {
 // in the order of the deduplicated bindings instead of the original order.
 // This is a bit weird and it would be nice to preserve the order in the future.
 
+#aliasConfig = #stream.resource_config<{
+  alias_mutable_bindings = true
+}>
+
 // CHECK-LABEL: @deduplicateBindingsEx
 stream.executable private @deduplicateBindingsEx {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch attributes {stream.resources = #aliasConfig}
   builtin.module  {
     // CHECK: func.func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
     // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)

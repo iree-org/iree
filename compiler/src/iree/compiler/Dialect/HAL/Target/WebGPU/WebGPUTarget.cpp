@@ -7,7 +7,8 @@
 #include "iree/compiler/Dialect/HAL/Target/WebGPU/WebGPUTarget.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Target/WebGPU/SPIRVToWGSL.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 #include "spirv-tools/libspirv.hpp"
 
@@ -55,20 +57,24 @@ static spirv::TargetEnvAttr getWebGPUTargetEnv(MLIRContext *context) {
 }
 
 class WebGPUTargetBackend : public TargetBackend {
- public:
+public:
   WebGPUTargetBackend(WebGPUTargetOptions options)
       : options_(std::move(options)) {}
 
   // NOTE: we could vary this based on the options such as 'webgpu-v2'.
   std::string name() const override { return "webgpu"; }
 
+  // TODO(scotttodd): Prune FlowDialect dep when WGSLReplacePushConstantsPass
+  //     does not use the Flow dialect (TranslateExecutables calls this
+  //     function and _does not_ query which passes are used by the dynamic
+  //     pipeline created by buildTranslationPassPipeline)
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
-                    gpu::GPUDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::Flow::FlowDialect,
+                    spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -87,7 +93,8 @@ class WebGPUTargetBackend : public TargetBackend {
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     // For now we disable translation if the variant has external object files.
-    if (variantOp.isExternal()) return;
+    if (variantOp.isExternal())
+      return;
 
     // WebGPU does not support push constants (yet?), so replace loads from
     // push constants with loads from uniform buffers.
@@ -108,6 +115,12 @@ class WebGPUTargetBackend : public TargetBackend {
     // Therefore, just let the SPIR-V CodeGen to avoid generating guards w.r.t.
     // NaN and infinity.
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/true);
+
+    // WGSL does not support extended multiplication:
+    // https://github.com/gpuweb/gpuweb/issues/1565. Make sure to lower it to
+    // regular multiplication before we convert SPIR-V to WGSL.
+    passManager.nest<ModuleOp>().nest<spirv::ModuleOp>().addPass(
+        spirv::createSPIRVWebGPUPreparePass());
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
@@ -120,7 +133,15 @@ class WebGPUTargetBackend : public TargetBackend {
       return variantOp.emitError()
              << "should only contain exactly one spirv.module op";
     }
+
     auto spvModuleOp = *spirvModuleOps.begin();
+    if (!options.dumpIntermediatesPath.empty()) {
+      std::string assembly;
+      llvm::raw_string_ostream os(assembly);
+      spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
+      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                     variantOp.getName(), ".mlir", assembly);
+    }
 
     // The schema expects each shader module to have entry points named "dN",
     // where N is the entry point ordinal.
@@ -128,8 +149,8 @@ class WebGPUTargetBackend : public TargetBackend {
     // that convention and keep track of the mapping between entry point
     // ordinals to which shader module they reference.
     auto exportOps =
-        llvm::to_vector<4>(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
-    llvm::SmallVector<uint32_t, 4> entryPointOrdinals(exportOps.size());
+        llvm::to_vector(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    llvm::SmallVector<uint32_t> entryPointOrdinals(exportOps.size());
     SymbolTableCollection symbolTable;
     SymbolUserMap symbolUsers(symbolTable, variantOp);
     for (auto exportOp : exportOps) {
@@ -141,7 +162,7 @@ class WebGPUTargetBackend : public TargetBackend {
           mlir::StringAttr::get(variantOp->getContext(), symbolName);
 
       symbolUsers.replaceAllUsesWith(entryPointFunc, nameAttr);
-      exportOp.setName(symbolName);  // Same symbol reference? Not in table?
+      exportOp.setName(symbolName); // Same symbol reference? Not in table?
       SymbolTable::setSymbolName(entryPointFunc, symbolName);
 
       // We only have one shader module right now, so all point to index 0.
@@ -200,23 +221,23 @@ class WebGPUTargetBackend : public TargetBackend {
 
     // Pack the WGSL and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
-    iree_WGSLExecutableDef_start_as_root(builder);
+    iree_hal_wgsl_ExecutableDef_start_as_root(builder);
 
-    iree_WGSLShaderModuleDef_start(builder);
+    iree_hal_wgsl_ShaderModuleDef_start(builder);
     auto wgslRef = builder.createString(wgsl.value());
-    iree_WGSLShaderModuleDef_code_add(builder, wgslRef);
+    iree_hal_wgsl_ShaderModuleDef_code_add(builder, wgslRef);
     // TODO(scotttodd): populate source map
-    auto shaderModuleRef = iree_WGSLShaderModuleDef_end(builder);
+    auto shaderModuleRef = iree_hal_wgsl_ShaderModuleDef_end(builder);
 
-    auto shaderModulesVec = iree_WGSLShaderModuleDef_vec_create(
+    auto shaderModulesVec = iree_hal_wgsl_ShaderModuleDef_vec_create(
         builder, &shaderModuleRef, /*len=*/1);
-    iree_WGSLExecutableDef_shader_modules_add(builder, shaderModulesVec);
+    iree_hal_wgsl_ExecutableDef_shader_modules_add(builder, shaderModulesVec);
 
     auto entryPointsRef = flatbuffers_uint32_vec_create(
         builder, entryPointOrdinals.data(), entryPointOrdinals.size());
-    iree_WGSLExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_wgsl_ExecutableDef_entry_points_add(builder, entryPointsRef);
 
-    iree_WGSLExecutableDef_end_as_root(builder);
+    iree_hal_wgsl_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
@@ -229,7 +250,7 @@ class WebGPUTargetBackend : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // If we had multiple target environments we would generate one target attr
@@ -239,8 +260,9 @@ class WebGPUTargetBackend : public TargetBackend {
     return ArrayAttr::get(context, targetAttrs);
   }
 
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context, spirv::TargetEnvAttr targetEnv) const {
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context,
+                      spirv::TargetEnvAttr targetEnv) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -268,7 +290,7 @@ void registerWebGPUTargetBackends(
   static TargetBackendRegistration registration1("webgpu-wgsl", backendFactory);
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

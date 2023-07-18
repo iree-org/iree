@@ -238,8 +238,7 @@ class ref {
 
  public:
   IREE_ATTRIBUTE_ALWAYS_INLINE iree_vm_ref_type_t type() const noexcept {
-    IREE_VM_REF_ASSERT(ref_type_descriptor<T>::type());
-    return ref_type_descriptor<T>::type();
+    return ref_.type;
   }
 
   IREE_ATTRIBUTE_ALWAYS_INLINE ref() noexcept : ref_(iree_vm_ref_null()) {}
@@ -319,11 +318,27 @@ class ref {
   constexpr T& operator*() const noexcept { return *get(); }
   constexpr T* operator->() const noexcept { return get(); }
 
+  // Utility for ensuring that the iree_vm_ref_t is consistent after operator&.
+  class Assignment {
+   public:
+    explicit Assignment(iree_vm_ref_t* ref) : ref_(ref) {}
+    ~Assignment() {
+      ref_->type =
+          ref_->ptr ? ref_type_descriptor<T>::type() : IREE_VM_REF_TYPE_NULL;
+    }
+    constexpr operator T**() noexcept {  // NOLINT
+      return reinterpret_cast<T**>(&ref_->ptr);
+    }
+
+   private:
+    iree_vm_ref_t* ref_ = nullptr;
+  };
+
   // Returns a pointer to the inner pointer storage.
   // This allows passing a pointer to the ref as an output argument to C-style
   // creation functions.
-  constexpr T** operator&() noexcept {  // NOLINT
-    return reinterpret_cast<T**>(&ref_.ptr);
+  constexpr Assignment operator&() noexcept {  // NOLINT
+    return Assignment(&ref_);
   }
 
   // Support boolean expression evaluation ala unique_ptr/shared_ptr:

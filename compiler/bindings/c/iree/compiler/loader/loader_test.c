@@ -20,6 +20,10 @@ static void printFlag(const char *flag, size_t length, void *userData) {
   flagCount += 1;
 };
 
+static void printPlugin(const char *pluginId, void *userData) {
+  printf("  LOADED PLUGIN: %s\n", pluginId);
+}
+
 static bool manipulateFlags(iree_compiler_session_t *session) {
   iree_compiler_error_t *error;
   // Flags.
@@ -30,7 +34,7 @@ static bool manipulateFlags(iree_compiler_session_t *session) {
     printf("FLAG GET ERROR. Abort\n");
     return 1;
   }
-  const char *flag1 = "--iree-input-type=mhlo";
+  const char *flag1 = "--iree-input-type=stablehlo";
   const char *badFlag1 = "--iree-non-existing-flag=foobar";
   const char *flagArgv[] = {
       flag1,
@@ -64,9 +68,9 @@ static bool manipulateFlags(iree_compiler_session_t *session) {
   return true;
 }
 
-static bool invokeWithConsoleDiagnostics(
-    iree_compiler_session_t *session,
-    iree_compiler_source_t *sourceWithErrors) {
+static bool
+invokeWithConsoleDiagnostics(iree_compiler_session_t *session,
+                             iree_compiler_source_t *sourceWithErrors) {
   bool rc;
   printf(
       "--- INVOKING WITH CONSOLE DIAGNOSTICS (console error expected) ---\n");
@@ -92,9 +96,9 @@ static void callbackDiag(enum iree_compiler_diagnostic_severity_t severity,
   (*messageAccum)[currentSize + 1 + messageSize] = 0;
 }
 
-static bool invokeWithCallbackDiagnostics(
-    iree_compiler_session_t *session,
-    iree_compiler_source_t *sourceWithErrors) {
+static bool
+invokeWithCallbackDiagnostics(iree_compiler_session_t *session,
+                              iree_compiler_source_t *sourceWithErrors) {
   bool rc;
   printf(
       "--- INVOKING WITH CALLBACK DIAGNOSTICS (console error expected) ---\n");
@@ -131,10 +135,15 @@ int main(int argc, char **argv) {
   printf("Library loaded: %s\n", argv[1]);
 
   int version = ireeCompilerGetAPIVersion();
-  printf("Version: %d\n", version);
+  printf("API Version: 0x%x\n", version);
 
   ireeCompilerGlobalInitialize();
   printf("Initialized\n");
+
+  const char *revision = ireeCompilerGetRevision();
+  printf("Revision: %s\n", revision);
+
+  ireeCompilerEnumeratePlugins(printPlugin, NULL);
 
   // Session.
   iree_compiler_session_t *session = ireeCompilerSessionCreate();

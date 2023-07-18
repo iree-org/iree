@@ -31,7 +31,7 @@ namespace {
 Value emptyCopy(ImplicitLocOpBuilder &rewriter, Value value) {
   Type eTy = getElementTypeOrSelf(value.getType());
   SmallVector<OpFoldResult> mixedSizes =
-      tensor::createDimValues(rewriter, rewriter.getLoc(), value);
+      tensor::getMixedSizes(rewriter, rewriter.getLoc(), value);
   return rewriter.create<tensor::EmptyOp>(mixedSizes, eTy);
 }
 
@@ -41,7 +41,7 @@ Value emptyZero(ImplicitLocOpBuilder &builder, RankedTensorType ty,
   Value empty =
       builder.create<tensor::EmptyOp>(ty.getShape(), ty.getElementType(), dyn);
 
-  Attribute attr = builder.getZeroAttr(ty.getElementType());
+  TypedAttr attr = builder.getZeroAttr(ty.getElementType());
   Value cnst = builder.create<arith::ConstantOp>(attr);
   return builder.create<linalg::FillOp>(ValueRange{cnst}, ValueRange{empty})
       .result();
@@ -52,7 +52,7 @@ Value emptyZero(ImplicitLocOpBuilder &builder, RankedTensorType ty,
 Value applyZeroPoint(ImplicitLocOpBuilder &builder, Value conv, Value sum,
                      Value zp, ArrayRef<int> affine_map) {
   auto context = builder.getContext();
-  auto convTy = conv.getType().cast<RankedTensorType>();
+  auto convTy = llvm::cast<RankedTensorType>(conv.getType());
 
   llvm::SmallVector<AffineExpr> sumExprs;
   for (auto i : affine_map) {
@@ -82,7 +82,7 @@ Value applyZeroPoint(ImplicitLocOpBuilder &builder, Value conv, Value sum,
 
 // Add the scalar value to the tensor.
 Value addScalar(ImplicitLocOpBuilder &builder, Value value, Value scalar) {
-  auto ty = value.getType().cast<RankedTensorType>();
+  auto ty = llvm::cast<RankedTensorType>(value.getType());
   SmallVector<utils::IteratorType> iterators(ty.getRank(),
                                              utils::IteratorType::parallel);
   auto map = builder.getMultiDimIdentityMap(ty.getRank());
@@ -102,7 +102,7 @@ void GetDynamicDym(ImplicitLocOpBuilder &builder,
                    llvm::SmallVector<int64_t> &dims,
                    llvm::SmallVector<Value> &dynDims, Value value,
                    int64_t dim) {
-  ShapedType ty = value.getType().cast<ShapedType>();
+  ShapedType ty = llvm::cast<ShapedType>(value.getType());
   dims.push_back(ty.getDimSize(dim));
   if (ty && ty.isDynamicDim(dim))
     dynDims.push_back(builder.create<tensor::DimOp>(value, dim));
@@ -135,8 +135,8 @@ struct QuantizedConvToConv
     auto filter = op.getInputs()[1];
     auto iZp = op.getInputs()[2];
     auto fZp = op.getInputs()[3];
-    auto inputTy = input.getType().cast<RankedTensorType>();
-    auto resultTy = op.getType(0).cast<ShapedType>();
+    auto inputTy = llvm::cast<RankedTensorType>(input.getType());
+    auto resultTy = llvm::cast<ShapedType>(op.getType(0));
     auto accETy = resultTy.getElementType();
 
     auto strides = op.getStrides();
@@ -179,7 +179,7 @@ struct QuantizedConvToConv
                                    /*reduce_dim*/ {false, false, false, true});
 
       // Materialize a length-1 dimension at the end of the summation.
-      SmallVector<ReassociationExprs, 4> reassociationMap(3);
+      SmallVector<ReassociationExprs> reassociationMap(3);
       for (int i = 0; i < 3; i++)
         reassociationMap[i].push_back(builder.getAffineDimExpr(i));
       reassociationMap.back().push_back(builder.getAffineDimExpr(3));
@@ -255,7 +255,7 @@ struct QuantizedDepthwiseConvToDepthwiseConv
     auto filter = op.getInputs()[1];
     auto iZp = op.getInputs()[2];
     auto fZp = op.getInputs()[3];
-    auto resultTy = op.getType(0).cast<ShapedType>();
+    auto resultTy = llvm::cast<ShapedType>(op.getType(0));
     auto accETy = resultTy.getElementType();
 
     auto strides = op.getStrides();
@@ -346,19 +346,19 @@ struct LinalgQuantizedConvToConvPass
     linalg::populateLinalgNamedOpConversionPatterns(patterns);
     patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
         context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
       signalPassFailure();
     }
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedConvToConvPass() {
   return std::make_unique<LinalgQuantizedConvToConvPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

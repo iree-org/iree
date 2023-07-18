@@ -26,7 +26,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal/flatcc:parsing",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",

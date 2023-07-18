@@ -10,7 +10,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
 
 typedef struct iree_hal_cuda_nop_executable_cache_t {

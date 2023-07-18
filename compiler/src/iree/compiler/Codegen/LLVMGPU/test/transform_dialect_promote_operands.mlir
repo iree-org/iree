@@ -29,16 +29,23 @@ hal.executable private @pad_matmul_static_dispatch_0  {
   }
 
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
+  ^bb1(%variant_op: !transform.any_op):
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
     %promoted_matmul, %alloc_0, %alloc_1 =
       transform.iree.promote_operands %matmul [0, 1] 
-        : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
+        : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // Late canonicalizations to cleanup and pass the checks.
-    transform.iree.apply_patterns %variant_op
-      { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
+    %func_op = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func_op {
+      transform.apply_patterns.iree.fold_fill_into_pad
+      transform.apply_patterns.linalg.tiling_canonicalization
+      transform.apply_patterns.scf.for_loop_canonicalization
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
+    transform.iree.apply_licm %func_op : !transform.any_op
+    transform.iree.apply_cse %func_op : !transform.any_op
   }
 }
 

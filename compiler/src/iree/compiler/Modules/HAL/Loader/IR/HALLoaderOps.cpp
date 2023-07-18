@@ -109,8 +109,8 @@ void ExecutableLookupOp::getAsmResultNames(
   setNameFn(getResult(), "exe");
 }
 
-LogicalResult ExecutableLookupOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
+LogicalResult
+ExecutableLookupOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
   auto exportOp = symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableOp>(
       op, getExecutableAttr());
@@ -182,7 +182,8 @@ struct FoldBindingSubspansIntoDispatchOp
       bindingBuffers.push_back(subspanOp.getSource());
       bindingOffsets.push_back(newOffset);
     }
-    if (!didChangeAny) return failure();
+    if (!didChangeAny)
+      return failure();
     rewriter.updateRootInPlace(op, [&]() {
       op.getBindingBuffersMutable().assign(bindingBuffers);
       op.getBindingOffsetsMutable().assign(bindingOffsets);
@@ -191,18 +192,18 @@ struct FoldBindingSubspansIntoDispatchOp
   }
 };
 
-}  // namespace
+} // namespace
 
 void ExecutableDispatchOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<FoldBindingSubspansIntoDispatchOp>(context);
 }
 
-}  // namespace Loader
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Loader
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

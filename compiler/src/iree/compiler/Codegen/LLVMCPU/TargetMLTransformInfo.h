@@ -21,11 +21,11 @@ struct TargetMLTransformInfo {
   unsigned defaultMaxTransposeUnrollFactor =
       std::numeric_limits<unsigned>::max();
 
-  static const TargetMLTransformInfo getTargetMLTransformInfo(
-      IREE::HAL::ExecutableTargetAttr targetAttr);
+  static const TargetMLTransformInfo
+  getTargetMLTransformInfo(IREE::HAL::ExecutableTargetAttr targetAttr);
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_TARGETMLTRANSFORMINFO_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMCPU_TARGETMLTRANSFORMINFO_H_

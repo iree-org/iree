@@ -12,13 +12,19 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
+// TODO(#13038): Remove this dependency on VMVX dialect.
+#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
+#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
+#include "mlir/Analysis/Presburger/IntegerRelation.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-transforms"
 
@@ -28,9 +34,11 @@ namespace iree_compiler {
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
   for (auto val : nonIndexComputationOperands) {
-    if (op == val.getDefiningOp()) return false;
+    if (op == val.getDefiningOp())
+      return false;
   }
-  if (op->isProperAncestor(baseOp)) return false;
+  if (op->isProperAncestor(baseOp))
+    return false;
   return !isa<IREE::HAL::InterfaceConstantLoadOp>(op);
 }
 
@@ -39,10 +47,12 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
     ValueRange nonIndexComputationOperands, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<OpFoldResult> strides,
     ValueRange dynamicDims) {
-  SetVector<Operation *> slice;
-  getBackwardSlice(baseOp, &slice, [&](Operation *op) {
+  BackwardSliceOptions options;
+  options.filter = [&](Operation *op) {
     return sliceFilter(op, nonIndexComputationOperands, baseOp);
-  });
+  };
+  SetVector<Operation *> slice;
+  getBackwardSlice(baseOp, &slice, options);
   IRMapping bvm;
   for (auto origOp : slice) {
     builder.clone(*origOp, bvm);
@@ -76,26 +86,29 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
   return clonedVals;
 }
 
-SliceAndDynamicDims cloneOffsetsSizesAndStrides(
-    OpBuilder &builder, IREE::Flow::DispatchTensorStoreOp storeOp) {
+SliceAndDynamicDims
+cloneOffsetsSizesAndStrides(OpBuilder &builder,
+                            IREE::Flow::DispatchTensorStoreOp storeOp) {
   return cloneOffsetsSizesAndStridesImpl(
       builder, storeOp, ValueRange{storeOp.getValue(), storeOp.getTarget()},
       storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
       storeOp.getMixedStrides(), storeOp.getTargetDims());
 }
 
-SliceAndDynamicDims cloneOffsetsSizesAndStrides(
-    OpBuilder &builder, IREE::Flow::DispatchTensorLoadOp loadOp) {
+SliceAndDynamicDims
+cloneOffsetsSizesAndStrides(OpBuilder &builder,
+                            IREE::Flow::DispatchTensorLoadOp loadOp) {
   return cloneOffsetsSizesAndStridesImpl(
       builder, loadOp, ValueRange{loadOp.getSource()}, loadOp.getMixedOffsets(),
       loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
 }
 
 template <typename AllocLikeOpType>
-std::optional<Value> hoistOneStaticallyBoundAllocation(
-    func::FuncOp funcOp, OpBuilder &builder, Location loc,
-    MemRefType allocLikeType, ValueRange dynamicSizes,
-    std::optional<uint64_t> alignment) {
+std::optional<Value>
+hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
+                                  Location loc, MemRefType allocLikeType,
+                                  ValueRange dynamicSizes,
+                                  std::optional<uint64_t> alignment) {
   IntegerAttr alignmentAttr =
       alignment ? builder.getI64IntegerAttr(alignment.value()) : nullptr;
   // For static case just create a new allocation in the entry block of the same
@@ -162,8 +175,9 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 }
 
 template <typename AllocLikeOpType>
-std::optional<Value> hoistOneStaticallyBoundAllocation(
-    func::FuncOp funcOp, OpBuilder &builder, AllocLikeOpType allocLikeOp) {
+std::optional<Value>
+hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
+                                  AllocLikeOpType allocLikeOp) {
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(allocLikeOp);
   return hoistOneStaticallyBoundAllocation<AllocLikeOpType>(
@@ -187,7 +201,8 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
 
   // Collect all allocLikes that are hoistable.
   funcOp.walk([&](AllocLikeOpType allocLikeOp) {
-    if (allocLikeOp->getBlock() == &funcOp.getBody().front()) return;
+    if (allocLikeOp->getBlock() == &funcOp.getBody().front())
+      return;
     if (allocLikeOp.getDynamicSizes().empty()) {
       allocLikeOps.push_back(allocLikeOp);
       return;
@@ -206,7 +221,8 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
     SmallVector<memref::DeallocOp> deallocOps;
     for (Operation *user : allocLikeOp->getUsers()) {
       auto dealloc = dyn_cast<memref::DeallocOp>(user);
-      if (dealloc) deallocOps.push_back(dealloc);
+      if (dealloc)
+        deallocOps.push_back(dealloc);
     }
 
     LLVM_DEBUG({
@@ -218,7 +234,8 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
     });
     std::optional<Value> replacement =
         hoistOneStaticallyBoundAllocation(funcOp, rewriter, allocLikeOp);
-    if (!replacement) continue;
+    if (!replacement)
+      continue;
     LLVM_DEBUG({
       llvm::dbgs() << "Replacement : ";
       replacement->dump();
@@ -226,20 +243,23 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
     Value replacementVal = replacement.value();
     rewriter.replaceOp(allocLikeOp, replacementVal);
 
-    for (memref::DeallocOp deallocOp : deallocOps) rewriter.eraseOp(deallocOp);
+    for (memref::DeallocOp deallocOp : deallocOps)
+      rewriter.eraseOp(deallocOp);
   }
 }
 
 /// Explicit instantiations for `hoistStaticallyBoundAllocationsInFunc` and
 /// dependent functions.
-template std::optional<Value> hoistOneStaticallyBoundAllocation<
-    memref::AllocOp>(func::FuncOp funcOp, OpBuilder &builder, Location loc,
-                     MemRefType allocLikeType, ValueRange dynamicSizes,
-                     std::optional<uint64_t> alignment);
-template std::optional<Value> hoistOneStaticallyBoundAllocation<
-    memref::AllocaOp>(func::FuncOp funcOp, OpBuilder &builder, Location loc,
-                      MemRefType allocLikeType, ValueRange dynamicSizes,
-                      std::optional<uint64_t> alignment);
+template std::optional<Value>
+hoistOneStaticallyBoundAllocation<memref::AllocOp>(
+    func::FuncOp funcOp, OpBuilder &builder, Location loc,
+    MemRefType allocLikeType, ValueRange dynamicSizes,
+    std::optional<uint64_t> alignment);
+template std::optional<Value>
+hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
+    func::FuncOp funcOp, OpBuilder &builder, Location loc,
+    MemRefType allocLikeType, ValueRange dynamicSizes,
+    std::optional<uint64_t> alignment);
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocOp>(func::FuncOp funcOp,
                                                    OpBuilder &builder,
@@ -247,10 +267,150 @@ hoistOneStaticallyBoundAllocation<memref::AllocOp>(func::FuncOp funcOp,
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
     func::FuncOp funcOp, OpBuilder &builder, memref::AllocaOp allocLikeOp);
-template void hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
-    RewriterBase &rewriter, func::FuncOp funcOp);
-template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
-    RewriterBase &rewriter, func::FuncOp funcOp);
+template void
+hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(RewriterBase &rewriter,
+                                                       func::FuncOp funcOp);
+template void
+hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(RewriterBase &rewriter,
+                                                        func::FuncOp funcOp);
+
+//===---------------------------------------------------------------------===//
+// Lowering `flow.dispatch.workgroup_count_from_slice` operation.
+//===---------------------------------------------------------------------===//
+
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter,
+    IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
+    func::FuncOp entryPointFn, ArrayRef<OpFoldResult> workgroupCount,
+    int maxWorkgroupParallelDims) {
+  // Compute the backward slice of the workgroup count operations.
+  BackwardSliceOptions options;
+  options.filter = [](Operation *op) {
+    return !isa<IREE::Flow::DispatchWorkloadOrdinalOp>(op);
+  };
+  options.inclusive = true;
+  llvm::SetVector<Operation *> slice;
+  for (auto ofr : workgroupCount) {
+    if (auto val = ofr.dyn_cast<Value>()) {
+      mlir::getBackwardSlice(val, &slice, options);
+    }
+  }
+  // Since there are more than one slices, sort the operations again.
+  auto slicedOps = llvm::to_vector(slice);
+  mlir::computeTopologicalSorting(slicedOps);
+
+  // Insert the slice into workgroup count region with all `hal.constant.index`
+  // operations replaced with arguments (drop the front argument since that is
+  // `hal.device`).
+  auto workloadVals = workgroupCountOp.getOperands();
+  IRMapping map;
+  // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
+  // the `flow.dispatch.workgroup_count_default` operation.
+  SmallVector<IREE::Flow::DispatchWorkloadOrdinalOp> ordinalOps;
+  entryPointFn.walk([&](IREE::Flow::DispatchWorkloadOrdinalOp ordinalOp) {
+    ordinalOps.push_back(ordinalOp);
+  });
+  for (auto ordinalOp : ordinalOps) {
+    int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
+    if (ordinal >= workloadVals.size()) {
+      ordinalOp.emitOpError(
+          "ordinal number is higher than the number of workloads captured in "
+          "the workgroup count region");
+    }
+    map.map(ordinalOp.getResult(),
+            workloadVals[ordinalOp.getOrdinal().getSExtValue()]);
+  }
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+  for (auto op : slice) {
+    // TODO(#13038) This is a WAR for the these ops ending up in workgroup count
+    // computation. They should not. Some pre-processing at MaterializeEncoding
+    // time might make these go away.
+    if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
+      Value constVal =
+          rewriter.create<arith::ConstantIndexOp>(op->getLoc(), 16);
+      for (auto result : op->getResults()) {
+        map.map(result, constVal);
+      }
+      continue;
+    }
+    rewriter.clone(*op, map);
+  }
+  SmallVector<OpFoldResult> results;
+  // Since the workgroup count at HAL level is in x, y, z form, process the
+  // workload in reverse.
+  for (auto ofr : llvm::reverse(workgroupCount)) {
+    if (auto val = ofr.dyn_cast<Value>()) {
+      results.push_back(getAsOpFoldResult(map.lookup(val)));
+    } else {
+      results.push_back(ofr);
+    }
+  }
+
+  // The `maxWorkgroupParallelDims` represents the maximum dimension number
+  // used for distribution. The rest of the workgroups get folded into the
+  // `maxWorkgroupParallelDims`
+  Location loc = workgroupCountOp.getLoc();
+  if (results.size() > maxWorkgroupParallelDims) {
+    MutableArrayRef<OpFoldResult> resultsRef =
+        llvm::MutableArrayRef<OpFoldResult>(results);
+    assert(maxWorkgroupParallelDims != 0 &&
+           "unexpected max parallel dimensions being 0");
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    AffineMap foldMap = AffineMap::get(0, 2, s0 * s1);
+    for (auto [index, foldedResult] : llvm::enumerate(
+             resultsRef.take_back(results.size() - maxWorkgroupParallelDims))) {
+      resultsRef[maxWorkgroupParallelDims - 1] =
+          affine::makeComposedFoldedAffineApply(
+              rewriter, loc, foldMap,
+              {resultsRef[maxWorkgroupParallelDims - 1],
+               resultsRef[maxWorkgroupParallelDims + index]});
+    }
+    results.resize(maxWorkgroupParallelDims);
+  }
+
+  // Fill out the remaining results with 1.
+  if (results.size() < workgroupCountOp.getNumResults()) {
+    results.resize(workgroupCountOp.getNumResults(), rewriter.getIndexAttr(1));
+  }
+  rewriter.replaceOp(workgroupCountOp,
+                     getValueOrCreateConstantIndexOp(rewriter, loc, results));
+  for (auto ordinalOp : ordinalOps) {
+    rewriter.replaceOp(ordinalOp, ordinalOp.getOperand());
+  }
+
+  return success();
+}
+
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter, func::FuncOp entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+      getEntryPoint(entryPointFn);
+  if (failed(exportOp)) {
+    return entryPointFn.emitOpError(
+        "expected function to be entry point function");
+  }
+  Block *body = exportOp->getWorkgroupCountBody();
+  if (!body) {
+    return exportOp->emitOpError("unexpected empty workgroup count region");
+  }
+  auto countOps = body->getOps<IREE::Flow::DispatchWorkgroupCountFromSliceOp>();
+  if (countOps.empty()) {
+    // If there are no `flow.dispatch.workgroup_count_default` operations
+    // do nothing.
+    return success();
+  }
+  if (!llvm::hasSingleElement(countOps)) {
+    return exportOp->emitOpError(
+        "unexpected multiple flow.dispatch.workgroup_count_default operations "
+        "in body");
+  }
+  return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
+                                        entryPointFn, workgroupCount,
+                                        maxWorkgroupParallelDims);
+}
 
 //===---------------------------------------------------------------------===//
 // Patterns to fold tensor.expand/collapse_shape into
@@ -262,9 +422,8 @@ namespace {
 // TODO(antigainst): enable dynamic shape support once they are needed.
 template <typename TensorReshapeOp>
 static std::optional<Value> getStaticReshapeOpSrc(TensorReshapeOp reshapeOp) {
-  auto reshapeSrcType =
-      reshapeOp.getSrc().getType().template cast<ShapedType>();
-  auto reshapeDstType = reshapeOp.getType().template cast<ShapedType>();
+  auto reshapeSrcType = llvm::cast<ShapedType>(reshapeOp.getSrc().getType());
+  auto reshapeDstType = llvm::cast<ShapedType>(reshapeOp.getType());
   if (!reshapeSrcType.hasStaticShape() || !reshapeDstType.hasStaticShape())
     return std::nullopt;
   return reshapeOp.getSrc();
@@ -298,11 +457,13 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
                                 PatternRewriter &rewriter) const override {
     std::optional<Value> reshapeSrc =
         getStaticReshapeOpSrc<TensorReshapeOp>(reshapeOp);
-    if (!reshapeSrc) return failure();
+    if (!reshapeSrc)
+      return failure();
 
     auto loadOp =
         reshapeSrc->template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-    if (!loadOp) return failure();
+    if (!loadOp)
+      return failure();
 
     // Make sure we are loading the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
@@ -313,12 +474,13 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
     auto subspanOp =
         loadOp.getSource()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp) return failure();
+    if (!subspanOp)
+      return failure();
     assert(subspanOp.getDynamicDims().empty());
 
-    auto tensorAccess = subspanOp.getType()
-                            .template cast<IREE::Flow::DispatchTensorType>()
-                            .getAccess();
+    auto tensorAccess =
+        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType())
+            .getAccess();
     auto newSubspanType = IREE::Flow::DispatchTensorType::get(
         tensorAccess, reshapeOp.getResultType());
 
@@ -379,17 +541,19 @@ struct FoldReshapeIntoInterfaceTensorStore
                   cast<tensor::CollapseShapeOp>(reshapeOp))
             : getStaticReshapeOpSrc<tensor::ExpandShapeOp>(
                   cast<tensor::ExpandShapeOp>(reshapeOp));
-    if (!reshapeSrc) return failure();
+    if (!reshapeSrc)
+      return failure();
 
     auto subspanOp =
         storeOp.getTarget()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp) return failure();
+    if (!subspanOp)
+      return failure();
     assert(subspanOp.getDynamicDims().empty());
 
-    auto tensorAccess = subspanOp.getType()
-                            .template cast<IREE::Flow::DispatchTensorType>()
-                            .getAccess();
+    auto tensorAccess =
+        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType())
+            .getAccess();
     auto newSubspanType = IREE::Flow::DispatchTensorType::get(
         tensorAccess, reshapeSrc->getType());
 
@@ -410,7 +574,7 @@ struct FoldReshapeIntoInterfaceTensorStore
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
   patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
@@ -471,7 +635,7 @@ struct RemoveDeadInterfaceBindings
     return eraseAlignmentOnlyDeadOp(rewriter, op);
   }
 };
-}  // namespace
+} // namespace
 
 void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
@@ -501,7 +665,8 @@ void analyseAllocsForPacking(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
         // Skip the whole analysis if any user is a subview.
         // TODO: This could be extended if needed by recursively merging
         // liveness.
-        if (isa<memref::SubViewOp>(user)) return;
+        if (isa<memref::SubViewOp>(user))
+          return;
         if (group.liveness.count(user)) {
           aliasGroups.push_back(i);
           break;
@@ -539,12 +704,14 @@ void analyseAllocsForPacking(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
   LLVM_DEBUG({
     for (size_t i = 0; i < groups.size(); i++) {
       llvm::dbgs() << "Alias group " << i << ":\n";
-      for (Operation *op : groups[i].allocs) op->dump();
+      for (Operation *op : groups[i].allocs)
+        op->dump();
     }
   });
 
   for (size_t i = 0; i < groups.size(); i++) {
-    if (groups[i].allocs.empty()) continue;
+    if (groups[i].allocs.empty())
+      continue;
     aliasGroups.push_back(std::move(groups[i].allocs));
   }
 }
@@ -559,7 +726,8 @@ static int64_t getAllocSize(Operation *op, DataLayout &dataLayout) {
 
 void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
                 ArrayRef<AliasGroup> aliasGroups) {
-  if (aliasGroups.empty()) return;
+  if (aliasGroups.empty())
+    return;
   DataLayout dataLayout = DataLayout::closest(funcOp);
   builder.setInsertionPointToStart(&(*funcOp.getBody().begin()));
   int64_t maxAlloc = 0;
@@ -570,10 +738,9 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
     }
     maxAlloc = std::max(maxAlloc, allocSize);
   }
-  Attribute memorySpace = aliasGroups[0][0]
-                              ->getResultTypes()[0]
-                              .cast<MemRefType>()
-                              .getMemorySpace();
+  Attribute memorySpace =
+      llvm::cast<MemRefType>(aliasGroups[0][0]->getResultTypes()[0])
+          .getMemorySpace();
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
                                          AffineMap(), memorySpace);
   Value packedAlloc =
@@ -594,5 +761,5 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
   }
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

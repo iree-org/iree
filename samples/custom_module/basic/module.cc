@@ -127,8 +127,9 @@ class CustomModuleState final {
       // Passed in refs may be null.
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null string arg");
     }
-    fprintf(stdout, "LENGTH %.*s = %zu\n", static_cast<int>(string->value.size),
-            string->value.data, string->value.size);
+    fprintf(stdout, "LENGTH %.*s = %" PRIhsz "\n",
+            static_cast<int>(string->value.size), string->value.data,
+            string->value.size);
     fflush(stdout);
     return static_cast<int64_t>(string->value.size);
   }
@@ -208,6 +209,11 @@ extern "C" iree_status_t iree_custom_module_basic_create(
   // Unregistration isn't strictly required in some cases but is good practice.
   iree_custom_module_basic_register_types(instance);
 
+  // NOTE: this isn't using the allocator here and that's bad as it leaves
+  // untracked allocations and pulls in the system allocator that may differ
+  // from the one requested by the user.
+  // TODO(benvanik): std::allocator wrapper around iree_allocator_t so this can
+  // use that instead.
   auto module = std::make_unique<CustomModule>(
       "custom", /*version=*/0, instance, allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>(

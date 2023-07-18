@@ -10,7 +10,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
@@ -38,9 +37,10 @@ namespace IREE {
 namespace LinalgExt {
 class LinalgExtTransformOpsExtension
     : public transform::TransformDialectExtension<
-          LinalgExtTransformOpsExtension, IREELinalgExtDialect> {
+          LinalgExtTransformOpsExtension> {
 public:
   LinalgExtTransformOpsExtension();
+  void init();
 };
 } // namespace LinalgExt
 } // namespace IREE

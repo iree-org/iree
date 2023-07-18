@@ -1,5 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-abi-wrap-entry-points{invocation-model=sync})' --split-input-file %s | FileCheck %s
 
+// Tests basic dynamic tensor I/O marshaling.
+
 // CHECK-LABEL: func.func @dynamicEntry(
 //  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view
 //  CHECK-SAME: -> (
@@ -29,6 +31,21 @@ func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) 
 
 // -----
 
+// Tests that exports with encodings specified are propagated to the HAL ops.
+
+// CHECK-LABEL: func.func @exportEncodings
+// CHECK: hal.tensor.import {{.+}} : !hal.buffer_view -> tensor<?x8x8x3xi32> as tensor<?x8x8x3xf32>{{.+}}
+// CHECK: hal.tensor.export {{.+}} : tensor<?x8x8x3xi32> as tensor<?x8x8x3xf32>{{.+}} -> !hal.buffer_view
+
+// CHECK-LABEL: func.func private @_exportEncodings(
+func.func @exportEncodings(%arg0: tensor<?x8x8x3xf32> {iree.abi.encoding = tensor<?x8x8x3xi32>}) -> (tensor<?x8x8x3xf32> {iree.abi.encoding = tensor<?x8x8x3xi32>}) {
+  return %arg0 : tensor<?x8x8x3xf32>
+}
+
+// -----
+
+// Tests specifying explicit storage for specific function results.
+
 // CHECK-LABEL: func.func @outputStorage(
 //  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view,
 //  CHECK-SAME:   %[[RET1_STORAGE:.+]]: !hal.buffer
@@ -43,7 +60,7 @@ func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) 
 //       CHECK:   %[[RET0_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>
 //  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#0 "output 0" : tensor<?x8x8x3xf32>{%[[RET0_DIM0]]} -> !hal.buffer_view
 //       CHECK:   %[[RET1_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#1, %c0{{.*}} : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#1 "output 1" into %[[RET1_STORAGE]] : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#1 "output 1" into(%[[RET1_STORAGE]] : !hal.buffer) : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 
@@ -56,6 +73,8 @@ func.func @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.ab
 }
 
 // -----
+
+// Tests that functions already wrapped (iree.abi.stub present) are ignored.
 
 // CHECK-LABEL: func.func @wrappedAlready
 //  CHECK-SAME: (%arg0: !hal.buffer_view) -> !hal.buffer_view
@@ -108,5 +127,28 @@ func.func private @import(tensor<?x2xi32>) -> tensor<2x?xi32>
 func.func private @caller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi32> {
   // CHECK: call @_import(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
   %0 = call @import(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
+  return %0 : tensor<2x?xi32>
+}
+
+// -----
+
+// Tests that imports with encodings specified are propagated to the HAL ops.
+
+// CHECK-LABEL: func.func private @importEncodings(!hal.buffer_view) -> !hal.buffer_view
+func.func private @importEncodings(tensor<?x2xi32> {iree.abi.encoding = tensor<?x2xf32>}) -> (tensor<2x?xi32> {iree.abi.encoding = tensor<2x?xf32>})
+
+// CHECK: func.func private @_importEncodings(%[[ARG_TENSOR:.+]]: tensor<?x2xi32>) -> tensor<2x?xi32> {
+// CHECK:   %[[ARG_DIM:.+]] = tensor.dim %[[ARG_TENSOR]], %c0
+// CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export %[[ARG_TENSOR]] : tensor<?x2xi32>{%[[ARG_DIM]]} -> !hal.buffer_view
+// CHECK:   %[[RET_VIEW:.+]] = call @importEncodings(%[[ARG_VIEW]]) : (!hal.buffer_view) -> !hal.buffer_view
+// CHECK:   %[[RET_DIM:.+]] = hal.buffer_view.dim<%[[RET_VIEW]] : !hal.buffer_view>[1]
+// CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import %[[RET_VIEW]] : !hal.buffer_view -> tensor<2x?xi32>{%[[RET_DIM]]}
+// CHECK:   return %[[RET_TENSOR]]
+// CHECK: }
+
+// CHECK: func.func private @importEncodingsCaller(%arg0: tensor
+func.func private @importEncodingsCaller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi32> {
+  // CHECK: call @_importEncodings(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
+  %0 = call @importEncodings(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
   return %0 : tensor<2x?xi32>
 }

@@ -74,6 +74,17 @@ func.func @TensorConstantToSplat() -> !stream.resource<constant> {
 
 // -----
 
+// CHECK-LABEL: @TensorComplexConstantToSplat
+func.func @TensorComplexConstantToSplat() -> !stream.resource<constant> {
+  // CHECK-DAG: %[[CST:.+]] = complex.constant [2.000000e+00 : f32, 3.000000e+00 : f32] : complex<f32>
+  // CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<2x2xcomplex<f32>> : index
+  // CHECK: = stream.tensor.splat %[[CST]] : complex<f32> -> tensor<2x2xcomplex<f32>> in !stream.resource<*>{%[[SIZE]]}
+  %cst = stream.tensor.constant : tensor<2x2xcomplex<f32>> in !stream.resource<constant> = dense<(2.000000e+00,3.000000e+00)> : tensor<2x2xcomplex<f32>>
+  return %cst : !stream.resource<constant>
+}
+
+// -----
+
 // CHECK-LABEL: @NarrowSplatPatternI32ToI8
 func.func @NarrowSplatPatternI32ToI8() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index

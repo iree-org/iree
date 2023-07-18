@@ -35,16 +35,37 @@ namespace {
 // Emplacement
 //===----------------------------------------------------------------------===//
 
+static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
+  assert(oldValue.getType().isa<IREE::Stream::ResourceType>());
+  assert(newValue.getType().isa<IREE::Stream::ResourceType>());
+  if (oldValue.getType() == newValue.getType()) {
+    oldValue.replaceAllUsesWith(newValue);
+    return;
+  }
+  OpBuilder builder(newValue.getContext());
+  builder.setInsertionPointAfterValue(newValue);
+  Value newValueSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
+      newValue.getLoc(), newValue, builder);
+  IREE::Stream::AffinityAttr sourceAffinity;
+  IREE::Stream::AffinityAttr resultAffinity;
+  Value transferValue = builder.create<IREE::Stream::AsyncTransferOp>(
+      newValue.getLoc(), oldValue.getType(), newValue, newValueSize,
+      newValueSize, sourceAffinity, resultAffinity);
+  oldValue.replaceAllUsesWith(transferValue);
+}
+
 static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
   bool didChange = false;
   for (auto [resultIndex, result] : llvm::enumerate(dispatchOp.getResults())) {
     // Ignore results with multiple users. We could potentially place these but
     // that makes tracking much more complicated.
-    if (!result.hasOneUse()) continue;
+    if (!result.hasOneUse())
+      continue;
     // Ignore already-tied operands.
     // TODO(benvanik): update tied range if we want to place into a superset?
     auto operandIndex = dispatchOp.getTiedResultOperandIndex(resultIndex);
-    if (operandIndex.has_value()) continue;
+    if (operandIndex.has_value())
+      continue;
 
     // Find potential.
     Value targetResource;
@@ -56,7 +77,8 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     Value targetResultSize;
     Operation *userOp = *result.user_begin();
     if (auto updateOp = dyn_cast<IREE::Stream::AsyncUpdateOp>(userOp)) {
-      if (updateOp.getUpdate() != result) continue;
+      if (updateOp.getUpdate() != result)
+        continue;
       if (!IREE::Util::tryMoveProducerBefore(updateOp.getTarget(),
                                              dispatchOp)) {
         // Failed to move while keeping valid SSA dominance.
@@ -76,7 +98,8 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
       targetResult = updateOp.getResult();
       targetResultSize = updateOp.getTargetSize();
     }
-    if (!targetResource) continue;
+    if (!targetResource)
+      continue;
 
     // Add operand and tie the result.
     operandIndex = dispatchOp.getResourceOperands().size();
@@ -93,7 +116,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     dispatchOp.getResultSizesMutable().assign(resultSizes);
 
     // Replace users with the result of the dispatch op.
-    targetResult.replaceAllUsesWith(result);
+    replaceUsesAndTransfer(targetResult, result);
     userOp->erase();
 
     didChange = true;
@@ -107,7 +130,8 @@ static bool emplaceAllocationsInRegion(Region &region) {
   bool didChange = false;
   for (auto &block : region.getBlocks()) {
     for (auto &op : block) {
-      if (!op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) continue;
+      if (!op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>())
+        continue;
       // TODO(benvanik): support placement for more ops e.g. copies/collectives.
       didChange = TypeSwitch<Operation *, bool>(&op)
                       // TODO(#11249): support in-place collective ops.
@@ -126,7 +150,7 @@ static bool emplaceAllocationsInRegion(Region &region) {
 
 class EmplaceAllocationsPass
     : public EmplaceAllocationsBase<EmplaceAllocationsPass> {
- public:
+public:
   EmplaceAllocationsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -146,13 +170,13 @@ class EmplaceAllocationsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<>> createEmplaceAllocationsPass() {
   return std::make_unique<EmplaceAllocationsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

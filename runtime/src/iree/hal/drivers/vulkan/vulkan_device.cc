@@ -13,7 +13,6 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/builtin_executables.h"
 #include "iree/hal/drivers/vulkan/command_queue.h"
@@ -23,6 +22,7 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
+#include "iree/hal/drivers/vulkan/native_allocator.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/native_semaphore.h"
@@ -246,7 +246,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   if (iree_all_bits_set(requested_features,
                         IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
     // VK_EXT_host_query_reset:
@@ -264,7 +264,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
             VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
   }
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   *out_string_count = string_count;
   return status;
@@ -467,6 +467,9 @@ typedef struct iree_hal_vulkan_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Optional provider used for creating/configuring collective channels.
+  iree_hal_channel_provider_t* channel_provider;
+
   // All queues available on the device; the device owns these.
   iree_host_size_t queue_count;
   CommandQueue** queues;
@@ -511,7 +514,7 @@ static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->flags = 0;
+  out_options->flags = IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR;
   out_options->large_heap_block_size = 64 * 1024 * 1024;
 }
 
@@ -709,9 +712,17 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
 
   // Create the device memory allocator that will service all buffer
   // allocation requests.
-  iree_status_t status = iree_hal_vulkan_vma_allocator_create(
-      options, instance, physical_device, logical_device,
-      (iree_hal_device_t*)device, &device->device_allocator);
+  iree_status_t status = iree_ok_status();
+  if (iree_all_bits_set(options->flags,
+                        IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR)) {
+    status = iree_hal_vulkan_vma_allocator_create(
+        options, instance, physical_device, logical_device,
+        (iree_hal_device_t*)device, &device->device_allocator);
+  } else {
+    status = iree_hal_vulkan_native_allocator_create(
+        options, instance, physical_device, logical_device,
+        (iree_hal_device_t*)device, &device->device_allocator);
+  }
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -775,6 +786,9 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
+
+  // Buffers may have been retaining collective resources.
+  iree_hal_channel_provider_release(device->channel_provider);
 
   // All arena blocks should have been returned.
   iree_arena_block_pool_deinitialize(&device->block_pool);
@@ -1011,9 +1025,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
       iree_hal_vulkan_infer_enabled_device_extensions(device_syms.get());
 
   iree_hal_vulkan_features_t enabled_features = 0;
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
   auto logical_device_handle = new VkDeviceHandle(
@@ -1055,6 +1069,14 @@ static void iree_hal_vulkan_replace_device_allocator(
   iree_hal_allocator_retain(new_allocator);
   iree_hal_allocator_release(device->device_allocator);
   device->device_allocator = new_allocator;
+}
+
+static void iree_hal_vulkan_replace_channel_provider(
+    iree_hal_device_t* base_device, iree_hal_channel_provider_t* new_provider) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  iree_hal_channel_provider_retain(new_provider);
+  iree_hal_channel_provider_release(device->channel_provider);
+  device->channel_provider = new_provider;
 }
 
 static iree_status_t iree_hal_vulkan_device_trim(
@@ -1351,6 +1373,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.host_allocator=*/iree_hal_vulkan_device_host_allocator,
     /*.device_allocator=*/iree_hal_vulkan_device_allocator,
     /*.replace_device_allocator=*/iree_hal_vulkan_replace_device_allocator,
+    /*.replace_channel_provider=*/iree_hal_vulkan_replace_channel_provider,
     /*.trim=*/iree_hal_vulkan_device_trim,
     /*.query_i64=*/iree_hal_vulkan_device_query_i64,
     /*.create_channel=*/iree_hal_vulkan_device_create_channel,

@@ -13,10 +13,10 @@ name: Setup
 on:
   workflow_call:
     outputs:
-      should-run:
+      enabled-jobs:
         description: |
-          Whether CI should run.
-        value: ${{ jobs.setup.outputs.should-run }}
+          Which jobs should run.
+        value: ${{ jobs.setup.outputs.enabled-jobs }}
       is-pr:
         description: |
           Whether the workflow has been triggered by a pull request.
@@ -55,7 +55,7 @@ jobs:
       # parent will be the tip of main.
       BASE_REF: HEAD^
     outputs:
-      should-run: ${{ steps.configure.outputs.should-run }}
+      enabled-jobs: ${{ steps.configure.outputs.enabled-jobs }}
       is-pr: ${{ steps.configure.outputs.is-pr }}
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
@@ -88,6 +88,7 @@ jobs:
           # the JSON strings and later use fromJSON to decode them.
           echo "pr-title=$(jq '.title' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
           echo "pr-body=$(jq '.body' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "pr-branch=$(jq '.head.ref' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
           # Use --compact-output to avoid multiline JSON.
           echo "pr-labels=$(jq --compact-output '.labels | map(.name)' \
             ${PR_JSON})" >> "${GITHUB_OUTPUT}"
@@ -96,6 +97,7 @@ jobs:
         env:
           PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
           PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
+          PR_BRANCH: ${{ fromJSON(steps.fetch-pr.outputs.pr-branch || '""') }}
           PR_LABELS: ${{ steps.fetch-pr.outputs.pr-labels || '[]' }}
           ORIGINAL_PR_TITLE: ${{ github.event.pull_request.title }}
           ORIGINAL_PR_BODY: ${{ github.event.pull_request.body }}
@@ -109,9 +111,12 @@ jobs:
 
           ./build_tools/github_actions/configure_ci.py
 
-      - name: "Show benchmark presets"
+      - name: "Show enabled options"
         env:
-          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets }}
+          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets || 'None' }}
+          ENABLED_JOBS: ${{ join(fromJson(steps.configure.outputs.enabled-jobs)) || 'None' }}
         run: |
+          echo ":green_circle: Enabled jobs: \`${ENABLED_JOBS}\`" \
+              >> "${GITHUB_STEP_SUMMARY}"
           echo ":stopwatch: Enabled benchmarks: \`${BENCHMARK_PRESETS}\`" \
             >> "${GITHUB_STEP_SUMMARY}"

@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/internal/path.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/resource.h"
 
@@ -54,7 +53,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_ordinal(
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)device_ordinal);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)device_ordinal);
 
   // Query the devices from the driver.
   iree_host_size_t device_info_count = 0;
@@ -99,7 +98,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_id(
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)device_id);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)device_id);
   iree_status_t status = _VTABLE_DISPATCH(driver, create_device_by_id)(
       driver, device_id, param_count, params, host_allocator, out_device);
   IREE_TRACE_ZONE_END(z0);

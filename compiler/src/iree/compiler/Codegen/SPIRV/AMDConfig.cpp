@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -47,7 +47,8 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {8, 8, 32};
   } else {
@@ -85,16 +86,18 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32) return failure();
+    if (bitwidth > 32)
+      return failure();
     const int multipler = 32 / bitwidth;
     bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
     const int bestTilingFactor = (hasPaddedInput ? 16 : 32) * multipler;
-    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
   }
 
   return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

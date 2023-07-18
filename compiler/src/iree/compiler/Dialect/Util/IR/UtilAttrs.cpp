@@ -23,7 +23,7 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -44,7 +44,7 @@ static llvm::cl::opt<bool> clZeroFillElidedAttrs(
 // Assumes that no more data will be written than is allocated in the provided
 // storage buffer.
 class raw_inplace_ostream : public llvm::raw_pwrite_stream {
- public:
+public:
   explicit raw_inplace_ostream(ArrayRef<char> storage) : storage(storage) {
     SetUnbuffered();
   }
@@ -54,7 +54,7 @@ class raw_inplace_ostream : public llvm::raw_pwrite_stream {
 
   void reserveExtraSpace(uint64_t extraSize) override {}
 
- private:
+private:
   uint64_t current_pos() const override { return offset; }
 
   void write_impl(const char *ptr, size_t size) override {
@@ -72,14 +72,22 @@ class raw_inplace_ostream : public llvm::raw_pwrite_stream {
 
 // Returns true if the raw data of the attribute matches our expected output
 // format. This allows the use of the attribute getRawData() method.
-static bool canUseRawData(DenseElementsAttr elementsAttr,
+static bool canUseRawData(DenseElementsAttr attr,
                           llvm::support::endianness endian) {
-  int32_t bitwidth = elementsAttr.getType().getElementTypeBitWidth();
-  if (bitwidth == 8) {
+  Type elementType = attr.getElementType();
+  if (!isa<IntegerType, FloatType, ComplexType>(elementType)) {
+    // We cannot assume composite element types have the raw layout we want,
+    // other than ComplexType, which is effectively vector<2xfN> and goes
+    // through the later logic.
+    return false;
+  }
+
+  int32_t bitWidth = getTypeBitWidth(elementType);
+  if (bitWidth == 8) {
     // Don't care about endianness at all for single-byte data.
     return true;
-  } else if (bitwidth % 8 != 0) {
-    // Any non-byte aligned bitwidth is stored byte aligned.
+  } else if (bitWidth % 8 != 0) {
+    // Any non-byte aligned bit width is stored byte aligned.
     return false;
   } else if (endian != llvm::support::endian::system_endianness()) {
     // Can't use raw data if the endianness of the system doesn't match the
@@ -90,66 +98,80 @@ static bool canUseRawData(DenseElementsAttr elementsAttr,
 }
 
 // Appends the raw bytes of |value| in the given endianness to |buffer|.
-static LogicalResult getAPIntRawData(APInt value, size_t bitWidth,
-                                     llvm::support::endianness endian,
-                                     SmallVectorImpl<char> &buffer) {
-  buffer.resize(bitWidth / 8);
-  switch (bitWidth) {
-    case 8: {
-      uint8_t rawValue = llvm::support::endian::byte_swap<uint8_t>(
-          value.extractBitsAsZExtValue(8, 0), endian);
-      std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
-      return success();
-    }
-    case 16: {
-      uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
-          value.extractBitsAsZExtValue(16, 0), endian);
-      std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
-      return success();
-    }
-    case 32: {
-      uint32_t rawValue = llvm::support::endian::byte_swap<uint32_t>(
-          value.extractBitsAsZExtValue(32, 0), endian);
-      std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
-      return success();
-    }
-    case 64: {
-      uint64_t rawValue = llvm::support::endian::byte_swap<uint64_t>(
-          value.extractBitsAsZExtValue(64, 0), endian);
-      std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
-      return success();
-    }
-    default:
-      return failure();
+// Non-byte-aligned types are rounded up to the next power of two byte-aligned
+// bit width (i1 -> i8, i4 -> i8, i17 -> i32, etc).
+static LogicalResult serializeAPIntRawData(APInt value, uint64_t bitWidth,
+                                           llvm::support::endianness endian,
+                                           SmallVectorImpl<char> &buffer) {
+  // Round up to 8-bit aligned bytes.
+  uint64_t byteAligned = llvm::divideCeil(bitWidth, 8);
+  // Round up to the next power of two (unless already a power of two).
+  uint64_t byteWidth = llvm::PowerOf2Ceil(byteAligned);
+  // Storage is in aligned bytes.
+  buffer.resize(byteWidth);
+  // Extract up to the declared bit width and pad.
+  switch (byteWidth) {
+  case 1: {
+    uint8_t rawValue = llvm::support::endian::byte_swap<uint8_t>(
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  case 2: {
+    uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  case 4: {
+    uint32_t rawValue = llvm::support::endian::byte_swap<uint32_t>(
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  case 8: {
+    uint64_t rawValue = llvm::support::endian::byte_swap<uint64_t>(
+        value.extractBitsAsZExtValue(bitWidth, 0), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  default:
+    return failure();
   }
 }
 
 // Appends the raw bytes of |value| in the given endianness to |buffer|.
-static LogicalResult getAPFloatRawData(APFloat value, size_t bitWidth,
-                                       llvm::support::endianness endian,
-                                       SmallVectorImpl<char> &buffer) {
+static LogicalResult serializeAPFloatRawData(APFloat value, size_t bitWidth,
+                                             llvm::support::endianness endian,
+                                             SmallVectorImpl<char> &buffer) {
   buffer.resize(bitWidth / 8);
   switch (bitWidth) {
-    case 16: {
-      uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
-          value.bitcastToAPInt().extractBitsAsZExtValue(16, 0), endian);
-      std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
-      return success();
-    }
-    case 32: {
-      float rawValue = llvm::support::endian::byte_swap<float>(
-          value.convertToFloat(), endian);
-      std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
-      return success();
-    }
-    case 64: {
-      double rawValue = llvm::support::endian::byte_swap<double>(
-          value.convertToDouble(), endian);
-      std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
-      return success();
-    }
-    default:
-      return failure();
+  case 8: {
+    uint8_t rawValue = llvm::support::endian::byte_swap<uint8_t>(
+        value.bitcastToAPInt().extractBitsAsZExtValue(8, 0), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  case 16: {
+    uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
+        value.bitcastToAPInt().extractBitsAsZExtValue(16, 0), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  case 32: {
+    float rawValue =
+        llvm::support::endian::byte_swap<float>(value.convertToFloat(), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  case 64: {
+    double rawValue = llvm::support::endian::byte_swap<double>(
+        value.convertToDouble(), endian);
+    std::memcpy(buffer.data(), &rawValue, sizeof(rawValue));
+    return success();
+  }
+  default:
+    return failure();
   }
 }
 
@@ -161,20 +183,20 @@ static LogicalResult serializeSplatValue(Attribute splatAttr, int64_t count,
                                          llvm::raw_ostream &os) {
   // Get the encoded byte contents of the splat element.
   SmallVector<char> elementBuffer;
-  if (auto attr = splatAttr.dyn_cast<IREE::Util::SerializableAttrInterface>()) {
+  if (auto attr = llvm::dyn_cast<SerializableAttrInterface>(splatAttr)) {
     if (failed(attr.serializeToVector(endian, elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = splatAttr.dyn_cast<IntegerAttr>()) {
-    if (failed(getAPIntRawData(attr.getValue(),
-                               attr.getType().getIntOrFloatBitWidth(), endian,
-                               elementBuffer))) {
+  } else if (auto attr = llvm::dyn_cast<IntegerAttr>(splatAttr)) {
+    if (failed(serializeAPIntRawData(attr.getValue(),
+                                     attr.getType().getIntOrFloatBitWidth(),
+                                     endian, elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = splatAttr.dyn_cast<FloatAttr>()) {
-    if (failed(getAPFloatRawData(attr.getValue(),
-                                 attr.getType().getIntOrFloatBitWidth(), endian,
-                                 elementBuffer))) {
+  } else if (auto attr = llvm::dyn_cast<FloatAttr>(splatAttr)) {
+    if (failed(serializeAPFloatRawData(attr.getValue(),
+                                       attr.getType().getIntOrFloatBitWidth(),
+                                       endian, elementBuffer))) {
       return failure();
     }
   } else {
@@ -199,84 +221,175 @@ static LogicalResult serializeRawData(DenseElementsAttr elementsAttr,
   return success();
 }
 
+// Stream writer that supports bit packing.
+// In the initial state the writer starts at a byte-aligned offset 0 and as new
+// values of |logicalBitWidth| are written they will be appended in
+// |physicalBitWidth| chunks in the specified endianness. When completed any
+// additional bits remaining in the last |physicalBitWidth| chunk will be padded
+// with zeros.
+//
+// Note that the logical bit width may not evenly divide the physical bit width:
+// a logical width of 3 and a physical width of 8 will always include 2 bits of
+// zero padding.
+template <typename physicalType,
+          unsigned physicalBitWidth = sizeof(physicalType) * 8>
+class PackedWriter {
+public:
+  explicit PackedWriter(unsigned logicalBitWidth,
+                        llvm::support::endianness endian, llvm::raw_ostream &os)
+      : logicalBitWidth(logicalBitWidth), endian(endian), os(os) {}
+
+  void write(const uint64_t value) {
+    if (bitOffset + logicalBitWidth > physicalBitWidth)
+      flush();
+    physicalBuffer |= value << bitOffset;
+    bitOffset += logicalBitWidth;
+  }
+
+  void flush() {
+    if (bitOffset == 0)
+      return;
+    physicalType physicalValue =
+        llvm::support::endian::byte_swap<physicalType>(physicalBuffer, endian);
+    os.write((const char *)&physicalValue, sizeof(physicalValue));
+    physicalBuffer = 0;
+    bitOffset = 0;
+  }
+
+private:
+  const unsigned logicalBitWidth;
+  const llvm::support::endianness endian;
+  llvm::raw_ostream &os;
+  unsigned bitOffset = 0;
+  physicalType physicalBuffer = 0;
+};
+
+static LogicalResult
+serializeSubByteIntegerElements(DenseIntElementsAttr attr,
+                                llvm::support::endianness endian,
+                                llvm::raw_ostream &os) {
+  const unsigned logicalBitWidth =
+      attr.getElementType().getIntOrFloatBitWidth();
+  // Round up to the next power of two (unless already a power of two) of the
+  // 8-bit aligned logical bit width.
+  const unsigned physicalBitWidth =
+      getTypePhysicalStorageBitWidth(attr.getElementType());
+  switch (physicalBitWidth) {
+  case 8: {
+    PackedWriter<uint8_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  case 16: {
+    PackedWriter<uint16_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  case 32: {
+    PackedWriter<uint32_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  case 64: {
+    PackedWriter<uint64_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APInt>()) {
+      writer.write(value.getZExtValue());
+    }
+    writer.flush();
+    return success();
+  }
+  default:
+    return emitError(UnknownLoc::get(attr.getContext()))
+           << "unhandled packed integer physical bit width " << physicalBitWidth
+           << " for type " << attr.getType();
+  }
+}
+
 template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
-static LogicalResult serializeGenericIntElements(
-    DenseIntElementsAttr attr, llvm::support::endianness endian,
-    llvm::raw_ostream &os) {
+static LogicalResult
+serializeGenericIntegerElements(DenseIntElementsAttr attr,
+                                llvm::support::endianness endian,
+                                llvm::raw_ostream &os) {
   for (const APInt &value : attr.getValues<APInt>()) {
     elementType rawValue = llvm::support::endian::byte_swap<elementType>(
         value.extractBitsAsZExtValue(numBits, 0), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
+    os.write((const char *)&rawValue, sizeof(rawValue));
   }
   return success();
 }
 
-static LogicalResult serializeGenericF16Elements(
-    DenseFPElementsAttr attr, llvm::support::endianness endian,
-    llvm::raw_ostream &os) {
+template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
+static LogicalResult
+serializeGenericFloatElements(DenseFPElementsAttr attr,
+                              llvm::support::endianness endian,
+                              llvm::raw_ostream &os) {
   for (const APFloat &value : attr.getValues<APFloat>()) {
-    uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
-        value.bitcastToAPInt().extractBitsAsZExtValue(16, 0), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
-  }
-  return success();
-}
-
-static LogicalResult serializeGenericF32Elements(
-    DenseFPElementsAttr attr, llvm::support::endianness endian,
-    llvm::raw_ostream &os) {
-  for (const APFloat &value : attr.getValues<APFloat>()) {
-    float rawValue =
-        llvm::support::endian::byte_swap<float>(value.convertToFloat(), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
-  }
-  return success();
-}
-
-static LogicalResult serializeGenericF64Elements(
-    DenseFPElementsAttr attr, llvm::support::endianness endian,
-    llvm::raw_ostream &os) {
-  for (const APFloat &value : attr.getValues<APFloat>()) {
-    double rawValue = llvm::support::endian::byte_swap<double>(
-        value.convertToDouble(), endian);
-    os.write((char *)&rawValue, sizeof(rawValue));
+    elementType rawValue = llvm::support::endian::byte_swap<elementType>(
+        value.bitcastToAPInt().extractBitsAsZExtValue(numBits, 0), endian);
+    os.write((const char *)&rawValue, sizeof(rawValue));
   }
   return success();
 }
 
 // Performs slow generic serialization of all of the elements in |elementsAttr|.
 // Respects the target |endian| setting, performing byte swaps if required.
-static LogicalResult serializeGenericElementData(
-    DenseElementsAttr elementsAttr, llvm::support::endianness endian,
-    llvm::raw_ostream &os) {
-  int32_t bitwidth = elementsAttr.getType().getElementTypeBitWidth();
-  if (auto attr = elementsAttr.dyn_cast<DenseIntElementsAttr>()) {
-    switch (bitwidth) {
-      case 8:
-        return serializeRawData(attr, os);
-      case 16:
-        return serializeGenericIntElements<uint16_t>(attr, endian, os);
-      case 32:
-        return serializeGenericIntElements<uint32_t>(attr, endian, os);
-      case 64:
-        return serializeGenericIntElements<uint64_t>(attr, endian, os);
-      default:
-        return emitError(UnknownLoc::get(elementsAttr.getContext()))
-               << "unhandled integer element bitwidth " << bitwidth
-               << " for type " << elementsAttr.getType();
+static LogicalResult
+serializeGenericElementData(DenseElementsAttr elementsAttr,
+                            llvm::support::endianness endian,
+                            llvm::raw_ostream &os) {
+  if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    unsigned bitWidth = attr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 8:
+      return serializeRawData(attr, os);
+    case 16:
+      return serializeGenericIntegerElements<uint16_t>(attr, endian, os);
+    case 32:
+      return serializeGenericIntegerElements<uint32_t>(attr, endian, os);
+    case 64:
+      return serializeGenericIntegerElements<uint64_t>(attr, endian, os);
+    default:
+      // NOTE: i1 is treated as i8 in a lot of places in MLIR/IREE and will need
+      // a larger cleanup to serialize as a sub-byte value.
+      if (bitWidth != 1 && bitWidth < 64) {
+        // Special case for bit-packing of sub-byte aligned types.
+        // This could be extended to handle larger widths (i33, etc) but they
+        // are rare today.
+        return serializeSubByteIntegerElements(attr, endian, os);
+      }
+      return emitError(UnknownLoc::get(elementsAttr.getContext()))
+             << "unhandled integer element bit width " << bitWidth
+             << " for type " << elementsAttr.getType();
     }
-  } else if (auto attr = elementsAttr.dyn_cast<DenseFPElementsAttr>()) {
-    switch (bitwidth) {
-      case 16:
-        return serializeGenericF16Elements(attr, endian, os);
-      case 32:
-        return serializeGenericF32Elements(attr, endian, os);
-      case 64:
-        return serializeGenericF64Elements(attr, endian, os);
-      default:
-        return emitError(UnknownLoc::get(elementsAttr.getContext()))
-               << "unhandled float element bitwidth " << bitwidth
-               << " for type " << elementsAttr.getType();
+  } else if (auto attr = llvm::dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    unsigned bitWidth = attr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 8:
+      // TODO(benvanik): see if serializeRawData works for f8 types.
+      return serializeGenericFloatElements<uint8_t>(attr, endian, os);
+    case 16:
+      return serializeGenericFloatElements<uint16_t>(attr, endian, os);
+    case 32:
+      return serializeGenericFloatElements<uint32_t>(attr, endian, os);
+    case 64:
+      return serializeGenericFloatElements<uint64_t>(attr, endian, os);
+    default:
+      return emitError(UnknownLoc::get(elementsAttr.getContext()))
+             << "unhandled float element bit width " << bitWidth << " for type "
+             << elementsAttr.getType();
     }
   }
   return emitError(UnknownLoc::get(elementsAttr.getContext()))
@@ -288,16 +401,17 @@ static LogicalResult serializeGenericElementData(
 //===----------------------------------------------------------------------===//
 
 Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess())) return {};
+  if (failed(p.parseLess()))
+    return {};
 
   // TODO(benvanik): support the range syntax; the dialect asm parser fights
   // with it though by checking for proper []/() nesting.
 
   // Try first the range style: byte_range<[start..end)>
   bool startInclusive;
-  if (succeeded(p.parseOptionalLSquare())) {  // [...
+  if (succeeded(p.parseOptionalLSquare())) { // [...
     startInclusive = true;
-  } else if (succeeded(p.parseOptionalLParen())) {  // (...
+  } else if (succeeded(p.parseOptionalLParen())) { // (...
     startInclusive = false;
   } else {
     // byte_range<offset, length>
@@ -318,16 +432,17 @@ Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
   }
 
   bool endInclusive;
-  if (succeeded(p.parseOptionalRSquare())) {  // ...]
+  if (succeeded(p.parseOptionalRSquare())) { // ...]
     endInclusive = true;
-  } else if (succeeded(p.parseOptionalRParen())) {  // ...)
+  } else if (succeeded(p.parseOptionalRParen())) { // ...)
     endInclusive = false;
   } else {
     p.emitError(p.getCurrentLocation()) << "expected ] or ) to end range";
     return {};
   }
 
-  if (failed(p.parseGreater())) return {};
+  if (failed(p.parseGreater()))
+    return {};
 
   start = startInclusive ? start : start + 1;
   end = endInclusive ? end : end - 1;
@@ -352,7 +467,7 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
     if (auto serializableAttr =
-            valueAttr.dyn_cast<SerializableAttrInterface>()) {
+            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
       calculatedLength += serializableAttr.getStorageSize();
     } else {
       return {};
@@ -362,13 +477,13 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
 }
 
 // static
-LogicalResult CompositeAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError, int64_t totalLength,
-    ArrayAttr valueAttrs) {
+LogicalResult
+CompositeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                      int64_t totalLength, ArrayAttr valueAttrs) {
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
     if (auto serializableAttr =
-            valueAttr.dyn_cast<SerializableAttrInterface>()) {
+            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
       calculatedLength += serializableAttr.getStorageSize();
     } else {
       return emitError() << "value is not serializable: " << valueAttr;
@@ -452,7 +567,8 @@ LogicalResult CompositeAttr::serializeToBuffer(llvm::support::endianness endian,
 LogicalResult CompositeAttr::serializeToStream(llvm::support::endianness endian,
                                                llvm::raw_ostream &os) const {
   for (auto valueAttr : getValues()) {
-    auto serializableAttr = valueAttr.dyn_cast<SerializableAttrInterface>();
+    auto serializableAttr =
+        llvm::dyn_cast<SerializableAttrInterface>(valueAttr);
     if (!serializableAttr) {
       llvm::errs() << "unable to serialize a non-serializable attribute: "
                    << valueAttr << "\n";
@@ -471,9 +587,10 @@ struct SerializableDenseElementsAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = baseAttr.cast<ElementsAttr>();
-    return attr.getNumElements() * IREE::Util::getRoundedElementByteWidth(
-                                       attr.getType().getElementType());
+    auto attr = llvm::cast<ElementsAttr>(baseAttr);
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(),
+        cast<ShapedType>(attr.getType()).getElementType());
   }
 
   LogicalResult serializeToVector(Attribute baseAttr,
@@ -497,7 +614,7 @@ struct SerializableDenseElementsAttrModel
     // it can really help.
     os.reserveExtraSpace(getStorageSize(baseAttr));
 
-    auto elementsAttr = baseAttr.cast<DenseElementsAttr>();
+    auto elementsAttr = llvm::cast<DenseElementsAttr>(baseAttr);
     if (elementsAttr.isSplat()) {
       // Fast-path for splat (no need to convert the value a bunch).
       return serializeSplatValue(elementsAttr.getSplatValue<Attribute>(),
@@ -523,9 +640,9 @@ struct SerializableDenseResourceElementsAttrModel
           SerializableDenseResourceElementsAttrModel,
           DenseResourceElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = baseAttr.cast<DenseResourceElementsAttr>();
-    return attr.getNumElements() * IREE::Util::getRoundedElementByteWidth(
-                                       attr.getType().getElementType());
+    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(), attr.getType().getElementType());
   }
 
   LogicalResult serializeToVector(Attribute baseAttr,
@@ -545,7 +662,7 @@ struct SerializableDenseResourceElementsAttrModel
   LogicalResult serializeToStream(Attribute baseAttr,
                                   llvm::support::endianness endian,
                                   llvm::raw_ostream &os) const {
-    auto attr = baseAttr.cast<DenseResourceElementsAttr>();
+    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
     auto handle = attr.getRawHandle();
 
     // Special testing path for elided attributes. We want this to be an
@@ -558,9 +675,7 @@ struct SerializableDenseResourceElementsAttrModel
                   "values or pass --iree-util-zero-fill-elided-attrs for "
                   "testing and expect invalid execution results";
       }
-      os.write_zeros(attr.getNumElements() *
-                     IREE::Util::getRoundedElementByteWidth(
-                         attr.getType().getElementType()));
+      os.write_zeros(getStorageSize(baseAttr));
       return success();
     }
 
@@ -575,7 +690,7 @@ struct SerializableStringAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableStringAttrModel, StringAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = baseAttr.cast<StringAttr>();
+    auto attr = llvm::cast<StringAttr>(baseAttr);
     return attr.getValue().size();
   }
 
@@ -599,7 +714,7 @@ struct SerializableStringAttrModel
     // NOTE: not all ostream implementations handle this but for buffering ones
     // it can really help.
     os.reserveExtraSpace(getStorageSize(baseAttr));
-    auto stringAttr = baseAttr.cast<StringAttr>();
+    auto stringAttr = llvm::cast<StringAttr>(baseAttr);
     os.write(stringAttr.data(), stringAttr.size());
     return success();
   }
@@ -618,7 +733,7 @@ void UtilDialect::registerAttributes() {
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc" // IWYU pragma: keep
       >();
 
   // NOTE: we only handle dense elements today; sparse will require a separate
@@ -635,7 +750,7 @@ void UtilDialect::registerAttributes() {
   StringAttr::attachInterface<SerializableStringAttrModel>(context);
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -50,12 +50,12 @@ IREE core libraries together with a specific VM bytecode invocation into an
 Android app. The wrapper and its documentation are placed at
 [`tools/android/run_module_app/`](https://github.com/openxla/iree/tree/main/tools/android/run_module_app).
 
-For example, to package a module compiled from the following `mhlo-dot.mlir` as
+For example, to package a module compiled from the following `stablehlo-dot.mlir` as
 an Android app:
 
 ```mlir
 func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
-  %0 = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xf32>, tensor<4x2xf32>) -> tensor<2x2xf32>
+  %0 = "stablehlo.dot"(%lhs, %rhs) : (tensor<2x4xf32>, tensor<4x2xf32>) -> tensor<2x2xf32>
   return %0 : tensor<2x2xf32>
 }
 ```
@@ -63,16 +63,16 @@ func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
 ```shell
 # First compile into a VM bytecode module
 $ /path/to/iree/build/tools/iree-compile -- \
-  --iree-input-type=mhlo \
+  --iree-input-type=stablehlo \
   --iree-hal-target-backends=vulkan-spirv \
-  /path/to/mhlo-dot.mlir \
-  -o /tmp/mhlo-dot.vmfb
+  /path/to/stablehlo-dot.mlir \
+  -o /tmp/stablehlo-dot.vmfb
 
 # Then package the Android app
 $ /path/to/iree/source/tools/android/run_module_app/build_apk.sh \
   ./build-apk \
   --device vulkan \
-  --module /tmp/mhlo-dot.vmfb \
+  --module /tmp/stablehlo-dot.vmfb \
   --function dot \
   --input=...
 ```

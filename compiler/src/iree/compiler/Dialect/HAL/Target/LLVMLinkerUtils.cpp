@@ -7,13 +7,19 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 
 #include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/Support/MemoryBufferRef.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Transforms/IPO/Internalize.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+static llvm::cl::opt<std::string> clBitcodeFile(
+    "iree-link-bitcode",
+    llvm::cl::desc("Paths of additional bitcode file to load and link."),
+    llvm::cl::init(""));
 
 bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix) {
   for (const auto &function : module.functions()) {
@@ -68,8 +74,9 @@ LogicalResult linkBitcodeModule(
   return success();
 }
 
-llvm::Expected<std::unique_ptr<llvm::Module>> loadBitcodeObject(
-    IREE::HAL::ExecutableObjectAttr objectAttr, llvm::LLVMContext &context) {
+llvm::Expected<std::unique_ptr<llvm::Module>>
+loadBitcodeObject(IREE::HAL::ExecutableObjectAttr objectAttr,
+                  llvm::LLVMContext &context) {
   // Load the object data into memory.
   auto objectData = objectAttr.loadData();
   if (!objectData) {
@@ -81,18 +88,17 @@ llvm::Expected<std::unique_ptr<llvm::Module>> loadBitcodeObject(
   llvm::MemoryBufferRef bitcodeBufferRef(objectData.value(),
                                          objectAttr.getPath());
   auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
-  if (!bitcodeModuleValue) return bitcodeModuleValue;
-  auto bitcodeModule = std::move(bitcodeModuleValue.get());
-
+  if (!bitcodeModuleValue)
+    return bitcodeModuleValue;
   // NOTE: at this point the bitcode may not have the expected data layout!
-  return std::move(bitcodeModule);
+  return std::move(bitcodeModuleValue.get());
 }
 
-LogicalResult linkBitcodeObjects(
-    Location loc, llvm::Linker &linker, unsigned linkerFlags,
-    llvm::TargetMachine &targetMachine, ArrayAttr objectAttrs,
-    llvm::LLVMContext &context,
-    ModuleSpecializationCallback specializationCallback) {
+LogicalResult
+linkBitcodeObjects(Location loc, llvm::Linker &linker, unsigned linkerFlags,
+                   llvm::TargetMachine &targetMachine, ArrayAttr objectAttrs,
+                   llvm::LLVMContext &context,
+                   ModuleSpecializationCallback specializationCallback) {
   // Gather only the bitcode objects.
   SmallVector<IREE::HAL::ExecutableObjectAttr> bitcodeObjectAttrs;
   IREE::HAL::ExecutableObjectAttr::filterObjects(objectAttrs, {".bc"},
@@ -113,7 +119,35 @@ LogicalResult linkBitcodeObjects(
   return success();
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+LogicalResult linkCmdlineBitcodeFile(Location loc, llvm::Linker &linker,
+                                     unsigned linkerFlags,
+                                     llvm::TargetMachine &targetMachine,
+                                     llvm::LLVMContext &context) {
+  if (clBitcodeFile.empty()) {
+    return success();
+  }
+  auto bitcodeBufferRef = llvm::MemoryBuffer::getFile(clBitcodeFile);
+  if (auto ec = bitcodeBufferRef.getError()) {
+    return mlir::emitError(loc) << "failed reading user bitcode file `"
+                                << clBitcodeFile << "`: " << ec.message();
+  }
+  auto setAlwaysInline = [&](llvm::Module &module) {
+    for (auto &func : module.getFunctionList()) {
+      func.addFnAttr(llvm::Attribute::AlwaysInline);
+    }
+  };
+  if (failed(linkBitcodeModule(
+          loc, linker, linkerFlags, targetMachine, clBitcodeFile,
+          llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context),
+          setAlwaysInline))) {
+    return mlir::emitError(loc) << "failed linking in user bitcode file `"
+                                << clBitcodeFile << "` for target triple '"
+                                << targetMachine.getTargetTriple().str() << "'";
+  }
+  return success();
+}
+
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

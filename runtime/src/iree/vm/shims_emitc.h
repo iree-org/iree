@@ -16,7 +16,7 @@ typedef iree_status_t (*iree_vm_native_function_target_emitc_t)(
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     void* IREE_RESTRICT module, void* IREE_RESTRICT module_state);
 
-static iree_status_t iree_emitc_shim(
+static inline iree_status_t iree_emitc_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     iree_vm_native_function_target_emitc_t target_fn,

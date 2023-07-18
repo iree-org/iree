@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda_descriptor_set_layout_t
@@ -133,10 +132,10 @@ iree_status_t iree_hal_cuda_pipeline_layout_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   if (push_constant_count > IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "push constant count %zu over the limit of %d",
-                            push_constant_count,
-                            IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "push constant count %" PRIhsz " over the limit of %d",
+        push_constant_count, IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT);
   }
 
   // Currently the pipeline layout doesn't do anything.

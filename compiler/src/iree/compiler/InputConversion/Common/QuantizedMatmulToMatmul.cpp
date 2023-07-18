@@ -9,7 +9,6 @@
 #include "iree/compiler/InputConversion/Common/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -64,10 +63,9 @@ struct QuantizedMatmulToMatmul
       return success();
     }
     // Create the result. No need to zero-fill it as we will overwrite it.
-    ShapedType accType = acc.getType().cast<ShapedType>();
-    auto accDynShape = linalg::createDynamicDimensions(rewriter, loc, acc);
+    ShapedType accType = llvm::cast<ShapedType>(acc.getType());
     Value initResult = builder.create<tensor::EmptyOp>(
-        accType.getShape(), accType.getElementType(), accDynShape);
+        tensor::getMixedSizes(builder, loc, acc), accType.getElementType());
     // Create the indexing maps for the generic.
     MLIRContext *context = rewriter.getContext();
     AffineExpr m, n;
@@ -162,19 +160,19 @@ struct LinalgQuantizedMatmulToMatmulPass
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
     patterns.add<QuantizedMatmulToMatmul>(context);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
       signalPassFailure();
     }
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedMatmulToMatmulPass() {
   return std::make_unique<LinalgQuantizedMatmulToMatmulPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -41,6 +41,7 @@
 #define IREE_WAIT_API_PPOLL 4
 #define IREE_WAIT_API_EPOLL 5
 #define IREE_WAIT_API_KQUEUE 6
+#define IREE_WAIT_API_PROMISE 7
 
 // We allow overriding the wait API via command line flags. If unspecified we
 // try to guess based on the target platform.
@@ -49,7 +50,9 @@
 // NOTE: we could be tighter here, but we today only have win32 or not-win32.
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 #define IREE_WAIT_API IREE_WAIT_API_NULL
-#elif defined(IREE_PLATFORM_GENERIC) || defined(IREE_PLATFORM_EMSCRIPTEN)
+#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+#define IREE_WAIT_API IREE_WAIT_API_PROMISE
+#elif defined(IREE_PLATFORM_GENERIC)
 #define IREE_WAIT_API IREE_WAIT_API_INPROC
 #elif defined(IREE_PLATFORM_WINDOWS)
 #define IREE_WAIT_API IREE_WAIT_API_WIN32  // WFMO used in wait_handle_win32.c

@@ -35,6 +35,7 @@ else()
     if(CUDAToolkit_FOUND)
       # Found on the system somewhere, no need to install our own copy.
       cmake_path(GET CUDAToolkit_BIN_DIR PARENT_PATH CUDAToolkit_ROOT)
+      set(CUDAToolkit_ROOT "${CUDAToolkit_ROOT}" PARENT_SCOPE)
       message(STATUS "Using found CUDA toolkit: ${CUDAToolkit_ROOT}")
     else()
       # Download a copy of the CUDA toolkit into the build directory if needed.

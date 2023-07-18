@@ -60,3 +60,13 @@ module {
 // CHECK: #translation = #iree_codegen.translation_info<CPUDefault>
 // CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation, workgroup_size = [16, 4, 1], subgroup_size = 32>
 
+// -----
+
+module {
+  func.func @test() attributes {
+    export_config = #iree_codegen.export_config<workgroup_size = [4: index, 1: index]>
+  } {
+    return
+  }
+}
+// CHECK: #iree_codegen.export_config<workgroup_size = [4 : index, 1 : index]

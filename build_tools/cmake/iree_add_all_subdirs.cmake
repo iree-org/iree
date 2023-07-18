@@ -6,11 +6,11 @@
 
 # iree_add_all_subidrs
 #
-# CMake function to add all subdirectories of the current directory that contain
+# CMake macro to add all subdirectories of the current directory that contain
 # a CMakeLists.txt file
 #
 # Takes no arguments.
-function(iree_add_all_subdirs)
+macro(iree_add_all_subdirs)
   FILE(GLOB _CHILDREN RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
   SET(_DIRLIST "")
   foreach(_CHILD ${_CHILDREN})
@@ -22,4 +22,4 @@ function(iree_add_all_subdirs)
   foreach(subdir ${_DIRLIST})
     add_subdirectory(${subdir})
   endforeach()
-endfunction()
+endmacro()

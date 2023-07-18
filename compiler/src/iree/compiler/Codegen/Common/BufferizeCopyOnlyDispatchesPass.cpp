@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -37,21 +37,17 @@ struct BufferizeCopyOnlyDispatchesPass
     : public BufferizeCopyOnlyDispatchesBase<BufferizeCopyOnlyDispatchesPass> {
   BufferizeCopyOnlyDispatchesPass() = default;
   BufferizeCopyOnlyDispatchesPass(const BufferizeCopyOnlyDispatchesPass &pass) {
-    this->embedSubspanOffsetIntoMemRefType =
-        pass.embedSubspanOffsetIntoMemRefType;
   }
-  BufferizeCopyOnlyDispatchesPass(bool embedSubspanOffsetIntoMemRefType) {
-    this->embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
-  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, bufferization::BufferizationDialect,
+    registry.insert<affine::AffineDialect, bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
                     memref::MemRefDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   ModuleOp module = getOperation();
@@ -66,13 +62,15 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
           return success(isReadOnly(storeOp.getValue()));
         });
-    if (walkResult.wasInterrupted()) continue;
+    if (walkResult.wasInterrupted())
+      continue;
     // The function is just a copy.
     copyOnlyFunctions.push_back(funcOp);
   }
 
   // There are no copy-only functions. So nothing to do.
-  if (copyOnlyFunctions.empty()) return;
+  if (copyOnlyFunctions.empty())
+    return;
 
   // Bufferize the dispatch to create a `linalg.generic` as a copy operation.
   // This can then be used by the backends to tile and distribute.
@@ -109,8 +107,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   };
 
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
-                                      deallocationFn, memcpyFn,
-                                      this->embedSubspanOffsetIntoMemRefType);
+                                      deallocationFn, memcpyFn);
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }
@@ -125,11 +122,10 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createBufferizeCopyOnlyDispatchesPass(
-    bool embedSubspanOffsetIntoMemRefType) {
-  return std::make_unique<BufferizeCopyOnlyDispatchesPass>(
-      embedSubspanOffsetIntoMemRefType);
+std::unique_ptr<OperationPass<ModuleOp>>
+createBufferizeCopyOnlyDispatchesPass() {
+  return std::make_unique<BufferizeCopyOnlyDispatchesPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

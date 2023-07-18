@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/ExtractAddressComputation.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -43,8 +43,9 @@ static nvgpu::LdMatrixOp rebuildLdMatrixOp(RewriterBase &rewriter,
       ldMatrixOp.getTranspose(), ldMatrixOp.getNumTiles());
 }
 
-SmallVector<OpFoldResult> getLdMatrixOpViewSizeForEachDim(
-    RewriterBase &rewriter, nvgpu::LdMatrixOp ldMatrixOp) {
+SmallVector<OpFoldResult>
+getLdMatrixOpViewSizeForEachDim(RewriterBase &rewriter,
+                                nvgpu::LdMatrixOp ldMatrixOp) {
   Location loc = ldMatrixOp.getLoc();
   auto extractStridedMetadataOp =
       rewriter.create<memref::ExtractStridedMetadataOp>(
@@ -59,14 +60,14 @@ SmallVector<OpFoldResult> getLdMatrixOpViewSizeForEachDim(
   AffineExpr s1 = rewriter.getAffineSymbolExpr(1);
 
   for (auto [srcSize, indice] : llvm::zip(srcSizes, indices)) {
-    finalSizes.push_back(makeComposedFoldedAffineApply(rewriter, loc, s0 - s1,
-                                                       {srcSize, indice}));
+    finalSizes.push_back(affine::makeComposedFoldedAffineApply(
+        rewriter, loc, s0 - s1, {srcSize, indice}));
   }
   return finalSizes;
 }
 
-static void populateExtractAddressComputationGPUPatterns(
-    RewritePatternSet &patterns) {
+static void
+populateExtractAddressComputationGPUPatterns(RewritePatternSet &patterns) {
   populateExtractAddressComputationPatterns(patterns);
   patterns.add<StoreLoadLikeOpRewriter<
       nvgpu::LdMatrixOp,
@@ -85,7 +86,7 @@ struct ExtractAddressComputationGPUPass
           ExtractAddressComputationGPUPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void ExtractAddressComputationGPUPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
@@ -99,5 +100,5 @@ void ExtractAddressComputationGPUPass::runOnOperation() {
 std::unique_ptr<Pass> createExtractAddressComputationGPUPass() {
   return std::make_unique<ExtractAddressComputationGPUPass>();
 }
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

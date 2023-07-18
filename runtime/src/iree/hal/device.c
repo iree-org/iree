@@ -6,7 +6,6 @@
 
 #include "iree/hal/device.h"
 
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
@@ -39,8 +38,13 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
 IREE_API_EXPORT void iree_hal_device_replace_allocator(
     iree_hal_device_t* device, iree_hal_allocator_t* new_allocator) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(new_allocator);
   _VTABLE_DISPATCH(device, replace_device_allocator)(device, new_allocator);
+}
+
+IREE_API_EXPORT void iree_hal_device_replace_channel_provider(
+    iree_hal_device_t* device, iree_hal_channel_provider_t* new_provider) {
+  IREE_ASSERT_ARGUMENT(device);
+  _VTABLE_DISPATCH(device, replace_channel_provider)(device, new_provider);
 }
 
 IREE_API_EXPORT
@@ -115,7 +119,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_range(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, is_source_host ? "h2d" : (is_target_host ? "d2h" : "d2d"));
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
 
   // Defer to the backing implementation.
   iree_status_t status = _VTABLE_DISPATCH(device, transfer_range)(

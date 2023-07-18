@@ -22,7 +22,9 @@ iree_lit_test_suite(
     "elide_timepoints_immediate.mlir"
     "emplace_allocations.mlir"
     "encode_device_tensors.mlir"
+    "encode_device_tensors_packing.mlir"
     "encode_host_tensors.mlir"
+    "encode_host_tensors_packing.mlir"
     "fold_globals.mlir"
     "fold_uniform_operands.mlir"
     "fuse_dispatch_bindings.mlir"
@@ -30,7 +32,6 @@ iree_lit_test_suite(
     "layout_slices.mlir"
     "materialize_builtins.mlir"
     "materialize_copy_on_write.mlir"
-    "memoize_channels.mlir"
     "outline_constants.mlir"
     "pack_allocations.mlir"
     "pack_constants.mlir"
@@ -42,6 +43,7 @@ iree_lit_test_suite(
     "schedule_concurrency.mlir"
     "schedule_execution.mlir"
     "specialize_dispatches.mlir"
+    "verify_async_access_ranges.mlir"
   TOOLS
     FileCheck
     iree-opt

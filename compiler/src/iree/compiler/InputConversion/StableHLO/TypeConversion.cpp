@@ -8,8 +8,6 @@
 
 #include <optional>
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -17,7 +15,6 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
-#include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
@@ -29,12 +26,12 @@ Type convertInteger(IntegerType intType) {
 }
 
 Type convertShapedType(ShapedType shapedType) {
-  if (auto intType = shapedType.getElementType().dyn_cast<IntegerType>())
+  if (auto intType = llvm::dyn_cast<IntegerType>(shapedType.getElementType()))
     return shapedType.clone(convertInteger(intType));
   return shapedType;
 }
 
-std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
+std::optional<Value> materializeCastFromIllegal(OpBuilder &builder, Type type,
                                                 ValueRange inputs,
                                                 Location loc) {
   Type fromType = getElementTypeOrSelf(inputs[0].getType());
@@ -47,7 +44,7 @@ std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
       ->getResult(0);
 }
 
-std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
+std::optional<Value> materializeCastToIllegal(OpBuilder &builder, Type type,
                                               ValueRange inputs, Location loc) {
   Type fromType = getElementTypeOrSelf(inputs[0].getType());
   Type toType = getElementTypeOrSelf(type);
@@ -59,10 +56,10 @@ std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
       ->getResult(0);
 }
 
-std::optional<Value> scalarToTensor(OpBuilder& builder, Type /*type*/,
+std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
                                     ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
-  if (inputs.front().getType().isa<ShapedType>()) {
+  if (llvm::isa<ShapedType>(inputs.front().getType())) {
     return std::nullopt;
   }
   return builder
@@ -72,7 +69,7 @@ std::optional<Value> scalarToTensor(OpBuilder& builder, Type /*type*/,
       .getResult();
 }
 
-}  // namespace
+} // namespace
 
 RemoveSignTypeConverter::RemoveSignTypeConverter() {
   addConversion([](Type type) { return type; });
@@ -89,4 +86,4 @@ LinalgTypeConverter::LinalgTypeConverter() : RemoveSignTypeConverter() {
   addArgumentMaterialization(scalarToTensor);
 }
 
-}  // namespace mlir::iree_compiler::stablehlo
+} // namespace mlir::iree_compiler::stablehlo

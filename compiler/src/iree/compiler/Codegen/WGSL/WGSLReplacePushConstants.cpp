@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/WGSL/PassDetail.h"
+#include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -40,7 +40,7 @@ static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
   unsigned destBitWidth = opType.getIntOrFloatBitWidth();
 
   // AnySignlessInteger
-  if (opType.isa<IntegerType>()) {
+  if (llvm::isa<IntegerType>(opType)) {
     if (sourceBitWidth > destBitWidth) {
       return builder.create<arith::TruncIOp>(loc, opType, extractElementOp);
     } else if (sourceBitWidth < destBitWidth) {
@@ -97,8 +97,9 @@ class WGSLReplacePushConstantsPass
     auto funcOp = getOperation();
     auto loc = funcOp.getLoc();
     auto constantLoadOps =
-        llvm::to_vector<4>(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
-    if (constantLoadOps.empty()) return;
+        llvm::to_vector(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
+    if (constantLoadOps.empty())
+      return;
 
     OpBuilder builder(funcOp);
     builder.setInsertionPointToStart(&funcOp.getBlocks().front());
@@ -172,12 +173,12 @@ class WGSLReplacePushConstantsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWGSLReplacePushConstantsPass() {
   return std::make_unique<WGSLReplacePushConstantsPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

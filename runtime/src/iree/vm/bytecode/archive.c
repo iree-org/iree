@@ -101,7 +101,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_archive_parse_header(
   if (!module_contents.data || module_contents.data_length < 16) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "FlatBuffer data is not present or less than 16 bytes (%zu total)",
+        "FlatBuffer data is not present or less than 16 bytes (%" PRIhsz
+        " total)",
         module_contents.data_length);
   }
 

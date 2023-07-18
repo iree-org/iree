@@ -45,4 +45,22 @@ def TopLevelSCFToCFG :
   let constructor = "mlir::iree_compiler::createTopLevelSCFToCFGPass()";
 }
 
+def AutoInputConversionPipeline :
+    Pass<"iree-auto-input-conversion", "ModuleOp"> {
+  let summary = "Analyzes and runs appropriate input pipeline.";
+  let description = [{
+    Analyzes the input program to determine which input pipeline, or part of input
+    conversion to run, then run that conversion.
+  }];
+  let constructor = "mlir::iree_compiler::createAutoInputConversionPipelinePass()";
+  let options = [
+    Option<"demoteI64ToI32", "iree-autoinput-demote-i64-to-i32", "bool",
+           /*default=*/"true", "Convert I64 to I32 equivalents">,
+    Option<"demoteF64ToF32", "iree-autoinput-demote-f64-to-f32", "bool",
+           /*default=*/"false", "Convert F64 to F32 equivalents">,
+    Option<"promoteBF16ToF32", "iree-autoinput-demote-bf16-to-f32", "bool",
+           /*default=*/"false", "Convert BF16 to F32 equivalents">,
+  ];
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES

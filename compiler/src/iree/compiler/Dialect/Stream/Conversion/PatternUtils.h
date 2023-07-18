@@ -29,7 +29,7 @@ struct ConvertedTensor {
 ConvertedTensor consumeTensorOperand(Location loc, Value operand,
                                      OpBuilder &builder);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_CONVERSION_PATTERN_UTILS_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_CONVERSION_PATTERN_UTILS_H_

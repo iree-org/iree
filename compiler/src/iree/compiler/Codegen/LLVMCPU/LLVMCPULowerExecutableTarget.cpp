@@ -6,21 +6,27 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+
+using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
 namespace mlir {
 namespace iree_compiler {
@@ -34,7 +40,7 @@ namespace {
 class LLVMCPULowerExecutableTargetPass
     : public LLVMCPULowerExecutableTargetBase<
           LLVMCPULowerExecutableTargetPass> {
- public:
+public:
   LLVMCPULowerExecutableTargetPass() = default;
   LLVMCPULowerExecutableTargetPass(
       const LLVMCPULowerExecutableTargetPass &pass) {}
@@ -58,7 +64,7 @@ class LLVMCPULowerExecutableTargetPass
 
   void runOnOperation() override;
 
- private:
+private:
   Option<bool> testLoweringConfiguration{
       *this, "test-lowering-configuration",
       llvm::cl::desc(
@@ -78,13 +84,14 @@ class LLVMCPULowerExecutableTargetPass
           "expected to work on the std.module op within the "
           "hal.executable.variant operation")};
 };
-}  // namespace
+} // namespace
 
 /// The pipeline parser doesnt like strings that have `'` or `"` in them. But it
 /// is needed for demarcating the option value. So just drop them before sending
 /// it one.
 static StringRef sanitizePipelineString(StringRef input) {
-  if (input.empty()) return input;
+  if (input.empty())
+    return input;
   // If first/last character is ' or ", drop them.
   if (input.front() == '\'' || input.front() == '"') {
     input = input.drop_front();
@@ -98,16 +105,54 @@ static StringRef sanitizePipelineString(StringRef input) {
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
 template <typename F>
-static LogicalResult verifyLoweringConfiguration(
-    ModuleOp module, IREE::Codegen::TranslationInfoAttr translationInfo,
-    F verificationFn) {
+static LogicalResult
+verifyLoweringConfiguration(ModuleOp module,
+                            IREE::Codegen::TranslationInfoAttr translationInfo,
+                            F verificationFn) {
   auto walkResult = module.walk([&](Operation *op) -> WalkResult {
     IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig) return WalkResult::advance();
-    return verificationFn(op, loweringConfig, translationInfo,
+    if (!loweringConfig)
+      return WalkResult::advance();
+    TilingConfig tilingConfig(loweringConfig);
+    return verificationFn(op, tilingConfig, translationInfo,
                           ArrayRef<int64_t>{});
   });
   return failure(walkResult.wasInterrupted());
+}
+
+// TODO(dcaballe): We temporarily need this utility to retrieve a valid
+// lowering config. We should be able to remove this once we have a lowering
+// config attribute per op.
+static FailureOr<LoweringConfigAttr> getRootLoweringConfig(ModuleOp moduleOp) {
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
+      getAllEntryPoints(moduleOp);
+  for (auto &it : exportOps) {
+    auto exportOp = it.second;
+    auto rootLoweringConfig = iree_compiler::getLoweringConfig(exportOp);
+    if (rootLoweringConfig) {
+      return rootLoweringConfig;
+    }
+  }
+
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+    getAllEntryPoints(moduleOp);
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+    // Check for self first.
+    FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+    auto rootLoweringConfig = iree_compiler::getLoweringConfig(rootOp.value());
+    if (rootLoweringConfig) {
+      return rootLoweringConfig;
+    }
+  }
+
+  return failure();
+}
+
+static TilingConfig getTilingConfigForPipeline(ModuleOp moduleOp) {
+  auto maybeLoweringConfig = getRootLoweringConfig(moduleOp);
+  assert(succeeded(maybeLoweringConfig) &&
+         "Pipeline requires a lowering config");
+  return TilingConfig(*maybeLoweringConfig);
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
@@ -164,20 +209,21 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     if (translationInfo.has_value()) {
       LogicalResult verificationStatus = success();
       switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
-        case IREE::Codegen::DispatchLoweringPassPipeline::
-            CPUDoubleTilingPadExpert:
-          verificationStatus = verifyLoweringConfiguration(
-              moduleOp, translationInfo.value(),
-              verifyDoubleTilingExpertPassPipelineConfig);
-          break;
-        case IREE::Codegen::DispatchLoweringPassPipeline::
-            CPUConvTileAndDecomposeExpert:
-          verificationStatus = verifyLoweringConfiguration(
-              moduleOp, translationInfo.value(),
-              verifyConvTileAndDecomposeExpertConfig);
-          break;
-        default:;
+      case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          CPUDoubleTilingPadExpert:
+        verificationStatus = verifyLoweringConfiguration(
+            moduleOp, translationInfo.value(),
+            verifyDoubleTilingExpertPassPipelineConfig);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          CPUConvTileAndDecomposeExpert:
+        verificationStatus =
+            verifyLoweringConfiguration(moduleOp, translationInfo.value(),
+                                        verifyConvTileAndDecomposeExpertConfig);
+        break;
+      default:
+        break;
       }
       if (failed(verificationStatus)) {
         return signalPassFailure();
@@ -188,61 +234,79 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       bool enableVectorMasking =
           isX86(target) || isRISCV(target) ||
           (isAArch64(target) && hasAnySVEFeature(target));
+
       bool enableMicrokernels = hasMicrokernels(target);
+      bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&
+                               hasSMEFeature(target);
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-          case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
-          case IREE::Codegen::DispatchLoweringPassPipeline::None:
-            addCPUDefaultPassPipeline(executableLoweringPipeline);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUBufferOpsTileAndVectorize:
-            addCPUBufferOpsTileAndVectorizePipeline(executableLoweringPipeline,
-                                                    enableVectorMasking);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUDoubleTilingExpert:
-            addMultiTilingExpertPassPipeline(
-                executableLoweringPipeline,
-                static_cast<int>(TilingLevel::NumTileLevels),
-                /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUDoubleTilingPadExpert:
-            addDoubleTilingPadExpertPassPipeline(executableLoweringPipeline,
-                                                 enableVectorMasking);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUDoubleTilingPeelingExpert:
-            addMultiTilingExpertPassPipeline(
-                executableLoweringPipeline,
-                static_cast<int>(TilingLevel::NumTileLevels),
-                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUConvTileAndDecomposeExpert:
-            addConvTileAndDecomposeExpertPassPipeline(
-                executableLoweringPipeline, enableVectorMasking);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
-            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
-                                             enableMicrokernels);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
-            addCPUDataTilingPipeline(executableLoweringPipeline);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-            addVMVXDefaultPassPipeline(executableLoweringPipeline,
-                                       enableMicrokernels);
-            break;
-          // Transform-dialect pipelines.
-          case IREE::Codegen::DispatchLoweringPassPipeline::
-              TransformDialectCodegen:
-            addTransformDialectPasses(executableLoweringPipeline);
-            break;
-          default:
-            variantOp.emitOpError("Unsupported pipeline on CPU target.");
-            return signalPassFailure();
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
+        case IREE::Codegen::DispatchLoweringPassPipeline::None:
+          addCPUDefaultPassPipeline(executableLoweringPipeline);
+          break;
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            CPUBufferOpsTileAndVectorize: {
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+          addCPUBufferOpsTileAndVectorizePipeline(
+              executableLoweringPipeline, tilingConfig, enableVectorMasking,
+              enableAArch64SSVE);
+          break;
+        }
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            CPUDoubleTilingExpert: {
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+          addMultiTilingExpertPassPipeline(
+              executableLoweringPipeline, tilingConfig,
+              /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2);
+          break;
+        }
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            CPUDoubleTilingPadExpert: {
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+          addDoubleTilingPadExpertPassPipeline(
+              executableLoweringPipeline, tilingConfig, enableVectorMasking);
+          break;
+        }
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            CPUDoubleTilingPeelingExpert: {
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+          addMultiTilingExpertPassPipeline(
+              executableLoweringPipeline, tilingConfig,
+              /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2,
+              enableAArch64SSVE);
+          break;
+        }
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            CPUConvTileAndDecomposeExpert: {
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+          addConvTileAndDecomposeExpertPassPipeline(
+              executableLoweringPipeline, tilingConfig, enableVectorMasking,
+              enableAArch64SSVE);
+          break;
+        }
+        case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+          addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
+                                           tilingConfig, enableMicrokernels);
+          break;
+        }
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
+          TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+          addCPUDataTilingPipeline(executableLoweringPipeline, tilingConfig);
+          break;
+        }
+        case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
+          addVMVXDefaultPassPipeline(executableLoweringPipeline,
+                                     enableMicrokernels);
+          break;
+        // Transform-dialect pipelines.
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            TransformDialectCodegen:
+          addTransformDialectPasses(executableLoweringPipeline);
+          break;
+        default:
+          moduleOp.emitOpError("Unsupported pipeline on CPU target.");
+          return signalPassFailure();
         }
       }
     }
@@ -258,5 +322,5 @@ createLLVMCPULowerExecutableTargetPass() {
   return std::make_unique<LLVMCPULowerExecutableTargetPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
