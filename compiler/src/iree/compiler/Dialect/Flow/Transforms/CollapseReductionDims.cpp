@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -45,6 +46,11 @@ static bool hasContiguousDims(AffineMap map, ArrayRef<unsigned> dims) {
 static SmallVector<ReassociationIndices>
 collapseDimensions(linalg::GenericOp genericOp) {
   SmallVector<ReassociationIndices> collapseIndices;
+
+  if (!isNonNullAndOutsideDispatch(genericOp)) {
+    return collapseIndices;
+  }
+
   SmallVector<unsigned> reductionDims;
   genericOp.getReductionDims(reductionDims);
   if (reductionDims.size() < 2)
