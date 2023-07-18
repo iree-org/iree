@@ -105,7 +105,7 @@ function docker_run() {
     # is a custom environment variable we translate into the corresponding Bazel
     # option.
     DOCKER_RUN_ARGS+=(
-      --mount="type=tmpfs,dst=/dev/shm"
+      --mount="type=tmpfs,dst=/dev/shm,exec"
       --env SANDBOX_BASE=/dev/shm
     )
 
