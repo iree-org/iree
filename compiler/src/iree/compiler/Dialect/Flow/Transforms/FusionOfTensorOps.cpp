@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -197,6 +198,9 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
   unsigned numCandidates = 0;
   OpBuilder builder(context);
   funcOp->walk<WalkOrder::PreOrder>([&](linalg::GenericOp genericOp) {
+    if (!isNonNullAndOutsideDispatch(genericOp)) {
+      return;
+    }
     auto consumerAttrName =
         FuseElementwiseOpsWithMultipleUses::getConsumerAttributeName();
     auto producerAttrName =
@@ -214,6 +218,9 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
       return;
 
     auto consumer = dyn_cast<linalg::GenericOp>(fusableUse.value()->getOwner());
+    if (!isNonNullAndOutsideDispatch(consumer)) {
+      return;
+    }
     auto isParallelIteratorType = [](Attribute attr) {
       return linalg::isParallelIterator(
           llvm::cast<linalg::IteratorTypeAttr>(attr).getValue());
@@ -273,9 +280,11 @@ struct FusionOfTensorOpsPass
       linalg::ControlFusionFn fuseElementwiseOpsControlFn =
           [&](OpOperand *fusedOperand) {
             Operation *producer = fusedOperand->get().getDefiningOp();
-            if (!producer)
-              return false;
             Operation *consumer = fusedOperand->getOwner();
+
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+              return false;
+            }
 
             // Limit the number of operands. We have hard limit (32) of bindings
             // passing down to HAL. Set the number to be as same as the limit --
@@ -301,9 +310,11 @@ struct FusionOfTensorOpsPass
       linalg::ControlFusionFn fuseByExpansionControlFn =
           [](OpOperand *fusedOperand) {
             Operation *producer = fusedOperand->get().getDefiningOp();
-            if (!producer) {
+            Operation *consumer = fusedOperand->get().getDefiningOp();
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
               return false;
             }
+
             // Do not fuse producer generic op if it has more than one user.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
@@ -317,6 +328,11 @@ struct FusionOfTensorOpsPass
 
       // Constant fold Linalg operations.
       auto constantFoldControlFn = [](OpOperand *fusedOperand) {
+        Operation *producer = fusedOperand->get().getDefiningOp();
+        Operation *consumer = fusedOperand->getOwner();
+        if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+          return false;
+        }
         if (auto shapedType =
                 dyn_cast<ShapedType>(fusedOperand->get().getType())) {
           if (shapedType.hasStaticShape() &&
@@ -324,8 +340,7 @@ struct FusionOfTensorOpsPass
             return false;
           }
         }
-        auto producer = fusedOperand->get().getDefiningOp();
-        return producer && producer->hasOneUse();
+        return producer->hasOneUse();
       };
       linalg::populateConstantFoldLinalgOperations(fusionPatterns,
                                                    constantFoldControlFn);
@@ -362,8 +377,9 @@ struct FusionOfTensorOpsPass
       // fuse.
       linalg::ControlFusionFn fuseByCollapsingControlFn =
           [](OpOperand *fusedOperand) {
-            auto producer = fusedOperand->get().getDefiningOp();
-            if (!producer) {
+            Operation *producer = fusedOperand->get().getDefiningOp();
+            Operation *consumer = fusedOperand->getOwner();
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
               return false;
             }
 

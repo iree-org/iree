@@ -103,6 +103,26 @@ SmallVector<Range> Flow::getLoopRanges(Operation *op, Location loc,
       });
 }
 
+/// Return `true` if an operation is within a `flow.dispatch.region` or
+/// `flow.dispatch.workgroups` op.
+bool Flow::isNonNullAndOutsideDispatch(Operation *op) {
+  if (!op)
+    return false;
+  Operation *parentOp = op->getParentOp();
+  while (parentOp) {
+    if (isa<Flow::DispatchRegionOp, Flow::DispatchWorkgroupsOp>(parentOp)) {
+      return false;
+    }
+    parentOp = parentOp->getParentOp();
+  }
+  return true;
+}
+bool Flow::isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations) {
+  return llvm::all_of(operations, [](Operation *op) {
+    return isNonNullAndOutsideDispatch(op);
+  });
+}
+
 /// Compute the workload to use for the workgroup based on the root op.
 static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
                                                Operation *rootOp) {

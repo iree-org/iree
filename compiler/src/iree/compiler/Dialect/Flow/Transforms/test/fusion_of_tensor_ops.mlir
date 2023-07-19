@@ -330,3 +330,36 @@ func.func @fuse_iota_ops(%arg0: tensor<10x20xi32>) -> (tensor<10x20xi32>, tensor
 //       CHECK:     arith.muli
 //       CHECK:     linalg.yield
 //       CHECK:   return %[[GENERIC1]], %[[GENERIC2]]
+
+// -----
+
+func.func @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<10x20xf32> {
+  %0 = flow.dispatch.region[] -> (tensor<10x20xf32>) {
+    %1 = tensor.empty() : tensor<10x20xf32>
+    %2 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel"]}
+        ins(%arg0 : tensor<10x20xf32>) outs(%1 : tensor<10x20xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %3 = arith.addf %b0, %b0 : f32
+      linalg.yield %3 : f32
+    } -> tensor<10x20xf32>
+    %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%2, %arg0 : tensor<10x20xf32>, tensor<10x20xf32>) outs(%1 : tensor<10x20xf32>) {
+    ^bb0(%b0: f32, %b1: f32, %b2 : f32):
+      %4 = arith.mulf %b0, %b1 : f32
+      linalg.yield %4 : f32
+    } -> tensor<10x20xf32>
+    flow.return %3 : tensor<10x20xf32>
+  }
+  return %0 : tensor<10x20xf32>
+}
+// CHECK-LABEL: func @no_fuse_within_dispatch
+//       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
+//       CHECK:     linalg.generic
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   return %[[RETURN]]
