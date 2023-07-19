@@ -1,4 +1,5 @@
 // RUN: iree-compile --split-input-file --compile-mode=vm \
+// RUN:   --iree-util-zero-fill-elided-attrs \
 // RUN:   --iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
 
 // CHECK: "name": "constants"
@@ -79,7 +80,7 @@ vm.module @constants {
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   66
   // CHECK-NEXT: ]
-  vm.rodata private @dense_float16 dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf16>
+  vm.rodata private @dense_f16 dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf16>
 
   //      CHECK: "embedded_data": [
   // CHECK-NEXT:   0,
@@ -89,7 +90,7 @@ vm.module @constants {
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   60
   // CHECK-NEXT: ]
-  vm.rodata private @splat_float16 dense<1.000000e+00> : tensor<3xf16>
+  vm.rodata private @splat_f16 dense<1.000000e+00> : tensor<3xf16>
 
   //      CHECK: "embedded_data": [
   // CHECK-NEXT:   0,
@@ -105,7 +106,7 @@ vm.module @constants {
   // CHECK-NEXT:   64,
   // CHECK-NEXT:   64
   // CHECK-NEXT: ]
-  vm.rodata private @dense_float32 dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf32>
+  vm.rodata private @dense_f32 dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf32>
 
   //      CHECK: "embedded_data": [
   // CHECK-NEXT:   0,
@@ -121,6 +122,32 @@ vm.module @constants {
   // CHECK-NEXT:   128,
   // CHECK-NEXT:   63
   // CHECK-NEXT: ]
-  vm.rodata private @splat_float32 dense<1.000000e+00> : tensor<3xf32>
+  vm.rodata private @splat_f32 dense<1.000000e+00> : tensor<3xf32>
 
+  // Tests that elided tensors of sub-byte types get filled with zeros when the
+  // --iree-util-zero-fill-elided-attrs flag is passed. This is useful for
+  // testing compilation without wanting to keep the large constants around
+  // during iteration.
+  //      CHECK: "embedded_data": [
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0
+  // CHECK-NEXT: ]
+  vm.rodata private @elided_i2 dense_resource<__elided__> : tensor<9xi2>
+
+  //      CHECK: "embedded_data": [
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0
+  // CHECK-NEXT: ]
+  vm.rodata private @elided_f32 dense_resource<__elided__> : tensor<3xf32>
 }
