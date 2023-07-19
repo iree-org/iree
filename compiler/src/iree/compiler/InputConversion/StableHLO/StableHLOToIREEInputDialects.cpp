@@ -336,7 +336,6 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
   }
 };
 
-
 struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
   using OpConversionPattern<tensor::EmptyOp>::OpConversionPattern;
 
@@ -348,13 +347,13 @@ struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
     if (newType == oldType)
       return failure();
 
-    if (!newType) 
-      return rewriter.notifyMatchFailure(
-        op, "result type conversion failed");
-    
+    if (!newType)
+      return rewriter.notifyMatchFailure(op, "result type conversion failed");
+
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
-      op, oldType.getShape(), getTypeConverter()->convertType(oldType.getElementType()),
-      op.getDynamicSizes());
+        op, oldType.getShape(),
+        getTypeConverter()->convertType(oldType.getElementType()),
+        op.getDynamicSizes());
     return success();
   }
 };
@@ -583,10 +582,9 @@ struct ConvertStableHloToIreeInputDialects final
           return typeConverter->isLegal(op.getType());
         });
 
-    target.addDynamicallyLegalOp<tensor::EmptyOp>(
-        [&](tensor::EmptyOp op) {
-          return typeConverter->isLegal(op.getType());
-        });
+    target.addDynamicallyLegalOp<tensor::EmptyOp>([&](tensor::EmptyOp op) {
+      return typeConverter->isLegal(op.getType());
+    });
 
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
