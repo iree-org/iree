@@ -40,13 +40,24 @@ iree_status_t iree_hal_vulkan_find_memory_type(
     const VkPhysicalDeviceProperties* device_props,
     const VkPhysicalDeviceMemoryProperties* memory_props,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    uint32_t* out_memory_type_index) {
+    uint32_t allowed_type_indices, uint32_t* out_memory_type_index) {
   *out_memory_type_index = 0;
+
+  iree_hal_memory_type_t requested_type = params->type;
+  if (device_props->deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+    // Integrated GPUs have tiny device local heaps commonly used for
+    // framebuffers and other bounded resources. We don't currently try to use
+    // them but could for very small transients.
+    if (iree_all_bits_set(requested_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+      requested_type &= ~IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+      requested_type |= IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+    }
+  }
 
   VkMemoryPropertyFlags require_flags = 0;
   VkMemoryPropertyFlags prefer_flags = 0;
-  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+  if (iree_all_bits_set(requested_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    if (iree_all_bits_set(requested_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       // Device-local, host-visible.
       require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
       prefer_flags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -55,7 +66,8 @@ iree_status_t iree_hal_vulkan_find_memory_type(
       require_flags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     }
   } else {
-    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    if (iree_all_bits_set(requested_type,
+                          IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
       // Host-local, device-visible.
       require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
     } else {
@@ -63,13 +75,13 @@ iree_status_t iree_hal_vulkan_find_memory_type(
       require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
     }
   }
-  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
+  if (iree_all_bits_set(requested_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
     require_flags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
   }
-  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+  if (iree_all_bits_set(requested_type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     require_flags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   }
-  if (iree_any_bit_set(params->usage,
+  if (iree_any_bit_set(requested_type,
                        IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
                            IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT)) {
     require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
@@ -80,7 +92,8 @@ iree_status_t iree_hal_vulkan_find_memory_type(
   for (uint32_t i = 0; i < memory_props->memoryTypeCount; ++i) {
     VkMemoryPropertyFlags flags = memory_props->memoryTypes[i].propertyFlags;
     if (!iree_all_bits_set(flags, require_flags) ||
-        !iree_hal_vulkan_is_memory_type_usable(flags)) {
+        !iree_hal_vulkan_is_memory_type_usable(flags) ||
+        !iree_all_bits_set(allowed_type_indices, 1u << i)) {
       // Excluded (required bits missing or memory type is not usable).
       continue;
     }

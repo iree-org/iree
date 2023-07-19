@@ -25,7 +25,7 @@ extern "C" {
 // existing VkInstances provided by the application).
 iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
-    iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
     iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
