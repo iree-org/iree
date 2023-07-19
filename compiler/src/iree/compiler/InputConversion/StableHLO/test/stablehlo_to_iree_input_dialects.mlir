@@ -88,3 +88,15 @@ module @jax_module attributes {
     return %arg0 : tensor<5x6xcomplex<f32>>
   }
 }
+
+// -----
+
+// CHECK-LABEL: @empty_zero_extent
+func.func public @empty_zero_extent(%arg0: tensor<ui8>, %arg1: tensor<0x4xui32>) -> (tensor<0x4xui32>) {
+  %0 = stablehlo.convert %arg0 : (tensor<ui8>) -> tensor<ui32>
+  %1 = stablehlo.broadcast_in_dim %0, dims = [] : (tensor<ui32>) -> tensor<0x4xui32>
+  %2 = stablehlo.and %1, %arg1 : tensor<0x4xui32>
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<0x4xi32>
+  // CHECK: return %[[EMPTY]]
+  return %2 : tensor<0x4xui32>
+}
