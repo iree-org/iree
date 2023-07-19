@@ -1,5 +1,6 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(iree-transform-dialect-interpreter,transform-dialect-drop-schedule))" | FileCheck %s
 
+// CHECK: #[[$DIV32MOD8:.*]] = affine_map<()[s0] -> ((s0 floordiv 32) mod 8)>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 #map = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<(d0) -> (d0)>
@@ -7,6 +8,9 @@
 #translation = #iree_codegen.translation_info<TransformDialectCodegen>
 hal.executable private @distribute {
   hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+// CHECK: hal.executable.export {{.*}} attributes
+// CHECK-SAME: subgroup_size = 32
+// CHECK-SAME: workgroup_size = [256 : index, 1 : index, 1 : index]
     hal.executable.export public @distribute ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %c1 = arith.constant 1 : index
@@ -14,7 +18,6 @@ hal.executable private @distribute {
     }
     builtin.module {
 
-//       CHECK: #[[$DIV32MOD8:.*]] = affine_map<()[s0] -> ((s0 floordiv 32) mod 8)>
 // CHECK-LABEL: func.func @distribute
       func.func @distribute() {
         %cst_0 = arith.constant dense<0.000000e+00> : vector<1xf16>
@@ -49,7 +52,7 @@ hal.executable private @distribute {
         %17 = transform.structured.match ops{["func.func"]} in %variant_op 
           : (!transform.any_op) -> !transform.any_op
         transform.iree.map_nested_forall_to_gpu_threads %17 
-          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] : (!transform.any_op) -> ()
+          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] subgroup_size = 32 : (!transform.any_op) -> ()
 
         // Late canonicalizations to cleanup and pass the checks.
         // Needs to occur on the whole variant to perform cse on the workgroup_count region
