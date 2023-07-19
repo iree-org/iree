@@ -110,6 +110,12 @@ static llvm::cl::opt<bool>
                        llvm::cl::desc("Enable data tiling path."),
                        llvm::cl::init(false));
 
+static llvm::cl::opt<int> clDataTilingAssumeTileSizesDivisorsOf(
+    "iree-flow-data-tiling-assume-tile-sizes-divisors-of",
+    llvm::cl::desc("If nonzero, must be a power of two known to be a multiple "
+                   "of any tile size that could be selected in codegen."),
+    llvm::cl::init(0));
+
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
     llvm::cl::desc("Enable normalizing input indexing map to identity."),
@@ -266,7 +272,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
       // Enable data tiling after all linalg level transformations.
-      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
+      .addPredicatedPass(clEnableDataTiling, []() {
+        return createSetEncodingPass(clDataTilingAssumeTileSizesDivisorsOf);
+      });
+
+  if (transformOptions.constExprHoisting) {
+    passManager.addPass(IREE::Util::createHoistIntoGlobalsPass());
+  }
+
+  FunctionLikeNest(passManager)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),

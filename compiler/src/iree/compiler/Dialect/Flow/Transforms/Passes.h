@@ -121,7 +121,8 @@ std::unique_ptr<Pass> createConvertToFlowPass();
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
 // Sets encoding for tensors to allow tiled execution of operations.
-std::unique_ptr<Pass> createSetEncodingPass();
+std::unique_ptr<Pass>
+createSetEncodingPass(int64_t assumeTileSizesDivisorsOf = 0);
 
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

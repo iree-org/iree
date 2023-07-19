@@ -14,6 +14,8 @@
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -41,8 +43,18 @@ namespace Flow {
 /// Pads `value` enough for any actual tile sizes that could result from
 /// materialization of `encodingAttr`.
 static Value pad(OpBuilder &builder, Location loc, Value source,
-                 IREE::LinalgExt::EncodingAttr encodingAttr) {
+                 IREE::LinalgExt::EncodingAttr encodingAttr,
+                 int64_t assumeTileSizesDivisorsOf) {
   RankedTensorType sourceType = source.getType().cast<RankedTensorType>();
+  if (sourceType.hasStaticShape() && assumeTileSizesDivisorsOf) {
+    ArrayRef<int64_t> shape = sourceType.getShape();
+    auto zeroPadding = [assumeTileSizesDivisorsOf](int64_t s) {
+      return (s % assumeTileSizesDivisorsOf) == 0;
+    };
+    if (llvm::all_of(shape, zeroPadding)) {
+      return source;
+    }
+  }
   Type elemType = sourceType.getElementType();
   size_t rank = sourceType.getRank();
   RankedTensorType tensorTypeWithEncoding =
@@ -96,13 +108,15 @@ static LinalgExt::EncodingAttr makeEncoding(OpBuilder &builder,
 
 static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
                                LinalgExt::EncodingUser user,
-                               LinalgExt::EncodingRole role) {
+                               LinalgExt::EncodingRole role,
+                               int64_t assumeTileSizesDivisorsOf) {
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
   auto encodingForPad =
       makeEncoding(builder, user, role, /*originalType=*/Type{});
-  Value padded = pad(builder, loc, source, encodingForPad);
+  Value padded =
+      pad(builder, loc, source, encodingForPad, assumeTileSizesDivisorsOf);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
   // returned by pad() above, but we want setEncoding to be aware of the
@@ -139,8 +153,10 @@ namespace {
 /// Rewrites the matmul op to work on tensors with encoding. Optionally
 /// also pads the operands.
 struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
-  SetMatmulEncoding(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit) {}
+  SetMatmulEncoding(MLIRContext *context, int64_t assumeTileSizesDivisorsOf = 0,
+                    PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
+        assumeTileSizesDivisorsOf(assumeTileSizesDivisorsOf) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
@@ -204,11 +220,14 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     Location loc = matmulOp.getLoc();
 
     Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
-                                         LinalgExt::EncodingRole::LHS);
+                                         LinalgExt::EncodingRole::LHS,
+                                         assumeTileSizesDivisorsOf);
     Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
-                                         LinalgExt::EncodingRole::RHS);
+                                         LinalgExt::EncodingRole::RHS,
+                                         assumeTileSizesDivisorsOf);
     Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
-                                         LinalgExt::EncodingRole::RESULT);
+                                         LinalgExt::EncodingRole::RESULT,
+                                         assumeTileSizesDivisorsOf);
 
     Value matmulTiled = rewriter
                             .create<linalg::MatmulOp>(
@@ -230,6 +249,9 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     rewriter.replaceOp(matmulOp, result);
     return success();
   }
+
+private:
+  int64_t assumeTileSizesDivisorsOf = 0;
 };
 
 /// Pattern to fold a `linalg.fill` -> `iree_linalg_ext.set_encoding`
@@ -259,11 +281,27 @@ struct FoldFillWithSetEncoding
 };
 
 struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
+  SetEncodingPass(int64_t assumeTileSizesDivisorsOf)
+      : assumeTileSizesDivisorsOf(assumeTileSizesDivisorsOf) {}
+
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) {
+      return failure();
+    }
+    if (optionAssumeTileSizesDivisorsOf) {
+      assumeTileSizesDivisorsOf = optionAssumeTileSizesDivisorsOf;
+    }
+    return success();
+  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   void runOnOperation() override;
+
+private:
+  int64_t assumeTileSizesDivisorsOf = 0;
 };
 } // namespace
 
@@ -271,7 +309,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<SetMatmulEncoding>(context);
+    patterns.insert<SetMatmulEncoding>(context, assumeTileSizesDivisorsOf);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
@@ -282,8 +320,8 @@ void SetEncodingPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<Pass> createSetEncodingPass() {
-  return std::make_unique<SetEncodingPass>();
+std::unique_ptr<Pass> createSetEncodingPass(int64_t assumeTileSizesDivisorsOf) {
+  return std::make_unique<SetEncodingPass>(assumeTileSizesDivisorsOf);
 }
 
 } // namespace Flow

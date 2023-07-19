@@ -250,6 +250,11 @@ def OutlineDispatchRegions :
 def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
+  let options = [
+    Option<"optionAssumeTileSizesDivisorsOf", "assume-tile-sizes-divisors-of", "int64_t",
+           /*default=*/"0",
+           "If nonzero, must be a power of two known to be a multiple of any tile size that could be selected in codegen.">
+  ];
 }
 
 def TensorPadToTensorInsertSlice :
