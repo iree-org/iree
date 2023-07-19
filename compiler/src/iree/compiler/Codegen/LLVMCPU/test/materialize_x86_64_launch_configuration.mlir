@@ -1698,7 +1698,7 @@ hal.executable private @transpose_pack  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 1], [8, 1], [0, 0], [0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64], [1, 8], [0, 0], [0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @transpose_pack
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

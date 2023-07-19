@@ -1965,6 +1965,7 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
 
     // Only adjust tile sizes for distribution and TileAndFuse, which are the
     // first two tile lists.
+    auto outerDimsPerm = packOp.getOuterDimsPerm();
     for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e; ++i) {
       auto &tileSizes = tileSizesList[i];
       ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
@@ -1977,6 +1978,8 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
         LLVM_DEBUG(KD_DBGS() << "Scale # " << pos << " tile size to "
                              << tileSizes[pos] << "\n");
       }
+      if (!outerDimsPerm.empty())
+        applyPermutationToVector(tileSizes, outerDimsPerm);
     }
 
     return WalkResult::advance();
