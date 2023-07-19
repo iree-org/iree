@@ -1023,9 +1023,9 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       if (!resultType) {
         continue;
       }
-      rewriter.replaceAllUsesWith(result,
-          rewriter.create<tensor::EmptyOp>(
-          loc, resultType->getShape(), resultType->getElementType()));
+      rewriter.replaceAllUsesWith(result, rewriter.create<tensor::EmptyOp>(
+                                              loc, resultType->getShape(),
+                                              resultType->getElementType()));
       didUpdate = true;
     }
 
