@@ -315,7 +315,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -331,7 +330,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "MobileNetV3Small_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -347,7 +345,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -363,7 +360,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -379,7 +375,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -395,7 +390,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -411,7 +405,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "MobileSSD_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -427,7 +420,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "PoseNet_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -443,7 +435,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -459,7 +450,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -475,7 +465,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "EfficientNetV2STF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -491,7 +480,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "MiniLML12H384Uncased(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -507,7 +495,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -3119,7 +3106,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3139,7 +3125,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3159,7 +3144,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3179,7 +3163,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3199,7 +3182,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3219,7 +3201,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3239,7 +3220,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3259,7 +3239,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3279,7 +3258,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3299,7 +3277,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3319,7 +3296,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3339,7 +3315,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3359,7 +3334,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"

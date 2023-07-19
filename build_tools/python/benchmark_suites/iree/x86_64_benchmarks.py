@@ -35,8 +35,6 @@ class Linux_x86_64_Benchmarks(object):
         extra_flags=[
             "--iree-flow-enable-data-tiling",
             "--iree-llvmcpu-enable-microkernels",
-            # TODO(#13216): Enable stack allocation check after fixing the issues.
-            "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false",
         ],
     )
 
