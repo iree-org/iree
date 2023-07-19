@@ -172,7 +172,6 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.eliminate_empty_tensors
 
 // CHECK:   transform.iree.bufferize {target_gpu}
-// CHECK:   transform.iree.erase_hal_descriptor_type_from_memref
 // CHECK:   transform.iree.apply_buffer_optimizations
 // CHECK:   transform.iree.forall_to_workgroup
 // CHECK:   transform.iree.map_nested_forall_to_gpu_threads

@@ -36,11 +36,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-NOT:   memref.alloc()
 //         CHECK: gpu.thread_id  x
 //         CHECK: %[[v:.*]] = scf.for %{{.*}} = %[[C0]] to %[[C12]] step %[[C4]] {{.*}} -> (vector<1xf32>) {
-//         CHECK:   vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<1x4xf32>
+//         CHECK:   vector.transfer_read {{.*}}: memref<1024x13xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
 //         CHECK:   vector.multi_reduction <add>, %{{.*}} : vector<1x4xf32> to vector<1xf32>
 //         CHECK: }
 //     CHECK-NOT: gpu.barrier
-//         CHECK: %[[r:.*]] = vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<1x1xf32>
+//         CHECK: %[[r:.*]] = vector.transfer_read {{.*}}: memref<1024x13xf32, #hal.descriptor_type<storage_buffer>>, vector<1x1xf32>
 //         CHECK: %[[r1:.*]] = vector.shape_cast %[[r:.*]] : vector<1x1xf32> to vector<1xf32>
 //         CHECK: arith.addf %[[v]], %[[r1]] : vector<1xf32>
 
@@ -87,7 +87,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-NOT: gpu.barrier
 // Local per-thread scf.for-based reduction.
 //         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<1xf32>) {
-//         CHECK:   vector.transfer_read {{.*}} memref<8x64xf32>, vector<1xf32>
+//         CHECK:   vector.transfer_read {{.*}} memref<8x64xf32, #hal.descriptor_type<storage_buffer>>, vector<1xf32>
 //         CHECK:   arith.addf {{.*}} : vector<1xf32>
 // No barrier within the loop.
 //     CHECK-NOT:   gpu.barrier
@@ -175,7 +175,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   %[[SQRT_VEC:.*]] = math.sqrt %[[RES_VEC]] : vector<1xf32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
-//         CHECK:     vector.transfer_write %[[SQRT_VEC]], {{.*}} : vector<1xf32>, memref<8xf32>
+//         CHECK:     vector.transfer_write %[[SQRT_VEC]], {{.*}} : vector<1xf32>, memref<8xf32, #hal.descriptor_type<storage_buffer>>
 //         CHECK:   gpu.barrier
 
 // -----
@@ -444,21 +444,21 @@ hal.executable @reduction_2d_trailing_elementwise_static_dispatch_0 {
 //
 // Loop vector<4> + tail vector<2> reduction part run sequentially.
 //   CHECK: scf.for {{.*}} -> (vector<1xf32>) {
-//   CHECK:   vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<128x10xf32>, vector<1x4xf32>
+//   CHECK:   vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<128x10xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
 //   CHECK:   vector.multi_reduction <add>, {{.*}} [1] : vector<1x4xf32> to vector<1xf32>
 //   CHECK:   scf.yield %{{.*}} : vector<1xf32>
 //   CHECK: }
-//   CHECK: vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<128x10xf32>, vector<1x2xf32>
+//   CHECK: vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<128x10xf32, #hal.descriptor_type<storage_buffer>>, vector<1x2xf32>
 //   CHECK: vector.multi_reduction <add>, {{.*}} [1] : vector<1x2xf32> to vector<1xf32>
 //   CHECK: vector.broadcast {{.*}} : vector<1xf32> to vector<1x4xf32>
 //
 // Loop vector<4> + tail vector<2> writeback part run sequentially.
 //   CHECK: scf.for {{.*}} {
-//   CHECK:   vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<128x10xf32>, vector<1x4xf32>
+//   CHECK:   vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<128x10xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
 //   CHECK:   arith.divf {{.*}} : vector<1x4xf32>
-//   CHECK:   vector.transfer_write {{.*}} {in_bounds = [true, true]} : vector<1x4xf32>, memref<1x8xf32, strided<[10, 1], offset: ?>>
+//   CHECK:   vector.transfer_write {{.*}} {in_bounds = [true, true]} : vector<1x4xf32>, memref<1x8xf32, strided<[10, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //   CHECK: }
 //   CHECK: vector.broadcast {{.*}} : vector<1xf32> to vector<1x2xf32>
 //   CHECK: arith.divf {{.*}} : vector<1x2xf32>
-//   CHECK: vector.transfer_write {{.*}} {in_bounds = [true, true]} : vector<1x2xf32>, memref<1x10xf32, strided<[10, 1], offset: ?>>
+//   CHECK: vector.transfer_write {{.*}} {in_bounds = [true, true]} : vector<1x2xf32>, memref<1x10xf32, strided<[10, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //   CHECK: gpu.barrier

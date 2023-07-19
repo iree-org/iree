@@ -356,43 +356,6 @@ def IREEEliminateEmptyTensorsOp : Op<
   }];
 }
 
-def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
-    "iree.erase_hal_descriptor_type_from_memref",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Erase #hal.descriptor_type from MemRef memory space to ignore all IREE
-    memory space planning. This is meant to ease transitioning given that
-    various LLVM conversion upstream patterns assumes numeric memory space,
-    especially the default 0.
-
-    Return modes:
-    =============
-    The pass is ran on all FuncOp nested under the top-level op on which
-    the transform dialect interpreter pass is applied.
-
-    If any of the pass on any of the FuncOp fails, the transformation
-    definitely fails. Otherwise the transformation succeeds.
-
-    This transform does not consume the target handle.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs);
-
-  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
