@@ -28,6 +28,11 @@ ireeCompilerRegisterDialects(MlirDialectRegistry registry);
 
 // Gets the MlirContext that the session manages. The context is owned by the
 // session and valid until it is destroyed.
+// This implicitly "activates" the session: make sure that any configuration
+// (flags, etc) has been done prior. Activation is lazy and is usually done
+// on the first use of the context (i.e. for parsing a source in an
+// invocation) but API access like this forces it.
+// Returns a NULL context if it has already been stolen or if activation fails.
 MLIR_CAPI_EXPORTED MlirContext
 ireeCompilerSessionBorrowContext(iree_compiler_session_t *session);
 
@@ -36,6 +41,11 @@ ireeCompilerSessionBorrowContext(iree_compiler_session_t *session);
 // then {nullptr} is returned. Upon return, it is up to the caller to destroy
 // the context and ensure that its lifetime extends at least as long as the
 // session remains in use.
+// This implicitly "activates" the session: make sure that any configuration
+// (flags, etc) has been done prior. Activation is lazy and is usually done
+// on the first use of the context (i.e. for parsing a source in an
+// invocation) but API access like this forces it.
+// Returns a NULL context if it has already been stolen or if activation fails.
 MLIR_CAPI_EXPORTED MlirContext
 ireeCompilerSessionStealContext(iree_compiler_session_t *session);
 

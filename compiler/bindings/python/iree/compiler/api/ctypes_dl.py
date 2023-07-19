@@ -174,8 +174,9 @@ class Session:
             context_void = _dylib.ireeCompilerSessionStealContext(self._session_p)
             if not context_void:
                 raise RuntimeError(
-                    "Context already released. "
-                    "This is an internal error and likely involves a memory leak (at a minimum)."
+                    "Session context could not be initialized. This either indicated"
+                    "an error setting it up or an attempt to steal the context "
+                    "multiple times (which could indicate a memory leak)."
                 )
             context_cp = PyCapsule_New(context_void, MLIR_PYTHON_CAPSULE_CONTEXT, None)
             self._owned_context = ir.Context._CAPICreate(context_cp)
