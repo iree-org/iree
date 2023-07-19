@@ -1507,15 +1507,18 @@ public:
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ConstantOp constOp, OpAdaptor /*adaptor*/,
                   ConversionPatternRewriter &rewriter) const final {
-    auto valueAttr = llvm::cast<DenseElementsAttr>(constOp.getValue());
-    auto type =
-        llvm::cast<ShapedType>(typeConverter->convertType(constOp.getType()));
-    if (type != constOp.getType()) {
-      // Signedness conversion.
-      valueAttr = valueAttr.mapValues(type.getElementType(),
-                                      [](const APInt &i) { return i; });
+    auto replacementType =
+        cast<ShapedType>(typeConverter->convertType(constOp.getType()));
+    ElementsAttr replacementAttr = constOp.getValue();
+    if (replacementType != constOp.getType()) {
+      if (auto denseAttr = dyn_cast<DenseElementsAttr>(replacementAttr)) {
+        // Signedness conversion.
+        replacementAttr = denseAttr.mapValues(replacementType.getElementType(),
+                                              [](const APInt &i) { return i; });
+      }
     }
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, type, valueAttr);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, replacementType,
+                                                   replacementAttr);
     return success();
   }
 };
