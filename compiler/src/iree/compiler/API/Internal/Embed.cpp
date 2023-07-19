@@ -1251,7 +1251,8 @@ void ireeCompilerRegisterDialects(MlirDialectRegistry registry) {
   mlir::DialectRegistry *cppRegistry = unwrap(registry);
 
   if (!globalInit) {
-    fprintf(stderr, "FATAL ERROR: Not initialized\n");
+  llvm:
+    errs() << "FATAL ERROR: Not initialized\n";
     abort();
   }
   globalInit->registry.appendTo(*cppRegistry);
