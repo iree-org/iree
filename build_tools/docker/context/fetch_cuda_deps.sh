@@ -25,10 +25,10 @@
 #   ./fetch_cuda_deps.sh /usr/local/iree_cuda_deps
 set -e
 
-machine=$(uname -m)
-if [[ $machine == aarch64 ]]; then
-  echo "CUDA for ${machine} is not supported yet."
-  exit 0
+ARCH="$(uname -m)"
+if [[ "${ARCH}" == "aarch64" ]]; then
+  echo "ERROR: Script does not support ${ARCH}."
+  exit 1
 fi
 
 TARGET_DIR="$1"

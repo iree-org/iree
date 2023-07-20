@@ -14,16 +14,15 @@ fi
 
 BAZEL_VERSION="$(cat .bazelversion)"
 
-# We could do the whole apt install dance, but this technique works across a
-# range of platforms, allowing us to use a single script. See
-# https://bazel.build/install/ubuntu#binary-installer
-machine=$(uname -m)
-if [ "$machine" == "aarch64" ]; then
-  machine="arm64"
+ARCH="$(uname -m)"
+if [[ "${ARCH}" == "aarch64" ]]; then
+  ARCH="arm64"
 fi
 
+# We could do the whole apt install dance, but this technique works across a
+# range of platforms.
 curl --silent --fail --show-error --location \
-  "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-linux-${machine}" \
+  "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-linux-${ARCH}" \
   --output /usr/bin/bazel
 chmod +x /usr/bin/bazel
 

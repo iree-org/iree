@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # 20.04
-FROM ubuntu@sha256:7bdccf116db125b3e6e39eb67ca9e2ae890386acf95a13a4e8b69466b6eba5e2
+FROM --platform=linux/arm64 ubuntu@sha256:7bdccf116db125b3e6e39eb67ca9e2ae890386acf95a13a4e8b69466b6eba5e2
 
 SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
 
@@ -16,19 +16,8 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
 WORKDIR /install-basics
-# Useful utilities for building child images. Best practices would tell us to
-# use multi-stage builds
-# (https://docs.docker.com/develop/develop-images/multistage-build/) but it
-# turns out that Dockerfile is a thoroughly non-composable awful format and that
-# doesn't actually work that well. These deps are pretty small.
-RUN apt-get update \
-  && apt-get install -y \
-    git \
-    unzip \
-    wget \
-    curl \
-    gnupg2 \
-    lsb-release
+COPY build_tools/docker/context/install_basics.sh ./
+RUN ./install_basics.sh && rm -rf /install-basics
 
 # Install the oldest supported compiler tools
 ARG LLVM_VERSION=9

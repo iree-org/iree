@@ -9,10 +9,10 @@ set -euo pipefail
 
 CMAKE_VERSION="$1"
 
-machine=$(uname -m)
+ARCH="$(uname -m)"
 
 curl --silent --fail --show-error --location \
-    "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-${machine}.sh" \
+    "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-${ARCH}.sh" \
     --output cmake-installer.sh
 
 chmod +x cmake-installer.sh
