@@ -655,13 +655,14 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (consumerLinalgOp.isDpsInput(&operand)) {
-    // Only fuse on inputs if both ops are generic ops.
-    if (!isa<linalg::GenericOp>(consumer) ||
-        !isa<linalg::GenericOp>(producer)) {
-      return false;
-    }
-  } else if (!consumerLinalgOp.isDpsInit(&operand)) {
+  /*   if (consumerLinalgOp.isDpsInput(&operand)) {
+      // Only fuse on inputs if both ops are generic ops.
+      if (!isa<linalg::GenericOp>(consumer) ||
+          !isa<linalg::GenericOp>(producer)) {
+        return false;
+      }
+    } else */
+  if (!consumerLinalgOp.isDpsInit(&operand)) {
     return false;
   }
 
