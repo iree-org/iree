@@ -422,12 +422,20 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
 
 namespace {
 
+using TargetPredicate = std::function<bool(IREE::HAL::ExecutableTargetAttr)>;
+
 template <typename OpType>
 struct LowerToUKernelPattern : OpRewritePattern<OpType> {
-  using OpRewritePattern<OpType>::OpRewritePattern;
+  LowerToUKernelPattern(MLIRContext *context,
+                        TargetPredicate targetPredicate = {})
+      : OpRewritePattern<OpType>(context), targetPredicate(targetPredicate) {}
 
   LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
+    if (targetPredicate &&
+        !targetPredicate(IREE::HAL::ExecutableTargetAttr::lookup(op))) {
+      return failure();
+    }
     FailureOr<IREE::Codegen::UKernelOpInterface> ukernelOp =
         matchDAGForUKernel(rewriter, op);
     if (failed(ukernelOp)) {
@@ -437,6 +445,8 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
     rewriter.replaceOp(op, ukernelOp.value()->getResults());
     return success();
   }
+
+  TargetPredicate targetPredicate;
 };
 
 } // namespace
@@ -444,11 +454,34 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
 void LLVMCPULowerToUKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
-                  LowerToUKernelPattern<tensor::PackOp>,
-                  LowerToUKernelPattern<tensor::UnPackOp>,
-                  LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
-      context);
+  // Enabling a lowering of an op to a microkernel is a trade-off between the
+  // potential performance advantage of a microkernel over pure code generation
+  // for that op, and the potential benefits of fusions. Indeed, once an op
+  // lowered into a microkernel, it will never be fused at any MLIR level.
+  // Since microkernels are linked as bitcode, they will still undergo LTO-like
+  // optimization in their calling contexts, but we shouldn't expect this to
+  // achieve similar results as fusing structured ops.
+
+  // These patterns are unconditionally enabled, because we have strong evidence
+  // that it is difficult for codegen to consistently approach microkernels
+  // performance, and that consideration overrides the benefit of fusions for
+  // these ops.
+  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>>(context);
+  // These patterns could in principle be used on LLVMCPU, not just VMVX, but
+  // we choose not to, for two reasons:
+  // 1. Codegen for these ops is thought to be good enough, that we do not
+  //    really need microkernels.
+  // 2. Fusions matter particularly for pack/unpack ops due to the memcpy-like
+  //    nature of these ops and the typical patterns ML workload offering
+  //    fusions opportunities there. The combinatorics of what could get fused
+  //    there seem unbounded, so any attempt to add microkernels for fusions
+  //    would have difficulty scaling.
+  patterns.insert<LowerToUKernelPattern<tensor::PackOp>,
+                  LowerToUKernelPattern<tensor::UnPackOp>>(context,
+                                                           isVMVXBackend);
+  // These patterns are inherently specific to the VMVX backend.
+  patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
+      context, isVMVXBackend);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
