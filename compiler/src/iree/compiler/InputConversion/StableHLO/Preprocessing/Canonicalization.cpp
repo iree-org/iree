@@ -1017,19 +1017,20 @@ struct ZeroExtentTensorCanon final : RewritePattern {
 
     // If the result is a zero-extent tensor, replace the whole op with an empty
     // tensor.
+    bool didUpdate = false;
     for (auto result : op->getResults()) {
       auto resultType = isZeroExtent(result.getType());
       if (!resultType) {
         continue;
       }
-      result.replaceAllUsesWith(rewriter.create<tensor::EmptyOp>(
-          loc, resultType->getShape(), resultType->getElementType()));
-      return success();
+      rewriter.replaceAllUsesWith(result, rewriter.create<tensor::EmptyOp>(
+                                              loc, resultType->getShape(),
+                                              resultType->getElementType()));
+      didUpdate = true;
     }
 
     // If one of the operands is a zero-extent tensor, replace the operand with
     // an empty tensor.
-    bool didUpdate = false;
     for (OpOperand &operand : op->getOpOperands()) {
       auto operandType = isZeroExtent(operand.get().getType());
       if (!operandType || operand.get().getDefiningOp<tensor::EmptyOp>()) {
