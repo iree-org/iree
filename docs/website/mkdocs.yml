@@ -19,19 +19,17 @@ theme:
 
   features:
     - content.code.annotate # Allow inline annotations
-    - content.code.copy     # Enable copy button
-    - content.tabs.link     # Link content tabs across site (e.g. Windows/Linux)
+    - content.code.copy # Enable copy button
+    - content.tabs.link # Link content tabs across site (e.g. Windows/Linux)
 
-    - navigation.instant  # Ajax-style dynamic loading (faster)
+    - navigation.instant # Ajax-style dynamic loading (faster)
     - navigation.tracking # Update URL in address bar with the active anchor
     - navigation.sections # Group sections without collapsible buttons
-    - navigation.expand   # Start sections expanded
-    - navigation.tabs     # Show primary sections in tabs below the header
-    - navigation.top      # "Back to top" button
+    - navigation.expand # Start sections expanded
+    - navigation.tabs # Show primary sections in tabs below the header
+    - navigation.tabs.sticky # Keep tabs visible at the top when scrolled
+    - navigation.top # "Back to top" button
     - navigation.indexes  # Section names can link to index.md pages
-
-    # Disabled options (consider enabling as the site changes)
-    # - navigation.tabs.sticky # Keep tabs visible at the top when scrolled
 
     - toc.follow # Scroll the TOC panel to follow the reader
 

@@ -8,11 +8,6 @@ icon: simple/python
 
 # Python bindings
 
-!!! info
-
-    API reference pages for IREE's runtime and compiler Python APIs are hosted on
-    [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
-
 ## Overview
 
 IREE offers Python bindings split into several packages, covering different
@@ -102,21 +97,19 @@ To use IREE's Python bindings, you will first need to install
 See [Building Python bindings](../../building-from-source/getting-started.md#python-bindings)
 page for instructions for building from source.
 
-## Using the Python bindings
+## Usage
 
-API reference pages for IREE's runtime and compiler Python APIs are hosted on
-[readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
+!!! info "Info - API reference pages"
 
-Check out the samples in IREE's
-[samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
-and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
-examples using the Python APIs.
+    API reference pages for IREE's runtime and compiler Python APIs are hosted on
+    [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
 
-### Quickstart
+    Documentation for the MLIR compiler Python APIs can be found at
+    [https://mlir.llvm.org/docs/Bindings/Python/](https://mlir.llvm.org/docs/Bindings/Python/).
+
+### Compile a program
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
-
-Compile a program:
 
 ```python
 from iree import compiler as ireec
@@ -137,7 +130,9 @@ compiled_flatbuffer = ireec.tools.compile_str(
     target_backends=["vmvx"])
 ```
 
-Run a compiled program:
+### Run a compiled program
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
 
 ```python
 from iree import runtime as ireert
@@ -157,3 +152,10 @@ f = ctx.modules.arithmetic["simple_mul"]
 results = f(arg0, arg1).to_host()
 print("Results:", results)
 ```
+
+### Samples
+
+Check out the samples in IREE's
+[samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
+and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
+examples using the Python APIs.
