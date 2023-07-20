@@ -247,11 +247,21 @@ if __name__ == "__main__":
             # access in builds.
             # We're assuming this is being run from the root of the repository.
             # FIXME: make this more robust to where it is run from.
-            cmd = ["docker", "buildx", "build", "--file", image_path, "--load"]
-            if image == "base-arm64":
-                cmd.extend(["--platform", "linux/arm64"])
-            cmd.extend(["--tag", tagged_image_url, "."])
-            utils.run_command(cmd, dry_run=args.dry_run)
+            utils.run_command(
+                [
+                    "docker",
+                    "buildx",
+                    "build",
+                    "--file",
+                    image_path,
+                    "--load",
+                    "--tag",
+                    tagged_image_url,
+                    ".",
+                ],
+                dry_run=args.dry_run,
+            )
+
 
             utils.run_command(
                 ["docker", "push", tagged_image_url], dry_run=args.dry_run
