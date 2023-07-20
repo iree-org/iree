@@ -13,6 +13,10 @@
 extern "C" {
 #endif  // __cplusplus
 
+// `pack` microkernel. Currently only used in the VMVX backend, not used in the
+// LLVMCPU backend, because codegen is thought to be good enough and because
+// fusions really matter here.
+
 typedef struct iree_uk_pack_params_t {
   const void* in_buffer;
   iree_uk_index_t in_offset;

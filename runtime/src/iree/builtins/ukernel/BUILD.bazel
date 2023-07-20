@@ -108,6 +108,14 @@ if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 [iree_bitcode_library(
     name = "ukernel_bitcode_%sbit_base" % bitness,
     srcs = [
+        # Note: only some of these ukernels are actually used in LLVMCPU, which
+        # is the backend that consumes this bitcode, while other ukernels are
+        # only used in VMVX, which links to the native build, not bitcode.
+        # We still keep all ukernels here to ensure that they all build as
+        # bitcode, so we could easily let LLVMCPU use them at any time. This
+        # unused bitcode should be only a small inflation of the IREE compiler
+        # (where it is embedded as data). It should have no effect on generated
+        # modules.
         "mmt4d.c",
         "mmt4d_tile.c",
         "pack.c",
