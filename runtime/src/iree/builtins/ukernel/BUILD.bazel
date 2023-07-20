@@ -27,7 +27,6 @@ iree_runtime_cc_library(
 
 internal_headers = [
     "common.h",
-    "elementwise.h",
     "exported_bits.h",
     "mmt4d.h",
     "mmt4d_internal.h",
@@ -59,7 +58,6 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "ukernel_noweak",
     srcs = [
-        "elementwise.c",
         "mmt4d.c",
         "mmt4d_tile.c",
         "pack.c",
