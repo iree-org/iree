@@ -35,8 +35,7 @@ void iree_hal_cuda2_event_retain(iree_hal_cuda2_event_t* event);
 
 // Releases the given |event| by decreasing its reference count.
 //
-// Afterwards releasing, if no other outstanding owner, |event| will be returned
-// to its owning pool.
+// |event| will be returned to its owning pool when the reference count is 0.
 void iree_hal_cuda2_event_release(iree_hal_cuda2_event_t* event);
 
 //===----------------------------------------------------------------------===//
@@ -50,7 +49,7 @@ typedef struct iree_hal_cuda2_event_pool_t iree_hal_cuda2_event_pool_t;
 
 // Allocates a new event pool with up to |available_capacity| events.
 //
-// Extra events requests beyond the capability are directly created and
+// Extra events requested beyond the capability are directly created and
 // destroyed without pooling.
 iree_status_t iree_hal_cuda2_event_pool_allocate(
     const iree_hal_cuda2_dynamic_symbols_t* symbols,

@@ -265,7 +265,7 @@ static iree_status_t iree_hal_cuda2_semaphore_wait(
   }
   iree_hal_cuda2_timepoint_pool_release(semaphore->timepoint_pool, 1,
                                         &timepoint);
-  return iree_ok_status();
+  return status;
 }
 
 // Handles device signal timepoints on the host when the |semaphore| timeline

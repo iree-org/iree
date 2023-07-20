@@ -70,7 +70,7 @@ the overall approach would be to:
 * Ordering: we need to defer releasing the workload to the GPU until the
   semaphore waits are reached on the host, or we can have some device
   `CUevent` to wait on.
-* Direction: host to host and host to device is mssing; we can support that
+* Direction: host to host and host to device is missing; we can support that
   with host synchronization mechanisms.
 
 #### Signal to wait analysis
@@ -98,11 +98,12 @@ need to implement a deferred/pending actions queue.
 GPU signals can only be through a `CUevent` object, which has a binary state.
 We need to advance the timeline too. One way is to use `cuLaunchHostFunc()`
 to perform the advance from the CPU side. This additionally would mean we can
-reuse the logic form CPU signal to unblock CPU waits.
+reuse the logic form CPU signaling to unblock CPU waits.
 
-For GPU waits, we can also leverage the same logic for CPU signals and deferred
-GPU queue actions. Though this is performant, given we are involving the CPU
-for GPU internal synchronization. We want to use `CUevent` for that:
+For GPU waits, we can also leverage the same logic--using CPU signaling to
+unblock deferred GPU queue actions. Though this is performant, given that
+the CPU is involved for GPU internal synchronization. We want to use `CUevent`
+instead:
 
 * We keep track of all GPU signals in the timeline. Once we see a GPU wait
   request, try to scan the timeline to find a GPU signal that advances the
@@ -113,10 +114,10 @@ for GPU internal synchronization. We want to use `CUevent` for that:
   accordingly--submitting immediately or associating the `CUevent`.
   This would also guarantee the requirement of `CUevent`--recording should
   happen before waiting.
-* We can use the same `CUevent` to unblock multiple GPU waits; that's allowed.
-  Though it would mean we need to be careful regarding `CUevent` lifetime
+* We can use the same `CUevent` to unblock multiple GPU waits. That's allowed,
+  though it would mean we need to be careful regarding `CUevent` lifetime
   management. Here we can use reference counting to see how many timepoints
-  are using it. And automatically return to a pool once done.
+  are using it and automatically return to a pool once done.
 
 Another problem is that per the `cuLaunchHostFunc()` doc, "the function will
 be called after currently enqueued work and will block work added after it."
@@ -148,7 +149,7 @@ To summarize, we need the following data structures to implement HAL semaphore:
 * `iree_hal_cuda2_queue_action_t`: a pending queue action (kernel launch or
   stream-ordered allocation).
 * `iree_hal_cuda2_pending_queue_actions_t`: a data structure to manage pending
-  queue actions. It provides APIs to enqueue actions, and dvance the queue on
+  queue actions. It provides APIs to enqueue actions, and advance the queue on
   demand--queue actions are released to the GPU when all their wait semaphores
   are signaled past the desired value, or we can have a `CUevent` object already
   recorded to some `CUstream` to wait on.

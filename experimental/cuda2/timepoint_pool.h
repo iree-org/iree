@@ -83,7 +83,7 @@ iree_status_t iree_hal_cuda2_timepoint_pool_allocate(
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_cuda2_timepoint_pool_t** out_timepoint_pool);
 
-// Deallocates an timepoint pool and destroys all timepoints.
+// Deallocates a timepoint pool and destroys all timepoints.
 //
 // All timepoints that were acquired from the pool must have already been
 // released back to it prior to deallocation.
