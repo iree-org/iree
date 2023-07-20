@@ -469,8 +469,8 @@ void BufferInstance::BindApi(PJRT_Api* api) {
       +[](PJRT_Buffer_ReadyEvent_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_ReadyEvent");
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
-    args->event =
-        reinterpret_cast<PJRT_Event*>(new EventInstance(buffer->ready_fence()));
+    args->event = reinterpret_cast<PJRT_Event*>(
+        new EventInstance(retain_ref(buffer->ready_fence())));
     return nullptr;
   };
   // TODO: Rework the API to be Aliases(b1, b2) to let the plugin explicitly
@@ -521,7 +521,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
     void* dst;
     size_t size;
     // Fence will be signaled when copy to host is complete.
-    iree_hal_fence_t* copy_done_fence;
+    iree::vm::ref<iree_hal_fence_t> copy_done_fence;
   };
 
   //  Configure a default structure that writes directly to dst.
@@ -582,21 +582,20 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       /*transfer_count=*/1, &transfer_command, &transfer_cb));
   dst_buffer.reset();
 
-  iree_hal_semaphore_t* semaphore;
+  iree::vm::ref<iree_hal_semaphore_t> semaphore;
   IREE_RETURN_IF_ERROR(
       iree_hal_semaphore_create(device_.device(), 0ull, &semaphore));
 
   // Signaled when `dst_buffer` is ready to be consumed.
-  iree_hal_fence_t* dst_buffer_ready_fence;
+  iree::vm::ref<iree_hal_fence_t> dst_buffer_ready_fence;
   IREE_RETURN_IF_ERROR(IreeApi::hal_fence_create_at(
-      semaphore, 1ull, device_.client().host_allocator(),
+      semaphore.get(), 1ull, device_.client().host_allocator(),
       &dst_buffer_ready_fence));
 
   // Signaled when copy to host is complete.
-  iree_hal_fence_t* copy_done_fence;
   IREE_RETURN_IF_ERROR(IreeApi::hal_fence_create_at(
-      semaphore, 2ull, device_.client().host_allocator(), &copy_done_fence));
-  copy_to_host_data->copy_done_fence = copy_done_fence;
+      semaphore.get(), 2ull, device_.client().host_allocator(),
+      &(copy_to_host_data->copy_done_fence)));
 
   auto dst_buffer_callback = [](PJRT_Error* error, void* user_data) {
     const ErrorInstance* error_instance = ErrorInstance::FromError(error);
@@ -607,9 +606,10 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       if (copy_data->alloc) {
         std::memcpy(copy_data->dst, copy_data->aligned, copy_data->size);
       }
-      iree_hal_fence_signal(copy_data->copy_done_fence);
+      iree_hal_fence_signal(copy_data->copy_done_fence.get());
     } else {
-      iree_hal_fence_fail(copy_data->copy_done_fence, error_instance->status());
+      iree_hal_fence_fail(copy_data->copy_done_fence.get(),
+                          error_instance->status());
     }
 
     if (copy_data->alloc) {
@@ -630,17 +630,19 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
     delete ErrorInstance::FromError(error);
   };
 
-  auto dst_buffer_ready_event = new EventInstance(dst_buffer_ready_fence);
+  auto dst_buffer_ready_event =
+      new EventInstance(retain_ref(dst_buffer_ready_fence));
   dst_buffer_ready_event->OnReady(dst_buffer_callback, copy_to_host_data);
 
-  auto copy_done_event = new EventInstance(copy_done_fence);
+  auto copy_done_event =
+      new EventInstance(retain_ref(copy_to_host_data->copy_done_fence));
   copy_done_event->OnReady(copy_done_callback, dst_buffer_ready_event);
 
   IREE_RETURN_IF_ERROR(IreeApi::hal_device_queue_execute(
       device_.device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(ready_fence_.get()),
       /*signal_semaphore_list=*/
-      iree_hal_fence_semaphore_list(dst_buffer_ready_fence),
+      iree_hal_fence_semaphore_list(dst_buffer_ready_fence.get()),
       /*command_buffer_count=*/1, &transfer_cb));
 
   *out_done_event = copy_done_event;
@@ -1371,25 +1373,25 @@ std::tuple<uint64_t, uint64_t> ClientInstance::AdvanceTimeline() {
 // EventInstance
 //===----------------------------------------------------------------------===//
 
-EventInstance::EventInstance(iree_hal_fence_t* fence) : is_ready_(false) {
-  if (fence == nullptr) {
+EventInstance::EventInstance(iree::vm::ref<iree_hal_fence_t> fence)
+    : is_ready_(false) {
+  if (!fence) {
     is_ready_ = true;
     return;
   }
 
-  iree_hal_fence_retain(fence);
   {
     std::lock_guard<std::mutex> guard(lock_);
     // Create a thread that waits on the fence and executes the callbacks when
     // the fence is ready.
     signal_thread_ = std::make_unique<std::thread>(
-        [](EventInstance* event_instance, iree_hal_fence_t* fence) {
+        [](EventInstance* event_instance,
+           iree::vm::ref<iree_hal_fence_t> fence) {
           iree_status_t wait_status =
-              iree_hal_fence_wait(fence, iree_infinite_timeout());
-          iree_hal_fence_release(fence);
+              iree_hal_fence_wait(fence.get(), iree_infinite_timeout());
           event_instance->SignalReady(wait_status);
         },
-        this, fence);
+        this, std::move(fence));
   }
 }
 
@@ -1861,7 +1863,7 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
 
     if (args->device_complete_events) {
       args->device_complete_events[dev_index] =
-          *(new EventInstance(inv.wait_fence.get()));
+          *(new EventInstance(retain_ref(inv.wait_fence)));
     }
   }
 

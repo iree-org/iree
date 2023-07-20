@@ -247,7 +247,7 @@ class DeviceInstance {
 
 class EventInstance {
  public:
-  EventInstance(iree_hal_fence_t* fence);
+  EventInstance(iree::vm::ref<iree_hal_fence_t> fence);
   ~EventInstance();
   operator PJRT_Event*() { return reinterpret_cast<PJRT_Event*>(this); }
   static void BindApi(PJRT_Api* api);
