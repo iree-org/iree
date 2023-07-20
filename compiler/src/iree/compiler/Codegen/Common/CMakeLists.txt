@@ -118,6 +118,7 @@ iree_cc_library(
     "Transforms.h"
     "UserConfig.h"
   SRCS
+    "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"

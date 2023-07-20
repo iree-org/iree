@@ -13,6 +13,13 @@ include "mlir/Pass/PassBase.td"
 // Common passes for all backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
+def AddFastMathFlags
+    : Pass<"iree-codegen-add-fast-math-flags", "LLVM::LLVMFuncOp"> {
+  let summary = "Add fast math flags to all the operations supporting them, "
+                "given a floating-point mode.";
+  let constructor = "mlir::iree_compiler::createAddFastMathFlagsPass()";
+}
+
 def BubbleUpOrdinalOps : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
   let summary = "Bubbles op ordinal ops to allow for workgroup count computation";
   let constructor = "mlir::iree_compiler::createBubbleUpOrdinalOpsPass()";

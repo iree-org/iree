@@ -143,6 +143,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "Common",
     srcs = [
+        "AddFastMathFlags.cpp",
         "BubbleUpOrdinalOps.cpp",
         "BufferizationAnalysis.cpp",
         "BufferizeCopyOnlyDispatchesPass.cpp",

@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -36,6 +37,8 @@ void addIREEComprehensiveBufferizePasses(
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+
+std::unique_ptr<OperationPass<LLVM::LLVMFuncOp>> createAddFastMathFlagsPass();
 
 /// Pass to bubble up ordinal operations to allow workgroup count computation
 /// based on slices to correlate back to workload computation.
