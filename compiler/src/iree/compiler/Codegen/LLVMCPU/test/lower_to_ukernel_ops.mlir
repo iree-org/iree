@@ -221,6 +221,18 @@ func.func @mmt4d_bf16bf16bf16(%arg0 : tensor<?x?x?x?xbf16>, %arg1 : tensor<?x?x?
 
 // -----
 
+// Check that tensor.pack is not lowered to a microkernel by default - it should
+// only be on VMVX.
+//      CHECK: func @pack_i8i8_default(
+//       CHECK: tensor.pack
+func.func @pack_i8i8_default(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?x7x8xi8>, %arg2 : i8) -> tensor<?x?x7x8xi8> {
+  %result = tensor.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+      : tensor<?x?xi8> -> tensor<?x?x7x8xi8>
+  func.return %result : tensor<?x?x7x8xi8>
+}
+
+// -----
+
 //      CHECK: func @pack_i8i8(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xi8>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x7x8xi8>
@@ -360,6 +372,18 @@ func.func @pack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?xf32>, %arg1 
   %result = tensor.pack %arg0 padding_value(%arg2 : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xf32> -> tensor<?x?x7x8xf32>
   func.return %result : tensor<?x?x7x8xf32>
+}
+
+// -----
+
+// Check that tensor.pack is not lowered to a microkernel by default - it should
+// only be on VMVX.
+// CHECK: func @unpack_f16f16_default
+// CHECK: tensor.unpack
+func.func @unpack_f16f16_default(%arg0 : tensor<?x?x7x8xf16>, %arg1 : tensor<?x?xf16>) -> tensor<?x?xf16> {
+  %result = tensor.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+      : tensor<?x?x7x8xf16> -> tensor<?x?xf16>
+  func.return %result : tensor<?x?xf16>
 }
 
 // -----
