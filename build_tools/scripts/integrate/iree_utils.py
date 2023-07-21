@@ -110,7 +110,7 @@ def git_check_if_branch_exists(branch_name, remote=None):
     args.append(full_name)
     output = git_exec(args, capture_output=True, quiet=True).strip()
     if output:
-	raise SystemExit(f"ERROR: {full_name} already exists.\n")
+        raise SystemExit(f"ERROR: {full_name} already exists.\n")
 
 
 def git_create_branch(
