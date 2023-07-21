@@ -59,6 +59,7 @@ UKERNEL_X86_64_AVX2_FMA_COPTS = [
     "-mavx",
     "-mavx2",
     "-mfma",
+    "-mf16c",
 ]
 
 iree_bitcode_library(

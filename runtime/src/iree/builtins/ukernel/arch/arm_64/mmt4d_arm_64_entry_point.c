@@ -45,6 +45,36 @@ iree_uk_mmt4d_select_tile_func_arm_64_f32f32f32(
   return 0;
 }
 
+static iree_uk_mmt4d_tile_func_t
+iree_uk_mmt4d_select_tile_func_arm_64_f16f16f32(
+    const iree_uk_mmt4d_params_t* params) {
+  if (params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
+    return iree_uk_mmt4d_tile_f16f16f32_8x8x1_arm_64;
+  }
+  return 0;
+}
+
+static iree_uk_mmt4d_tile_func_t
+iree_uk_mmt4d_select_tile_func_arm_64_f16f16f16(
+    const iree_uk_mmt4d_params_t* params) {
+  if (params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
+    return iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64;
+  }
+  return 0;
+}
+
+static iree_uk_mmt4d_tile_func_t
+iree_uk_mmt4d_select_tile_func_arm_64_bf16bf16f32(
+    const iree_uk_mmt4d_params_t* params) {
+  return 0;
+}
+
+static iree_uk_mmt4d_tile_func_t
+iree_uk_mmt4d_select_tile_func_arm_64_bf16bf16bf16(
+    const iree_uk_mmt4d_params_t* params) {
+  return 0;
+}
+
 static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arm_64_i8i8i32(
     const iree_uk_mmt4d_params_t* params) {
   if (params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
@@ -64,6 +94,14 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
   switch (iree_uk_mmt4d_type(params->flags)) {
     case iree_uk_mmt4d_type_f32f32f32:
       return iree_uk_mmt4d_select_tile_func_arm_64_f32f32f32(params);
+    case iree_uk_mmt4d_type_f16f16f32:
+      return iree_uk_mmt4d_select_tile_func_arm_64_f16f16f32(params);
+    case iree_uk_mmt4d_type_f16f16f16:
+      return iree_uk_mmt4d_select_tile_func_arm_64_f16f16f16(params);
+    case iree_uk_mmt4d_type_bf16bf16f32:
+      return iree_uk_mmt4d_select_tile_func_arm_64_bf16bf16f32(params);
+    case iree_uk_mmt4d_type_bf16bf16bf16:
+      return iree_uk_mmt4d_select_tile_func_arm_64_bf16bf16bf16(params);
     case iree_uk_mmt4d_type_i8i8i32:
       return iree_uk_mmt4d_select_tile_func_arm_64_i8i8i32(params);
     default:
