@@ -42,7 +42,7 @@ export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT="${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT:
 # Respect the user setting, default to no --tests-regex.
 export IREE_CTEST_TESTS_REGEX="${IREE_CTEST_TESTS_REGEX:-}"
 # Respect the user setting, default to no --label-regex
-export IREE_CTEST_LABEL_REGEX="${IREE_CTEST_LABEL_REGEX:-}"
+export IREE_CTEST_EXTRA_ARGS="${IREE_CTEST_EXTRA_ARGS:-}"
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with its directory.
@@ -138,8 +138,8 @@ if [[ -n "${IREE_CTEST_TESTS_REGEX}" ]]; then
   ctest_args+=("--tests-regex ${IREE_CTEST_TESTS_REGEX}")
 fi
 
-if [[ -n "${IREE_CTEST_LABEL_REGEX}" ]]; then
-  ctest_args+=("${IREE_CTEST_LABEL_REGEX}")
+if [[ -n "${IREE_CTEST_EXTRA_ARGS}" ]]; then
+  ctest_args+=("${IREE_CTEST_EXTRA_ARGS}")
 fi
 
 if [[ -n "${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT}" ]]; then

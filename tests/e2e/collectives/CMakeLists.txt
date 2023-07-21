@@ -13,7 +13,7 @@ endif()
 if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
   iree_py_test(
     NAME
-      collectives_test_single_rank
+      collectives_test_single_gpu
     SRCS
       "collectives_test.py"
     ARGS
@@ -27,7 +27,7 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
 
   iree_py_test(
     NAME
-      collectives_test_two_ranks
+      collectives_test_multi_gpu
     SRCS
       "collectives_test.py"
     ARGS
@@ -37,6 +37,8 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
     LABELS
       "requires-gpu-nvidia"
       "driver=cuda"
+      # The NCCL collectives backend requires 1 GPU per rank.
+      # To properly test for 2 ranks we need 2 GPUs.
       "device-count=2"
   )
 endif()

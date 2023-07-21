@@ -41,13 +41,26 @@ def prepare_shards_io_files(
     return input_filepaths, output_filepaths
 
 
-def run_shards(
+def run_ranks(
     num_ranks: int,
     module_filepath: str,
     function: str,
     inputs: List[List[ArrayLike]],
     driver: str,
 ) -> List[List[DeviceArray]]:
+    """
+    Start all ranks with mpirun.
+    On all ranks run the function |function| from the given module.
+    Parameters
+    ----------
+    inputs : Function inputs for all ranks.
+    Axis 0 is ranks. Axis 1 is arguments per rank.
+
+    Returns
+    -------
+    The output of the function for all ranks.
+    Axis 0 is ranks. Axis 1 is arguments per rank.
+    """
     with tempfile.TemporaryDirectory() as out_dir:
         input_filepaths, output_filepaths = prepare_shards_io_files(
             inputs=inputs, out_dir=out_dir
@@ -57,10 +70,11 @@ def run_shards(
         subprocess.check_call(
             [
                 "mpirun",
+                "--oversubscribe",
                 "-n",
                 str(num_ranks),
                 sys.executable,
-                os.path.join(os.path.dirname(__file__), "run_shard.py"),
+                os.path.join(os.path.dirname(__file__), "run_rank.py"),
                 f"--driver={driver}",
                 f"--module_filepath={module_filepath}",
                 f"--function={function}",
@@ -90,7 +104,7 @@ def run_test(
 
         num_ranks = len(inputs)
         # Ranks on the 0th axis.
-        outputs = run_shards(
+        outputs = run_ranks(
             num_ranks=num_ranks,
             function="all_reduce_sum",
             driver=args.driver,
