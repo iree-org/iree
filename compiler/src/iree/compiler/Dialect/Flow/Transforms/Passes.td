@@ -62,6 +62,12 @@ def DetachElementwiseFromNamedOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDetachElementwiseFromNamedOpsPass()";
 }
 
+def FoldUnitExtentDims :
+    InterfacePass<"iree-flow-fold-unit-extent-dims", "mlir::FunctionOpInterface"> {
+  let summary = "Fold unit extent dimension of operations";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFoldUnitExtentDimsPass()";
+}
+
 def FormDispatchRegions :
     InterfacePass<"iree-flow-form-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
