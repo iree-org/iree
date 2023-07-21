@@ -17,7 +17,10 @@ namespace iree_compiler {
 /// have bank conflicts when reading 2D shapes within shared memory.
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
                      int64_t paddingSizeBits) {
-  int64_t innerDim = allocOp.getType().getShape().back();
+  auto allocOpShape = allocOp.getType().getShape();
+  if (allocOpShape.empty())
+    return;
+  int64_t innerDim = allocOpShape.back();
   if (ShapedType::isDynamic(innerDim))
     return;
   Type elType = allocOp.getType().getElementType();
